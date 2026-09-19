@@ -295,7 +295,7 @@ describe.if(pgAvailable)('plugin contributions', () => {
   });
 
   describe('ContextAssembler — the non-generation purposes', () => {
-    const briefScope = { scopeType: 'brief' as const, scopeRef: 'chapter:3', createdAt: new Date() };
+    const briefScope = { scopeType: 'brief' as const, createdAt: new Date() };
 
     it('should leave an outline pack byte-identical to the same pack assembled with no policy at all', async () => {
       const projectId = await seedProject();

@@ -255,7 +255,7 @@ export class RefineService {
         return this.contextAssembler.forOutline(projectId, chapter, { policy: resolver.for({ role: 'outline', chapter }) });
       case 'chat': {
         if (!query.scopeType) throw AppErrorCode.CHT_003.create();
-        const session = { scopeType: query.scopeType as Refinement.ChatScope, scopeRef: query.scopeRef ?? null, createdAt: new Date() };
+        const session = { scopeType: query.scopeType as Refinement.ChatScope, createdAt: new Date() };
         return this.contextAssembler.forChatTurn(projectId, session, { policy: resolver.for({ role: 'chat' }) });
       }
       case 'arc_plan': {

@@ -43,7 +43,6 @@ export type IdeationSeedInput = Pick<schema.Ideation.StorySeed, 'projectId' | 'f
 
 export interface ChatScopeInput {
   scopeType: schema.Refinement.ChatScope;
-  scopeRef: string | null;
   createdAt: Date;
 }
 
@@ -51,13 +50,8 @@ export const DEFAULT_BUDGET = 24_000;
 export const PREV_ENDING_TAIL = 500;
 export const FULL_CAST_MAX = 5;
 
-// Refinement budgets (design §10.4). History is prompt messages, not pack text, so the chat pack
-// budget is stable + volatile-delta; the history budgets are enforced by ChatService compaction.
-export const CHAT_STABLE_BUDGET = 14_000;
-export const CHAT_VOLATILE_DELTA_BUDGET = 2_000;
-export const CHAT_PACK_BUDGET = CHAT_STABLE_BUDGET + CHAT_VOLATILE_DELTA_BUDGET;
-// The hub sees the whole project (catalog + full plan + pipeline status), so it gets catalog headroom
-// over the scoped chat budget (chat-hub design §6.1).
+// Refinement budgets (design §10.4). History is prompt messages, not pack text, so it does not count
+// against the pack; the history budgets are enforced by ChatService compaction.
 export const CHAT_HUB_BUDGET = 20_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
@@ -870,180 +864,44 @@ export class ContextAssembler {
   }
 
   /**
-   * Builds the pack for one chat turn (design §10.3): stable sections carry the scope's canon,
-   * volatile carries only the artifacts whose revision moved since the session started. History is
-   * NOT part of the pack — it rides as prompt messages so provider caching can extend across turns.
+   * Builds the pack for one chat turn (design §10.3): the stable segment is a whole-project index —
+   * premise, inventories, one-line summaries — with the lookup tools pulling full artifacts on demand
+   * (chat-revamp design §2.1). Volatile carries only the artifacts whose revision moved since the
+   * session started. History is NOT part of the pack — it rides as prompt messages so provider caching
+   * can extend across turns.
    */
   async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = session.scopeType === 'project' ? CHAT_HUB_BUDGET : CHAT_PACK_BUDGET;
-    const refValue = session.scopeRef?.includes(':') ? (session.scopeRef.split(':')[1] ?? '') : (session.scopeRef ?? '');
+    // An ideation session assembles through forIdeationTurn, which needs the seed row and the round the
+    // router chose — neither of which a chat-scope input carries. ChatService rejects the scope before it
+    // gets here; RefineService's /context/preview endpoint reaches this branch directly.
+    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
+
+    // Every other scope value, legacy rows included, is the hub (chat-revamp design D1).
+    const [project, docs, volumes, arcs, catalogText] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+      this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
+      this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId), orderBy: [schema.arcs.volumeKey, schema.arcs.ordinal] }),
+      this.catalogService.render(projectId),
+    ]);
 
     const sections: ContextSection[] = [];
-    let unresolvedRefs: string[] = [];
-
-    switch (session.scopeType) {
-      // The hub (chat-hub design §6.1): whole-project canon in the stable segment, live pipeline
-      // state in the volatile tail — the model is both story editor and showrunner here.
-      case 'project': {
-        const [project, docs, volumes, arcs, catalogText] = await Promise.all([
-          this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-          this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
-          this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-          this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId), orderBy: [schema.arcs.volumeKey, schema.arcs.ordinal] }),
-          this.catalogService.render(projectId),
-        ]);
-        if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-        if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
-        if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
-        if (arcs.length > 0) {
-          const lines = arcs.map(a => `${a.arcKey} [${a.volumeKey}] (chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'}, ${a.status}): ${a.title ?? a.objective ?? ''}`);
-          sections.push(asStable(makeSection('arc_inventory', lines.join('\n'), 'approved_intent', [])));
-        }
-        if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-        sections.push(makeSection('pipeline_status', await this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0), 'working', []));
-        break;
-      }
-      case 'novel': {
-        const [project, docs, volumes, catalogText] = await Promise.all([
-          this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-          this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
-          this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-          this.catalogService.render(projectId),
-        ]);
-        if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-        if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
-        if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
-        if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-        break;
-      }
-      case 'bible_document': {
-        const [section = '', ...rest] = refValue.split('/');
-        const [doc, siblings, catalogText] = await Promise.all([
-          this.db.query.bibleDocuments.findFirst({
-            where: and(
-              eq(schema.bibleDocuments.projectId, projectId),
-              eq(schema.bibleDocuments.section, section as schema.Bible.Section),
-              eq(schema.bibleDocuments.slug, rest.join('/')),
-            ),
-          }),
-          this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
-          this.catalogService.render(projectId),
-        ]);
-        if (doc) sections.push(asStable(makeSection('document', `${doc.section}/${doc.slug}\n\n${doc.body ?? ''}`, 'canonical', [`doc:${doc.section}/${doc.slug}`])));
-        if (siblings.length > 0)
-          sections.push(asStable(makeSection('doc_inventory', siblings.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
-        if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-        break;
-      }
-      case 'volume_plan': {
-        const [project, volumes] = await Promise.all([
-          this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-          this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-        ]);
-        if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-        if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeFull(v)).join('\n\n'), 'approved_intent', [])));
-        if (project?.skeletonCharacterArcs || project?.skeletonPowerCurve) {
-          const skeleton = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
-          sections.push(asStable(makeSection('skeleton', skeleton, 'canonical', [])));
-        }
-        break;
-      }
-      case 'volume':
-      case 'arc_plan': {
-        const [volume, allVolumes, arcs, catalogText] = await Promise.all([
-          this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, refValue)) }),
-          this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-          this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, refValue)), orderBy: schema.arcs.ordinal }),
-          this.catalogService.render(projectId),
-        ]);
-        if (volume) {
-          sections.push(asStable(makeSection('volume', this.renderVolumeFull(volume), 'approved_intent', [`volume:${volume.volumeKey}`])));
-          const neighbours = allVolumes.filter(v => Math.abs(v.ordinal - volume.ordinal) === 1 && v.epitome);
-          if (neighbours.length > 0)
-            sections.push(asStable(makeSection('memory', neighbours.map(v => `Vol ${v.ordinal} (${v.title ?? v.volumeKey}): ${v.epitome}`).join('\n'), 'canonical', [])));
-        }
-        if (arcs.length > 0) sections.push(asStable(makeSection('arcs', arcs.map(a => this.renderArcFull(a)).join('\n\n'), 'approved_intent', [])));
-        if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-        break;
-      }
-      case 'arc': {
-        const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, refValue)) });
-        if (arc) {
-          const [volume, siblings, briefs] = await Promise.all([
-            this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, arc.volumeKey)) }),
-            this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: schema.arcs.ordinal }),
-            arc.chapterStart !== null && arc.chapterEnd !== null
-              ? this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), between(schema.briefs.chapter, arc.chapterStart, arc.chapterEnd)) })
-              : Promise.resolve([]),
-          ]);
-          sections.push(asStable(makeSection('arc', this.renderArcFull(arc), 'approved_intent', [`arc:${arc.arcKey}`])));
-          if (volume) sections.push(asStable(makeSection('volume', this.renderVolumeFull(volume), 'approved_intent', [`volume:${volume.volumeKey}`])));
-          const hooks = siblings.filter(s => s.arcKey !== arc.arcKey && s.hook);
-          if (hooks.length > 0)
-            sections.push(
-              asStable(makeSection('sibling_hooks', hooks.map(s => `${s.arcKey} (chs ${s.chapterStart}–${s.chapterEnd}): ${s.hook}`).join('\n'), 'approved_intent', [])),
-            );
-          if (briefs.length > 0) sections.push(asStable(makeSection('briefs_list', briefs.map(b => `Ch ${b.chapter}: ${b.title ?? ''}`).join('\n'), 'approved_intent', [])));
-        }
-        break;
-      }
-      case 'brief': {
-        const chapter = parseInt(refValue, 10);
-        const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
-        if (brief) {
-          const contract = brief.endingContract ? `\n\nEnding contract: ${JSON.stringify(brief.endingContract)}` : '';
-          const refs = Array.isArray(brief.contextRefs) ? (brief.contextRefs as string[]) : [];
-          sections.push(
-            asStable(
-              makeSection('brief', `Ch ${brief.chapter}: ${brief.title ?? ''}\n\n${brief.body}${contract}\n\nContext refs: ${refs.join(', ')}`, 'approved_intent', [
-                `chapter:${chapter}`,
-              ]),
-            ),
-          );
-          const [arc, volume] = await Promise.all([
-            brief.arcKey ? this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, brief.arcKey)) }) : Promise.resolve(undefined),
-            brief.volumeKey
-              ? this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, brief.volumeKey)) })
-              : Promise.resolve(undefined),
-          ]);
-          if (arc) sections.push(asStable(makeSection('arc', this.renderArcFull(arc), 'approved_intent', [`arc:${arc.arcKey}`])));
-          if (volume)
-            sections.push(
-              asStable(makeSection('volume_objective', [volume.objective, volume.conflict].filter(Boolean).join('\n'), 'approved_intent', [`volume:${volume.volumeKey}`])),
-            );
-          if (refs.length > 0) {
-            const { resolved, unresolved } = await this.resolveRefs(projectId, refs);
-            unresolvedRefs = unresolved;
-            for (const section of resolved) sections.push(asStable(section));
-          }
-          // The chapter's actual prose: refining a drafted chapter is meaningless if the model can only
-          // see the brief, so the current draft rides along (working tier — it is not canon yet).
-          const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-          if (draft?.body) {
-            const { text } = truncateAtParagraph(draft.body, 8_000);
-            sections.push(asStable(makeSection('current_draft', `Ch ${chapter} draft (rev ${draft.revision}):\n\n${text}`, 'working', [`chapter:${chapter}`])));
-          }
-        }
-        break;
-      }
-      // An ideation session assembles through forIdeationTurn, which needs the seed row and the round the
-      // router chose — neither of which a chat-scope input carries. ChatService rejects the scope before it
-      // gets here; RefineService's /context/preview endpoint reaches this branch directly.
-      case 'ideation':
-        throw AppErrorCode.IDE_005.create();
-      default: {
-        const exhaustive: never = session.scopeType;
-        throw new Error(`Unhandled chat scope: ${String(exhaustive)}`);
-      }
+    if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
+    if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
+    if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
+    if (arcs.length > 0) {
+      const lines = arcs.map(a => `${a.arcKey} [${a.volumeKey}] (chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'}, ${a.status}): ${a.title ?? a.objective ?? ''}`);
+      sections.push(asStable(makeSection('arc_inventory', lines.join('\n'), 'approved_intent', [])));
     }
+    if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
+    sections.push(makeSection('pipeline_status', await this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0), 'working', []));
 
     // Volatile tail: artifacts whose revision moved since the session started — the model must know
     // the canon under discussion shifted beneath the conversation.
     const changed = await this.changedSince(projectId, session.createdAt);
     if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
 
-    const purpose = session.scopeType === 'project' ? 'chat_hub' : 'chat';
-    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, opts);
+    return this.finalize(projectId, 'chat_hub', null, sections, [], CHAT_HUB_BUDGET, opts);
   }
 
   /**
@@ -1519,20 +1377,6 @@ export class ContextAssembler {
       `Payoff: ${v.payoff ?? ''}`,
       Array.isArray(v.cast) && v.cast.length > 0 ? `Cast: ${(v.cast as string[]).join(', ')}` : '',
       v.body ?? '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  private renderArcFull(a: schema.Plan.Arc): string {
-    return [
-      `**${a.title ?? a.arcKey}** (${a.arcKey}, ${a.status}, chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'})${a.staleReason ? ` [STALE: ${a.staleReason}]` : ''}`,
-      `Objective: ${a.objective ?? ''}`,
-      `Escalation: ${a.escalation ?? ''}`,
-      `Payoff: ${a.payoff ?? ''}`,
-      `Hook: ${a.hook ?? ''}`,
-      Array.isArray(a.cast) && a.cast.length > 0 ? `Cast: ${(a.cast as string[]).join(', ')}` : '',
-      a.body ?? '',
     ]
       .filter(Boolean)
       .join('\n');

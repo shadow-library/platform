@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ARC_PLAN_BUDGET, CHAT_PACK_BUDGET, ContextAssembler, PREMISE_BUDGET } from '@modules/ai/context/context-assembler.service';
+import { ARC_PLAN_BUDGET, CHAT_HUB_BUDGET, ContextAssembler, PREMISE_BUDGET } from '@modules/ai/context/context-assembler.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -108,40 +108,53 @@ describe.if(pgAvailable)('ContextAssembler refinement purposes', () => {
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   it('keeps the chat stable segment byte-identical across assemblies with unchanged canon', async () => {
-    const session = { scopeType: 'volume' as const, scopeRef: 'volume:v1', createdAt: sessionStart };
+    const session = { scopeType: 'volume' as const, createdAt: sessionStart };
     const first = await assembler.forChatTurn(projectId, session);
     const second = await assembler.forChatTurn(projectId, session);
 
     expect(first.renderedStable.length).toBeGreaterThan(0);
     expect(second.renderedStable).toBe(first.renderedStable);
-    expect(first.purpose).toBe('chat');
-    expect(first.budgetTokens).toBe(CHAT_PACK_BUDGET);
+    expect(first.purpose).toBe('chat_hub');
+    expect(first.budgetTokens).toBe(CHAT_HUB_BUDGET);
     expect(first.rendered.startsWith(first.renderedStable)).toBe(true);
     expect(first.renderedStable).toContain('The Trial');
     expect(first.renderedStable).toContain('v1_a1');
   });
 
   it('reports canon changed since session start in the volatile tail only', async () => {
-    const session = { scopeType: 'volume' as const, scopeRef: 'volume:v1', createdAt: sessionStart };
+    const session = { scopeType: 'volume' as const, createdAt: sessionStart };
     const before = await assembler.forChatTurn(projectId, session);
     expect(before.renderedVolatile).not.toContain('changed');
 
     await db
       .update(schema.volumes)
-      .set({ objective: 'survive AND humiliate the rival', revision: 2, updatedAt: new Date() })
+      .set({ objective: 'survive AND humiliate the rival', epitome: 'He survived and humiliated the rival.', revision: 2, updatedAt: new Date() })
       .where(and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, 'v1')));
 
     const after = await assembler.forChatTurn(projectId, session);
     expect(after.renderedVolatile).toContain('volume:v1 is now at revision 2');
-    expect(after.renderedStable).toContain('humiliate the rival');
+    expect(after.renderedStable).toContain('humiliated the rival');
   });
 
-  it('builds brief-scoped packs with the arc, volume objective, and resolved refs', async () => {
-    const pack = await assembler.forChatTurn(projectId, { scopeType: 'brief', scopeRef: 'chapter:3', createdAt: new Date() });
-    expect(pack.renderedStable).toContain('The First Cut');
-    expect(pack.renderedStable).toContain('who poisoned the blade?');
+  it('gives a legacy scoped session the hub pack rather than its own scoped pack', async () => {
+    const pack = await assembler.forChatTurn(projectId, { scopeType: 'brief', createdAt: new Date() });
+
+    expect(pack.purpose).toBe('chat_hub');
+    expect(pack.budgetTokens).toBe(CHAT_HUB_BUDGET);
     expect(pack.renderedStable).toContain('v1_a1');
-    expect(pack.sections.every(s => s.key === 'changed_since' || s.segment === 'stable')).toBe(true);
+    expect(pack.renderedStable).not.toContain('The First Cut');
+    expect(pack.renderedStable).not.toContain('who poisoned the blade?');
+  });
+
+  it('keeps the hub stable segment an index, leaving full bodies to the lookup tools', async () => {
+    const pack = await assembler.forChatTurn(projectId, { scopeType: 'project', createdAt: new Date() });
+
+    expect(pack.renderedStable).toContain('project/reader-promise: Weekly power-ups.');
+    expect(pack.renderedStable).not.toContain('Every arc ends with a rank breakthrough.');
+    expect(pack.renderedVolatile).toContain('Story cursor');
+    const stableKeys = pack.sections.filter(s => s.segment === 'stable').map(s => s.key);
+    expect(stableKeys.slice(0, 4)).toEqual(['premise', 'doc_inventory', 'volume_plan', 'arc_inventory']);
+    expect(stableKeys).not.toContain('document');
   });
 
   it('builds arc-planning packs with the previous volume handoff and next volume objective', async () => {

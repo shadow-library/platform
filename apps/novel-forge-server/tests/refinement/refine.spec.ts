@@ -173,7 +173,7 @@ describe.if(pgAvailable)('RefineService', () => {
 
   it('previews context packs for the refinement purposes without touching a model', async () => {
     const chat = await refine.previewContext(projectId, { purpose: 'chat', scopeType: 'volume', scopeRef: 'volume:v1' });
-    expect(chat['purpose']).toBe('chat');
+    expect(chat['purpose']).toBe('chat_hub');
     expect(String(chat['renderedStable'])).toContain('trial');
 
     const arcPlan = await refine.previewContext(projectId, { purpose: 'arc_plan', volumeKey: 'v1' });
