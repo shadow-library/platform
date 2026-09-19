@@ -365,4 +365,20 @@ describe.if(pgAvailable)('ChatService', () => {
     expect(result.assistantMessage.content).toBe('still looking 3');
     expect(result.proposal).toBeNull();
   });
+
+  it('enforces maxCallsPerRun across lookup rounds, not per round (get_draft caps at 2 for the whole turn)', async () => {
+    const session = await chat.createSession(projectId, {});
+    for (let i = 0; i < 3; i++) {
+      structuredMock.mockImplementationOnce(async () => ({ reply: `pulling draft ${i}`, lookups: [{ tool: 'get_draft', args: { chapter: 1 } }] }));
+    }
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'grounded in the drafts I pulled' }));
+
+    const result = await chat.turn(projectId, session.id, 'compare chapter 1 across every draft revision you can pull');
+    expect(result.assistantMessage.content).toBe('grounded in the drafts I pulled');
+
+    // 3 rounds each declare one get_draft call; a per-round budget (the pre-fix bug) would pass all
+    // three since each round resets the counter. Enforced per-turn, the 3rd call is over budget.
+    const calls = await db.query.toolCalls.findMany({ where: and(eq(schema.toolCalls.runId, result.runId), eq(schema.toolCalls.tool, 'get_draft')), orderBy: schema.toolCalls.id });
+    expect(calls.map(c => c.status)).toEqual(['ok', 'ok', 'budget_exceeded']);
+  });
 });

@@ -322,7 +322,7 @@ export class ChatService {
   }
 
   /**
-   * One chat turn (design §5.1): guard, compact if needed, assemble the scoped pack, one structured
+   * One chat turn (design §5.1): guard, compact if needed, assemble the hub pack, one structured
    * call through the repair ladder, then persist the exchange and stage any proposed change-set —
    * all correlated under a fresh workflow run (Appendix A rules 9/11/12/13).
    */
@@ -367,9 +367,10 @@ export class ChatService {
       // Declared-lookup rounds (chat-hub design §6 step 4): execute the requested read-only tools,
       // fold the results into the conversation, and re-invoke — bounded, audited, hub-only.
       let output = await invoke();
+      const lookupCallCounts = new Map<string, number>();
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? []);
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts);
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
         output = await invoke();
@@ -417,11 +418,14 @@ export class ChatService {
     return `Lookup tools available this scope (read-only):\n${lines.join('\n')}`;
   }
 
-  /** Runs declared lookups through the registry handlers with the same audit and budgets as the tool loop. */
-  private async executeLookups(projectId: bigint, runId: string, lookups: { tool: string; args?: Record<string, unknown> }[]): Promise<string> {
+  /**
+   * Runs declared lookups through the registry handlers with the same audit and budgets as the tool loop.
+   * `callCounts` is threaded in by the caller so `maxCallsPerRun` is enforced across every round of one turn,
+   * not reset per round — the map lives on the turn's call stack, never on the (singleton, cross-project) service.
+   */
+  private async executeLookups(projectId: bigint, runId: string, lookups: { tool: string; args?: Record<string, unknown> }[], callCounts: Map<string, number>): Promise<string> {
     const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
     const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
-    const callCounts = new Map<string, number>();
     const blocks: string[] = [];
 
     for (const lookup of lookups) {
