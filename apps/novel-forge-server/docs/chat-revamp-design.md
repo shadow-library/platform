@@ -97,14 +97,20 @@ A `llm_cache` hit emits one `delta` carrying the whole reply.
 
 ### 4.1 When the model defeats the stream
 
-Scanning `reply` out of partial JSON only works while the model emits that key first. Key order is the
-model's choice: the schema shows `reply` first and grammar-constrained decoding on Ollama guarantees it,
-but a hosted model may emit `changeSet` first, in which case no delta is ever produced and the client
-renders the finished reply from `done` — indistinguishable from today's behaviour.
+Key order is the model's choice: the schema shows `reply` first and grammar-constrained decoding on Ollama
+guarantees it, but a hosted model may emit `changeSet` first. The D1 scanner is key-order agnostic — it
+picks up a top-level `reply` wherever in the object it arrives — so key order costs **latency only**: the
+deltas start once the preceding keys have gone by, and the author waits meanwhile on a composer that shows
+nothing.
 
-That degradation is silent to the author and **must be logged**: a structured warn naming the model and
-prompt key, so how often a given model defeats the stream is measurable from logs rather than guessed at.
-The turn itself never fails for this reason.
+The degradation this section covers is the harder case: a response carrying no top-level `reply` string at
+all, so no delta is ever produced and the client renders the finished reply from `done` —
+indistinguishable from today's behaviour. That is what `ReplyStreamScanner.replyFound === false` detects
+once the whole response has arrived.
+
+It is silent to the author and **must be logged**: a structured warn naming the resolved provider, the
+model and the prompt key, so how often a given model defeats the stream is measurable from logs rather
+than guessed at. The turn itself never fails for this reason.
 
 ---
 

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, type BaseMessage, HumanMessage, type MessageContent, SystemMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { eq } from 'drizzle-orm';
@@ -32,6 +32,7 @@ import { AiQuotaService } from './ai-quota.service';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
+import { ReplyStreamScanner } from './reply-stream-scanner';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toJsonSchemaFormat } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
@@ -144,6 +145,67 @@ function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data
   if (messages.length === 0) return result;
   const issues: SchemaIssue[] = messages.map(message => ({ path: [], message }));
   return { success: false, issues };
+}
+
+export interface ReplyStreamHandlers {
+  /** Newly decoded text of the response's top-level `reply` field; never called with an empty string. */
+  onDelta: (text: string) => void;
+  /** Everything emitted so far is void: a transport retry restarted the response, or repair replaced it. */
+  onReset?: () => void;
+}
+
+// `invoke` stringifies a whole non-string content block; a stream must concatenate the text parts instead,
+// because stringifying each chunk on its own would never reassemble into the model's JSON payload.
+function streamChunkText(content: MessageContent): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.map(part => ('text' in part && typeof part.text === 'string' ? part.text : '')).join('');
+}
+
+// Display-only sink. A handler that throws — an SSE write to a connection the browser already dropped —
+// must never fail the model call, so the first failure retires the sink and the turn finishes unstreamed.
+class ReplyStreamRelay {
+  private scanner = new ReplyStreamScanner();
+  private streamed = '';
+  private retired = false;
+
+  constructor(
+    private readonly handlers: ReplyStreamHandlers,
+    private readonly onSinkError: (err: unknown) => void,
+  ) {}
+
+  get replyFound(): boolean {
+    return this.scanner.replyFound;
+  }
+
+  push(chunk: string): void {
+    const text = this.scanner.push(chunk);
+    if (!text) return;
+    this.streamed += text;
+    this.emit(() => this.handlers.onDelta(text));
+  }
+
+  restart(): void {
+    this.scanner = new ReplyStreamScanner();
+    if (!this.streamed) return;
+    this.streamed = '';
+    this.emit(() => this.handlers.onReset?.());
+  }
+
+  settle(rawResponse: string): void {
+    if (!this.streamed || this.streamed === new ReplyStreamScanner().push(rawResponse)) return;
+    this.emit(() => this.handlers.onReset?.());
+  }
+
+  private emit(send: () => void): void {
+    if (this.retired) return;
+    try {
+      send();
+    } catch (err) {
+      this.retired = true;
+      this.onSinkError(err);
+    }
+  }
 }
 
 @Injectable()
@@ -282,6 +344,22 @@ export class ModelRouterService {
     return this.runStructured(promptModule, input, ctx, project, policy, image);
   }
 
+  /**
+   * `structured` that also streams the response's `reply` field as it decodes. The stream is advisory (design D6):
+   * the returned value is the same parsed-and-repaired object `structured` returns, and `onReset` fires whenever
+   * what was already emitted is void — a transport retry restarted the response, or repair changed the reply.
+   */
+  async streamStructured<T>(
+    promptModule: PromptModule<T>,
+    input: Record<string, unknown>,
+    ctx: TelemetryContext,
+    stream: ReplyStreamHandlers,
+    project?: ProjectConfig,
+    policy?: ForgeCallPolicy,
+  ): Promise<T> {
+    return this.runStructured(promptModule, input, ctx, project, policy, undefined, stream);
+  }
+
   private async runStructured<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,
@@ -289,6 +367,7 @@ export class ModelRouterService {
     project?: ProjectConfig,
     policy?: ForgeCallPolicy,
     image?: string,
+    stream?: ReplyStreamHandlers,
   ): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
@@ -296,6 +375,7 @@ export class ModelRouterService {
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
+    const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err })) : null;
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
     this.logger.debug('structured: invoking model', {
@@ -318,17 +398,35 @@ export class ModelRouterService {
         const parsedCached = this.parseOutput(promptModule, tryParseJson(cached.response));
         if (parsedCached.success) {
           this.logger.debug('LLM cache hit — skipping model call', { role, requestHash });
+          relay?.push(cached.response);
           return parsedCached.data;
         }
         this.logger.debug('LLM cache row present but no longer parses — re-invoking', { role, requestHash });
       }
     }
 
-    const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0, policy), role);
+    const firstConfig = this.invokeConfig(ctx, resolved, 0, policy);
+    const rawOutput1 = relay ? await this.streamResilient(llm, messages, firstConfig, role, relay) : await this.invokeResilient(llm, messages, firstConfig, role);
+    // Design §4.1: a response carrying no top-level `reply` string produced no delta at all, so the author
+    // saw a dead composer until `done`. (The scanner is key-order agnostic — `changeSet` first only costs
+    // latency — so this is the whole of the degradation.) Logged per provider/model/prompt to make it
+    // measurable; never a failure, since the ladder still returns a reply.
+    if (relay && !relay.replyFound) {
+      this.logger.warn('Model defeated the reply stream — no delta was emitted', {
+        provider: resolveProvider(resolved),
+        model: resolved.model,
+        promptKey: promptModule.key,
+        promptVersion: promptModule.version,
+        role,
+        runId: ctx.runId,
+      });
+    }
+
     const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
       this.logger.debug('structured: parsed on first attempt', { role, runId: ctx.runId, outputLength: rawOutput1.length });
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
+      relay?.settle(rawOutput1);
       return parsed1.data;
     }
 
@@ -348,6 +446,7 @@ export class ModelRouterService {
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput2);
+      relay?.settle(rawOutput2);
       return parsed2.data;
     }
 
@@ -358,7 +457,9 @@ export class ModelRouterService {
       const parsed3 = this.parseOutput(promptModule, extracted);
       if (parsed3.success) {
         this.logger.debug('structured: parsed via tolerant extraction', { role, runId: ctx.runId });
-        await this.cacheResponse(requestHash, ctx, resolved, promptModule, JSON.stringify(extracted));
+        const extractedRaw = JSON.stringify(extracted);
+        await this.cacheResponse(requestHash, ctx, resolved, promptModule, extractedRaw);
+        relay?.settle(extractedRaw);
         return parsed3.data;
       }
     }
@@ -525,6 +626,48 @@ export class ModelRouterService {
     }
     this.logger.error('LLM call failed after retries', { role, attempts: this.llmMaxRetries + 1, err: lastErr });
     throw AppErrorCode.AI_007.create();
+  }
+
+  // The streaming twin of `invokeResilient` — same budget, same backoff, same transport-only retry rule —
+  // plus the two things `withTimeout` alone cannot do, since it only races and never cancels: the abort is
+  // taken before the backoff sleep rather than after it, so an abandoned attempt cannot go on feeding the
+  // relay for the whole backoff window, and it reaches the provider so the losing HTTP leg is not leaked.
+  private async streamResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, relay: ReplyStreamRelay): Promise<string> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
+      const abandon = new AbortController();
+      try {
+        relay.restart();
+        return await this.withTimeout(
+          this.consumeStream(llm, messages, config, abandon.signal, chunk => relay.push(chunk)),
+          this.llmTimeoutMs,
+        );
+      } catch (err) {
+        abandon.abort();
+        lastErr = err;
+        if (attempt < this.llmMaxRetries) {
+          const backoff = this.llmBackoffMs * 2 ** attempt;
+          this.logger.warn('LLM stream transport error — backing off before retry', { role, attempt, backoff, err });
+          await sleep(backoff);
+        }
+      }
+    }
+    this.logger.error('LLM stream failed after retries', { role, attempts: this.llmMaxRetries + 1, err: lastErr });
+    throw AppErrorCode.AI_007.create();
+  }
+
+  // The `aborted` check is what makes abandonment provider-independent: it drops the chunk before the sink
+  // sees it, and breaking the `for await` closes the iterator even where the signal was ignored.
+  private async consumeStream(llm: BaseChatModel, messages: BaseMessage[], config: object, signal: AbortSignal, onChunk: (text: string) => void): Promise<string> {
+    let accumulated = '';
+    for await (const chunk of await llm.stream(messages, { ...config, signal })) {
+      if (signal.aborted) break;
+      const text = streamChunkText(chunk.content);
+      if (!text) continue;
+      accumulated += text;
+      onChunk(text);
+    }
+    return accumulated;
   }
 
   private withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
