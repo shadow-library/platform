@@ -69,11 +69,23 @@ change-set on the next round.
 
 ## 4. Stream protocol
 
-`GET /api/v1/projects/:projectId/chats/:sessionId/turn/stream?content=…` — `EventStream`, events:
+Two calls, decided 2026-09-19. `POST` starts the turn and returns its `runId` at once; the client then
+opens the stream for that run. A `GET` carrying the message in its query string was rejected: the turn is a
+mutation that persists a row, and a long opening message does not belong in a URL.
+
+```
+POST /api/v1/projects/:projectId/chats/:sessionId/turn/stream   -> { runId }
+GET  /api/v1/projects/:projectId/turns/:runId/stream            -> text/event-stream
+```
+
+The gap between the POST returning and the GET connecting is real, so **the server buffers every event it
+emits for a run** and replays the backlog to the first subscriber on connect. Without that, the opening
+deltas of a fast turn are lost. The buffer is keyed by `runId`, bounded, and dropped when the turn ends and
+its stream closes — or by a TTL, so a client that never connects cannot leak one.
 
 | Event    | Payload                                                       | When                                                          |
 | -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| `ready`  | `{}`                                                          | subscription taken, before any work                           |
+| `ready`  | `{}`                                                          | subscription taken, backlog about to replay                   |
 | `user`   | `ChatMessageResponse`                                         | the user message is persisted                                 |
 | `lookup` | `{ round, tool, args, status: 'running' \| 'ok' \| 'error' }` | each declared lookup                                          |
 | `delta`  | `{ text }`                                                    | a chunk of the `reply` field, scanned out of the partial JSON |
@@ -81,8 +93,18 @@ change-set on the next round.
 | `done`   | `ChatTurnResult`                                              | transcript, proposal and apply result, exactly today's shape  |
 | `error`  | `{ code, message }`                                           | the turn failed; the existing failed-turn card takes over     |
 
-A `llm_cache` hit emits one `delta` carrying the whole reply. A model that emits `changeSet` before
-`reply` produces no deltas and one `done` — degraded, not broken.
+A `llm_cache` hit emits one `delta` carrying the whole reply.
+
+### 4.1 When the model defeats the stream
+
+Scanning `reply` out of partial JSON only works while the model emits that key first. Key order is the
+model's choice: the schema shows `reply` first and grammar-constrained decoding on Ollama guarantees it,
+but a hosted model may emit `changeSet` first, in which case no delta is ever produced and the client
+renders the finished reply from `done` — indistinguishable from today's behaviour.
+
+That degradation is silent to the author and **must be logged**: a structured warn naming the model and
+prompt key, so how often a given model defeats the stream is measurable from logs rather than guessed at.
+The turn itself never fails for this reason.
 
 ---
 
