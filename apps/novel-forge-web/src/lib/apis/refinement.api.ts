@@ -9,14 +9,16 @@ import {
   type UseQueryOptions,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   type ApplyProposalResponse,
   type AuditBibleResponse,
+  type ChatMessageResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
   type ChatTurnStatusResponse,
+  type ChatTurnStreamResponse,
   type CreateChatSessionBody,
   type FailedTurnResponse,
   type ListChangesResponse,
@@ -31,7 +33,7 @@ import {
 } from './api-types.gen';
 import { flushInvalidations, invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
-import { ApiError, APIRequest } from './transport';
+import { ApiError, APIRequest, isApiError } from './transport';
 
 /**
  * The refinement surface: conversational chat sessions that reason over the novel and stage
@@ -62,7 +64,7 @@ interface ForgeTurnVariables {
 
 // The optimistic-update rollback snapshot for a chat turn: the messages cache as it was before the
 // author's message was appended.
-interface ChatTurnContext {
+export interface ChatTurnContext {
   previous?: ListChatMessagesResponse;
 }
 
@@ -211,36 +213,250 @@ export function useCreateChatSessionMutation(projectId: string): UseMutationResu
   });
 }
 
+/**
+ * Shows the author's message and a pending state the instant they send — the reply can take a while, and
+ * the server has already persisted this message so any other tab sees it too. Shared by the request and
+ * the stream, which must open a turn identically.
+ */
+async function beginChatTurn(queryClient: QueryClient, projectId: string, sessionId: string, content: string): Promise<ChatTurnContext> {
+  const messagesKey = refinementKeys.messages(projectId, sessionId);
+  await queryClient.cancelQueries({ queryKey: messagesKey });
+  const previous = queryClient.getQueryData<ListChatMessagesResponse>(messagesKey);
+  const optimistic: ListChatMessagesResponse['messages'][number] = {
+    id: `optimistic-${Date.now()}`,
+    sessionId,
+    ordinal: (previous?.messages.at(-1)?.ordinal ?? 0) + 1,
+    role: 'user',
+    content,
+    createdAt: new Date().toISOString(),
+  };
+  // No run to name yet — the fresh trailing user message is what `turnState` reads as pending, and
+  // clearing `failedTurn` retires the previous attempt's card the moment this one is sent.
+  queryClient.setQueryData<ListChatMessagesResponse>(messagesKey, old => ({ messages: [...(old?.messages ?? []), optimistic], pendingTurn: null, failedTurn: null }));
+  return { previous };
+}
+
+function rollbackChatTurn(queryClient: QueryClient, projectId: string, sessionId: string, context: ChatTurnContext | undefined): void {
+  if (context?.previous) queryClient.setQueryData(refinementKeys.messages(projectId, sessionId), context.previous);
+}
+
 export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, string, ChatTurnContext> {
   const queryClient = useQueryClient();
-  const messagesKey = refinementKeys.messages(projectId, sessionId);
   return useMutation<ChatTurnResponse, ApiError, string, ChatTurnContext>({
     mutationFn: content => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body({ content }).execute(),
-    // Show the author's message and a pending state the instant they send — the reply can take a
-    // while, and the server has already persisted this message so any other tab sees it too.
-    onMutate: async content => {
-      await queryClient.cancelQueries({ queryKey: messagesKey });
-      const previous = queryClient.getQueryData<ListChatMessagesResponse>(messagesKey);
-      const optimistic: ListChatMessagesResponse['messages'][number] = {
-        id: `optimistic-${Date.now()}`,
-        sessionId,
-        ordinal: (previous?.messages.at(-1)?.ordinal ?? 0) + 1,
-        role: 'user',
-        content,
-        createdAt: new Date().toISOString(),
-      };
-      // No run to name yet — the fresh trailing user message is what `turnState` reads as pending, and
-      // clearing `failedTurn` retires the previous attempt's card the moment this one is sent.
-      queryClient.setQueryData<ListChatMessagesResponse>(messagesKey, old => ({ messages: [...(old?.messages ?? []), optimistic], pendingTurn: null, failedTurn: null }));
-      return { previous };
-    },
-    onError: (_err, _content, context) => {
-      if (context?.previous) queryClient.setQueryData(messagesKey, context.previous);
-    },
+    onMutate: content => beginChatTurn(queryClient, projectId, sessionId, content),
+    onError: (_err, _content, context) => rollbackChatTurn(queryClient, projectId, sessionId, context),
     // Reconcile against the server on both outcomes: on success the real exchange arrives; on a
     // post-persist failure the user message is still there, minus a reply.
     onSettled: () => invalidateChat(queryClient, projectId, sessionId),
   });
+}
+
+/**
+ * The turn stream (design §4). The SSE route hijacks its reply, so it has no generated response type and the
+ * frames are hand-typed here; `user` and `done` carry generated shapes and reuse them.
+ */
+export interface ChatTurnLookup {
+  round: number;
+  tool: string;
+  args: Record<string, unknown>;
+  status: 'running' | 'ok' | 'error';
+}
+
+export interface ChatTurnFailure {
+  code: string;
+  message: string;
+}
+
+export type ChatTurnStreamEvent =
+  | { type: 'user'; message: ChatMessageResponse }
+  | { type: 'lookup'; lookup: ChatTurnLookup }
+  | { type: 'delta'; text: string }
+  | { type: 'reset' }
+  | { type: 'done'; turn: ChatTurnResponse }
+  | { type: 'error'; failure: ChatTurnFailure };
+
+interface ChatTurnProgress {
+  reply: string;
+  lookups: ChatTurnLookup[];
+  userMessage: ChatMessageResponse | null;
+}
+
+export type ChatTurnStreamState =
+  | (ChatTurnProgress & { status: 'idle' | 'streaming' })
+  | (ChatTurnProgress & { status: 'done'; turn: ChatTurnResponse })
+  | (ChatTurnProgress & { status: 'failed'; failure: ChatTurnFailure });
+
+export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], userMessage: null };
+
+const CHAT_TURN_EVENTS = ['user', 'lookup', 'delta', 'reset', 'done', 'error'] as const;
+const LOOKUP_STATUSES = ['running', 'ok', 'error'] as const;
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+export function parseChatTurnEvent(name: string, data: unknown): ChatTurnStreamEvent | undefined {
+  if (typeof data !== 'string') return undefined;
+  let payload: Record<string, unknown> | undefined;
+  try {
+    payload = asRecord(JSON.parse(data));
+  } catch {
+    return undefined;
+  }
+  if (!payload) return undefined;
+  if (name === 'reset') return { type: 'reset' };
+  if (name === 'delta') return typeof payload.text === 'string' ? { type: 'delta', text: payload.text } : undefined;
+  if (name === 'user') return typeof payload.content === 'string' ? { type: 'user', message: payload as unknown as ChatMessageResponse } : undefined;
+  if (name === 'done') return asRecord(payload.assistantMessage) ? { type: 'done', turn: payload as unknown as ChatTurnResponse } : undefined;
+  if (name === 'error')
+    return typeof payload.code === 'string' && typeof payload.message === 'string' ? { type: 'error', failure: { code: payload.code, message: payload.message } } : undefined;
+  if (name !== 'lookup') return undefined;
+  const { round, tool, status } = payload;
+  if (typeof round !== 'number' || typeof tool !== 'string') return undefined;
+  if (!LOOKUP_STATUSES.includes(status as ChatTurnLookup['status'])) return undefined;
+  return { type: 'lookup', lookup: { round, tool, args: asRecord(payload.args) ?? {}, status: status as ChatTurnLookup['status'] } };
+}
+
+/**
+ * Lookups carry no call id, so a round's start and finish are matched on `(round, tool, args)` and upserted.
+ * Appending would double the trace whenever the backlog replays it — which every reconnect does.
+ */
+function mergeLookup(lookups: ChatTurnLookup[], lookup: ChatTurnLookup): ChatTurnLookup[] {
+  const key = (entry: ChatTurnLookup): string => `${entry.round}\u0000${entry.tool}\u0000${JSON.stringify(entry.args)}`;
+  const index = lookups.findIndex(entry => key(entry) === key(lookup));
+  if (index < 0) return [...lookups, lookup];
+  return lookups.map((entry, at) => (at === index ? lookup : entry));
+}
+
+/**
+ * The whole wire protocol as one pure function. `reset` voids the deltas and only the deltas — the lookups
+ * already ran and the replay that follows a reconnect re-states them. `error` keeps the partial text and
+ * marks the turn failed: it is what the model actually said, and no better text is coming.
+ */
+export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurnStreamEvent): ChatTurnStreamState {
+  if (state.status === 'done' || state.status === 'failed') return state;
+  const progress: ChatTurnProgress = { reply: state.reply, lookups: state.lookups, userMessage: state.userMessage };
+  if (event.type === 'reset') return { ...progress, status: 'streaming', reply: '' };
+  if (event.type === 'delta') return { ...progress, status: 'streaming', reply: state.reply + event.text };
+  if (event.type === 'user') return { ...progress, status: 'streaming', userMessage: event.message };
+  if (event.type === 'lookup') return { ...progress, status: 'streaming', lookups: mergeLookup(state.lookups, event.lookup) };
+  // `done` is authoritative, and a model that emits no top-level `reply` (§4.1) streams no deltas at all.
+  if (event.type === 'done') return { ...progress, status: 'done', reply: event.turn.assistantMessage.content, turn: event.turn };
+  return { ...progress, status: 'failed', failure: event.failure };
+}
+
+export interface ChatTurnHandlers {
+  onSuccess?: (turn: ChatTurnResponse) => void;
+  onError?: (error: ApiError, context: ChatTurnContext | undefined) => void;
+}
+
+export interface ChatTurnSender {
+  send: (content: string, handlers?: ChatTurnHandlers) => void;
+  isPending: boolean;
+  stream: ChatTurnStreamState;
+}
+
+const UNKNOWN_TURN_FAILURE: ChatTurnFailure = { code: 'UNKNOWN', message: 'Something went wrong. Please try again later' };
+
+// The frame carries a code and a message and nothing else, so the status and type the transport's error
+// shape needs are supplied here rather than read off a response that was never sent.
+function turnFailureError(failure: ChatTurnFailure): ApiError {
+  return new ApiError(500, { code: failure.code, message: failure.message, type: 'UnknownError' });
+}
+
+/**
+ * Runs a turn over SSE, reducing its events into renderable state, and falls back to `useChatTurnMutation`
+ * where `EventSource` does not exist (SSR, old browsers) — `send` behaves the same either way, so a caller
+ * reads `stream` for the live reply and never has to know which path ran.
+ *
+ * A stream that dies mid-turn is not a failed turn: the run persists server-side either way, so the hook
+ * hands it back to the transcript's own poll instead of reporting a failure the author never suffered.
+ */
+export function useChatTurnStream(projectId: string, sessionId: string): ChatTurnSender {
+  const queryClient = useQueryClient();
+  const fallback = useChatTurnMutation(projectId, sessionId);
+  const [stream, setStream] = useState<ChatTurnStreamState>(idleChatTurnStream);
+  const [streaming, setStreaming] = useState(false);
+  const sourceRef = useRef<EventSource | undefined>(undefined);
+  const mountedRef = useRef(true);
+  const tokenRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Retires the in-flight turn's token too, so a POST that resolves after unmount opens no stream.
+      tokenRef.current++;
+      sourceRef.current?.close();
+      sourceRef.current = undefined;
+    };
+  }, [projectId, sessionId]);
+
+  const run = async (content: string, handlers?: ChatTurnHandlers): Promise<void> => {
+    const token = ++tokenRef.current;
+    const current = (): boolean => mountedRef.current && tokenRef.current === token;
+    sourceRef.current?.close();
+    sourceRef.current = undefined;
+    setStream(idleChatTurnStream);
+    setStreaming(true);
+    const context = await beginChatTurn(queryClient, projectId, sessionId, content);
+
+    let runId: string;
+    try {
+      ({ runId } = await APIRequest.post(`/projects/${projectId}/chats/${sessionId}/turn/stream`).body({ content }).execute<ChatTurnStreamResponse>());
+    } catch (err) {
+      rollbackChatTurn(queryClient, projectId, sessionId, context);
+      invalidateChat(queryClient, projectId, sessionId);
+      if (current()) setStreaming(false);
+      handlers?.onError?.(isApiError(err) ? err : turnFailureError(UNKNOWN_TURN_FAILURE), context);
+      return;
+    }
+    if (!current()) return;
+
+    const source = new EventSource(`${APIRequest.basePath}/projects/${projectId}/turns/${runId}/stream`);
+    sourceRef.current = source;
+    const close = (): void => {
+      source.close();
+      if (sourceRef.current === source) sourceRef.current = undefined;
+    };
+
+    for (const name of CHAT_TURN_EVENTS) {
+      source.addEventListener(name, message => {
+        const event = parseChatTurnEvent(name, message.data);
+        if (!event) return;
+        const terminal = event.type === 'done' || event.type === 'error';
+        if (terminal) close();
+        if (current()) setStream(state => reduceChatTurnStream(state, event));
+        if (!terminal) return;
+        if (current()) setStreaming(false);
+        invalidateChat(queryClient, projectId, sessionId);
+        if (event.type === 'done') handlers?.onSuccess?.(event.turn);
+        // The turn recorded its own failure, so the transcript's failed-turn card is the authority and the
+        // optimistic message stands; the caller is told only so it can speak for a failure nothing shows.
+        else handlers?.onError?.(turnFailureError(event.failure), context);
+      });
+    }
+
+    // EventSource reconnects a dropped stream itself and the replay resynchronises it; a stream left closed
+    // (an expired or unknown run answers 404) means the events are gone, not the turn.
+    source.onerror = () => {
+      if (source.readyState !== EventSource.CLOSED) return;
+      close();
+      if (current()) setStreaming(false);
+      invalidateChat(queryClient, projectId, sessionId);
+    };
+  };
+
+  const send = (content: string, handlers?: ChatTurnHandlers): void => {
+    if (typeof EventSource === 'undefined') {
+      fallback.mutate(content, { onSuccess: turn => handlers?.onSuccess?.(turn), onError: (err, _content, context) => handlers?.onError?.(err, context) });
+      return;
+    }
+    void run(content, handlers);
+  };
+
+  return { send, isPending: streaming || fallback.isPending, stream };
 }
 
 export function useForgeTurnMutation(projectId: string): UseMutationResult<ChatTurnResponse, ApiError, ForgeTurnVariables> {
