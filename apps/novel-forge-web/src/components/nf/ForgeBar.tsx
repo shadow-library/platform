@@ -17,6 +17,11 @@ export interface ForgeScope {
   title: string;
 }
 
+/** The hub playbook only knows what the author is looking at if the first turn tells it — `ref` is the literal lookup key, so it wins; title is the only signal for the scopes that carry no ref (an entity bio, the volume plan). */
+function contextLine(scope: ForgeScope): string {
+  return scope.ref ? `[context: ${scope.ref} — "${scope.title}"]` : `[context: ${scope.title}]`;
+}
+
 export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; scope: ForgeScope; placeholder?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -24,6 +29,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   const [last, setLast] = useState<ChatTurnResponse | undefined>();
   const creatingRef = useRef<string | null>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
+  const contextSentFor = useRef<string | null>(null);
 
   const createSession = useCreateChatSessionMutation(novelId);
   const turn = useForgeTurnMutation(novelId);
@@ -37,6 +43,10 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   }
 
   const sessionId = createdSession?.id;
+
+  useEffect(() => {
+    contextSentFor.current = null;
+  }, [scopeKey]);
 
   useEffect(() => {
     if (!open || sessionId || creatingRef.current === scopeKey) return;
@@ -60,12 +70,15 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   const session = createdSession;
 
   const propose = (): void => {
-    const content = text.trim();
-    if (!content || !sessionId || turn.isPending) return;
+    const message = text.trim();
+    if (!message || !sessionId || turn.isPending) return;
+    const isFirstTurn = contextSentFor.current !== sessionId;
+    const content = isFirstTurn ? `${contextLine(scope)}\n${message}` : message;
     turn.mutate(
       { sessionId, content },
       {
         onSuccess: result => {
+          if (isFirstTurn) contextSentFor.current = sessionId;
           setText('');
           setLast(result);
           if (result.proposal) toast.success('Forge staged a proposal — review it in Proposals');
