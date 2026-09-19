@@ -79,20 +79,12 @@ const CHAT_HUB_NODE = 'chat-hub';
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
 const TURN_GRAPHS = ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress'];
 
-// Which planning discipline each chat scope belongs to. A chat scoped to an arc IS arc-planning
-// work, so it defaults to the model the author configured for arc planning in the project settings —
-// not to a one-size-fits-all chat model. See resolveSessionModel for the full resolution ladder.
-export const SCOPE_CHAT_ROLE: Record<Refinement.ChatScope, AiRole> = {
-  project: 'chat',
-  novel: 'chat',
-  volume_plan: 'plan',
-  volume: 'plan',
-  arc_plan: 'arc',
-  arc: 'arc',
-  brief: 'outline',
-  bible_document: 'bible',
-  ideation: 'ideation',
-};
+// The chat model role for a scope (chat-revamp design D1/A2): every scope but ideation now runs the
+// single hub playbook, so every scope but ideation runs the single 'chat' model role too — a legacy
+// per-artifact scope no longer gets its own planning-discipline model.
+export function chatRoleForScope(scope: Refinement.ChatScope): AiRole {
+  return scope === 'ideation' ? 'ideation' : 'chat';
+}
 
 @Injectable()
 export class ChatService {
@@ -480,14 +472,15 @@ export class ChatService {
    * The chat model resolution ladder, most specific first:
    *  1. the chat's own override (the author picked a model for this conversation),
    *  2. otherwise the model routed for the scope's role — the router folds in the project's group
-   *     selection, the chat → planning default (arc chat → the planning model, and so on), then the owner's defaults.
+   *     selection, then the owner's defaults.
    */
   private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
+    const role = chatRoleForScope(session.scopeType);
     if (session.modelProvider && session.modelId) {
       const picked = { provider: session.modelProvider, model: session.modelId };
-      if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(SCOPE_CHAT_ROLE[session.scopeType], picked)) return picked;
+      if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, picked)) return picked;
     }
-    return this.modelRouter.resolveFor(SCOPE_CHAT_ROLE[session.scopeType], project, projectId);
+    return this.modelRouter.resolveFor(role, project, projectId);
   }
 
   private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {

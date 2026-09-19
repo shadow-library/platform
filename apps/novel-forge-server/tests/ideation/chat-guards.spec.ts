@@ -12,7 +12,7 @@ import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { IdeationTurnRegistrar } from '@modules/ideation/ideation-turn.registrar';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
 import { ChatTurnRegistry } from '@modules/refinement/chat-turn.registry';
-import { ChatService, SCOPE_CHAT_ROLE } from '@modules/refinement/chat.service';
+import { chatRoleForScope, ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
@@ -125,7 +125,9 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
   });
 
   it('should route the ideation scope through its own AI role, not the shared chat role', () => {
-    expect(SCOPE_CHAT_ROLE.ideation).toBe('ideation');
+    expect(chatRoleForScope('ideation')).toBe('ideation');
+    expect(chatRoleForScope('project')).toBe('chat');
+    expect(chatRoleForScope('brief')).toBe('chat');
   });
 });
 

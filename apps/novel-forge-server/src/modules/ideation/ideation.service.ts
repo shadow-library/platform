@@ -21,7 +21,7 @@ import { buildIdeationStressPrompt, buildIdeationTurnPrompt, PROMPT_REGISTRY, re
 import { type IdeationConceptsOutput, type IdeationStressOutput, type IdeationTurnOutput } from '../ai/schemas';
 import { type ChangeOp } from '../refinement/change-set';
 import { ChatCompactionService } from '../refinement/chat-compaction.service';
-import { ChatService, SCOPE_CHAT_ROLE } from '../refinement/chat.service';
+import { chatRoleForScope, ChatService } from '../refinement/chat.service';
 import { type ScopedTurnResult } from '../refinement/chat-turn.registry';
 import { declinedOpNote, ProposalApplyService } from '../refinement/proposal-apply.service';
 import { ProposalService } from '../refinement/proposal.service';
@@ -657,7 +657,7 @@ export class IdeationService {
 
   /** A pin the unrestricted allowlist refuses is ignored rather than recorded: the router would route around it, and the message would name a model that never ran. */
   private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
-    const role = SCOPE_CHAT_ROLE[session.scopeType];
+    const role = chatRoleForScope(session.scopeType);
     if (session.modelProvider && session.modelId) {
       const pinned = { provider: session.modelProvider, model: session.modelId };
       if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, pinned)) return pinned;

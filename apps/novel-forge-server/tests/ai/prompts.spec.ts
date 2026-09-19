@@ -202,7 +202,7 @@ describe('Prompt modules', () => {
 
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
       const messages = await PROMPT_REGISTRY['chat-refine'].template.formatMessages({
-        scopeInstructions: SCOPE_PLAYBOOKS.volume.guidance,
+        scopeInstructions: SCOPE_PLAYBOOKS.project.guidance,
         stableContext: 'STABLE-CANON-BLOCK',
         history: [],
         volatileContext: 'VOLATILE-DELTA',
@@ -211,14 +211,16 @@ describe('Prompt modules', () => {
       expect(messages).toHaveLength(3);
       expect(messages[0]?.getType()).toBe('system');
       expect(String(messages[1]?.content)).toContain('STABLE-CANON-BLOCK');
-      expect(String(messages[1]?.content)).toContain(SCOPE_PLAYBOOKS.volume.guidance.slice(0, 40));
+      expect(String(messages[1]?.content)).toContain(SCOPE_PLAYBOOKS.project.guidance.slice(0, 40));
       expect(String(messages[2]?.content)).toContain('VOLATILE-DELTA');
       expect(String(messages[2]?.content)).toContain('raise the stakes');
     });
 
     it('chat-refine scope factory rejects ops outside the scope allowlist', () => {
+      // A legacy per-artifact scope (e.g. 'brief') now resolves to the hub playbook (chat-revamp
+      // design D1/A2), so its allowlist is the project op set — only the ideation-only op is off-scope.
       const scoped = buildChatRefinePrompt('brief');
-      const offScope = { reply: 'done', changeSet: [{ op: 'volume.upsert', volumeKey: 'v1' }] };
+      const offScope = { reply: 'done', changeSet: [{ op: 'seed.update', seedId: 's1' }] };
       expect(scoped.postValidate?.(offScope as never)[0]).toMatch(/not allowed for this scope/);
       const onScope = { reply: 'done', changeSet: [{ op: 'brief.update', chapter: 3, title: 'sharper' }] };
       expect(scoped.postValidate?.(onScope as never)).toEqual([]);
@@ -242,14 +244,12 @@ describe('Prompt modules', () => {
       expect(hub).toContain('"op": "fact.remove"');
       expect(hub).toContain('the reveal schedule IS the plot');
       expect(hub).toContain('"pov": <non-empty array of entity keys>');
+      expect(hub).toContain('knowledgeContract');
 
-      const brief = renderScopeInstructions('brief');
-      expect(brief).toContain('knowledgeContract');
-      expect(brief).toContain('a chapter that reveals nothing previously hidden carries no contract');
-      expect(brief).not.toContain('"op": "fact.upsert"');
-
-      expect(renderScopeInstructions('novel')).toContain('never in a bible document or an entity sheet');
-      expect(renderScopeInstructions('volume_plan')).not.toContain('knowledgeContract');
+      // Every legacy per-artifact scope now resolves to the same hub playbook (chat-revamp design D1/A2).
+      expect(renderScopeInstructions('brief')).toBe(hub);
+      expect(renderScopeInstructions('novel')).toBe(hub);
+      expect(renderScopeInstructions('volume_plan')).toBe(hub);
     });
 
     it('no longer carries a bootstrap interview block — the Ideation Studio owns that conversation', () => {
@@ -268,14 +268,17 @@ describe('Prompt modules', () => {
       expect(SCOPE_PLAYBOOKS.project.allowedActions).not.toContain('action.graduate_seed');
     });
 
-    it('accepts epistemic ops in the hub scope and rejects them elsewhere', () => {
+    it('accepts epistemic ops in the hub scope and rejects them in the ideation scope', () => {
       const hub = buildChatRefinePrompt('project');
       const changeSet = [
         { op: 'fact.upsert', factKey: 'mentor_is_the_traitor', body: 'the mentor sold the sect out', terms: ['sect seal'] },
         { op: 'brief.update', chapter: 41, knowledgeContract: { pov: ['hero'], learns: [{ entityKey: 'hero', factKey: 'mentor_is_the_traitor' }] } },
       ];
       expect(hub.postValidate?.({ reply: 'staged the reveal', changeSet } as never)).toEqual([]);
-      expect(buildChatRefinePrompt('brief').postValidate?.({ reply: 'x', changeSet } as never)[0]).toMatch(/not allowed for this scope/);
+      // A legacy per-artifact scope now shares the hub's op allowlist (chat-revamp design D1/A2); only
+      // the ideation scope still carries its own narrower one.
+      expect(buildChatRefinePrompt('brief').postValidate?.({ reply: 'x', changeSet } as never)).toEqual([]);
+      expect(buildChatRefinePrompt('ideation').postValidate?.({ reply: 'x', changeSet } as never)[0]).toMatch(/not allowed for this scope/);
     });
 
     it('validates chat-refine output shape', () => {
