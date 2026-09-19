@@ -252,6 +252,16 @@ describe('Prompt modules', () => {
       expect(renderScopeInstructions('volume_plan')).toBe(hub);
     });
 
+    it('binds the read-before-overwrite rule on every record-overwriting op, and only the ideation playbook is exempt', () => {
+      const hub = renderScopeInstructions('project');
+      expect(hub).toContain('Chat context is an index, not the text');
+      for (const op of ['bible_document.upsert', 'volume.upsert', 'arc.upsert', 'brief.update', 'draft.update']) expect(hub).toContain(op);
+      for (const tool of ['get_bible_document', 'get_volume', 'get_arc', 'get_brief', 'get_draft']) expect(hub).toContain(tool);
+      expect(hub).toContain('Lookups and a changeSet never share a response');
+
+      expect(renderScopeInstructions('ideation')).not.toContain('Chat context is an index');
+    });
+
     it('no longer carries a bootstrap interview block — the Ideation Studio owns that conversation', () => {
       const hub = renderScopeInstructions('project');
       expect(hub).toContain(SCOPE_PLAYBOOKS.project.guidance);

@@ -58,8 +58,14 @@ get_brief          { chapter }         → full brief incl. ending contract + kn
 get_draft          { chapter }         → draft title/body/summary/status/revision
 ```
 
-The hub playbook gains a hard rule: a turn may not propose `bible_document.upsert`, `brief.update` or
-`draft.update` for an artifact it has not fetched in that same turn.
+The hub playbook gains a hard rule: a turn may not propose `bible_document.upsert`, `volume.upsert`,
+`arc.upsert`, `brief.update` or `draft.update` for an artifact it has not fetched in that same turn.
+`volume.upsert` and `arc.upsert` are in the list because they overwrite whole records too, and volumes
+and arcs reach the model only as one-line summaries.
+
+Because the turn schema forbids `lookups` and `changeSet` in one response, editing an artifact is
+inherently two-step: a turn that needs more than the index spends itself on lookups and proposes the
+change-set on the next round.
 
 ## 4. Stream protocol
 
