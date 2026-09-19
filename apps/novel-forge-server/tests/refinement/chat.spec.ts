@@ -182,10 +182,24 @@ describe.if(pgAvailable)('ChatService', () => {
 
     expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
     expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
-    // Ignores the background chat-title run's own events (this opener also qualifies for naming) — this
-    // assertion is about the chat-turn run's lifecycle, not everything the project channel saw.
+    // Drops the background chat-title run's own run events (this opener also qualifies for naming) — this
+    // assertion is about the chat-turn run's lifecycle, not everything the project channel saw. The naming
+    // run's own `chat` event is real and indistinguishable in shape from the turn's (both are `{type:'chat',
+    // sessionId}`), so it is not filtered out — it races unsubscribe() and may or may not have landed yet.
+    // Instead of asserting its absence, keep only the first `chat` entry: persistUserMessage publishes the
+    // turn's own `chat` event synchronously before nameSession() is even dispatched, so that first entry is
+    // always the turn's, whichever way the race lands.
     const turnEvents = published.filter(event => event.type !== 'run' || event.graph === 'chat-turn');
-    expect(turnEvents.map(event => (event.type === 'run' ? `run:${event.status}` : event.type))).toEqual(['run:running', 'chat', 'run:failed']);
+    let sawChat = false;
+    const turnEventKinds = turnEvents
+      .filter(event => {
+        if (event.type !== 'chat') return true;
+        if (sawChat) return false;
+        sawChat = true;
+        return true;
+      })
+      .map(event => (event.type === 'run' ? `run:${event.status}` : event.type));
+    expect(turnEventKinds).toEqual(['run:running', 'chat', 'run:failed']);
   });
 
   it('should still report a failed turn whose message the database stamped later than the app stamped the failure', async () => {
