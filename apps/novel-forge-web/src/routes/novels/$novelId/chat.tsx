@@ -3,18 +3,19 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { ArchiveIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
+import { ArchiveIcon, BookIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
+import { type ChipIntent, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
+  type ChatMessageResponse,
   type ChatMode,
   type ChatSessionResponse,
   isTurnFailureRecorded,
   turnState,
   useApplyProposalMutation,
   useChatMessagesQuery,
-  useChatTurnMutation,
+  useChatTurnStream,
   useCreateChatSessionMutation,
   useDeleteChatSessionMutation,
   useDiscardProposalMutation,
@@ -336,12 +337,16 @@ function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): Rea
   );
 }
 
+function lastAssistantOrdinal(messages: ChatMessageResponse[]): number {
+  return messages.reduce((ordinal, message) => (message.role === 'assistant' ? Math.max(ordinal, message.ordinal) : ordinal), 0);
+}
+
 interface ChatThreadProps {
   novelId: string;
   session: ChatSessionResponse;
   onOpenHistory: () => void;
   // The just-created session's first message, queued by the draft screen — this is the one place a turn
-  // is ever sent without the author touching this thread's own composer, and the seam F3 swaps to stream.
+  // is ever sent without the author touching this thread's own composer.
   initialTurn?: string;
   onInitialTurnSent?: () => void;
 }
@@ -349,19 +354,33 @@ interface ChatThreadProps {
 function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTurnSent }: ChatThreadProps): React.JSX.Element {
   const messagesQuery = useChatMessagesQuery(novelId, session.id);
   const queryClient = useQueryClient();
-  const turn = useChatTurnMutation(novelId, session.id);
+  const turn = useChatTurnStream(novelId, session.id);
   const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
   const [renamingHeader, setRenamingHeader] = useState(false);
+  // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the
+  // first one past it. Zero until a turn is sent, which is also right for a session whose transcript has none.
+  const [assistantWatermark, setAssistantWatermark] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = messagesQuery.data?.messages ?? [];
   const isAuto = session.mode === 'auto';
-  const isHub = session.scopeType === 'project';
   // The composer locks on this tab's own request OR a turn the server still has running — the latter is
   // what lets a refresh or a second tab recover an in-flight turn instead of showing a silent message.
   const state = turnState(messagesQuery.data);
   const pending = turn.isPending || state.kind === 'pending';
+  // The stream is never cleared, so a finished turn's text would render twice — once live, once from the
+  // refreshed transcript. The streamed row stands down on the transcript alone, the instant it carries an
+  // assistant message past where this turn started: the reply reaches the transcript over the 1.5s status
+  // poll, which is a separate race from the SSE frames, so either side can win and neither one alone is a
+  // safe signal. Reading only the transcript covers both orders, and holds the reply on screen through the
+  // gap between `done` and that refetch, when nothing else is showing it.
+  const stream = turn.stream;
+  const settled = lastAssistantOrdinal(messages) > assistantWatermark;
+  const showStream = !settled && (stream.lookups.length > 0 || stream.reply.length > 0);
+  // A live stream is its own progress indicator; `TurnStatus` stays for the failed-turn card, which owns the
+  // reason and the retry while the streamed bubble only keeps whatever the model managed to say.
+  const showTurnStatus = !showStream || stream.status === 'failed';
 
   // Stay pinned to the newest message ChatGPT-style: inline change cards load after the transcript,
   // so a one-shot scroll lands short — follow content growth while the user is near the bottom, and
@@ -400,7 +419,8 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   // restore on a second failure; the ordinary send passes its draft so a failure hands it back.
   const resend = (content: string, draft?: string): void => {
     if (!content || pending) return;
-    turn.mutate(content, {
+    setAssistantWatermark(lastAssistantOrdinal(messages));
+    turn.send(content, {
       onSuccess: result => {
         if (result.applied) {
           // A turn whose every op was declined applied nothing and left the proposal pending, so it is not
@@ -412,7 +432,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
       },
       // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
       // reached the transcript needs the toast and the draft handed back.
-      onError: async (err, _content, context) => {
+      onError: async (err, context) => {
         if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
         toast.danger(err.message);
         if (draft !== undefined) setInput(current => current || draft);
@@ -446,9 +466,9 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
     sentInitialRef.current = true;
     onInitialTurnSent?.();
     // Pass the content as the draft too: on an UNRECORDED failure (network error, 500 before the workflow
-    // starts) there is no failed-turn card to retry from — `useChatTurnMutation`'s onError rolls a brand-new
-    // session's optimistic message back to an empty transcript, so without this the author's opening
-    // message is just gone. `resend` hands it back into this thread's own composer.
+    // starts) there is no failed-turn card to retry from — the turn sender rolls a brand-new session's
+    // optimistic message back to an empty transcript, so without this the author's opening message is
+    // just gone. `resend` hands it back into this thread's own composer.
     resend(initialTurn, initialTurn);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- guarded by sentInitialRef; re-running on every resend identity change would defeat the once-only guard
   }, [initialTurn]);
@@ -456,8 +476,6 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   return (
     <div className={styles.thread}>
       <div className={styles.threadHead}>
-        <StatusChip intent="info">{isHub ? 'control hub' : `scope: ${session.scopeType}`}</StatusChip>
-        {session.scopeRef && <StatusChip intent="neutral">{session.scopeRef}</StatusChip>}
         {renamingHeader ? (
           <RenameInput
             label={`Rename “${session.title ?? 'New chat'}”`}
@@ -491,11 +509,9 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
           {messagesQuery.error && <PaneError error={messagesQuery.error} />}
           {!messagesQuery.isLoading && messages.length === 0 && (
             <p className={styles.emptyHint}>
-              {isHub
-                ? isAuto
-                  ? 'Ask for anything — edits land immediately and every change is revertible from History.'
-                  : 'Ask for anything — content edits, prose rewrites, or pipeline runs. You accept or decline each change.'
-                : `Ask Forge to change this ${session.scopeType}. It drafts a reviewable proposal — canon isn't edited directly.`}
+              {isAuto
+                ? 'Ask for anything — edits land immediately and every change is revertible from History.'
+                : 'Ask for anything — content edits, prose rewrites, or pipeline runs. You accept or decline each change.'}
             </p>
           )}
           {messages.map(m =>
@@ -511,7 +527,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
             ) : (
               <div key={m.id} className={styles.assistantRow}>
                 <div className={styles.avatar}>
-                  <ProposalsIcon size={15} />
+                  <BookIcon size={15} />
                 </div>
                 <div className={styles.assistantCol}>
                   <Markdown content={m.content} className={styles.assistantBubble} />
@@ -521,7 +537,20 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
               </div>
             ),
           )}
-          <TurnStatus state={state} sending={turn.isPending} fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'} onRetry={resend} />
+          {showStream && (
+            <div className={styles.assistantRow}>
+              <div className={styles.avatar}>
+                <BookIcon size={15} />
+              </div>
+              <div className={`${styles.assistantCol} ${styles.streamCol}`}>
+                <LookupTrace lookups={stream.lookups} running={stream.status === 'streaming'} />
+                {stream.reply && (
+                  <Markdown content={stream.reply} className={stream.status === 'failed' ? `${styles.assistantBubble} ${styles.streamFailed}` : styles.assistantBubble} />
+                )}
+              </div>
+            </div>
+          )}
+          {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'} onRetry={resend} />}
         </div>
       </div>
 
@@ -530,7 +559,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
           <Textarea
             value={input}
             onValueChange={setInput}
-            placeholder={isHub ? 'Ask for anything — edits, prose, pipeline runs…' : `Ask for a change to this ${session.scopeType}…`}
+            placeholder="Ask for anything — edits, prose, pipeline runs…"
             minRows={1}
             maxRows={6}
             autoGrow
@@ -544,7 +573,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
             }}
           />
           <div className={styles.composerBar}>
-            <ChatModelMenu novelId={novelId} session={session} scopeType={session.scopeType} disabled={session.status !== 'active'} />
+            <ChatModelMenu novelId={novelId} session={session} disabled={session.status !== 'active'} />
             <SegmentedControl value={session.mode} onValueChange={v => switchMode(v as 'manual' | 'auto')} size="sm" disabled={session.status !== 'active'}>
               <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
               <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
@@ -662,7 +691,7 @@ function DraftChat({ novelId, onStart, starting = false }: DraftChatProps): Reac
             }}
           />
           <div className={styles.composerBar}>
-            <ChatModelMenu novelId={novelId} scopeType="project" />
+            <ChatModelMenu novelId={novelId} />
             <SegmentedControl value={mode} onValueChange={v => setMode(v as ChatMode)} size="sm" disabled={starting}>
               <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
               <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
@@ -740,8 +769,7 @@ function ChatScreen(): React.JSX.Element {
   };
 
   // The first message of a brand-new chat: create the session, then hand its content to the `ChatThread`
-  // that mounts for it so the SAME turn-sending path (today `useChatTurnMutation`, swapped for the SSE
-  // client in F3) sends it — never sent from here directly.
+  // that mounts for it so the same turn-sending path sends it — never sent from here directly.
   const startDraft = (content: string, mode: ChatMode): void => {
     if (startingRef.current) return;
     startingRef.current = true;
@@ -840,7 +868,6 @@ function ChatScreen(): React.JSX.Element {
                   data-active={session.id === selected?.id}
                 >
                   <div className={styles.sessionTop}>
-                    <StatusChip intent="neutral">{session.scopeType === 'project' ? 'hub' : session.scopeType}</StatusChip>
                     {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
                     <div className={styles.spacer} />
                     <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>

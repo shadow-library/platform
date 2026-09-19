@@ -488,3 +488,13 @@
   gap: 6px;
   margin-top: 8px;
 }
+
+.streamCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streamFailed {
+  border-color: var(--sh-danger-border, var(--sh-border-default));
+}

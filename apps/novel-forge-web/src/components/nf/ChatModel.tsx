@@ -103,11 +103,12 @@ function resolveDefault(scopeType: ChatScope, { config, account, platform, regis
 interface ChatModelMenuProps {
   novelId: string;
   session?: ChatSessionResponse;
-  scopeType: ChatScope;
+  /** The scope whose role and model group the default is resolved from; the refinement chat is always the project hub. */
+  scopeType?: ChatScope;
   disabled?: boolean;
 }
 
-export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatModelMenuProps): React.JSX.Element {
+export function ChatModelMenu({ novelId, session, scopeType = 'project', disabled }: ChatModelMenuProps): React.JSX.Element {
   const modelsQuery = useAiModelsQuery();
   const accountQuery = useAccountSettingsQuery();
   const projectQuery = useProjectQuery(novelId);
