@@ -262,3 +262,22 @@ export class ChatTurnResponse {
   @Field()
   runId: string;
 }
+
+@Schema()
+export class TurnStreamParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field({
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    description: 'Workflow run UUID, as returned by the turn-stream POST.',
+  })
+  runId: string;
+}
+
+@Schema({ description: 'A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does.' })
+export class ChatTurnStreamResponse {
+  @Field({ description: 'Workflow run driving the turn — the key of GET /api/v1/projects/:projectId/turns/:runId/stream.' })
+  runId: string;
+}

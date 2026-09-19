@@ -15,11 +15,13 @@ import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
 import { RefineController } from './refine.controller';
 import { RefineService } from './refine.service';
+import { TurnStreamController } from './turn-stream.controller';
+import { TurnStreamService } from './turn-stream.service';
 
 @Module({
   imports: [DatabaseModule, AiModule, EventsModule, PluginsModule],
-  controllers: [ProposalController, ChangeHistoryController, ChatController, RefineController],
-  providers: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService],
-  exports: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService],
+  controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController],
+  providers: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService],
+  exports: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService],
 })
 export class RefinementModule {}

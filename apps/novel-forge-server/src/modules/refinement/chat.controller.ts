@@ -20,7 +20,7 @@ import {
 } from './chat.dto';
 import { ChatService } from './chat.service';
 import { type ChatTurnHandler, ChatTurnRegistry } from './chat-turn.registry';
-import { serialiseMessage, serialiseProposal } from './serialise';
+import { serialiseMessage, serialiseTurn } from './serialise';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
@@ -81,16 +81,7 @@ export class ChatController {
     const scoped = this.turnRegistry.get(session.scopeType);
     const turn: ChatTurnHandler = scoped ?? ((projectId, sessionId, content) => this.chatService.turn(projectId, sessionId, content));
 
-    const result = await turn(params.projectId, params.sessionId, body.content);
-    return {
-      userMessage: serialiseMessage(result.userMessage),
-      assistantMessage: serialiseMessage(result.assistantMessage),
-      proposal: result.proposal ? serialiseProposal(result.proposal) : undefined,
-      applied: result.applied,
-      applyNote: result.applyNote,
-      seed: result.seed,
-      runId: result.runId,
-    };
+    return serialiseTurn(await turn(params.projectId, params.sessionId, body.content));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

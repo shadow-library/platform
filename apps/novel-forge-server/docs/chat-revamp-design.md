@@ -79,21 +79,52 @@ GET  /api/v1/projects/:projectId/turns/:runId/stream            -> text/event-st
 ```
 
 The gap between the POST returning and the GET connecting is real, so **the server buffers every event it
-emits for a run** and replays the backlog to the first subscriber on connect. Without that, the opening
-deltas of a fast turn are lost. The buffer is keyed by `runId`, bounded, and dropped when the turn ends and
-its stream closes — or by a TTL, so a client that never connects cannot leak one.
+emits for a run** and replays the backlog to every subscriber on connect. Without that, the opening deltas
+of a fast turn are lost. The buffer is keyed by `runId` and owned by `TurnStreamService`, which also owns
+the turn: the POST hands back the `runId` the moment the run row exists and the turn runs on behind it, so
+a client that never connects, or closes its tab mid-reply, cannot abort it. Concretely:
 
-| Event    | Payload                                                       | When                                                          |
-| -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| `ready`  | `{}`                                                          | subscription taken, backlog about to replay                   |
-| `user`   | `ChatMessageResponse`                                         | the user message is persisted                                 |
-| `lookup` | `{ round, tool, args, status: 'running' \| 'ok' \| 'error' }` | each declared lookup                                          |
-| `delta`  | `{ text }`                                                    | a chunk of the `reply` field, scanned out of the partial JSON |
-| `reset`  | `{}`                                                          | the deltas so far are void — discard them and start again     |
-| `done`   | `ChatTurnResult`                                              | transcript, proposal and apply result, exactly today's shape  |
-| `error`  | `{ code, message }`                                           | the turn failed; the existing failed-turn card takes over     |
+- **Bound.** 512 KiB of serialised event data per run. A reply is tens of kilobytes, so the cap is reached
+  only by a model that has stopped producing a reply and started producing a flood.
+- **Overflow.** The backlog is discarded whole and buffering for that run stops; live subscribers are
+  unaffected. A subscriber connecting afterwards is sent a `reset` first and renders from the live events
+  and the authoritative `done`. Replaying a suffix as though it were a prefix would be worse than replaying
+  nothing.
+- **Lifetime.** Dropped as soon as the turn has ended _and_ the last stream watching it has closed;
+  otherwise 60s after the turn ends, which covers both the client that never connected and one whose SSE
+  connection dropped mid-turn and is reconnecting to the same run. A hard 20-minute ceiling from the run's
+  creation catches a turn that never ends at all — past the cutoff at which `pendingTurn` stops reporting
+  it, so nothing is still waiting on it.
+
+| Event    | Payload                                                       | When                                                           |
+| -------- | ------------------------------------------------------------- | -------------------------------------------------------------- |
+| `ready`  | `{}`                                                          | subscription taken, backlog about to replay                    |
+| `user`   | `ChatMessageResponse`                                         | the user message is persisted                                  |
+| `lookup` | `{ round, tool, args, status: 'running' \| 'ok' \| 'error' }` | each declared lookup                                           |
+| `delta`  | `{ text }`                                                    | a chunk of the `reply` field, scanned out of the partial JSON  |
+| `reset`  | `{}`                                                          | the deltas so far are void — discard them and start again      |
+| `done`   | `ChatTurnResponse`                                            | the body `POST /chat/sessions/:id/messages` returns, unchanged |
+| `error`  | `{ code, message }`                                           | the turn failed; the existing failed-turn card takes over      |
+
+Every replay opens with a `reset`, ahead of the backlog. A subscriber is not necessarily a new one — the
+stream tells clients to reconnect after 3s and the frames carry no ids — so a client that reconnects
+mid-turn would otherwise append the whole backlog a second time on top of what it has already rendered. A
+genuinely new client has nothing to discard and is unaffected.
 
 A `llm_cache` hit emits one `delta` carrying the whole reply.
+
+`error` **keeps the partial text and marks the bubble failed** — it never clears it. The deltas the author
+has already read are what the model actually said; blanking them turns a transport failure into something
+indistinguishable from a message that was never sent, and destroys the only evidence of how far the turn
+got. `reset` is the event that means discard, and the two must stay distinguishable: `reset` says the text
+is void because a better one is coming, `error` says no better one is coming. The partial text is never
+persisted, so a reload shows the canonical failed-turn card — user message, retryable, no partial reply —
+which stays the authoritative view. `code` and `message` are `AppError.toResponse()`, so an internal
+failure arrives as the generic `UNKNOWN` face rather than leaking its message.
+
+A run that the server is not buffering — unknown, expired, or belonging to another project — answers `404
+CHT_007` on the GET, before the response is hijacked, so the client falls back to polling `turn` rather
+than holding an empty stream. Two clients may watch one run; each is replayed the backlog independently.
 
 `reset` has two causes, and the client handles both the same way — drop everything streamed so far and render what
 follows. The repair ladder replaced the reply it had already streamed (D6), or a declared-lookup round superseded it:

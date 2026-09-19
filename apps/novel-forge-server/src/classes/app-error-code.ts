@@ -166,6 +166,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_004 = AppErrorCode.badRequest('CHT_004', 'Lookup budget exhausted — the turn hit its declared-lookup round cap');
   static readonly CHT_005 = AppErrorCode.badRequest('CHT_005', 'Invalid chat session mode');
   static readonly CHT_006 = AppErrorCode.conflict('CHT_006', 'Another turn wrote to this conversation at the same time — send the message again');
+  static readonly CHT_007 = AppErrorCode.notFound('CHT_007', 'Turn stream not found — the run is unknown, belongs to another project, or its buffer has expired');
 
   /*!
    * Refinement Proposal Errors

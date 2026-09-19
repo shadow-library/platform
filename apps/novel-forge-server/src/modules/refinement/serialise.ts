@@ -1,36 +1,93 @@
 import { type Refinement } from '@server/database';
 
-import { asStudioPayload, type StudioPayload } from '../ideation/studio-payload.dto';
+import { asStudioPayload } from '../ideation/studio-payload.dto';
+import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
+import { type ScopedTurnResult } from './chat-turn.registry';
 import { type ProposalResponse } from './refinement.dto';
 
 /**
- * Response serialisation helpers for the refinement module. The response schema serialises a `bigint`
- * field typed as `@Field(() => String)` by coercing it to a string — but only on the non-nullable
- * path. A nullable bigint-as-string field (a chat message's `proposalId`, a proposal's `messageId`)
- * that actually holds a value is handed to the serialiser as a raw `bigint`, which fails its
- * `string | null` schema. Coercing the value here, before it reaches the serialiser, keeps the wire
- * contract (`string | null`) intact.
+ * Response serialisation for the refinement module. Every helper here **projects** its row onto the
+ * declared response fields rather than spreading it: over HTTP the compiled schema would drop whatever
+ * the DTO does not declare, but the turn stream writes these objects straight to the wire with no schema
+ * in front of them, and a spread row would put `refinement_proposals.inverse_ops` — the full rollback
+ * payload the DTO reduces to the derived `revertible` flag — in front of the client.
+ *
+ * Bigints are left as bigints: a field typed `@Field(() => String)` is coerced by the response
+ * serialiser, except on the nullable path (a message's `proposalId`, a proposal's `messageId`), where a
+ * raw bigint fails its `string | null` schema — so those two are coerced here instead.
  */
 
-export function serialiseMessage<T extends { proposalId?: bigint | null; payload?: Record<string, unknown> | null }>(message: T): T & { payload?: StudioPayload } {
+interface ChatMessageRow {
+  id: bigint;
+  sessionId: string;
+  ordinal: number;
+  role: string;
+  content: string;
+  payload?: Record<string, unknown> | null;
+  proposalId?: bigint | null;
+  runId?: string | null;
+  modelProvider?: string | null;
+  modelId?: string | null;
+  createdAt: Date;
+}
+
+export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
   return {
-    ...message,
-    proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint),
+    id: message.id,
+    sessionId: message.sessionId,
+    ordinal: message.ordinal,
+    role: message.role,
+    content: message.content,
     payload: asStudioPayload(message.payload),
+    proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint),
+    runId: message.runId ?? null,
+    modelProvider: message.modelProvider ?? null,
+    modelId: message.modelId ?? null,
+    createdAt: message.createdAt,
   };
 }
 
-// The proposal's op/state columns are jsonb (`unknown` on the row); the response exposes them as the
-// loose `Record<string, unknown>` shape the DTO declares, and `messageId`'s nullable bigint is coerced
-// to the wire's `string | null` (see the bigint-as-string note above). `revertible` is derived here.
 export function serialiseProposal(proposal: Refinement.Proposal): ProposalResponse {
   const inverseOps = proposal.inverseOps as unknown[] | null | undefined;
   return {
-    ...proposal,
+    id: proposal.id,
+    projectId: proposal.projectId,
+    sessionId: proposal.sessionId,
     messageId: proposal.messageId == null ? null : (String(proposal.messageId) as unknown as bigint),
+    scopeType: proposal.scopeType,
+    scopeRef: proposal.scopeRef,
+    kind: proposal.kind,
+    status: proposal.status,
+    summary: proposal.summary,
     changeSet: proposal.changeSet as Record<string, unknown>[],
     baseline: proposal.baseline as Record<string, unknown>,
-    opResults: (proposal.opResults ?? null) as Record<string, unknown>[] | null,
+    autoApplied: proposal.autoApplied,
     revertible: proposal.status === 'applied' && (inverseOps?.length ?? 0) > 0,
+    opResults: (proposal.opResults ?? null) as Record<string, unknown>[] | null,
+    model: proposal.model,
+    runId: proposal.runId,
+    appliedAt: proposal.appliedAt,
+    revertedAt: proposal.revertedAt,
+    error: proposal.error as Record<string, unknown> | null,
+    createdAt: proposal.createdAt,
+    updatedAt: proposal.updatedAt,
+  };
+}
+
+/** One turn on the wire. Shared by the synchronous turn endpoint and the stream's `done` event, which carry the same shape by contract. */
+export function serialiseTurn(result: ScopedTurnResult): ChatTurnResponse {
+  const applied = result.applied;
+  return {
+    userMessage: serialiseMessage(result.userMessage),
+    assistantMessage: serialiseMessage(result.assistantMessage),
+    proposal: result.proposal ? serialiseProposal(result.proposal) : undefined,
+    applied: applied && {
+      applied: applied.applied.map(({ artifactRef, newRevision }) => ({ artifactRef, newRevision })),
+      staleMarked: applied.staleMarked,
+      opResults: applied.opResults,
+    },
+    applyNote: result.applyNote,
+    seed: result.seed,
+    runId: result.runId,
   };
 }

@@ -34,11 +34,17 @@ const pgAvailable = await (async () => {
   }
 })();
 
-type TurnEvent = { type: 'user'; ordinal: number } | { type: 'lookup'; round: number; tool: string; status: string } | { type: 'delta'; text: string } | { type: 'reset' };
+type TurnEvent =
+  | { type: 'run'; runId: string }
+  | { type: 'user'; ordinal: number }
+  | { type: 'lookup'; round: number; tool: string; status: string }
+  | { type: 'delta'; text: string }
+  | { type: 'reset' };
 
 function recorder(): { emitter: ChatTurnEmitter; events: TurnEvent[] } {
   const events: TurnEvent[] = [];
   const emitter: ChatTurnEmitter = {
+    onRunId: runId => events.push({ type: 'run', runId }),
     onUserMessage: message => events.push({ type: 'user', ordinal: message.ordinal }),
     onLookup: ({ round, tool, status }) => events.push({ type: 'lookup', round, tool, status }),
     onDelta: text => events.push({ type: 'delta', text }),
@@ -446,7 +452,8 @@ describe.if(pgAvailable)('ChatService', () => {
     const result = await chat.turn(projectId, session.id, 'what should the opening beat be?', emitter);
 
     expect(streamCalls).toBe(streamBefore + 1);
-    expect(events[0]).toEqual({ type: 'user', ordinal: 1 });
+    expect(events[0]).toEqual({ type: 'run', runId: result.runId });
+    expect(events[1]).toEqual({ type: 'user', ordinal: 1 });
     expect(deltaText(events)).toBe(reply);
     expect(events.filter(event => event.type === 'reset')).toHaveLength(0);
     expect(result.userMessage).toMatchObject({ ordinal: 1, role: 'user' });
@@ -529,7 +536,13 @@ describe.if(pgAvailable)('ChatService', () => {
       throw new Error('client gone');
     };
 
-    const result = await chat.turn(projectId, session.id, 'does a dropped client kill the turn?', { onUserMessage: boom, onLookup: boom, onDelta: boom, onReset: boom });
+    const result = await chat.turn(projectId, session.id, 'does a dropped client kill the turn?', {
+      onRunId: boom,
+      onUserMessage: boom,
+      onLookup: boom,
+      onDelta: boom,
+      onReset: boom,
+    });
 
     expect(result.assistantMessage.content).toBe('Persisted all the same.');
     expect((await chat.listMessages(projectId, session.id, {})).map(message => message.role)).toEqual(['user', 'assistant']);

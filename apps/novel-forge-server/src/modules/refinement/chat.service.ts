@@ -73,6 +73,8 @@ export interface ChatLookupEvent {
  * not — so the SSE route relays rather than translates.
  */
 export interface ChatTurnEmitter {
+  /** The run this turn was given, reported as soon as it exists — long before the turn settles. */
+  onRunId: (runId: string) => void;
   onUserMessage: (message: Refinement.ChatMessage) => void;
   onLookup: (event: ChatLookupEvent) => void;
   onDelta: (text: string) => void;
@@ -103,6 +105,10 @@ class EmitterRelay {
       },
       onReset: () => this.reset(),
     };
+  }
+
+  runId(runId: string): void {
+    this.send(() => this.emitter.onRunId(runId));
   }
 
   userMessage(message: Refinement.ChatMessage): void {
@@ -441,6 +447,7 @@ export class ChatService {
     const relay = emitter ? new EmitterRelay(emitter, err => this.logger.warn('chat turn emitter failed — running the turn unobserved', { projectId, sessionId, err })) : null;
     const streamHandlers = relay?.streamHandlers;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
+      relay?.runId(runId);
       await this.workflowRunService.linkContextPack(runId, pack.id);
       // Persist the user's message before the model call: the running chat-turn run plus this
       // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
