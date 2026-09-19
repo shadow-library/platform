@@ -15,7 +15,7 @@ import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-ass
 import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
-import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
+import { ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
 import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
@@ -58,6 +58,86 @@ export interface ChatTurnResult {
   applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
   applyNote?: string;
   runId: string;
+}
+
+export interface ChatLookupEvent {
+  round: number;
+  tool: string;
+  args: Record<string, unknown>;
+  status: 'running' | 'ok' | 'error';
+}
+
+/**
+ * Progress a caller can observe while a turn runs. Its members are the four design §4 events the turn
+ * itself produces — `ready`, `done` and `error` belong to the transport, which knows things the turn does
+ * not — so the SSE route relays rather than translates.
+ */
+export interface ChatTurnEmitter {
+  onUserMessage: (message: Refinement.ChatMessage) => void;
+  onLookup: (event: ChatLookupEvent) => void;
+  onDelta: (text: string) => void;
+  onReset: () => void;
+}
+
+/**
+ * Failure-isolated view of the caller's emitter. The first throw — an SSE write to a browser that has
+ * already gone — retires it and the turn runs on unobserved, because the turn persists its exchange
+ * whether or not anyone is still listening.
+ */
+class EmitterRelay {
+  private retired = false;
+  private shown = false;
+  private supersede = false;
+
+  constructor(
+    private readonly emitter: ChatTurnEmitter,
+    private readonly onError: (err: unknown) => void,
+  ) {}
+
+  get streamHandlers(): ReplyStreamHandlers {
+    return {
+      onDelta: text => {
+        if (this.supersede) this.reset();
+        this.shown = true;
+        this.send(() => this.emitter.onDelta(text));
+      },
+      onReset: () => this.reset(),
+    };
+  }
+
+  userMessage(message: Refinement.ChatMessage): void {
+    this.send(() => this.emitter.onUserMessage(message));
+  }
+
+  lookup(event: ChatLookupEvent): void {
+    this.send(() => this.emitter.onLookup(event));
+  }
+
+  /**
+   * A lookup round re-invokes the model for a reply that replaces the one already displayed, but the
+   * replacement is only worth a blank composer once its own text starts arriving: a round that streams
+   * nothing would otherwise leave the author staring at nothing until the turn lands.
+   */
+  supersedeOnNextDelta(): void {
+    this.supersede = this.shown;
+  }
+
+  private reset(): void {
+    this.supersede = false;
+    if (!this.shown) return;
+    this.shown = false;
+    this.send(() => this.emitter.onReset());
+  }
+
+  private send(emit: () => void): void {
+    if (this.retired) return;
+    try {
+      emit();
+    } catch (err) {
+      this.retired = true;
+      this.onError(err);
+    }
+  }
 }
 
 interface SessionListFilter {
@@ -329,8 +409,11 @@ export class ChatService {
    * One chat turn (design §5.1): guard, compact if needed, assemble the hub pack, one structured
    * call through the repair ladder, then persist the exchange and stage any proposed change-set —
    * all correlated under a fresh workflow run (Appendix A rules 9/11/12/13).
+   *
+   * With an `emitter` the reply streams as it decodes and the declared lookups are reported as they run;
+   * without one the turn is byte-for-byte what it was, down to going through `modelRouter.structured`.
    */
-  async turn(projectId: bigint, sessionId: string, content: string): Promise<ChatTurnResult> {
+  async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter): Promise<ChatTurnResult> {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
@@ -355,12 +438,15 @@ export class ChatService {
     const resolvedModel = await this.resolveSessionModel(session, projectId, project as ProjectConfig | undefined);
     const baseConfig = (project?.config as { models?: Record<string, unknown> } | null) ?? {};
     const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
+    const relay = emitter ? new EmitterRelay(emitter, err => this.logger.warn('chat turn emitter failed — running the turn unobserved', { projectId, sessionId, err })) : null;
+    const streamHandlers = relay?.streamHandlers;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
       // Persist the user's message before the model call: the running chat-turn run plus this
       // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
       // (design recovery). The reply lands in persistAssistantTurn once the model returns.
       const userMessage = await this.persistUserMessage(projectId, session, content, runId);
+      relay?.userMessage(userMessage);
       // Not awaited (D4): must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
       if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, project as ProjectConfig | undefined);
@@ -368,7 +454,11 @@ export class ChatService {
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
         const input = { scopeInstructions, stableContext: pack.renderedStable, history: turnHistory, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content };
-        return this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined, policy) as Promise<ChatRefineOutput>;
+        const routed = effectiveProject as ProjectConfig | undefined;
+        const output = streamHandlers
+          ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, routed, policy)
+          : this.modelRouter.structured(prompt, input, ctx, routed, policy);
+        return output as Promise<ChatRefineOutput>;
       };
 
       // Declared-lookup rounds (chat-hub design §6 step 4): execute the requested read-only tools,
@@ -377,9 +467,10 @@ export class ChatService {
       const lookupCallCounts = new Map<string, number>();
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts);
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, round, relay);
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
+        relay?.supersedeOnNextDelta();
         output = await invoke();
       }
       // A model that still asks for lookups after the budget note answers with its reply alone.
@@ -457,12 +548,21 @@ export class ChatService {
    * `callCounts` is threaded in by the caller so `maxCallsPerRun` is enforced across every round of one turn,
    * not reset per round — the map lives on the turn's call stack, never on the (singleton, cross-project) service.
    */
-  private async executeLookups(projectId: bigint, runId: string, lookups: { tool: string; args?: Record<string, unknown> }[], callCounts: Map<string, number>): Promise<string> {
+  private async executeLookups(
+    projectId: bigint,
+    runId: string,
+    lookups: { tool: string; args?: Record<string, unknown> }[],
+    callCounts: Map<string, number>,
+    round: number,
+    relay: EmitterRelay | null,
+  ): Promise<string> {
     const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
     const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
     const blocks: string[] = [];
 
     for (const lookup of lookups) {
+      const args = lookup.args ?? {};
+      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status: 'running' });
       const rawTool = rawTools.find(t => t.name === lookup.tool);
       const callCount = (callCounts.get(lookup.tool) ?? 0) + 1;
       callCounts.set(lookup.tool, callCount);
@@ -477,7 +577,7 @@ export class ChatService {
         resultStr = `error: tool '${lookup.tool}' has exceeded its call budget for this turn`;
         auditStatus = 'budget_exceeded';
       } else {
-        const parsed = rawTool.inputSchema.safeParse(lookup.args ?? {});
+        const parsed = rawTool.inputSchema.safeParse(args);
         if (!parsed.success) {
           resultStr = `error: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
           auditStatus = 'invalid_args';
@@ -495,10 +595,14 @@ export class ChatService {
         }
       }
 
+      // Copied, not shared: `args` is the object the audit row below stores, and a subscriber that
+      // redacts what it is handed in place would rewrite that row.
+      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status: auditStatus === 'ok' ? 'ok' : 'error' });
+
       const digest = createHash('sha256').update(resultStr).digest('hex').slice(0, 16);
       await this.db
         .insert(schema.toolCalls)
-        .values({ args: lookup.args ?? {}, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool })
+        .values({ args, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool })
         .catch(err => this.logger.error('failed to write lookup audit row', { err }));
       blocks.push(`### ${lookup.tool}\n${resultStr}`);
     }

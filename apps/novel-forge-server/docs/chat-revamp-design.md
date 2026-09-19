@@ -89,11 +89,18 @@ its stream closes — or by a TTL, so a client that never connects cannot leak o
 | `user`   | `ChatMessageResponse`                                         | the user message is persisted                                 |
 | `lookup` | `{ round, tool, args, status: 'running' \| 'ok' \| 'error' }` | each declared lookup                                          |
 | `delta`  | `{ text }`                                                    | a chunk of the `reply` field, scanned out of the partial JSON |
-| `reset`  | `{}`                                                          | the repair ladder produced a different reply — discard deltas |
+| `reset`  | `{}`                                                          | the deltas so far are void — discard them and start again     |
 | `done`   | `ChatTurnResult`                                              | transcript, proposal and apply result, exactly today's shape  |
 | `error`  | `{ code, message }`                                           | the turn failed; the existing failed-turn card takes over     |
 
 A `llm_cache` hit emits one `delta` carrying the whole reply.
+
+`reset` has two causes, and the client handles both the same way — drop everything streamed so far and render what
+follows. The repair ladder replaced the reply it had already streamed (D6), or a declared-lookup round superseded it:
+each round re-invokes the model, so the reply streamed before the lookups ran is not the reply the turn persists. In
+the lookup case the reset is deliberately withheld until the replacement's first `delta`, so the interim reply — the
+model narrating what it is fetching — stays on screen while the lookups run instead of blanking the composer, and a
+round that streams nothing at all (§4.1) never blanks it either.
 
 ### 4.1 When the model defeats the stream
 

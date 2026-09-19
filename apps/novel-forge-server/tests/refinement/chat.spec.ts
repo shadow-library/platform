@@ -8,10 +8,11 @@ import { type ProjectEvent, ProjectEventService } from '@modules/events';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { CHAT_HUB_BUDGET, ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
+import { type ReplyStreamHandlers } from '@modules/ai/model-router.service';
 import { ToolRegistryService } from '@modules/ai/tools';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
-import { ChatService } from '@modules/refinement/chat.service';
+import { ChatService, type ChatTurnEmitter } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { AppErrorCode } from '@server/classes';
@@ -33,6 +34,25 @@ const pgAvailable = await (async () => {
   }
 })();
 
+type TurnEvent = { type: 'user'; ordinal: number } | { type: 'lookup'; round: number; tool: string; status: string } | { type: 'delta'; text: string } | { type: 'reset' };
+
+function recorder(): { emitter: ChatTurnEmitter; events: TurnEvent[] } {
+  const events: TurnEvent[] = [];
+  const emitter: ChatTurnEmitter = {
+    onUserMessage: message => events.push({ type: 'user', ordinal: message.ordinal }),
+    onLookup: ({ round, tool, status }) => events.push({ type: 'lookup', round, tool, status }),
+    onDelta: text => events.push({ type: 'delta', text }),
+    onReset: () => events.push({ type: 'reset' }),
+  };
+  return { emitter, events };
+}
+
+const deltaText = (events: TurnEvent[]): string =>
+  events
+    .filter(event => event.type === 'delta')
+    .map(event => event.text)
+    .join('');
+
 async function codeOf(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
@@ -48,6 +68,8 @@ describe.if(pgAvailable)('ChatService', () => {
   let projectId: bigint;
   const structuredMock = mock<(...args: unknown[]) => Promise<unknown>>(async () => ({ reply: 'stub' }));
   const events = new ProjectEventService();
+  let plainCalls = 0;
+  let streamCalls = 0;
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
@@ -61,8 +83,19 @@ describe.if(pgAvailable)('ChatService', () => {
       // The unawaited chat-title call (fired alongside every first turn whose opener qualifies) is
       // dispatched here, before it ever reaches structuredMock — otherwise it would race the turn's own
       // calls for entries queued via mockImplementationOnce.
-      structured: (promptModule: { key: string }, ...rest: unknown[]) =>
-        promptModule.key === 'chat-title' ? Promise.resolve({ title: 'Auto title' }) : structuredMock(promptModule, ...rest),
+      structured: (promptModule: { key: string }, ...rest: unknown[]) => {
+        if (promptModule.key === 'chat-title') return Promise.resolve({ title: 'Auto title' });
+        plainCalls++;
+        return structuredMock(promptModule, ...rest);
+      },
+      // Only the turn's own call ever streams, so it shares structuredMock's queue with `structured` and
+      // never sees a chat-title call: the two paths cannot consume each other's entries out of order.
+      streamStructured: async (promptModule: { key: string }, input: unknown, ctx: unknown, stream: ReplyStreamHandlers, ...rest: unknown[]) => {
+        streamCalls++;
+        const output = (await structuredMock(promptModule, input, ctx, ...rest)) as { reply?: unknown };
+        if (typeof output.reply === 'string') for (const chunk of output.reply.match(/[\s\S]{1,5}/g) ?? []) stream.onDelta(chunk);
+        return output;
+      },
       resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
       resolveFor: async () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),
     } as never;
@@ -401,5 +434,104 @@ describe.if(pgAvailable)('ChatService', () => {
     // three since each round resets the counter. Enforced per-turn, the 3rd call is over budget.
     const calls = await db.query.toolCalls.findMany({ where: and(eq(schema.toolCalls.runId, result.runId), eq(schema.toolCalls.tool, 'get_draft')), orderBy: schema.toolCalls.id });
     expect(calls.map(c => c.status)).toEqual(['ok', 'ok', 'budget_exceeded']);
+  });
+
+  it('should stream the reply to an emitter and still return the result a plain turn returns', async () => {
+    const session = await chat.createSession(projectId, {});
+    const reply = 'The tide is out; walk the flats before the fog lands.';
+    structuredMock.mockImplementationOnce(async () => ({ reply, changeSet: [{ op: 'premise.update', premise: 'streamed premise' }] }));
+    const { emitter, events } = recorder();
+    const streamBefore = streamCalls;
+
+    const result = await chat.turn(projectId, session.id, 'what should the opening beat be?', emitter);
+
+    expect(streamCalls).toBe(streamBefore + 1);
+    expect(events[0]).toEqual({ type: 'user', ordinal: 1 });
+    expect(deltaText(events)).toBe(reply);
+    expect(events.filter(event => event.type === 'reset')).toHaveLength(0);
+    expect(result.userMessage).toMatchObject({ ordinal: 1, role: 'user' });
+    expect(result.assistantMessage).toMatchObject({ ordinal: 2, role: 'assistant', content: reply });
+    expect(result.proposal).toMatchObject({ status: 'pending', kind: 'hub' });
+  });
+
+  it('should go through structured, never streamStructured, when no emitter is passed', async () => {
+    const session = await chat.createSession(projectId, {});
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'nobody asked to watch' }));
+    const plainBefore = plainCalls;
+    const streamBefore = streamCalls;
+
+    await chat.turn(projectId, session.id, 'answer without an audience');
+
+    expect(plainCalls).toBe(plainBefore + 1);
+    expect(streamCalls).toBe(streamBefore);
+  });
+
+  it('should report each declared lookup with its round, tool and outcome', async () => {
+    const session = await chat.createSession(projectId, {});
+    structuredMock.mockImplementationOnce(async () => ({
+      reply: 'Pulling what I need.',
+      lookups: [
+        { tool: 'get_draft', args: { chapter: 1 } },
+        { tool: 'search_lore', args: { query: 'axiom system' } },
+      ],
+    }));
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Grounded in what came back.' }));
+    const { emitter, events } = recorder();
+
+    await chat.turn(projectId, session.id, 'ground this in the chapter one draft', emitter);
+
+    expect(events.filter(event => event.type === 'lookup')).toEqual([
+      { type: 'lookup', round: 0, tool: 'get_draft', status: 'running' },
+      { type: 'lookup', round: 0, tool: 'get_draft', status: 'ok' },
+      { type: 'lookup', round: 0, tool: 'search_lore', status: 'running' },
+      { type: 'lookup', round: 0, tool: 'search_lore', status: 'error' },
+    ]);
+  });
+
+  it('should hold the interim reply up until the post-lookup round starts arriving, then reset once', async () => {
+    const session = await chat.createSession(projectId, {});
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Checking the drafts.', lookups: [{ tool: 'get_draft', args: { chapter: 1 } }] }));
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Chapter one lands on the wrong beat.' }));
+    const { emitter, events } = recorder();
+
+    await chat.turn(projectId, session.id, 'is chapter one landing its beat?', emitter);
+
+    const shape = events.map(event => event.type);
+    const resetAt = shape.indexOf('reset');
+    expect(shape.filter(type => type === 'reset')).toHaveLength(1);
+    expect(resetAt).toBeGreaterThan(shape.lastIndexOf('lookup'));
+    expect(shape[resetAt + 1]).toBe('delta');
+    expect(deltaText(events.slice(0, resetAt))).toBe('Checking the drafts.');
+    expect(deltaText(events.slice(resetAt))).toBe('Chapter one lands on the wrong beat.');
+  });
+
+  // The case an eager round-boundary reset would get wrong: nothing was shown before the lookups, so
+  // there is nothing to discard and the author must never see the composer blanked.
+  it('should not reset when the round before the lookups streamed nothing', async () => {
+    const session = await chat.createSession(projectId, {});
+    structuredMock.mockImplementationOnce(async () => ({ reply: '', lookups: [{ tool: 'get_draft', args: { chapter: 1 } }] }));
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Chapter one opens on the wrong beat.' }));
+    const { emitter, events } = recorder();
+
+    const result = await chat.turn(projectId, session.id, 'read chapter one and tell me its opening beat', emitter);
+
+    expect(events.filter(event => event.type === 'reset')).toHaveLength(0);
+    expect(deltaText(events)).toBe('Chapter one opens on the wrong beat.');
+    expect(events.map(event => event.type).lastIndexOf('lookup')).toBeLessThan(events.map(event => event.type).indexOf('delta'));
+    expect(result.assistantMessage.content).toBe('Chapter one opens on the wrong beat.');
+  });
+
+  it('should finish and persist the turn when every emitter call throws', async () => {
+    const session = await chat.createSession(projectId, {});
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Nobody is listening.', lookups: [{ tool: 'get_draft', args: { chapter: 1 } }] }));
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Persisted all the same.' }));
+    const boom = (): never => {
+      throw new Error('client gone');
+    };
+
+    const result = await chat.turn(projectId, session.id, 'does a dropped client kill the turn?', { onUserMessage: boom, onLookup: boom, onDelta: boom, onReset: boom });
+
+    expect(result.assistantMessage.content).toBe('Persisted all the same.');
+    expect((await chat.listMessages(projectId, session.id, {})).map(message => message.role)).toEqual(['user', 'assistant']);
   });
 });
