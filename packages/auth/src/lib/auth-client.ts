@@ -455,7 +455,7 @@ export class AuthClient {
     assertValidRoleCatalog(manifest);
     const token = await this.identityToken(ROLE_SYNC_SCOPE);
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
-    const url = `${this.issuer}/api/v1/authz/catalog${options.force ? '?force=true' : ''}`;
+    const url = `${this.identityUrl}/api/v1/authz/catalog${options.force ? '?force=true' : ''}`;
     const response = await this.transport(url, { method: 'PUT', headers, body: JSON.stringify(manifest) }).catch((error: Error) =>
       throwError(this.logged(AuthErrorCode.ROLE_SYNC_FAILED.create({ reason: `role sync failed: ${error.message}` }))),
     );

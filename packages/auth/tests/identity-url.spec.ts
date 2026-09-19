@@ -21,12 +21,13 @@ import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
  */
 const PUBLIC_ISSUER = 'https://identity.shadow-apps.test';
 const AUDIENCE = 'api://pulse';
+const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
 
 describe('AuthClient identityUrl (back-channel split)', () => {
   let idp: TestIdP;
 
   beforeAll(async () => {
-    idp = await createTestIdP({ issuer: PUBLIC_ISSUER });
+    idp = await createTestIdP({ issuer: PUBLIC_ISSUER, clientId: CLIENT.id, clientSecret: CLIENT.secret });
   });
   afterAll(() => idp.stop());
 
@@ -88,6 +89,20 @@ describe('AuthClient identityUrl (back-channel split)', () => {
 
   it('should refuse an identityUrl that is not an absolute url', () => {
     expect(() => new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: 'identity-server.identity', audience: AUDIENCE })).toThrow();
+  });
+
+  /**
+   * Endpoints that come from discovery are rebased for free; a url this client builds by hand is
+   * not, and the public issuer resolves to the pod's own loopback in-cluster. `syncRoles` ran on
+   * `issuer` and died on connect at every startup that set identityUrl.
+   */
+  it('should send a hand-built back-channel url to identityUrl, not the public issuer', async () => {
+    const auth = new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: idp.url, audience: AUDIENCE, client: CLIENT });
+    const before = idp.getRequestCount('/api/v1/authz/catalog');
+
+    await auth.syncRoles({ permissions: [{ name: 'posts:write' }], roles: [{ name: 'editor', permissions: ['posts:write'] }] });
+
+    expect(idp.getRequestCount('/api/v1/authz/catalog')).toBe(before + 1);
   });
 
   it('should leave every endpoint untouched when identityUrl is not set', async () => {
