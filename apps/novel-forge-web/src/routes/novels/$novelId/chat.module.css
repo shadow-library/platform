@@ -260,12 +260,14 @@
 .sessionTop {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 8px;
   min-height: 22px;
 }
 
 .sessionTitle {
+  flex: 1;
+  min-width: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);
@@ -280,7 +282,8 @@
 }
 
 .sessionTitleInput {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 .sessionSummary {
@@ -290,11 +293,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
-}
-
-.sessionTime {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
 }
 
 .hero {

@@ -424,9 +424,6 @@ function CanonFactsScreen(): React.JSX.Element {
                   <div className={styles.factName}>{fact.factKey}</div>
                   <div className={styles.factSub}>{revealed ? `revealed to ${fact.knowledge.length}` : 'hidden'}</div>
                 </div>
-                <StatusChip intent={revealed ? 'success' : 'warning'} dot>
-                  {revealed ? 'revealed' : 'hidden'}
-                </StatusChip>
                 <div className="nf-rowactions">
                   <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
                     <TrashIcon size={13} />

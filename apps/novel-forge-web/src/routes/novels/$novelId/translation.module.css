@@ -269,11 +269,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .railTerm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 15px;
   font-weight: 600;
+}
+
+.railRowTop :global(.nf-chip) {
+  flex-shrink: 0;
 }
 
 .railTarget {

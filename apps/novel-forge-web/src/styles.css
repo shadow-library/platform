@@ -241,19 +241,65 @@ a:hover {
   color: var(--sh-text-tertiary);
 }
 
-/* A `.nf-selrow` laid out as a stacked card; selection colours come from `data-active` + `--nf-bar`.
-   Compound selector on purpose: plain `.nf-selrow` below sets `align-items: center` later in the
+/* A `.nf-selrow` laid out as a stacked card for rows whose lines are all primary content (a chip
+   strip, a title, a status/duration line) — genuinely multi-line, just tighter than the old 12px/5px
+   card. Compound selector on purpose: plain `.nf-selrow` below sets `align-items: center` later in the
    cascade at equal specificity, which would re-center stacked rows' titles. */
 .nf-selrow.nf-selrow-stack {
   flex-direction: column;
   align-items: stretch;
-  gap: 5px;
-  padding: 12px;
-  margin-bottom: 4px;
+  gap: 3px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
 }
 
 .nf-selrow.nf-selrow-stack[data-active='true'] {
   box-shadow: inset 2px 0 0 var(--nf-bar, var(--sh-accent));
+}
+
+/* One line — title left (truncating) and a meta cluster right — with an opt-in second line
+   (`.nf-selrow-flat` + a consumer's own summary element below it) for the rows that carry real
+   secondary text. ~32px with no second line. */
+.nf-selrow.nf-selrow-flat {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 10px;
+  margin-bottom: 1px;
+}
+
+.nf-selrow.nf-selrow-flat[data-active='true'] {
+  box-shadow: inset 2px 0 0 var(--nf-bar, var(--sh-accent));
+}
+
+/* Reserves the wider of the two states (icons vs. the time label) so the swap on hover/focus never
+   shifts the row's layout. */
+.nf-selrow-meta {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 70px;
+  height: 22px;
+}
+
+.nf-selrow-meta-time {
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+  white-space: nowrap;
+  transition: opacity 0.12s;
+}
+
+.nf-selrow:hover .nf-selrow-meta-time,
+.nf-selrow:focus-within .nf-selrow-meta-time {
+  opacity: 0;
+}
+
+.nf-selrow-meta .nf-rowactions {
+  position: absolute;
+  inset: 0;
+  justify-content: flex-end;
 }
 
 .nf-scroll {

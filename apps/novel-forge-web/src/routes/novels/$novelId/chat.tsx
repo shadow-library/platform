@@ -864,38 +864,39 @@ function ChatScreen(): React.JSX.Element {
                   tabIndex={0}
                   onClick={() => selectSession(session.id)}
                   onKeyDown={e => e.key === 'Enter' && selectSession(session.id)}
-                  className="nf-selrow nf-selrow-stack"
+                  className="nf-selrow nf-selrow-flat"
                   data-active={session.id === selected?.id}
                 >
                   <div className={styles.sessionTop}>
                     {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
-                    <div className={styles.spacer} />
-                    <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
-                    <div className="nf-rowactions">
-                      <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
-                        <EditIcon size={13} />
-                      </RowAction>
-                      <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
-                        <ArchiveIcon size={13} />
-                      </RowAction>
-                      <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
-                        <TrashIcon size={13} />
-                      </RowAction>
+                    {renamingSessionId === session.id ? (
+                      <RenameInput
+                        label={`Rename “${session.title ?? 'New chat'}”`}
+                        value={session.title ?? ''}
+                        loading={renameSession.isPending}
+                        onCommit={title => rename(session.id, title)}
+                        onCancel={() => setRenamingSessionId(undefined)}
+                        className={styles.sessionTitleInput}
+                      />
+                    ) : (
+                      <div className={styles.sessionTitle}>{session.title ?? 'New chat'}</div>
+                    )}
+                    <div className="nf-selrow-meta">
+                      <span className="nf-selrow-meta-time">{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
+                      <div className="nf-rowactions">
+                        <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
+                          <EditIcon size={13} />
+                        </RowAction>
+                        <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
+                          <ArchiveIcon size={13} />
+                        </RowAction>
+                        <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
+                          <TrashIcon size={13} />
+                        </RowAction>
+                      </div>
                     </div>
                   </div>
-                  {renamingSessionId === session.id ? (
-                    <RenameInput
-                      label={`Rename “${session.title ?? 'New chat'}”`}
-                      value={session.title ?? ''}
-                      loading={renameSession.isPending}
-                      onCommit={title => rename(session.id, title)}
-                      onCancel={() => setRenamingSessionId(undefined)}
-                      className={styles.sessionTitleInput}
-                    />
-                  ) : (
-                    <div className={styles.sessionTitle}>{session.title ?? 'New chat'}</div>
-                  )}
-                  {session.summary && <div className={styles.sessionSummary}>{session.summary}</div>}
+                  {session.summary && renamingSessionId !== session.id && <div className={styles.sessionSummary}>{session.summary}</div>}
                 </div>
               ))}
             </div>
