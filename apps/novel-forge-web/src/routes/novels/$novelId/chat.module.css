@@ -244,6 +244,19 @@
   color: var(--sh-accent);
 }
 
+.railGroup:first-child .railGroupHeading {
+  margin-top: 2px;
+}
+
+.railGroupHeading {
+  margin: 16px 6px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
 .sessionTop {
   display: flex;
   align-items: center;

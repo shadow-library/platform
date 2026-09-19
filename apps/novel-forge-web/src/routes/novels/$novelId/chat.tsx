@@ -27,7 +27,7 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
-import { messageTime, projectTitle, relativeTime } from '@/lib/format';
+import { groupByRecency, messageTime, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
 import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, PluginSourceChip } from './proposals';
@@ -460,7 +460,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
         {session.scopeRef && <StatusChip intent="neutral">{session.scopeRef}</StatusChip>}
         {renamingHeader ? (
           <RenameInput
-            label={`Rename “${session.title ?? 'Untitled chat'}”`}
+            label={`Rename “${session.title ?? 'New chat'}”`}
             value={session.title ?? ''}
             loading={updateSession.isPending}
             onCommit={renameSession}
@@ -469,7 +469,10 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
           />
         ) : (
           <button type="button" className={styles.threadTitleButton} onClick={() => setRenamingHeader(true)}>
-            <span className={styles.threadTitle}>{session.title ?? 'Untitled chat'}</span>
+            {/* The namer runs alongside the first turn (ac3d730d), so a null title while that turn is
+                still pending is genuinely being named, not just untitled — `state.kind` already tracks
+                that turn for the composer lock, so this reuses it rather than adding a flag. */}
+            <span className={styles.threadTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
             <EditIcon size={13} className={styles.threadTitleEdit} />
           </button>
         )}
@@ -706,6 +709,11 @@ function ChatScreen(): React.JSX.Element {
   // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
   // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
   const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
+  // The server sorts by `updatedAt`, which a rename, archive, or mode switch also bumps without
+  // touching `lastTurnAt` — so a chat's row can move without it having been spoken to. Bucketing
+  // reads `lastTurnAt ?? updatedAt` (recency is "last spoken to"), and `groupByRecency` re-sorts on
+  // that same field before grouping so the two never disagree on order.
+  const sessionGroups = groupByRecency(sessions, session => session.lastTurnAt ?? session.updatedAt);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
@@ -818,46 +826,51 @@ function ChatScreen(): React.JSX.Element {
           {!sessionsQuery.isLoading && sessions.length === 0 && (
             <div className="nf-emptynote">{statusFilter === 'active' ? 'No chats yet — start one to run the whole novel.' : 'No archived chats.'}</div>
           )}
-          {sessions.map(session => (
-            <div
-              key={session.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => selectSession(session.id)}
-              onKeyDown={e => e.key === 'Enter' && selectSession(session.id)}
-              className="nf-selrow nf-selrow-stack"
-              data-active={session.id === selected?.id}
-            >
-              <div className={styles.sessionTop}>
-                <StatusChip intent="neutral">{session.scopeType === 'project' ? 'hub' : session.scopeType}</StatusChip>
-                {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
-                <div className={styles.spacer} />
-                <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
-                <div className="nf-rowactions">
-                  <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
-                    <EditIcon size={13} />
-                  </RowAction>
-                  <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
-                    <ArchiveIcon size={13} />
-                  </RowAction>
-                  <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
+          {sessionGroups.map(group => (
+            <div key={group.label} className={styles.railGroup}>
+              <h3 className={styles.railGroupHeading}>{group.label}</h3>
+              {group.items.map(session => (
+                <div
+                  key={session.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectSession(session.id)}
+                  onKeyDown={e => e.key === 'Enter' && selectSession(session.id)}
+                  className="nf-selrow nf-selrow-stack"
+                  data-active={session.id === selected?.id}
+                >
+                  <div className={styles.sessionTop}>
+                    <StatusChip intent="neutral">{session.scopeType === 'project' ? 'hub' : session.scopeType}</StatusChip>
+                    {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
+                    <div className={styles.spacer} />
+                    <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
+                    <div className="nf-rowactions">
+                      <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
+                        <EditIcon size={13} />
+                      </RowAction>
+                      <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
+                        <ArchiveIcon size={13} />
+                      </RowAction>
+                      <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
+                        <TrashIcon size={13} />
+                      </RowAction>
+                    </div>
+                  </div>
+                  {renamingSessionId === session.id ? (
+                    <RenameInput
+                      label={`Rename “${session.title ?? 'New chat'}”`}
+                      value={session.title ?? ''}
+                      loading={renameSession.isPending}
+                      onCommit={title => rename(session.id, title)}
+                      onCancel={() => setRenamingSessionId(undefined)}
+                      className={styles.sessionTitleInput}
+                    />
+                  ) : (
+                    <div className={styles.sessionTitle}>{session.title ?? 'New chat'}</div>
+                  )}
+                  {session.summary && <div className={styles.sessionSummary}>{session.summary}</div>}
                 </div>
-              </div>
-              {renamingSessionId === session.id ? (
-                <RenameInput
-                  label={`Rename “${session.title ?? 'Untitled chat'}”`}
-                  value={session.title ?? ''}
-                  loading={renameSession.isPending}
-                  onCommit={title => rename(session.id, title)}
-                  onCancel={() => setRenamingSessionId(undefined)}
-                  className={styles.sessionTitleInput}
-                />
-              ) : (
-                <div className={styles.sessionTitle}>{session.title ?? 'Untitled chat'}</div>
-              )}
-              {session.summary && <div className={styles.sessionSummary}>{session.summary}</div>}
+              ))}
             </div>
           ))}
         </div>
