@@ -15,6 +15,7 @@ import {
   useApplyProposalMutation,
   useChatMessagesQuery,
   useChatTurnMutation,
+  useCreateChatSessionMutation,
   useDeleteChatSessionMutation,
   useDiscardProposalMutation,
   useListChangesQuery,
@@ -288,9 +289,13 @@ interface ChatThreadProps {
   novelId: string;
   session: ChatSessionResponse;
   onOpenHistory: () => void;
+  // The just-created session's first message, queued by the draft screen — this is the one place a turn
+  // is ever sent without the author touching this thread's own composer, and the seam F3 swaps to stream.
+  initialTurn?: string;
+  onInitialTurnSent?: () => void;
 }
 
-function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React.JSX.Element {
+function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTurnSent }: ChatThreadProps): React.JSX.Element {
   const messagesQuery = useChatMessagesQuery(novelId, session.id);
   const queryClient = useQueryClient();
   const turn = useChatTurnMutation(novelId, session.id);
@@ -366,6 +371,22 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   const switchMode = (mode: 'manual' | 'auto'): void => {
     updateSession.mutate({ sessionId: session.id, mode }, { onError: err => toast.danger(err.message) });
   };
+
+  // Fires once per freshly created session: the draft screen hands off its content and unmounts, so this
+  // is the only place it can be sent. Clearing the parent's queue up front — before the request settles —
+  // means a remount (StrictMode, or the author bouncing back to this session) never re-sends it.
+  const sentInitialRef = useRef(false);
+  useEffect(() => {
+    if (!initialTurn || sentInitialRef.current) return;
+    sentInitialRef.current = true;
+    onInitialTurnSent?.();
+    // Pass the content as the draft too: on an UNRECORDED failure (network error, 500 before the workflow
+    // starts) there is no failed-turn card to retry from — `useChatTurnMutation`'s onError rolls a brand-new
+    // session's optimistic message back to an empty transcript, so without this the author's opening
+    // message is just gone. `resend` hands it back into this thread's own composer.
+    resend(initialTurn, initialTurn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- guarded by sentInitialRef; re-running on every resend identity change would defeat the once-only guard
+  }, [initialTurn]);
 
   return (
     <div className={styles.thread}>
@@ -495,9 +516,12 @@ const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
 interface DraftChatProps {
   novelId: string;
   onStart?: (content: string, mode: ChatMode) => void;
+  // True while the session create this draft handed off is in flight — locks the composer so a second
+  // Enter or Send click can't spawn a second session from the same opening message.
+  starting?: boolean;
 }
 
-function DraftChat({ novelId, onStart }: DraftChatProps): React.JSX.Element {
+function DraftChat({ novelId, onStart, starting = false }: DraftChatProps): React.JSX.Element {
   const projectQuery = useProjectQuery(novelId);
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<ChatMode>('manual');
@@ -505,7 +529,7 @@ function DraftChat({ novelId, onStart }: DraftChatProps): React.JSX.Element {
 
   const isAuto = mode === 'auto';
   const name = projectQuery.data ? projectTitle(projectQuery.data) : 'this novel';
-  const canStart = Boolean(onStart) && input.trim().length > 0;
+  const canStart = Boolean(onStart) && input.trim().length > 0 && !starting;
 
   const fill = (prompt: string): void => {
     setInput(prompt);
@@ -546,6 +570,7 @@ function DraftChat({ novelId, onStart }: DraftChatProps): React.JSX.Element {
             minRows={1}
             maxRows={6}
             autoGrow
+            disabled={starting}
             className={styles.input}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -556,13 +581,13 @@ function DraftChat({ novelId, onStart }: DraftChatProps): React.JSX.Element {
           />
           <div className={styles.composerBar}>
             <ChatModelMenu novelId={novelId} scopeType="project" />
-            <SegmentedControl value={mode} onValueChange={v => setMode(v as ChatMode)} size="sm">
+            <SegmentedControl value={mode} onValueChange={v => setMode(v as ChatMode)} size="sm" disabled={starting}>
               <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
               <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
             </SegmentedControl>
             <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
             <div className={styles.spacer} />
-            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} disabled={!canStart} onClick={start}>
+            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={starting} disabled={!canStart} onClick={start}>
               Send
             </Button>
           </div>
@@ -580,6 +605,21 @@ function ChatScreen(): React.JSX.Element {
   const sessionsQuery = useListChatSessionsQuery(novelId, { status: statusFilter, limit: 50 });
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
+  const createSession = useCreateChatSessionMutation(novelId);
+  // Bridges the gap between a create succeeding and the sessions list re-fetching to include the new row:
+  // without it, `selected` would fall back to `sessions[0]` — a different chat — for one render.
+  const [draftSession, setDraftSession] = useState<ChatSessionResponse>();
+  // The opening message, queued for the one `ChatThread` mount that owns sending it.
+  const [pendingFirstTurn, setPendingFirstTurn] = useState<{ sessionId: string; content: string }>();
+  // A synchronous latch against a second create: `createSession.isPending` only becomes true once the
+  // mutate call's internal dispatch runs, and both a very fast double-submit and a stray render in that
+  // gap could otherwise slip a second `mutate` through. Held until `selectSession` actually resolves —
+  // `isPending` (and so `starting` on `DraftChat`) goes false the instant `onSuccess` runs, before the
+  // navigation away from the draft screen has landed, and the composer re-enables in that window.
+  const startingRef = useRef(false);
+  // Which `startDraft` call is still current: `newChat` bumps it so an earlier, now-abandoned create's
+  // `onSuccess` can tell it was superseded and skip navigating the author away from what they're doing now.
+  const startRequestRef = useRef(0);
 
   // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
   // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
@@ -591,11 +631,51 @@ function ChatScreen(): React.JSX.Element {
   // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.
   // The draft sentinel outranks both — it means the author asked for a chat none of these rows can be.
   const selectSession = (id?: string): Promise<void> => navigate({ search: { session: id } });
-  const selected = sessionParam === DRAFT_SESSION ? undefined : (sessions.find(s => s.id === sessionParam) ?? sessions[0]);
+  const selected = sessionParam === DRAFT_SESSION ? undefined : (sessions.find(s => s.id === sessionParam) ?? (draftSession?.id === sessionParam ? draftSession : sessions[0]));
+
+  // Once the invalidated sessions list actually carries the new row, the lookup above finds it on its own
+  // — drop the stand-in during render (not an effect: this is adjusting state from props, not
+  // synchronizing with an external system) so a later archive/delete of it isn't shadowed by a stale snapshot.
+  if (draftSession && sessions.some(s => s.id === draftSession.id)) setDraftSession(undefined);
 
   const newChat = (): void => {
     setStatusFilter('active');
+    // Invalidates any create still in flight: its `onSuccess` checks this token and, finding it stale,
+    // leaves the author here instead of navigating them to a chat they didn't ask to open. The session it
+    // created is not lost — it still lands in the rail once the list invalidation the mutation already
+    // does resolves — just not auto-opened.
+    startRequestRef.current += 1;
+    startingRef.current = false;
     void selectSession(DRAFT_SESSION);
+  };
+
+  // The first message of a brand-new chat: create the session, then hand its content to the `ChatThread`
+  // that mounts for it so the SAME turn-sending path (today `useChatTurnMutation`, swapped for the SSE
+  // client in F3) sends it — never sent from here directly.
+  const startDraft = (content: string, mode: ChatMode): void => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    const requestId = (startRequestRef.current += 1);
+    createSession.mutate(
+      { mode },
+      {
+        onSuccess: async session => {
+          if (startRequestRef.current !== requestId) return;
+          setStatusFilter('active');
+          setDraftSession(session);
+          setPendingFirstTurn({ sessionId: session.id, content });
+          // Held until the navigation away from the draft screen actually lands — releasing it on
+          // `onSuccess` alone re-enables the still-mounted `DraftChat` composer while `sessionParam` is
+          // still the draft sentinel, letting a second Enter in that window fire a second create.
+          await selectSession(session.id);
+          startingRef.current = false;
+        },
+        onError: err => {
+          if (startRequestRef.current === requestId) startingRef.current = false;
+          toast.danger(err.message);
+        },
+      },
+    );
   };
 
   const archive = (session: ChatSessionResponse): void => {
@@ -676,7 +756,18 @@ function ChatScreen(): React.JSX.Element {
 
       {/* thread */}
       <div className="nf-detail">
-        {selected ? <ChatThread key={selected.id} novelId={novelId} session={selected} onOpenHistory={() => setHistoryOpen(true)} /> : <DraftChat novelId={novelId} />}
+        {selected ? (
+          <ChatThread
+            key={selected.id}
+            novelId={novelId}
+            session={selected}
+            onOpenHistory={() => setHistoryOpen(true)}
+            initialTurn={pendingFirstTurn?.sessionId === selected.id ? pendingFirstTurn.content : undefined}
+            onInitialTurnSent={() => setPendingFirstTurn(undefined)}
+          />
+        ) : (
+          <DraftChat novelId={novelId} onStart={startDraft} starting={createSession.isPending} />
+        )}
       </div>
 
       <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
