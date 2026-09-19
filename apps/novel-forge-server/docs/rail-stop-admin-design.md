@@ -68,6 +68,8 @@ Tiers per `plan-orchestrator`. Groups are serial. Within a group, ∥ marks task
 | R2  | Move each page's explanatory blurb from the rail into that page's detail-pane empty state: Canon Facts ("The spoiler ledger…"), Illustrations ("Forge composes each prompt…"), and any other page carrying one — find them all. The blurb must not appear twice, and must still be reachable when the detail pane has a selection.                                                                        | Medium | ⇢   | `apps/novel-forge-web/src/routes/novels/$novelId/*.tsx`                  |
 | R3  | Story Bible's entity-type filter becomes chips rather than the 58px `SHOWING / All types` card. Keep it keyboard-navigable and keep whatever the current control does about types with zero entities.                                                                                                                                                                                                     | Low    | ⇢   | `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx` + css  |
 
+| R5 | Replace the favicon. It is currently the Shadow Library "S" on a non-square `-30 -30 350 470` viewBox, carrying a `@keyframes glow-pulse` animation and two drop-shadow filters — squished, muddy and animated at 16px. Use the app's own book mark on a square viewBox, following `web-novel-web`'s rounded-square-plus-white-glyph pattern with Novel Forge's indigo. Also fix `manifest.json`: it references a `logo.png` that does not exist, and its `theme_color` is the old purple rather than `#4f46e5`. | Low | ∥ | `apps/novel-forge-web/public/favicon.svg`, `public/manifest.json` |
+
 ## Group S — stopping work
 
 | id  | Task                                                                                                                                                                                                                                                                                                                   | Tier   | ∥   | Files                                                                             |
@@ -97,7 +99,7 @@ Tiers per `plan-orchestrator`. Groups are serial. Within a group, ∥ marks task
 ## Ordering
 
 ```
-R1 → R4 → R2 → R3                (rail; R1 and R4 are both styles.css)
+R1 → R4 → R2 → R3 → R5           (rail; R1/R4 are both styles.css, R5 is assets only)
 S1 → S2                          (run cancellation)
 S3 → S4 → S5                     (job cancellation; S3 is the migration)
 N1 → N2
