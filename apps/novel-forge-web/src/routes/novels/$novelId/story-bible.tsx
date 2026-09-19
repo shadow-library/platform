@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
@@ -98,57 +98,26 @@ function iconTile(size: number, radius: number, background: string, color: strin
   return { '--tile-size': `${size}px`, '--tile-radius': `${radius}px`, '--tile-bg': background, '--tile-fg': color } as React.CSSProperties;
 }
 
-interface TypePickerProps {
+const TYPE_FILTER_LABEL_ID = 'story-bible-type-filter-label';
+
+interface TypeChipsProps {
   active: BibleCategory;
   counts: Map<EntityType, number>;
   onPick: (category: BibleCategory) => void;
 }
 
-function TypePicker({ active, counts, onPick }: TypePickerProps): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const pick = (category: BibleCategory): void => {
-    onPick(category);
-    setOpen(false);
-  };
-
+function TypeChips({ active, counts, onPick }: TypeChipsProps): React.JSX.Element {
   return (
-    <div className={styles.picker}>
-      <button type="button" className="nf-btrigger" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(prev => !prev)}>
-        <span className={styles.iconTile} style={iconTile(34, 9, 'var(--sh-accent)', 'var(--sh-on-accent)')}>
-          <TypeGlyph type={active} size={18} />
-        </span>
-        <span className={styles.triggerLabel}>
-          <span className={styles.showingLabel}>Showing</span>
-          <span className={styles.showingValue}>{active === 'all' ? 'All types' : TYPE_LABEL[active]}</span>
-        </span>
-        <ChevronDownIcon size={17} className={styles.iconSecondary} />
+    <div className={styles.chipRow} role="group" aria-labelledby={TYPE_FILTER_LABEL_ID}>
+      <button type="button" className={styles.chip} data-active={active === 'all' || undefined} aria-pressed={active === 'all'} onClick={() => onPick('all')}>
+        All
       </button>
-      {open && (
-        <>
-          <div role="presentation" className={styles.overlay} onClick={() => setOpen(false)} />
-          <div role="menu" className={styles.menu}>
-            <button type="button" className="nf-menuitem" data-active={active === 'all' || undefined} onClick={() => pick('all')}>
-              <span className={styles.iconTile} style={iconTile(28, 7, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
-                <TypeGlyph type="all" size={15} />
-              </span>
-              <span className={styles.menuItemText}>
-                <span className={styles.menuItemTitle}>All types</span>
-                <span className={styles.menuItemSub}>Browse everything as cards</span>
-              </span>
-            </button>
-            <div className={styles.menuDivider} />
-            {TYPE_ORDER.map(type => (
-              <button key={type} type="button" className="nf-menuitem" data-active={active === type || undefined} onClick={() => pick(type)}>
-                <span className={styles.iconTile} style={iconTile(28, 7, 'var(--sh-surface-well)', 'var(--sh-text-secondary)')}>
-                  <TypeGlyph type={type} size={15} />
-                </span>
-                <span className={styles.menuItemLabel}>{TYPE_LABEL[type]}</span>
-                <span className={styles.menuCount}>{counts.get(type) ?? 0}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      {TYPE_ORDER.map(type => (
+        <button key={type} type="button" className={styles.chip} data-active={active === type || undefined} aria-pressed={active === type} onClick={() => onPick(type)}>
+          {TYPE_LABEL[type]}
+          <span className={styles.chipCount}>{counts.get(type) ?? 0}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -584,8 +553,10 @@ function StoryBibleScreen(): React.JSX.Element {
               />
             </Tooltip>
           </div>
-          <div className={styles.railEyebrow}>Entity type</div>
-          <TypePicker active={activeType} counts={counts} onPick={pickCategory} />
+          <div id={TYPE_FILTER_LABEL_ID} className={styles.railEyebrow}>
+            Entity type
+          </div>
+          <TypeChips active={activeType} counts={counts} onPick={pickCategory} />
         </div>
         <div className={`nf-scroll ${styles.railList}`}>
           {entitiesQuery.isLoading && <PaneLoader />}

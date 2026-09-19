@@ -379,49 +379,6 @@ a:hover {
     transform 0.12s;
 }
 
-.nf-btrigger {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 11px 12px;
-  border-radius: var(--sh-radius-lg);
-  border: 1.5px solid var(--sh-border-interactive);
-  background: var(--sh-surface-app);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    border-color 0.12s,
-    background 0.12s;
-}
-
-.nf-btrigger:hover {
-  border-color: var(--sh-accent);
-  background: var(--sh-surface-raised);
-}
-
-.nf-menuitem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: var(--sh-radius-md);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-
-.nf-menuitem:hover {
-  background: var(--sh-bg-hover);
-}
-
-.nf-menuitem[data-active='true'] {
-  background: var(--sh-accent-soft);
-}
-
 .nf-catcard {
   text-align: left;
   background: var(--sh-surface-card);
