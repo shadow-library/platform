@@ -114,6 +114,39 @@ export interface JobEnqueueResult {
 const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
 
 /**
+ * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
+ * An allowlist rather than a denylist of background graphs (`chat-title`, `chat-compact`, `ideation-name` —
+ * fire-and-forget metadata graphs no `turn()`/`nameIdea()` caller awaits or reports through) because a
+ * forgotten entry then fails closed: a new background graph stays off this list by default and never
+ * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
+ */
+const AUTHOR_FACING_GRAPHS = [
+  'translate-seed',
+  'rebrand-glossary',
+  'recombine',
+  'ideation-turn',
+  'ideation-concepts',
+  'ideation-stress',
+  'chat-turn',
+  'premise-enhance',
+  'bible-audit',
+  'arc-plan',
+  'illustration',
+  'reforge-plan',
+  'reforge-analyze-window',
+  'reforge-synthesize',
+  'chapter-generation',
+  'chapter-finalization',
+  'bible-builder',
+  'source-extraction',
+  'chapter-rebrand',
+  'chapter-reforge',
+  'chapter-translation',
+  'span-transform',
+  'novel-validation',
+] as const;
+
+/**
  * Whole-book `outline()` is the legacy planning path — arc-scoped `outlineArc` (gated on approved
  * arcs) is the intended production path per the planning hierarchy. This cap keeps an omitted or
  * oversized `count` from silently planning the entire unwritten novel in one model call.
@@ -1356,7 +1389,11 @@ export class GenerationService {
 
   // The runs screen is a reference view — only the latest 20 matter; older runs stay queryable by id.
   async listRuns(projectId: bigint): Promise<Ai.WorkflowRun[]> {
-    return this.db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, projectId), orderBy: [desc(schema.workflowRuns.startedAt)], limit: 20 });
+    return this.db.query.workflowRuns.findMany({
+      where: and(eq(schema.workflowRuns.projectId, projectId), inArray(schema.workflowRuns.graph, AUTHOR_FACING_GRAPHS)),
+      orderBy: [desc(schema.workflowRuns.startedAt)],
+      limit: 20,
+    });
   }
 
   async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
