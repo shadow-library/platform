@@ -85,8 +85,9 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  it('rejects creating a chat session with scopeType ideation', async () => {
-    expect(await codeOf(chat.createSession(projectId, { scopeType: 'ideation' }))).toBe('IDE_005');
+  it('always creates a project-scope session, so the ideation scope is unreachable through this path', async () => {
+    const session = await chat.createSession(projectId, {});
+    expect(session).toMatchObject({ scopeType: 'project' });
   });
 
   it('rejects a turn on an existing ideation-scope session', async () => {

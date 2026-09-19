@@ -28,9 +28,6 @@ import { type ApplyResult, declinedOpNote, ProposalApplyService } from './propos
 import { ProposalService } from './proposal.service';
 
 export interface CreateSessionInput {
-  scopeType: Refinement.ChatScope;
-  scopeRef?: string;
-  title?: string;
   mode?: Refinement.ChatMode;
 }
 
@@ -119,14 +116,12 @@ export class ChatService {
   }
 
   async createSession(projectId: bigint, input: CreateSessionInput): Promise<Refinement.ChatSession> {
-    if (input.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
-    const scopeRef = await this.validateScopeRef(projectId, input.scopeType, input.scopeRef ?? null);
     const [session] = await this.db
       .insert(schema.chatSessions)
-      .values({ projectId, scopeType: input.scopeType, scopeRef, title: input.title, mode: input.mode ?? 'manual' })
+      .values({ projectId, scopeType: 'project', scopeRef: null, title: null, mode: input.mode ?? 'manual' })
       .returning();
     if (!session) throw AppErrorCode.CHT_001.create();
-    this.logger.info('chat session created', { projectId, sessionId: session.id, scopeType: session.scopeType, scopeRef, mode: session.mode });
+    this.logger.info('chat session created', { projectId, sessionId: session.id, mode: session.mode });
     return session;
   }
 

@@ -111,9 +111,10 @@ export class IdeationService {
 
   /**
    * Mints an idea: a seed-status project, its sheet, and the studio conversation. The chat session is
-   * inserted here rather than through `ChatService.createSession`, which refuses the `ideation` scope
-   * (IDE_005) so no HTTP caller can open a studio session out of band. A spark is persisted as the
-   * conversation's first user message so the turn pipeline reads it as an ordinary opening turn.
+   * inserted here rather than through `ChatService.createSession`, which takes no scope and can only ever
+   * produce a `project`-scoped session — so no HTTP caller can open a studio session that way. A spark is
+   * persisted as the conversation's first user message so the turn pipeline reads it as an ordinary
+   * opening turn.
    */
   async createSeed(body: CreateSeedBody): Promise<SeedResponse> {
     const spark = body.spark?.trim();

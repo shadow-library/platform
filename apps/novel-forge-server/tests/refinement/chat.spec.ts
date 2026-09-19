@@ -90,15 +90,24 @@ describe.if(pgAvailable)('ChatService', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  it('validates scope refs at session creation', async () => {
-    expect(await codeOf(chat.createSession(projectId, { scopeType: 'volume', scopeRef: 'volume:missing' }))).toBe('CHT_003');
-    expect(await codeOf(chat.createSession(projectId, { scopeType: 'arc', scopeRef: 'volume:v1' }))).toBe('CHT_003');
-    const session = await chat.createSession(projectId, { scopeType: 'volume', scopeRef: 'volume:v1', title: 'refine v1' });
-    expect(session).toMatchObject({ status: 'active', scopeRef: 'volume:v1', summaryThroughOrdinal: 0 });
+  it('creates every new session in project scope regardless of what the caller asks for', async () => {
+    const session = await chat.createSession(projectId, {});
+    expect(session).toMatchObject({ status: 'active', scopeType: 'project', scopeRef: null, title: null, mode: 'manual', summaryThroughOrdinal: 0 });
+  });
+
+  it('still validates scope refs on turn() for legacy scoped sessions', async () => {
+    const [badVolume] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'volume', scopeRef: 'volume:missing' }).returning();
+    if (!badVolume) throw new Error('failed to seed session');
+    expect(await codeOf(chat.turn(projectId, badVolume.id, 'hello'))).toBe('CHT_003');
+
+    const [badArc] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'arc', scopeRef: 'volume:v1' }).returning();
+    if (!badArc) throw new Error('failed to seed session');
+    expect(await codeOf(chat.turn(projectId, badArc.id, 'hello'))).toBe('CHT_003');
   });
 
   it('runs a full turn: messages persisted, proposal staged, run recorded', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'volume', scopeRef: 'volume:v1' });
+    const [session] = await db.insert(schema.chatSessions).values({ projectId, scopeType: 'volume', scopeRef: 'volume:v1' }).returning();
+    if (!session) throw new Error('failed to seed session');
     structuredMock.mockImplementationOnce(async () => ({
       reply: 'Raise the stakes: make the trial lethal.',
       changeSet: [{ op: 'volume.upsert', volumeKey: 'v1', objective: 'survive the lethal trials' }],
@@ -124,7 +133,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('recovers an in-flight turn: the user message is persisted and pendingTurn is true while the model runs', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
 
     let release!: () => void;
     const gate = new Promise<void>(resolve => (release = resolve));
@@ -155,7 +164,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('should clear the pending turn and report the failure code when the model call fails', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
     structuredMock.mockImplementationOnce(async () => {
       throw AppErrorCode.AI_007.create();
     });
@@ -172,7 +181,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('should still report a failed turn whose message the database stamped later than the app stamped the failure', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
     const failedAt = new Date();
     const [run] = await db
       .insert(schema.workflowRuns)
@@ -186,7 +195,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('should not report a failed turn once the author has sent a newer message', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
     structuredMock.mockImplementationOnce(async () => {
       throw AppErrorCode.AI_007.create();
     });
@@ -197,7 +206,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('should report a turn’s status and how far the transcript has got, without the transcript', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
     expect(await chat.turnStatus(projectId, session.id)).toEqual({ pendingTurn: null, failedTurn: null, lastOrdinal: 0 });
 
     structuredMock.mockImplementationOnce(async () => {
@@ -209,7 +218,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('returns no proposal for discussion-only turns and rejects archived sessions', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+    const session = await chat.createSession(projectId, {});
     structuredMock.mockImplementationOnce(async () => ({ reply: 'Just thoughts, no changes yet.' }));
 
     const result = await chat.turn(projectId, session.id, 'thoughts on pacing?');
@@ -224,7 +233,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('compacts history past the verbatim window and advances the watermark', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'volume', scopeRef: 'volume:v1' });
+    const session = await chat.createSession(projectId, {});
 
     // 7 turns = 14 messages > MAX_VERBATIM_TURNS(12) → compaction triggers on the next turn.
     for (let i = 0; i < 7; i++) {
@@ -249,15 +258,15 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('creates hub sessions defaulting to manual and switches mode via update', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project', title: 'control hub' });
-    expect(session).toMatchObject({ scopeType: 'project', scopeRef: null, mode: 'manual' });
+    const session = await chat.createSession(projectId, {});
+    expect(session).toMatchObject({ scopeType: 'project', scopeRef: null, title: null, mode: 'manual' });
 
     const flipped = await chat.updateSession(projectId, session.id, { mode: 'auto', title: 'hub (auto)' });
     expect(flipped).toMatchObject({ mode: 'auto', title: 'hub (auto)' });
   });
 
   it('hub manual turn stages a kind=hub proposal with the full vocabulary incl. actions', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    const session = await chat.createSession(projectId, {});
     structuredMock.mockImplementationOnce(async () => ({
       reply: 'Premise sharpened; kicking off a batch.',
       changeSet: [
@@ -289,7 +298,7 @@ describe.if(pgAvailable)('ChatService', () => {
       .returning();
     if (!fresh) throw new Error('failed to seed project');
 
-    const session = await chat.createSession(fresh.id, { scopeType: 'project' });
+    const session = await chat.createSession(fresh.id, {});
     await chat.turn(fresh.id, session.id, 'I want to write something');
 
     const input = structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
@@ -300,7 +309,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('hub auto turn applies the change-set in the same request with autoApplied provenance', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project', mode: 'auto' });
+    const session = await chat.createSession(projectId, { mode: 'auto' });
     structuredMock.mockImplementationOnce(async () => ({
       reply: 'Done — premise updated.',
       changeSet: [{ op: 'premise.update', premise: 'auto-applied premise' }],
@@ -316,7 +325,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('auto turn declines a finalize action with a note instead of running it', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project', mode: 'auto' });
+    const session = await chat.createSession(projectId, { mode: 'auto' });
     structuredMock.mockImplementationOnce(async () => ({
       reply: 'Finalizing everything.',
       changeSet: [{ op: 'premise.update', premise: 'a premise the turn keeps' }, { op: 'action.finalize' }],
@@ -330,7 +339,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('executes declared lookups between rounds and audits them in tool_calls', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    const session = await chat.createSession(projectId, {});
     structuredMock.mockImplementationOnce(async () => ({ reply: 'Checking the lore first.', lookups: [{ tool: 'search_lore', args: { query: 'axiom system' } }] }));
     structuredMock.mockImplementationOnce(async () => ({ reply: 'Answer grounded in lookups.' }));
 
@@ -345,7 +354,7 @@ describe.if(pgAvailable)('ChatService', () => {
   });
 
   it('caps lookup rounds and falls back to the final reply', async () => {
-    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    const session = await chat.createSession(projectId, {});
     for (let i = 0; i < 4; i++) {
       structuredMock.mockImplementationOnce(async () => ({ reply: `still looking ${i}`, lookups: [{ tool: 'get_entity', args: { entityKey: 'hero' } }] }));
     }

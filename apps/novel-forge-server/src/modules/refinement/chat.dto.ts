@@ -33,15 +33,6 @@ export class ChatSessionParams {
 
 @Schema()
 export class CreateChatSessionBody {
-  @Field(() => ChatScope)
-  scopeType: Refinement.ChatScope;
-
-  @Field({ optional: true })
-  scopeRef?: string;
-
-  @Field({ optional: true })
-  title?: string;
-
   @Field(() => ChatMode, { optional: true })
   mode?: Refinement.ChatMode;
 }
