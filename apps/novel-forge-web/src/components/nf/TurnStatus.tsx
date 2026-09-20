@@ -34,7 +34,7 @@ const FAILURE_COPY: Record<string, FailureCopy> = {
   AI_001: { title: 'The model’s answer came back unreadable', reason: 'It replied, but not in a shape that could be used.' },
   AI_002: { title: 'This model can’t be used here', reason: 'Pick a different model for this conversation, then try again.' },
   AI_003: { title: 'This model isn’t allowed for this project', reason: 'Unrestricted projects can only use models on their allowlist.' },
-  AI_006: { title: 'AI isn’t set up on this server', reason: 'The model provider’s key has to be configured first.' },
+  AI_006: { title: 'AI isn’t set up on this server', reason: 'An API key has to be configured on the server first.' },
   AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond after a few tries.' },
   AI_008: { title: 'Too many model calls right now', reason: 'Wait a moment, then try again.' },
   AI_009: { title: 'AI spending limit reached', reason: 'Model calls are paused for this account until the limit resets.' },

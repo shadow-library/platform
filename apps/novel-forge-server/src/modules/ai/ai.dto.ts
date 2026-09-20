@@ -8,7 +8,7 @@ export class AiModelOption {
   @Field()
   provider: string;
 
-  @Field()
+  @Field({ description: 'The name to show an author — a product name on its own, never a gateway or a slug. The embedding entry, which is never offered, carries its id.' })
   label: string;
 
   @Field(() => String, { enum: ['llm', 'embedding', 'image'] })

@@ -18,7 +18,7 @@ import {
   useUpdateProjectMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectKindIntent, projectKindLabel, projectKindTag, projectTitle } from '@/lib/format';
-import { inheritedModel } from '@/lib/model-defaults';
+import { inheritedModel, modelLabel } from '@/lib/model-defaults';
 
 import styles from './settings.module.css';
 
@@ -166,7 +166,8 @@ function SettingsScreen(): React.JSX.Element {
   const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
   const unrestricted = contentMode === 'unrestricted';
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
-  const modelOptions = (modelsQuery.data?.models ?? []).filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
+  const registry = modelsQuery.data?.models ?? [];
+  const modelOptions = registry.filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
   const profile = modelsQuery.data?.profile;
   const inheritedDefaults = unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []);
 
@@ -244,10 +245,9 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
-                  Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use your defaults from
-                  Settings, or else the
+                  Operations set to “Inherit default” use your defaults from Settings, or else the
                   <strong>{profile ? ` ${profile}` : ''}</strong> server profile{unrestricted ? ' Unrestricted map' : ''}. In-flight jobs keep the model they started with.
-                  {unrestricted ? ' Unrestricted only lists models on the unrestricted allowlist; other providers are hidden.' : ''}
+                  {unrestricted ? ' Unrestricted only lists the models cleared for it; the rest are hidden.' : ''}
                 </Alert>
               </div>
 
@@ -261,13 +261,7 @@ function SettingsScreen(): React.JSX.Element {
                     <div key={section.title} className={styles.modelGroup}>
                       <div className={styles.modelGroupHead}>{section.title}</div>
                       {section.roles.map(role => {
-                        const inherited = inheritedModel(
-                          role.key,
-                          accountQuery.data?.models,
-                          inheritedDefaults,
-                          modelsQuery.data?.models ?? [],
-                          unrestricted ? allowlist : undefined,
-                        );
+                        const inherited = inheritedModel(role.key, accountQuery.data?.models, inheritedDefaults, registry, unrestricted ? allowlist : undefined);
                         return (
                           <div key={role.key} className={styles.roleRow}>
                             <div className={styles.roleInfo}>
@@ -275,7 +269,7 @@ function SettingsScreen(): React.JSX.Element {
                               <div className={styles.roleHint}>
                                 {role.hint}
                                 {models[role.key] === INHERIT_MODEL && inherited
-                                  ? ` · inherits ${inherited.model} from ${inherited.source === 'account' ? 'your defaults' : 'the platform'}`
+                                  ? ` · inherits ${modelLabel(registry, inherited.model, inherited.provider)} from ${inherited.source === 'account' ? 'your defaults' : 'the platform'}`
                                   : ''}
                               </div>
                             </div>

@@ -1,4 +1,3 @@
-type ModelKind = 'llm' | 'embedding' | 'image';
 type ModelProvider = 'openrouter' | 'ollama';
 export type ReasoningEffort = 'max' | 'xhigh' | 'high' | 'medium' | 'low' | 'none';
 
@@ -9,10 +8,9 @@ interface ReasoningSpec {
   efforts?: ReasoningEffort[];
 }
 
-export interface ModelEntry {
+interface ModelEntryBase {
   id: string;
   provider: ModelProvider;
-  kind: ModelKind;
   contextWindow?: number;
   inputPricePerMToken?: number;
   outputPricePerMToken?: number;
@@ -25,12 +23,26 @@ export interface ModelEntry {
   supportsImageInput?: boolean;
 }
 
+/** A model an author can pick. `label` is the product name on its own — never the gateway, the vendor prefix, or the slug. */
+interface SelectableModelEntry extends ModelEntryBase {
+  kind: 'llm' | 'image';
+  label: string;
+}
+
+/** Pinned to the pgvector column width and never offered in a picker, so it carries no display name. */
+interface EmbeddingModelEntry extends ModelEntryBase {
+  kind: 'embedding';
+}
+
+export type ModelEntry = SelectableModelEntry | EmbeddingModelEntry;
+
 // All supported models. New entries land here; the router validates against this registry. Every LLM
 // id is an OpenRouter `vendor/model` slug — the gateway every chat call goes through.
 export const MODEL_REGISTRY: ModelEntry[] = [
   // xAI / Grok LLMs
   {
     id: 'x-ai/grok-4.6',
+    label: 'Grok 4.6',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 500000,
@@ -43,6 +55,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'x-ai/grok-4.3',
+    label: 'Grok 4.3',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1000000,
@@ -54,10 +67,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     reasoning: { mode: 'optional', efforts: ['high', 'medium', 'low', 'none'] },
   },
   // xAI image. OpenRouter's per-model `/endpoints` metadata confirms image input support but documents no reference-count limit, so 1 is the conservative floor.
-  { id: 'x-ai/grok-imagine-image-2.0', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
+  { id: 'x-ai/grok-imagine-image-2.0', label: 'Grok Imagine Image 2.0', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
   // Anthropic
   {
     id: 'anthropic/claude-sonnet-5',
+    label: 'Claude Sonnet 5',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1000000,
@@ -70,6 +84,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'anthropic/claude-opus-5',
+    label: 'Claude Opus 5',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1000000,
@@ -82,6 +97,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'anthropic/claude-haiku-4.5',
+    label: 'Claude Haiku 4.5',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 200000,
@@ -95,6 +111,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // OpenAI
   {
     id: 'openai/gpt-5.4',
+    label: 'GPT-5.4',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -107,6 +124,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'openai/gpt-5.6-luna',
+    label: 'GPT-5.6 Luna',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -119,6 +137,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'openai/gpt-5.6-sol',
+    label: 'GPT-5.6 Sol',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -131,6 +150,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'openai/gpt-5.4-mini',
+    label: 'GPT-5.4 Mini',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 400000,
@@ -142,10 +162,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     reasoning: { mode: 'optional', efforts: ['xhigh', 'high', 'medium', 'low', 'none'] },
   },
   // OpenAI image. Confirms image input support the same way, again with no documented reference-count cap.
-  { id: 'openai/gpt-5.4-image-2', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
+  { id: 'openai/gpt-5.4-image-2', label: 'GPT-5.4 Image 2', provider: 'openrouter', kind: 'image', maxInputReferences: 1 },
   // Moonshot AI
   {
     id: 'moonshotai/kimi-k3',
+    label: 'Kimi K3',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1000000,
@@ -158,6 +179,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'moonshotai/kimi-k2.6',
+    label: 'Kimi K2.6',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 262000,
@@ -171,6 +193,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // Z.AI
   {
     id: 'z-ai/glm-5.2',
+    label: 'GLM 5.2',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -182,6 +205,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
   {
     id: 'z-ai/glm-5.3',
+    label: 'GLM 5.3',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -194,6 +218,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // DeepSeek
   {
     id: 'deepseek/deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,
@@ -206,6 +231,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // Google
   {
     id: 'google/gemini-3.7-flash',
+    label: 'Gemini 3.7 Flash',
     provider: 'openrouter',
     kind: 'llm',
     contextWindow: 1050000,

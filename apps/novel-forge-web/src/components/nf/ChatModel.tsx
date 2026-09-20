@@ -17,7 +17,7 @@ import {
   useUpdateSessionModelMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, messageTime } from '@/lib/format';
-import { type AccountModelGroup, inheritedModel } from '@/lib/model-defaults';
+import { type AccountModelGroup, inheritedModel, modelLabel } from '@/lib/model-defaults';
 
 import styles from './ChatModel.module.css';
 
@@ -73,12 +73,6 @@ interface ResolvedDefault {
 const SOURCE_CAPTION: Record<Exclude<ResolvedDefault['source'], 'project'>, string> = { account: 'your default', platform: 'platform default' };
 const TRIGGER_SOURCE: Record<ResolvedDefault['source'], string> = { project: 'project default', ...SOURCE_CAPTION };
 
-function modelLabel(models: AiModelOption[], provider?: string | null, modelId?: string | null): string {
-  if (!provider || !modelId) return 'default';
-  const match = models.find(m => m.provider === provider && m.id === modelId);
-  return match?.label ?? modelId;
-}
-
 interface DefaultSources {
   config?: ProjectConfig;
   account?: AccountModelDefaults;
@@ -131,10 +125,11 @@ export function ChatModelMenu({ novelId, session, scopeType = 'project', disable
 
   const overridden = Boolean(session?.modelProvider && session?.modelId);
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
-  const triggerLabel = overridden ? modelLabel(models, session?.modelProvider, session?.modelId) : modelLabel(models, resolvedDefault?.provider, resolvedDefault?.model);
+  const triggerLabel =
+    (overridden ? modelLabel(models, session?.modelId, session?.modelProvider) : modelLabel(models, resolvedDefault?.model, resolvedDefault?.provider)) ?? 'default';
   const defaultCaption =
     resolvedDefault &&
-    `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · ${
+    `${modelLabel(models, resolvedDefault.model, resolvedDefault.provider)} · ${
       resolvedDefault.source === 'project' ? `from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings` : SOURCE_CAPTION[resolvedDefault.source]
     }`;
 
@@ -143,7 +138,10 @@ export function ChatModelMenu({ novelId, session, scopeType = 'project', disable
     const ref = next === 'default' ? null : decodeModelRef(next);
     updateModel.mutate(
       { sessionId: session.id, provider: ref?.provider ?? null, model: ref?.model ?? null },
-      { onSuccess: () => toast.success(ref ? `This chat now uses ${ref.model}` : 'This chat is back on the default model'), onError: e => toast.danger(e.message) },
+      {
+        onSuccess: () => toast.success(ref ? `This chat now uses ${modelLabel(models, ref.model, ref.provider)}` : 'This chat is back on the default model'),
+        onError: e => toast.danger(e.message),
+      },
     );
   };
 
@@ -184,7 +182,7 @@ interface MessageModelTagProps {
 export function MessageModelTag({ message }: MessageModelTagProps): React.JSX.Element | null {
   const modelsQuery = useAiModelsQuery();
   if (message.role !== 'assistant') return null;
-  const label = message.modelId ? modelLabel(modelsQuery.data?.models ?? [], message.modelProvider, message.modelId) : null;
+  const label = modelLabel(modelsQuery.data?.models ?? [], message.modelId, message.modelProvider);
   const time = messageTime(message.createdAt);
   if (!label && !time) return null;
   return (

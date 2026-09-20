@@ -2,6 +2,16 @@ import { type AccountModelDefaults, type AiModelOption, type AiRoleDefault } fro
 
 export type AccountModelGroup = keyof AccountModelDefaults;
 
+/**
+ * The author-facing name for a model id. A model the registry no longer lists — a retired pin still stored on an
+ * account or a project — falls back to its id, the only thing left that identifies it.
+ */
+export function modelLabel(registry: readonly AiModelOption[], model: string | null | undefined, provider?: string | null): string | undefined {
+  if (!model) return undefined;
+  const match = registry.find(option => option.id === model && (!provider || option.provider === provider));
+  return match?.label ?? model;
+}
+
 export interface InheritedModel {
   provider: string;
   model: string;

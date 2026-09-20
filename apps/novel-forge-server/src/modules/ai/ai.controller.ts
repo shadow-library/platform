@@ -29,7 +29,7 @@ export class AiController {
     const registry: AiModelOption[] = MODEL_REGISTRY.map(m => ({
       id: m.id,
       provider: m.provider,
-      label: m.id,
+      label: m.kind === 'embedding' ? m.id : m.label,
       kind: m.kind,
       enabled: true,
       contextWindow: m.contextWindow,

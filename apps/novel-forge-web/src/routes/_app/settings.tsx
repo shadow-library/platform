@@ -12,7 +12,7 @@ import {
   useUpdateAccountSettingsMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef } from '@/lib/format';
-import { type AccountModelGroup } from '@/lib/model-defaults';
+import { type AccountModelGroup, modelLabel } from '@/lib/model-defaults';
 
 import styles from './settings.module.css';
 
@@ -90,7 +90,8 @@ function SettingsScreen(): React.JSX.Element {
 
   const savedPicks = toPicks(saved);
   const dirty = SECTIONS.some(section => section.rows.some(row => (picks[row.key] ?? INHERIT_MODEL) !== savedPicks[row.key]));
-  const platform = new Map((modelsQuery.data?.defaults ?? []).map(entry => [entry.role, entry.model]));
+  const registry = modelsQuery.data?.models ?? [];
+  const platform = new Map((modelsQuery.data?.defaults ?? []).map(entry => [entry.role, modelLabel(registry, entry.model, entry.provider)]));
 
   const save = (): void => update.mutate({ models: toModels(picks) }, { onSuccess: () => toast.success('Your defaults are saved'), onError: err => toast.danger(err.message) });
 
@@ -131,7 +132,7 @@ function SettingsScreen(): React.JSX.Element {
                         value={pick}
                         onChange={value => setPicks(current => ({ ...current, [row.key]: value }))}
                         kind={row.kind}
-                        models={modelsQuery.data?.models ?? []}
+                        models={registry}
                         loading={modelsQuery.isLoading}
                         inheritLabel={platformModel ? `Platform default · ${platformModel}` : 'Platform default'}
                         aria-label={`${row.label} model`}

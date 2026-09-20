@@ -3166,6 +3166,7 @@ export interface components {
     AiModelOption: {
       id: string;
       provider: string;
+      /** @description The name to show an author — a product name on its own, never a gateway or a slug. The embedding entry, which is never offered, carries its id. */
       label: string;
       /** @enum {string} */
       kind: 'llm' | 'embedding' | 'image';

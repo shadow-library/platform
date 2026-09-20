@@ -6,6 +6,7 @@ import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/
 import {
   listProposalsQueryOptions,
   type ProposalResponse,
+  useAiModelsQuery,
   useApplyProposalMutation,
   useDiscardProposalMutation,
   useListPluginsQuery,
@@ -13,6 +14,7 @@ import {
   useRevertProposalMutation,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { modelLabel } from '@/lib/model-defaults';
 
 import styles from './proposals.module.css';
 
@@ -126,6 +128,7 @@ interface ProposalDetailProps {
 }
 
 function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.Element {
+  const modelsQuery = useAiModelsQuery();
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
   const revert = useRevertProposalMutation(novelId);
@@ -189,7 +192,7 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
           <PluginSourceChip proposal={proposal} />
           {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
           <div className={styles.spacer} />
-          {proposal.model && <span className={styles.model}>{proposal.model}</span>}
+          {proposal.model && <span className={styles.model}>{modelLabel(modelsQuery.data?.models ?? [], proposal.model)}</span>}
         </div>
         <h1 className={styles.title}>{proposalTitle(proposal)}</h1>
 
