@@ -28,6 +28,14 @@ export function toggleOption(question: StudioQuestionResponse, answer: StudioAns
   return selection(held.includes(index) ? held.filter(pick => pick !== index) : [...held, index].sort((a, b) => a - b));
 }
 
+export function decideAnswer(answer: StudioAnswer | undefined): StudioAnswer | undefined {
+  return answer?.kind === 'decide' ? undefined : { kind: 'decide' };
+}
+
+export function shouldAdvanceAfter(question: StudioQuestionResponse, next: StudioAnswer): boolean {
+  return next.kind === 'decide' || question.select !== 'many';
+}
+
 function rawAnswer(question: StudioQuestionResponse, answer: StudioAnswer): string | undefined {
   switch (answer.kind) {
     case 'option':

@@ -415,7 +415,7 @@
   cursor: default;
 }
 
-.option[aria-pressed='true'] {
+.option[aria-checked='true'] {
   border-color: var(--sh-accent);
   background: var(--sh-accent-soft);
   color: var(--sh-text-primary);
@@ -432,17 +432,31 @@
   border-radius: var(--sh-radius-full);
 }
 
-.option[aria-pressed='true'] .optionTick {
+.option[aria-checked='true'] .optionTick {
   border-color: var(--sh-accent);
   background: var(--sh-accent);
 }
 
-.option[aria-pressed='true'] .optionTick::after {
+.option[aria-checked='true'] .optionTick::after {
   content: '';
   width: 5px;
   height: 5px;
   border-radius: var(--sh-radius-full);
   background: var(--sh-on-accent);
+}
+
+.checkboxTick {
+  border-radius: var(--sh-radius-sm);
+}
+
+.option[aria-checked='true'] .optionTick.checkboxTick::after {
+  width: 7px;
+  height: 4px;
+  border-radius: 1px;
+  background: none;
+  border-left: 1.5px solid var(--sh-on-accent);
+  border-bottom: 1.5px solid var(--sh-on-accent);
+  transform: rotate(-45deg) translateY(-1px);
 }
 
 .optionDecide {
@@ -462,7 +476,7 @@
   color: var(--sh-text-secondary);
 }
 
-.option[aria-pressed='true'] .decideLabel {
+.option[aria-checked='true'] .decideLabel {
   color: var(--sh-accent);
 }
 

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type StudioQuestionResponse } from '../src/lib/apis/api-types.gen';
-import { answeredCount, composeAnswers, holdsOption, nextUnanswered, questionLabel, recoverAnswers, toggleOption } from '../src/lib/studio-answers';
+import {
+  answeredCount,
+  composeAnswers,
+  decideAnswer,
+  holdsOption,
+  nextUnanswered,
+  questionLabel,
+  recoverAnswers,
+  shouldAdvanceAfter,
+  toggleOption,
+} from '../src/lib/studio-answers';
 
 const question = (id: string, wording: string, options: string[] = ['First option', 'Second option'], select: 'one' | 'many' = 'one'): StudioQuestionResponse => ({
   id,
@@ -226,5 +236,47 @@ describe('recoverAnswers on a multi-select question', () => {
       tone: { kind: 'options', indexes: [0] },
       length: { kind: 'option', index: 1 },
     });
+  });
+});
+
+describe('shouldAdvanceAfter', () => {
+  it('should not advance for an option pick on a multi-select question', () => {
+    expect(shouldAdvanceAfter(tone, { kind: 'options', indexes: [0] })).toBe(false);
+  });
+
+  it('should advance for an option pick on a single-select question', () => {
+    expect(shouldAdvanceAfter(shelf, { kind: 'option', index: 0 })).toBe(true);
+  });
+
+  it('should advance for "You decide" on both a single- and multi-select question', () => {
+    expect(shouldAdvanceAfter(shelf, { kind: 'decide' })).toBe(true);
+    expect(shouldAdvanceAfter(tone, { kind: 'decide' })).toBe(true);
+  });
+});
+
+describe('decideAnswer', () => {
+  it('should replace existing picks with a "You decide" answer', () => {
+    expect(decideAnswer({ kind: 'options', indexes: [0, 1] })).toEqual({ kind: 'decide' });
+  });
+
+  it('should clear "You decide" when it is already held', () => {
+    expect(decideAnswer({ kind: 'decide' })).toBeUndefined();
+  });
+
+  it('should set "You decide" when nothing is held', () => {
+    expect(decideAnswer(undefined)).toEqual({ kind: 'decide' });
+  });
+});
+
+describe('toggleOption and shouldAdvanceAfter together', () => {
+  it('should leave no picks and not skip a beat when the last multi-select pick is removed', () => {
+    const next = toggleOption(tone, { kind: 'options', indexes: [1] }, 1);
+    expect(next).toBeUndefined();
+  });
+
+  it('should clear "You decide" and yield an advancing-ineligible options answer when an option is picked over it', () => {
+    const next = toggleOption(tone, { kind: 'decide' }, 1);
+    expect(next).toEqual({ kind: 'options', indexes: [1] });
+    expect(next && shouldAdvanceAfter(tone, next)).toBe(false);
   });
 });

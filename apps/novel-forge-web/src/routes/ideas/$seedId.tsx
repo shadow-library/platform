@@ -34,7 +34,19 @@ import {
 import { messageTime } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { requireSession } from '@/lib/session';
-import { answeredCount, answerText, composeAnswers, holdsOption, nextUnanswered, recoverAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
+import {
+  answeredCount,
+  answerText,
+  composeAnswers,
+  decideAnswer,
+  holdsOption,
+  nextUnanswered,
+  recoverAnswers,
+  shouldAdvanceAfter,
+  type StudioAnswer,
+  type StudioAnswers,
+  toggleOption,
+} from '@/lib/studio-answers';
 
 import styles from './$seedId.module.css';
 
@@ -183,7 +195,10 @@ function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, l
   const [advance, setAdvance] = useState<PendingAdvance | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const ownHintId = useId();
+  const wordingId = useId();
+  const decideHintId = useId();
 
   const index = Math.min(view.index, questions.length - 1);
 
@@ -233,17 +248,46 @@ function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, l
     else if (answer?.kind === 'own') onAnswer(question.id, undefined);
   };
 
-  const isSelected = (candidate: StudioAnswer): boolean => (candidate.kind === 'option' ? holdsOption(answer, candidate.index) : answer?.kind === candidate.kind);
+  const isMulti = question.select === 'many';
+  const isDecideSelected = answer?.kind === 'decide';
 
-  const select = (candidate: StudioAnswer): void => {
-    const next = isSelected(candidate) ? undefined : candidate;
-    onAnswer(question.id, next);
-    setAdvance(null);
+  const radioCount = question.options.length + 1;
+  const selectedRadioIndex = isMulti ? -1 : isDecideSelected ? question.options.length : answer?.kind === 'option' ? answer.index : -1;
+  const activeRadioIndex = selectedRadioIndex === -1 ? 0 : selectedRadioIndex;
+
+  const advanceAfter = (next: StudioAnswer | undefined): void => {
     if (!next) return;
     const after = { ...answers, [question.id]: next };
+    if (!shouldAdvanceAfter(question, next)) {
+      if (answeredCount(questions, after) === questions.length) onRoundAnswered?.();
+      return;
+    }
     const target = nextUnanswered(questions, after, index);
     if (target !== undefined) setAdvance({ from: index, to: target });
     else if (answeredCount(questions, after) === questions.length) onRoundAnswered?.();
+  };
+
+  const selectOption = (optionIndex: number): void => {
+    const next = toggleOption(question, answer, optionIndex);
+    onAnswer(question.id, next);
+    setAdvance(null);
+    advanceAfter(next);
+  };
+
+  const selectDecide = (): void => {
+    const next = decideAnswer(answer);
+    onAnswer(question.id, next);
+    setAdvance(null);
+    advanceAfter(next);
+  };
+
+  const onOptionsKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (isMulti || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    const nextIndex = (activeRadioIndex + (event.key === 'ArrowDown' ? 1 : -1) + radioCount) % radioCount;
+    if (nextIndex === question.options.length) selectDecide();
+    else selectOption(nextIndex);
+    radioRefs.current[nextIndex]?.focus();
   };
 
   const badge: { intent: ChipIntent; label: string } | undefined =
@@ -305,24 +349,45 @@ function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, l
       <div key={index} ref={bodyRef} className={styles.questionBody} data-direction={view.direction}>
         {advance?.from === index && <span className={styles.advanceBar} aria-hidden="true" />}
         {badge && <StatusChip intent={badge.intent}>{badge.label}</StatusChip>}
-        <div className={styles.questionWording}>{question.wording}</div>
+        <div id={wordingId} className={styles.questionWording}>
+          {question.wording}
+        </div>
         <div className={styles.questionCoaching}>{question.coaching}</div>
-        <div className={styles.options}>
+        <div className={styles.options} role={isMulti ? 'group' : 'radiogroup'} aria-labelledby={wordingId} onKeyDown={onOptionsKeyDown}>
           {question.options.map((option, optionIndex) => {
-            const candidate: StudioAnswer = { kind: 'option', index: optionIndex };
+            const selected = holdsOption(answer, optionIndex);
             return (
-              <button key={optionIndex} type="button" className={styles.option} aria-pressed={isSelected(candidate)} disabled={locked} onClick={() => select(candidate)}>
-                <span className={styles.optionTick} aria-hidden="true" />
+              <button
+                key={optionIndex}
+                type="button"
+                ref={el => {
+                  radioRefs.current[optionIndex] = el;
+                }}
+                className={styles.option}
+                role={isMulti ? 'checkbox' : 'radio'}
+                aria-checked={selected}
+                aria-describedby={isMulti ? decideHintId : undefined}
+                tabIndex={isMulti ? undefined : optionIndex === activeRadioIndex ? 0 : -1}
+                disabled={locked}
+                onClick={() => selectOption(optionIndex)}
+              >
+                <span className={`${styles.optionTick} ${isMulti ? styles.checkboxTick : ''}`} aria-hidden="true" />
                 <span>{option}</span>
               </button>
             );
           })}
           <button
             type="button"
+            ref={el => {
+              radioRefs.current[question.options.length] = el;
+            }}
             className={`${styles.option} ${styles.optionDecide}`}
-            aria-pressed={isSelected({ kind: 'decide' })}
+            role={isMulti ? 'checkbox' : 'radio'}
+            aria-checked={isDecideSelected}
+            aria-describedby={isMulti ? decideHintId : undefined}
+            tabIndex={isMulti ? undefined : question.options.length === activeRadioIndex ? 0 : -1}
             disabled={locked}
-            onClick={() => select({ kind: 'decide' })}
+            onClick={selectDecide}
           >
             <span className={styles.optionTick} aria-hidden="true" />
             <span className={styles.decideBody}>
@@ -330,6 +395,11 @@ function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, l
               <span className={styles.decideText}>{question.youDecide}</span>
             </span>
           </button>
+          {isMulti && (
+            <span id={decideHintId} className={styles.hint}>
+              Picking an option clears &quot;You decide&quot;; picking &quot;You decide&quot; clears your picks.
+            </span>
+          )}
         </div>
         {status !== 'open' ? (
           answer?.kind === 'own' && <p className={styles.ownQuote}>{answer.text}</p>
