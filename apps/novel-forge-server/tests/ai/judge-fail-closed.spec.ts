@@ -121,6 +121,43 @@ describe.if(pgAvailable)('judge fail-closed behavior', () => {
     expect(draft?.judgeNote).toContain('judge output unparseable');
   });
 
+  it('should accept a verdict that follows a schema-invalid object in the same reply, without spending the retry', async () => {
+    const projectId = await seedProject();
+    const seenMessages: BaseMessage[][] = [];
+    const verdict = JSON.stringify({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } });
+    const services = buildServices(db, [`Weighing the canon first: {"note":"two passes over the tracker"}\n\nVerdict:\n${verdict}`], seenMessages);
+    const graph = createChapterGenerationGraph(services);
+
+    const runId = `judge-later-candidate-${projectId}`;
+    const input = { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix: false, maxFixes: 3, runId };
+    const finalState = (await graph.invoke(input, { configurable: { thread_id: runId } })) as { outcome: string | null };
+
+    expect(seenMessages.length).toBe(1);
+    expect(finalState.outcome).toBe('accepted');
+
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.judge).toBe('consistent');
+  });
+
+  it('should still route to human review when the reply holds objects but none match the judge schema', async () => {
+    const projectId = await seedProject();
+    const seenMessages: BaseMessage[][] = [];
+    const noise = 'Thinking: {"note":"still weighing"}\n\n{"conclusion":"looks fine to me"}';
+    const services = buildServices(db, [noise, noise], seenMessages);
+    const graph = createChapterGenerationGraph(services);
+
+    const runId = `judge-no-candidate-${projectId}`;
+    const input = { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix: true, maxFixes: 3, runId };
+    const finalState = (await graph.invoke(input, { configurable: { thread_id: runId } })) as { outcome: string | null };
+
+    expect(seenMessages.length).toBe(2);
+    expect(finalState.outcome).toBe('awaiting_review');
+
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.judge).toBe('evaluation_failed');
+    expect(draft?.judgeNote).toContain('judge output unparseable');
+  });
+
   it('forbids the hidden facts to the judge but never the graduation promises the book openly obeys', async () => {
     const projectId = await seedProject();
     await db.insert(schema.briefs).values({

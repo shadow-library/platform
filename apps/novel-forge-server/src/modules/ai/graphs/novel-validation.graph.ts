@@ -9,7 +9,7 @@ import * as schema from '@server/database/schemas';
 
 import { type PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
-import { extractJsonBlock } from '../json-extract';
+import { extractJsonCandidates } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -66,9 +66,8 @@ function tryParseValidation(raw: string): ValidationOutput | null {
   } catch {
     // try extraction
   }
-  const extracted = extractJsonBlock(raw);
-  if (extracted) {
-    const parsed = parseSchema<ValidationOutput>(ValidationSchema, extracted);
+  for (const candidate of extractJsonCandidates(raw)) {
+    const parsed = parseSchema<ValidationOutput>(ValidationSchema, candidate);
     if (parsed.success) return parsed.data;
   }
   return null;

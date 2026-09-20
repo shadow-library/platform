@@ -12,7 +12,7 @@ import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, ren
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
-import { extractJsonBlock, tryParseJson } from '../json-extract';
+import { extractJsonCandidates, tryParseJson } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -138,9 +138,8 @@ export function mergeKnowledgeCompliance(
 function parseJudgeOutput(raw: string): JudgeOutput | null {
   const fromJson = parseSchema<JudgeOutput>(JudgeSchema, tryParseJson(raw));
   if (fromJson.success) return fromJson.data;
-  const extracted = extractJsonBlock(raw);
-  if (extracted) {
-    const fromExtracted = parseSchema<JudgeOutput>(JudgeSchema, extracted);
+  for (const candidate of extractJsonCandidates(raw)) {
+    const fromExtracted = parseSchema<JudgeOutput>(JudgeSchema, candidate);
     if (fromExtracted.success) return fromExtracted.data;
   }
   return null;

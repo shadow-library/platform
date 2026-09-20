@@ -39,14 +39,10 @@ export function extractJsonCandidates(text: string): unknown[] {
   return candidates;
 }
 
-export function extractJsonBlock(text: string): unknown {
-  return extractJsonCandidates(text)[0] ?? null;
-}
-
 export function tryParseJson(raw: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
-    return extractJsonBlock(raw);
+    return extractJsonCandidates(raw)[0] ?? null;
   }
 }

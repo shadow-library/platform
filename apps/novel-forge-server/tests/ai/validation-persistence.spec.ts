@@ -174,6 +174,62 @@ describe.if(pgAvailable)('novel-validation persistReport', () => {
     expect(await needsRevalidationFor(project.id, 5)).toBe(true);
   });
 
+  function buildRawServices(rawReply: string) {
+    return {
+      db,
+      contextAssembler: { forValidationWindow: async () => ({ rendered: 'context' }) },
+      modelRouter: { chatFor: () => ({ invoke: async () => new AIMessage({ content: rawReply }) }) },
+      telemetry: {},
+      toolRegistry: { forNode: () => [], getRaw: () => [] },
+      indexingService: {},
+      pluginPolicy: { resolve: async () => emptyPolicy() },
+      checkpointer,
+    } as never;
+  }
+
+  it('should accept a window report that follows a schema-invalid object in the same reply', async () => {
+    const project = await seedProject(
+      'val-later-candidate',
+      [
+        { number: 1, needsRevalidation: false },
+        { number: 2, needsRevalidation: false },
+      ],
+      [{ volumeKey: 'vol-a', ordinal: 1, startChapter: 1, endChapter: 2 }],
+    );
+
+    const report = JSON.stringify({ issues: [{ chapter: 2, severity: 'error', category: 'continuity', description: 'timeline conflict' }], summary: 'one break' });
+    const graph = createNovelValidationGraph(buildRawServices(`Scanning the window: {"note":"two passes"}\n\n${report}`));
+    const runId = `val-run-later-${project.id}`;
+    await graph.invoke({ projectId: String(project.id), runId }, { configurable: { thread_id: runId } });
+
+    const row = await db.query.validationReports.findFirst({ where: eq(schema.validationReports.projectId, project.id) });
+    const payload = row?.payload as { windowsSucceeded: number; failedRanges: { from: number; to: number }[] };
+    expect(payload.windowsSucceeded).toBe(1);
+    expect(payload.failedRanges).toEqual([]);
+    expect(row?.issues).toBe(1);
+  });
+
+  it('should still fail the window when the reply holds objects but none match the validation schema', async () => {
+    const project = await seedProject(
+      'val-no-candidate',
+      [
+        { number: 1, needsRevalidation: false },
+        { number: 2, needsRevalidation: false },
+      ],
+      [{ volumeKey: 'vol-a', ordinal: 1, startChapter: 1, endChapter: 2 }],
+    );
+
+    const graph = createNovelValidationGraph(buildRawServices('Scanning: {"note":"two passes"}\n\n{"conclusion":"nothing to report"}'));
+    const runId = `val-run-none-${project.id}`;
+    await graph.invoke({ projectId: String(project.id), runId }, { configurable: { thread_id: runId } });
+
+    const row = await db.query.validationReports.findFirst({ where: eq(schema.validationReports.projectId, project.id) });
+    const payload = row?.payload as { windowsRequested: number; windowsSucceeded: number; failedRanges: { from: number; to: number }[] };
+    expect(payload.windowsRequested).toBe(1);
+    expect(payload.windowsSucceeded).toBe(0);
+    expect(payload.failedRanges).toEqual([{ from: 1, to: 2 }]);
+  });
+
   it('should preserve flags set by refinement when a window fails', async () => {
     const project = await seedProject(
       'val-preserve',
