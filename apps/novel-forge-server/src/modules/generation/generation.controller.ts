@@ -1,7 +1,7 @@
-import { Authenticated, BotPermission } from '@shadow-library/auth/module';
+import { Authenticated, BotPermission, RequirePermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
-import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
+import { ADMIN_PERMISSION, GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
@@ -326,6 +326,7 @@ export class GenerationController {
     return { items };
   }
 
+  @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
   @Get('/runs/:runId')
   @RespondFor(200, WorkflowRunDetailResponse)
   getRun(@Params() params: RunParams): Promise<WorkflowRunDetailResponse> {
@@ -340,12 +341,14 @@ export class GenerationController {
     return this.generationService.cancelRun(params.projectId, params.runId);
   }
 
+  @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
   @Get('/runs/:runId/context')
   @RespondFor(200, RunContextResponse)
   getRunContext(@Params() params: RunParams): Promise<RunContextResponse> {
     return this.generationService.getRunContext(params.projectId, params.runId);
   }
 
+  @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
   @Get('/runs/:runId/calls/:callId')
   @RespondFor(200, RunModelCallDetailResponse)
   getRunCall(@Params() params: RunCallParams): Promise<RunModelCallDetailResponse> {
