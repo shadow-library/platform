@@ -115,6 +115,17 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     });
   }
 
+  /** The sweep dispatches without awaiting, and the executor settles the job row after the ledger write — so only a terminal job row means the executor is done */
+  async function settledPublishJob(projectId: bigint): Promise<schema.Job.Row> {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const job = await db.query.jobs.findFirst({ where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'publish')) });
+      if (job && job.status !== 'pending' && job.status !== 'in_progress') return job;
+      if (Date.now() > deadline) throw new Error(`publish job never settled (status: ${job?.status ?? 'missing'})`);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  }
+
   /** Only the sweep's selection is under test here; `sweep()` itself dispatches real converge jobs and would race the assertions */
   function dueProjects(): Promise<bigint[]> {
     return new PublicationJanitor(databaseService, {} as never, {} as never).dueProjects();
@@ -335,17 +346,11 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const swept = await janitor.sweep();
     expect(swept.map(String)).toContain(String(projectId));
 
-    // dispatch() resolves before the job body settles only when the lock queue is contended; poll the row.
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && (await ledgerRow(projectId, 1))?.status !== 'published') await new Promise(resolve => setTimeout(resolve, 50));
-
+    expect((await settledPublishJob(projectId)).status).toBe('done');
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'published' });
     expect(await ledgerRow(projectId, 2)).toMatchObject({ status: 'scheduled' });
     expect(reader.novels.get(slug)?.chapters.has(1)).toBe(true);
     expect(reader.novels.get(slug)?.chapters.has(2)).toBe(false);
-
-    const job = await db.query.jobs.findFirst({ where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'publish')) });
-    expect(job?.status).toBe('done');
 
     // A sweep with nothing due for this project leaves it alone (the future row is not yet released).
     const again = await janitor.sweep();
@@ -385,8 +390,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     const swept = await janitor.sweep();
     expect(swept.map(String)).toContain(String(projectId));
 
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && (await ledgerRow(projectId, 1))?.status !== 'published') await new Promise(resolve => setTimeout(resolve, 50));
+    expect((await settledPublishJob(projectId)).status).toBe('done');
     expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'published', error: null });
   });
   it('should re-assign a slug another publisher owns and push the novel under the new one', async () => {
