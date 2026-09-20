@@ -30,6 +30,8 @@ export interface StudioQuestion {
   /** A deterministic note about what is already locked, so the turn confirms the decision instead of re-asking it. */
   hint?: (seed: RouterSeedState) => string | undefined;
   youDecide: 'commit-and-explain';
+  /** Whether an author can hold several of the offered options at once, or only one. */
+  select: 'one' | 'many';
 }
 
 /** Exhaustive by construction: a new `SeedFields` key fails to type-check until it is listed here. */
@@ -90,6 +92,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => hasField(seed, 'premise') || seed.constraints.length > 0,
     youDecide: 'commit-and-explain',
+    select: 'many',
   },
   {
     id: 'taste.comps',
@@ -101,6 +104,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => seed.tasteAnchors.comps.length > 0 || (hasField(seed, 'premise') && seed.constraints.length > 0),
     youDecide: 'commit-and-explain',
+    select: 'many',
   },
   {
     id: 'orient.shelf',
@@ -113,6 +117,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     hint: seed =>
       playbook(seed, 'litrpg-system') ? 'Locked already: a litRPG system with visible numbers. Confirm the shelf around it rather than re-asking the shelf.' : undefined,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'orient.room',
@@ -124,6 +129,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: hasRoomConstraint,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'orient.length',
@@ -136,6 +142,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     followUps: seed => (isOpenEndedLength(seed.fields.serializationNotes) ? ['deepen.renewal'] : []),
     hint: seed => (playbook(seed, 'open-ended-length') ? 'Locked already: an open-ended run. Confirm the cadence rather than re-asking the container.' : undefined),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'orient.tone',
@@ -146,6 +153,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['themes'],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'many',
   },
   {
     id: 'orient.cast',
@@ -162,6 +170,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
       return undefined;
     },
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'diverge.cards',
@@ -172,6 +181,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['premise', 'hook'],
     skipWhen: seed => hasField(seed, 'premise'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.hook',
@@ -185,6 +195,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     // route to a hook, so it is offered the moment a seed arrives with a premise and no hook.
     skipWhen: seed => !hasField(seed, 'premise'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.engine',
@@ -195,6 +206,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['progressionSystem'],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.renewal',
@@ -206,6 +218,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'open-ended-length') && !isOpenEndedLength(seed.fields.serializationNotes),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.want',
@@ -216,6 +229,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['protagonistDrive'],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.refusal',
@@ -227,6 +241,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.cost',
@@ -237,6 +252,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['stakes'],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.foil',
@@ -248,6 +264,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.promise',
@@ -259,6 +276,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => hasConstraintKind(seed, 'promise'),
     youDecide: 'commit-and-explain',
+    select: 'many',
   },
   {
     id: 'deepen.voice',
@@ -269,6 +287,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: ['voice'],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.secondLadder',
@@ -280,6 +299,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'dual-leads'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.foreknowledgeDecay',
@@ -291,6 +311,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'regression'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.divergence',
@@ -302,6 +323,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'regression'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.stayingCost',
@@ -313,6 +335,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'no-harem'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.systemRules',
@@ -324,6 +347,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'litrpg-system'),
     youDecide: 'commit-and-explain',
+    select: 'many',
   },
   {
     id: 'deepen.povBudget',
@@ -334,6 +358,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'ensemble'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.deferredTension',
@@ -345,6 +370,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'slow-burn'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'deepen.ironyBudget',
@@ -356,6 +382,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: seed => !playbook(seed, 'single-pov'),
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
   {
     id: 'stress.readiness',
@@ -367,6 +394,7 @@ export const QUESTION_BANK: StudioQuestion[] = [
     fills: [],
     skipWhen: () => false,
     youDecide: 'commit-and-explain',
+    select: 'one',
   },
 ];
 
