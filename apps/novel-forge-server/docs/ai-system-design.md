@@ -545,16 +545,15 @@ There is no offline model rung: every LLM call routes through OpenRouter, so no 
 
 ### 8.4 Fixtures and commands
 
-`scripts/seed-ai-fixtures.ts` builds the **micro-project**: 1 project, minimal filled bible (1 approved volume, 4 characters, 6 world facts, 2 threads), 2 finalized chapters with summaries + continuation state, briefs for chapters 3–4 (with `contextRefs`) — small enough to keep every pack cheap, rich enough that every assembler section is non-empty. Contradictory / patchable / title-less fixture drafts live under `tests/fixtures/ai/`.
+**Unbuilt.** This section specifies a shared **micro-project** fixture — 1 project, minimal filled bible (1 approved volume, 4 characters, 6 world facts, 2 threads), 2 finalized chapters with summaries + continuation state, briefs for chapters 3–4 (with `contextRefs`), small enough to keep every pack cheap and rich enough that every assembler section is non-empty — built by a `scripts/seed-ai-fixtures.ts` seeder, with contradictory / patchable / title-less drafts under `tests/fixtures/ai/`. Neither the seeder nor that fixture directory was ever landed; each AI spec builds the rows it needs through `tests/fixtures/`. The spec is retained as the shape to build if the shared fixture is picked up.
 
-| Command                     | Runs                                       | Needs                                     |
-| --------------------------- | ------------------------------------------ | ----------------------------------------- |
-| `bun test`                  | everything                                 | template DB                               |
-| `bun run test:ai:unit`      | prompts, schemas, context, router          | template DB                               |
-| `bun run test:ai:graph`     | topology + checkpoint resume               | template DB                               |
-| `bun run test:ai:tools`     | registry, handlers, isolation, audit       | template DB                               |
-| `bun run test:ai:retrieval` | both indexes round-trip, filters, re-embed | template DB + Ollama (embed only)         |
-| `bun run ai:smoke`          | the core prompts against real models       | OpenRouter key, `AI_SMOKE_SPEND=1`, money |
+| Command                 | Runs                                 | Needs                                     |
+| ----------------------- | ------------------------------------ | ----------------------------------------- |
+| `bun test`              | everything                           | template DB                               |
+| `bun run test:ai:unit`  | prompts, schemas, context, router    | template DB                               |
+| `bun run test:ai:graph` | topology + checkpoint resume         | template DB                               |
+| `bun run test:ai:tools` | registry, handlers, isolation, audit | template DB                               |
+| `bun run ai:smoke`      | the core prompts against real models | OpenRouter key, `AI_SMOKE_SPEND=1`, money |
 
 ---
 

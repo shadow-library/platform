@@ -135,8 +135,7 @@ round that streams nothing at all (§4.1) never blanks it either.
 
 ### 4.1 When the model defeats the stream
 
-Key order is the model's choice: the schema shows `reply` first and grammar-constrained decoding on Ollama
-guarantees it, but a hosted model may emit `changeSet` first. The D1 scanner is key-order agnostic — it
+Key order is the model's choice: the schema shows `reply` first, but a model may emit `changeSet` first. The D1 scanner is key-order agnostic — it
 picks up a top-level `reply` wherever in the object it arrives — so key order costs **latency only**: the
 deltas start once the preceding keys have gone by, and the author waits meanwhile on a composer that shows
 nothing.

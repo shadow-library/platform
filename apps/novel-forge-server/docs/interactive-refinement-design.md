@@ -371,7 +371,6 @@ Injection lives entirely in `ModelRouterService.structured()` — nodes and serv
 | ------------ | --------------------------------------------------------------------------- |
 | anthropic    | explicit `cache_control` blocks                                             |
 | openai / xai | no-op in code; automatic prefix caching benefits from stable-first ordering |
-| ollama       | no-op (KV-cache reuse still benefits from the stable prefix)                |
 
 Orthogonal to `llm_cache` (whole-response memo for deterministic roles), which is unchanged; `audit` and `compact` join `CACHEABLE_ROLES`; creative roles (chat, premise, arc, generation) stay out.
 
@@ -407,7 +406,7 @@ Constants beside `DEFAULT_BUDGET = 24_000`, counted with js-tiktoken `o200k_base
 | `generation` **v2** | (existing) | authoring  | no             | ending-contract instructions + volatile-tail render |
 | `judge` **v2**      | (existing) | analytical | yes (existing) | + `endingCompliance`                                |
 
-New roles are added to both `AI_PROFILE` default maps (production + local-test). All five new features run as chains under a new public helper `WorkflowRunService.runChain(projectId, graph, target, fn)` (generalizing the private `createRun`/`completeRun`/`failRun` trio), with `graph` values `chat-turn`, `premise-enhance`, `bible-audit`, `arc-plan`. Version bumps (v2) intentionally invalidate render goldens and `llm_cache` keys.
+New roles are added to `ROLE_GROUP`, so each inherits its group's default model. All five new features run as chains under a new public helper `WorkflowRunService.runChain(projectId, graph, target, fn)` (generalizing the private `createRun`/`completeRun`/`failRun` trio), with `graph` values `chat-turn`, `premise-enhance`, `bible-audit`, `arc-plan`. Version bumps (v2) intentionally invalidate render goldens and `llm_cache` keys.
 
 ---
 
@@ -433,14 +432,14 @@ Everything under `/projects/:projectId`:
 - **Apply-engine transaction tests**: happy path per op type, baseline-mismatch 409 + `conflicted`, partial-failure rollback, staleness propagation, supersession, finalized-chapter guard.
 - **Gate-matrix tests**: arc-less vs arc-bearing volumes across plan/outline/generate.
 - **Assembler tests**: stable segment byte-identical across two assemblies with unchanged canon; budget splits respected; compaction watermark math.
-- **Router tests**: mocked Anthropic asserting injected `cache_control` blocks; xai/ollama unchanged.
-- **Rung-3 Ollama smoke** (extends A10 suite): one chat turn per scope family, one arc plan with coverage check, one premise enhance — weak-model tolerance via scope playbooks shrinking the op vocabulary.
+- **Router tests**: mocked Anthropic asserting injected `cache_control` blocks; non-Anthropic models unchanged.
+- **Live-model smoke**: this design originally specified a rung-3 Ollama suite extending A10 — one chat turn per scope family, one arc plan with coverage check, one premise enhance. It was removed with the LLM-path Ollama removal (`docs/ollama-removal-design.md` P5); the paid `ai:smoke` check is now the only live-model rung.
 
 ---
 
 ## 14. Risks & open questions
 
-- **Weak local models vs the broad `chat-refine` schema** — mitigated by per-scope allowlists (smaller visible vocabulary) and the repair ladder; watched by rung-3 smoke.
+- **Weak local models vs the broad `chat-refine` schema** — mitigated at the time by per-scope allowlists (smaller visible vocabulary) and the repair ladder. Moot since every LLM call moved to OpenRouter; there are no local LLMs left to watch.
 - **Anthropic cache TTL (~5 min)** only pays during active chat cadence; stable-prefix ordering is still a pure win for xAI/OpenAI automatic caching.
 - **Conflicted proposals are terminal-ish** (discard + re-chat). Automatic change-set rebase is explicitly out of scope v1.
 - **Prompt-version bumps** invalidate goldens and `llm_cache` keys — intended and one-time.
