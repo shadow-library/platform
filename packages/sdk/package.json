@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/sdk",
+  "private": true,
   "type": "module",
   "version": "0.1.0",
   "sideEffects": false,
@@ -16,12 +17,6 @@
     }
   },
   "description": "Shared Shadow Library novel vocabulary (genres, tags, content ratings) and the cross-app publishing content-hash contract",
-  "scripts": {
-    "prepublishOnly": "echo 'Publish the built package, not this directory: bun scripts/build.ts packages/sdk && npm publish packages/sdk/dist' >&2 && exit 1"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/platform.git",
