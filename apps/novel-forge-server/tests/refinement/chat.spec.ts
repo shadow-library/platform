@@ -221,7 +221,7 @@ describe.if(pgAvailable)('ChatService', () => {
     unsubscribe();
 
     expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
-    expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', code: 'AI_007' });
+    expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ graph: 'chat-turn', status: 'failed', code: 'AI_007' });
     // Drops the background chat-title run's own run events (this opener also qualifies for naming) — this
     // assertion is about the chat-turn run's lifecycle, not everything the project channel saw. The naming
     // run's own `chat` event is real and indistinguishable in shape from the turn's (both are `{type:'chat',
@@ -263,6 +263,38 @@ describe.if(pgAvailable)('ChatService', () => {
     });
     await codeOf(chat.turn(projectId, session.id, 'first try'));
     await db.insert(schema.chatMessages).values({ sessionId: session.id, projectId, ordinal: 2, role: 'user', content: 'never sent to a run' });
+
+    expect(await chat.failedTurn(projectId, session.id)).toBeNull();
+  });
+
+  it('should report a cancelled run on the trailing user message, distinguishable from a failure', async () => {
+    const session = await chat.createSession(projectId, {});
+    const endedAt = new Date();
+    const [run] = await db
+      .insert(schema.workflowRuns)
+      .values({ projectId, graph: 'chat-turn', target: `session:${session.id}`, status: 'cancelled', input: {}, nodeTrace: [], startedAt: endedAt, endedAt })
+      .returning();
+    await db
+      .insert(schema.chatMessages)
+      .values({ sessionId: session.id, projectId, ordinal: 1, role: 'user', content: 'stop that', runId: run?.id, createdAt: new Date(endedAt.getTime() + 1) });
+
+    expect(await chat.failedTurn(projectId, session.id)).toMatchObject({ runId: run?.id, status: 'cancelled', code: null });
+    expect(await chat.turnStatus(projectId, session.id)).toMatchObject({ pendingTurn: null, failedTurn: { status: 'cancelled' }, lastOrdinal: 1 });
+  });
+
+  it('should not report a cancelled run the author has already moved past', async () => {
+    const session = await chat.createSession(projectId, {});
+    const endedAt = new Date();
+    const [run] = await db
+      .insert(schema.workflowRuns)
+      .values({ projectId, graph: 'chat-turn', target: `session:${session.id}`, status: 'cancelled', input: {}, nodeTrace: [], startedAt: endedAt, endedAt })
+      .returning();
+    await db
+      .insert(schema.chatMessages)
+      .values({ sessionId: session.id, projectId, ordinal: 1, role: 'user', content: 'stop that', runId: run?.id, createdAt: new Date(endedAt.getTime() + 1) });
+    await db
+      .insert(schema.chatMessages)
+      .values({ sessionId: session.id, projectId, ordinal: 2, role: 'assistant', content: 'moved on since', createdAt: new Date(endedAt.getTime() + 2) });
 
     expect(await chat.failedTurn(projectId, session.id)).toBeNull();
   });

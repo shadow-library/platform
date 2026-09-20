@@ -2,7 +2,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
+import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, SortByTime } from '@server/common';
 import { type Refinement } from '@server/database';
 
 import { SeedResponse } from '../ideation/ideation.dto';
@@ -175,7 +175,11 @@ export class PendingTurnResponse {
   startedAt: Date;
 }
 
-@Schema({ description: 'The turn that died on a transcript still ending in an unanswered user message, so a reload shows the failure instead of a silent thread.' })
+@Schema({
+  description:
+    'The turn that died or was stopped, on a transcript still ending in an unanswered user message, so a reload shows why instead of a silent thread. ' +
+    "`status: 'cancelled'` is the author stopping the turn deliberately — terminal and not a failure, so the client must not offer the same retry affordance it offers a failure.",
+})
 export class FailedTurnResponse {
   @Field()
   runId: string;
@@ -183,10 +187,13 @@ export class FailedTurnResponse {
   @Field()
   graph: string;
 
-  @Field(() => String, { format: 'date-time' })
-  failedAt: Date;
+  @Field(() => ChatTurnOutcome, { description: 'Whether the run failed on its own or was cancelled by the author.' })
+  status: 'failed' | 'cancelled';
 
-  @Field({ optional: true, nullable: true, description: 'Application error code, when the failure carried one.' })
+  @Field(() => String, { format: 'date-time' })
+  endedAt: Date;
+
+  @Field({ optional: true, nullable: true, description: 'Application error code, when the failure carried one; never present for a cancelled run.' })
   code?: string | null;
 
   @Field({ optional: true, nullable: true })
@@ -201,7 +208,11 @@ export class ListChatMessagesResponse {
   @Field(() => PendingTurnResponse, { optional: true, nullable: true, description: 'Present while a chat turn is running for this session; null otherwise.' })
   pendingTurn?: PendingTurnResponse | null;
 
-  @Field(() => FailedTurnResponse, { optional: true, nullable: true, description: 'Present when the last turn failed and left the transcript unanswered.' })
+  @Field(() => FailedTurnResponse, {
+    optional: true,
+    nullable: true,
+    description: 'Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`.',
+  })
   failedTurn?: FailedTurnResponse | null;
 }
 
@@ -210,7 +221,11 @@ export class ChatTurnStatusResponse {
   @Field(() => PendingTurnResponse, { optional: true, nullable: true, description: 'Present while a chat turn is running for this session; null otherwise.' })
   pendingTurn?: PendingTurnResponse | null;
 
-  @Field(() => FailedTurnResponse, { optional: true, nullable: true, description: 'Present when the last turn failed and left the transcript unanswered.' })
+  @Field(() => FailedTurnResponse, {
+    optional: true,
+    nullable: true,
+    description: 'Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`.',
+  })
   failedTurn?: FailedTurnResponse | null;
 
   @Field(() => Integer, { description: 'Ordinal of the newest message in the transcript; 0 when it is empty.' })

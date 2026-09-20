@@ -40,7 +40,9 @@ export interface PendingTurn {
 export interface FailedTurn {
   runId: string;
   graph: string;
-  failedAt: Date;
+  /** `cancelled` is the author stopping the turn deliberately (D6) — terminal, not a failure, and never retried automatically. */
+  status: 'failed' | 'cancelled';
+  endedAt: Date;
   code: string | null;
   message: string | null;
 }
@@ -372,10 +374,11 @@ export class ChatService {
   }
 
   /**
-   * The turn that died, for a session whose transcript ends on an unanswered user message. Without this
-   * a failed turn is a toast that expires: reload, and the thread is indistinguishable from one that was
-   * never asked. Reported only while the failure is the last thing that happened — any assistant message
-   * written after the run ended means the author has already moved past it.
+   * The turn that died or was stopped, for a session whose transcript ends on an unanswered user message.
+   * Without this the transcript is a mystery on reload — a `cancelled` run is the author stopping the turn
+   * deliberately (D6: terminal, not a failure, never auto-retried) and must read as that, not as a generic
+   * failure or a phantom pending state. Reported only while it is the last thing that happened — any
+   * assistant message written after the run ended means the author has already moved past it.
    */
   async failedTurn(projectId: bigint, sessionId: string): Promise<FailedTurn | null> {
     const run = await this.db.query.workflowRuns.findFirst({
@@ -383,9 +386,9 @@ export class ChatService {
         eq(schema.workflowRuns.projectId, projectId),
         inArray(schema.workflowRuns.graph, TURN_GRAPHS),
         eq(schema.workflowRuns.target, `session:${sessionId}`),
-        eq(schema.workflowRuns.status, 'failed'),
+        inArray(schema.workflowRuns.status, ['failed', 'cancelled']),
       ),
-      columns: { id: true, graph: true, error: true, endedAt: true, startedAt: true },
+      columns: { id: true, graph: true, status: true, error: true, endedAt: true, startedAt: true },
       orderBy: desc(schema.workflowRuns.startedAt),
     });
     if (!run) return null;
@@ -399,13 +402,14 @@ export class ChatService {
     // turn that fails within the millisecond its message was stored would otherwise read as already moved past.
     if (!last || last.role !== 'user' || last.runId !== run.id) return null;
 
-    const failedAt = run.endedAt ?? run.startedAt;
+    const endedAt = run.endedAt ?? run.startedAt;
 
     const error = run.error as { code?: unknown; message?: unknown } | null;
     return {
       runId: run.id,
       graph: run.graph,
-      failedAt,
+      status: run.status === 'cancelled' ? 'cancelled' : 'failed',
+      endedAt,
       code: typeof error?.code === 'string' ? error.code : null,
       message: typeof error?.message === 'string' ? error.message : null,
     };
