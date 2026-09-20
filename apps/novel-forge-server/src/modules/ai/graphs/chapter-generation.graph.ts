@@ -12,6 +12,7 @@ import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, ren
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
+import { extractJsonBlock, tryParseJson } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -134,27 +135,6 @@ export function mergeKnowledgeCompliance(
   return { knowledgeCompliant: issues.length === 0, findings: issues.map(issue => ({ severity: 'soft' as const, text: `knowledge leak: ${issue}` })) };
 }
 
-function extractJsonBlock(text: string): unknown {
-  let depth = 0;
-  let start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (text[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        try {
-          return JSON.parse(text.slice(start, i + 1));
-        } catch {
-          start = -1;
-        }
-      }
-    }
-  }
-  return null;
-}
-
 function parseJudgeOutput(raw: string): JudgeOutput | null {
   const fromJson = parseSchema<JudgeOutput>(JudgeSchema, tryParseJson(raw));
   if (fromJson.success) return fromJson.data;
@@ -164,14 +144,6 @@ function parseJudgeOutput(raw: string): JudgeOutput | null {
     if (fromExtracted.success) return fromExtracted.data;
   }
   return null;
-}
-
-function tryParseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return extractJsonBlock(raw);
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types

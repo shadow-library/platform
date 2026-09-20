@@ -469,6 +469,58 @@ describe('ModelRouterService.structured (repair ladder)', () => {
 
     await expect(router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
   });
+
+  it('should extract from attempt 1 when the repair answers with no object at all', async () => {
+    let callCount = 0;
+    const fakeChain = {
+      invoke: mock(async () => {
+        callCount++;
+        if (callCount === 1)
+          return { content: 'Two things before I hand you anything invented: {"note":"still thinking"}\n\nFinal answer:\n{"verdict":"consistent","findings":[]}' };
+        return { content: 'I have said all I can say about this chapter.' };
+      }),
+    };
+    const router = makeRouter(fakeChain);
+
+    const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+    expect(result.verdict).toBe('consistent');
+    expect(callCount).toBe(2);
+  });
+
+  it('should extract a prose-wrapped object whose string value carries an unbalanced brace', async () => {
+    let callCount = 0;
+    const fakeChain = {
+      invoke: mock(async () => {
+        callCount++;
+        if (callCount === 1) return { content: 'Verdict below.\n{"verdict":"consistent","findings":[{"severity":"soft","text":"the ward sigil closes with a } glyph"}]}' };
+        return { content: 'no further comment' };
+      }),
+    };
+    const router = makeRouter(fakeChain);
+
+    const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+    expect(result.findings[0]?.text).toContain('} glyph');
+  });
+
+  it('should still carry the required schema in the conversation the repair rung sees', async () => {
+    const seen: BaseMessage[][] = [];
+    let callCount = 0;
+    const fakeChain = {
+      invoke: mock(async (messages: BaseMessage[]) => {
+        seen.push(messages);
+        callCount++;
+        if (callCount === 1) return { content: '{"verdict":"consistent"}' };
+        return { content: JSON.stringify({ verdict: 'consistent', findings: [] }) };
+      }),
+    };
+    const router = makeRouter(fakeChain);
+
+    await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+
+    const repairConversation = (seen[1] ?? []).map(message => String(message.content)).join('\n');
+    expect(repairConversation).toContain('matching this JSON schema');
+    expect(repairConversation).toContain('one finding, citing the canon it conflicts with');
+  });
 });
 
 // The over-capacity cases never reach the model_calls insert, so the shared cache-only stub covers them;

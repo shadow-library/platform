@@ -9,6 +9,7 @@ import * as schema from '@server/database/schemas';
 
 import { type PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
+import { extractJsonBlock } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -57,27 +58,6 @@ type ValidationState = typeof NovelValidationAnnotation.State;
 
 const DEFAULT_WINDOW_SIZE = 20;
 const logger = Logger.getLogger(APP_NAME, 'novel-validation.graph');
-
-function extractJsonBlock(text: string): unknown {
-  let depth = 0;
-  let start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (text[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        try {
-          return JSON.parse(text.slice(start, i + 1));
-        } catch {
-          start = -1;
-        }
-      }
-    }
-  }
-  return null;
-}
 
 function tryParseValidation(raw: string): ValidationOutput | null {
   try {

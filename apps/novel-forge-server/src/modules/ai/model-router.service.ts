@@ -29,6 +29,7 @@ import {
 } from './defaults';
 import { type AccountModelGroup, AccountSettingsService } from './account-settings.service';
 import { AiQuotaService } from './ai-quota.service';
+import { extractJsonCandidates, tryParseJson } from './json-extract';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
@@ -96,35 +97,6 @@ function withImageAttached(messages: BaseMessage[], image: string): BaseMessage[
   const { content } = messages[lastHuman] as BaseMessage;
   const textParts = typeof content === 'string' ? [{ type: 'text', text: content }] : content;
   return messages.map((message, index) => (index === lastHuman ? new HumanMessage({ content: [...textParts, imagePart] }) : message));
-}
-
-function extractJsonBlock(text: string): unknown {
-  let depth = 0;
-  let start = -1;
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (text[i] === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        try {
-          return JSON.parse(text.slice(start, i + 1));
-        } catch {
-          start = -1;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function tryParseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return extractJsonBlock(raw);
-  }
 }
 
 // Ollama's JSON mode biases toward objects, so a schema expecting a top-level array frequently arrives
@@ -491,16 +463,21 @@ export class ModelRouterService {
       issues: issues2,
     });
     this.logger.debug('Repair raw output', { role, runId: ctx.runId, rawOutput: rawOutput2 });
-    const extracted = extractJsonBlock(rawOutput2);
-    if (extracted) {
-      const parsed3 = this.parseOutput(promptModule, extracted);
-      if (parsed3.success) {
-        this.logger.debug('structured: parsed via tolerant extraction', { role, runId: ctx.runId });
-        const extractedRaw = JSON.stringify(extracted);
-        await this.cacheResponse(requestHash, ctx, resolved, promptModule, extractedRaw);
-        relay?.settle(extractedRaw);
-        return parsed3.data;
-      }
+    // The repair output goes first because it is the only one the model wrote after seeing the issues, which
+    // also leaves every call that recovers today recovering from the same text; attempt 1 is the added rung,
+    // for the repair that discarded a usable object rather than fixing it.
+    const candidates = [
+      ...extractJsonCandidates(rawOutput2).map(value => ['repair', value] as const),
+      ...extractJsonCandidates(rawOutput1).map(value => ['attempt-1', value] as const),
+    ];
+    for (const [source, extracted] of candidates) {
+      const parsedExtracted = this.parseOutput(promptModule, extracted);
+      if (!parsedExtracted.success) continue;
+      this.logger.debug('structured: parsed via tolerant extraction', { role, runId: ctx.runId, source });
+      const extractedRaw = JSON.stringify(extracted);
+      await this.cacheResponse(requestHash, ctx, resolved, promptModule, extractedRaw);
+      relay?.settle(extractedRaw);
+      return parsedExtracted.data;
     }
 
     this.logger.error('All parse attempts failed', {
