@@ -13,7 +13,7 @@ import { ensureOnboarded } from './helpers';
  * Defining types
  */
 
-test.describe('shadow memoir quick capture', () => {
+test.describe('memoir quick capture', () => {
   test.use({ storageState: storageStateFor('user1') });
 
   test('should log an expense through the command palette and show it on the Finance screen', async ({ page }) => {

@@ -31,7 +31,7 @@ export type ProductKey = 'identity' | 'memoir' | 'novelForge' | 'pulse' | 'webNo
 /** Human-readable name for test titles and skip reasons. */
 const PRODUCT_LABELS: Record<ProductKey, string> = {
   identity: 'Identity',
-  memoir: 'Shadow Memoir',
+  memoir: 'Memoir',
   novelForge: 'Novel Forge',
   pulse: 'Pulse',
   webNovel: 'Web Novel',

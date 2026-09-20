@@ -21,7 +21,7 @@ import { createDailyQuest, ensureOnboarded, hasQuestLogFor, pullDelta } from './
  * network emulation (`BrowserContext.setOffline`) rather than the OS network, which is what the client's own
  * `navigator.onLine`-driven `NetStrip` reacts to.
  */
-test.describe('shadow memoir offline outbox', () => {
+test.describe('memoir offline outbox', () => {
   test.use({ storageState: storageStateFor('user1') });
 
   test('should queue a quest completion while offline and flush it once back online', async ({ page, context }) => {

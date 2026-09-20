@@ -35,7 +35,7 @@ type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
  */
 
 /** Physical database name per key, for the default local URL. */
-const DATABASE_NAMES: Record<DatabaseKey, string> = { identity: 'identity', memoir: 'shadow_memoir', pulse: 'pulse', webNovel: 'web_novel', novelForge: 'novel_forge' };
+const DATABASE_NAMES: Record<DatabaseKey, string> = { identity: 'identity', memoir: 'memoir', pulse: 'pulse', webNovel: 'web_novel', novelForge: 'novel_forge' };
 
 /** The env var each database's connection string is read from. */
 const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
@@ -331,7 +331,7 @@ async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
 }
 
 /**
- * Deletes `user2Sub`'s shadow-memoir account (cascade), so the onboarding e2e flow always finds an
+ * Deletes `user2Sub`'s memoir account (cascade), so the onboarding e2e flow always finds an
  * unprovisioned, never-onboarded account to walk through — the account row is otherwise created lazily on
  * first authenticated request and would persist "onboarded" across every later run against this dev cluster.
  * `user1` is left alone: the core-loop/quick-capture/settings specs want a persistent, already-onboarded
@@ -341,7 +341,7 @@ async function cleanMemoir(url: string, user2Sub: string): Promise<void> {
   const sql = connect(url);
   try {
     const deleted = await sql`DELETE FROM accounts WHERE identity_sub = ${user2Sub} RETURNING id`;
-    summary.push(`shadow_memoir: deleted ${deleted.count} account(s) for e2e user2 (keeps onboarding fresh)`);
+    summary.push(`memoir: deleted ${deleted.count} account(s) for e2e user2 (keeps onboarding fresh)`);
   } finally {
     await sql.end();
   }
@@ -376,7 +376,7 @@ async function main(): Promise<void> {
 
   const memoirUrl = resolveUrl('memoir');
   if (memoirUrl && users) await cleanMemoir(memoirUrl, users.user2.sub);
-  else summary.push(`shadow_memoir: skipped (${memoirUrl ? 'no identity subs' : 'E2E_PG_URL_MEMOIR blank'})`);
+  else summary.push(`memoir: skipped (${memoirUrl ? 'no identity subs' : 'E2E_PG_URL_MEMOIR blank'})`);
 
   const pulseUrl = resolveUrl('pulse');
   if (pulseUrl) await seedPulse(pulseUrl);

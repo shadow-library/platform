@@ -1,0 +1,379 @@
+import { type AppUpdateState } from '@/lib/app-update';
+
+import {
+  type AccountCommand,
+  type AppSyncView,
+  type BillingPlan,
+  type BillingView,
+  type DayPreferences,
+  type DeletionView,
+  type ErasureDevice,
+  type ExportJob,
+  type ExportView,
+  type InstallRow,
+  type NotificationPreference,
+  type NotificationSettings,
+  type OnboardingStatus,
+  type PlanId,
+} from './account.types';
+import { type CommandOutcome, type SettledCommandResult } from './command.types';
+import { type Persona } from './fixtures';
+
+export interface AccountProvider {
+  getDay(): Promise<DayPreferences>;
+  getNotifications(): Promise<NotificationSettings>;
+  getBilling(): Promise<BillingView>;
+  getExport(): Promise<ExportView>;
+  getDeletion(): Promise<DeletionView>;
+  getAppSync(): Promise<AppSyncView>;
+  getOnboarding(): Promise<OnboardingStatus>;
+  dispatchCommand(command: AccountCommand): Promise<SettledCommandResult>;
+}
+
+/** Every category ships off. This is a safety requirement rather than a default anyone may tune (PRD §2.11). */
+export const NOTIFICATION_SEEDS: Omit<NotificationPreference, 'email'>[] = [
+  { id: 'weeklyDigest', label: 'Weekly review', help: 'One email when the week is ready to close. Never about a quest you missed.' },
+  { id: 'aiReadiness', label: 'Coaching result ready', help: 'When a request or the nightly summary has finished.' },
+  { id: 'billingReminders', label: 'Billing reminders', help: 'Renewals, trial endings and failed payments.' },
+];
+
+export const DELETION_ACKNOWLEDGEMENTS: DeletionView['acknowledgements'] = [
+  { id: 'permanent', text: 'I understand my quests, my history, my records and my experience are erased permanently and cannot be restored.' },
+  { id: 'exported', text: 'I have exported anything I want to keep, or I do not want to keep any of it.' },
+];
+
+export const DELETION_ALTERNATIVES: DeletionView['alternatives'] = [
+  {
+    title: 'Pause instead',
+    body: 'Set intensity to gentle, or deactivate your quests. Nothing is deleted and the streaks stay as records.',
+    links: [
+      { label: 'Change intensity', to: '/settings' },
+      { label: 'Deactivate quests', to: '/quests' },
+    ],
+  },
+  {
+    title: 'Export and keep the account',
+    body: 'Take the archive now. The account can be deleted at any later time.',
+    links: [{ label: 'Export your data', to: '/settings/export' }],
+  },
+  {
+    title: 'Turn off coaching and notifications',
+    body: 'If it is the coaching or the reminders you want gone, both are switches rather than a deletion.',
+    links: [
+      { label: 'Coaching consent', to: '/ai' },
+      { label: 'Notification settings', to: '/settings/notifications' },
+    ],
+  },
+];
+
+export const DELETION_TERMS = 'Erasure starts the moment you confirm, and it cannot be stopped or undone. If it is interrupted, it resumes on its own.';
+
+export const REAUTH_HANDOFF_COPY = {
+  title: 'Confirm it is you, on your Shadow account',
+  body: 'Deleting your data needs a fresh sign-in on the account itself, not in this app. You come back here for the final confirmation, and nothing is erased before you give it.',
+  continueLabel: 'Continue on your Shadow account',
+};
+
+export const DELETION_UNACKNOWLEDGED = 'Both statements need to be true before anything goes further.';
+
+export const DELETION_STARTED = 'The erasure has started. It runs to the end on its own.';
+
+export const DELETION_STOPPED = 'Stopped. Nothing was started and nothing was erased.';
+
+export const DELETION_WRONG_ACCOUNT = 'Nothing was erased: this tab is no longer signed in as this account.';
+
+export const DELETION_ACCOUNT_UNCONFIRMED = 'Couldn’t confirm which account is signed in. Nothing was erased.';
+
+export const DELETION_START_UNCONFIRMED_CODE = 'DELETION_START_UNCONFIRMED';
+
+export const DELETION_START_UNCONFIRMED = [
+  'The request was sent, but Memoir didn’t answer, so the erasure may have started.',
+  'Check again before doing anything else — asking again never starts a second erasure.',
+].join(' ');
+
+export const DELETION_UNEXPECTED = 'Something went wrong on this device. Nothing was sent and nothing was erased.';
+
+/** A started erasure: the server has revoked the session, and `device` says whether this device's copy of the account is gone. */
+export interface ErasureStartedResult extends CommandOutcome {
+  status: 'applied';
+  erasure: { device: ErasureDevice };
+}
+
+export function isErasureStarted(result: SettledCommandResult): result is ErasureStartedResult {
+  return result.status === 'applied' && 'erasure' in result;
+}
+
+export const DELETION_DEVICE_ERROR = 'This device couldn’t read the deletion steps it saved, so nothing was sent and nothing was erased.';
+
+export const REAUTH_EXPIRED_NOTE = 'The confirmation on your Shadow account expired before the erasure started, so nothing was erased. Confirm it is you again to continue.';
+
+export const SYNC_COPY: Record<AppSyncView['status'], { title: string; body: string }> = {
+  online: { title: 'Online and synced', body: 'Everything on this device matches the server.' },
+  offline: { title: 'Offline — working from this device', body: 'Every screen still works. Insights, coaching and exports are the only things that wait for a connection.' },
+  syncing: { title: 'Syncing', body: 'Sending anything queued in the order you made it, then bringing this device up to date.' },
+  failed: { title: 'Sync did not go through', body: 'Your data is safe on this device. It tries again when you next make a change or reconnect, or you can retry it now.' },
+  'signed-out': { title: 'Signed out', body: 'Your data and queue are kept on this device. Sign in again to resume syncing; retrying will not help until then.' },
+};
+
+export const OFFLINE_CAPABILITIES = [
+  'Today, quest completion and every quick log',
+  'Journal, meals, weight and health entries',
+  'The planning board for this week and next',
+  'History for the last ninety days',
+];
+
+export const ONLINE_ONLY_NOTE = 'Insights, coaching results and exports need a connection. They are the only things that wait.';
+
+export const SESSION_NOTE =
+  'If your session ends while you are offline, everything you logged stays on the device and syncs once the platform restores it. You are never asked to re-enter anything.';
+
+export const DEVICE_REMOVED = 'Removed from your devices.';
+
+const OFFLINE_ROWS: Record<AppUpdateState['offline'], InstallRow> = {
+  unavailable: {
+    id: 'offline',
+    label: 'Needs a connection to open',
+    help: 'This browser hasn’t saved the app for offline use. Anything you log is still kept on this device until it syncs.',
+    action: null,
+  },
+  'next-load': {
+    id: 'offline',
+    label: 'Opens offline after its next load here',
+    help: 'The app finishes saving itself on this device the next time it loads. Until then, opening it needs a connection.',
+    action: null,
+  },
+  ready: {
+    id: 'offline',
+    label: 'Opens offline',
+    help: 'The app is saved on this device, so it opens with no connection. A screen you haven’t opened here before may still need one.',
+    action: null,
+  },
+};
+
+export function installRows({ offline, update }: AppUpdateState): InstallRow[] {
+  return [
+    OFFLINE_ROWS[offline],
+    update !== 'none'
+      ? { id: 'update', label: 'Update waiting', help: 'A newer version is downloaded and ready to apply.', action: { label: 'Reload to update', overlay: 'update' } }
+      : { id: 'update', label: 'Up to date', help: 'This device runs the newest version it has found.', action: null },
+    {
+      id: 'other-device',
+      label: 'Install on another device',
+      help: 'Open Memoir in that device’s browser and choose install.',
+      action: { label: 'Preview', overlay: 'install-preview' },
+    },
+  ];
+}
+
+export function billingPlans(current: PlanId): BillingPlan[] {
+  return [
+    {
+      id: 'free',
+      name: 'Free',
+      price: '€0',
+      cycle: 'always',
+      tagline: 'The whole product. Quests, planning, money, journal, history and insights.',
+      features: [
+        { included: true, text: 'Everything except coaching volume' },
+        { included: true, text: '2 coaching requests a month' },
+        { included: true, text: 'Full export, whenever you want it' },
+        { included: true, text: 'Identical hero mechanics' },
+      ],
+      current: current === 'free',
+    },
+    {
+      id: 'coach',
+      name: 'Coach',
+      price: '€6',
+      cycle: 'a month, or €60 a year',
+      tagline: 'More machine time for questions about your own history. Nothing else changes.',
+      features: [
+        { included: true, text: 'A daily allowance instead of two requests a month' },
+        { included: true, text: 'The nightly summary and a weekly deep read' },
+        { included: true, text: 'Twelve months of context instead of three' },
+        { included: false, text: 'No XP, HP, shields or cosmetics — not now, not later' },
+      ],
+      current: current === 'coach',
+    },
+  ];
+}
+
+export const BILLING_INVOICES_LINE = 'Sent by email and managed by the payment provider. Memoir never sees your card.';
+
+export const BILLING_MANAGE_NOTE =
+  'Cancelling, changing card and invoices all happen with the payment provider. Memoir has no route that can write your plan — only the provider’s webhook can, which is why nothing here pretends to.';
+
+const EXPORT_COPY: Record<Exclude<ExportJob['stage'], 'idle'>, Omit<ExportJob, 'stage' | 'downloadUrl'>> = {
+  preparing: { when: 'started a moment ago', body: 'Collecting your records. You can leave this page — the archive will be here when it is done.' },
+  ready: { when: 'ready · the link expires on its own', body: 'JSON and CSV, with your journal as Markdown files.' },
+  failed: { when: 'did not finish', body: 'The archive could not be assembled. Nothing was deleted or changed, and retrying is safe.' },
+};
+
+export function exportJobCopy(stage: ExportJob['stage'], downloadUrl: string | null): ExportJob {
+  if (stage === 'idle') return { stage, when: '', body: '', downloadUrl: null };
+  return { stage, ...EXPORT_COPY[stage], downloadUrl };
+}
+
+interface AccountFixtureState {
+  persona: Persona;
+  day: DayPreferences;
+  notifications: NotificationSettings;
+  plan: PlanId;
+  exportStage: ExportJob['stage'];
+  deletionStage: Extract<DeletionView['stage']['kind'], 'idle' | 'awaiting-reauth'>;
+  acknowledged: Set<string>;
+}
+
+export interface AccountFixtureOptions {
+  persona?: Persona;
+  currency: string;
+}
+
+function applied(message: string): SettledCommandResult {
+  return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
+}
+
+/**
+ * The fixture account, kept for stories and component tests. Its session is never elevated, so `deletion.continue` stops at the
+ * re-authentication handoff and nothing can start an erasure.
+ */
+export function createAccountProvider({ persona = 'active', currency }: AccountFixtureOptions): AccountProvider {
+  const state: AccountFixtureState = {
+    persona,
+    day: {
+      wakeTime: '06:30',
+      sleepTime: '22:30',
+      timezone: 'Europe/Oslo',
+      pendingTimezone: null,
+      intensity: 'standard',
+      pendingIntensity: null,
+      currency,
+      currencyLocked: persona !== 'new',
+      monthlyBudgetMinor: persona === 'new' ? null : 160_000,
+    },
+    notifications: {
+      preferences: NOTIFICATION_SEEDS.map(seed => ({ ...seed, email: false })),
+    },
+    plan: 'free',
+    exportStage: 'idle',
+    deletionStage: 'idle',
+    acknowledged: new Set(),
+  };
+
+  const sets = [
+    { name: 'Quests', meta: '11 quests · 3,180 occurrences' },
+    { name: 'Money', meta: '96 expenses · 7 subscriptions' },
+    { name: 'Journal', meta: '184 entries' },
+    { name: 'Body', meta: '21 weights · 68 metrics · 19 meals' },
+    { name: 'Side quests', meta: '46 records' },
+  ];
+
+  return {
+    getDay: () => Promise.resolve({ ...state.day }),
+    getNotifications: () => Promise.resolve({ ...state.notifications, preferences: state.notifications.preferences.map(item => ({ ...item })) }),
+    getOnboarding: () => Promise.resolve({ completed: state.persona !== 'new' }),
+    getBilling: () =>
+      Promise.resolve({
+        plans: billingPlans(state.plan),
+        status: state.plan === 'coach' ? 'Coach · active' : 'Free',
+        lapsed: false,
+        quotaLine: state.plan === 'coach' ? 'A daily allowance, reset at your local midnight' : '1 of 2 requests used this month',
+        trialLine: '',
+        invoicesLine: BILLING_INVOICES_LINE,
+        manageNote: BILLING_MANAGE_NOTE,
+      }),
+    getExport: () => Promise.resolve({ sets, job: exportJobCopy(state.exportStage, state.exportStage === 'ready' ? 'https://example.invalid/archive.zip' : null), notice: null }),
+    getDeletion: () =>
+      Promise.resolve({
+        stage: state.deletionStage === 'idle' ? { kind: 'idle' } : { kind: 'awaiting-reauth', reason: 'step-up' },
+        sets,
+        acknowledgements: DELETION_ACKNOWLEDGEMENTS,
+        acknowledged: [...state.acknowledged],
+        reauth: { ...REAUTH_HANDOFF_COPY, continueTo: '/api/auth/step-up' },
+        alternatives: DELETION_ALTERNATIVES,
+        terms: DELETION_TERMS,
+      }),
+    getAppSync: () => {
+      const status: AppSyncView['status'] = state.persona === 'new' ? 'online' : 'offline';
+      return Promise.resolve({
+        status,
+        ...SYNC_COPY[status],
+        queuedCount: state.persona === 'new' ? 0 : 2,
+        lastSyncedAt: null,
+        failed: [],
+        queue:
+          state.persona === 'new'
+            ? []
+            : [
+                { id: 'q1', state: 'queued' as const, text: 'Expense €18.40 · Groceries', meta: 'Created 09:12 · position 1', retryable: false },
+                { id: 'q2', state: 'queued' as const, text: 'Journal entry · 84 words', meta: 'Created 09:31 · position 2', retryable: false },
+              ],
+        devices:
+          state.persona === 'new'
+            ? []
+            : [
+                { id: 'd1', name: 'Chrome · MacBook', meta: 'Last seen a moment ago', current: true },
+                { id: 'd2', name: 'Memoir · iPhone', meta: 'Last seen 2 August', current: false },
+              ],
+        offlineCapabilities: OFFLINE_CAPABILITIES,
+        onlineOnly: ONLINE_ONLY_NOTE,
+        sessionNote: SESSION_NOTE,
+      });
+    },
+    dispatchCommand: command => {
+      switch (command.type) {
+        case 'day.set':
+          state.day = { ...state.day, ...command.patch };
+          return Promise.resolve(applied('Saved. Changing your wake window never rewrites past days.'));
+
+        case 'onboarding.complete':
+          state.day = { ...state.day, currency: command.submission.currency, currencyLocked: true };
+          state.persona = 'active';
+          return Promise.resolve(applied('Set up. Your home currency is fixed from here.'));
+
+        case 'notification.set':
+          state.notifications = {
+            ...state.notifications,
+            preferences: state.notifications.preferences.map(item => (item.id === command.preferenceId ? { ...item, email: command.enabled } : item)),
+          };
+          return Promise.resolve(applied(command.enabled ? 'On.' : 'Off.'));
+
+        case 'device.remove':
+          return Promise.resolve(applied(DEVICE_REMOVED));
+
+        case 'failedChange.dismiss':
+          return Promise.resolve(applied(''));
+
+        case 'billing.checkout':
+          state.plan = 'coach';
+          return Promise.resolve(applied('Opening the payment provider’s checkout.'));
+
+        case 'export.prepare':
+          state.exportStage = 'preparing';
+          return Promise.resolve(applied('Preparing your archive. You can leave this page.'));
+
+        case 'export.dismiss':
+          state.exportStage = 'idle';
+          return Promise.resolve(applied(''));
+
+        case 'deletion.acknowledge':
+          if (command.acknowledged) state.acknowledged.add(command.acknowledgementId);
+          else state.acknowledged.delete(command.acknowledgementId);
+          return Promise.resolve(applied(''));
+
+        case 'deletion.continue':
+          if (state.acknowledged.size < DELETION_ACKNOWLEDGEMENTS.length) return Promise.resolve({ status: 'rejected', message: DELETION_UNACKNOWLEDGED });
+          state.deletionStage = 'awaiting-reauth';
+          return Promise.resolve(applied(''));
+
+        case 'deletion.begin':
+          return Promise.resolve({ status: 'rejected', message: REAUTH_EXPIRED_NOTE });
+
+        default:
+          state.deletionStage = 'idle';
+          state.acknowledged.clear();
+          return Promise.resolve(applied(DELETION_STOPPED));
+      }
+    },
+  };
+}

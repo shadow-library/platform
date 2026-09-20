@@ -175,9 +175,9 @@ describe('Sidebar', () => {
   });
 
   it('should leave room for a focused brand link ring inside the truncating workspace clip', () => {
-    render(<Sidebar workspace={<a href="/">Shadow Memoir</a>} />);
+    render(<Sidebar workspace={<a href="/">Memoir</a>} />);
 
-    expect(screen.getByRole('link', { name: 'Shadow Memoir' }).parentElement).toHaveClass(/workspace/);
+    expect(screen.getByRole('link', { name: 'Memoir' }).parentElement).toHaveClass(/workspace/);
     const workspace = css.match(/\.workspace\s*{([^}]*)}/)?.[1] ?? '';
     expect(workspace).toContain('overflow: hidden;');
     expect(workspace).toContain('text-overflow: ellipsis;');

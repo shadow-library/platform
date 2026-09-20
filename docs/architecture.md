@@ -2,13 +2,12 @@
 
 ## Topology
 
-- Five products (`identity`, `novel-forge`, `pulse`, `web-novel`, `shadow-memoir`), each a server + web pair: ten independently built and deployed apps.
+- Five products (`identity`, `novel-forge`, `pulse`, `web-novel`, `memoir`), each a server + web pair: ten independently built and deployed apps.
 - Server: Bun + Fastify over the in-house DI kernel, PostgreSQL via Drizzle; JSON/REST, except identity-server which also speaks OAuth2, SAML2 and SCIM. Web: React + TanStack
-  Start SSR; `web-novel-web` and `shadow-memoir-web` are also PWAs.
+  Start SSR; `web-novel-web` and `memoir-web` are also PWAs.
 - The browser calls the paired server same-origin: `/api/*` plus `/auth/*` (and `/oauth2`, `/saml2` on identity); SSR calls the server directly. Web apps hold no auth logic and,
-  except offline-first `shadow-memoir-web` (which projects domain state client-side), no business logic.
-- Naming trap: `apps/identity-server` is the package `@shadow-library/identity`. Identity's application names are `pulse`, `novel-forge`, `web-novel`, `memoir` (not `shadow-memoir`),
-  and web-novel's runtime identifiers are unhyphenated `webnovel`. `identity-server` ships a `worker` entrypoint; memoir's exists but registers no sweeps.
+  except offline-first `memoir-web` (which projects domain state client-side), no business logic.
+- Naming trap: `apps/identity-server` is the package `@shadow-library/identity`. Web-novel's runtime identifiers are unhyphenated `webnovel`, unlike its workspace name. `identity-server` ships a `worker` entrypoint; memoir's exists but registers no sweeps.
 
 ## Integrations
 
@@ -39,7 +38,7 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
 ## Data stores
 
 - Each server owns one PostgreSQL database; migrations are applied by a separate `migrate` entrypoint, not on server boot. Redis is Identity-only (opaque sessions). Object storage (`@shadow-library/modules/storage`) holds
-  blobs for novel-forge, web-novel and shadow-memoir.
+  blobs for novel-forge, web-novel and memoir.
 - Web Novel's catalog, chapter and wiki tables are a projection of Forge content, rebuilt by re-pushing; its reader tables (library, progress) and publish audit are native and
   cannot be rebuilt from Forge.
 

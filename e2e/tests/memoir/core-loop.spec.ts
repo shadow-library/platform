@@ -21,7 +21,7 @@ import { createDailyQuest, ensureOnboarded, hasQuestLogFor, pullDelta } from './
  * screen, and checks the result both in the UI and by pulling the server's own delta — the round trip the
  * offline outbox exists to make invisible to the user.
  */
-test.describe('shadow memoir core loop', () => {
+test.describe('memoir core loop', () => {
   test.use({ storageState: storageStateFor('user1') });
 
   test('should complete a quest from Today, update Hero state, and persist across reload', async ({ page }) => {

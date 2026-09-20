@@ -118,7 +118,7 @@ describe('TopNavigation', () => {
   it('should not overflow the centred top bar when utility content is wide', () => {
     render(
       <TopNavigation
-        brand="Shadow Memoir Operator Workspace"
+        brand="Memoir Operator Workspace"
         search={<button type="button">Log something, or jump to a screen</button>}
         utility={
           <>

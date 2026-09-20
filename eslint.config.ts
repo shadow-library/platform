@@ -185,19 +185,19 @@ export default defineConfig([
       'apps/novel-forge-server/**/*.{ts,tsx}',
       'apps/pulse-server/**/*.{ts,tsx}',
       'apps/web-novel-server/**/*.{ts,tsx}',
-      'apps/shadow-memoir-server/**/*.{ts,tsx}',
+      'apps/memoir-server/**/*.{ts,tsx}',
     ],
     rules: { '@typescript-eslint/no-namespace': 'off' },
   },
 
   /**
-   * shadow-memoir-server: `OwnerScopedRepository` (ARCHITECTURE §8.3, §5.3) is the only sanctioned entry
+   * memoir-server: `OwnerScopedRepository` (ARCHITECTURE §8.3, §5.3) is the only sanctioned entry
    * point to user-owned tables — raw `DatabaseService.getPostgresClient()` access is confined to
    * `*.repository.ts` files and `database/`, so a domain service reaching for the client directly (and
    * skipping owner scoping) fails lint instead of only code review.
    */
   {
-    files: ['apps/shadow-memoir-server/**/*.{ts,tsx}'],
+    files: ['apps/memoir-server/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -209,7 +209,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['apps/shadow-memoir-server/**/*.repository.ts', 'apps/shadow-memoir-server/src/database/**/*.{ts,tsx}', 'apps/shadow-memoir-server/tests/**/*.{ts,tsx}'],
+    files: ['apps/memoir-server/**/*.repository.ts', 'apps/memoir-server/src/database/**/*.{ts,tsx}', 'apps/memoir-server/tests/**/*.{ts,tsx}'],
     rules: { 'no-restricted-syntax': 'off' },
   },
 
@@ -237,9 +237,9 @@ export default defineConfig([
     },
   },
 
-  /** shadow-memoir-web Insights: a horizontally scrollable chart row needs to be keyboard-reachable, and `role="group"` is the correct role for it — just not one jsx-a11y's default allowlist treats as interactive. */
+  /** memoir-web Insights: a horizontally scrollable chart row needs to be keyboard-reachable, and `role="group"` is the correct role for it — just not one jsx-a11y's default allowlist treats as interactive. */
   {
-    files: ['apps/shadow-memoir-web/src/features/insights/**/*.tsx'],
+    files: ['apps/memoir-web/src/features/insights/**/*.tsx'],
     rules: {
       'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['tabpanel', 'group'] }],
     },

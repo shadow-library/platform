@@ -13,7 +13,7 @@ Notification service and operations console. Other apps send a message by templa
 
 ## Architecture
 
-- Producers call Pulse server-to-server: `identity` (auth/security/user/org/bot templates) and `shadow-memoir-server` (memoir-*). Each needs a service-access rule in Identity.
+- Producers call Pulse server-to-server: `identity` (auth/security/user/org/bot templates) and `memoir-server` (memoir-*). Each needs a service-access rule in Identity.
 - Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.

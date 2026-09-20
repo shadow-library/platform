@@ -22,7 +22,7 @@ import { getAccount } from './helpers';
  * cluster before. `user1` is deliberately left alone for the other specs, which want a persistent,
  * already-onboarded account.
  */
-test.describe('shadow memoir onboarding', () => {
+test.describe('memoir onboarding', () => {
   test.use({ storageState: storageStateFor('user2') });
 
   test('should walk a fresh account through onboarding, lock the currency, and land a first quest on Today', async ({ page }) => {

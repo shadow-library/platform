@@ -13,7 +13,7 @@ import { ensureOnboarded, getAccount, memoirMutate } from './helpers';
  * Defining types
  */
 
-test.describe('shadow memoir settings', () => {
+test.describe('memoir settings', () => {
   test.use({ storageState: storageStateFor('user1') });
 
   test('should round-trip a notification preference toggle from the settings screen', async ({ page }) => {

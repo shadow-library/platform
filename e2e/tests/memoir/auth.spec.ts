@@ -20,7 +20,7 @@ import { ensureOnboarded } from './helpers';
  * account persists in the dev cluster across runs, so this makes the landing → Today assertion deterministic
  * whether this is the very first run or the hundredth.
  */
-test.describe('shadow memoir auth', () => {
+test.describe('memoir auth', () => {
   test.use({ storageState: storageStateFor('user1') });
 
   test('should sign in through identity, land on Today, and keep the session across a reload', async ({ page }) => {

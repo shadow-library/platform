@@ -18,7 +18,7 @@ import { apiContext, requireProductUrl } from '../../lib';
  * The internal health contract (`/health/live`, `/health/ready`) is asserted for every configured product,
  * memoir included, by `tests/health-not-exposed.spec.ts` — nothing memoir-specific belongs here for that.
  */
-test.describe('shadow memoir smoke', () => {
+test.describe('memoir smoke', () => {
   test.beforeEach(() => requireProductUrl('memoir'));
 
   test('should 401 an unauthenticated sync delta pull', async () => {

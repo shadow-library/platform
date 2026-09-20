@@ -559,7 +559,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   {
     templateKey: 'memoir-ai-result-ready',
     name: 'Memoir: AI review ready',
-    description: 'Notice that a Shadow Memoir AI review has finished and is ready to read',
+    description: 'Notice that a Memoir AI review has finished and is ready to read',
     messageType: 'TRANSACTIONAL',
     priority: 'MEDIUM',
     category: 'memoir',
@@ -570,7 +570,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
         subject: 'Your AI review is ready',
         layoutKey: DEFAULT_LAYOUT_KEY,
         body: `<h1 class="email-h1">Your AI review is ready</h1>
-<p class="email-text">Your Shadow Memoir AI review has finished, with <span class="email-strong">{{ suggestionCount }}</span> suggestion(s) to look over.</p>
+<p class="email-text">Your Memoir AI review has finished, with <span class="email-strong">{{ suggestionCount }}</span> suggestion(s) to look over.</p>
 <p class="email-muted">Reference: {{ resultId }}. Open the app to read the full review.</p>`,
       },
     ],
@@ -623,10 +623,10 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
     channels: [
       {
         channel: 'EMAIL',
-        subject: 'About your Shadow Memoir subscription',
+        subject: 'About your Memoir subscription',
         layoutKey: DEFAULT_LAYOUT_KEY,
         body: `<h1 class="email-h1">Your subscription status</h1>
-<p class="email-text">Your Shadow Memoir subscription status is <span class="email-strong">{{ state }}</span>, with the current billing date on <span class="email-strong">{{ expiresAtDate }}</span>.</p>
+<p class="email-text">Your Memoir subscription status is <span class="email-strong">{{ state }}</span>, with the current billing date on <span class="email-strong">{{ expiresAtDate }}</span>.</p>
 {% if amount != 0 %}<p class="email-text">Renewal amount: {{ amount }} {{ currencyCode }}</p>{% endif %}
 <p class="email-muted">Manage your subscription any time from account settings.</p>`,
       },

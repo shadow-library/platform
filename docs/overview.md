@@ -12,7 +12,7 @@
 - **Novel Forge** — AI-assisted novel authoring (story bible, planning, chapter generation with judge/repair, review, continuity, import/translation). Source of truth for novels.
 - **Pulse** — notification service and operator console. Apps send by template key; Pulse renders, routes to a sender and logs the outcome (email via Resend is the only real provider today).
 - **Web Novel** — public reading platform (catalog, reader, library, spoiler-gated wikis, PWA). A serving copy of content pushed from Novel Forge; owns no identities but does own reader state (library, progress) and app sessions.
-- **Shadow Memoir** — personal gamified life-tracking (quests, hero progression, finance, AI insights). Offline-first PWA with client sync; notifies through Pulse.
+- **Memoir** — personal gamified life-tracking (quests, hero progression, finance, AI insights). Offline-first PWA with client sync; notifies through Pulse.
 
 ## Shared packages
 
@@ -23,7 +23,7 @@
 - `AGENTS.md` is the entry point that points here; the `shadow-library-ecosystem` skill owns the package API catalog.
 - `docs/architecture.md` — topology, integrations, contract-first API types, monorepo rules.
 - `docs/packages.md` — shared package roles and hard rules.
-- `docs/identity.md`, `docs/novel-forge.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/shadow-memoir.md` — one per product (server and web).
+- `docs/identity.md`, `docs/novel-forge.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md` — one per product (server and web).
 
 ## Reading rule
 

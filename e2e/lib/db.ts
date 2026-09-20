@@ -31,7 +31,7 @@ type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
 /** Physical database name for each key, used to build the default local URL. */
 const DATABASE_NAMES: Record<DatabaseKey, string> = {
   identity: 'identity',
-  memoir: 'shadow_memoir',
+  memoir: 'memoir',
   pulse: 'pulse',
   webNovel: 'web_novel',
   novelForge: 'novel_forge',
