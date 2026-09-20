@@ -19,7 +19,7 @@ import { buildFinalBundle, createProject, deleteProjectQuietly, jsonOrUndefined,
  * Workspace odds-and-ends that do not need AI: the export endpoint's two outcomes (bytes for a project with
  * chapters, EXP_001 for an empty one), and the authenticated web surface — overview CTA, the settings General
  * tab persisting a brief, and the Models tab's role rows. The Models test also RECORDS which Haiku id the
- * dropdown would submit, documenting (never "fixing") the dated-id-vs-gateway mismatch from novel-forge.md §0.
+ * dropdown would submit, documenting (never "fixing") the dated-id-vs-gateway mismatch.
  */
 
 test.describe('novel-forge export endpoint (API)', () => {
@@ -126,7 +126,7 @@ test.describe('novel-forge workspace UI', () => {
     await page.keyboard.press('Escape');
 
     // RECORD (do not "fix") the id the dropdown actually submits. The Select is built from GET /ai/models, whose
-    // Anthropic Haiku entry carries the DATED id — the exact one the dev AI gateway rejects (novel-forge.md §0),
+    // Anthropic Haiku entry carries the DATED id — the exact one the dev AI gateway rejects,
     // while the API model-pin uses the undated `claude-haiku-4-5`. Surfacing the mismatch is the point.
     const registry = (await (await ctx.get('/api/v1/ai/models')).json()) as { models: { id: string; provider: string }[] };
     const haiku = registry.models.filter(m => m.provider === 'anthropic' && /haiku/i.test(m.id)).map(m => m.id);

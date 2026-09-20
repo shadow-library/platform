@@ -19,9 +19,8 @@ const system =
   '"cutDelta": [{"label": string, "kind": "subplot|thread|entity|arc|running_gag|scene_pattern", "aliases": [string], "detail": string, "disposition": "cut|condensed|resolved_early", "replacementNote": string}]}';
 
 // There is no outline node ahead of this prompt: the plan's kept beats ARE the outline, authored once
-// and human-approved, which removes the only place the pipeline could silently re-introduce a cut beat
-// (transform design §6.4). Cache order per refinement design §10.2: static system, stable pack, volatile
-// span contract and source prose last.
+// and human-approved, which removes the only place the pipeline could silently re-introduce a cut beat.
+// Cache order: static system, stable pack, volatile span contract and source prose last.
 export const reforgeTransformWritePrompt: PromptModule<ReforgeTransformWriteOutput> = {
   key: 'reforge-transform-write',
   version: '1.0.0',

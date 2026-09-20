@@ -13,7 +13,7 @@ import { ModelRouterService, type ProjectConfig } from '../ai/model-router.servi
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ChatCompactOutput } from '../ai/schemas';
 
-// Compaction thresholds (design §5.4): fold history once the verbatim window outgrows its token
+// Compaction thresholds: fold history once the verbatim window outgrows its token
 // budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
 // KEEP_VERBATIM_TURNS messages always stay verbatim.
 const MAX_VERBATIM_TURNS = 12;
@@ -37,7 +37,7 @@ export class ChatCompactionService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /** Summary + post-watermark verbatim turns as real prompt messages (design §10.2). */
+  /** Summary + post-watermark verbatim turns as real prompt messages. */
   async buildHistory(session: Refinement.ChatSession): Promise<BaseMessage[]> {
     const verbatim = await this.verbatimWindow(session);
 

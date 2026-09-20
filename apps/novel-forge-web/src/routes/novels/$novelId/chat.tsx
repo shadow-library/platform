@@ -59,7 +59,7 @@ interface ChatSearch {
 // then there is nothing to name. Session ids are server-generated UUIDs, which can never spell `new`.
 const DRAFT_SESSION = 'new';
 
-// `?session=all` is the full directory — the state D2 gives a list-detail page when no item is open.
+// `?session=all` is the full directory — the state a list-detail page takes when no item is open.
 const ALL_SESSIONS = 'all';
 
 // Matches the shell's own pending-proposal query, so the changes panel reads that cache rather than
@@ -67,7 +67,7 @@ const ALL_SESSIONS = 'all';
 const PENDING_PROPOSAL_LIMIT = 50;
 
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
-// No loader by design (category D): the refinement chat is a live, streaming conversation whose data is
+// No loader by design: the refinement chat is a live, streaming conversation whose data is
 // session-selection driven — the session list, transcript, and pending-turn polling aren't needed for the
 // first server paint. Project context is already seeded by the parent novel loader.
 export const Route = createFileRoute('/novels/$novelId/chat')({
@@ -787,7 +787,7 @@ interface ChangesPanelProps {
   onOpenHistory: () => void;
 }
 
-/** The right-hand context panel (D4): what this conversation changed, and the way back out of it. */
+/** The right-hand context panel: what this conversation changed, and the way back out of it. */
 function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps): React.JSX.Element {
   // Same params as the shell's own pending-proposal query, so this reads that cache instead of fetching again.
   const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: PENDING_PROPOSAL_LIMIT });
@@ -876,7 +876,7 @@ interface ChatDirectoryProps {
 }
 
 /**
- * Every conversation, full width (D2) — reached from the sidebar's "All N chats" and from a delete that
+ * Every conversation, full width — reached from the sidebar's "All N chats" and from a delete that
  * left nothing open. The row actions the old rail carried live here now; nothing else has them.
  */
 function ChatDirectory({

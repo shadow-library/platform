@@ -19,7 +19,7 @@ function toSummary(brief: Generation.Brief): BriefSummary {
 }
 
 /**
- * The two proposing decision points (plugin-host design §5.1, §5.2). A plugin emits ops; core validates them
+ * The two proposing decision points. A plugin emits ops; core validates them
  * against the real `OP_SPECS` and stages one author-approved proposal — plugins never write domain tables.
  */
 @Injectable()
@@ -47,7 +47,7 @@ export class PluginProposalService {
     return entry ? this.augmentWith(projectId, entry) : undefined;
   }
 
-  /** §5.1: every enabled plugin gets its say once a bible run has settled, and one of them failing never fails the run. */
+  /** Every enabled plugin gets its say once a bible run has settled, and one of them failing never fails the run. */
   async augmentEnabled(projectId: bigint): Promise<Refinement.Proposal[]> {
     const staged: Refinement.Proposal[] = [];
     for (const entry of await this.pluginPolicy.active(projectId)) {
@@ -57,14 +57,14 @@ export class PluginProposalService {
     return staged;
   }
 
-  /** §5.2: the planner is nudged, never compelled, so policy runs on what it actually produced and stages the correction. */
+  /** The planner is nudged, never compelled, so policy runs on what it actually produced and stages the correction. */
   async stageBriefPolicy(projectId: bigint, briefs: Generation.Brief[]): Promise<Refinement.Proposal | undefined> {
     if (briefs.length === 0) return undefined;
 
     const answering = (await this.pluginPolicy.active(projectId)).filter(entry => entry.plugin.decideBriefPolicy);
     const [owner, ...ignored] = answering;
     if (!owner) return undefined;
-    // brief.policy is an exclusive decision point (§4.9), so the first plugin in ordinal order owns it; a second
+    // brief.policy is an exclusive decision point, so the first plugin in ordinal order owns it; a second
     // one answering without claiming exclusivity is a misconfiguration PLG_004 cannot catch at enable time.
     if (ignored.length > 0)
       this.logger.warn('more than one plugin answers brief.policy — ignoring all but the first', { owner: owner.id, ignored: ignored.map(entry => entry.id) });
@@ -102,7 +102,7 @@ export class PluginProposalService {
     return this.proposalService.create(projectId, { scopeType: 'project', scopeRef, kind: 'plugin', summary, changeSet, allowedOps: PLUGIN_ALLOWED_OPS });
   }
 
-  /** §12: `volumeKey` is required on `arc.upsert`, so only a *change* to an existing arc's volume is the structural move that is refused. */
+  /** `volumeKey` is required on `arc.upsert`, so only a *change* to an existing arc's volume is the structural move that is refused. */
   private async assertNoArcReparenting(projectId: bigint, changeSet: ChangeOp[]): Promise<void> {
     const upserts = changeSet.filter((op): op is ArcUpsertOp => op.op === 'arc.upsert');
     if (upserts.length === 0) return;
@@ -124,7 +124,7 @@ export class PluginProposalService {
     }
   }
 
-  /** §10: a misbehaving plugin degrades its own decision point and never fails the run it was called from. */
+  /** A misbehaving plugin degrades its own decision point and never fails the run it was called from. */
   private dropped(pluginId: string, point: DecisionPoint, err: unknown): undefined {
     this.logger.warn('plugin decision point failed — contribution dropped', { pluginId, point, reason: err instanceof Error ? err.message : String(err) });
     return undefined;

@@ -12,7 +12,7 @@ const system =
   '{"title": string, "throughline": string, "beats": [{"summary": string, "purpose": string, "entities": [string], "emotionalTurn": string, "dialogueAnchors": [string]}]}';
 
 // System, then the stable pack (world notes) in the first human message, volatile source prose last —
-// same cache-order convention as the rebrand prompts (refinement design §10.2).
+// same cache-order convention as the rebrand prompts.
 export const reforgeOutlinePrompt: PromptModule<ReforgeOutlineOutput> = {
   key: 'reforge-outline',
   version: '1.0.0',

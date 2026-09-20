@@ -40,7 +40,7 @@ export interface PendingTurn {
 export interface FailedTurn {
   runId: string;
   graph: string;
-  /** `cancelled` is the author stopping the turn deliberately (D6) — terminal, not a failure, and never retried automatically. */
+  /** `cancelled` is the author stopping the turn deliberately — terminal, not a failure, and never retried automatically. */
   status: 'failed' | 'cancelled';
   endedAt: Date;
   code: string | null;
@@ -70,7 +70,7 @@ export interface ChatLookupEvent {
 }
 
 /**
- * Progress a caller can observe while a turn runs. Its members are the four design §4 events the turn
+ * Progress a caller can observe while a turn runs. Its members are the four events the turn
  * itself produces — `ready`, `done` and `error` belong to the transport, which knows things the turn does
  * not — so the SSE route relays rather than translates.
  */
@@ -157,12 +157,12 @@ interface SessionListFilter {
   sortOrder?: string;
 }
 
-// Declared-lookup budget for a hub turn (chat-hub design §6 step 4): at most this many lookup rounds
+// Declared-lookup budget for a hub turn: at most this many lookup rounds
 // execute before the model is told to answer with what it has.
 const MAX_LOOKUP_ROUNDS = 3;
 const CHAT_HUB_NODE = 'chat-hub';
 
-// D4: an opener this short ("fix this") never earns an auto-title — it would name nothing worth keeping.
+// An opener this short ("fix this") never earns an auto-title — it would name nothing worth keeping.
 const CHAT_TITLE_MIN_CONTENT_LENGTH = 15;
 const CHAT_TITLE_GRAPH = 'chat-title';
 
@@ -171,7 +171,7 @@ const CHAT_TITLE_GRAPH = 'chat-title';
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
 const TURN_GRAPHS = ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress'];
 
-// The chat model role for a scope (chat-revamp design D1/A2): every scope but ideation now runs the
+// The chat model role for a scope: every scope but ideation now runs the
 // single hub playbook, so every scope but ideation runs the single 'chat' model role too — a legacy
 // per-artifact scope no longer gets its own planning-discipline model.
 export function chatRoleForScope(scope: Refinement.ChatScope): AiRole {
@@ -376,7 +376,7 @@ export class ChatService {
   /**
    * The turn that died or was stopped, for a session whose transcript ends on an unanswered user message.
    * Without this the transcript is a mystery on reload — a `cancelled` run is the author stopping the turn
-   * deliberately (D6: terminal, not a failure, never auto-retried) and must read as that, not as a generic
+   * deliberately (terminal, not a failure, never auto-retried) and must read as that, not as a generic
    * failure or a phantom pending state. Reported only while it is the last thing that happened — any
    * assistant message written after the run ended means the author has already moved past it.
    */
@@ -416,9 +416,9 @@ export class ChatService {
   }
 
   /**
-   * One chat turn (design §5.1): guard, compact if needed, assemble the hub pack, one structured
+   * One chat turn: guard, compact if needed, assemble the hub pack, one structured
    * call through the repair ladder, then persist the exchange and stage any proposed change-set —
-   * all correlated under a fresh workflow run (Appendix A rules 9/11/12/13).
+   * all correlated under a fresh workflow run.
    *
    * With an `emitter` the reply streams as it decodes and the declared lookups are reported as they run;
    * without one the turn is byte-for-byte what it was, down to going through `modelRouter.structured`.
@@ -458,7 +458,7 @@ export class ChatService {
       // (design recovery). The reply lands in persistAssistantTurn once the model returns.
       const userMessage = await this.persistUserMessage(projectId, session, content, runId);
       relay?.userMessage(userMessage);
-      // Not awaited (D4): must overlap the turn, not delay it. Its own workflow run, not this one — this
+      // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
       if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, project as ProjectConfig | undefined);
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
@@ -472,7 +472,7 @@ export class ChatService {
         return output as Promise<ChatRefineOutput>;
       };
 
-      // Declared-lookup rounds (chat-hub design §6 step 4): execute the requested read-only tools,
+      // Declared-lookup rounds: execute the requested read-only tools,
       // fold the results into the conversation, and re-invoke — bounded, audited, hub-only.
       let output = await invoke();
       const lookupCallCounts = new Map<string, number>();
@@ -517,7 +517,7 @@ export class ChatService {
     }
   }
 
-  /** Names a session from its opening message alone (design D4). */
+  /** Names a session from its opening message alone. */
   private nameSession(projectId: bigint, session: Refinement.ChatSession, content: string, project: ProjectConfig | undefined): void {
     if (session.title !== null) return;
     const message = content.trim();

@@ -6,7 +6,7 @@ import { countTokens } from './token-budget';
 const CLASS_RANK: Record<WriterClass, number> = { standard: 0, permissive: 1 };
 
 /**
- * The `minWriterClass` guard of plugin-host design §5.4. It is the one point at which a contribution becomes a
+ * The `minWriterClass` guard. It is the one point at which a contribution becomes a
  * `ContextSection`, and a `ContextSection` carries no writer class — so nothing downstream of this function can
  * re-derive what to filter, and there is no ordering in which assembly precedes the guard.
  */

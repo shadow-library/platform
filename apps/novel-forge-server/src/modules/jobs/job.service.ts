@@ -122,7 +122,7 @@ export class JobService {
   }
 
   // The terminal write for a job the executor stopped: `cancel()` deliberately leaves an in_progress
-  // job's status alone (D5), so this is the only path that converts the request into a settled row.
+  // job's status alone, so this is the only path that converts the request into a settled row.
   async settleCancelled(jobId: string): Promise<void> {
     this.logger.info('marking job cancelled', { jobId });
     const [job] = await this.db
@@ -138,7 +138,7 @@ export class JobService {
   // conditional updates are tried in the order a job actually progresses (pending, then in_progress),
   // which is why trying both is race-safe rather than a plain if/else on a stale read: whichever state
   // the row is in by the time each UPDATE runs is the one that matches, and a job never moves backwards.
-  // An `in_progress` job only gets `cancelRequestedAt` (D5): the worker calls `succeed()`/`fail()` when
+  // An `in_progress` job only gets `cancelRequestedAt`: the worker calls `succeed()`/`fail()` when
   // `runJob` returns and would overwrite a status written underneath it, so this never touches `status`.
   async cancel(jobId: string, projectId: bigint): Promise<JobCancelResult | undefined> {
     const [cancelledPending] = await this.db

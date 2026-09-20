@@ -152,7 +152,7 @@ export interface FactRemoveOp {
 }
 
 /**
- * The Ideation Studio sheet edit (ideation-studio design §4.1). `fields` and `provenance` merge per
+ * The Ideation Studio sheet edit. `fields` and `provenance` merge per
  * key — a `null` value clears that key, which is what makes the captured inverse exact; the three
  * collection columns replace wholesale.
  */
@@ -178,7 +178,7 @@ export interface SeedUpdateOp {
   tasteAnchors?: Ideation.TasteAnchors;
 }
 
-// Action ops drive the pipeline through existing service code (chat-hub design §4.2). They carry no
+// Action ops drive the pipeline through existing service code. They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
 interface GenerateChaptersAction {
@@ -400,7 +400,7 @@ export const HUB_ACTION_TYPES = ACTION_TYPES.filter(action => action !== 'action
 const VALIDATION_SCOPES = ['novel', 'chapter'];
 
 // What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
-// guessing from the name (chat-hub design §4.2/§4.3).
+// guessing from the name.
 const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.generate_chapters': 'enqueue prose generation for the next `count` chapters (drafted, judged, and queued for review)',
   'action.plan_volumes': 'generate or regenerate the multi-volume story plan from the premise and bible',
@@ -670,7 +670,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
 }
 
 /**
- * What a plugin may propose (plugin-host design §12): what the novel contains, never its structure. An arc's
+ * What a plugin may propose: what the novel contains, never its structure. An arc's
  * narrative fields place a beat at a chapter; its chapter range, ordinal, and volume — and a brief's arc and
  * volume — are the book's skeleton, which only an explicit author action rearranges.
  */
@@ -688,7 +688,7 @@ export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
 const ARC_SKELETON_FIELDS = ['ordinal', 'chapterStart', 'chapterEnd'] as const;
 const BRIEF_PARENT_FIELDS = ['volumeKey', 'arcKey'] as const;
 
-/** The §12 allowlist enforced against the real `OP_SPECS`, because a plugin's emitted ops are untrusted input at runtime. */
+/** The plugin allowlist enforced against the real `OP_SPECS`, because a plugin's emitted ops are untrusted input at runtime. */
 export function validatePluginChangeSet(value: unknown): string[] {
   const errors = validateChangeSet(value, PLUGIN_ALLOWED_OPS);
   if (!Array.isArray(value)) return errors;
@@ -710,7 +710,7 @@ const RATIONALE_NOTE =
 
 /**
  * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
- * malformed change-sets when the vocabulary is named but never shown (design §14 risk).
+ * malformed change-sets when the vocabulary is named but never shown.
  */
 export function renderOpVocabulary(ops: readonly OpType[]): string {
   const lines = ops.map(op => {
@@ -731,7 +731,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }
 
-/** Action shapes + what each one does — the pipeline half of the hub playbook (chat-hub design §4.3). */
+/** Action shapes + what each one does — the pipeline half of the hub playbook. */
 export function renderActionVocabulary(actions: readonly ActionType[]): string {
   const lines = actions.map(action => {
     const spec = OP_SPECS[action];

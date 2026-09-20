@@ -74,7 +74,7 @@ export class GraduationService {
   }
 
   /**
-   * Turns a seed into a novel (ideation-studio design §5): deterministic, zero AI, one transaction. The
+   * Turns a seed into a novel: deterministic, zero AI, one transaction. The
    * sheet becomes the project row, two real bible documents, and one canon fact per named betrayal —
    * then the sheet is deleted and the studio conversation archived, because a seed kept alive next to
    * the documents refinement now edits is a second, diverging copy of the truth. No volumes and no

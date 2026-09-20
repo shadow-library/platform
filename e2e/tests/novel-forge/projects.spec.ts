@@ -114,7 +114,7 @@ test.describe('novel-forge dashboard and new-novel modal (UI)', () => {
 
     await page.goto(`${base}/`, { waitUntil: 'networkidle' });
 
-    // The dashboard's primary action opens the "Start a new novel" modal (novel-forge.md §1). The modal only
+    // The dashboard's primary action opens the "Start a new novel" modal. The modal only
     // wires up once the client has hydrated, so open it via a poll on its "Working title" field rather than a
     // single click — the header button can register a pre-hydration click that no-ops.
     const workingTitleField = page.getByLabel('Working title');

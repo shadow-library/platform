@@ -9,7 +9,7 @@ export namespace Chapter {
   export type Row = InferSelectModel<typeof chapters>;
   export type Status = InferEnum<typeof chapterStatus>;
 
-  /** One absorbed translator part recorded on a recombined chapter (recombine design §3). */
+  /** One absorbed translator part recorded on a recombined chapter. */
   export interface MergedPart {
     number: number;
     title: string | null;

@@ -15,7 +15,7 @@ const system =
   'Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:\n' +
   '{"title": string, "body": string, "summaryOfChanges": string, "discoveredNames": [{"sourceName": string, "variants": [string], "replacement": string, "category": "character|place|country|culture|faction|technique|item|term", "notes": string}], "carryState": {"activeThreads": string, "lastInsertedBeat": string, "pendingSetups": string}, "fixes": [{"kind": "name|attribution|grammar", "detail": string}], "addedScenes": [{"placement": string, "purpose": string}]}';
 
-// The message layout is the caching contract (refinement design §10.2): static system, then the stable
+// The message layout is the caching contract: static system, then the stable
 // pack (world notes + directives) in the first human message, volatile chapter material last.
 export const rebrandConvertPrompt: PromptModule<RebrandConvertOutput> = {
   key: 'rebrand-convert',

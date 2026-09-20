@@ -31,7 +31,7 @@ const axisOf = (card: IdeationConceptCard): string[] => [card.engine, card.ladde
 
 // Playbook `conceptFilter`s are NOT applied here: rejecting a card means generating a replacement, and
 // that reject-and-retry loop (with its fallback for a filter that rejects everything) belongs to the
-// caller in IdeationService — a postValidate can only fail the whole call (ideation-studio design §4.2).
+// caller in IdeationService — a postValidate can only fail the whole call.
 //
 // The card count is a schema invariant (minItems/maxItems on `cards`), so postValidate is left with
 // pairwise distinctness alone — a floor, not a guarantee that four cards are four different novels.

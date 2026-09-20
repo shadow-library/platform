@@ -40,7 +40,7 @@ export interface CreateProposalInput {
 }
 
 /**
- * Who a new proposal supersedes its own stale pending work for (§6.4): a chat session, or — for a plugin, which
+ * Who a new proposal supersedes its own stale pending work for: a chat session, or — for a plugin, which
  * has no session and restages the same decision on every run — the plugin's own scope.
  */
 function supersessionOwner(input: CreateProposalInput): SQL | undefined {
@@ -49,7 +49,7 @@ function supersessionOwner(input: CreateProposalInput): SQL | undefined {
   return and(eq(schema.refinementProposals.kind, 'plugin'), eq(schema.refinementProposals.scopeType, input.scopeType), eq(schema.refinementProposals.scopeRef, input.scopeRef));
 }
 
-/** A plugin-kind proposal carries the §12 allowlist by virtue of its kind, so a hand-edit cannot widen it either. */
+/** A plugin-kind proposal carries the plugin allowlist by virtue of its kind, so a hand-edit cannot widen it either. */
 function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[]): string[] {
   return kind === 'plugin' ? validatePluginChangeSet(changeSet) : validateChangeSet(changeSet, allowedOps);
 }
@@ -65,7 +65,7 @@ export class ProposalService {
 
   /**
    * Persists a new pending proposal with a freshly captured baseline, and supersedes any prior
-   * pending proposal of the same session that touches an overlapping artifact (§6.4). Cross-session
+   * pending proposal of the same session that touches an overlapping artifact. Cross-session
    * pending proposals are left alone — the baseline check catches them at apply time.
    */
   async create(projectId: bigint, input: CreateProposalInput, executor: DbExecutor = this.db): Promise<Refinement.Proposal> {
@@ -132,7 +132,7 @@ export class ProposalService {
   }
 
   /**
-   * The project-wide change history (chat-hub design §5.6): every applied/reverted proposal, newest
+   * The project-wide change history: every applied/reverted proposal, newest
    * apply first — the feed the UI timeline renders with per-change revert and rollback-to-here.
    */
   async listChanges(projectId: bigint, filter: Partial<ListChangesQuery>): Promise<OffsetPaginationResult<ChangeItem>> {

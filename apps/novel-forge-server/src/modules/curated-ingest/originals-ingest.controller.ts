@@ -15,7 +15,7 @@ import { TranslationService } from '../translation/translation.service';
 import { type IngestAction, IngestAuditService, type IngestOutcome } from './ingest-audit.service';
 
 /**
- * The external translation app's door onto the originals (translation design D9), reached by the curation
+ * The external translation app's door onto the originals, reached by the curation
  * bot or by a curator holding the project.
  *
  * The permission pair is `CuratedIngestController`'s, for its reasons. Unlike that controller this one IS

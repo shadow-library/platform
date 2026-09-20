@@ -258,7 +258,7 @@ function resolve(constraint: Ideation.SeedConstraint): ConstraintPlaybook | unde
  * Sorts locked constraints into the ones the library recognises and the ones it does not. An
  * unrecognised constraint is not an error: it still locks, and the generic "satisfy every locked
  * constraint" rule still filters concepts against it — it simply forces no questions. The log line
- * per unmatched key is the playbook backlog (ideation-studio design §3.2).
+ * per unmatched key is the playbook backlog.
  */
 export function matchPlaybooks(constraints: Ideation.SeedConstraint[]): PlaybookMatchResult {
   const matched: PlaybookMatch[] = [];

@@ -257,11 +257,9 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
 
   // `delta.knowledgeChanges` is deliberately not written to `character_knowledge`: that ledger is populated
   // only deterministically from brief `learns` declarations at draft approval, never by AI extraction
-  // (character-knowledge design §4) — it is what the leak scanner and the judge's forbidden-knowledge gate
-  // trust to decide what a character may safely reference, so a hallucinated reveal would silently mark a
-  // still-hidden fact as known. The raw delta stays visible on the continuity proposal for a human to act on
-  // via the manual fact-reveal endpoint. `delta.timeline` and `delta.power` are likewise not persisted
-  // (recommendation §6). Entries the model marked `confidence: 'low'` follow the same route — skipped here,
-  // still on the proposal for a human to edit and re-apply. An absent `confidence` means auto-apply, so a
-  // model that never emits the field behaves exactly as before.
+  // — it is what the leak scanner and the judge's forbidden-knowledge gate trust to decide what a character may safely reference,
+  // so a hallucinated reveal would silently mark a still-hidden fact as known. The raw delta stays visible on the continuity proposal
+  // for a human to act on via the manual fact-reveal endpoint. `delta.timeline` and `delta.power` are likewise not persisted.
+  // Entries the model marked `confidence: 'low'` follow the same route — skipped here, still on the proposal for a human to edit
+  // and re-apply. An absent `confidence` means auto-apply, so a model that never emits the field behaves exactly as before.
 }

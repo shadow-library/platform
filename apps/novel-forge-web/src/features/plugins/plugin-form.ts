@@ -100,7 +100,7 @@ export function pluginFormConfig(form: PluginForm, values: PluginFormValues): Re
   return config;
 }
 
-/** The §8.1 rules the host re-checks server-side, run first so the common mistakes never cost a PLG_003 round trip. */
+/** The rules the host re-checks server-side, run first so the common mistakes never cost a PLG_003 round trip. */
 export function pluginFormErrors(form: PluginForm, values: PluginFormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   const required = new Set(form.required);

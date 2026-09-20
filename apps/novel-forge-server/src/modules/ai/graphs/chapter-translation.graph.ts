@@ -132,7 +132,7 @@ function foldTerm(term: string, profile: ScriptProfile): string {
 
 // A term the reviewer has already called "not a term" must not come back as a suggestion, and must not
 // reach the fidelity scan either — re-admitted as `suggested` it reads as a dropped glossary term and
-// burns the repair budget on a rendering the project deliberately refused (design D3).
+// burns the repair budget on a rendering the project deliberately refused.
 function rejectedSourceTerms(glossary: TranslationTermLike[], profile: ScriptProfile): Set<string> {
   return new Set(
     glossary
@@ -434,7 +434,7 @@ function buildChapterTranslationGraph(services: TranslationGraphServices) {
   }
 
   // Runs for attention rows too — later chapters need the discovered terms either way. Rejected terms are
-  // dropped here rather than left to the reviewer, or the model re-suggests them on every chapter (design D3).
+  // dropped here rather than left to the reviewer, or the model re-suggests them on every chapter.
   async function mergeGlossary(state: TranslationState) {
     if (state.discoveredTerms.length === 0) return { nodeTrace: ['mergeGlossary'] };
     const projectId = BigInt(state.projectId);

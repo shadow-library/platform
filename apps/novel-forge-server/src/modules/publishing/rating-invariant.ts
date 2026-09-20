@@ -9,8 +9,8 @@ export interface RatingViolation {
 }
 
 /**
- * The novel-level rating must be at least the maximum over its published chapters, per dimension
- * (interstitial-chapter design §11), so a reader filtering on the novel never opens a chapter that
+ * The novel-level rating must be at least the maximum over its published chapters, per dimension,
+ * so a reader filtering on the novel never opens a chapter that
  * exceeds what the catalog promised.
  *
  * Unrated is not `'none'` in either direction: an unrated *chapter* dimension contributes nothing to

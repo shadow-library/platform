@@ -15,8 +15,7 @@ export interface GenerationBatch {
  * Truncates — never skips — at an unfilled `external` slot: that chapter is filled by hand
  * (`generate-unrestricted` or `drafts/:n/import` + finalize), and drafting past it would write the next
  * chapter against a gap it cannot see, leaving a permanent hole no later run has reason to notice. A batch
- * of 20 with an external slot at chapter 4 therefore yields 3 chapters; that cost is the deliberate trade
- * (interstitial-chapter-design §8). Only a finalized `chapters` row releases the stop — an imported draft is
+ * of 20 with an external slot at chapter 4 therefore yields 3 chapters; that cost is the deliberate trade. Only a finalized `chapters` row releases the stop — an imported draft is
  * not yet canon and its prose can still change under the chapters that would follow it.
  */
 export function selectGenerationBatch(briefs: readonly BatchBrief[], started: ReadonlySet<number>, finalized: ReadonlySet<number>, limit: number): GenerationBatch {

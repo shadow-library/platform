@@ -271,7 +271,7 @@
    * Breakpoints (reference) — matching the Foundations grid (xs–2xl).
    * CSS custom properties cannot be used inside media queries, so these document the
    * scale; a component media query uses the literal px value and cites the token name
-   * in an adjacent comment (see CLAUDE.md · Design Tokens).
+   * in an adjacent comment.
    */
   --sh-breakpoint-sm: 640px;
   --sh-breakpoint-md: 768px;

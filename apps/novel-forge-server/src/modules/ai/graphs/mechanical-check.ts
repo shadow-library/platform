@@ -79,7 +79,7 @@ function excerpt(text: string, length = 80): string {
 }
 
 /**
- * Deterministic mechanical checks over a finished draft (D32). Hard findings are structural defects that
+ * Deterministic mechanical checks over a finished draft. Hard findings are structural defects that
  * must ride the repair ladder; soft findings are prose-quality signals that surface at review without
  * blocking. `priorBodies` is the raw text of the last ~10 finished chapters, newest first — an empty array
  * simply skips the cross-chapter comparison.

@@ -92,7 +92,7 @@ function splitOversizedParagraph(paragraph: Span, maxTokens: number, countTokens
 }
 
 /**
- * Packs the original chapter into checkpointed translation units (translation design §D7): paragraphs
+ * Packs the original chapter into checkpointed translation units: paragraphs
  * pack greedily up to `maxTokens`, and a paragraph that alone exceeds the budget is split at sentence
  * punctuation (CJK and Latin terminators) or, failing that, hard-cut by binary-searching the token count.
  * Every segment's `start`/`end` are exact offsets into the normalised text with no gap or overlap

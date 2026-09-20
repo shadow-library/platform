@@ -39,7 +39,7 @@ export function invalidateJobs(queryClient: QueryClient, projectId: string): voi
   invalidateSoon(queryClient, { queryKey: insightKeys.jobs(projectId) });
 }
 
-/** Cancels a queued or running job (S7). Generic to any `JobKind` — the worker converts it per D5. */
+/** Cancels a queued or running job. Generic to any `JobKind`. */
 export function useCancelJobMutation(projectId: string): UseMutationResult<CancelJobResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<CancelJobResponse, ApiError, string>({

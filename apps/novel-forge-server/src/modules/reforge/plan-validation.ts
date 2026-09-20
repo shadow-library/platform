@@ -59,7 +59,7 @@ function targetIssue(span: PlanSpanLike): string | null {
 
 /**
  * The plan is the sole structural authority, so it is checked before it is stored and again before it
- * is approved (transform design §4). Spans must partition the source: a chapter is never silently
+ * is approved. Spans must partition the source: a chapter is never silently
  * forgotten — if it is going away, some span says `drop`.
  */
 export function validateTransformPlan(spans: PlanSpanLike[], options: PlanValidationOptions = {}): string[] {

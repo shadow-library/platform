@@ -36,7 +36,7 @@ export function renderReforgeFidelityGuidance(fidelity: ReforgeFidelityLevel): s
   return '';
 }
 
-// The message layout is the caching contract (refinement design §10.2): static system, then the stable
+// The message layout is the caching contract: static system, then the stable
 // pack (world notes + directives + author instructions + fidelity latitude) in the first human message,
 // volatile outline last.
 export const reforgeWritePrompt: PromptModule<ReforgeWriteOutput> = {

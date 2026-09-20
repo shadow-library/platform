@@ -20,7 +20,7 @@ function retryableFailure(error: PgColumn): SQL | undefined {
 const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
 
 /**
- * The ledger-as-outbox sweeper (checkpoint-janitor pattern, reader-publish design §5): on boot and
+ * The ledger-as-outbox sweeper (checkpoint-janitor pattern): on boot and
  * every minute it finds projects whose ledger has due work — scheduled rows past their gate, or
  * failed pushes a retry can still clear — and (re-)enqueues their `publish` job. The enqueue dedups
  * onto an active job and resets a terminal one, so a reader outage simply keeps the loop turning

@@ -5,7 +5,7 @@ import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
 import { TestEnvironment } from '@tests/test-environment';
 
 /**
- * Proves the body-limit scoping (novel-import-format.md §7): POST /api/v1/import alone gets a raised
+ * Proves the body-limit scoping: POST /api/v1/import alone gets a raised
  * per-route bodyLimit; every other write route stays under the app-wide 12MB default.
  */
 

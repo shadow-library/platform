@@ -43,7 +43,7 @@ interface StopButtonProps {
   size?: 'sm' | 'md';
 }
 
-/** The one Stop affordance every live run/job card reaches for (S7), so a double-press always reads the same loading state. */
+/** The one Stop affordance every live run/job card reaches for, so a double-press always reads the same loading state. */
 export function StopButton({ onStop, stopping, label = 'Stop', size = 'sm' }: StopButtonProps): ReactElement {
   return (
     <Button variant="danger" size={size} prefix={<StopIcon size={14} />} loading={stopping} disabled={stopping} onClick={onStop}>

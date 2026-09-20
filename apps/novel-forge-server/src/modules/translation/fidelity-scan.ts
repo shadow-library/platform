@@ -113,7 +113,7 @@ function scanNumberDrift(original: string, translation: string): FidelityIssue[]
 }
 
 /**
- * Deterministic fidelity checks that run before the AI audit (translation design §D6): stuck source
+ * Deterministic fidelity checks that run before the AI audit: stuck source
  * script, dropped/renamed glossary terms, digit drift, and coarse shape ratios. `scanScriptResidue`
  * applies the caller's script profile to the translation itself — that is what makes the check
  * meaningful, since it is the source script that must not survive into English prose. Only the

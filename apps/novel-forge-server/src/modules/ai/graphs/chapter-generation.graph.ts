@@ -78,7 +78,7 @@ export type JudgeFinding = JudgeOutput['findings'][number];
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
-// `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so §5.4's guard runs against the lowest of the three classes.
+// `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so the `minWriterClass` guard runs against the lowest of the three classes.
 export const CHAPTER_PACK_CONSUMERS = ['generation', 'judge', 'fix'] as const;
 
 // Normalize finding text for dedup comparison.
@@ -99,8 +99,7 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
 }
 
 // Routing function after judge — exported for testing. Ending-contract, knowledge-leak, mechanical and
-// brief-fulfillment violations ride the same repair ladder as continuity findings (refinement design §9.2,
-// character-knowledge design §6, harness D32/D33) but never harden the verdict.
+// brief-fulfillment violations ride the same repair ladder as continuity findings but never harden the verdict.
 export function routeAfterJudge(
   state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & {
     endingCompliant?: boolean;
@@ -358,7 +357,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       ? `\n\n## ENDING CONTRACT\n${renderedContract}\n\nAlso assess the draft ending against this contract and include endingCompliance in your JSON.`
       : '';
 
-    // The judge — unlike the drafter — sees the full forbidden list (character-knowledge design §6):
+    // The judge — unlike the drafter — sees the full forbidden list:
     // asymmetric visibility is what lets it catch leaks the pack-level filtering cannot prevent.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     const knowledgeView = knowledgeContract ? await loadKnowledgeView(db, projectId, state.chapter, knowledgeContract) : null;

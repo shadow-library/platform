@@ -69,7 +69,7 @@ export namespace Project {
 export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'translation', 'curated']);
 // A `seed` project is an idea under construction in the Ideation Studio: it owns chat, proposal and run
 // history like any project, but the generation, planning and publishing pipelines reject it until
-// graduation flips it to `active` (ideation-studio design §2.1).
+// graduation flips it to `active`.
 export const projectStatus = pgEnum('project_status', ['seed', 'active']);
 export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'unrestricted', 'human']);

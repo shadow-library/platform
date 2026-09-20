@@ -91,7 +91,7 @@ test.describe('identity registration', () => {
     const identityUrl = requireProductUrl('identity');
     // A seeded, definitely-existing account. Identity must not reveal that it exists: `register/init` answers
     // with the same 200 → OTP step as a brand-new email, and issues no code. A submitted code therefore fails
-    // generically — the account's existence is never disclosed at any step (design decision D-12).
+    // generically — the account's existence is never disclosed at any step.
     const existingEmail = 'e2e.user2@shadow-apps.test';
 
     await page.goto(`${identityUrl}/register`);

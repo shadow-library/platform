@@ -14,8 +14,7 @@ import { RouteGuardSentinel } from './route-guard.sentinel';
  *
  * `AuthModule.forRoot` derives everything a deploy used to restate — audience, redirect URIs, granted
  * scopes — from `GET {issuer}/api/v1/apps/me`, so pulse configures nothing but the route base path
- * here; `AUTH_ISSUER`, `AUTH_APP_ID` and one client credential come from the environment (see
- * `CLAUDE.md`). Role sync stays off (`roles` unset): the pulse RBAC catalog is seeded by identity's
+ * here; `AUTH_ISSUER`, `AUTH_APP_ID` and one client credential come from the environment. Role sync stays off (`roles` unset): the pulse RBAC catalog is seeded by identity's
  * BootstrapService, and code-owned sync would first need the client granted `authz:roles:sync`.
  *
  * `forRoot` resolves its config when it is called (deferred from `dynamic.modules.ts`) rather than at

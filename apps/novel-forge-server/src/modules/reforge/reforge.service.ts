@@ -95,7 +95,7 @@ export class ReforgeService {
     if (update.settings !== undefined) set.settings = update.settings;
 
     // Transform requires and forces `loose`: the plan subsumes the within-chapter latitude the fidelity
-    // enum expresses, so any other value is a config the writer could not honour (design §7).
+    // enum expresses, so any other value is a config the writer could not honour.
     const mode = update.mode ?? reforge.mode;
     if (mode === 'transform') {
       if (update.fidelity !== undefined && update.fidelity !== 'loose') throw AppErrorCode.REF_008.create();
@@ -137,7 +137,7 @@ export class ReforgeService {
     for (const row of statusRows) counts[row.status] = row.count;
 
     const result: ReforgeStatusResult = { reforge, sourceChapters: chapterCount?.count ?? 0, glossaryCount: glossaryCount?.count ?? 0, counts };
-    // The two modes write different tables (design §5); chapter mode's response is untouched by the
+    // The two modes write different tables; chapter mode's response is untouched by the
     // transform tables' existence, and transform mode reads its progress off the plan's outputs.
     if (reforge.mode === 'transform') result.transform = await this.transformStatus(projectId);
     return result;

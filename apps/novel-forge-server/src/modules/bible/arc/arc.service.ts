@@ -77,7 +77,7 @@ export class ArcService {
   }
 
   /**
-   * Approves a volume's arcs after validating the coverage invariant (design §4): ordered by
+   * Approves a volume's arcs after validating the coverage invariant: ordered by
    * ordinal, the arcs must be contiguous, non-overlapping, and exactly cover the volume's range.
    * Approval clears staleness — the human has re-blessed the structure.
    */

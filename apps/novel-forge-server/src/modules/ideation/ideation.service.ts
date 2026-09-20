@@ -282,7 +282,7 @@ export class IdeationService {
   }
 
   /**
-   * One studio turn (ideation-studio design §4.2). The router runs first and decides which of three
+   * One studio turn. The router runs first and decides which of three
    * turns this is — the interview, the concept round, or the stress pass — and the shape of the rest
    * mirrors `ChatService.turn`: compact, assemble, one structured call through the repair ladder,
    * persist the exchange, stage the change-set, apply it in the same request because studio sessions

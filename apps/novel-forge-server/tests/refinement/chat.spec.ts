@@ -172,7 +172,7 @@ describe.if(pgAvailable)('ChatService', () => {
     // The structured call received the stable pack + playbook + the user message.
     const input = structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
     expect(input['stableContext']).toContain('survive');
-    // A legacy volume-scoped session now gets the hub playbook, not its old narrower one (chat-revamp design D1/A2).
+    // A legacy volume-scoped session now gets the hub playbook, not its old narrower one.
     expect(input['scopeInstructions']).toContain("showrunner's right hand");
     expect(input['userMessage']).toContain('grip harder');
   });

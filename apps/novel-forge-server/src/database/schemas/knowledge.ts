@@ -28,7 +28,7 @@ export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'gen
 
 // Author opt-out for the reader wiki: `default` projects the entity to the published wiki (spoiler-gated
 // per fragment), `hidden` withholds it entirely — a flipped-to-hidden entity is deleted from the reader
-// on the next converge (wiki publish pipeline, reader-publish design §5–6).
+// on the next converge.
 export const entityWikiVisibility = pgEnum('entity_wiki_visibility', ['default', 'hidden']);
 
 export const entities = pgTable(
@@ -136,9 +136,8 @@ export const relationshipObservations = pgTable(
   t => [primaryKey({ columns: [t.entityId, t.targetKey, t.kind, t.chapter] })],
 );
 
-// Spoiler-grade canon lives here, never in bible prose or entity sheets (character-knowledge design
-// §1): the drafter only ever sees a fact's `text` once the POV cast has ledgered it. While hidden,
-// `constraintNote` supplies POV-safe behavior and `terms` feeds the deterministic leak scan.
+// Spoiler-grade canon lives here, never in bible prose or entity sheets: the drafter only ever sees a fact's `text` once the POV cast has ledgered it.
+// While hidden, `constraintNote` supplies POV-safe behavior and `terms` feeds the deterministic leak scan.
 export const canonFacts = pgTable(
   'canon_facts',
   {

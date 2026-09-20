@@ -63,7 +63,7 @@ export interface ManifestItem {
   revision: number;
 }
 
-/** The reader-clean wiki-entry push body (reader-publish design §5 wiki extension) — payload plus its concurrency keys. */
+/** The reader-clean wiki-entry push body — payload plus its concurrency keys. */
 export interface WikiPushBody {
   type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
   name: string;
@@ -169,7 +169,7 @@ function describeRejection(data: unknown): string {
 }
 
 /**
- * The one-way HTTP client for the reader's `/internal/*` surface (reader-publish design §5). Every
+ * The one-way HTTP client for the reader's `/internal/*` surface. Every
  * call rides an identity-issued M2M token addressed to `api://web-novel` and carrying the
  * cross-application scope `web-novel:publish`, minted by the DI-injected `AuthClient` — built from the
  * forge's own `AUTH_*` registration, no separate credential to configure. A mint or transport failure

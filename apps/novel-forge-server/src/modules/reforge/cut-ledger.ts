@@ -38,7 +38,7 @@ export function slugifyCutKey(label: string): string {
 }
 
 /**
- * Seeds the ledger from an approved plan (transform design §6.1): every `drop` span becomes an entry
+ * Seeds the ledger from an approved plan: every `drop` span becomes an entry
  * for the arc it removes, and every `cutThreads` name on any span becomes an entry of its own.
  * `effectiveFromOutput` is the first output chapter written after the cut, which is where the ban on
  * resurfacing starts.
@@ -97,8 +97,8 @@ export function buildSeedCuts(spans: SeedSpan[]): CutEntryLike[] {
 }
 
 /**
- * The bridge across a seam, composed from the plan rather than from a model call: everything §6.2 asks
- * for — what the reader last saw, what the dropped span took with it, and what must be true when this
+ * The bridge across a seam, composed from the plan rather than from a model call: everything the bridge
+ * needs — what the reader last saw, what the dropped span took with it, and what must be true when this
  * chapter opens — is already authored in the plan the human approved, and a model call here would only
  * paraphrase it with a chance of contradicting it.
  */
@@ -148,7 +148,7 @@ function renderEntry(entry: CutEntryLike): string {
 }
 
 /**
- * Orders the ledger by what this chapter is actually at risk of resurfacing (§6.1): first the entries
+ * Orders the ledger by what this chapter is actually at risk of resurfacing: first the entries
  * whose aliases appear in this span's source prose, then the most recently effective. Truncation drops
  * the least-at-risk entries, never the ones the writer is reading around.
  */
@@ -192,7 +192,7 @@ function excerptAround(body: string, index: number, length: number): string {
 }
 
 /**
- * Free and exact: every literal alias of a ledgered cut found in the written prose (§6.3). The model
+ * Free and exact: every literal alias of a ledgered cut found in the written prose. The model
  * only adjudicates these hits and catches the paraphrased resurfacing a string match cannot see, which
  * is why the scan runs first and its output travels into the judge prompt.
  */

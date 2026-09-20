@@ -38,7 +38,7 @@ import { type ProjectScreen, SCREEN_LABEL, screensForWorkflow } from './screens'
 
 const PROJECT_LIMIT = 50;
 
-// The sidebar's conversation list is nested under Refinement Chat (D6). The disclosure is what gates its
+// The sidebar's conversation list is nested under Refinement Chat. The disclosure is what gates its
 // query, so every other project screen costs nothing until the reader opens the group there.
 type ChatListDisclosure = { kind: 'route' } | { kind: 'pinned'; open: boolean };
 
@@ -135,7 +135,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     badge: badges[screen.segment],
   });
 
-  // D6: the one list that is genuinely navigation lives here rather than in a column of its own.
+  // The one list that is genuinely navigation lives here rather than in a column of its own.
   const chatBranch = (screen: ProjectScreen): NavBranch => {
     const params = { novelId: novelId ?? '' };
     const rows = recentChats(recentSessions, pinnedQuery.data);

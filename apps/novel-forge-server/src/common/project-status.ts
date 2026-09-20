@@ -2,7 +2,7 @@ import { AppErrorCode } from '@server/classes';
 import { type Project } from '@server/database';
 
 /**
- * The pipeline gate for seed projects (ideation-studio design §2.1): generation, planning, arc
+ * The pipeline gate for seed projects: generation, planning, arc
  * outlining and publishing all assume a project with a bible behind it, which a seed does not have
  * until graduation.
  */
@@ -11,7 +11,7 @@ export function assertActiveProject(project: Pick<Project.Row, 'status'>): void 
 }
 
 /**
- * The authoring-pipeline gate (translation design D10): generation, planning and arc outlining assume a
+ * The authoring-pipeline gate: generation, planning and arc outlining assume a
  * project whose English prose the forge writes. A `translation` project's prose comes from its originals
  * and a `curated` one's arrived finished, so both refuse the authoring pipeline the way a seed does.
  */

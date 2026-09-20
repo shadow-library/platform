@@ -100,10 +100,10 @@ export const refinementProposals = pgTable(
     // change history; manual applies (even of auto-session proposals after a conflict) stay false.
     autoApplied: boolean('auto_applied').notNull().default(false),
     // Per-op dispositions recorded at apply time: [{ index, status: applied|declined|failed, error?, result? }].
-    // Cherry-picked declines and post-commit action outcomes both land here (chat-hub design §5.1/§5.3).
+    // Cherry-picked declines and post-commit action outcomes both land here.
     opResults: jsonb('op_results'),
     // The ChangeOp[] that undoes the applied content ops (reverse order) and the artifact states right
-    // after apply — together they make the proposal revertible under a strict conflict guard (§5.2/§5.4).
+    // after apply — together they make the proposal revertible under a strict conflict guard.
     inverseOps: jsonb('inverse_ops'),
     postState: jsonb('post_state'),
     model: varchar('model'),

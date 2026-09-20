@@ -30,8 +30,8 @@ export class ChapterAmendService {
   }
 
   /**
-   * Replaces a finalized chapter's prose in place — the one path allowed past `chapters.locked`
-   * (interstitial-chapter design §10). It is deliberately prose-only: the bible keeps every fact this
+   * Replaces a finalized chapter's prose in place — the one path allowed past `chapters.locked`.
+   * It is deliberately prose-only: the bible keeps every fact this
    * chapter already contributed and no downstream chapter is flagged, so the response asks the UI to
    * offer `extract-to-bible` as the author's explicit follow-up.
    */

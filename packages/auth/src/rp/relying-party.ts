@@ -78,7 +78,7 @@ interface TokenEndpointResponse {
  *
  * The protocol core of an OIDC relying party: authorization URLs, PKCE, code exchange, ID-token
  * validation. Session-cookie management and back-channel logout are deliberately left to the
- * consuming app (see docs/sdk.md).
+ * consuming app (see docs/identity.md).
  *
  * **For third-party and external consumers only.** A Shadow app is first-party: it logs users in
  * through `AuthModule`'s browser routes, exchanges the code for an opaque app-session handle, and

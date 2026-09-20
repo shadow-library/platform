@@ -74,7 +74,7 @@ export class PublishingService {
   }
 
   /**
-   * Creates or updates the novel's publication record — metadata plus go-live (design §4). An
+   * Creates or updates the novel's publication record — metadata plus go-live. An
    * omitted `novelSlug` is derived from the title and walked past collisions on a suffix ladder; a
    * supplied one is taken verbatim — the only way out for a publication every candidate slug has
    * been refused for. Supplying a different one later renames the novel: the converge push carries
@@ -173,7 +173,7 @@ export class PublishingService {
   /**
    * Publishes (or schedules, or republishes) a chapter. Gates: the canonical chapter must be
    * finalized (`PUB_002`) and the release sequence contiguous (`PUB_003`). A first publish assigns
-   * the next `publishedOrdinal` — once, never re-derived (hard rule 6); a republish reuses the row,
+   * the next `publishedOrdinal` — once, never re-derived; a republish reuses the row,
    * bumping `revision` only when the rendered payload's hash actually changed.
    */
   async publishChapter(projectId: bigint, chapterNumber: number, body: PublishChapterBody): Promise<Publishing.ChapterPublication> {
@@ -286,7 +286,7 @@ export class PublishingService {
     else this.logger.warn('publication slug could not be restored after a spent ladder', context);
   }
 
-  /** Marks the ledger row unpublished — the ordinal is kept forever so a later republish reuses it (design §4). Idempotent. */
+  /** Marks the ledger row unpublished — the ordinal is kept forever so a later republish reuses it. Idempotent. */
   async unpublishChapter(projectId: bigint, chapterNumber: number): Promise<Publishing.ChapterPublication> {
     await this.getPublication(projectId);
     const ledger = await this.loadLedger(projectId);

@@ -32,7 +32,7 @@ export function computeContentHash(content: Record<string, unknown>): string {
  * Wire contract between novel-forge-server and web-novel-server: the reader recomputes this
  * digest from the payload it receives and rejects a mismatch, and the forge's ledger decides republish-vs-no-op
  * by comparing it. What governs the field set is therefore not "never change it" — `contentRating` was added
- * after this comment first declared the set frozen (interstitial-chapter design §11), because a rating change
+ * after this comment first declared the set frozen, because a rating change
  * must reach readers — but the stricter rule that survived that change: **no edit may move the digest of a
  * chapter whose reader-visible content did not change.** An unrated chapter omits `contentRating` entirely and
  * keeps its historical digest, so only a chapter that actually carries a rating hashes differently; that is what

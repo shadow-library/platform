@@ -125,7 +125,7 @@ export class ProjectService {
     this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind, status: project.status });
 
     // A seed gets no blank bible documents: graduation writes real ones, and blanks would defeat the
-    // emptiness checks the bible builder and audit rely on (ideation-studio design §2.1).
+    // emptiness checks the bible builder and audit rely on.
     if (body.kind === 'new_novel' && status !== 'seed') {
       await this.db
         .insert(schema.bibleDocuments)
@@ -144,7 +144,7 @@ export class ProjectService {
 
     const visibility = await this.listVisibilityFilter(this.actor());
     // Seeds are hidden unless asked for by name: the main shelf is the novels shelf, and an unfiltered
-    // list would fill it with ideas that have no bible, plan, or chapters (ideation-studio design §2.1).
+    // list would fill it with ideas that have no bible, plan, or chapters.
     const conditions = [visibility, eq(schema.projects.status, filter.status ?? 'active')];
     if (filter.kind) conditions.push(eq(schema.projects.kind, filter.kind));
     const where = and(...conditions);

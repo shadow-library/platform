@@ -211,7 +211,7 @@ export class WorkflowRunService {
     if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
   }
 
-  // Terminal and non-retrying (design D6): the run keeps whatever it already persisted.
+  // Terminal and non-retrying: the run keeps whatever it already persisted.
   private async cancelRun(runId: string, nodeTrace?: string[]): Promise<void> {
     this.logger.info('workflow run cancelled', { runId });
     const [run] = await this.db
@@ -225,7 +225,7 @@ export class WorkflowRunService {
   /**
    * Aborts a run in flight, returning whether one was live on this replica — an unknown or already
    * settled run answers `false` rather than throwing. The run itself writes the `cancelled` row as it
-   * unwinds, so this never races a concurrent settle. Cancellation is process-local (design §2.1): a
+   * unwinds, so this never races a concurrent settle. Cancellation is process-local: a
    * run owned by another replica is invisible here.
    */
   cancel(runId: string): boolean {

@@ -49,7 +49,7 @@ export interface ProjectBaseline {
 
 export interface ScopedPolicyResolver {
   for(call: PolicyCall): ForgeCallPolicy;
-  /** §5.4: a pack outlives the call that assembles it, so its guard runs against the lowest class among the roles that will read it. */
+  /** A pack outlives the call that assembles it, so its guard runs against the lowest class among the roles that will read it. */
   forPack(call: PolicyCall, consumers: readonly string[]): ForgeCallPolicy;
 }
 
@@ -165,7 +165,7 @@ export class PluginPolicyService {
 
     const plugins: PluginStamp[] = active.map(entry => ({ id: entry.id, version: entry.version, configHash: entry.configHash }));
 
-    // Settled before a single additive hook runs, and at the lowest class among the consumers, so §5.4's guard reads a class no later reader can undercut.
+    // Settled before a single additive hook runs, and at the lowest class among the consumers, so the guard reads a class no later reader can undercut.
     let writerClass: WriterClass = baseline;
     for (const role of consumers) {
       writerClass = this.classFor(active, baseline, { ...call, role });
@@ -206,7 +206,7 @@ export class PluginPolicyService {
     return Array.isArray(result) ? result : [];
   }
 
-  /** §10: a misbehaving plugin degrades its own decision point and never fails the generation. */
+  /** A misbehaving plugin degrades its own decision point and never fails the generation. */
   private safely<T>(pluginId: string, point: string, fn: () => T): T | undefined {
     try {
       return fn();

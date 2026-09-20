@@ -7,8 +7,6 @@
  * own markup, and every value is drawn from the same `--sh-*` tokens as every component
  * (spacing follows the 4px grid, typography/radius/color reference the semantic tokens
  * verbatim; nothing here hardcodes a raw value that isn't already on the token scale).
- * See CLAUDE.md · "Utility Classes" for the scope, naming rationale, and rules for
- * extending this file.
  */
 
 /* ── Display ──────────────────────────────────────────────────────────── */

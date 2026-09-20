@@ -31,7 +31,7 @@ import {
 
 import styles from './transform.module.css';
 
-// No loader by design (category D): a live pipeline dashboard that polls analysis, plan, and output
+// No loader by design: a live pipeline dashboard that polls analysis, plan, and output
 // progress while the transform runs — there is nothing stable to prefetch for the first server paint.
 export const Route = createFileRoute('/novels/$novelId/transform')({
   component: TransformScreen,

@@ -4,9 +4,8 @@ import { chapterContentHash } from '@shadow-library/sdk/publishing';
 import { type Chapter } from '@server/database';
 
 /**
- * The complete reader-facing chapter payload — nothing forge-internal may ever be added here (reader-publish
- * design §4, hard rule 7, as amended by interstitial-chapter design §11: a rating level is metadata about the
- * content rather than the content, so it is reader-safe and crosses; nothing else has been readmitted).
+ * The complete reader-facing chapter payload — nothing forge-internal may ever be added here. A rating level is
+ * metadata about the content rather than the content, so it is reader-safe and crosses; nothing else has been readmitted.
  */
 export interface ReaderChapterPayload {
   title: string;

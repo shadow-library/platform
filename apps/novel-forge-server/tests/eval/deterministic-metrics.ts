@@ -1,4 +1,4 @@
-// Track 2 (harness-final-recommendation.md §14) deterministic prose metrics — standalone runnable CLI.
+// Deterministic prose metrics — standalone runnable CLI.
 // Reusable tooling: intended to run later against a real generated project/arc, not as a one-off. All
 // metric math lives in `@server/modules/eval/deterministic-metrics` (pure, unit-tested); this script only
 // does argument parsing, DB fetch, and report printing.
@@ -11,7 +11,7 @@
 //   --from / --to    inclusive chapter range; omit both (or pass --all) for every chapter with prose
 //   --source         'final' reads `chapters.content` (default); 'draft' reads `drafts.body`
 //   --prior-window   how many chapters immediately before each target chapter count toward its
-//                     cross-chapter n-gram comparison (default 10, per §14's "prior ~10 chapters")
+//                     cross-chapter n-gram comparison (default 10)
 //   --json           print the full machine-readable report instead of the plain-text summary
 //
 // Connects to `DATABASE_POSTGRES_URL` directly (same convention as `src/migrate.ts`) — this is an infra

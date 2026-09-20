@@ -56,7 +56,7 @@ const templateFor = (systemText: string): ChatPromptTemplate =>
     ['human', `{volatileContext}\n\n${AUTHOR_MESSAGE_HEADING}\n\n{userMessage}`],
   ]);
 
-// The message layout is the caching contract (refinement design §10.2): static system, then the stable
+// The message layout is the caching contract: static system, then the stable
 // sheet context, then history, with the round's questions and the author's message last. The placeholder
 // is the conversation's ONLY channel — the pack never carries turn text, or history would be billed twice
 // and the volatile tail would change on every turn for two different reasons.

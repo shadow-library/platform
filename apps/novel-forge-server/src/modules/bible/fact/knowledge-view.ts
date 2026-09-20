@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
-/** A brief's epistemic contract (character-knowledge design §3): who bounds the chapter, who learns what. */
+/** A brief's epistemic contract: who bounds the chapter, who learns what. */
 interface KnowledgeReveal {
   entityKey: string;
   factKey: string;
@@ -24,7 +24,7 @@ export interface FactLike {
   source?: Knowledge.FactSource;
 }
 
-/** Facts partitioned by what this chapter's POV cast may see (design §4). */
+/** Facts partitioned by what this chapter's POV cast may see. */
 export interface KnowledgeView {
   known: FactLike[];
   reveals: FactLike[];
@@ -150,7 +150,7 @@ export function renderForbiddenFacts(facts: FactLike[]): string {
 }
 
 /**
- * Deterministic leak gate (design §6): word-boundary, case-insensitive match of each hidden fact's
+ * Deterministic leak gate: word-boundary, case-insensitive match of each hidden fact's
  * tell-tale terms against the draft. Free, so it runs on every attempt; one issue per fact is
  * enough to trigger a repair.
  */
@@ -169,7 +169,7 @@ export function scanKnowledgeLeaks(body: string, hidden: FactLike[]): KnowledgeL
 }
 
 /**
- * Applies a brief's `learns` declarations to the ledger at draft approval (design §4) — the
+ * Applies a brief's `learns` declarations to the ledger at draft approval — the
  * deterministic alternative to AI extraction. Unknown entity/fact keys are logged and skipped:
  * approval is a human gate and a missed row is recoverable via the manual reveal endpoint.
  */

@@ -45,7 +45,7 @@ function sourceTerms(entry: GlossaryLike): string[] {
 }
 
 /**
- * Deterministic post-conversion check (rebrand design §2): leftover glossary source names/variants
+ * Deterministic post-conversion check: leftover glossary source names/variants
  * (case-insensitive unless the term collides with a common English word — see
  * `isCaseInsensitiveTerm` — so lowercase leftovers like "the huaxia banner" are still caught), CJK
  * characters, and banned real-world terms (case-insensitive, drawn from the selected term packs).
@@ -80,7 +80,7 @@ export function scanResidue(body: string, glossary: GlossaryLike[], extraBanned:
 }
 
 /**
- * Selects the glossary entries a chapter conversion needs (rebrand design §2): every `country` and
+ * Selects the glossary entries a chapter conversion needs: every `country` and
  * `culture` entry (the bounded world map, always first so budget truncation never drops it), then
  * entries whose source name, variant, or replacement appears in the text — replacements matter
  * because repair and audit passes scan converted prose. Matched entries sort by occurrence count so

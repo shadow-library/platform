@@ -11,7 +11,7 @@ export interface ActionExecutionResult {
 
 export interface ActionExecutionContext {
   // True when the action runs from an auto-mode turn — chain-producing executors then auto-apply the
-  // proposal they staged (chat-hub design §4.2); manual applies leave it pending for review.
+  // proposal they staged; manual applies leave it pending for review.
   autoApplied: boolean;
 }
 
@@ -20,7 +20,7 @@ export type ActionExecutor = (projectId: bigint, action: ActionOp, ctx: ActionEx
 /**
  * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)
  * because GenerationModule already imports RefinementModule — the executors, which need the
- * generation/bible services, are registered by HubActionsModule at bootstrap (chat-hub design §5.3).
+ * generation/bible services, are registered by HubActionsModule at bootstrap.
  */
 @Injectable()
 export class ActionExecutorRegistry {

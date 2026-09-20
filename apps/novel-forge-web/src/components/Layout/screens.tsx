@@ -33,14 +33,13 @@ export interface ProjectScreen {
   to: ProjectRoute;
   label: string;
   icon: ReactNode;
-  /** Which project workflows show this screen — see D10 in the translation-pipeline design doc. */
+  /** Which project workflows show this screen. */
   workflows: ProjectKind[];
   /** Sits below the nav divider rather than in the main run. */
   trailing?: boolean;
   /**
    * Requires the `novel-forge:admin` scope regardless of workflow — a session concern, not a project-kind
-   * one, so it is a field callers compose with `workflows` rather than a case folded into it (see D7 in
-   * rail-stop-admin-design.md). `screensForWorkflow` stays workflow-only; a caller that also cares about
+   * one, so it is a field callers compose with `workflows` rather than a case folded into it. `screensForWorkflow` stays workflow-only; a caller that also cares about
    * admin-gating filters this field itself, the way `AppShell` does.
    */
   adminOnly?: boolean;

@@ -262,7 +262,7 @@ export class TranslationService {
   }
 
   /**
-   * The only writer of the original columns (translation design D9), reached from both the session route
+   * The only writer of the original columns, reached from both the session route
    * and the API-key ingest route. The whole decision runs under a row lock on the project so two pushes
    * cannot both read the same highest chapter number and then compute the same next one.
    */
@@ -376,7 +376,7 @@ export class TranslationService {
   }
 
   /**
-   * Seeds the style notes and the initial terminology (translation design D5 phase 2). Idempotent: a
+   * Seeds the style notes and the initial terminology. Idempotent: a
    * translation with `styleNotes` already set is a no-op, so job resume never re-seeds or re-bills.
    */
   async seedGlossary(projectId: bigint, jobId?: string): Promise<SeedGlossaryResult> {
@@ -455,7 +455,7 @@ export class TranslationService {
     return result;
   }
 
-  /** A finalized chapter is never a re-run target, even under `force` — reopen it first (translation design D5). */
+  /** A finalized chapter is never a re-run target, even under `force` — reopen it first. */
   async assertRerunnable(projectId: bigint, chapter: number): Promise<void> {
     await this.getOrCreate(projectId);
     const translation = await this.db.query.chapterTranslations.findFirst({
@@ -700,7 +700,7 @@ export class TranslationService {
   }
 
   /**
-   * The only path that writes canon (translation design D4). Every gate is checked before the transaction
+   * The only path that writes canon. Every gate is checked before the transaction
    * opens, so a refusal costs no lock; the republish decision inside reuses the amend path's rule, which
    * schedules only when the reader-facing digest actually moved.
    */

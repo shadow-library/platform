@@ -255,7 +255,7 @@ export function useChatTurnMutation(projectId: string, sessionId: string): UseMu
   });
 }
 
-/** Cancels a live workflow run. Shared by the chat composer's Stop and (S7) the run/job cards — the endpoint is generic to any run. */
+/** Cancels a live workflow run. Shared by the chat composer's Stop and the run/job cards — the endpoint is generic to any run. */
 export function useCancelRunMutation(projectId: string): UseMutationResult<CancelRunResponse, ApiError, string> {
   return useMutation<CancelRunResponse, ApiError, string>({
     mutationFn: runId => APIRequest.post(`/projects/${projectId}/runs/${runId}/cancel`).execute(),
@@ -268,7 +268,7 @@ export interface RunStopAction {
 }
 
 /**
- * Idempotent Stop for a run shown outside the chat composer (S7) — the ref guard mirrors
+ * Idempotent Stop for a run shown outside the chat composer — the ref guard mirrors
  * `useChatTurnStream`'s own `stop`, and `not_delivered` gets the same "may still be running" warning
  * rather than a claim that nothing happened.
  */
@@ -294,7 +294,7 @@ export function useRunStop(projectId: string): RunStopAction {
 }
 
 /**
- * The turn stream (design §4). The SSE route hijacks its reply, so it has no generated response type and the
+ * The turn stream. The SSE route hijacks its reply, so it has no generated response type and the
  * frames are hand-typed here; `user` and `done` carry generated shapes and reuse them.
  */
 export interface ChatTurnLookup {
@@ -328,7 +328,7 @@ export type ChatTurnStreamState =
   | (ChatTurnProgress & { status: 'done'; turn: ChatTurnResponse })
   | (ChatTurnProgress & { status: 'failed'; failure: ChatTurnFailure })
   // The author stopped the turn themselves — distinct from `failed`: nothing went wrong, and there is no
-  // error to show. Reuses the `error` precedent of keeping the partial reply rather than voiding it (§4).
+  // error to show. Reuses the `error` precedent of keeping the partial reply rather than voiding it.
   | (ChatTurnProgress & { status: 'stopped' });
 
 export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], userMessage: null };
@@ -385,7 +385,7 @@ export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurn
   if (event.type === 'delta') return { ...progress, status: 'streaming', reply: state.reply + event.text };
   if (event.type === 'user') return { ...progress, status: 'streaming', userMessage: event.message };
   if (event.type === 'lookup') return { ...progress, status: 'streaming', lookups: mergeLookup(state.lookups, event.lookup) };
-  // `done` is authoritative, and a model that emits no top-level `reply` (§4.1) streams no deltas at all.
+  // `done` is authoritative, and a model that emits no top-level `reply` streams no deltas at all.
   if (event.type === 'done') return { ...progress, status: 'done', reply: event.turn.assistantMessage.content, turn: event.turn };
   return { ...progress, status: 'failed', failure: event.failure };
 }
@@ -557,7 +557,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
         // still be going and must not be told otherwise.
         if (result.outcome === 'stopping') {
           invalidateChat(queryClient, projectId, sessionId);
-          // Freeze whatever text streamed so far as `stopped` (§S6) — the same partial-text-survives
+          // Freeze whatever text streamed so far as `stopped` — the same partial-text-survives
           // treatment `error` gets, never `reset`'s discard — but only for the stream this hook owns.
           if (ownTurn && current()) {
             sourceRef.current?.close();

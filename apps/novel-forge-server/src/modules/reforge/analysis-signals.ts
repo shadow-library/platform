@@ -12,7 +12,7 @@ export interface SignalChapter {
 type SignalCandidateType = 'filler' | 'repetition' | 'pacing_stall' | 'dropped_thread' | 'arc_boundary' | 'quality_outlier';
 
 /**
- * A candidate with evidence, never a verdict (transform design §3.1). The model confirms, rates, and
+ * A candidate with evidence, never a verdict. The model confirms, rates, and
  * explains these; unconfirmed ones survive into the report at the confidence the detector assigned.
  */
 export interface SignalCandidate {
@@ -380,7 +380,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 /**
- * The deterministic pre-signals of transform design §3.1 — repetition clusters, length outliers, static
+ * The deterministic pre-signals — repetition clusters, length outliers, static
  * chapters, dropped threads, and arc boundaries. Pure and reproducible: the model's job shrinks from
  * "find the repetition" to "explain and rate this repetition", and everything here is free.
  */
@@ -543,7 +543,7 @@ export function computeAnalysisSignals(chapters: SignalChapter[], options: Analy
 }
 
 /**
- * The digest the analysis prompts read (transform design §3.2). A range scopes it to one window's
+ * The digest the analysis prompts read. A range scopes it to one window's
  * chapters — an overlapping candidate still shows, because a repetition cluster that starts before the
  * window is exactly what the window needs to know about.
  */

@@ -16,7 +16,7 @@ const system =
   '{"summary": string, "spans": [{"ordinal": number, "fromChapter": number, "toChapter": number, "action": "keep|condense|merge|drop", "targetChapters": number, "arcLabel": string, "rationale": string, "keptBeats": [string], "cutThreads": [string], "continuityNotes": string, "findingIds": [string]}]}';
 
 // The plan is drawn from the persisted report, not from prose: the analysis is the whole novel already
-// read once, and re-reading it here would buy nothing but a 300k-token haystack (transform design §3.2).
+// read once, and re-reading it here would buy nothing but a 300k-token haystack.
 export const reforgePlanPrompt: PromptModule<ReforgePlanOutput> = {
   key: 'reforge-plan',
   version: '1.0.0',

@@ -43,7 +43,7 @@ const MS_PER_DAY = 86_400_000;
  * redacts any top-level `value` key to defend `metric_entries.value` (T-23's numeric health data), and
  * that redaction is name-based, not call-site-aware (`tests/privacy/canary.spec.ts`'s formatter-level
  * case). Every alert here is therefore occurrence-based (the line is only emitted when there's something
- * to page on) rather than a `value > N` comparison — `docs/observability.md` documents this per metric.
+ * to page on) rather than a `value > N` comparison.
  */
 @Injectable()
 export class ReconciliationService implements OnModuleInit {

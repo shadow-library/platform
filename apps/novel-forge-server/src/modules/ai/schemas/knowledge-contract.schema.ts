@@ -11,7 +11,7 @@ export class KnowledgeRevealSchema {
   factKey: string;
 }
 
-/** A brief's epistemic contract (character-knowledge design §3) — absent, the chapter is unfiltered. */
+/** A brief's epistemic contract — absent, the chapter is unfiltered. */
 @Schema()
 export class KnowledgeContractSchema {
   @Field(() => [String], { minItems: 1, description: 'entity keys whose ledgered knowledge bounds what the chapter may state' })

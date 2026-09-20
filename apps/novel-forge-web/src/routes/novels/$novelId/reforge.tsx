@@ -22,7 +22,7 @@ import {
 
 import styles from './reforge.module.css';
 
-// No loader by design (category D): a live re-authoring dashboard (source projects only) that polls
+// No loader by design: a live re-authoring dashboard (source projects only) that polls
 // status, counts, and per-chapter progress while a reforge job runs — there is nothing stable to
 // prefetch for the first server paint.
 export const Route = createFileRoute('/novels/$novelId/reforge')({

@@ -24,7 +24,7 @@ export const IDEATION_EDITORIAL_CHARTER = `${IDEATION_EDITORIAL_IDENTITY}\n\n${I
 // narrows both what good looks like for the scoped artifact and the op vocabulary the model may
 // propose — smaller vocabularies keep weak local models inside the repair ladder's reach.
 //
-// Only two playbooks exist now (chat-revamp design D1/A2): the chat-scope enum still carries its
+// Only two playbooks exist now: the chat-scope enum still carries its
 // original 9 values for legacy rows, but the application layer collapses every non-ideation scope
 // onto the hub playbook below — see playbookForScope.
 export const SCOPE_PLAYBOOKS: Record<'project' | 'ideation', ScopePlaybook> = {
@@ -57,7 +57,7 @@ export const SCOPE_PLAYBOOKS: Record<'project' | 'ideation', ScopePlaybook> = {
   },
 };
 
-/** Every scope but ideation now answers with the hub playbook — a legacy per-artifact scope (design D1) gets a working turn, just not a narrowed one. */
+/** Every scope but ideation now answers with the hub playbook — a legacy per-artifact scope gets a working turn, just not a narrowed one. */
 function playbookForScope(scope: Refinement.ChatScope): ScopePlaybook {
   return scope === 'ideation' ? SCOPE_PLAYBOOKS.ideation : SCOPE_PLAYBOOKS.project;
 }

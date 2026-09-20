@@ -52,7 +52,7 @@ export interface FindingFilter {
 
 const DEFAULT_WINDOW = 15;
 // Above this many cards a single synthesis call would carry a >120k-token haystack, which degrades
-// exactly the comparative judgment the pass exists to make (transform design §3.3).
+// exactly the comparative judgment the pass exists to make.
 const ROLLUP_THRESHOLD = 600;
 const ROLLUP_SIZE = 100;
 // A pathological unsplit chapter must not blow a whole window's budget; the recombine pass is what
@@ -127,7 +127,7 @@ export class ReforgeAnalysisService {
   }
 
   /**
-   * The analysis stage of transform design §3: deterministic signals, then a serial chain of windowed
+   * The analysis stage: deterministic signals, then a serial chain of windowed
    * model passes carrying state forward, then synthesis. A failed window is flagged and the chain
    * continues on the previous window's carry state — but the stage throws if too many failed, because
    * the plan drawn from the report is the thing that decides what the novel becomes.

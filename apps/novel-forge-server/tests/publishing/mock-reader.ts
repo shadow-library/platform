@@ -84,7 +84,7 @@ export class MockReaderService {
     this.server = null;
   }
 
-  /** The §6 disaster scenario: the reader's content tables are gone; only reconcile can rebuild them */
+  /** The disaster scenario: the reader's content tables are gone; only reconcile can rebuild them */
   wipe(): void {
     this.novels.clear();
   }

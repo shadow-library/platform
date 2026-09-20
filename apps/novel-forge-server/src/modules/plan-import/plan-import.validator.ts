@@ -112,7 +112,7 @@ export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: Reado
     }
   }
 
-  // Knowledge contracts (character-knowledge design §3): a reveal against a fact that exists nowhere
+  // Knowledge contracts: a reveal against a fact that exists nowhere
   // can never be ledgered — that is an issue; unknown entity keys stay warnings like cast refs, since
   // the approve-time skip is logged and recoverable via the manual reveal endpoint.
   const knownEntities = new Set([...existingEntityKeys, ...(bundle.entities ?? []).map(e => e.entityKey)]);

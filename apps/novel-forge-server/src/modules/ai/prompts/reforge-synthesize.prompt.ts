@@ -14,7 +14,7 @@ const system =
   '{"summary": string, "pacingProfile": string, "arcs": [{"fromChapter": number, "toChapter": number, "label": string, "rationale": string}], ' +
   '"findings": [{"type": "filler|repetition|pacing_stall|dead_subplot|dropped_thread|arc_boundary|quality_outlier", "fromChapter": number, "toChapter": number, "severity": number, "confidence": number, "label": string, "detail": string, "signalRef": string}]}';
 
-// Two-level synthesis (transform design §3.3) runs this same prompt over card slices and then over the
+// Two-level synthesis runs this same prompt over card slices and then over the
 // resulting rollups; `scope` is what tells the model which of the two it is doing.
 export const reforgeSynthesizePrompt: PromptModule<ReforgeSynthesizeOutput> = {
   key: 'reforge-synthesize',

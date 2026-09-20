@@ -13,9 +13,8 @@ function markEphemeral(message: BaseMessage | undefined): void {
 }
 
 /**
- * Injects Anthropic prompt-cache breakpoints per the stable-first message convention (refinement
- * design §10.2): the static system message, the first human message (the stable scope context), and
- * — for chat — the last prior-turn history message, so the cached prefix extends across turns.
+ * Injects Anthropic prompt-cache breakpoints per the stable-first message convention: the static system message, the first human message
+ * (the stable scope context), and — for chat — the last prior-turn history message, so the cached prefix extends across turns.
  * Mutates the freshly formatted messages in place and returns them; three breakpoints maximum,
  * within Anthropic's limit of four.
  */

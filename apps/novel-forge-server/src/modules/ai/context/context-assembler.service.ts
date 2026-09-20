@@ -50,7 +50,7 @@ export const DEFAULT_BUDGET = 24_000;
 export const PREV_ENDING_TAIL = 500;
 export const FULL_CAST_MAX = 5;
 
-// Refinement budgets (design §10.4). History is prompt messages, not pack text, so it does not count
+// Refinement budgets. History is prompt messages, not pack text, so it does not count
 // against the pack; the history budgets are enforced by ChatService compaction.
 export const CHAT_HUB_BUDGET = 20_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
@@ -69,7 +69,7 @@ export const TRANSLATE_BUDGET = 12_000;
 export const REFORGE_OUTLINE_BUDGET = 12_000;
 export const REFORGE_BUDGET = 12_000;
 // The analysis window's chapters and the synthesis card index both travel as template vars, so the pack
-// only carries the rename bible, the window's signal digest, and the carry-forward state (§3.2).
+// only carries the rename bible, the window's signal digest, and the carry-forward state.
 export const REFORGE_ANALYSIS_BUDGET = 12_000;
 // A transform write carries the span's plan contract and the cut ledger on top of a reforge pack; the
 // span's source prose still travels as a template var.
@@ -428,7 +428,7 @@ export class ContextAssembler {
         }
         case 'fact': {
           // Deliberately NOT surfaced via catalog.service.ts: canon_facts carries hidden-truth rows
-          // (character-knowledge design) that must stay POV-filtered until ledgered. Only hand-authored
+          // that must stay POV-filtered until ledgered. Only hand-authored
           // refs — plan-import, manual brief edits, hand-authored chat-hub lookups — may name a fact:
           // ref, since the automated outliner reading the catalog must never be able to request one and
           // self-spoil a not-yet-revealed fact into a future chapter's context.
@@ -867,11 +867,10 @@ export class ContextAssembler {
   }
 
   /**
-   * Builds the pack for one chat turn (design §10.3): the stable segment is a whole-project index —
-   * premise, inventories, one-line summaries — with the lookup tools pulling full artifacts on demand
-   * (chat-revamp design §2.1). Volatile carries only the artifacts whose revision moved since the
-   * session started. History is NOT part of the pack — it rides as prompt messages so provider caching
-   * can extend across turns.
+   * Builds the pack for one chat turn: the stable segment is a whole-project index —
+   * premise, inventories, one-line summaries — with the lookup tools pulling full artifacts on demand.
+   * Volatile carries only the artifacts whose revision moved since the session started. History is NOT part of the pack — it rides as
+   * prompt messages so provider caching can extend across turns.
    */
   async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
     // An ideation session assembles through forIdeationTurn, which needs the seed row and the round the
@@ -879,7 +878,7 @@ export class ContextAssembler {
     // gets here; RefineService's /context/preview endpoint reaches this branch directly.
     if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
 
-    // Every other scope value, legacy rows included, is the hub (chat-revamp design D1).
+    // Every other scope value, legacy rows included, is the hub.
     const [project, docs, volumes, arcs, catalogText] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
@@ -908,7 +907,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one Ideation Studio turn (ideation-studio design §4.2). Stable: the sheet, the locked
+   * Pack for one Ideation Studio turn. Stable: the sheet, the locked
    * constraints, the taste anchors, and the playbooks for the shapes already committed to — all of it
    * byte-identical until the sheet itself moves. Volatile: the round the router just chose and the
    * concept rounds already offered. The conversation is NOT here — it travels as prompt messages
@@ -967,7 +966,7 @@ export class ContextAssembler {
     return lines.join('\n');
   }
 
-  /** Pack for the arc-plan chain (design §10.3): the volume, its neighbours' handoffs, premise, skeleton, catalog. */
+  /** Pack for the arc-plan chain: the volume, its neighbours' handoffs, premise, skeleton, catalog. */
   async forArcPlanning(projectId: bigint, volumeKey: string, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
 
@@ -1014,7 +1013,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for the rebrand glossary seed (rebrand design §2): the project overview plus every known
+   * Pack for the rebrand glossary seed: the project overview plus every known
    * proper noun the seeder must map — the extracted entity roster (with aliases) and world facts.
    * Both are empty on an unextracted project; the opening chapters travel as a template var instead.
    */
@@ -1042,7 +1041,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one chapter conversion (rebrand design §5). World notes and directives are the stable
+   * Pack for one chapter conversion. World notes and directives are the stable
    * segment (byte-identical across chapters — the provider cache prefix); the glossary slice, carry
    * state, and previous converted ending are volatile. The chapter prose itself travels as a template
    * var so the pack stays cacheable. Callers pass pre-rendered strings — the assembler stays free of
@@ -1064,7 +1063,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for the translation seed (translation design D3): the project overview plus every proper noun
+   * Pack for the translation seed: the project overview plus every proper noun
    * already known — the extracted entity roster (with aliases) and world facts. Both are empty on a
    * freshly created translation project; the sample chapters travel as a template var instead.
    */
@@ -1092,7 +1091,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one chapter translation (translation design D7). The style notes and the term policy are
+   * Pack for one chapter translation. The style notes and the term policy are
    * the stable segment — byte-identical for every chapter and every segment of a chapter, which is what
    * the provider cache prefix is worth here; the per-chapter glossary slice and the tail of the previous
    * CHAPTER's translation are volatile. The source segment and the previous SEGMENT's tail travel as
@@ -1116,7 +1115,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one chapter reforge outline (reforge design §5). Only the world notes are stable (the
+   * Pack for one chapter reforge outline. Only the world notes are stable (the
    * cache prefix, byte-identical across chapters); the glossary slice is volatile. The source prose
    * itself travels as a template var, never in the pack, so the stable segment never churns.
    */
@@ -1133,7 +1132,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one source-analysis call — a window pass or a synthesis pass (transform design §3.2–3.3).
+   * Pack for one source-analysis call — a window pass or a synthesis pass.
    * Only the world notes are stable, so the cache prefix stays byte-identical across every window of a
    * run; the glossary slice, the window's signal digest, and the carry-forward state are volatile. The
    * window's source prose and the synthesis card index travel as template vars, never in the pack.
@@ -1154,7 +1153,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one chapter re-author (reforge design §5). World notes, directives, the author's
+   * Pack for one chapter re-author. World notes, directives, the author's
    * instructions, and the target-length guide are the stable segment (the provider cache prefix); the glossary slice, carry state,
    * and previous REFORGED ending are volatile. `prev_ending` is the tail of the previous reforged
    * body — never the source tail, which would leak pre-rename names and break re-authored continuity.
@@ -1190,7 +1189,7 @@ export class ContextAssembler {
   }
 
   /**
-   * Pack for one output chapter of a transform (transform design §6.1). The rename bible, the author's
+   * Pack for one output chapter of a transform. The rename bible, the author's
    * voice instructions, and the SEEDED cut ledger are stable — the ledger seeded at approval is
    * byte-identical for the whole run, which is what keeps the cache prefix alive as the volatile
    * `discovered_cuts` section grows underneath it. The plan span (its kept beats, its continuity notes,

@@ -21,7 +21,7 @@ import {
 
 import styles from './rebrand.module.css';
 
-// No loader by design (category D): a live conversion-pipeline dashboard (source projects only) that polls
+// No loader by design: a live conversion-pipeline dashboard (source projects only) that polls
 // status, counts, and per-chapter progress while a rebrand job runs — there is nothing stable to prefetch
 // for the first server paint.
 export const Route = createFileRoute('/novels/$novelId/rebrand')({

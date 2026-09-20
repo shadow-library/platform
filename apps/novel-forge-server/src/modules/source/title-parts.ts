@@ -117,7 +117,7 @@ export function parseTitleParts(title: string | null): TitleParts {
   return { base, sourceChapter, part, partTotal };
 }
 
-/** True when the chapter should extend the current group (recombine design §2 detection ladder). */
+/** True when the chapter should extend the current group (detection ladder). */
 function continuesGroup(group: GroupDraft, parsed: TitleParts): boolean {
   if (parsed.sourceChapter !== null && group.sourceChapter !== null) return parsed.sourceChapter === group.sourceChapter;
 
@@ -189,7 +189,7 @@ export function buildGroupingPlan(chapters: ChapterLike[]): RecombinePlan {
 /**
  * Folds AI merge verdicts into a deterministic plan: for every boundary the model said to merge, the
  * group ending at that chapter absorbs the following group. Deterministic groupings are never split
- * apart — the model only ever joins what the ladder left separate (recombine design §2).
+ * apart — the model only ever joins what the ladder left separate.
  */
 export function applyBoundaryMerges(plan: RecombinePlan, mergeAfter: number[]): RecombinePlan {
   if (mergeAfter.length === 0) return plan;

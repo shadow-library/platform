@@ -40,7 +40,7 @@ function brief(chapter: number, overrides: Partial<{ chapterPurpose: string; rea
   };
 }
 
-describe.if(pgAvailable)('brief chapterPurpose/readerValue/repetitionRisks (harness-final-recommendation.md D16)', () => {
+describe.if(pgAvailable)('brief chapterPurpose/readerValue/repetitionRisks', () => {
   let db: PrimaryDatabase;
 
   beforeAll(async () => {

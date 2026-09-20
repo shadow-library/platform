@@ -25,7 +25,7 @@ function percent(ratio: number): string {
 
 /**
  * The one document the author reads before deciding what their novel should become — a table of 400
- * findings is not that document (transform design §3.4). Findings are grouped by type and ordered by
+ * findings is not that document. Findings are grouped by type and ordered by
  * severity, because the author's next action is always "what is worst".
  */
 export function renderAnalysisReport(input: ReportInput): string {

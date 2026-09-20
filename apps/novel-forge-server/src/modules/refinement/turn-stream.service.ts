@@ -49,7 +49,7 @@ function encode(data: unknown): string {
 }
 
 /**
- * The turn stream's server half (design §4): the POST starts a turn and answers with its run id, the GET
+ * The turn stream's server half: the POST starts a turn and answers with its run id, the GET
  * subscribes to that run. Because the two are separate requests, every event a turn emits is buffered
  * under its run id and replayed on connect — otherwise a turn that opens faster than the client connects
  * loses its first deltas. The turn itself is owned here, not by either request, so neither a client that

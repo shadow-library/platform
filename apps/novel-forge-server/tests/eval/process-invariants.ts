@@ -1,4 +1,4 @@
-// Track 3 (harness-final-recommendation.md §14) process/telemetry invariant checks — standalone runnable
+// Process/telemetry invariant checks — standalone runnable
 // CLI. Reusable tooling: intended to run later against a real project's data, not as a one-off. All
 // invariant math lives in `@server/modules/eval/process-invariants` (pure, unit-tested); this script only
 // does argument parsing, DB fetch, and report printing.

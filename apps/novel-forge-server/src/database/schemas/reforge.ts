@@ -38,7 +38,7 @@ export const reforgeChapterStatus = pgEnum('reforge_chapter_status', ['reforged'
 // How faithful the re-author stays to the source: preserve = keep beats + dialogue meaning, re-prose fully
 // (default); close = keep dialogue near the source wording; loose = allow scene re-ordering for pacing.
 export const reforgeFidelity = pgEnum('reforge_fidelity', ['preserve', 'close', 'loose']);
-// Structural re-authoring is gated here rather than on `fidelity` (transform design §7): overloading the
+// Structural re-authoring is gated here rather than on `fidelity`: overloading the
 // fidelity enum would silently re-route every project already configured `loose` into a pipeline that
 // refuses to run without an analysis and an approved plan.
 export const reforgeMode = pgEnum('reforge_mode', ['chapter', 'transform']);

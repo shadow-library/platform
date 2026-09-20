@@ -119,7 +119,7 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
 
   /**
    * Resolves which span this output chapter belongs to from the plan itself, so a single-output re-run
-   * can never drift from the approved structure (transform design §5).
+   * can never drift from the approved structure.
    */
   async function loadSpan(state: SpanTransformState) {
     const projectId = BigInt(state.projectId);
@@ -132,7 +132,7 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
       db.query.rebrandGlossary.findMany({ where: eq(schema.rebrandGlossary.projectId, projectId) }),
       db.query.reforgeCuts.findMany({ where: eq(schema.reforgeCuts.planId, planId) }),
       // Continuity comes from the previous OUTPUT chapter — the source tail would leak pre-rename names
-      // and pre-cut material by definition (design §6.2).
+      // and pre-cut material by definition.
       db.query.reforgeOutputs.findFirst({
         where: and(eq(schema.reforgeOutputs.planId, planId), lt(schema.reforgeOutputs.outputChapter, state.outputChapter), ne(schema.reforgeOutputs.status, 'failed')),
         orderBy: [desc(schema.reforgeOutputs.outputChapter)],
@@ -185,7 +185,7 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
     const glossarySlice = renderGlossarySlice(selectGlossarySlice(state.sourceProse, state.glossary));
 
     // The ledger seeded at approval is the stable half; anything appended during the run is volatile,
-    // so a growing ledger never invalidates the cache prefix (design §6.1).
+    // so a growing ledger never invalidates the cache prefix.
     const approvedAt = state.approvedAt ? new Date(state.approvedAt) : null;
     const isSeeded = (cut: ReforgeTransform.Cut): boolean => !approvedAt || cut.createdAt <= approvedAt;
     const options = { sourceText: state.sourceProse, outputChapter: state.outputChapter };
@@ -404,7 +404,7 @@ function buildSpanTransformGraph(services: SpanTransformServices) {
   }
 
   // Append-only, insert-conflict-keeps-existing: what this chapter discovered it had to cut binds on
-  // every later chapter, and is never re-described (design §6.1).
+  // every later chapter, and is never re-described.
   async function appendCuts(state: SpanTransformState) {
     const deltas = state.written?.cutDelta ?? [];
     if (deltas.length === 0) return { nodeTrace: ['appendCuts'] };

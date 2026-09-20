@@ -63,7 +63,7 @@ export class RefineService {
   }
 
   /**
-   * Upgrades a rough overview into a serialized-web-novel premise (design §7). The improvements are
+   * Upgrades a rough overview into a serialized-web-novel premise. The improvements are
    * staged as a premise_enhance proposal; the rationale fields come back so the author sees WHY
    * before applying, and refinement continues in a novel-scoped chat.
    */
@@ -112,7 +112,7 @@ export class RefineService {
   }
 
   /**
-   * Audits the bible against the required-document manifest (design §7): drafted content for what is
+   * Audits the bible against the required-document manifest: drafted content for what is
    * missing or thin, removals for dead weight — all staged through the same proposal pipe. A clean
    * bible returns findings with no proposal.
    */
@@ -161,9 +161,9 @@ export class RefineService {
   }
 
   /**
-   * Plans the arcs of one volume (design §8): the model must partition the volume's chapter range
+   * Plans the arcs of one volume: the model must partition the volume's chapter range
    * exactly (coverage re-enters the repair ladder) and expand thin material with suggested ideas.
-   * Per Appendix A rule 13 the plan is STAGED as an arc_plan proposal — applying it writes the arcs.
+   * The plan is STAGED as an arc_plan proposal — applying it writes the arcs.
    */
   async planArcs(projectId: bigint, volumeKey: string, opts?: { arcCount?: number; guidance?: string }): Promise<ArcPlanResult> {
     const [project, volumes] = await Promise.all([
@@ -175,7 +175,7 @@ export class RefineService {
 
     const volume = volumes.find(v => v.volumeKey === volumeKey);
     if (!volume) throw AppErrorCode.VOL_001.create();
-    // Gate 1 (design §4): the whole plan is approved with laid-out ranges before arcs are planned.
+    // Gate 1: the whole plan is approved with laid-out ranges before arcs are planned.
     const planReady = volumes.every(v => v.status !== 'draft') && volume.startChapter !== null && volume.endChapter !== null;
     if (!planReady) throw AppErrorCode.ARC_003.create();
 
@@ -231,7 +231,7 @@ export class RefineService {
     return { ...result, runId };
   }
 
-  /** Dry-run window into exactly what a model call would see — the debugging seam of design §12. */
+  /** Dry-run window into exactly what a model call would see — the debugging seam. */
   async previewContext(projectId: bigint, query: ContextPreviewInput): Promise<ContextPreviewResponse> {
     const pack = await this.assemblePreview(projectId, query);
     return {

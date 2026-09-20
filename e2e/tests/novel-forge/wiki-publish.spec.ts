@@ -36,7 +36,7 @@ interface ReconcileResult {
  * Declaring the constants
  *
  * The forge→reader wiki round-trip, AI-free. The novel-import bundle format carries NO wiki/entity content
- * (docs/novel-import-format.md is metadata + volumes/chapters + a cover asset only), so the wiki is authored
+ * (the bundle is metadata + volumes/chapters + a cover asset only), so the wiki is authored
  * through the forge bible API after import: entities (`POST /projects/:id/entities`) plus canon facts
  * (`PUT /projects/:id/facts/:key` + `POST .../reveal`). The reader wiki is a pure PROJECTION of that bible —
  * `WikiPublishingService.computeProjections` derives one spoiler-gated payload per visible entity from

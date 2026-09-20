@@ -11,7 +11,7 @@ import { type ActionExecutionContext, type ActionExecutionResult, ActionExecutor
 import { RefineService } from '../refinement/refine.service';
 
 /**
- * Wires every chat action to the service that performs it (chat-hub design §5.3). Lives outside the
+ * Wires every chat action to the service that performs it. Lives outside the
  * refinement module because GenerationModule imports RefinementModule — this module sits above both
  * and pushes closures down into the dependency-free registry at bootstrap.
  */
@@ -118,7 +118,7 @@ export class HubActionRegistrar {
   /**
    * Chain-producing actions stage their own proposal; in an auto-mode turn that proposal is applied
    * on the spot so the mode stays honest end-to-end — a conflict leaves it pending for manual review
-   * instead of failing the action (chat-hub design §4.2).
+   * instead of failing the action.
    */
   private async settleChainProposal(projectId: bigint, proposal: Refinement.Proposal, runId: string, summary: string, ctx: ActionExecutionContext): Promise<ActionExecutionResult> {
     if (!ctx.autoApplied) return { summary: `${summary} — proposal ${proposal.id} pending review`, runId, proposalId: String(proposal.id) };

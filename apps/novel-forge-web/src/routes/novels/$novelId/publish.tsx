@@ -38,7 +38,7 @@ import { messageTime, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './publish.module.css';
 
-// No loader by design (category D): a release dashboard over the publication ledger — it polls while
+// No loader by design: a release dashboard over the publication ledger — it polls while
 // pushes are in flight, so there is nothing stable to prefetch for the first server paint.
 export const Route = createFileRoute('/novels/$novelId/publish')({
   component: PublishScreen,

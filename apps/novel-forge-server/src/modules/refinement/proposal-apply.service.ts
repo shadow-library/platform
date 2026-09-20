@@ -102,7 +102,7 @@ const STALE_VOLUME_CHANGED = 'volume_changed';
 const STALE_RANGE_SHIFTED = 'volume_range_shifted';
 const STALE_ARC_CHANGED = 'arc_changed';
 
-// Fields whose change invalidates the artifacts planned beneath the volume (§6.2 step 5).
+// Fields whose change invalidates the artifacts planned beneath the volume.
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
 
 /**
@@ -144,7 +144,7 @@ function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unkn
 }
 
 /**
- * The deterministic provenance floor (ideation-studio design §2.2). The studio prompt marks material
+ * The deterministic provenance floor. The studio prompt marks material
  * that came from the author's own words; a field written with no source named is therefore the studio's
  * own suggestion, and the honesty check at graduation must be able to say so. Stamped onto the op before
  * the inverse is captured, so a revert still restores exactly the provenance the sheet had.
@@ -174,7 +174,7 @@ function priorKeys(patch: Record<string, unknown>, prior: object | null): Record
  * that repeats an id already used earlier in the same collection, is a new card and gets a fresh uuid.
  * An id the sheet does not recognise is likewise a new card; it is kept rather than re-minted because an
  * inverse op restoring a prior collection is applied through here too, and re-minting would restore the
- * content but not the identity, breaking the exact-restore guarantee reverts are held to (hard rule 14).
+ * content but not the identity, breaking the exact-restore guarantee reverts are held to.
  */
 function stampConceptIds(incoming: ConceptCardInput[]): Ideation.ConceptCard[] {
   const seen = new Set<string>();
@@ -198,7 +198,7 @@ export class ProposalApplyService {
   }
 
   /**
-   * Applies a pending proposal (§6.2, chat-hub design §5): lock, per-op selection (cherry-pick),
+   * Applies a pending proposal: lock, per-op selection (cherry-pick),
    * baseline conflict check over the selected refs, guarded op dispatch with inverse capture,
    * staleness propagation, audit. Content ops are transactional; selected actions execute after
    * commit, sequentially, with their outcomes folded into opResults — except the one-way doors, which
@@ -351,7 +351,7 @@ export class ProposalApplyService {
   /**
    * Runs the selected actions after the content transaction committed (they enqueue jobs and run AI
    * chains — no DB transaction can span them). Sequential and fail-fast: a failed action records its
-   * error and stops the rest; already-applied content stays applied (chat-hub design §5.3).
+   * error and stops the rest; already-applied content stays applied.
    */
   private async executeActions(
     projectId: bigint,
@@ -414,7 +414,7 @@ export class ProposalApplyService {
 
   /**
    * Synthesizes the op that would undo `op`, from the row state as it stands right now — called
-   * immediately before the op executes, inside the same transaction (chat-hub design §5.2). Upserts
+   * immediately before the op executes, inside the same transaction. Upserts
    * over existing rows invert to upserts of the prior refinable fields; creations invert to removes;
    * removes invert to upserts of the deleted content.
    */
@@ -616,7 +616,7 @@ export class ProposalApplyService {
         return this.applySeedUpdate(ctx, op);
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
-        // post-commit (chat-hub design §5.3). Reaching here is a programming error, not bad input.
+        // post-commit. Reaching here is a programming error, not bad input.
         throw AppErrorCode.RFN_004.create();
     }
   }
@@ -712,8 +712,8 @@ export class ProposalApplyService {
   }
 
   /**
-   * Recomputes approved-plan volume ranges as cumulative `targetChapterCount` sums in ordinal order
-   * (§2.1). Volumes missing a count stop the walk — their ranges are settled at the next approve.
+   * Recomputes approved-plan volume ranges as cumulative `targetChapterCount` sums in ordinal order.
+   * Volumes missing a count stop the walk — their ranges are settled at the next approve.
    * Returns the volumeKeys whose range actually moved.
    */
   private async recomputeVolumeRanges(ctx: ApplyContext): Promise<string[]> {
@@ -973,7 +973,7 @@ export class ProposalApplyService {
 
   /**
    * Deleting a fact cascades its knowledge ledger, and the inverse op restores only the fact row — so
-   * a ledgered fact is refused rather than silently breaking the revert guarantee (hard rule 14).
+   * a ledgered fact is refused rather than silently breaking the revert guarantee.
    * Retract the reveals first through the fact endpoints.
    */
   private async applyFactRemove(ctx: ApplyContext, op: FactRemoveOp): Promise<void> {
@@ -990,7 +990,7 @@ export class ProposalApplyService {
   /**
    * The sheet is a singleton per seed project, so there is nothing to create and nothing downstream to
    * mark stale — no bible, plan, or brief can depend on a project that has not graduated. The hash
-   * covers `fields` alone (ideation-studio design §2.2).
+   * covers `fields` alone.
    */
   private async applySeedUpdate(ctx: ApplyContext, op: SeedUpdateOp): Promise<void> {
     const existing = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
@@ -1015,7 +1015,7 @@ export class ProposalApplyService {
 
   /**
    * Undoes an applied proposal by executing its stored inverse ops through the same appliers —
-   * same hashing, revision bumps, and staleness propagation as any apply (hard rule 14). Guarded
+   * same hashing, revision bumps, and staleness propagation as any apply. Guarded
    * strictly: every artifact must still be exactly as the apply left it (postState); anything moved
    * on → 409 RFN_006, nothing touched. Revisions only ever move forward — a revert bumps them again
    * with the restored content, so later baselines stay coherent.
@@ -1034,7 +1034,7 @@ export class ProposalApplyService {
 
       // Content identity (exists + contentHash) is the guard — NOT revision: reverting a newer change
       // on the same artifact restores this proposal's content but bumps the revision counter, and a
-      // rollback chain must keep walking backward through exactly that state (chat-hub design §5.5).
+      // rollback chain must keep walking backward through exactly that state.
       const postState = (proposal.postState ?? {}) as Record<string, ArtifactState>;
       const refs = Object.keys(postState);
       const current = await loadArtifactStates(tx as unknown as PrimaryDatabase, projectId, refs);
@@ -1070,8 +1070,8 @@ export class ProposalApplyService {
   /**
    * Rolls the project back to the state right after `afterProposalId` was applied: every applied
    * proposal newer than the anchor is reverted, newest first, each in its own transaction. Action-only
-   * proposals (nothing to invert) are skipped. Stops at the first conflict and reports how far it got
-   * (chat-hub design §5.5). Cross-session changes are included by design — the history is project-wide.
+   * proposals (nothing to invert) are skipped. Stops at the first conflict and reports how far it got.
+   * Cross-session changes are included by design — the history is project-wide.
    */
   async rollbackAfter(projectId: bigint, afterProposalId: bigint): Promise<RollbackResult> {
     const anchor = await this.db.query.refinementProposals.findFirst({

@@ -15,7 +15,7 @@ function occurrenceCount(originalText: string, entry: TranslationTermLike, profi
 }
 
 /**
- * Ranks entries by occurrence in the original chapter (glossary-slice §D3/D6): rejected entries that
+ * Ranks entries by occurrence in the original chapter: rejected entries that
  * still occur are reported separately so the model is told "translate this normally" without ever
  * counting against the cap; among the rest, approved and preserve-treatment entries fill the cap
  * ahead of merely suggested ones, since those are the terms a re-run must render identically.

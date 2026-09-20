@@ -22,7 +22,7 @@ export type ContextPurpose =
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
-// unchanged canon — it is the provider prompt-cache key (refinement design §10.1).
+// unchanged canon — it is the provider prompt-cache key.
 export type ContextSegment = 'stable' | 'volatile';
 
 export interface ContextSection {

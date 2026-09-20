@@ -208,7 +208,7 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
       expect(extract.statusCode).toBe(202);
       expect(extract.json()).toMatchObject({ kind: 'extract', status: 'pending' });
 
-      // P0-08: the enqueued payload must carry the real chapter numbers the executor destructures —
+      // The enqueued payload must carry the real chapter numbers the executor destructures —
       // never bare `{ limit }`, which the executor never reads.
       const jobId = extract.json().jobId as string;
       const jobRow = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });

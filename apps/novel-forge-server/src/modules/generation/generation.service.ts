@@ -109,7 +109,7 @@ export interface JobEnqueueResult {
   kind: string;
   status: string;
   target: string;
-  /** Set when an unfilled external-write slot truncated the batch before its limit (interstitial-chapter-design §8). */
+  /** Set when an unfilled external-write slot truncated the batch before its limit. */
   stoppedAtExternalChapter?: number;
 }
 
@@ -370,9 +370,9 @@ export class GenerationService {
   }
 
   /**
-   * Arc-scoped outlining (refinement design §9.2): briefs for exactly the arc's chapter range, with
+   * Arc-scoped outlining: briefs for exactly the arc's chapter range, with
    * the arc's escalation/hook and the next arc's intent in view so ending contracts chain across the
-   * boundary. Gated on the whole volume's arcs being approved (design §4 gate 2).
+   * boundary. Gated on the whole volume's arcs being approved.
    */
   async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
     await this.assertActive(projectId);
@@ -614,7 +614,7 @@ export class GenerationService {
     const staleChapters = chapters.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
     if (staleChapters.length > 0) throw AppErrorCode.BRF_002.create({ chapters: staleChapters.join(', ') });
 
-    // Guard: when a chapter's volume has arcs, the covering arc must be approved (refinement design §4 gate 3).
+    // Guard: when a chapter's volume has arcs, the covering arc must be approved.
     // Arc-less volumes (e.g. source-imported ones) keep the volume-scoped path.
     const arcs = await this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
     for (const chapter of arcs.length > 0 ? chapters : []) {
@@ -850,7 +850,7 @@ export class GenerationService {
         .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
         .returning();
 
-      // Approval is the deterministic reveal gate (character-knowledge design §4): the brief's
+      // Approval is the deterministic reveal gate: the brief's
       // `learns` declarations become ledger rows in the same transaction as the approval itself.
       const reveals = await applyBriefReveals(tx, projectId, chapter);
       if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, applied: reveals.applied });
@@ -1413,7 +1413,7 @@ export class GenerationService {
     return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
   }
 
-  // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local (design §2.1),
+  // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local,
   // so a running row with no controller here is owned by another replica that never saw the request and is
   // still working. The abort is what was undeliverable, not the status.
   async cancelRun(projectId: bigint, runId: string): Promise<CancelRunResponse> {
@@ -1428,9 +1428,9 @@ export class GenerationService {
     return { runId, status: 'running', outcome: live ? 'stopping' : 'not_delivered' };
   }
 
-  // The state transition itself is JobService.cancel's atomic conditional update (D5/D6); this only
+  // The state transition itself is JobService.cancel's atomic conditional update; this only
   // translates its result. A job driving a workflow run is not cancelled here — the job row does not
-  // know which run it currently owns, only the executor does mid-dispatch, so S5 must cancel that run
+  // know which run it currently owns, only the executor does mid-dispatch, so the executor must cancel that run
   // itself when it observes `cancelRequestedAt` at the next step boundary.
   async cancelJob(projectId: bigint, jobId: string): Promise<CancelJobResponse> {
     const result = await this.jobService.cancel(jobId, projectId);

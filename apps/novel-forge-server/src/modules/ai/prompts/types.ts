@@ -69,7 +69,7 @@ export interface PromptModule<TOut> {
   schema: SchemaClass;
   // Model-routing role when it differs from the key (e.g. key 'chat-refine' routes as role 'chat').
   role?: AiRole;
-  // Declares that the template follows the stable-first message convention (refinement design §10.2):
+  // Declares that the template follows the stable-first message convention:
   // static system, then all `stableVars` content in the FIRST human message, volatile content last.
   // The router injects provider cache breakpoints only when this is present.
   cacheStrategy?: { stableVars: string[] };

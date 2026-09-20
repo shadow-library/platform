@@ -19,7 +19,7 @@ interface WikiImage {
   visibleFromOrdinal: number;
 }
 
-/** The reader-clean wiki payload — nothing forge-internal, nothing unrevealed, may ever appear here (hard rule 7). */
+/** The reader-clean wiki payload — nothing forge-internal, nothing unrevealed, may ever appear here. */
 interface WikiEntryPayload {
   type: WikiEntryType;
   name: string;

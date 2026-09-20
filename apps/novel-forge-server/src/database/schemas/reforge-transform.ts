@@ -65,7 +65,7 @@ export const reforgeOutputStatus = pgEnum('reforge_output_status', ['written', '
 export const reforgeCutKind = pgEnum('reforge_cut_kind', ['subplot', 'thread', 'entity', 'arc', 'running_gag', 'scene_pattern']);
 export const reforgeCutDisposition = pgEnum('reforge_cut_disposition', ['cut', 'condensed', 'resolved_early']);
 
-// One row per analysis run over a source project (transform design §3.4); the latest row wins and older
+// One row per analysis run over a source project; the latest row wins and older
 // rows are retained so a plan can always be traced back to the report it was drawn from. `windowsFailed`
 // is the flag-and-continue tally — the stage aborts above 10% because a plan drawn from a holed report is
 // worse than no plan.
@@ -132,7 +132,7 @@ export const reforgeFindings = pgTable(
   t => [index('reforge_findings_analysis_id_type_idx').on(t.analysisId, t.type)],
 );
 
-// The versioned structural authority (transform design §4). An edit to an approved plan never mutates it:
+// The versioned structural authority. An edit to an approved plan never mutates it:
 // a new revision is drafted and the old one is marked `superseded`, so outputs always name the exact plan
 // revision they were written under.
 export const reforgePlans = pgTable(
@@ -157,7 +157,7 @@ export const reforgePlans = pgTable(
   t => [unique('reforge_plans_project_id_revision_unique').on(t.projectId, t.revision), index('reforge_plans_project_id_status_idx').on(t.projectId, t.status)],
 );
 
-// The span rows of §4. `spanKey` survives a revision that leaves the span's bounds, action, and target
+// The span rows of the plan. `spanKey` survives a revision that leaves the span's bounds, action, and target
 // untouched, which is what lets already-written outputs carry forward instead of a single edit at span 3
 // of 300 invalidating a book's worth of generation. `bridgeDirective` is generated once at approval for
 // the span that follows a drop — the writer never improvises a seam.
@@ -187,7 +187,7 @@ export const reforgePlanSpans = pgTable(
   t => [unique('reforge_plan_spans_plan_id_ordinal_unique').on(t.planId, t.ordinal), unique('reforge_plan_spans_plan_id_span_key_unique').on(t.planId, t.spanKey)],
 );
 
-// Output chapters are first-class rows keyed on the plan, not a mirror of the source numbering (§5).
+// Output chapters are first-class rows keyed on the plan, not a mirror of the source numbering.
 // `body` is '' on failed rows so the upsert path stays uniform, exactly as `chapter_reforges` does.
 // `planBeats` is the judge's contract: beats absent from it are outside the contract, so condensation is
 // not drift.
@@ -230,7 +230,7 @@ export const reforgeOutputs = pgTable(
   ],
 );
 
-// The append-only cut ledger (§6.1). Seeded at plan approval, grown by each output's reported delta, and
+// The append-only cut ledger. Seeded at plan approval, grown by each output's reported delta, and
 // merged insert-conflict-keeps-existing like `rebrand_glossary`: a cut is never re-described once
 // recorded, and entries are superseded by a new plan revision rather than deleted.
 export const reforgeCuts = pgTable(

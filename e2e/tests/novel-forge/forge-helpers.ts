@@ -40,7 +40,7 @@ export interface NovelBundle {
  */
 
 /**
- * Every text-generating AI role the settings UI exposes (novel-forge.md §0). An AI test must pin ALL of them
+ * Every text-generating AI role the settings UI exposes. An AI test must pin ALL of them
  * to Haiku: leaving one on the profile default routes that stage to grok-3 (xAI) and defeats the pin. `image`
  * and `embedding` are deliberately excluded — they are not text roles and their providers are left untouched.
  */
@@ -100,7 +100,7 @@ export async function createProject(
   return { id: parsed.id, response };
 }
 
-/** Pins every text role of `projectId` to Haiku. Must run before any AI action (novel-forge.md §0). */
+/** Pins every text role of `projectId` to Haiku. Must run before any AI action. */
 export async function pinHaiku(ctx: APIRequestContext, projectId: string): Promise<APIResponse> {
   return mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { config: haikuModelConfig() } });
 }

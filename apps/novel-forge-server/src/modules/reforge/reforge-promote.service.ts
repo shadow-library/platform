@@ -54,7 +54,7 @@ export class ReforgePromoteService {
   }
 
   /**
-   * Lands the approved plan's outputs as a publishable `new_novel` project. Idempotent per plan
+   * Lands the approved plan's outputs as a publishable `curated` project. Idempotent per plan
    * revision: a revision that already promoted returns its project rather than duplicating a book.
    */
   async promote(projectId: bigint, options: PromoteOptions = {}): Promise<PromoteResult> {

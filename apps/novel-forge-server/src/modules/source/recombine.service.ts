@@ -51,7 +51,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * Merges translator-split chapter parts back into original source chapters (recombine design):
+ * Merges translator-split chapter parts back into original source chapters:
  * deterministic title-driven grouping, transactional merge + contiguous renumbering, with a
  * dry-run mode and a derived-data guard — chapter numbers are referenced by extraction, briefs,
  * and conversions, so renumbering is only legal before any of them exist.
@@ -119,7 +119,7 @@ export class RecombineService {
     if (!useAi || plan.ambiguous.length === 0) return plan;
 
     // An AI failure falls back to the deterministic plan — every unresolved boundary defaults to
-    // split, which is always the safe direction (recombine design §3).
+    // split, which is always the safe direction.
     try {
       this.logger.debug('buildPlan: resolving ambiguous boundaries with AI', { projectId, ambiguous: plan.ambiguous.length });
       const mergeAfter = await this.resolveBoundaries(projectId, chapters, plan.ambiguous, project);

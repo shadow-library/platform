@@ -19,7 +19,7 @@ const pgAvailable = await (async () => {
 const testEnv = new TestEnvironment('reforge_mode');
 
 // Row ids and timestamps are the only response fields a fresh run cannot reproduce; everything else is
-// compared byte-for-byte, which is the whole point of these goldens (design §13).
+// compared byte-for-byte, which is the whole point of these goldens.
 function golden(body: unknown): string {
   return JSON.stringify(body, (key, value) => (key === 'id' || key === 'jobId' || key === 'createdAt' || key === 'updatedAt' ? `<${key}>` : value));
 }

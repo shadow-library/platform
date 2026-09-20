@@ -15,7 +15,7 @@ const system =
   '"findings": [{"type": "filler|repetition|pacing_stall|dead_subplot|dropped_thread|arc_boundary|quality_outlier", "fromChapter": number, "toChapter": number, "severity": number, "confidence": number, "label": string, "detail": string, "signalRef": string}], ' +
   '"carryState": {"storySoFar": string, "openThreads": [string], "arcRegister": string}}';
 
-// The message layout is the caching contract (refinement design §10.2): static system, then the stable
+// The message layout is the caching contract: static system, then the stable
 // pack (world notes) in the first human message, the volatile carry state and signal digest with the
 // window's source prose last. The prose is a template var so the pack never churns.
 export const reforgeAnalyzeWindowPrompt: PromptModule<ReforgeAnalyzeWindowOutput> = {

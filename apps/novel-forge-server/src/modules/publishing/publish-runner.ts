@@ -35,7 +35,7 @@ interface WikiConvergeResult {
   deleted: string[];
   skipped: string[];
   failed: WikiConvergeFailure[];
-  /** Manifest entry keys the ledger knows nothing about — reported, never deleted (one-way convergence, §6) */
+  /** Manifest entry keys the ledger knows nothing about — reported, never deleted (one-way convergence) */
   unknownEntries: string[];
 }
 
@@ -46,7 +46,7 @@ export interface ConvergeResult {
   deleted: number[];
   skipped: number[];
   failed: ConvergeFailure[];
-  /** Manifest ordinals the ledger knows nothing about — reported, never deleted (one-way convergence, §6) */
+  /** Manifest ordinals the ledger knows nothing about — reported, never deleted (one-way convergence) */
   unknownOrdinals: number[];
   /** The wiki convergence outcome — derived projections pushed one-way alongside the chapters */
   wiki: WikiConvergeResult;
@@ -80,11 +80,11 @@ function isUnsweepable(error: string | null | undefined): boolean {
 }
 
 /**
- * The convergence engine behind the `publish` job, the janitor sweep, and the reconcile endpoint
- * (reader-publish design §5–6). One pass: push the novel metadata, fetch the reader manifest, then
+ * The convergence engine behind the `publish` job, the janitor sweep, and the reconcile endpoint.
+ * One pass: push the novel metadata, fetch the reader manifest, then
  * walk the ledger — PUT every due or drifted chapter, DELETE every ledgered-unpublished ordinal the
  * reader still serves, and record per-row failures on the ledger (the row IS the outbox). Every
- * reader call is idempotent, so overlapping runs and replays are always safe (hard rule 5).
+ * reader call is idempotent, so overlapping runs and replays are always safe.
  */
 @Injectable()
 export class PublishRunner {
@@ -377,7 +377,7 @@ export class PublishRunner {
   /**
    * Re-renders the payload from the canonical chapter and insists it still matches the ledgered
    * hash: publication is an editorial decision, so silently pushing prose that drifted after the
-   * decision would bypass the author (design §4) — the row fails with a "republish" hint instead.
+   * decision would bypass the author — the row fails with a "republish" hint instead.
    */
   private async renderLedgeredPayload(projectId: bigint, row: Publishing.ChapterPublication): Promise<Omit<ChapterPushBody, 'revision' | 'publishedAt'> | string> {
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, row.chapter)) });

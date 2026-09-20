@@ -80,7 +80,7 @@ export function supportsPromptCaching(resolved: ResolvedModel): boolean {
   return resolveProvider(resolved) === 'openrouter' && resolved.model.startsWith('anthropic/');
 }
 
-// `prompt.contribute` (§5.5): contributions land directly after the module's own leading system messages and
+// `prompt.contribute`: contributions land directly after the module's own leading system messages and
 // before cache control, so the three Anthropic breakpoints still key on the module's static system message.
 function withPluginSystemMessages(messages: BaseMessage[], policy?: ForgeCallPolicy): BaseMessage[] {
   if (!policy?.systemMessages.length) return messages;
@@ -186,7 +186,7 @@ export class ModelRouterService {
   private readonly llmTimeoutMs = Config.get('ai.llm.timeout-ms') ?? 300_000;
   private readonly llmMaxRetries = Config.get('ai.llm.max-retries') ?? 2;
   private readonly llmBackoffMs = Config.get('ai.llm.backoff-ms') ?? 500;
-  // Process-local by design (rail-stop-admin §2.1): a cancel only reaches a run owned by the replica
+  // Process-local by design: a cancel only reaches a run owned by the replica
   // that received it, exactly like ProjectEventService's in-process fan-out.
   private readonly runAborts = new Map<string, AbortController>();
 
@@ -319,7 +319,7 @@ export class ModelRouterService {
   }
 
   /**
-   * `structured` that also streams the response's `reply` field as it decodes. The stream is advisory (design D6):
+   * `structured` that also streams the response's `reply` field as it decodes. The stream is advisory:
    * the returned value is the same parsed-and-repaired object `structured` returns, and `onReset` fires whenever
    * what was already emitted is void — a transport retry restarted the response, or repair changed the reply.
    */
@@ -384,7 +384,7 @@ export class ModelRouterService {
     const rawOutput1 = relay
       ? await this.streamResilient(llm, messages, firstConfig, role, relay, runSignal)
       : await this.invokeResilient(llm, messages, firstConfig, role, runSignal);
-    // Design §4.1: a response carrying no top-level `reply` string produced no delta at all, so the author
+    // A response carrying no top-level `reply` string produced no delta at all, so the author
     // saw a dead composer until `done`. (The scanner is key-order agnostic — `changeSet` first only costs
     // latency — so this is the whole of the degradation.) Logged per provider/model/prompt to make it
     // measurable; never a failure, since the ladder still returns a reply.

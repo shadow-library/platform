@@ -20,7 +20,7 @@ When an "## ENDING CONTRACT" section is present, it is binding: the closing scen
 
 When the context pack contains a "## KNOWN FACTS (POV CAST)" section, the chapter is epistemically bounded: the POV characters may only act on, state, or reason from the facts listed there, plus whatever the scene itself shows them. Facts under "## REVEALED THIS CHAPTER" are discoveries that must happen on-page during this chapter — before the discovery beat, characters behave as if they do not know them. Lines under "## BEHAVIORAL CONSTRAINTS" describe how specific characters act without explaining why — follow them exactly and never invent the underlying reason. Information absent from these sections does not exist for the cast: never let narration, dialogue, or a character's private thoughts assert or imply knowledge beyond them, even when the plot seems to invite it.`;
 
-// The message layout is the caching contract (refinement design §10.2): static system, then the pack's
+// The message layout is the caching contract: static system, then the pack's
 // stable segment (volume/arc objectives, writing style, canon cards) alone in the first human message,
 // with the per-chapter volatile segment and the brief last.
 export const generationPrompt: PromptModule<GenerationOutput> = {

@@ -1,4 +1,4 @@
-// Real-world nation/ethnicity/brand terms that must never survive conversion (rebrand design §2),
+// Real-world nation/ethnicity/brand terms that must never survive conversion,
 // grouped into named packs so a project can opt into only the ones its source material needs.
 // Matched case-insensitively on word boundaries, so common-word collisions need care: single-word
 // dynasty names ("Han", "Tang", "Ming") are left out because they collide with ordinary names and

@@ -20,7 +20,7 @@ export interface BundleValidation {
 
 // Sanity ceiling on chapter text + (estimated) decoded asset bytes, independent of the HTTP transport
 // body limit (see `dynamic.modules.ts`) — catches a pathological bundle with a clear field error
-// instead of a bare transport-level rejection. See novel-import-format.md for the documented figure.
+// instead of a bare transport-level rejection.
 const MAX_BUNDLE_CONTENT_BYTES = 48 * 1024 * 1024;
 
 function findDuplicates<T>(items: T[]): T[] {

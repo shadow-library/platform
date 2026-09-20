@@ -50,7 +50,7 @@ function bulletList(items: string[]): string {
 }
 
 /**
- * The whole-novel synopsis, rendered from the sheet alone (ideation-studio design §5). Short by
+ * The whole-novel synopsis, rendered from the sheet alone. Short by
  * construction: the sheet holds idea-altitude material only, so there is nothing here that could grow
  * into a plan. Refinement details it from here; this is half of the studio's entire handoff.
  */
@@ -106,7 +106,7 @@ export function renderInstructions(existing: string | null, voice: string | unde
 }
 
 /**
- * The honesty check (ideation-studio design §2.2). Graduation deletes the seed, so the response
+ * The honesty check. Graduation deletes the seed, so the response
  * carrying this summary is the only place the split between the author's decisions and the studio's
  * suggestions can still be read.
  */

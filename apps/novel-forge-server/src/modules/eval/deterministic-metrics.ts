@@ -1,6 +1,6 @@
-// Track 2 (harness-final-recommendation.md §14) deterministic prose metrics — pure, synchronous
+// Deterministic prose metrics — pure, synchronous
 // functions over already-fetched chapter/draft text. No DB, no LLM: everything here is re-derivable
-// from prose alone, which is the point (D32/D33 — mechanical properties need no model judgment).
+// from prose alone, which is the point — mechanical properties need no model judgment.
 //
 // Definitions, so a future reader can trust the numbers without re-reading the code:
 // - Word count: whitespace-split tokens, matches the target band from `generation.prompt.ts` (1,800–2,600).
@@ -9,14 +9,14 @@
 // - "Longest-run monotony": the longest run of consecutive sentences that all fall OUTSIDE the 6–22
 //   band (either direction — a run of all-short or all-long sentences, or an alternating mix of both,
 //   still counts as monotonous because neither hits the target register). This is one reasonable
-//   operationalization of "monotony", not the only one — see the module doc comment on §14 for context.
+//   operationalization of "monotony", not the only one.
 // - N-gram repetition: word n-grams (n = 5..8 inclusive), case-insensitive, built from tokens with pure
 //   punctuation stripped (a token that is only punctuation after stripping is dropped, so n-grams never
 //   span a sentence purely on punctuation noise). Within-chapter rate = ngrams occurring 2+ times in the
 //   same chapter, as a share of all ngram occurrences. Cross-chapter rate = this chapter's ngrams that
 //   also occur anywhere in the prior-chapters window, as a share of this chapter's ngram occurrences.
 // - Stock-reaction phrases: a fixed ~20-item starting list (see STOCK_PHRASES) of overused web-novel/LLM
-//   stock reactions and clichés, sourced from the report's §13 examples plus common LLM-prose tells. This
+//   stock reactions and clichés, sourced from common web-novel and LLM-prose tells. This
 //   is a starting point, not exhaustive — extend it as evaluation runs surface more offenders.
 // - Dialogue-tag density / said-alternative rate: a "tag" is a verb from SAID_ALTERNATIVE_VERBS or the
 //   words "said"/"asked" immediately following a closing quotation mark (optionally after an attribution
@@ -24,7 +24,7 @@
 // - Contraction rate in dialogue: restricted to text between double quotes; contracted vs. expanded forms
 //   from the fixed CONTRACTION_PAIRS list. Rate = contracted / (contracted + expanded).
 // - Ending-mode distribution: tallies `briefs.endingContract.hookType` (or a supplied hook type) across a
-//   chapter span; reports the counts and the distinct-type count, per §14's "hook vs closure variety".
+//   chapter span; reports the counts and the distinct-type count.
 
 export const WORD_TARGET_MIN = 1800;
 export const WORD_TARGET_MAX = 2600;

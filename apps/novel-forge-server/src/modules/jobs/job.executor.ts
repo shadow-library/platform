@@ -149,7 +149,7 @@ export class JobExecutor {
         await this.jobService.succeed(jobId);
         this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
       } catch (err) {
-        // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and D6 makes
+        // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and cancellation makes
         // the job terminal-cancelled with its finished work kept, not failed into a retry ladder.
         if (await this.cancelRequested(jobId)) return this.markCancelled(job);
         const msg = err instanceof Error ? err.message : String(err);
@@ -287,8 +287,8 @@ export class JobExecutor {
       this.logger.debug('runRebrand: phase 1 — chapters present', { jobId: job.id, projectId, chapterCount });
       if (chapterCount === 0) throw AppError.internal(`project ${projectId} has no chapters — provide chapters before running rebrand`);
 
-      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them
-      // (recombine design §1); the guard makes this a safe no-op on resume.
+      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them;
+      // the guard makes this a safe no-op on resume.
       this.logger.info('runRebrand: phase 1.5 — recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
       await this.recombineService.autoRecombine(projectId);
@@ -340,7 +340,7 @@ export class JobExecutor {
     return this.runChapterReforge(job, payload);
   }
 
-  // The transform-mode source analysis (transform design §3.4). It shares the reforge job kind but
+  // The transform-mode source analysis. It shares the reforge job kind but
   // touches none of the 1:1 path's tables, and its own phases are derived from the window loop.
   private async runReforgeAnalyze(job: Job.Row): Promise<void> {
     const projectId = job.projectId;
@@ -360,7 +360,7 @@ export class JobExecutor {
 
   // Drafts the transformation plan from the persisted analysis. It ends in `draft`: the plan is always
   // human-gated, and a "just run it end to end" button is the one feature that would make this mode
-  // untrustworthy (transform design §11).
+  // untrustworthy.
   private async runReforgePlan(job: Job.Row): Promise<void> {
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'drafting', phase: 'planning' });
     const { plan, outputChapterCount } = await this.reforgePlanService.draft(job.projectId, job.id);
@@ -368,7 +368,7 @@ export class JobExecutor {
     this.logger.info('runReforgePlan: complete', { jobId: job.id, projectId: job.projectId, planId: String(plan.id), revision: plan.revision, outputChapterCount });
   }
 
-  // The N:M write. The approved plan is the only structural authority (hard rule 16), so the stage
+  // The N:M write. The approved plan is the only structural authority, so the stage
   // verifies it before anything is spent and derives its targets from the plan's own numbering rather
   // than from the payload. Per-output failures flag-and-continue, identical to the 1:1 path.
   private async runReforgeTransform(job: Job.Row, payload: ReforgePayload): Promise<void> {
@@ -440,8 +440,8 @@ export class JobExecutor {
       this.logger.debug('runReforge: phase 1 — chapters present', { jobId: job.id, projectId, chapterCount });
       if (chapterCount === 0) throw AppError.internal(`project ${projectId} has no chapters — provide chapters before running reforge`);
 
-      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them
-      // (recombine design §1); the guard makes this a safe no-op on resume.
+      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them;
+      // the guard makes this a safe no-op on resume.
       this.logger.info('runReforge: phase 1.5 — recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
       await this.recombineService.autoRecombine(projectId);
@@ -524,7 +524,7 @@ export class JobExecutor {
       },
     });
 
-    // The only boundary an import has: the chapters are landed and kept (D6), the cover and the
+    // The only boundary an import has: the chapters are landed and kept, the cover and the
     // recombine pass are abandoned. The payload is still compacted, so a cancelled import never leaves
     // the whole bundle's prose sitting on the row.
     if (await this.cancelRequested(job.id)) return this.compactImportPayload(job.id, total, !!cover);
@@ -537,8 +537,8 @@ export class JobExecutor {
     }
 
     if (mode === 'source') {
-      // Re-homes the auto-recombine hook that used to run on remote-ingest completion (recombine design
-      // §pipeline hooks) — autoRecombine already no-ops quietly when there is nothing to merge.
+      // Re-homes the auto-recombine hook that used to run on remote-ingest completion;
+      // autoRecombine already no-ops quietly when there is nothing to merge.
       this.logger.info('runImport: source mode — running auto-recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: total, total, current: 'recombine', phase: 'recombining' });
       await this.recombineService.autoRecombine(projectId);
@@ -723,7 +723,7 @@ export class JobExecutor {
   }
 
   // Three phases, each derived from data — never from translations.phase, which is advisory display
-  // state. Divergences from runRebrand (translation design D5): the seed can pause the run for term
+  // state. Divergences from runRebrand: the seed can pause the run for term
   // review, a finalized chapter is never a target, and a failed run never overwrites a good row.
   private async runTranslate(job: Job.Row): Promise<void> {
     const projectId = job.projectId;

@@ -198,7 +198,7 @@ describe('Prompt modules', () => {
       expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.0.0');
       // premise-enhance v1.1 reframes the enhanced premise as an enticing summary, not a plot walkthrough.
       expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.1.0');
-      // chat-refine v2 added the declared-lookup protocol (chat-hub design §6); v2.1 instructs partial
+      // chat-refine v2 added the declared-lookup protocol; v2.1 instructs partial
       // updates (emit only changed fields, since the apply engine merges) to cut output tokens.
       expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.1.0');
     });
@@ -220,8 +220,8 @@ describe('Prompt modules', () => {
     });
 
     it('chat-refine scope factory rejects ops outside the scope allowlist', () => {
-      // A legacy per-artifact scope (e.g. 'brief') now resolves to the hub playbook (chat-revamp
-      // design D1/A2), so its allowlist is the project op set — only the ideation-only op is off-scope.
+      // A legacy per-artifact scope (e.g. 'brief') now resolves to the hub playbook, so its
+      // allowlist is the project op set — only the ideation-only op is off-scope.
       const scoped = buildChatRefinePrompt('brief');
       const offScope = { reply: 'done', changeSet: [{ op: 'seed.update', seedId: 's1' }] };
       expect(scoped.postValidate?.(offScope as never)[0]).toMatch(/not allowed for this scope/);
@@ -249,7 +249,7 @@ describe('Prompt modules', () => {
       expect(hub).toContain('"pov": <non-empty array of entity keys>');
       expect(hub).toContain('knowledgeContract');
 
-      // Every legacy per-artifact scope now resolves to the same hub playbook (chat-revamp design D1/A2).
+      // Every legacy per-artifact scope now resolves to the same hub playbook.
       expect(renderScopeInstructions('brief')).toBe(hub);
       expect(renderScopeInstructions('novel')).toBe(hub);
       expect(renderScopeInstructions('volume_plan')).toBe(hub);
@@ -288,7 +288,7 @@ describe('Prompt modules', () => {
         { op: 'brief.update', chapter: 41, knowledgeContract: { pov: ['hero'], learns: [{ entityKey: 'hero', factKey: 'mentor_is_the_traitor' }] } },
       ];
       expect(hub.postValidate?.({ reply: 'staged the reveal', changeSet } as never)).toEqual([]);
-      // A legacy per-artifact scope now shares the hub's op allowlist (chat-revamp design D1/A2); only
+      // A legacy per-artifact scope now shares the hub's op allowlist; only
       // the ideation scope still carries its own narrower one.
       expect(buildChatRefinePrompt('brief').postValidate?.({ reply: 'x', changeSet } as never)).toEqual([]);
       expect(buildChatRefinePrompt('ideation').postValidate?.({ reply: 'x', changeSet } as never)[0]).toMatch(/not allowed for this scope/);
@@ -1003,7 +1003,7 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('knowledge contract (generation/judge v2.2, character-knowledge design §5–6)', () => {
+  describe('knowledge contract (generation/judge v2.2)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
       expect(PROMPT_REGISTRY.generation.version).toBe('2.5.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
@@ -1048,7 +1048,7 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('reader value and purpose (outline v2.3, harness-final-recommendation.md D16)', () => {
+  describe('reader value and purpose (outline v2.3)', () => {
     const baseBrief = {
       chapter: 1,
       volumeKey: 'vol_01',

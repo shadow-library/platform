@@ -4,7 +4,7 @@ import { type ImportNovelResponse, type NovelBundle } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
 /**
- * Imports a hand-authored `novel-import` bundle (§ docs/novel-import-format.md in the server repo):
+ * Imports a hand-authored `novel-import` bundle:
  * creates the project synchronously and enqueues chapter insertion + cover storage as a background
  * `import` job. Not project-scoped — the bundle's own `mode` decides whether the created project is a
  * `source` or a locked, publish-ready `final` novel, so there is no existing project to invalidate.

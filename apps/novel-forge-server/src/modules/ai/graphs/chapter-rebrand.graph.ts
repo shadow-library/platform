@@ -94,7 +94,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) }),
       db.query.rebrandGlossary.findMany({ where: eq(schema.rebrandGlossary.projectId, projectId) }),
       // Carry state and the previous ending come from the previous CONVERTED body — the source tail
-      // would leak pre-rebrand names and break inserted-thread continuity (design §5).
+      // would leak pre-rebrand names and break inserted-thread continuity.
       db.query.chapterConversions.findFirst({
         where: and(eq(schema.chapterConversions.projectId, projectId), lt(schema.chapterConversions.chapter, state.chapter), ne(schema.chapterConversions.status, 'failed')),
         orderBy: [desc(schema.chapterConversions.chapter)],
@@ -264,7 +264,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
   }
 
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
-  // keep the existing mapping: a name is never re-mapped once made (design §2).
+  // keep the existing mapping: a name is never re-mapped once made.
   async function mergeGlossary(state: RebrandState) {
     const discovered = state.converted?.discoveredNames ?? [];
     if (discovered.length === 0) return { nodeTrace: ['mergeGlossary'] };

@@ -17,7 +17,7 @@ export namespace Ideation {
 
   /**
    * The sheet — idea altitude only. No field holds places, chapter structure, or volume detail;
-   * `serializationNotes` stays short prose rather than a plan (ideation-studio design §2.2).
+   * `serializationNotes` stays short prose rather than a plan.
    */
   export interface SeedFields {
     genre?: string;
@@ -86,7 +86,7 @@ export namespace Ideation {
 }
 
 // One row per seed project, alive only while the project is in `seed` status — graduation folds its
-// content into the project and bible documents and deletes the row (ideation-studio design §2.2/§5).
+// content into the project and bible documents and deletes the row.
 // `revision` + `contentHash` make the sheet an ordinary artifact for the proposal engine's baseline
 // and conflict machinery.
 export const storySeeds = pgTable(

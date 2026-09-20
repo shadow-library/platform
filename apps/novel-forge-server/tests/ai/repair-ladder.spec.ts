@@ -106,7 +106,7 @@ describe.if(pgAvailable)('repair ladder accounting', () => {
     const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
     expect(draft?.reviewStatus).toBe('contradiction');
 
-    // The real repair-ladder path, not a hardcoded happy-path list (D38): two patch detours plus
+    // The real repair-ladder path, not a hardcoded happy-path list: two patch detours plus
     // three judge visits must actually show up, in order, ending on the fallback node.
     expect(finalState.nodeTrace.filter(n => n === 'repairPatch')).toHaveLength(2);
     expect(finalState.nodeTrace.filter(n => n === 'judge')).toHaveLength(3);

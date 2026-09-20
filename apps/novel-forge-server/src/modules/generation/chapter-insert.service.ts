@@ -107,7 +107,7 @@ const SHIFT_TARGETS: ShiftTarget[] = [
 const INSERT_STALE_REASON = 'a chapter was inserted after this point';
 
 /**
- * Inserts a chapter slot the plan never allocated (interstitial-chapter design §7): one transaction that
+ * Inserts a chapter slot the plan never allocated: one transaction that
  * renumbers everything above the insert point, re-renders the briefs it moved, grows the arc and volume
  * ranges, and lands an `external` write-mode brief in the hole. Legal only ahead of the write frontier,
  * which is what keeps finalized canon — and `chapter_publications.publishedOrdinal` with it — immovable.

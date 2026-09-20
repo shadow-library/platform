@@ -79,7 +79,7 @@ const playbook = (seed: RouterSeedState, key: string): boolean => hasPlaybook(se
 /**
  * The bank's altitude ceiling is the idea. It stops after promise-naming: nothing here asks for an
  * opening paragraph, a chapter breakdown, or a volume shape — those are authored downstream, during
- * lore-bible refinement (ideation-studio design §3.1).
+ * lore-bible refinement.
  */
 export const QUESTION_BANK: StudioQuestion[] = [
   {

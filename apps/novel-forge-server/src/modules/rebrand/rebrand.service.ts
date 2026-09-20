@@ -164,7 +164,7 @@ export class RebrandService {
   }
 
   /**
-   * Seeds the world notes and initial name mappings (rebrand design §2). Idempotent: a rebrand with
+   * Seeds the world notes and initial name mappings. Idempotent: a rebrand with
    * worldNotes already set is a no-op, so job resume never re-seeds or re-bills.
    */
   async seedGlossary(projectId: bigint, jobId?: string): Promise<SeedGlossaryResult> {

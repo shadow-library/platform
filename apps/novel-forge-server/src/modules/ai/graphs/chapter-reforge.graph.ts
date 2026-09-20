@@ -124,7 +124,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
       db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) }),
       db.query.rebrandGlossary.findMany({ where: eq(schema.rebrandGlossary.projectId, projectId) }),
       // Carry state and the previous ending come from the previous REFORGED body — the source tail
-      // would leak pre-rename names and break re-authored continuity (design §5).
+      // would leak pre-rename names and break re-authored continuity.
       db.query.chapterReforges.findFirst({
         where: and(eq(schema.chapterReforges.projectId, projectId), lt(schema.chapterReforges.chapter, state.chapter), ne(schema.chapterReforges.status, 'failed')),
         orderBy: [desc(schema.chapterReforges.chapter)],
@@ -351,7 +351,7 @@ function buildChapterReforgeGraph(services: ReforgeGraphServices) {
   }
 
   // Runs even for attention rows — later chapters need the discovered names either way. Conflicts
-  // keep the existing mapping: a name is never re-mapped once made (design §2).
+  // keep the existing mapping: a name is never re-mapped once made.
   async function mergeGlossary(state: ReforgeState) {
     const discovered = state.written?.discoveredNames ?? [];
     if (discovered.length === 0) return { nodeTrace: ['mergeGlossary'] };
