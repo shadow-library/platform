@@ -1,40 +1,54 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Button, Dialog, FormField, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { EyeIcon, EyeOffIcon, PlusIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { EyeIcon, EyeOffIcon, LockIcon, SearchIcon, TrashIcon } from '@/components/icons';
+import { useCollectionJump } from '@/components/Layout';
+import { CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import {
   type FactResponse,
   type ListEntityResponse,
   listFactsQueryOptions,
   useDeleteFactMutation,
-  useFactQuery,
   useListEntitiesQuery,
   useListFactsQuery,
   useRetractKnowledgeMutation,
   useRevealFactMutation,
   useUpsertFactMutation,
 } from '@/lib/apis';
+import {
+  backLabel,
+  countByState,
+  factAttachments,
+  factCaption,
+  type FactCategory,
+  type FactState,
+  factState,
+  filterFacts,
+  initialSpoilerState,
+  parseFactState,
+  sortFactsByKey,
+  type SpoilerState,
+  spoilerToggleLabel,
+  STATE_LABEL,
+} from '@/lib/canon-facts';
 import { relativeTime } from '@/lib/format';
 
 import styles from './canon-facts.module.css';
 
 interface FactsSearch {
+  state?: FactState;
   fact?: string;
 }
 
 export const Route = createFileRoute('/novels/$novelId/canon-facts')({
   validateSearch: (search: Record<string, unknown>): FactsSearch => ({
+    state: parseFactState(search.state),
     fact: typeof search.fact === 'string' && search.fact ? search.fact : undefined,
   }),
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listFactsQueryOptions(params.novelId)),
   component: CanonFactsScreen,
 });
-
-function isRevealed(fact: Pick<FactResponse, 'knowledge'>): boolean {
-  return fact.knowledge.length > 0;
-}
 
 function listToText(values?: string[] | null): string {
   return (values ?? []).join(', ');
@@ -215,159 +229,238 @@ function RevealDialog({ novelId, factKey, entities, open, onOpenChange }: Reveal
   );
 }
 
-interface FactDetailProps {
-  novelId: string;
+interface SpoilerBlockProps {
   factKey: string;
-  onEdit: (fact: FactResponse) => void;
+  text: string;
+  state: FactState;
 }
 
-function FactDetail({ novelId, factKey, onEdit }: FactDetailProps): React.JSX.Element {
-  const factQuery = useFactQuery(novelId, factKey);
-  const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
-  const retract = useRetractKnowledgeMutation(novelId, factKey);
-  const [spoilerShown, setSpoilerShown] = useState(false);
-  const [revealOpen, setRevealOpen] = useState(false);
+/** The concealed text is `aria-hidden`: a blur a screen reader reads straight through is decoration, not a spoiler guard. */
+function SpoilerBlock({ factKey, text, state }: SpoilerBlockProps): React.JSX.Element {
+  const [spoiler, setSpoiler] = useState<SpoilerState>(() => initialSpoilerState(state));
+  const label = spoilerToggleLabel(spoiler, factKey);
 
-  if (factQuery.isLoading) return <PaneLoader />;
-  if (factQuery.error) return <PaneError error={factQuery.error} />;
-  const fact = factQuery.data;
-  if (!fact) return <PaneLoader />;
+  return (
+    <section className={styles.spoilerBlock}>
+      <div className={styles.sectionLabel}>Truth · judge-only — never shown to the chapter writer</div>
+      {spoiler === 'shown' ? (
+        <div className={styles.spoilerRevealed}>
+          <p className={styles.spoilerText}>{text}</p>
+          <Button variant="ghost" size="sm" prefix={<EyeOffIcon size={14} />} aria-label={label} onClick={() => setSpoiler('concealed')}>
+            Hide spoiler
+          </Button>
+        </div>
+      ) : (
+        <button type="button" className={styles.spoilerHidden} aria-label={label} onClick={() => setSpoiler('shown')}>
+          <span className={styles.spoilerBlur} aria-hidden="true">
+            {text}
+          </span>
+          <span className={styles.spoilerCta} aria-hidden="true">
+            <EyeIcon size={14} /> Click to reveal spoiler
+          </span>
+        </button>
+      )}
+    </section>
+  );
+}
 
-  const revealed = isRevealed(fact);
-  const entities = entitiesQuery.data?.items ?? [];
+interface FactAsideProps {
+  novelId: string;
+  fact: FactResponse;
+  names: ReadonlyMap<string, string>;
+  onReveal: () => void;
+}
 
-  const doRetract = (entityKey: string): void => {
+function FactAside({ novelId, fact, names, onReveal }: FactAsideProps): React.JSX.Element {
+  const retract = useRetractKnowledgeMutation(novelId, fact.factKey);
+  const attachments = useMemo(() => factAttachments(fact, names), [fact, names]);
+
+  const doRetract = (entityKey: string, entityName: string): void => {
     retract.mutate(entityKey, {
-      onSuccess: () => toast.success(`Retracted ${entityKey}’s knowledge of “${fact.factKey}”`),
+      onSuccess: () => toast.success(`Retracted ${entityName}’s knowledge of “${fact.factKey}”`),
       onError: err => toast.danger(err.message),
     });
   };
 
   return (
     <>
-      <div className={styles.detailHead}>
-        <div className={styles.detailTitleWrap}>
-          <h2 className={styles.detailTitle}>{fact.factKey}</h2>
-          <StatusChip intent={revealed ? 'success' : 'warning'} dot>
-            {revealed ? `revealed to ${fact.knowledge.length}` : 'hidden'}
-          </StatusChip>
-        </div>
-        <div className={styles.spacer} />
-        <Button variant="ghost" onClick={() => onEdit(fact)}>
-          Edit
-        </Button>
-      </div>
-      <div className={`nf-scroll ${styles.paneScroll}`}>
-        <div className={styles.detailInner}>
-          <div className={styles.spoilerBlock}>
-            <div className={styles.sectionLabel}>Truth · judge-only — never shown to the chapter writer</div>
-            {spoilerShown ? (
-              <div className={styles.spoilerRevealed}>
-                <p className={styles.spoilerText}>{fact.text}</p>
-                <Button variant="ghost" size="sm" prefix={<EyeOffIcon size={14} />} onClick={() => setSpoilerShown(false)}>
-                  Hide spoiler
-                </Button>
-              </div>
-            ) : (
-              <button type="button" className={styles.spoilerHidden} onClick={() => setSpoilerShown(true)}>
-                <span className={styles.spoilerBlur}>{fact.text}</span>
-                <span className={styles.spoilerCta}>
-                  <EyeIcon size={14} /> Click to reveal spoiler
-                </span>
-              </button>
-            )}
-          </div>
-
-          {fact.constraintNote && (
-            <div>
-              <div className={styles.sectionLabel}>Behavioral constraint while hidden</div>
-              <p className={styles.para}>{fact.constraintNote}</p>
-            </div>
-          )}
-
-          <div className={styles.chips}>
-            {(fact.subjects ?? []).map(s => (
-              <StatusChip key={s} intent="neutral">
-                {s}
-              </StatusChip>
-            ))}
-            {fact.revealChapter != null && <StatusChip intent="info">planned reveal · ch. {fact.revealChapter}</StatusChip>}
-          </div>
-
-          {(fact.terms ?? []).length > 0 && (
-            <div>
-              <div className={styles.sectionLabel}>Leak-scan terms</div>
-              <div className={styles.chips}>
-                {(fact.terms ?? []).map(t => (
-                  <StatusChip key={t} intent="neutral">
-                    {t}
-                  </StatusChip>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.sectionHeadRow}>
-            <div className={styles.sectionLabel}>Reveal ledger</div>
-            <div className={styles.spacer} />
-            <Button variant="secondary" size="sm" prefix={<EyeIcon size={14} />} onClick={() => setRevealOpen(true)}>
-              Reveal to character
-            </Button>
-          </div>
-          {fact.knowledge.length === 0 ? (
-            <p className={styles.emptyLedger}>No character knows this yet — it stays out of every drafting pack until revealed.</p>
-          ) : (
-            <div className={styles.ledger}>
-              {fact.knowledge.map(entry => (
-                <div key={entry.entityKey} className={styles.ledgerRow}>
-                  <div className={styles.ledgerMain}>
-                    <span className={styles.ledgerName}>{entry.entityName}</span>
-                    <span className={styles.ledgerMeta}>
-                      ch. {entry.learnedInChapter} · {entry.source} · {relativeTime(entry.createdAt)}
-                    </span>
-                    {entry.note && <span className={styles.ledgerNote}>{entry.note}</span>}
-                  </div>
-                  <RowAction label={`Retract ${entry.entityName}’s knowledge`} danger onClick={() => doRetract(entry.entityKey)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
+      <section className={styles.asideBlock}>
+        <h2 className={styles.asideTitle}>Reveal ledger</h2>
+        <p className={styles.asideMeta}>{fact.revealChapter != null ? `Planned reveal · chapter ${fact.revealChapter}` : 'No planned reveal chapter'}</p>
+        {fact.knowledge.length === 0 ? (
+          <p className={styles.asideNote}>No character knows this yet — it stays out of every drafting pack until revealed.</p>
+        ) : (
+          <div className={styles.ledger}>
+            {fact.knowledge.map(entry => (
+              <div key={entry.entityKey} className={styles.ledgerRow}>
+                <div className={styles.ledgerMain}>
+                  <span className={styles.ledgerName}>{entry.entityName}</span>
+                  <span className={styles.ledgerMeta}>
+                    ch. {entry.learnedInChapter} · {entry.source} · {relativeTime(entry.createdAt)}
+                  </span>
+                  {entry.note && <span className={styles.ledgerNote}>{entry.note}</span>}
                 </div>
+                <RowAction label={`Retract ${entry.entityName}’s knowledge`} danger onClick={() => doRetract(entry.entityKey, entry.entityName)}>
+                  <TrashIcon size={13} />
+                </RowAction>
+              </div>
+            ))}
+          </div>
+        )}
+        <Button variant="secondary" size="sm" className={styles.asideAction} prefix={<EyeIcon size={14} />} onClick={onReveal}>
+          Reveal to character
+        </Button>
+      </section>
+
+      <section className={styles.asideBlock}>
+        <h2 className={styles.asideTitle}>Attached to</h2>
+        {attachments.length === 0 ? (
+          <p className={styles.asideNote}>This fact names no entity yet — add subjects so the leak scan knows who it belongs to.</p>
+        ) : (
+          <ul className={styles.attachments}>
+            {attachments.map(attachment => (
+              <li key={attachment.entityKey}>
+                {attachment.kind === 'linked' ? (
+                  <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ entity: attachment.entityKey }} className={styles.attachment}>
+                    <span className={styles.attachmentName}>{attachment.name}</span>
+                    <span className={styles.attachmentKey}>{attachment.entityKey}</span>
+                  </Link>
+                ) : (
+                  <span className={styles.attachment} data-missing="true">
+                    <span className={styles.attachmentKey}>{attachment.entityKey}</span>
+                    <span className={styles.attachmentNote}>no longer in the story bible</span>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  );
+}
+
+interface FactDetailProps {
+  novelId: string;
+  fact: FactResponse;
+  total: number | undefined;
+  filterState: FactState | undefined;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  onSelect: (factKey: string) => void;
+  onEdit: (fact: FactResponse) => void;
+  onDelete: (fact: FactResponse) => void;
+}
+
+function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, onEdit, onDelete }: FactDetailProps): React.JSX.Element {
+  const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
+  const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
+  const names = useMemo(() => new Map(entities.map(entity => [entity.entityKey, entity.name])), [entities]);
+  const [revealOpen, setRevealOpen] = useState(false);
+  const state = factState(fact);
+
+  return (
+    <>
+      <DetailPage
+        back={
+          <Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: filterState }}>
+            {backLabel(total)}
+          </Link>
+        }
+        identity={
+          <DetailPage.Identity title={<span className={styles.identityKey}>{fact.factKey}</span>}>
+            <StatusChip intent={state === 'revealed' ? 'success' : 'warning'} dot>
+              {state}
+            </StatusChip>
+          </DetailPage.Identity>
+        }
+        pager={<ItemPager ids={ids} currentId={fact.factKey} onSelect={onSelect} itemNoun="fact" jump={jump} />}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => onEdit(fact)}>
+              Edit
+            </Button>
+            <Tooltip content={`Delete ${fact.factKey}`}>
+              <IconButton variant="ghost" size="sm" aria-label={`Delete ${fact.factKey}`} icon={<TrashIcon size={15} />} onClick={() => onDelete(fact)} />
+            </Tooltip>
+          </>
+        }
+        aside={<FactAside novelId={novelId} fact={fact} names={names} onReveal={() => setRevealOpen(true)} />}
+        asideLabel={`${fact.factKey} reveal context`}
+      >
+        <SpoilerBlock key={fact.factKey} factKey={fact.factKey} text={fact.text} state={state} />
+
+        {fact.constraintNote && (
+          <DetailPage.Prose className={styles.constraint}>
+            <div className={styles.sectionLabel}>Behavioral constraint while hidden</div>
+            <p className={styles.para}>{fact.constraintNote}</p>
+          </DetailPage.Prose>
+        )}
+
+        {(fact.terms ?? []).length > 0 && (
+          <div className={styles.termsSection}>
+            <div className={styles.sectionLabel}>Leak-scan terms</div>
+            <div className={styles.chips}>
+              {(fact.terms ?? []).map(term => (
+                <StatusChip key={term} intent="neutral">
+                  {term}
+                </StatusChip>
               ))}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </DetailPage>
 
-      <RevealDialog novelId={novelId} factKey={factKey} entities={entities} open={revealOpen} onOpenChange={setRevealOpen} />
+      <RevealDialog novelId={novelId} factKey={fact.factKey} entities={entities} open={revealOpen} onOpenChange={setRevealOpen} />
     </>
   );
 }
 
 function CanonFactsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { fact: factParam } = Route.useSearch();
+  const { state: stateParam, fact: factParam } = Route.useSearch();
   const goSearch = Route.useNavigate();
   const factsQuery = useListFactsQuery(novelId);
-  const facts = useMemo(() => [...(factsQuery.data?.facts ?? [])].sort((a, b) => a.factKey.localeCompare(b.factKey)), [factsQuery.data]);
+  const facts = useMemo(() => sortFactsByKey(factsQuery.data?.facts ?? []), [factsQuery.data]);
+  const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<FactDialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FactResponse | undefined>();
-
-  const selectFact = (key?: string): Promise<void> => goSearch({ search: { fact: key } });
-  const selectedKey = factParam && facts.some(f => f.factKey === factParam) ? factParam : facts[0]?.factKey;
 
   const upsertFact = useUpsertFactMutation(novelId);
   const deleteFact = useDeleteFactMutation(novelId);
 
-  const doDelete = (): void => {
-    if (!deleteTarget) return;
-    deleteFact.mutate(deleteTarget.factKey, {
-      onSuccess: () => {
-        toast.success(`Deleted fact “${deleteTarget.factKey}”`);
-        setDeleteTarget(undefined);
-        if (deleteTarget.factKey === factParam) selectFact(undefined);
-      },
-      onError: err => toast.danger(err.message),
-    });
+  const activeState: FactCategory = stateParam ?? 'all';
+  const resolved = !factsQuery.isLoading && !factsQuery.error;
+  const total = resolved ? facts.length : undefined;
+
+  const counts = useMemo(() => countByState(facts), [facts]);
+  const visible = useMemo(() => filterFacts(facts, activeState, query), [facts, activeState, query]);
+  const byKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
+  const visibleIds = useMemo(() => (resolved ? visible.map(fact => fact.factKey) : undefined), [resolved, visible]);
+
+  const selected = factParam ? byKey.get(factParam) : undefined;
+  const selectFact = (factKey?: string): Promise<void> => goSearch({ search: { state: stateParam, fact: factKey } });
+  const pickState = (value: string): Promise<void> => goSearch({ search: { state: parseFactState(value) } });
+  const clearFilters = (): void => {
+    setQuery('');
+    void goSearch({ search: {} });
   };
+
+  const filtering = stateParam !== undefined || query.trim() !== '';
+  const jumpItems = useMemo(() => visible.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })), [visible]);
+  const allJumpItems = useMemo(() => (filtering ? facts.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })) : undefined), [filtering, facts]);
+  const jump = useCollectionJump(
+    resolved
+      ? {
+          collection: 'canon facts',
+          items: jumpItems,
+          filterLabel: stateParam ? STATE_LABEL[stateParam] : undefined,
+          allItems: allJumpItems,
+          currentId: factParam,
+          onSelect: key => void selectFact(key),
+        }
+      : null,
+  );
 
   const submit = (form: FactFormState): void => {
     const body = {
@@ -388,60 +481,20 @@ function CanonFactsScreen(): React.JSX.Element {
     });
   };
 
-  return (
-    <div className="nf-splitpane">
-      <div className="nf-rail">
-        <div className={styles.railHead}>
-          <div className={styles.railTitleRow}>
-            <span className={styles.railTitle}>Canon Facts</span>
-            <div className={styles.spacer} />
-            <Tooltip content="New fact">
-              <Button variant="ghost" size="sm" prefix={<PlusIcon />} onClick={() => setDialog({ mode: 'create', initial: emptyForm() })}>
-                New
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
-        <div className={`nf-scroll ${styles.railList}`}>
-          {factsQuery.isLoading && <PaneLoader />}
-          {factsQuery.error && <PaneError error={factsQuery.error} />}
-          {!factsQuery.isLoading && facts.length === 0 && <div className="nf-emptynote">No canon facts yet.</div>}
-          {facts.map(fact => {
-            const selected = fact.factKey === selectedKey;
-            const revealed = isRevealed(fact);
-            return (
-              <div
-                key={fact.id}
-                role="button"
-                tabIndex={0}
-                className={`nf-selrow ${styles.factRow}`}
-                data-active={selected || undefined}
-                onClick={() => selectFact(fact.factKey)}
-                onKeyDown={e => e.key === 'Enter' && selectFact(fact.factKey)}
-              >
-                <div className={styles.factBody}>
-                  <div className={styles.factName}>{fact.factKey}</div>
-                  <div className={styles.factSub}>{revealed ? `revealed to ${fact.knowledge.length}` : 'hidden'}</div>
-                </div>
-                <div className="nf-rowactions">
-                  <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+  const doDelete = (): void => {
+    if (!deleteTarget) return;
+    deleteFact.mutate(deleteTarget.factKey, {
+      onSuccess: () => {
+        toast.success(`Deleted fact “${deleteTarget.factKey}”`);
+        setDeleteTarget(undefined);
+        if (deleteTarget.factKey === factParam) selectFact(undefined);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
 
-      <div className="nf-detail">
-        {selectedKey ? (
-          <FactDetail key={selectedKey} novelId={novelId} factKey={selectedKey} onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })} />
-        ) : (
-          <div className="nf-pane-empty">The spoiler ledger — truths only the judge sees until a character earns them on-page. Select a fact to see its detail, or create one.</div>
-        )}
-      </div>
-
+  const dialogs = (
+    <>
       {dialog && <FactDialog open onOpenChange={next => !next && setDialog(null)} mode={dialog.mode} initial={dialog.initial} pending={upsertFact.isPending} onSubmit={submit} />}
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
@@ -457,6 +510,104 @@ function CanonFactsScreen(): React.JSX.Element {
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog>
-    </div>
+    </>
+  );
+
+  if (selected)
+    return (
+      <>
+        <FactDetail
+          novelId={novelId}
+          fact={selected}
+          total={total}
+          filterState={stateParam}
+          ids={visibleIds}
+          jump={jump}
+          onSelect={key => void selectFact(key)}
+          onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })}
+          onDelete={setDeleteTarget}
+        />
+        {dialogs}
+      </>
+    );
+
+  return (
+    <>
+      <CollectionPage
+        title="Canon Facts"
+        subtitle="The spoiler ledger — truths only the judge sees until a character earns them on-page."
+        total={total}
+        actions={
+          <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm() })}>
+            New fact
+          </Button>
+        }
+        filter={{ label: 'Filter canon facts', placeholder: 'Filter by key, subject or term…', value: query, onValueChange: setQuery }}
+        notice={
+          resolved &&
+          factParam && (
+            <Alert intent="warning" title="That canon fact is no longer in the ledger." action={{ label: 'Back to the directory', onClick: () => void selectFact(undefined) }}>
+              It was deleted, its key was changed, or the link was typed by hand.
+            </Alert>
+          )
+        }
+        segments={{
+          label: 'Reveal state',
+          value: activeState,
+          onValueChange: pickState,
+          items: [
+            { value: 'all', label: STATE_LABEL.all, count: facts.length },
+            { value: 'hidden', label: STATE_LABEL.hidden, count: counts.hidden },
+            { value: 'revealed', label: STATE_LABEL.revealed, count: counts.revealed },
+          ],
+        }}
+        empty={
+          <EmptyState
+            icon={<LockIcon size={24} />}
+            title="No canon facts yet"
+            description="A canon fact is a truth the judge holds back — the drafting model never sees it until a character earns it on-page. Write the first one and the leak scan starts guarding it."
+            actions={
+              <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm() })}>
+                New fact
+              </Button>
+            }
+          />
+        }
+      >
+        {factsQuery.isLoading ? (
+          <PaneLoader />
+        ) : factsQuery.error ? (
+          <PaneError error={factsQuery.error} />
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={<SearchIcon size={24} />}
+            title="Nothing matches"
+            description={`No ${activeState === 'all' ? '' : `${activeState} `}canon fact matches this filter.`}
+            actions={
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear the filter
+              </Button>
+            }
+          />
+        ) : (
+          <ul className={styles.rows}>
+            {visible.map(fact => (
+              <li key={fact.id} className={styles.row}>
+                <Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: stateParam, fact: fact.factKey }} className={styles.rowLink}>
+                  <span className={styles.rowKey}>{fact.factKey}</span>
+                  <StatusChip intent={factState(fact) === 'revealed' ? 'success' : 'warning'} dot>
+                    {factCaption(fact)}
+                  </StatusChip>
+                </Link>
+                <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
+                  <TrashIcon size={13} />
+                </RowAction>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CollectionPage>
+      {dialogs}
+    </>
   );
 }

@@ -7,11 +7,11 @@ interface VariantRule {
 
 const VARIANT_RULES: VariantRule[] = [
   { pattern: /^\/novels\/[^/]+\/overview\/?$/, variant: 'overview' },
-  { pattern: /^\/novels\/[^/]+\/(chapters|volumes|source)\/?$/, variant: 'rows' },
+  { pattern: /^\/novels\/[^/]+\/(chapters|volumes|source|canon-facts)\/?$/, variant: 'rows' },
   { pattern: /^\/novels\/[^/]+\/chat\/?$/, variant: 'chat' },
   { pattern: /^\/ideas\/[^/]+\/?$/, variant: 'chat' },
   { pattern: /^\/novels\/[^/]+\/story-bible\/?$/, variant: 'list' },
-  { pattern: /^\/novels\/[^/]+\/(canon-facts|review|proposals|runs|illustrations)\/?$/, variant: 'split' },
+  { pattern: /^\/novels\/[^/]+\/(review|proposals|runs|illustrations)\/?$/, variant: 'split' },
   { pattern: /^\/novels\/[^/]+\/(publish|settings|import-plan|rebrand|reforge|transform|translation)\/?$/, variant: 'form' },
   { pattern: /^\/(ideas)?\/?$/, variant: 'list' },
   { pattern: /^\/(settings|import)\/?$/, variant: 'form' },
