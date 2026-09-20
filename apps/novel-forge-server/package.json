@@ -8,10 +8,8 @@
     "dev": "bun run --watch src/main.ts",
     "test": "bun test --coverage --timeout 20000",
     "ai:smoke": "bun run tests/ai/ai-smoke.ts",
-    "ai:pull-models": "bun run tests/ai/ai-pull-models.ts",
     "eval:metrics": "bun run tests/eval/deterministic-metrics.ts",
     "eval:invariants": "bun run tests/eval/process-invariants.ts",
-    "test:ai:local": "bun test tests/ai/local/",
     "test:ai:unit": "bun test tests/ai/prompts.spec.ts tests/ai/model-router.spec.ts tests/ai/context-assembler.spec.ts",
     "test:ai:graph": "bun test tests/ai/workflow.spec.ts",
     "test:ai:tools": "bun test tests/ai/tool-registry.spec.ts"
@@ -48,7 +46,6 @@
     "@langchain/core": "^1.2.1",
     "@langchain/langgraph": "^1.4.7",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.4",
-    "@langchain/ollama": "^1.3.0",
     "@langchain/openai": "^1.5.3",
     "@shadow-library/app": "workspace:*",
     "@shadow-library/auth": "workspace:*",

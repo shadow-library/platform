@@ -70,10 +70,9 @@ describe('RetrievalService — unrestricted project', () => {
   });
 });
 
-describe.skip('IndexingService.backfill (rung-3, requires PG + Ollama)', () => {
+describe.skip('IndexingService.backfill (requires PG + Ollama)', () => {
   it('backfills missing chapter chunks and reports indexed/skipped counts', async () => {
     // Full integration test: requires a live Postgres instance and a running Ollama server.
-    // Run manually as part of the A10 local-LLM test suite.
   });
 });
 

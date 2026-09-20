@@ -67,7 +67,7 @@ interface OpenRouterImageResponse {
 const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review', 'audit', 'compact']);
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-// An explicitly resolved provider always wins: Unrestricted allowlist, the AI_PROFILE defaults and a per-project
+// An explicitly resolved provider always wins: Unrestricted allowlist, the role defaults and a per-project
 // pin all choose provider and model together, so a model id that also happens to sit in MODEL_REGISTRY
 // must not silently reroute that choice. The registry is only the fallback when no provider was resolved.
 export function resolveProvider(resolved: ResolvedModel): string {

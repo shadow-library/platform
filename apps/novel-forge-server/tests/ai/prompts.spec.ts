@@ -705,7 +705,7 @@ describe('Prompt modules', () => {
       for (const key of ['reforge-analyze-window', 'reforge-synthesize'] as const) {
         expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
         expect(PROMPT_REGISTRY[key].kind).toBe('analytical');
-        // No new AiRole: analysis reuses `extraction` so neither AI_PROFILE churns.
+        // No new AiRole: analysis reuses `extraction` so neither role-defaults map churns.
         expect(PROMPT_REGISTRY[key].role).toBe('extraction');
         expect(PROMPT_REGISTRY[key].cacheStrategy?.stableVars).toEqual(['stableContext']);
       }

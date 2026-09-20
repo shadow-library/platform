@@ -1,42 +1,59 @@
-import { Logger } from '@shadow-library/common';
+import '@server/bootstrap';
+
+import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+import { HumanMessage } from '@langchain/core/messages';
+import { Config, Logger } from '@shadow-library/common';
+
+import { type AiRole, PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
+import { ModelRouterService } from '@modules/ai/model-router.service';
+import { MODEL_MAP } from '@modules/ai/models';
+import { foundationPrompt } from '@modules/ai/prompts/bible-builder/foundation.prompt';
+import { judgePrompt } from '@modules/ai/prompts/judge.prompt';
+import { titlePrompt } from '@modules/ai/prompts/title.prompt';
+import { translateAuditPrompt } from '@modules/ai/prompts/translate-audit.prompt';
+import { translateChapterPrompt } from '@modules/ai/prompts/translate-chapter.prompt';
+import { translateSeedPrompt } from '@modules/ai/prompts/translate-seed.prompt';
+
+const SPEND_VAR = 'AI_SMOKE_SPEND';
+const ROLES: AiRole[] = ['bible', 'title', 'judge', 'generation', 'translate', 'translate', 'audit'];
+
+// Every rung sends a short pack and asks for a short answer; these bound one call generously.
+const INPUT_TOKENS_PER_CALL = 1500;
+const OUTPUT_TOKENS_PER_CALL = 700;
+
+function estimateCostUsd(): number {
+  return ROLES.reduce((total, role) => {
+    const entry = MODEL_MAP[PRODUCTION_DEFAULTS[role].model];
+    const input = ((entry?.inputPricePerMToken ?? 0) * INPUT_TOKENS_PER_CALL) / 1_000_000;
+    const output = ((entry?.outputPricePerMToken ?? 0) * OUTPUT_TOKENS_PER_CALL) / 1_000_000;
+    return total + input + output;
+  }, 0);
+}
+
+if (!process.env[SPEND_VAR]) {
+  const models = [...new Set(ROLES.map(role => `${role} → ${PRODUCTION_DEFAULTS[role].model}`))];
+  console.log('AI smoke not run — it makes real, billable calls through OpenRouter.');
+  console.log('');
+  console.log(`  ${ROLES.length} live model calls, roughly $${estimateCostUsd().toFixed(3)} on the platform key:`);
+  for (const model of models) console.log(`    ${model}`);
+  console.log('');
+  console.log(`  Run it with:  ${SPEND_VAR}=1 bun run ai:smoke`);
+  process.exit(0);
+}
+
+if (!Config.get('ai.openrouter.api.key')) {
+  console.error('AI_OPENROUTER_API_KEY is not set — the smoke check has no credential to spend.');
+  process.exit(1);
+}
 
 Logger.attachTransport('console:pretty');
 const logger = Logger.getLogger('Scripts', 'AiSmoke');
 
-const ollamaHost = process.env['OLLAMA_HOST'];
-
-if (!ollamaHost) {
-  console.log('OLLAMA_HOST not set — smoke test skipped');
-  process.exit(0);
-}
-
-// Select local-test profile before any config-aware code runs.
-// getProfileDefaults() reads process.env['AI_PROFILE'] at call time, so this takes effect
-// as long as it is set before the model router is used.
-process.env['AI_PROFILE'] = 'local-test';
-
-// Config must be loaded before any Config.get() calls in the app.
-await import('@server/bootstrap');
-
-const { Config } = await import('@shadow-library/common');
-// Override the ollamaHost config cache entry to point at the test instance.
-(Config as unknown as { cache: Map<string, unknown> }).cache.set('ai.ollamaHost', ollamaHost);
-
-const { BaseCallbackHandler } = await import('@langchain/core/callbacks/base');
-const { ModelRouterService } = await import('@server/modules/ai/model-router.service');
-const { judgePrompt } = await import('@server/modules/ai/prompts/judge.prompt');
-const { titlePrompt } = await import('@server/modules/ai/prompts/title.prompt');
-const { foundationPrompt } = await import('@server/modules/ai/prompts/bible-builder/foundation.prompt');
-const { translateSeedPrompt } = await import('@server/modules/ai/prompts/translate-seed.prompt');
-const { translateChapterPrompt } = await import('@server/modules/ai/prompts/translate-chapter.prompt');
-const { translateAuditPrompt } = await import('@server/modules/ai/prompts/translate-audit.prompt');
-
-// Minimal no-op telemetry — smoke test does not need DB writes.
 class SmokeNoop extends BaseCallbackHandler {
   name = 'smoke-noop';
 }
 
-// Minimal DatabaseService stub — smoke test runs deterministic roles with cache disabled (always misses).
+// Deterministic roles with cache disabled always miss, so the stub only has to answer a lookup and swallow a write.
 const stubDbService = {
   getPostgresClient: () => ({ query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) }),
 };
@@ -47,7 +64,7 @@ const router = new ModelRouterService(
   { defaultsFor: async () => undefined } as never,
 );
 
-logger.info('AI smoke test starting', { ollamaHost, profile: 'local-test' });
+logger.info('AI smoke test starting', { calls: ROLES.length, estimatedCostUsd: Number(estimateCostUsd().toFixed(3)) });
 
 const results: { test: string; passed: boolean; detail?: string }[] = [];
 
@@ -94,7 +111,6 @@ try {
 }
 
 try {
-  const { HumanMessage } = await import('@langchain/core/messages');
   const llm = await router.chatFor('generation');
   const response = await llm.invoke([new HumanMessage('Write one sentence of fantasy prose.')]);
   const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);

@@ -26,7 +26,7 @@ Most LangChain/LangGraph/LlamaIndex messes come from letting the libraries overl
 
 **Why each library earns its place:**
 
-- **LangChain** — one abstraction over four providers (Anthropic, OpenAI, xAI, Ollama) with per-role routing, `withStructuredOutput(zod)`, `withRetry`, and a callback seam that writes telemetry without touching business code. Rewriting this per-provider is the alternative, and it is worse.
+- **LangChain** — one abstraction over every hosted model, all reached through OpenRouter's OpenAI-compatible endpoint, with per-role routing, `withStructuredOutput(zod)`, `withRetry`, and a callback seam that writes telemetry without touching business code. Rewriting this per-provider is the alternative, and it is worse.
 - **LangGraph** — durable execution. With `@langchain/langgraph-checkpoint-postgres`, a crash inside chapter 7's third repair attempt resumes at the judge node with the repaired prose intact instead of re-paying the drafting call. Conditional edges make the judge-verdict routing, patch-vs-rewrite fallback, and attempt budgets explicit topology — visible and testable — instead of `while` loops.
 - **LlamaIndex.TS** — ingestion pipelines (chunking + metadata + embedding) and metadata-filtered retrievers over two logical pgvector indexes. Used strictly below the LLM line; synthesis belongs to LangChain. This prevents two competing LLM abstractions in one codebase.
 
@@ -45,7 +45,7 @@ Most LangChain/LangGraph/LlamaIndex messes come from letting the libraries overl
 ```
 src/modules/ai/
   ai.module.ts                  DI module wiring everything below
-  defaults.ts  models.ts        role→model profiles, capability flags, AI_PROFILE seam
+  defaults.ts  models.ts        role→model defaults, per-project overrides
   model-router.service.ts       chatFor(role) + structured() repair ladder
   telemetry.handler.ts          LangChain callback → model_calls
   context/                      ContextAssembler + catalog + ref resolution + sections + token budget
@@ -405,8 +405,6 @@ Every structured call runs this ladder, implemented **once** in `ModelRouterServ
 3. Second failure ⇒ tolerant extraction (first balanced `{…}` block) → Zod parse.
 4. Still failing ⇒ `AiResponseError` → `AI_001`; the raw output is already persisted in `model_calls` (trace-first: raw output is written _before_ parsing).
 
-For prompt-directive providers (some Ollama models) step 1 is a JSON directive appended to the prompt; steps 2–4 are identical. Cost: at most one extra call, only on failure — the insurance that matters most for local models.
-
 Subprocess CLI providers (Claude Code / Codex CLIs as LLM backends via subscriptions) were considered but never implemented — every hosted call instead routes through the OpenRouter-compatible endpoint, and `AI_OPENROUTER_API_URL`/`ai.openrouter.api.url` is the seam for pointing that leg at a subscription-backed in-cluster gateway speaking the same protocol.
 
 **Zod discipline:** port every Python JSON schema to Zod **with the `.describe()` texts preserved** (descriptions steer the model). Add `z.enum` for closed sets, `.min(1)` on prose, and cross-field refinements only where the Python code enforced them post-hoc. Schemas are the single source for `withStructuredOutput`, output validation, mock fixtures, and DTO alignment. The outline schema adds `requiredContext: string[]` per brief, with a `.describe()` instructing selection from the catalog only, most-important first; it is post-validated against the catalog — invented refs are dropped and logged, and ordering is preserved (it doubles as the eviction priority, §3.5).
@@ -499,7 +497,7 @@ The same shape covers every reviewable artifact: continuity proposals (propose �
 
 ### 7.3 Embedding and retrieval strategy
 
-- **Embedding model:** `ollama/qwen3-embedding:8b`, dim 1024 (shared `EMBEDDING_DIM` constant; a dim change is a migration, not a runtime branch). Tests use `qwen3-embedding:0.6b` truncated to 1024 — same family, same dimension path.
+- **Embedding model:** `ollama/qwen3-embedding:8b`, dim 1024 (shared `EMBEDDING_DIM` constant; a dim change is a migration, not a runtime branch).
 - **Retrieval:** `VectorIndexRetriever` with metadata filters; `retrieve(projectId, query, { index, k, excludeIsolated: true })` returns `{ text, score, metadata }[]`. No query engines, no synthesis — retrieval only.
 - **Exclusions:** isolated chapters (`isolated = true`) are excluded from prose retrieval. Unrestricted projects retrieve normally — embeddings have no content policy.
 
@@ -515,62 +513,48 @@ Nowhere else. Drafting never retrieves — its context is fully declared by the 
 
 ---
 
-## 8. Local LLM Testing
+## 8. Model Testing
 
-### 8.1 The four-rung pyramid
+### 8.1 The two-rung pyramid
 
 Verify that graphs route, tools bind, schemas parse, context assembles, and persistence lands — with zero paid tokens. Each rung tests only what the rung below cannot:
 
-| Rung                         | Model                    | Speed   | Proves                                                                   |
-| ---------------------------- | ------------------------ | ------- | ------------------------------------------------------------------------ |
-| 1. Mocked router             | none (scripted fixtures) | ms      | business logic, graph transitions, persistence, idempotency              |
-| 2. Fake graph nodes          | none                     | ms      | graph topology in isolation (edges, state merging)                       |
-| 3. Local LLM integration     | Ollama                   | sec–min | real tokenization / JSON quirks / tool-call formats survive the plumbing |
-| 4. Paid smoke (manual, rare) | prod models              | —       | provider-specific structured output + refusal behavior                   |
+| Rung                | Model                    | Speed | Proves                                                      |
+| ------------------- | ------------------------ | ----- | ----------------------------------------------------------- |
+| 1. Mocked router    | none (scripted fixtures) | ms    | business logic, graph transitions, persistence, idempotency |
+| 2. Fake graph nodes | none                     | ms    | graph topology in isolation (edges, state merging)          |
 
-Rungs 1–2 run in CI on every commit. Rung 3 runs locally and nightly (needs an Ollama host; skip-with-warning when absent, never red). Rung 4 is a hand-run script, never CI.
+Both run in CI on every commit. Above them sits `bun run ai:smoke` — a hand-run script, never CI, that spends real money and therefore refuses to run unless `AI_SMOKE_SPEND` is set, printing the call count and an estimated cost instead.
 
-### 8.2 Runtime and recommended models
+There is no offline model rung: every LLM call routes through OpenRouter, so no local model can stand in for a production one. Embeddings are the sole exception and still run on Ollama (§7).
 
-- **Runtime: Ollama** (primary) — it is already a first-class production provider, so the test path _is_ a production path. **LM Studio** is a supported developer-convenience alternative (same OpenAI-compatible API surface); nothing in the test suite depends on which one serves the model.
-- **Chat model:** `qwen3:8b` — good JSON + native tool-calling in Ollama, fits consumer hardware. Fast lane: `qwen3:4b` or `llama3.2:3b` where quality is irrelevant. **Pin exact tags** in the test profile so results don't drift with `latest`.
-- **Embedding model:** `qwen3-embedding:0.6b` truncated to 1024 dims — same family and dimension as production, ~13× smaller.
-- **Determinism:** `temperature: 0`, fixed `seed`, pinned `num_ctx`. This is repeatable-ish, not deterministic — hence the rule: **rung 3 asserts shape, not content.**
+**No test ever monkey-patches a provider SDK** — `ModelRouterService` is the single seam, and the scripted router replaces it wholesale. Per-project config overrides still apply on top (itself a test case).
 
-### 8.3 The `AI_PROFILE` seam
-
-One env var selects the role→model profile at bootstrap: `AI_PROFILE=prod | local-test | mock`. `local-test` maps every role to the pinned Ollama models; `mock` short-circuits `ModelRouterService` to the scripted router. **No test ever monkey-patches a provider SDK** — the router is the single seam. Per-project config overrides still apply on top (itself a test case).
-
-### 8.4 Mocked model testing (rung 1)
+### 8.2 Mocked model testing (rung 1)
 
 `FakeModelRouter implements ModelRouterService`: `enqueue(promptKey, output | Error)` FIFO per key, plus `defaultFor(promptKey, factory)`. Outputs are **built from the real Zod schemas**, so a schema change breaks fixtures loudly. It records every call for spy assertions ("no Anthropic model constructed for an Unrestricted project"). For tool-using chains, the fake returns scripted `tool_calls` messages so the loop executes **real handlers** against the test DB — tool handlers are always real; only the model is fake.
 
-### 8.5 What each test class covers
+### 8.3 What each test class covers
 
 - **Context routing tests (rung 1):** catalog render golden; outline schema drops invented refs and preserves ordering; ref resolution (fresh content after a canon edit, unknown-ref skip → `unresolvedRefs`, zero-ref legacy fallback); per-purpose pack goldens asserting the §3.4 matrix — the generation pack contains the serial core + resolved refs and _nothing else_.
 - **Graph testing (rung 2):** build each `StateGraph` with fake node functions; assert topology — contradiction routes to repair only when `autoFix`; patch-uniqueness failure routes to rewrite; repeated finding early-stops; budget exhaustion ⇒ `acceptAsIs`; **checkpoint-resume**: kill between nodes, re-invoke same `thread_id`, assert `draftChapter` executed once.
 - **Tool testing (rung 1, real handlers):** per tool — happy path, projectId isolation (cannot see project B), arg-validation error string, call budget, output truncation, `tool_calls` audit rows.
-- **Retrieval testing (rung 3-lite: real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; isolated chapters excluded; Unrestricted projects retrieve; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
-- **Structured output testing:** schema fixtures (rung 1: ok/repaired/extracted/`AI_001` ladder paths, judge normalization corners) plus a rung-3 **torture test**: run each schema 5× against the local model, record parse/repair/fail counts to a report file — a regression tripwire, not a hard gate.
-- **End-to-end workflow (rung 3, ~6 scenarios):** (1) seed-from-brief on a 3-sentence brief ⇒ every bible section has rows, all Zod-parsed; (2) generate chapter 1 of the micro-project ⇒ prose 300+ words, valid continuation state, judge returns a verdict; (3) judge a fixture draft that kills an already-dead character ⇒ hard assertion: verdict parses; soft assertion (logged, non-failing): verdict is contradiction; (4) fix-loop on a planted unique find-string ⇒ patch applies byte-identically outside the edit; (5) judge tool loop against seeded canon ⇒ valid `tool_calls` rows, no crash, final verdict parses; (6) the torture report.
-- **Smoke test:** `bun run ai:smoke` — one end-to-end micro-novel on Ollama: seed → plan → approve → generate 2 chapters (autofix) → feedback + revise → approve → finalize both; assert canon rows, `lore_chunks`, `model_calls`/`tool_calls` populated, checkpoints pruned; print a run report (tokens, latency, parse stats).
+- **Retrieval testing (real embedder, no chat model):** seed 3 chapters + lore; prose search returns the right chapter; lore search returns the right entity; isolated chapters excluded; Unrestricted projects retrieve; edit-driven re-embed (`sourceUpdatedAt` newer ⇒ refresh).
+- **Structured output testing:** schema fixtures (rung 1: ok/repaired/extracted/`AI_001` ladder paths, judge normalization corners).
+- **Smoke test:** `bun run ai:smoke` — one `router.structured` call per core prompt (bible foundation, title, judge, a generation chat turn, and the three translation rungs chained seed → chapter → audit) against the production model map, asserting shape only. It is the one check that proves a hosted model still honours the schemas it is judged against, which is what the structured-output incident turned on.
 
-**Capability flags** make weak models a tested feature, not a failure mode: `models.ts` entries carry `capabilities: { tools: boolean, structured: 'native' | 'json_directive' }`; verification nodes and the repair ladder branch on them, and tests assert both branches.
+### 8.4 Fixtures and commands
 
-### 8.6 Fixtures and commands
+`scripts/seed-ai-fixtures.ts` builds the **micro-project**: 1 project, minimal filled bible (1 approved volume, 4 characters, 6 world facts, 2 threads), 2 finalized chapters with summaries + continuation state, briefs for chapters 3–4 (with `contextRefs`) — small enough to keep every pack cheap, rich enough that every assembler section is non-empty. Contradictory / patchable / title-less fixture drafts live under `tests/fixtures/ai/`.
 
-`scripts/seed-ai-fixtures.ts` builds the **micro-project**: 1 project, minimal filled bible (1 approved volume, 4 characters, 6 world facts, 2 threads), 2 finalized chapters with summaries + continuation state, briefs for chapters 3–4 (with `contextRefs`) — small enough for any local model's window, rich enough that every assembler section is non-empty. Contradictory / patchable / title-less fixture drafts live under `tests/fixtures/ai/`.
-
-| Command                     | Runs                                             | Needs                             |
-| --------------------------- | ------------------------------------------------ | --------------------------------- |
-| `bun test`                  | everything except `tests/ai/local`               | template DB                       |
-| `bun run test:ai:unit`      | prompts, schemas, context, router                | template DB                       |
-| `bun run test:ai:graph`     | topology + checkpoint resume                     | template DB                       |
-| `bun run test:ai:tools`     | registry, handlers, isolation, audit             | template DB                       |
-| `bun run test:ai:retrieval` | both indexes round-trip, filters, re-embed       | template DB + Ollama (embed only) |
-| `bun run test:ai:local`     | the 6 rung-3 scenarios, serialized               | Ollama, pinned models             |
-| `bun run ai:smoke`          | end-to-end micro-novel                           | Ollama, `AI_PROFILE=local-test`   |
-| `bun run ai:pull-models`    | pulls pinned test models, clear error if missing | Ollama                            |
+| Command                     | Runs                                       | Needs                                     |
+| --------------------------- | ------------------------------------------ | ----------------------------------------- |
+| `bun test`                  | everything                                 | template DB                               |
+| `bun run test:ai:unit`      | prompts, schemas, context, router          | template DB                               |
+| `bun run test:ai:graph`     | topology + checkpoint resume               | template DB                               |
+| `bun run test:ai:tools`     | registry, handlers, isolation, audit       | template DB                               |
+| `bun run test:ai:retrieval` | both indexes round-trip, filters, re-embed | template DB + Ollama (embed only)         |
+| `bun run ai:smoke`          | the core prompts against real models       | OpenRouter key, `AI_SMOKE_SPEND=1`, money |
 
 ---
 
@@ -603,7 +587,7 @@ Rules that make this work:
 2. `GET /runs/:runId` → failing node + error class + node trace (timings expose stalls vs errors).
 3. `GET /runs/:runId/model-calls?raw=true` → the raw model output that failed parse/repair (always there, even for `AI_001`).
 4. `GET /projects/:id/context/preview?chapter=n` (or the run's persisted pack) → exactly what the model saw; the manifest shows what was evicted or truncated.
-5. Reproduce locally with `AI_PROFILE=local-test` + the seeded state, or re-invoke the run to resume from checkpoint after an infra fix.
+5. Re-invoke the run to resume from checkpoint after an infra fix.
 
 Every step is an API call over Postgres data — no grepping process logs to reconstruct what happened.
 
@@ -613,7 +597,7 @@ Every step is an API call over Postgres data — no grepping process logs to rec
 
 Prerequisites: scaffold, schema, domain CRUD, and idempotent persistence are already in place. Each phase below ends green (`bun scripts/verify.ts apps/novel-forge-server` — format + lint + type-check + test); one commit per phase. Dependencies: A1 → A2/A3 (parallel-safe) → A4/A5/A6 → A7 → A8/A9 → A10 → A11.
 
-New dependencies (installed in A1–A5 as needed): `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/openai`, `@langchain/xai`, `@langchain/ollama`, `@langchain/langgraph`, `@langchain/langgraph-checkpoint-postgres`, `llamaindex`, `@llamaindex/postgres`, `zod`, `js-tiktoken`.
+New dependencies (installed in A1–A5 as needed): `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/openai`, `@langchain/langgraph`, `@langchain/langgraph-checkpoint-postgres`, `llamaindex`, `@llamaindex/postgres`, `zod`, `js-tiktoken`.
 
 **Phase A1 — AI data model.** _Objective:_ every AI table exists before any AI code (you cannot debug what you cannot see).
 _Create:_ `src/database/schemas/{workflow-runs,model-calls,tool-calls,context-packs,draft-revisions,user-feedback,lore-chunks}.ts`; Drizzle migration incl. `lore_chunks` HNSW; `PostgresSaver.setup()` call in the migrate script; checkpoint-janitor query stub.
@@ -627,7 +611,7 @@ _Result:_ every prompt renders against the micro-fixture; `AUTHORING_STYLE` pres
 _Tests:_ render goldens per prompt; schema fixtures (known-good and known-bad outputs, incl. invented-ref dropping).
 
 **Phase A3 — Model router, telemetry, repair ladder.** _Objective:_ `ModelRouterService.chatFor(role)` + `structured()` + `model_calls` writing.
-_Create:_ `src/modules/ai/{models,defaults,model-router.service,telemetry.handler}.ts`, provider constructors, `AI_PROFILE` bootstrap key, `FakeModelRouter` test double.
+_Create:_ `src/modules/ai/{models,defaults,model-router.service,telemetry.handler}.ts`, provider constructors, `FakeModelRouter` test double.
 _Result:_ role-resolution precedence matrix passes (unrestricted allowlist, forceProvider, env gating); parse-fail fixture yields `repaired` then `AI_001` with raw output persisted first.
 _Tests:_ router precedence; repair ladder (ok/repaired/extracted/fail); isolation spy tests.
 
@@ -662,10 +646,10 @@ _Create:_ generate/extract job executors (one run per chapter, `progress` from r
 _Result:_ kill mid-run → restart → resumes from the failed node, not the chapter; progress queryable throughout; concurrency policy holds.
 _Tests:_ jobs suite + resume spec.
 
-**Phase A10 — Local LLM harness.** _Objective:_ rung 3 exists.
-_Create:_ `tests/ai/local/*`, `scripts/{seed-ai-fixtures,ai-smoke,ai-pull-models}.ts`, `local-test` profile, nightly CI job (skip-with-warning without `OLLAMA_HOST`).
-_Result:_ `bun run ai:smoke` completes an end-to-end micro-novel on Ollama; torture report produced; capability-flag fallback branches tested.
-_Tests:_ the 6 rung-3 scenarios.
+**Phase A10 — Paid smoke script.** _Objective:_ one hand-run check against the models production actually uses.
+_Create:_ `tests/ai/ai-smoke.ts`, gated on `AI_SMOKE_SPEND`.
+_Result:_ `bun run ai:smoke` drives the core prompts through `router.structured` against the production model map and reports per-rung pass/fail.
+_Tests:_ none — the script is the test, and it is never run in CI.
 
 **Phase A11 — Hardening and docs.** _Objective:_ close the gaps; ship the long tail.
 _Tasks:_ sweep test coverage of the known failure modes (budget edges, tier leaks, ref-resolution corners, judge normalization corners, repair caps); wire all commands into CI; `/ai-usage` polish; LangSmith env seam; update `README.md`/`CLAUDE.md` with architecture, commands, env keys, and the §9.2 debugging playbook.

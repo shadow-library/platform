@@ -91,11 +91,11 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] A7 — LangGraph workflows + WorkflowRunService (A7, §2)
 - [x] A8 — Human review API: feedback/approve/revisions/review-queue/runs endpoints (A8, §6)
 - [x] A9 — Job executors, crash recovery, checkpoint janitor (A9)
-- [x] A10 — Local LLM test harness: Ollama rung-3 suite + `ai:smoke` (A10, §8)
+- [x] A10 — Paid smoke script: `ai:smoke`, opt-in behind `AI_SMOKE_SPEND` (A10, §8). The Ollama rung-3 suite it originally shipped with was deleted with the LLM-path Ollama removal (`docs/ollama-removal-design.md` P5).
 - [x] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
 - [x] M6 — Source pipeline: extract, consolidate, assets, skeleton (migration Phase 6)
 - [x] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
-- [x] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
+- [x] M8 — Final verification against migration §12 checklist + design-doc §8.4 command table
 - [x] R1 — Refinement schema & error codes: `arcs`, `chat_sessions`, `chat_messages`, `refinement_proposals` tables + `volumes`/`briefs` column additions, enums, `ARC_`/`CHT_`/`RFN_`/`PRM_` codes, `content-hash` util (refinement §3). Verify: migration applies to template DB, schema tests green.
 - [x] R2 — Proposal apply engine (no AI): op registry, baseline conflict 409 → `conflicted`, staleness propagation, supersession, proposal endpoints (refinement §6). Verify: transaction tests incl. rollback.
 - [x] R3 — Arc module & gates: arc CRUD/approve, `targetChapterCount` volume approve with cumulative chapter mapping, generation precheck (refinement §4, §8). Verify: gate-matrix tests (arc-less vs arc-bearing volumes).

@@ -14,10 +14,9 @@ Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 | `SERVER_PORT`           | `8080`                         | HTTP listen port                                          |
 | `SERVER_HOST`           | `0.0.0.0`                      | HTTP listen host                                          |
 | `DATABASE_POSTGRES_URL` | —                              | PostgreSQL connection URL (required)                      |
-| `AI_PROFILE`            | `production`                   | `production` or `local-test` (Ollama-only)                |
 | `AI_OPENROUTER_API_KEY` | —                              | OpenRouter key — every hosted model, chat and image alike |
 | `AI_OPENROUTER_API_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL (or in-cluster gateway)               |
-| `AI_OLLAMA_HOST`        | `http://localhost:11434`       | Ollama server URL                                         |
+| `AI_OLLAMA_HOST`        | `http://localhost:11434`       | Ollama server URL — embeddings only                       |
 | `AI_EMBEDDING_MODEL`    | `qwen3-embedding:8b`           | Embedding model for vector indexes                        |
 | `AI_LANGSMITH_API_KEY`  | —                              | LangSmith API key (enables tracing when set)              |
 | `STORAGE_DRIVER`        | `local`                        | Storage driver (`local` only currently)                   |
@@ -30,11 +29,9 @@ Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 test:ai:unit      # Prompt, model-router, and context-assembler unit tests
 test:ai:graph     # LangGraph workflow tests
 test:ai:tools     # Tool registry tests
-test:ai:local     # Ollama local integration tests (requires Ollama)
 
-# AI utilities
-ai:smoke          # Smoke test against all configured providers
-ai:pull-models    # Pull required Ollama models
+# AI utilities — AI_SMOKE_SPEND=1 bun run ai:smoke
+ai:smoke          # Hand-run check of the core prompts against real, billable models
 ```
 
 ## API Overview
@@ -110,15 +107,6 @@ All routes are prefixed `/api/v1`.
 
 ## Development Notes
 
-### AI_PROFILE
-
-Set `AI_PROFILE=local-test` to route all AI calls to Ollama instead of cloud providers. Requires Ollama running locally with models pulled:
-
-```bash
-bun run ai:pull-models
-bun run dev
-```
-
 ### Template DB for tests
 
 Tests use a `_template` database to spin up isolated per-test databases without running migrations each time:
@@ -134,7 +122,7 @@ bun test
 
 ### Model routing
 
-The model router (`src/modules/ai/model-router.service.ts`) selects a model per generation role (`generation`, `judge`, `fix`, `extraction`, etc.). Per-project overrides are stored in `projects.config.models`. The `AI_PROFILE=local-test` seam redirects all roles to Ollama models.
+The model router (`src/modules/ai/model-router.service.ts`) selects a model per generation role (`generation`, `judge`, `fix`, `extraction`, etc.). Per-project overrides are stored in `projects.config.models`. Every LLM call routes through OpenRouter; the one Ollama model left in the registry is the embedder.
 
 ### Workflow architecture
 
