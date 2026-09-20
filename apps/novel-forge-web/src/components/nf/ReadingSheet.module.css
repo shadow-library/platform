@@ -1,0 +1,19 @@
+/* Doubled to outrank ui's own `.panel[data-size]` max-width, which CSS-module import order does not settle. */
+.sheet.sheet[data-size] {
+  max-width: 640px;
+}
+
+.prose {
+  font-size: var(--sh-text-body);
+  line-height: 1.7;
+  color: var(--sh-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.placeholder {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-style: italic;
+  color: var(--sh-text-tertiary);
+}

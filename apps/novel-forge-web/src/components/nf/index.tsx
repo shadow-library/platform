@@ -9,8 +9,11 @@ export { CollectionPage, type CollectionFilter, type CollectionPageProps, type C
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
 export { DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { FieldCard, type FieldCardProps } from './FieldCard';
 export { IdeaRename } from './IdeaRename';
 export { ItemPager, type ItemPagerJump, type ItemPagerProps } from './ItemPager';
+export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';
+export { SidePanel, type SidePanelProps } from './SidePanel';
 export { LookupTrace } from './LookupTrace';
 export { Markdown } from './Markdown';
 export { INHERIT_MODEL, type ModelKind, ModelPicker } from './ModelPicker';
