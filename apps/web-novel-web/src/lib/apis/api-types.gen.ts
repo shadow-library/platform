@@ -531,6 +531,8 @@ export interface components {
     NovelUpsertBody: {
       /** @description Required. The publisher's own stable id — it, not the slug, identifies the novel, so a push under a new slug renames it rather than publishing a second one. */
       sourceRef: string;
+      /** @description Per-project publish token, bound trust-on-first-use. Optional for wire compatibility; once a novel is bound, a push carrying a different token is refused. Defense-in-depth that hardens the guessable sourceRef — not a full guarantee against a publisher-side authorization gap. */
+      publishToken?: string;
       title: string;
       /** @description The work's own author, as the reader should see them. Omit when the publisher does not know it; readers fall back to their own placeholder. */
       originalAuthor?: string;
