@@ -12,7 +12,7 @@ const message = (ordinal: number): ListChatMessagesResponse['messages'][number] 
   createdAt: '2026-09-12T19:00:00.000Z',
 });
 const pending = { runId: 'r1', graph: 'ideation-turn', startedAt: '2026-09-12T19:00:00.000Z' };
-const failed = { runId: 'r1', graph: 'ideation-turn', failedAt: '2026-09-12T19:00:01.000Z', code: 'AI_007', message: null };
+const failed = { runId: 'r1', graph: 'ideation-turn', status: 'failed' as const, endedAt: '2026-09-12T19:00:01.000Z', code: 'AI_007', message: null };
 
 function transcript(ordinals: number[], turns: Partial<ListChatMessagesResponse> = {}): ListChatMessagesResponse {
   return { messages: ordinals.map(message), pendingTurn: null, failedTurn: null, ...turns };

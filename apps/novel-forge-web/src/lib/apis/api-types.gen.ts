@@ -4415,7 +4415,7 @@ export interface components {
       messages: components['schemas']['ChatMessageResponse'][];
       /** @description Present while a chat turn is running for this session; null otherwise. */
       pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
-      /** @description Present when the last turn failed and left the transcript unanswered. */
+      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
       failedTurn?: components['schemas']['FailedTurnResponse'] | null;
     };
     ChatMessageResponse: {
@@ -4531,21 +4531,25 @@ export interface components {
        */
       startedAt: string;
     };
-    /** @description The turn that died on a transcript still ending in an unanswered user message, so a reload shows the failure instead of a silent thread. */
+    /** @description The turn that died or was stopped, on a transcript still ending in an unanswered user message, so a reload shows why instead of a silent thread. `status: 'cancelled'` is the author stopping the turn deliberately — terminal and not a failure, so the client must not offer the same retry affordance it offers a failure. */
     FailedTurnResponse: {
       runId: string;
       graph: string;
+      /** @description Whether the run failed on its own or was cancelled by the author. */
+      status: components['schemas']['ChatTurnOutcome'];
       /** Format: date-time */
-      failedAt: string;
-      /** @description Application error code, when the failure carried one. */
+      endedAt: string;
+      /** @description Application error code, when the failure carried one; never present for a cancelled run. */
       code?: string | null;
       message?: string | null;
     };
+    /** @enum {string} */
+    ChatTurnOutcome: 'failed' | 'cancelled';
     /** @description Whether a session’s turn is still running and how far its transcript has got — cheap enough to poll while a turn runs. */
     ChatTurnStatusResponse: {
       /** @description Present while a chat turn is running for this session; null otherwise. */
       pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
-      /** @description Present when the last turn failed and left the transcript unanswered. */
+      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
       failedTurn?: components['schemas']['FailedTurnResponse'] | null;
       /** @description Ordinal of the newest message in the transcript; 0 when it is empty. */
       lastOrdinal: number;
@@ -15812,6 +15816,7 @@ export type StudioReadinessPayloadResponse = components['schemas']['StudioReadin
 export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
+export type ChatTurnOutcome = components['schemas']['ChatTurnOutcome'];
 export type ChatTurnStatusResponse = components['schemas']['ChatTurnStatusResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
