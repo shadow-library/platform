@@ -1,8 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { Fragment, useState } from 'react';
-import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { Fragment, useMemo, useState } from 'react';
+import { Alert, Button, Checkbox, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { ProposalsIcon } from '@/components/icons';
+import { useCollectionJump } from '@/components/Layout';
+import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   listProposalsQueryOptions,
   type ProposalResponse,
@@ -15,11 +17,41 @@ import {
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 import { modelLabel } from '@/lib/model-defaults';
+import {
+  applyButtonLabel,
+  backLabel,
+  type ChangeOp,
+  changeSetCaption,
+  countByFilter,
+  defaultDeclined,
+  FILTER_LABEL,
+  filterProposals,
+  isGuardedOp,
+  NEVER_AUTO_NOTE,
+  nextAfterDecision,
+  opLabel,
+  parseProposalFilter,
+  proposalDisposition,
+  type ProposalFilter,
+  proposalIds,
+  proposalMeta,
+  proposalTitle,
+  selectedOpIndexes,
+} from '@/lib/proposals';
 
 import styles from './proposals.module.css';
 
+interface ProposalsSearch {
+  filter?: ProposalFilter;
+  proposal?: string;
+}
+
 export const Route = createFileRoute('/novels/$novelId/proposals')({
-  loader: ({ context, params }) => context.queryClient.prefetchQuery(listProposalsQueryOptions(params.novelId, { limit: 100, status: 'pending' })),
+  validateSearch: (search: Record<string, unknown>): ProposalsSearch => ({
+    filter: parseProposalFilter(search.filter),
+    proposal: typeof search.proposal === 'string' && search.proposal ? search.proposal : undefined,
+  }),
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(listProposalsQueryOptions(params.novelId, { limit: 100 })),
   component: ProposalsScreen,
 });
 
@@ -43,34 +75,6 @@ function statusIntent(status: string): ChipIntent {
   return STATUS_INTENT[status] ?? 'neutral';
 }
 
-const GUARDED_OP_TYPES = new Set(['action.finalize', 'action.graduate_seed']);
-
-export const NEVER_AUTO_NOTE = 'Applies only when you select it deliberately.';
-
-export function isGuardedOp(op: Record<string, unknown>): boolean {
-  return GUARDED_OP_TYPES.has(String(op.op));
-}
-
-export function defaultDeclined(changeSet: Record<string, unknown>[]): Set<number> {
-  return new Set(changeSet.reduce<number[]>((acc, op, i) => (isGuardedOp(op) ? [...acc, i] : acc), []));
-}
-
-function proposalTitle(p: ProposalResponse): string {
-  return p.summary?.trim() || `${p.kind} · ${p.scopeType}`;
-}
-
-export function opLabel(op: Record<string, unknown>): string {
-  const type = String(op.op ?? 'unknown');
-  const target =
-    op.volumeKey ??
-    op.arcKey ??
-    op.entityKey ??
-    op.factKey ??
-    (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ??
-    (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
-  return target === undefined ? type : `${type} · ${target}`;
-}
-
 // Fields whose values are prose/Markdown — shown as a rendered block instead of an inline value.
 const OP_PROSE_FIELDS = new Set(['body', 'premise', 'brief', 'objective', 'escalation', 'payoff', 'hook', 'conflict', 'motivation', 'notes', 'summary', 'instructions', 'note']);
 
@@ -85,7 +89,7 @@ function formatOpValue(value: unknown): string {
  * and the prose fields (a rewritten body, a new objective, a revision note) rendered as Markdown —
  * so a change reads as what it does, not as a raw JSON blob.
  */
-export function ChangeOpBody({ op }: { op: Record<string, unknown> }): React.JSX.Element {
+export function ChangeOpBody({ op }: { op: ChangeOp }): React.JSX.Element {
   const rationale = typeof op.rationale === 'string' ? op.rationale.trim() : '';
   const entries = Object.entries(op).filter(([k]) => k !== 'op' && k !== 'rationale' && op[k] !== undefined);
   const prose = entries.filter(([k, v]) => OP_PROSE_FIELDS.has(k) && typeof v === 'string' && v.trim() !== '');
@@ -125,21 +129,25 @@ export function PluginSourceChip({ proposal }: { proposal: ProposalResponse }): 
 interface ProposalDetailProps {
   novelId: string;
   proposal: ProposalResponse;
+  total: number | undefined;
+  filter: ProposalFilter | undefined;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  onSelect: (proposalId?: string) => void;
 }
 
-function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.Element {
+function ProposalDetail({ novelId, proposal, total, filter, ids, jump, onSelect }: ProposalDetailProps): React.JSX.Element {
   const modelsQuery = useAiModelsQuery();
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
   const revert = useRevertProposalMutation(novelId);
-  const isPending = proposal.status === 'pending';
-  const isConflicted = proposal.status === 'conflicted';
-  const isApplied = proposal.status === 'applied';
+  const disposition = proposalDisposition(proposal);
+  const deciding = disposition.kind === 'decide';
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
 
-  // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
-  // it during render rather than in an effect — an effect would paint one frame of the old selection.
+  // The selection is keyed to one proposal's op indexes, so paging to another proposal resets it during
+  // render rather than in an effect — an effect would paint one frame of the old selection.
   const [selectionFor, setSelectionFor] = useState(proposal.id);
   if (selectionFor !== proposal.id) {
     setSelectionFor(proposal.id);
@@ -155,8 +163,10 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
     });
   };
 
+  // Applying leaves op results on this very proposal — the only record of which ops landed — so the
+  // author stays on it, unlike a discard, which has nothing left to read.
   const doApply = (): void => {
-    const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
+    const selected = selectedOpIndexes(proposal.changeSet.length, declined);
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
     // one-way door, so naming the indexes is what makes finalize and graduation reachable at all.
@@ -172,9 +182,18 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
       },
     );
   };
+
   const doDiscard = (): void => {
-    discard.mutate(proposal.id, { onSuccess: () => toast.success('Proposal discarded'), onError: err => toast.danger(err.message) });
+    const next = nextAfterDecision(ids, proposal.id);
+    discard.mutate(proposal.id, {
+      onSuccess: () => {
+        toast.success('Proposal discarded');
+        onSelect(next);
+      },
+      onError: err => toast.danger(err.message),
+    });
   };
+
   const doRevert = (): void => {
     revert.mutate(proposal.id, {
       onSuccess: r => toast.success(`Reverted ${r.reverted.length} artifact(s)`),
@@ -183,138 +202,230 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
   };
 
   return (
-    <div className={`nf-scroll ${styles.detailScroll}`}>
-      <div className={styles.detailInner}>
-        <div className={styles.metaRow}>
-          <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
-          <StatusChip intent="neutral">{proposal.kind}</StatusChip>
-          <StatusChip intent="neutral">{proposal.scopeType}</StatusChip>
+    <DetailPage
+      back={
+        <Link to="/novels/$novelId/proposals" params={{ novelId }} search={{ filter }}>
+          {backLabel(total)}
+        </Link>
+      }
+      identity={
+        <DetailPage.Identity title={proposalTitle(proposal)}>
+          <StatusChip intent={statusIntent(proposal.status)} dot>
+            {proposal.status}
+          </StatusChip>
           <PluginSourceChip proposal={proposal} />
           {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
-          <div className={styles.spacer} />
-          {proposal.model && <span className={styles.model}>{modelLabel(modelsQuery.data?.models ?? [], proposal.model)}</span>}
-        </div>
-        <h1 className={styles.title}>{proposalTitle(proposal)}</h1>
-
-        {isConflicted && (
-          <div className={styles.conflict}>
-            <div>
-              <div className={styles.conflictTitle}>Baseline changed underneath this proposal</div>
-              <div className={styles.conflictBody}>
-                The canon moved on since this was drafted, so it can no longer apply cleanly. Discard it and ask again for a fresh proposal.
+        </DetailPage.Identity>
+      }
+      pager={<ItemPager ids={ids} currentId={proposal.id} onSelect={onSelect} itemNoun="proposal" jump={jump} />}
+      asideLabel="Proposal decision"
+      aside={
+        <>
+          <section className={styles.asideBlock}>
+            <h2 className={styles.asideTitle}>Decision</h2>
+            {disposition.kind === 'decide' && (
+              <div className={styles.decision}>
+                <Button variant="primary" fullWidth loading={apply.isPending} onClick={doApply}>
+                  {applyButtonLabel(proposal.changeSet.length, declined.size)}
+                </Button>
+                <Button variant="secondary" fullWidth loading={discard.isPending} onClick={doDiscard}>
+                  Discard
+                </Button>
               </div>
-            </div>
-          </div>
-        )}
-
-        <div className={`nf-eyebrow ${styles.changeSetLabel}`}>
-          Proposed change-set · {proposal.changeSet.length} op{proposal.changeSet.length === 1 ? '' : 's'}
-          {isPending && ' · untick to decline'}
-        </div>
-        <div className={styles.changeSet}>
-          {proposal.changeSet.map((op, i) => {
-            const result = opResults.find(r => r.index === i);
-            return (
-              <div key={i} className={styles.opRow} data-declined={declined.has(i)}>
-                <div className={styles.opHead}>
-                  {isPending && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggleOp(i)} aria-label={`include ${opLabel(op)}`} />}
-                  <span className={styles.opLabel}>{opLabel(op)}</span>
-                  {String(op.op).startsWith('action.') && <StatusChip intent="info">action</StatusChip>}
-                  <div className={styles.spacer} />
-                  {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
-                </div>
-                {isPending && isGuardedOp(op) && <div className={styles.opNote}>{NEVER_AUTO_NOTE}</div>}
-                <ChangeOpBody op={op} />
-                {result?.error && <div className={styles.opError}>{result.error}</div>}
-                {result?.result?.summary !== undefined && <div className={styles.opSummary}>{String(result.result.summary)}</div>}
+            )}
+            {disposition.kind === 'blocked' && (
+              <div className={styles.decision}>
+                <p className={styles.asideNote}>{disposition.note}</p>
+                <Button variant="danger" fullWidth loading={discard.isPending} onClick={doDiscard}>
+                  Discard
+                </Button>
               </div>
-            );
-          })}
-        </div>
+            )}
+            {disposition.kind === 'revert' && (
+              <div className={styles.decision}>
+                <p className={styles.asideNote}>{disposition.note}</p>
+                <Button variant="danger" fullWidth loading={revert.isPending} onClick={doRevert}>
+                  Revert this change
+                </Button>
+              </div>
+            )}
+            {disposition.kind === 'settled' && <p className={styles.asideNote}>{disposition.note}</p>}
+          </section>
 
-        {isPending && (
-          <div className={styles.actions}>
-            <Button variant="primary" loading={apply.isPending} onClick={doApply}>
-              {declined.size > 0 ? `Apply ${proposal.changeSet.length - declined.size} selected` : 'Apply to canon'}
-            </Button>
-            <Button variant="ghost" loading={discard.isPending} onClick={doDiscard}>
-              Discard
-            </Button>
-          </div>
-        )}
-        {isApplied && proposal.revertible && (
-          <div className={styles.actions}>
-            <Button variant="danger" loading={revert.isPending} onClick={doRevert}>
-              Revert this change
-            </Button>
-            <p className={styles.statusNote}>Applied{proposal.appliedAt ? ` ${relativeTime(proposal.appliedAt)}` : ''} — reverting restores every touched artifact.</p>
-          </div>
-        )}
-        {isApplied && !proposal.revertible && (
-          <p className={styles.statusNote}>Applied{proposal.appliedAt ? ` ${relativeTime(proposal.appliedAt)}` : ''} — no inverse recorded, so this change cannot be reverted.</p>
-        )}
-        {!isPending && !isApplied && (
-          <p className={styles.statusNote}>
-            This proposal is {proposal.status}
-            {proposal.revertedAt ? ` · reverted ${relativeTime(proposal.revertedAt)}` : proposal.appliedAt ? ` · ${relativeTime(proposal.appliedAt)}` : ''}.
-          </p>
-        )}
+          <section className={styles.asideBlock}>
+            <h2 className={styles.asideTitle}>Origin</h2>
+            <dl className={styles.originGrid}>
+              <dt>Kind</dt>
+              <dd>{proposal.kind}</dd>
+              <dt>Scope</dt>
+              <dd>{proposal.scopeType}</dd>
+              <dt>Staged</dt>
+              <dd>{relativeTime(proposal.createdAt)}</dd>
+              {proposal.model && (
+                <>
+                  <dt>Model</dt>
+                  <dd className={styles.model}>{modelLabel(modelsQuery.data?.models ?? [], proposal.model)}</dd>
+                </>
+              )}
+            </dl>
+          </section>
+        </>
+      }
+    >
+      {disposition.kind === 'blocked' && (
+        <Alert intent="danger" title="Baseline changed underneath this proposal" className={styles.conflict}>
+          {disposition.note}
+        </Alert>
+      )}
+
+      <div className={`nf-eyebrow ${styles.changeSetLabel}`}>
+        Proposed change-set · {proposal.changeSet.length} op{proposal.changeSet.length === 1 ? '' : 's'}
+        {deciding && ' · untick to decline'}
       </div>
-    </div>
+      <div className={styles.changeSet}>
+        {proposal.changeSet.map((op, i) => {
+          const result = opResults.find(r => r.index === i);
+          return (
+            <div key={i} className={styles.opRow} data-declined={declined.has(i)}>
+              <div className={styles.opHead}>
+                {deciding && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggleOp(i)} aria-label={`include ${opLabel(op)}`} />}
+                <span className={styles.opLabel}>{opLabel(op)}</span>
+                {String(op.op).startsWith('action.') && <StatusChip intent="info">action</StatusChip>}
+                <div className={styles.spacer} />
+                {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
+              </div>
+              {deciding && isGuardedOp(op) && <div className={styles.opNote}>{NEVER_AUTO_NOTE}</div>}
+              <ChangeOpBody op={op} />
+              {result?.error && <div className={styles.opError}>{result.error}</div>}
+              {result?.result?.summary !== undefined && <div className={styles.opSummary}>{String(result.result.summary)}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </DetailPage>
   );
 }
 
-type Filter = 'pending' | 'all';
-
 function ProposalsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const [filter, setFilter] = useState<Filter>('pending');
-  const proposalsQuery = useListProposalsQuery(novelId, { limit: 100, ...(filter === 'pending' ? { status: 'pending' } : {}) });
-  const proposals = proposalsQuery.data?.items ?? [];
-  const [selectedId, setSelectedId] = useState<string | undefined>();
+  const { filter: filterParam, proposal: proposalParam } = Route.useSearch();
+  const goSearch = Route.useNavigate();
+  const proposalsQuery = useListProposalsQuery(novelId, { limit: 100 });
+  const proposals = useMemo(() => proposalsQuery.data?.items ?? [], [proposalsQuery.data]);
 
-  const selected = proposals.find(p => p.id === selectedId) ?? proposals[0];
-  const pendingCount = proposals.filter(p => p.status === 'pending').length;
+  const resolved = !proposalsQuery.isLoading && !proposalsQuery.error;
+  const total = resolved ? proposals.length : undefined;
+  const activeFilter: ProposalFilter = filterParam ?? 'open';
+
+  const counts = useMemo(() => countByFilter(proposals), [proposals]);
+  const visible = useMemo(() => filterProposals(proposals, activeFilter), [proposals, activeFilter]);
+  const byId = useMemo(() => new Map(proposals.map(proposal => [proposal.id, proposal])), [proposals]);
+  const visibleIds = useMemo(() => (resolved ? proposalIds(visible) : undefined), [resolved, visible]);
+
+  const selected = proposalParam ? byId.get(proposalParam) : undefined;
+  const selectProposal = (proposalId?: string): void => void goSearch({ search: { filter: filterParam, proposal: proposalId } });
+  const pickFilter = (value: string): void => void goSearch({ search: { filter: parseProposalFilter(value) } });
+
+  const jumpItems = useMemo(() => visible.map(proposal => ({ id: proposal.id, label: proposalTitle(proposal), caption: changeSetCaption(proposal.changeSet) })), [visible]);
+  const allJumpItems = useMemo(
+    () => (activeFilter === 'all' ? undefined : proposals.map(proposal => ({ id: proposal.id, label: proposalTitle(proposal), caption: changeSetCaption(proposal.changeSet) }))),
+    [activeFilter, proposals],
+  );
+  const jump = useCollectionJump(
+    resolved
+      ? {
+          collection: 'proposals',
+          items: jumpItems,
+          filterLabel: FILTER_LABEL[activeFilter],
+          allItems: allJumpItems,
+          currentId: proposalParam,
+          onSelect: selectProposal,
+        }
+      : null,
+  );
+
+  if (selected) return <ProposalDetail novelId={novelId} proposal={selected} total={total} filter={filterParam} ids={visibleIds} jump={jump} onSelect={selectProposal} />;
 
   return (
-    <div className="nf-splitpane">
-      <div className="nf-rail">
-        <div className="nf-railhead">
-          <div className={styles.railTitleRow}>
-            <span className={styles.railTitle}>Proposals Center</span>
-            {pendingCount > 0 && <StatusChip intent="warning">{pendingCount} pending</StatusChip>}
-          </div>
-          <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)} size="sm">
-            <SegmentedControl.Item value="pending">Pending</SegmentedControl.Item>
-            <SegmentedControl.Item value="all">All</SegmentedControl.Item>
-          </SegmentedControl>
-        </div>
-        <div className="nf-scroll nf-raillist">
-          {proposalsQuery.isLoading && <PaneLoader />}
-          {proposalsQuery.error && <PaneError error={proposalsQuery.error} />}
-          {!proposalsQuery.isLoading && proposals.length === 0 && <div className="nf-emptynote">No proposals here.</div>}
-          {proposals.map(proposal => (
-            <button
+    <CollectionPage
+      title="Proposals"
+      subtitle="Change-sets a chat turn, an analysis pass or a plugin staged against canon — nothing lands until you apply it."
+      total={total}
+      notice={
+        resolved &&
+        proposalParam && (
+          <Alert intent="warning" title="That proposal is no longer here." action={{ label: 'Back to the directory', onClick: () => selectProposal(undefined) }}>
+            It was superseded by a newer draft, or the link was typed by hand.
+          </Alert>
+        )
+      }
+      segments={{
+        label: 'Proposal state',
+        value: activeFilter,
+        onValueChange: pickFilter,
+        items: [
+          { value: 'open', label: FILTER_LABEL.open, count: counts.open },
+          { value: 'applied', label: FILTER_LABEL.applied, count: counts.applied },
+          { value: 'all', label: FILTER_LABEL.all, count: counts.all },
+        ],
+      }}
+      empty={
+        <EmptyState
+          icon={<ProposalsIcon size={24} />}
+          title="No proposals staged"
+          description="A proposal appears here when a refinement chat turn, an analysis pass or a plugin drafts a change-set against this novel's canon."
+          actions={
+            <Button variant="primary" asChild>
+              <Link to="/novels/$novelId/chat" params={{ novelId }}>
+                Open refinement chat
+              </Link>
+            </Button>
+          }
+        />
+      }
+    >
+      {proposalsQuery.isLoading ? (
+        <PaneLoader />
+      ) : proposalsQuery.error ? (
+        <PaneError error={proposalsQuery.error} />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={<ProposalsIcon size={24} />}
+          title={activeFilter === 'open' ? 'Nothing is waiting on you' : 'No applied proposals'}
+          description={
+            activeFilter === 'open'
+              ? 'Every proposal staged against this novel has been applied, discarded or superseded.'
+              : 'No proposal has been applied to canon yet — open ones are still waiting on your decision.'
+          }
+          actions={
+            <Button variant="secondary" onClick={() => pickFilter('all')}>
+              See all {counts.all}
+            </Button>
+          }
+        />
+      ) : (
+        <CollectionPage.Rows>
+          {visible.map(proposal => (
+            <CollectionPage.Row
               key={proposal.id}
-              className="nf-selrow nf-selrow-stack"
-              data-active={proposal.id === selected?.id}
-              onClick={() => setSelectedId(proposal.id)}
-              style={proposal.status === 'conflicted' ? ({ '--nf-bar': 'var(--sh-danger-solid)' } as React.CSSProperties) : undefined}
-            >
-              <div className={styles.cardRow}>
-                <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
-                <StatusChip intent="neutral">{proposal.kind}</StatusChip>
-                <PluginSourceChip proposal={proposal} />
-                {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
-                <div className={styles.spacer} />
-                <span className={styles.cardTime}>{relativeTime(proposal.createdAt)}</span>
-              </div>
-              <div className={styles.cardTitle}>{proposalTitle(proposal)}</div>
-            </button>
+              link={<Link to="/novels/$novelId/proposals" params={{ novelId }} search={{ filter: filterParam, proposal: proposal.id }} />}
+              title={proposalTitle(proposal)}
+              caption={changeSetCaption(proposal.changeSet)}
+              clampCaption
+              trailing={
+                <>
+                  <StatusChip intent={statusIntent(proposal.status)} dot>
+                    {proposal.status}
+                  </StatusChip>
+                  <PluginSourceChip proposal={proposal} />
+                  {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
+                </>
+              }
+              meta={proposalMeta(proposal)}
+            />
           ))}
-        </div>
-      </div>
-      <div className="nf-detail">{selected ? <ProposalDetail novelId={novelId} proposal={selected} /> : <div className="nf-pane-empty">Select a proposal to review.</div>}</div>
-    </div>
+        </CollectionPage.Rows>
+      )}
+    </CollectionPage>
   );
 }

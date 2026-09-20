@@ -34,10 +34,12 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/review')).toBe('rows');
   });
 
+  it('should resolve the migrated proposals inbox to the rows variant rather than a rail it no longer renders', () => {
+    expect(resolveSkeletonVariant('/novels/abc123/proposals')).toBe('rows');
+  });
+
   it('should resolve rail-and-detail workspace routes to the split variant', () => {
-    for (const segment of ['proposals', 'runs']) {
-      expect(resolveSkeletonVariant(`/novels/abc123/${segment}`)).toBe('split');
-    }
+    expect(resolveSkeletonVariant('/novels/abc123/runs')).toBe('split');
   });
 
   it('should resolve form-shaped project routes to the form variant', () => {

@@ -46,9 +46,10 @@ import {
 } from '@/lib/apis';
 import { bySession, chatChangesSummary, chatTitle } from '@/lib/chat-sessions';
 import { messageTime, projectTitle, relativeTime } from '@/lib/format';
+import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from '@/lib/proposals';
 
 import styles from './chat.module.css';
-import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, PluginSourceChip } from './proposals';
+import { ChangeOpBody, PluginSourceChip } from './proposals';
 
 interface ChatSearch {
   session?: string;
