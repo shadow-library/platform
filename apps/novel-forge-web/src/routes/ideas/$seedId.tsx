@@ -34,7 +34,7 @@ import {
 import { messageTime } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { requireSession } from '@/lib/session';
-import { answeredCount, answerText, composeAnswers, nextUnanswered, recoverAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
+import { answeredCount, answerText, composeAnswers, holdsOption, nextUnanswered, recoverAnswers, type StudioAnswer, type StudioAnswers } from '@/lib/studio-answers';
 
 import styles from './$seedId.module.css';
 
@@ -233,8 +233,7 @@ function QuestionCard({ questions, answers, status, onAnswer, onRoundAnswered, l
     else if (answer?.kind === 'own') onAnswer(question.id, undefined);
   };
 
-  const isSelected = (candidate: StudioAnswer): boolean =>
-    answer?.kind === candidate.kind && (candidate.kind !== 'option' || (answer.kind === 'option' && answer.index === candidate.index));
+  const isSelected = (candidate: StudioAnswer): boolean => (candidate.kind === 'option' ? holdsOption(answer, candidate.index) : answer?.kind === candidate.kind);
 
   const select = (candidate: StudioAnswer): void => {
     const next = isSelected(candidate) ? undefined : candidate;

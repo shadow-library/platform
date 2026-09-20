@@ -1,6 +1,6 @@
 import { type StudioQuestionResponse } from './apis/api-types.gen';
 
-export type StudioAnswer = { kind: 'option'; index: number } | { kind: 'decide' } | { kind: 'own'; text: string };
+export type StudioAnswer = { kind: 'option'; index: number } | { kind: 'options'; indexes: readonly [number, ...number[]] } | { kind: 'decide' } | { kind: 'own'; text: string };
 
 export type StudioAnswers = Readonly<Record<string, StudioAnswer | undefined>>;
 
@@ -12,10 +12,28 @@ export function questionLabel(wording: string): string {
   return label.endsWith('?') ? label : `${label}?`;
 }
 
+function selection(indexes: readonly number[]): StudioAnswer | undefined {
+  const [first, ...rest] = indexes;
+  return first === undefined ? undefined : { kind: 'options', indexes: [first, ...rest] };
+}
+
+export function holdsOption(answer: StudioAnswer | undefined, index: number): boolean {
+  if (answer?.kind === 'option') return answer.index === index;
+  return answer?.kind === 'options' && answer.indexes.includes(index);
+}
+
+export function toggleOption(question: StudioQuestionResponse, answer: StudioAnswer | undefined, index: number): StudioAnswer | undefined {
+  if (question.select !== 'many') return answer?.kind === 'option' && answer.index === index ? undefined : { kind: 'option', index };
+  const held: readonly number[] = answer?.kind === 'options' ? answer.indexes : [];
+  return selection(held.includes(index) ? held.filter(pick => pick !== index) : [...held, index].sort((a, b) => a - b));
+}
+
 function rawAnswer(question: StudioQuestionResponse, answer: StudioAnswer): string | undefined {
   switch (answer.kind) {
     case 'option':
       return question.options[answer.index];
+    case 'options':
+      return answer.indexes.flatMap(index => question.options[index]?.trim() || []).join('\n') || undefined;
     case 'decide':
       return question.youDecide;
     case 'own':
@@ -48,12 +66,26 @@ export function nextUnanswered(questions: readonly StudioQuestionResponse[], ans
   return index < 0 ? undefined : index;
 }
 
+/** A multi-selection is one picked option per line, so an option holding a newline of its own can only come back as `own`. */
+function matchSelection(question: StudioQuestionResponse, lead: string): StudioAnswer | undefined {
+  const lines = lead.split('\n').flatMap(line => line.trim() || []);
+  if (lines.length < 2) return undefined;
+  const indexes: number[] = [];
+  for (const line of lines) {
+    const index = question.options.findIndex((option, candidate) => !indexes.includes(candidate) && option.trim() === line);
+    if (index < 0) return undefined;
+    indexes.push(index);
+  }
+  return selection(indexes);
+}
+
 function matchAnswer(question: StudioQuestionResponse, text: string): StudioAnswer {
+  const many = question.select === 'many';
   const lead = text.split('\n\n')[0]?.trim() ?? text;
   const index = question.options.findIndex(option => option.trim() === lead);
-  if (index >= 0) return { kind: 'option', index };
+  if (index >= 0) return many ? { kind: 'options', indexes: [index] } : { kind: 'option', index };
   if (question.youDecide.trim() === lead) return { kind: 'decide' };
-  return { kind: 'own', text };
+  return (many ? matchSelection(question, lead) : undefined) ?? { kind: 'own', text };
 }
 
 /**

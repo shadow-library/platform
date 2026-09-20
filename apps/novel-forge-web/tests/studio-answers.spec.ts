@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type StudioQuestionResponse } from '../src/lib/apis/api-types.gen';
-import { answeredCount, composeAnswers, nextUnanswered, questionLabel, recoverAnswers } from '../src/lib/studio-answers';
+import { answeredCount, composeAnswers, holdsOption, nextUnanswered, questionLabel, recoverAnswers, toggleOption } from '../src/lib/studio-answers';
 
-const question = (id: string, wording: string, options: string[] = ['First option', 'Second option']): StudioQuestionResponse => ({
+const question = (id: string, wording: string, options: string[] = ['First option', 'Second option'], select: 'one' | 'many' = 'one'): StudioQuestionResponse => ({
   id,
   wording,
   coaching: 'Coaching line.',
   options,
   youDecide: 'The studio pick.',
+  select,
 });
+
+const many = (id: string, wording: string, options: string[]): StudioQuestionResponse => question(id, wording, options, 'many');
+
+const tone = many('tone', 'Which tones are in play — what should the prose feel like?', ['Wry', 'Tender', 'Bleak']);
 
 const shelf = question('shelf', 'Which shelf does this sit on — what genre would a reader browse for?', ['System-fantasy romance', 'Villainess fantasy']);
 const place = question('place', 'Where does this actually happen, and when — which room will the reader spend most time in?', ['The noble academy', 'The royal court']);
@@ -101,6 +106,125 @@ describe('recoverAnswers', () => {
     expect(recoverAnswers([first, second], 'Which one?\nBeta\n\nWhich one?\nGamma')).toEqual({
       first: { kind: 'option', index: 1 },
       second: { kind: 'option', index: 0 },
+    });
+  });
+});
+
+describe('toggleOption', () => {
+  it('should replace the pick on a single-select question and clear it when picked again', () => {
+    expect(toggleOption(shelf, undefined, 1)).toEqual({ kind: 'option', index: 1 });
+    expect(toggleOption(shelf, { kind: 'option', index: 0 }, 1)).toEqual({ kind: 'option', index: 1 });
+    expect(toggleOption(shelf, { kind: 'option', index: 1 }, 1)).toBeUndefined();
+  });
+
+  it('should accumulate picks on a multi-select question in option order', () => {
+    expect(toggleOption(tone, undefined, 2)).toEqual({ kind: 'options', indexes: [2] });
+    expect(toggleOption(tone, { kind: 'options', indexes: [2] }, 0)).toEqual({ kind: 'options', indexes: [0, 2] });
+  });
+
+  it('should drop a pick already held and yield no answer once the last one goes', () => {
+    expect(toggleOption(tone, { kind: 'options', indexes: [0, 2] }, 0)).toEqual({ kind: 'options', indexes: [2] });
+    expect(toggleOption(tone, { kind: 'options', indexes: [2] }, 2)).toBeUndefined();
+  });
+
+  it('should clear "You decide" when an option is picked on a multi-select question', () => {
+    expect(toggleOption(tone, { kind: 'decide' }, 1)).toEqual({ kind: 'options', indexes: [1] });
+  });
+});
+
+describe('holdsOption', () => {
+  it('should report a pick held by either selection variant', () => {
+    expect(holdsOption({ kind: 'option', index: 1 }, 1)).toBe(true);
+    expect(holdsOption({ kind: 'options', indexes: [0, 2] }, 2)).toBe(true);
+    expect(holdsOption({ kind: 'options', indexes: [0, 2] }, 1)).toBe(false);
+    expect(holdsOption({ kind: 'decide' }, 0)).toBe(false);
+    expect(holdsOption(undefined, 0)).toBe(false);
+  });
+});
+
+describe('composeAnswers on a multi-select question', () => {
+  it('should write one picked option per line', () => {
+    expect(composeAnswers([tone], { tone: { kind: 'options', indexes: [0, 2] } })).toBe('Which tones are in play?\nWry\nBleak');
+  });
+
+  it('should write a single pick as that option alone', () => {
+    expect(composeAnswers([tone], { tone: { kind: 'options', indexes: [1] } })).toBe('Which tones are in play?\nTender');
+  });
+
+  it('should count a multi answer once and skip one whose picks no longer resolve', () => {
+    expect(answeredCount([tone], { tone: { kind: 'options', indexes: [0, 2] } })).toBe(1);
+    expect(answeredCount([tone], { tone: { kind: 'options', indexes: [7] } })).toBe(0);
+    expect(nextUnanswered([tone, length], { tone: { kind: 'options', indexes: [7] } }, -1)).toBe(0);
+  });
+});
+
+describe('recoverAnswers on a multi-select question', () => {
+  it('should read several picks back out of the reply composeAnswers wrote', () => {
+    const answers = { tone: { kind: 'options', indexes: [0, 2] }, length: { kind: 'option', index: 1 } } as const;
+
+    expect(recoverAnswers([tone, length], composeAnswers([tone, length], answers))).toEqual(answers);
+  });
+
+  it('should round-trip a single pick as the multi variant rather than collapsing it', () => {
+    const reply = composeAnswers([tone], { tone: { kind: 'options', indexes: [1] } });
+
+    expect(recoverAnswers([tone], reply)).toEqual({ tone: { kind: 'options', indexes: [1] } });
+  });
+
+  it('should read a historical single-select reply back as a multi answer of one pick', () => {
+    expect(recoverAnswers([tone], 'Which tones are in play?\nBleak')).toEqual({ tone: { kind: 'options', indexes: [2] } });
+  });
+
+  it('should still read "You decide" back as the exclusive answer it is', () => {
+    expect(recoverAnswers([tone], composeAnswers([tone], { tone: { kind: 'decide' } }))).toEqual({ tone: { kind: 'decide' } });
+  });
+
+  it('should keep a picked option when a note follows the block', () => {
+    const reply = composeAnswers([tone], { tone: { kind: 'options', indexes: [0, 1] } }, 'Nothing too arch.');
+
+    expect(recoverAnswers([tone], reply)).toEqual({ tone: { kind: 'options', indexes: [0, 1] } });
+  });
+
+  it('should fall back to the author’s own words when a line matches no option', () => {
+    expect(recoverAnswers([tone], 'Which tones are in play?\nWry\nSomething else entirely')).toEqual({
+      tone: { kind: 'own', text: 'Wry\nSomething else entirely' },
+    });
+  });
+
+  it('should fall back to the author’s own words for an option that holds a newline of its own', () => {
+    const split = many('split', 'Which ones?', ['A pick\nover two lines', 'Plain pick']);
+    const reply = composeAnswers([split], { split: { kind: 'options', indexes: [0, 1] } });
+
+    expect(recoverAnswers([split], reply)).toEqual({ split: { kind: 'own', text: 'A pick\nover two lines\nPlain pick' } });
+  });
+
+  it('should recover a single newline-bearing pick whole, since the block matches it exactly', () => {
+    const split = many('split', 'Which ones?', ['A pick\nover two lines', 'Plain pick']);
+
+    expect(recoverAnswers([split], composeAnswers([split], { split: { kind: 'options', indexes: [0] } }))).toEqual({ split: { kind: 'options', indexes: [0] } });
+  });
+
+  it('should trim whitespace around an option on both sides of the round trip', () => {
+    const padded = many('padded', 'Which ones?', ['  Wry  ', 'Bleak']);
+
+    expect(recoverAnswers([padded], composeAnswers([padded], { padded: { kind: 'options', indexes: [0, 1] } }))).toEqual({ padded: { kind: 'options', indexes: [0, 1] } });
+  });
+
+  it('should hand each line of a duplicated option list to a distinct index', () => {
+    const twins = many('twins', 'Which ones?', ['Same', 'Same', 'Other']);
+
+    expect(recoverAnswers([twins], composeAnswers([twins], { twins: { kind: 'options', indexes: [0, 1] } }))).toEqual({ twins: { kind: 'options', indexes: [0, 1] } });
+    expect(recoverAnswers([twins], composeAnswers([twins], { twins: { kind: 'options', indexes: [1] } }))).toEqual({ twins: { kind: 'options', indexes: [0] } });
+  });
+
+  it('should read free text whose every line is an option as those picks', () => {
+    expect(recoverAnswers([tone], 'Which tones are in play?\nBleak\nWry')).toEqual({ tone: { kind: 'options', indexes: [2, 0] } });
+  });
+
+  it('should leave a single-select question matching a lead line on the single variant', () => {
+    expect(recoverAnswers([tone, length], 'Which tones are in play?\nWry\n\nHow long is this?\nFinite novel')).toEqual({
+      tone: { kind: 'options', indexes: [0] },
+      length: { kind: 'option', index: 1 },
     });
   });
 });
