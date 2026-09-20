@@ -18,8 +18,12 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/ideas/seed-1')).toBe('chat');
   });
 
+  it('should resolve a migrated collection route to the card-grid variant rather than a rail it no longer renders', () => {
+    expect(resolveSkeletonVariant('/novels/abc123/story-bible')).toBe('list');
+  });
+
   it('should resolve rail-and-detail workspace routes to the split variant', () => {
-    for (const segment of ['story-bible', 'canon-facts', 'review', 'proposals', 'runs', 'illustrations']) {
+    for (const segment of ['canon-facts', 'review', 'proposals', 'runs', 'illustrations']) {
       expect(resolveSkeletonVariant(`/novels/abc123/${segment}`)).toBe('split');
     }
   });

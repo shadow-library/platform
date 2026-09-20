@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { useCollectionJump } from '@/components/Layout';
+import { CollectionPage, DetailPage, EmptyState, FieldCard, ItemPager, type ItemPagerJump, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import { ImageUpload } from '@/components/nf/ImageUpload';
@@ -21,12 +22,32 @@ import {
   useDeleteEntityMutation,
   useEntityQuery,
   useListEntitiesQuery,
+  useListFactsQuery,
   useProjectQuery,
   useSeedFromBriefMutation,
   useUpdateEntityMutation,
   useUploadEntityImageMutation,
 } from '@/lib/apis';
 import { coverColor } from '@/lib/format';
+import {
+  ALL_TYPES,
+  ASIDE_FACT_LIMIT,
+  backLabel,
+  type BibleCategory,
+  type BibleEntity,
+  countByType,
+  entityCaption,
+  entityFacts,
+  filterEntities,
+  groupByType,
+  orderTypesByCount,
+  parseEntityType,
+  relatedEntities,
+  sectionSlice,
+  stripEntityHeading,
+  TYPE_LABEL,
+  TYPE_SINGULAR,
+} from '@/lib/story-bible';
 
 import styles from './story-bible.module.css';
 
@@ -35,135 +56,44 @@ interface BibleSearch {
   entity?: string;
 }
 
-// The active category and selected entity live in the URL so a refresh reopens the same entry.
+// The active type and the open entity live in the URL so a refresh reopens the same entry.
 export const Route = createFileRoute('/novels/$novelId/story-bible')({
-  validateSearch: (search: Record<string, unknown>): BibleSearch => {
-    const type = search.type;
-    const valid = type === 'character' || type === 'faction' || type === 'location' || type === 'power_rule' || type === 'item' || type === 'concept';
-    return {
-      type: valid ? (type as EntityType) : undefined,
-      entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
-    };
-  },
+  validateSearch: (search: Record<string, unknown>): BibleSearch => ({
+    type: parseEntityType(search.type),
+    entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
+  }),
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listEntitiesQueryOptions(params.novelId, { limit: 500 })),
   component: StoryBibleScreen,
 });
 
-const TYPE_ORDER: EntityType[] = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
-const TYPE_LABEL: Record<EntityType, string> = {
-  character: 'Characters',
-  faction: 'Factions',
-  location: 'Locations',
-  power_rule: 'Power rules',
-  item: 'Items',
-  concept: 'Concepts',
-};
-const TYPE_SINGULAR: Record<EntityType, string> = {
-  character: 'Character',
-  faction: 'Faction',
-  location: 'Location',
-  power_rule: 'Power rule',
-  item: 'Item',
-  concept: 'Concept',
-};
-
-type BibleCategory = EntityType | 'all';
-
-const TYPE_ICON: Record<BibleCategory, [string, string]> = {
-  all: ['M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z', ''],
-  character: ['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8'],
-  faction: ['M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z', 'M4 22v-7'],
-  location: ['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z', 'M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
-  power_rule: ['M13 2L3 14h9l-1 8 10-12h-9l1-8z', ''],
-  item: ['M21 8l-9-5-9 5v8l9 5 9-5V8z', 'M3 8l9 5 9-5M12 13v10'],
-  concept: ['M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z', ''],
-};
-
-interface TypeGlyphProps {
-  type: BibleCategory;
+interface EntityAvatarProps {
+  entity: BibleEntity;
   size: number;
 }
 
-function TypeGlyph({ type, size }: TypeGlyphProps): React.JSX.Element {
-  const [d1, d2] = TYPE_ICON[type];
+function EntityAvatar({ entity, size }: EntityAvatarProps): React.JSX.Element {
+  const style = { '--avatar-size': `${size}px`, '--avatar-fill': coverColor(entity.id) } as React.CSSProperties;
+  if (entity.imageUrl) return <img src={entity.imageUrl} alt="" className={styles.avatar} style={style} />;
+  return <span className={styles.avatar} style={style} aria-hidden="true" />;
+}
+
+interface EntityCardProps {
+  novelId: string;
+  entity: BibleEntity;
+  type?: EntityType;
+}
+
+function EntityCard({ novelId, entity, type }: EntityCardProps): React.JSX.Element {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-      <path d={d1} />
-      {d2 && <path d={d2} />}
-    </svg>
-  );
-}
-
-function iconTile(size: number, radius: number, background: string, color: string): React.CSSProperties {
-  return { '--tile-size': `${size}px`, '--tile-radius': `${radius}px`, '--tile-bg': background, '--tile-fg': color } as React.CSSProperties;
-}
-
-const TYPE_FILTER_LABEL_ID = 'story-bible-type-filter-label';
-
-interface TypeChipsProps {
-  active: BibleCategory;
-  counts: Map<EntityType, number>;
-  onPick: (category: BibleCategory) => void;
-}
-
-function TypeChips({ active, counts, onPick }: TypeChipsProps): React.JSX.Element {
-  return (
-    <div className={styles.chipRow} role="group" aria-labelledby={TYPE_FILTER_LABEL_ID}>
-      <button type="button" className={styles.chip} data-active={active === 'all' || undefined} aria-pressed={active === 'all'} onClick={() => onPick('all')}>
-        All
-      </button>
-      {TYPE_ORDER.map(type => (
-        <button key={type} type="button" className={styles.chip} data-active={active === type || undefined} aria-pressed={active === type} onClick={() => onPick(type)}>
-          {TYPE_LABEL[type]}
-          <span className={styles.chipCount}>{counts.get(type) ?? 0}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-interface BibleOverviewProps {
-  entities: EntityResponse[];
-  counts: Map<EntityType, number>;
-  onOpen: (type: EntityType) => void;
-}
-
-function BibleOverview({ entities, counts, onOpen }: BibleOverviewProps): React.JSX.Element {
-  return (
-    <>
-      <div className={styles.overviewHead}>
-        <h2 className={styles.overviewTitle}>Story Bible</h2>
-        <span className={styles.overviewMeta}>All types · {entities.length} entities</span>
-      </div>
-      <div className={`nf-scroll ${styles.paneScroll}`}>
-        <div className={styles.overviewInner}>
-          <p className={styles.overviewHint}>Pick a category to browse its entries — or use the type selector on the left.</p>
-          <div className={styles.catGrid}>
-            {TYPE_ORDER.map(type => {
-              const sample = entities
-                .filter(e => e.type === type)
-                .slice(0, 3)
-                .map(e => e.name)
-                .join(' · ');
-              return (
-                <button key={type} type="button" className="nf-catcard" onClick={() => onOpen(type)}>
-                  <div className={styles.catHead}>
-                    <span className={styles.iconTile} style={iconTile(40, 11, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
-                      <TypeGlyph type={type} size={20} />
-                    </span>
-                    <div className={styles.catInfo}>
-                      <div className={styles.catTitle}>{TYPE_LABEL[type]}</div>
-                      <div className={styles.catCount}>{counts.get(type) ?? 0} entries</div>
-                    </div>
-                  </div>
-                  <div className={styles.catSample}>{sample || 'No entries yet'}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </>
+    <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type, entity: entity.entityKey }} className={styles.card}>
+      <EntityAvatar entity={entity} size={36} />
+      <span className={styles.cardBody}>
+        <span className={styles.cardName}>{entity.name}</span>
+        <span className={styles.cardCaption} data-major={entity.significance === 'major' || undefined}>
+          {entityCaption(entity)}
+        </span>
+      </span>
+    </Link>
   );
 }
 
@@ -183,13 +113,26 @@ function emptyForm(type: EntityType): EntityFormState {
   return { entityKey: '', name: '', type, significance: 'minor', status: '', notes: '', motivation: '', appearance: '', body: '' };
 }
 
+function editForm(entity: EntityResponse): EntityFormState {
+  return {
+    entityKey: entity.entityKey,
+    name: entity.name,
+    type: entity.type,
+    significance: entity.significance ?? 'minor',
+    status: entity.status ?? '',
+    notes: entity.notes ?? '',
+    motivation: entity.motivation ?? '',
+    appearance: entity.appearance ?? '',
+    body: entity.body ?? '',
+  };
+}
+
 interface EntityDialogState {
   mode: 'create' | 'edit';
   initial: EntityFormState;
 }
 
 interface EntityDialogProps {
-  open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'create' | 'edit';
   initial: EntityFormState;
@@ -197,13 +140,13 @@ interface EntityDialogProps {
   pending: boolean;
 }
 
-function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: EntityDialogProps): React.JSX.Element {
+function EntityDialog({ onOpenChange, mode, initial, onSubmit, pending }: EntityDialogProps): React.JSX.Element {
   const [form, setForm] = useState(initial);
   const set = <K extends keyof EntityFormState>(key: K, value: EntityFormState[K]): void => setForm(prev => ({ ...prev, [key]: value }));
   const invalid = !form.name.trim() || (mode === 'create' && !form.entityKey.trim());
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open onOpenChange={onOpenChange}>
       <Dialog.Content size="md">
         <Dialog.Header title={mode === 'create' ? 'New entity' : 'Edit entity'} />
         <Dialog.Body>
@@ -219,7 +162,7 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
               ) : (
                 <FormField label="Type">
                   <Select value={form.type} onValueChange={v => set('type', v as EntityType)}>
-                    {TYPE_ORDER.map(t => (
+                    {ALL_TYPES.map(t => (
                       <Select.Item key={t} value={t}>
                         {TYPE_SINGULAR[t]}
                       </Select.Item>
@@ -231,7 +174,7 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
             {mode === 'create' && (
               <FormField label="Type">
                 <Select value={form.type} onValueChange={v => set('type', v as EntityType)}>
-                  {TYPE_ORDER.map(t => (
+                  {ALL_TYPES.map(t => (
                     <Select.Item key={t} value={t}>
                       {TYPE_SINGULAR[t]}
                     </Select.Item>
@@ -277,148 +220,193 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
   );
 }
 
-interface EntityDetailProps {
+interface EntityAsideProps {
   novelId: string;
   entityKey: string;
+  byKey: ReadonlyMap<string, BibleEntity>;
+  type?: EntityType;
+}
+
+function EntityAside({ novelId, entityKey, byKey, type }: EntityAsideProps): React.JSX.Element {
+  const factsQuery = useListFactsQuery(novelId);
+  const facts = useMemo(() => factsQuery.data?.facts ?? [], [factsQuery.data]);
+  const related = useMemo(() => relatedEntities(facts, entityKey), [facts, entityKey]);
+  const mentions = useMemo(() => entityFacts(facts, entityKey), [facts, entityKey]);
+
+  return (
+    <>
+      <section className={styles.asideBlock}>
+        <h2 className={styles.asideTitle}>Relationships</h2>
+        {related.length === 0 ? (
+          <p className={styles.asideNote}>No canon fact names this entity beside another one yet.</p>
+        ) : (
+          <ul className={styles.relations}>
+            {related.map(relation => {
+              const other = byKey.get(relation.entityKey);
+              return (
+                <li key={relation.entityKey}>
+                  <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type, entity: relation.entityKey }} className={styles.relation}>
+                    <span className={styles.relationName}>{other?.name ?? relation.entityKey}</span>
+                    <span className={styles.relationCount}>
+                      {relation.shared} fact{relation.shared === 1 ? '' : 's'}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className={styles.asideBlock}>
+        <h2 className={styles.asideTitle}>Canon facts</h2>
+        {mentions.length === 0 ? (
+          <p className={styles.asideNote}>Nothing in the spoiler ledger mentions this entity.</p>
+        ) : (
+          <div className={styles.factList}>
+            {mentions.slice(0, ASIDE_FACT_LIMIT).map(fact => (
+              <FieldCard
+                key={fact.factKey}
+                label={fact.factKey}
+                value={fact.text}
+                provenance={fact.revealChapter != null && <StatusChip intent="info">reveals ch. {fact.revealChapter}</StatusChip>}
+              />
+            ))}
+            {mentions.length > ASIDE_FACT_LIMIT && (
+              <Link to="/novels/$novelId/canon-facts" params={{ novelId }} className={styles.asideLink}>
+                See all {mentions.length} in Canon Facts
+              </Link>
+            )}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+interface EntityDetailProps {
+  novelId: string;
+  entity: BibleEntity;
+  total: number | undefined;
+  type?: EntityType;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  byKey: ReadonlyMap<string, BibleEntity>;
+  onSelect: (entityKey: string) => void;
   onEdit: (entity: EntityResponse) => void;
+  onDelete: (entity: EntityResponse) => void;
 }
 
-// Generated entity summaries lead with an `# <Name>` heading that repeats the title already shown above
-// the summary. Drop a leading heading when its text is just the entity's own name, so the name isn't
-// stated twice.
-function stripEntityHeading(body: string, name: string): string {
-  const match = /^\s*#{1,3}[ \t]+(.+?)[ \t]*(?:\r?\n|$)/.exec(body);
-  if (!match?.[1]) return body;
-  const headingText = match[1].replace(/[*_`]/g, '').trim().toLowerCase();
-  if (headingText !== name.trim().toLowerCase()) return body;
-  return body.slice(match[0].length).replace(/^\s+/, '');
-}
-
-function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.JSX.Element {
+function EntityDetail({ novelId, entity, total, type, ids, jump, byKey, onSelect, onEdit, onDelete }: EntityDetailProps): React.JSX.Element {
   const navigate = useNavigate();
+  const entityKey = entity.entityKey;
   const entityQuery = useEntityQuery(novelId, entityKey);
   const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
   const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
   const addGalleryImage = useAddEntityImageMutation(novelId, entityKey);
   const removeGalleryImage = useDeleteEntityImageByIdMutation(novelId, entityKey);
-
-  if (entityQuery.isLoading) return <PaneLoader />;
-  if (entityQuery.error) return <PaneError error={entityQuery.error} />;
-  const entity = entityQuery.data;
-  if (!entity) return <PaneLoader />;
+  const full = entityQuery.data;
 
   return (
-    <>
-      <div className={styles.detailHead}>
-        <div className={styles.detailTitleWrap}>
-          <h2 className={styles.detailTitle}>{entity.name}</h2>
-          <span className={styles.detailType}>
-            {TYPE_SINGULAR[entity.type]} · {entity.significance || 'minor'}
-          </span>
-        </div>
-        <div className={styles.spacer} />
-        <Button
-          variant="secondary"
-          prefix={<SparkIcon />}
-          onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'entity', key: entityKey, start: true } })}
-        >
-          Generate portrait
-        </Button>
-        <Button variant="ghost" onClick={() => onEdit(entity)}>
-          Edit
-        </Button>
-      </div>
-      <div className={`nf-scroll ${styles.paneScroll}`}>
-        <div className={styles.detailInner}>
-          <div>
+    <DetailPage
+      back={
+        <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type }}>
+          {backLabel(total)}
+        </Link>
+      }
+      identity={
+        <>
+          <EntityAvatar entity={entity} size={32} />
+          <h1 className={styles.detailName}>{entity.name}</h1>
+          <StatusChip intent="neutral">{TYPE_SINGULAR[entity.type]}</StatusChip>
+          <StatusChip intent={entity.significance === 'major' ? 'accent' : 'neutral'}>{entity.significance ?? 'minor'}</StatusChip>
+        </>
+      }
+      pager={<ItemPager ids={ids} currentId={entityKey} onSelect={onSelect} itemNoun="entity" jump={jump} />}
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            prefix={<SparkIcon />}
+            onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'entity', key: entityKey, start: true } })}
+          >
+            Generate portrait
+          </Button>
+          <Button variant="ghost" disabled={!full} onClick={() => full && onEdit(full)}>
+            Edit
+          </Button>
+          <Tooltip content={`Delete ${entity.name}`}>
+            <IconButton variant="ghost" size="sm" aria-label={`Delete ${entity.name}`} icon={<TrashIcon size={15} />} disabled={!full} onClick={() => full && onDelete(full)} />
+          </Tooltip>
+        </>
+      }
+      aside={<EntityAside novelId={novelId} entityKey={entityKey} byKey={byKey} type={type} />}
+      asideLabel={`${entity.name} context`}
+    >
+      {entityQuery.error ? (
+        <PaneError error={entityQuery.error} />
+      ) : !full ? (
+        <PaneLoader />
+      ) : (
+        <>
+          <div className={styles.detailTop}>
             <ImageUpload
               className={styles.cover}
-              src={entity.imageUrl ?? undefined}
-              alt={entity.name}
+              src={full.imageUrl ?? undefined}
+              alt={full.name}
               uploading={uploadImage.isPending || removeImage.isPending}
-              placeholder={<div className={styles.coverPlaceholder} style={{ background: coverColor(entity.id) }} />}
-              onUpload={body => uploadImage.mutate(body, { onSuccess: () => toast.success(`Updated ${entity.name}’s image`), onError: e => toast.danger(e.message) })}
+              placeholder={<div className={styles.coverPlaceholder} style={{ background: coverColor(full.id) }} />}
+              onUpload={body => uploadImage.mutate(body, { onSuccess: () => toast.success(`Updated ${full.name}’s image`), onError: e => toast.danger(e.message) })}
               onRemove={() => removeImage.mutate(undefined, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
             />
+            <DetailPage.Prose>
+              {full.body && (
+                <>
+                  <div className={styles.sectionLabel}>Summary</div>
+                  <Markdown content={stripEntityHeading(full.body, full.name)} className={styles.para} />
+                </>
+              )}
+              {full.motivation && (
+                <>
+                  <div className={styles.sectionLabel}>Motivation</div>
+                  <Markdown content={full.motivation} className={`${styles.para} ${styles.paraMuted}`} />
+                </>
+              )}
+              {full.notes && (
+                <>
+                  <div className={styles.sectionLabel}>Notes</div>
+                  <Markdown content={full.notes} className={`${styles.para} ${styles.paraMuted}`} />
+                </>
+              )}
+              <div className={styles.chips}>
+                {full.status && <StatusChip intent="neutral">{full.status}</StatusChip>}
+                {full.origin && <StatusChip intent="info">{full.origin}</StatusChip>}
+                {full.firstSeenChapter != null && <StatusChip intent="neutral">first seen · ch. {full.firstSeenChapter}</StatusChip>}
+              </div>
+            </DetailPage.Prose>
           </div>
-          <div>
-            {entity.body && (
-              <>
-                <div className={styles.sectionLabel}>Summary</div>
-                <Markdown content={stripEntityHeading(entity.body, entity.name)} className={styles.para} />
-              </>
-            )}
-            {entity.motivation && (
-              <>
-                <div className={styles.sectionLabel}>Motivation</div>
-                <Markdown content={entity.motivation} className={`${styles.para} ${styles.paraMuted}`} />
-              </>
-            )}
-            {entity.notes && (
-              <>
-                <div className={styles.sectionLabel}>Notes</div>
-                <Markdown content={entity.notes} className={`${styles.para} ${styles.paraMuted}`} />
-              </>
-            )}
-            <div className={styles.chips}>
-              {entity.status && <StatusChip intent="neutral">{entity.status}</StatusChip>}
-              {entity.origin && <StatusChip intent="info">{entity.origin}</StatusChip>}
-              {entity.firstSeenChapter != null && <StatusChip intent="neutral">first seen · ch. {entity.firstSeenChapter}</StatusChip>}
-            </div>
 
-            <div className={styles.gallerySection}>
-              <div className={styles.sectionLabel}>Gallery</div>
-              <ImageGallery
-                images={(entity.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
-                busy={addGalleryImage.isPending || removeGalleryImage.isPending}
-                addLabel="Add image"
-                onAdd={body => addGalleryImage.mutate(body, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
-                onRemove={id => removeGalleryImage.mutate(id, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
-              />
-            </div>
+          <div className={styles.gallerySection}>
+            <div className={styles.sectionLabel}>Gallery</div>
+            <ImageGallery
+              images={(full.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
+              busy={addGalleryImage.isPending || removeGalleryImage.isPending}
+              addLabel="Add image"
+              onAdd={body => addGalleryImage.mutate(body, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
+              onRemove={id => removeGalleryImage.mutate(id, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
+            />
           </div>
-        </div>
-      </div>
 
-      <div className={styles.forgeDock}>
-        <ForgeBar
-          novelId={novelId}
-          scope={{ type: 'novel', title: entity.name }}
-          placeholder={`Ask Forge to update ${entity.name} — add a detail, change a trait, note a new relationship…`}
-        />
-      </div>
-    </>
-  );
-}
-
-interface BibleEmptyPaneProps {
-  brief?: string;
-  pending: boolean;
-  onGenerate: () => void;
-  onSettings: () => void;
-}
-
-function BibleEmptyPane({ brief, pending, onGenerate, onSettings }: BibleEmptyPaneProps): React.JSX.Element {
-  return (
-    <div className={styles.emptyPane}>
-      <div className={styles.emptyIcon}>
-        <SparkIcon size={24} className={styles.accentIcon} />
-      </div>
-      <h2 className={styles.emptyTitle}>Draft the story bible</h2>
-      <p className={styles.emptyText}>
-        Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take
-        a few minutes.
-      </p>
-      {brief ? (
-        <Button variant="primary" prefix={<SparkIcon />} loading={pending} onClick={onGenerate}>
-          Generate story bible
-        </Button>
-      ) : (
-        <Button variant="secondary" onClick={onSettings}>
-          Add a brief in Settings
-        </Button>
+          <div className={styles.forgeRow}>
+            <ForgeBar
+              novelId={novelId}
+              scope={{ type: 'novel', title: full.name }}
+              placeholder={`Ask Forge to update ${full.name} — add a detail, change a trait, note a new relationship…`}
+            />
+          </div>
+        </>
       )}
-    </div>
+    </DetailPage>
   );
 }
 
@@ -429,43 +417,56 @@ function StoryBibleScreen(): React.JSX.Element {
   const goSearch = Route.useNavigate();
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
-  const createEntity = useCreateEntityMutation(novelId);
   const projectQuery = useProjectQuery(novelId);
+  const createEntity = useCreateEntityMutation(novelId);
   const seed = useSeedFromBriefMutation(novelId);
-  const activeType: BibleCategory = typeParam ?? 'all';
+  const audit = useAuditBibleMutation(novelId);
+  const deleteEntity = useDeleteEntityMutation(novelId);
+  const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<EntityDialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EntityResponse | undefined>();
-
-  const selectEntity = (key?: string): Promise<void> => goSearch({ search: { type: typeParam, entity: key } });
-
   const updateEntity = useUpdateEntityMutation(novelId, dialog?.mode === 'edit' ? dialog.initial.entityKey : '');
-  const deleteEntity = useDeleteEntityMutation(novelId);
 
-  const doDelete = (): void => {
-    if (!deleteTarget) return;
-    deleteEntity.mutate(deleteTarget.entityKey, {
-      onSuccess: () => {
-        toast.success(`Deleted “${deleteTarget.name}”`);
-        setDeleteTarget(undefined);
-        if (deleteTarget.entityKey === entityParam) selectEntity(undefined);
-      },
-      onError: err => toast.danger(err.message),
-    });
+  const activeType: BibleCategory = typeParam ?? 'all';
+  const resolved = !entitiesQuery.isLoading && !entitiesQuery.error;
+  const total = resolved ? entities.length : undefined;
+
+  const counts = useMemo(() => countByType(entities), [entities]);
+  const order = useMemo(() => orderTypesByCount(counts, typeParam), [counts, typeParam]);
+  const visible = useMemo(() => filterEntities(entities, activeType, query), [entities, activeType, query]);
+  const expanded = activeType !== 'all';
+  const sections = useMemo(
+    () => groupByType(visible, order).map(section => ({ type: section.type, total: section.items.length, items: sectionSlice(section.items, expanded) })),
+    [visible, order, expanded],
+  );
+  const byKey = useMemo(() => new Map(entities.map(entity => [entity.entityKey, entity])), [entities]);
+  const visibleIds = useMemo(() => (resolved ? visible.map(entity => entity.entityKey) : undefined), [resolved, visible]);
+
+  const selected = entityParam ? byKey.get(entityParam) : undefined;
+  const selectEntity = (entityKey?: string): Promise<void> => goSearch({ search: { type: typeParam, entity: entityKey } });
+  const pickType = (value: string): Promise<void> => goSearch({ search: { type: parseEntityType(value) } });
+  const clearFilters = (): void => {
+    setQuery('');
+    void goSearch({ search: {} });
   };
 
-  const counts = useMemo(() => {
-    const map = new Map<EntityType, number>();
-    for (const e of entities) map.set(e.type, (map.get(e.type) ?? 0) + 1);
-    return map;
-  }, [entities]);
-
-  const visible = useMemo(() => (activeType === 'all' ? entities : entities.filter(e => e.type === activeType)), [entities, activeType]);
-
-  // The selection is derived, not stored: the URL wins when it names a visible entity, otherwise a
-  // specific category auto-focuses its first entry while "all" shows the category overview.
-  const selectedKey = entityParam && visible.some(e => e.entityKey === entityParam) ? entityParam : activeType === 'all' ? undefined : visible[0]?.entityKey;
-
-  const pickCategory = (category: BibleCategory): Promise<void> => goSearch({ search: { type: category === 'all' ? undefined : category } });
+  const jumpItems = useMemo(() => visible.map(entity => ({ id: entity.entityKey, label: entity.name, caption: entityCaption(entity) })), [visible]);
+  const allJumpItems = useMemo(
+    () => (typeParam ? entities.map(entity => ({ id: entity.entityKey, label: entity.name, caption: entityCaption(entity) })) : undefined),
+    [entities, typeParam],
+  );
+  const jump = useCollectionJump(
+    resolved
+      ? {
+          collection: 'entities',
+          items: jumpItems,
+          filterLabel: typeParam ? TYPE_LABEL[typeParam] : undefined,
+          allItems: allJumpItems,
+          currentId: entityParam,
+          onSelect: key => void selectEntity(key),
+        }
+      : null,
+  );
 
   const submit = (form: EntityFormState): void => {
     if (dialog?.mode === 'create') {
@@ -488,29 +489,48 @@ function StoryBibleScreen(): React.JSX.Element {
         },
         onError: err => toast.danger(err.message),
       });
-    } else {
-      const body: UpdateEntityBody = {
-        name: form.name.trim(),
-        significance: form.significance,
-        status: form.status || undefined,
-        notes: form.notes || undefined,
-        motivation: form.motivation || undefined,
-        appearance: form.appearance || undefined,
-        body: form.body || undefined,
-      };
-      updateEntity.mutate(body, {
-        onSuccess: () => {
-          toast.success('Entity updated');
-          setDialog(null);
-        },
-        onError: err => toast.danger(err.message),
-      });
+      return;
     }
+    const body: UpdateEntityBody = {
+      name: form.name.trim(),
+      significance: form.significance,
+      status: form.status || undefined,
+      notes: form.notes || undefined,
+      motivation: form.motivation || undefined,
+      appearance: form.appearance || undefined,
+      body: form.body || undefined,
+    };
+    updateEntity.mutate(body, {
+      onSuccess: () => {
+        toast.success('Entity updated');
+        setDialog(null);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  const doDelete = (): void => {
+    if (!deleteTarget) return;
+    deleteEntity.mutate(deleteTarget.entityKey, {
+      onSuccess: () => {
+        toast.success(`Deleted “${deleteTarget.name}”`);
+        setDeleteTarget(undefined);
+        if (deleteTarget.entityKey === entityParam) selectEntity(undefined);
+      },
+      onError: err => toast.danger(err.message),
+    });
   };
 
   const brief = projectQuery.data?.brief?.trim();
-  const bibleEmpty = !entitiesQuery.isLoading && !entitiesQuery.error && entities.length === 0;
-  const audit = useAuditBibleMutation(novelId);
+  const runSeed = (): void => {
+    if (!brief) {
+      toast.danger('Add a project brief in Settings before generating the bible.');
+      return;
+    }
+    toast.success('Generating story bible — this can take a few minutes.');
+    seed.mutate({ brief }, { onSuccess: () => toast.success('Story bible generated'), onError: err => toast.danger(err.message) });
+  };
+
   const runAudit = (): void => {
     toast.success('Auditing the bible — this reads every document and can take a minute.');
     audit.mutate(undefined, {
@@ -521,122 +541,11 @@ function StoryBibleScreen(): React.JSX.Element {
       onError: err => toast.danger(err.message),
     });
   };
-  const runSeed = (): void => {
-    if (!brief) {
-      toast.danger('Add a project brief in Settings before generating the bible.');
-      return;
-    }
-    toast.success('Generating story bible — this can take a few minutes.');
-    seed.mutate(
-      { brief },
-      {
-        onSuccess: () => toast.success('Story bible generated'),
-        onError: err => toast.danger(err.message),
-      },
-    );
-  };
 
-  return (
-    <div className="nf-splitpane">
-      <div className="nf-rail">
-        <div className={styles.railHead}>
-          <div className={styles.railTitleRow}>
-            <span className={styles.railTitle}>Story Bible</span>
-            <div className={styles.spacer} />
-            <Tooltip content="New entity">
-              <IconButton
-                variant="ghost"
-                size="sm"
-                aria-label="New entity"
-                icon={<PlusIcon />}
-                onClick={() => setDialog({ mode: 'create', initial: emptyForm(activeType === 'all' ? 'character' : activeType) })}
-              />
-            </Tooltip>
-          </div>
-          <div id={TYPE_FILTER_LABEL_ID} className={styles.railEyebrow}>
-            Entity type
-          </div>
-          <TypeChips active={activeType} counts={counts} onPick={pickCategory} />
-        </div>
-        <div className={`nf-scroll ${styles.railList}`}>
-          {entitiesQuery.isLoading && <PaneLoader />}
-          {entitiesQuery.error && <PaneError error={entitiesQuery.error} />}
-          {!entitiesQuery.isLoading && visible.length === 0 && (
-            <div className="nf-emptynote">No {activeType === 'all' ? 'entities' : TYPE_LABEL[activeType].toLowerCase()} yet.</div>
-          )}
-          {visible.map(entity => {
-            const selected = entity.entityKey === selectedKey;
-            const subtitle = activeType === 'all' ? TYPE_SINGULAR[entity.type] : entity.status;
-            return (
-              <div
-                key={entity.id}
-                role="button"
-                tabIndex={0}
-                className={`nf-selrow ${styles.entityRow}`}
-                data-active={selected || undefined}
-                onClick={() => selectEntity(entity.entityKey)}
-                onKeyDown={e => e.key === 'Enter' && selectEntity(entity.entityKey)}
-              >
-                {entity.imageUrl ? (
-                  <img src={entity.imageUrl} alt="" className={styles.entityThumb} />
-                ) : (
-                  <div className={styles.entityAvatar} style={{ '--nf-dot': coverColor(entity.id) } as React.CSSProperties} />
-                )}
-                <div className={styles.entityBody}>
-                  <div className={`nf-entname ${styles.entityName}`}>{entity.name}</div>
-                  {subtitle && <div className={styles.entitySub}>{subtitle}</div>}
-                </div>
-                <span className={styles.entitySig}>{entity.significance ?? ''}</span>
-                <div className="nf-rowactions">
-                  <RowAction label={`Delete ${entity.name}`} danger onClick={() => setDeleteTarget(entity)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className={styles.railFooter}>
-          <Button variant="ghost" size="sm" fullWidth loading={audit.isPending} disabled={bibleEmpty} onClick={runAudit}>
-            Run bible audit
-          </Button>
-        </div>
-      </div>
-
-      <div className={`nf-detail ${styles.detailRelative}`}>
-        {selectedKey ? (
-          <EntityDetail
-            novelId={novelId}
-            entityKey={selectedKey}
-            onEdit={entity =>
-              setDialog({
-                mode: 'edit',
-                initial: {
-                  entityKey: entity.entityKey,
-                  name: entity.name,
-                  type: entity.type,
-                  significance: entity.significance ?? 'minor',
-                  status: entity.status ?? '',
-                  notes: entity.notes ?? '',
-                  motivation: entity.motivation ?? '',
-                  appearance: entity.appearance ?? '',
-                  body: entity.body ?? '',
-                },
-              })
-            }
-          />
-        ) : bibleEmpty ? (
-          <BibleEmptyPane brief={brief} pending={seed.isPending} onGenerate={runSeed} onSettings={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })} />
-        ) : activeType === 'all' ? (
-          <BibleOverview entities={entities} counts={counts} onOpen={pickCategory} />
-        ) : (
-          <div className="nf-pane-empty">Select an entity to see its detail.</div>
-        )}
-      </div>
-
+  const dialogs = (
+    <>
       {dialog && (
         <EntityDialog
-          open
           onOpenChange={next => !next && setDialog(null)}
           mode={dialog.mode}
           initial={dialog.initial}
@@ -658,6 +567,117 @@ function StoryBibleScreen(): React.JSX.Element {
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog>
-    </div>
+    </>
+  );
+
+  if (selected)
+    return (
+      <>
+        <EntityDetail
+          novelId={novelId}
+          entity={selected}
+          total={total}
+          type={typeParam}
+          ids={visibleIds}
+          jump={jump}
+          byKey={byKey}
+          onSelect={key => void selectEntity(key)}
+          onEdit={entity => setDialog({ mode: 'edit', initial: editForm(entity) })}
+          onDelete={setDeleteTarget}
+        />
+        {dialogs}
+      </>
+    );
+
+  return (
+    <>
+      <CollectionPage
+        title="Story Bible"
+        subtitle="The canon every chapter is checked against — cast, factions, places, rules."
+        total={total}
+        actions={
+          <>
+            <Button variant="secondary" loading={audit.isPending} disabled={entities.length === 0} onClick={runAudit}>
+              Run bible audit
+            </Button>
+            <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm(typeParam ?? 'character') })}>
+              New entity
+            </Button>
+          </>
+        }
+        filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
+        segments={{
+          label: 'Entity type',
+          value: activeType,
+          onValueChange: pickType,
+          items: [{ value: 'all', label: 'All', count: entities.length }, ...order.map(type => ({ value: type, label: TYPE_LABEL[type], count: counts.get(type) ?? 0 }))],
+        }}
+        empty={
+          <EmptyState
+            icon={<SparkIcon size={24} />}
+            title="Draft the story bible"
+            description="Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take a few minutes."
+            actions={
+              brief ? (
+                <Button variant="primary" prefix={<SparkIcon />} loading={seed.isPending} onClick={runSeed}>
+                  Generate story bible
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })}>
+                  Add a brief in Settings
+                </Button>
+              )
+            }
+          />
+        }
+      >
+        {entitiesQuery.isLoading ? (
+          <PaneLoader />
+        ) : entitiesQuery.error ? (
+          <PaneError error={entitiesQuery.error} />
+        ) : (
+          <>
+            {entityParam && (
+              <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
+                It was deleted, renamed, or the link was typed by hand.
+              </Alert>
+            )}
+            {visible.length === 0 ? (
+              <EmptyState
+                icon={<SearchIcon size={24} />}
+                title="Nothing matches"
+                description={`No ${activeType === 'all' ? 'entity' : TYPE_SINGULAR[activeType].toLowerCase()} matches this filter.`}
+                actions={
+                  <Button variant="secondary" onClick={clearFilters}>
+                    Clear the filter
+                  </Button>
+                }
+              />
+            ) : (
+              sections.map(section => (
+                <CollectionPage.Section
+                  key={section.type}
+                  label={TYPE_LABEL[section.type]}
+                  total={section.total}
+                  shown={section.items.length}
+                  seeAll={count => (
+                    <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type: section.type }}>
+                      See all {count}
+                    </Link>
+                  )}
+                >
+                  <div className={styles.grid}>
+                    {section.items.map(entity => (
+                      <EntityCard key={entity.id} novelId={novelId} entity={entity} type={typeParam} />
+                    ))}
+                  </div>
+                </CollectionPage.Section>
+              ))
+            )}
+          </>
+        )}
+      </CollectionPage>
+      {dialogs}
+    </>
   );
 }
