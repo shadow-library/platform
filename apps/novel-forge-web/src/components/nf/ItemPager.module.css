@@ -1,0 +1,29 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+}
+
+.pager [aria-disabled='true'] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.position {
+  padding-inline: 6px;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

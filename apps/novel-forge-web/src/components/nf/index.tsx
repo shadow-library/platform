@@ -7,8 +7,10 @@ import styles from './nf.module.css';
 
 export { CollectionPage, type CollectionFilter, type CollectionPageProps, type CollectionSectionProps, type CollectionSegment, type CollectionSegments } from './CollectionPage';
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
+export { DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { IdeaRename } from './IdeaRename';
+export { ItemPager, type ItemPagerJump, type ItemPagerProps } from './ItemPager';
 export { LookupTrace } from './LookupTrace';
 export { Markdown } from './Markdown';
 export { INHERIT_MODEL, type ModelKind, ModelPicker } from './ModelPicker';
