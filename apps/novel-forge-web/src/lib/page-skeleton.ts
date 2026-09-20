@@ -1,4 +1,4 @@
-export type SkeletonVariant = 'list' | 'overview' | 'rows' | 'split' | 'chat' | 'form' | 'default';
+export type SkeletonVariant = 'list' | 'overview' | 'rows' | 'chat' | 'form' | 'default';
 
 interface VariantRule {
   pattern: RegExp;

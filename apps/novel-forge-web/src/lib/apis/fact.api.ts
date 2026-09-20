@@ -10,7 +10,6 @@ import { ApiError, APIRequest } from './transport';
  */
 const factKeys = {
   all: (projectId: string) => ['projects', projectId, 'facts'] as const,
-  detail: (projectId: string, factKey: string) => [...factKeys.all(projectId), factKey] as const,
 };
 
 export const listFactsQueryOptions = (projectId: string): UseQueryOptions<ListFactsResponse, ApiError> =>
@@ -21,14 +20,6 @@ export const listFactsQueryOptions = (projectId: string): UseQueryOptions<ListFa
 
 export function useListFactsQuery(projectId: string, enabled = true): UseQueryResult<ListFactsResponse, ApiError> {
   return useQuery({ ...listFactsQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
-}
-
-export function useFactQuery(projectId: string, factKey: string, enabled = true): UseQueryResult<FactResponse, ApiError> {
-  return useQuery<FactResponse, ApiError>({
-    queryKey: factKeys.detail(projectId, factKey),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/facts/${factKey}`).execute(),
-    enabled: enabled && Boolean(projectId) && Boolean(factKey),
-  });
 }
 
 export type UpsertFactVariables = UpsertFactBody & { factKey: string };

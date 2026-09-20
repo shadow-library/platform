@@ -86,38 +86,6 @@ function RowsSkeleton(): React.JSX.Element {
   );
 }
 
-function RailSkeleton(): React.JSX.Element {
-  return (
-    <div className={styles.rail}>
-      <div className={styles.railHead}>
-        <Skeleton shape="line" width="60%" />
-      </div>
-      <div className={styles.railList}>
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className={styles.railRow}>
-            <Skeleton shape="line" width="80%" />
-            <Skeleton shape="line" width="45%" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SplitSkeleton(): React.JSX.Element {
-  return (
-    <div className={styles.splitPane}>
-      <RailSkeleton />
-      <div className={styles.detail}>
-        <Skeleton shape="rect" height={24} width="min(280px, 50%)" radius="var(--sh-radius-sm)" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} shape="line" width={i % 2 === 0 ? '90%' : '65%'} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function ChatSkeleton(): React.JSX.Element {
   return (
     <div className={styles.chatPane}>
@@ -166,7 +134,6 @@ const VARIANT_CONTENT: Record<SkeletonVariant, () => React.JSX.Element> = {
   list: ListSkeleton,
   overview: OverviewSkeleton,
   rows: RowsSkeleton,
-  split: SplitSkeleton,
   chat: ChatSkeleton,
   form: FormSkeleton,
   default: ListSkeleton,
@@ -176,7 +143,7 @@ export function PageSkeleton(): React.JSX.Element {
   const pathname = useRouterState({ select: state => state.location.pathname });
   const variant = resolveSkeletonVariant(pathname);
   const Content = VARIANT_CONTENT[variant];
-  const bare = variant === 'split' || variant === 'chat';
+  const bare = variant === 'chat';
 
   return (
     <div className={styles.wrap} aria-busy="true">

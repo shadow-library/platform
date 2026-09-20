@@ -93,7 +93,7 @@ interface RenameInputProps {
   className?: string;
 }
 
-// Shared by the rail row and the thread header: pre-filled and selected so typing replaces the title,
+// Shared by the sidebar row and the thread header: pre-filled and selected so typing replaces the title,
 // Enter/blur commit, Escape cancels. `settledRef` guards against an Escape's cancel and the blur that
 // follows it (removing the input from the DOM) both firing — only the first one is allowed to act.
 function RenameInput({ label, value, loading, onCommit, onCancel, className }: RenameInputProps): React.JSX.Element {
@@ -867,7 +867,7 @@ interface ChatDirectoryProps {
 
 /**
  * Every conversation, full width (D2) — reached from the sidebar's "All N chats" and from a delete that
- * left nothing open. The rail's own row actions live here now; nothing else has them.
+ * left nothing open. The row actions the old rail carried live here now; nothing else has them.
  */
 function ChatDirectory({
   novelId,

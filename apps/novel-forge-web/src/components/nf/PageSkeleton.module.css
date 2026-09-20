@@ -121,43 +121,6 @@
   margin-left: auto;
 }
 
-.rail {
-  width: var(--nf-rail-width);
-  flex-shrink: 0;
-  border-right: 1px solid var(--sh-border-subtle);
-  display: flex;
-  flex-direction: column;
-}
-
-.railHead {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--sh-border-subtle);
-}
-
-.railList {
-  flex: 1;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.railRow {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 12px;
-}
-
-.detail {
-  flex: 1;
-  min-width: var(--nf-detail-min);
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 2rem;
-}
-
 /* One centred column and a context panel — the transcript no longer shares the page with an index. */
 .chatPane {
   flex: 1;

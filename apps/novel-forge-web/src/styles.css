@@ -5,15 +5,6 @@
    to the popover layer (which already sits above modals) so they work inside dialogs. */
 :root {
   --sh-z-dropdown: 1300;
-
-  /* Shared Novel Forge layout dimensions — the split-pane list rail and the detail-pane min width.
-     Screens draw from these so navigation never shifts the layout. The document column itself is not one
-     of them: it is the platform's `--sh-page-max`, so a project here measures what a novel does in the
-     reader and a page does in Pulse. The gutters likewise mirror the shell's own scale — this app takes
-     the content region whole (`contentPadding="none"`) so the editor, chat and bible can reach every
-     edge, which means the document screens have to re-create the gutters the shell would have given them. */
-  --nf-rail-width: 240px;
-  --nf-detail-min: 480px;
 }
 
 * {
@@ -175,61 +166,17 @@ a:hover {
   background: var(--nf-dot);
 }
 
-/* Centered content column shared by the non-split-pane screens. It owns the horizontal gutters so every
-   document screen agrees on them; each screen still sets its own vertical rhythm. */
+/* Centered content column. It owns the horizontal gutters so every document screen agrees on them; each
+   screen still sets its own vertical rhythm. */
 .nf-page {
   max-width: var(--sh-page-max);
   margin: 0 auto;
   padding-inline: var(--nf-page-pad-inline);
 }
 
-.nf-splitpane {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  background: var(--sh-surface-app);
-}
-
-.nf-rail {
-  width: var(--nf-rail-width);
-  flex-shrink: 0;
-  border-right: 1px solid var(--sh-border-subtle);
-  background: var(--sh-surface-card);
-  display: flex;
-  flex-direction: column;
-}
-
-.nf-detail {
-  flex: 1;
-  min-width: var(--nf-detail-min);
-  display: flex;
-  flex-direction: column;
-  background: var(--sh-surface-app);
-}
-
-.nf-railhead {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--sh-border-subtle);
-}
-
-.nf-raillist {
-  flex: 1;
-  padding: 8px;
-}
-
 .nf-emptynote {
   padding: 16px;
   font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-}
-
-.nf-pane-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
   color: var(--sh-text-tertiary);
 }
 
@@ -270,36 +217,6 @@ a:hover {
 
 .nf-selrow.nf-selrow-flat[data-active='true'] {
   box-shadow: inset 2px 0 0 var(--nf-bar, var(--sh-accent));
-}
-
-/* Reserves the wider of the two states (icons vs. the time label) so the swap on hover/focus never
-   shifts the row's layout. */
-.nf-selrow-meta {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 70px;
-  height: 22px;
-}
-
-.nf-selrow-meta-time {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
-  white-space: nowrap;
-  transition: opacity 0.12s;
-}
-
-.nf-selrow:hover .nf-selrow-meta-time,
-.nf-selrow:focus-within .nf-selrow-meta-time {
-  opacity: 0;
-}
-
-.nf-selrow-meta .nf-rowactions {
-  position: absolute;
-  inset: 0;
-  justify-content: flex-end;
 }
 
 .nf-scroll {
@@ -377,28 +294,6 @@ a:hover {
     border-color 0.12s,
     box-shadow 0.12s,
     transform 0.12s;
-}
-
-.nf-catcard {
-  text-align: left;
-  background: var(--sh-surface-card);
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-lg);
-  padding: 15px;
-  cursor: pointer;
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    transform 0.12s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.nf-catcard:hover {
-  border-color: var(--sh-accent);
-  box-shadow: var(--sh-shadow-e2);
-  transform: translateY(-2px);
 }
 
 .nf-cardhover:hover {

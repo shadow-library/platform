@@ -45,48 +45,6 @@ export function messageTime(iso: string): string {
   return `${day}, ${time}`;
 }
 
-export interface RecencyGroup<T> {
-  label: string;
-  items: T[];
-}
-
-// Local calendar date reduced to a single UTC-anchored integer: `Date.UTC` here isn't claiming these
-// components are UTC, it's just the cheapest way to collapse a local Y/M/D into one comparable number
-// per day, independent of time-of-day and DST.
-function dayIndex(date: Date): number {
-  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
-}
-
-function recencyLabel(date: Date, now: Date): string {
-  const dayDiff = dayIndex(now) - dayIndex(date);
-  if (dayDiff <= 0) return 'Today';
-  if (dayDiff === 1) return 'Yesterday';
-  if (dayDiff < 7) return 'Previous 7 days';
-  if (dayDiff < 30) return 'Previous 30 days';
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString(undefined, sameYear ? { month: 'long' } : { month: 'long', year: 'numeric' });
-}
-
-/**
- * Groups items into recency buckets — Today, Yesterday, Previous 7 days, Previous 30 days, then by
- * month (with year once it's not `now`'s) — newest first. Sorts by `recencyOf` before bucketing, since
- * a caller's own list order may track a different field than the one buckets are computed from; a
- * dayDiff of zero or less (today, or a clock-skewed future timestamp) always lands in "Today" rather
- * than an out-of-range bucket. A bucket is only emitted when it holds at least one item.
- */
-export function groupByRecency<T>(items: T[], recencyOf: (item: T) => string, now: Date = new Date()): RecencyGroup<T>[] {
-  const sorted = [...items].sort((a, b) => new Date(recencyOf(b)).getTime() - new Date(recencyOf(a)).getTime());
-  const groups: RecencyGroup<T>[] = [];
-  for (const item of sorted) {
-    const parsed = new Date(recencyOf(item));
-    const label = recencyLabel(Number.isNaN(parsed.getTime()) ? now : parsed, now);
-    const current = groups.at(-1);
-    if (current?.label === label) current.items.push(item);
-    else groups.push({ label, items: [item] });
-  }
-  return groups;
-}
-
 export function coverColor(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;

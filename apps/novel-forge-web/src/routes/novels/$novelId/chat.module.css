@@ -205,12 +205,6 @@
   white-space: nowrap;
 }
 
-.filterPill[data-active='true'] {
-  font-weight: 600;
-  background: var(--sh-accent-soft);
-  color: var(--sh-accent);
-}
-
 .hero {
   min-height: 100%;
   max-width: 720px;
