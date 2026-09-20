@@ -186,13 +186,15 @@ export class WorkflowRunService {
     return run.id;
   }
 
+  // Every settle carries the `running` predicate: a run is written once, by whichever path reaches it
+  // first, so a late finish cannot reopen a cancelled row and leave the audit trail lying about it.
   private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[]): Promise<void> {
     this.logger.info('workflow run finished', { runId, status, outcome });
     this.logger.debug('workflow run node trace', { runId, nodeTrace });
     const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: nodeTrace as never })
-      .where(eq(schema.workflowRuns.id, runId))
+      .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
     if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status });
   }
@@ -204,13 +206,12 @@ export class WorkflowRunService {
     const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status: 'failed', error: error as never, endedAt: new Date() })
-      .where(eq(schema.workflowRuns.id, runId))
+      .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
     if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
   }
 
-  // Terminal and non-retrying (design D6): the run keeps whatever it already persisted, and the
-  // `running` predicate makes a second settle a no-op rather than reopening a finished row.
+  // Terminal and non-retrying (design D6): the run keeps whatever it already persisted.
   private async cancelRun(runId: string, nodeTrace?: string[]): Promise<void> {
     this.logger.info('workflow run cancelled', { runId });
     const [run] = await this.db

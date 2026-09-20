@@ -14,6 +14,7 @@ import { ChatService } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -53,7 +54,7 @@ describe.if(pgAvailable)('ChatService — session naming (C2)', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, events);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, events);
     const modelRouter = {
       structured: structuredMock,
       resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),

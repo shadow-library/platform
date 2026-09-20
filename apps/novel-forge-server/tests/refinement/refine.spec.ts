@@ -13,6 +13,7 @@ import { ProposalService } from '@modules/refinement/proposal.service';
 import { RefineService } from '@modules/refinement/refine.service';
 import { REQUIRED_BIBLE_DOCS } from '@modules/refinement/required-bible-docs';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -64,7 +65,7 @@ describe.if(pgAvailable)('RefineService', () => {
     (modelRouter as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke: llmInvoke, pipe: () => ({ invoke: llmInvoke }) });
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
+    const workflowRuns = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, new ProjectEventService());
     refine = new RefineService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), noPluginPolicy());
 
     const [project] = await db

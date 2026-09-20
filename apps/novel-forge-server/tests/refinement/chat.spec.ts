@@ -17,6 +17,7 @@ import { ProposalApplyService } from '@modules/refinement/proposal-apply.service
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -84,7 +85,7 @@ describe.if(pgAvailable)('ChatService', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, events);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, events);
     const modelRouter = {
       // The unawaited chat-title call (fired alongside every first turn whose opener qualifies) is
       // dispatched here, before it ever reaches structuredMock — otherwise it would race the turn's own

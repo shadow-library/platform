@@ -10,6 +10,7 @@ import { createChapterTranslationGraph, renderAuditPairs, renderTermPolicy, rout
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { type PrimaryDatabase, type Translation } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -51,6 +52,7 @@ const auditIssue: Translation.Issue = { source: 'audit', type: 'omission', detai
 
 function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, translateOutputs: unknown[], auditOutputs: unknown[], calls: ScriptedCall[]) {
   const modelRouter = {
+    ...runCancellationStub(),
     structured: async (promptModule: { key: string }, inputs: Record<string, unknown>) => {
       calls.push({ key: promptModule.key, inputs });
       if (promptModule.key === 'translate-chapter') return translateOutputs.shift();

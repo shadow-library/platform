@@ -16,6 +16,7 @@ import { chatRoleForScope, ChatService } from '@modules/refinement/chat.service'
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
@@ -54,7 +55,7 @@ describe.if(pgAvailable)('ChatService ideation guards', () => {
     const noop = {} as never;
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, new ProjectEventService());
+    const workflowRuns = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, new ProjectEventService());
     const modelRouter = {
       structured: noop,
       resolveModel: () => ({ provider: 'openrouter', model: 'x-ai/grok-4.6' }),

@@ -14,6 +14,7 @@ import { IDEA_NAME_SOURCE_LIMIT, IdeaNamingService, normaliseIdeaName } from '@m
 import { type ProjectEvent } from '@modules/events/project-events.types';
 import { seedContentHash } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -152,7 +153,7 @@ describe.if(pgAvailable)('IdeaNamingService', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
-    const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop, noop, events);
+    const workflowRuns = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, events);
     naming = new IdeaNamingService(databaseService, { structured } as never, workflowRuns);
   });
 

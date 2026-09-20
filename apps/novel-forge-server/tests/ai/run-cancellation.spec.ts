@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'bun:test';
+import { SQL } from 'bun';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ChatRefineSchema } from '@modules/ai/schemas/chat-refine.schema';
+import { type PrimaryDatabase } from '@server/database';
+import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const CTX = { projectId: BigInt(1), runId: 'run-1', promptKey: 'chat-refine', promptVersion: '2.0.0', role: 'chat' };
 const VALID = JSON.stringify({ reply: 'ok' });
@@ -229,5 +235,81 @@ describe('WorkflowRunService run lifecycle', () => {
 
     await expect(run).rejects.toMatchObject({ code: 'AI_013' });
     expect(writes[0]).toMatchObject({ status: 'cancelled' });
+  });
+});
+
+const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
+const dbName = `${baseConnectionString.split('/').pop()}_run_cancellation`;
+
+const pgAvailable = await (async () => {
+  try {
+    const sql = new SQL(baseConnectionString);
+    await sql`SELECT 1`;
+    await sql.close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+describe.if(pgAvailable)('workflow run settle guard', () => {
+  let db: PrimaryDatabase;
+  let sql: SQL;
+  let service: WorkflowRunService;
+
+  beforeAll(async () => {
+    const connectionString = await createDatabaseFromTemplate(dbName);
+    sql = new SQL(connectionString);
+    db = drizzle({ client: sql, schema }) as unknown as PrimaryDatabase;
+    service = new WorkflowRunService(
+      { getPostgresClient: () => db } as never,
+      {} as never,
+      makeRouter({}),
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        publish: () => undefined,
+      } as never,
+    );
+  });
+
+  afterAll(async () => {
+    await sql?.close();
+  });
+
+  async function seedCancelledRun(): Promise<string> {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `settle-guard-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+    const [run] = await db
+      .insert(schema.workflowRuns)
+      .values({ projectId: project.id, graph: 'chat-turn', target: 'session:1', status: 'cancelled', endedAt: new Date(), nodeTrace: [] })
+      .returning({ id: schema.workflowRuns.id });
+    if (!run) throw new Error('failed to seed run');
+    return run.id;
+  }
+
+  const settled = (runId: string) => db.query.workflowRuns.findFirst({ where: eq(schema.workflowRuns.id, runId) });
+
+  it('should not let a late completion reopen a run that already settled as cancelled', async () => {
+    const runId = await seedCancelledRun();
+
+    await (service as unknown as { completeRun: (id: string, o: string, s: string, t: string[]) => Promise<void> }).completeRun(runId, 'completed', 'completed', ['chat-turn']);
+
+    expect(await settled(runId)).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('should not let a late failure reopen a run that already settled as cancelled', async () => {
+    const runId = await seedCancelledRun();
+
+    await (service as unknown as { failRun: (id: string, err: unknown) => Promise<void> }).failRun(runId, new Error('late boom'));
+
+    const row = await settled(runId);
+    expect(row).toMatchObject({ status: 'cancelled' });
+    expect(row?.error).toBeNull();
   });
 });
