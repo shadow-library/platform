@@ -669,6 +669,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/jobs/{jobId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel Job */
+    post: operations['post_api_v1_projects_projectId_jobs_jobId_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/drafts': {
     parameters: {
       query?: never;
@@ -1057,6 +1074,23 @@ export interface paths {
     get: operations['get_api_v1_projects_projectId_runs_runId'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/runs/{runId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel Run */
+    post: operations['post_api_v1_projects_projectId_runs_runId_cancel'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3757,7 +3791,17 @@ export interface components {
     /** @enum {string} */
     JobKind: 'extract' | 'generate' | 'finalize' | 'backfill' | 'rebrand' | 'reforge' | 'publish' | 'import' | 'translate';
     /** @enum {string} */
-    JobStatus: 'pending' | 'in_progress' | 'done' | 'failed';
+    JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
+    CancelJobResponse: {
+      jobId: string;
+      /** @description The job status as recorded right now — a `stopping` outcome still reads `in_progress` because the worker writes `cancelled` as it settles. */
+      status: components['schemas']['JobStatus'];
+      /**
+       * @description 'cancelled': the job was still pending and was cancelled immediately, never dispatched. 'stopping': the job was in progress; cancellation was requested and the worker will settle it as cancelled at its next step boundary. 'already_settled': the job had already reached a terminal status (done, failed, or cancelled), so nothing was done.
+       * @enum {string}
+       */
+      outcome: 'cancelled' | 'stopping' | 'already_settled';
+    };
     ListDraftResponse: {
       items: components['schemas']['DraftResponse'][];
     };
@@ -4060,6 +4104,16 @@ export interface components {
       segment: string;
       tokens: number;
       truncated: boolean;
+    };
+    CancelRunResponse: {
+      runId: string;
+      /** @description The run status as recorded right now — a `stopping` outcome still reads `running` because the run itself writes `cancelled` as it unwinds. */
+      status: components['schemas']['WorkflowRunStatus'];
+      /**
+       * @description 'stopping': a live run on this replica was just signalled to abort. 'already_settled': the run had already reached a terminal status, so nothing was done. 'not_delivered': the run is still `running` in the database but not live on this replica — cancellation is process-local, so the signal could not be delivered; the run may be owned by another replica or may have crashed.
+       * @enum {string}
+       */
+      outcome: 'stopping' | 'already_settled' | 'not_delivered';
     };
     /** @description The context sections that contributed to a run's prompt token usage. */
     RunContextResponse: {
@@ -8117,6 +8171,47 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_jobs_jobId_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        jobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelJobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_drafts: {
     parameters: {
       query?: never;
@@ -9180,6 +9275,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_runs_runId_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelRunResponse'];
         };
       };
       /** @description Default Response */
@@ -15587,6 +15723,7 @@ export type ListGenerationJobResponse = components['schemas']['ListGenerationJob
 export type GenerationJobItem = components['schemas']['GenerationJobItem'];
 export type JobKind = components['schemas']['JobKind'];
 export type JobStatus = components['schemas']['JobStatus'];
+export type CancelJobResponse = components['schemas']['CancelJobResponse'];
 export type ListDraftResponse = components['schemas']['ListDraftResponse'];
 export type DraftResponse = components['schemas']['DraftResponse'];
 export type DraftStatus = components['schemas']['DraftStatus'];
@@ -15625,6 +15762,7 @@ export type RunModelCallResponse = components['schemas']['RunModelCallResponse']
 export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
 export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
 export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
+export type CancelRunResponse = components['schemas']['CancelRunResponse'];
 export type RunContextResponse = components['schemas']['RunContextResponse'];
 export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
 export type AiUsageResponse = components['schemas']['AiUsageResponse'];
