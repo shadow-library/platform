@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
-import { AppShell as Chrome, type NavBranch, type NavConfig, type NavLeaf, type NavNode } from '@shadow-library/ui/router';
+import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
 import { IdeaRename } from '@/components/nf';
@@ -10,8 +10,6 @@ import {
   applySeedName,
   invalidateSeed,
   translationJobActive,
-  useChatSessionQuery,
-  useListChatSessionsQuery,
   useListProjectsQuery,
   useListProposalsQuery,
   useLogoutMutation,
@@ -23,13 +21,12 @@ import {
   useTranslationStatusQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
-import { allChatsLabel, chatTitle, openChatId, RECENT_CHAT_LIMIT, recentChats } from '@/lib/chat-sessions';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { useIsAdmin } from '@/lib/session';
 
-import { BookIcon, EditIcon, GridIcon, MoonIcon, PlusIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
+import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
@@ -37,12 +34,6 @@ import { type NovelParams } from './routes';
 import { type ProjectScreen, SCREEN_LABEL, screensForWorkflow } from './screens';
 
 const PROJECT_LIMIT = 50;
-
-// The sidebar's conversation list is nested under Refinement Chat. The disclosure is what gates its
-// query, so every other project screen costs nothing until the reader opens the group there.
-type ChatListDisclosure = { kind: 'route' } | { kind: 'pinned'; open: boolean };
-
-const CHAT_LIST_PARAMS = { scopeType: 'project', status: 'active', limit: RECENT_CHAT_LIMIT } as const;
 
 function ThemeToggle(): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
@@ -55,7 +46,7 @@ function ThemeToggle(): React.JSX.Element {
 }
 
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
-  const { pathname, search: locationSearch } = useLocation();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { novelId, seedId } = useParams({ strict: false }) as NovelParams;
@@ -82,23 +73,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const seedQuery = useSeedQuery(seedId ?? '', onIdeaStudio);
   const isTranslation = projectQuery.data?.kind === 'translation';
   const translationQuery = useTranslationStatusQuery(novelId ?? '', inProject && isTranslation);
-
-  const onChatRoute = inProject && pathname.endsWith('/chat');
-  const [chatList, setChatList] = useState<ChatListDisclosure>({ kind: 'route' });
-  // A route change hands the disclosure back to the route: opening a chat should show its siblings even
-  // if the reader collapsed the group three screens ago.
-  const [chatListRoute, setChatListRoute] = useState(pathname);
-  if (chatListRoute !== pathname) {
-    setChatListRoute(pathname);
-    setChatList({ kind: 'route' });
-  }
-  const chatListOpen = chatList.kind === 'route' ? onChatRoute : chatList.open;
-  const chatSessionsQuery = useListChatSessionsQuery(novelId ?? '', CHAT_LIST_PARAMS, inProject && chatListOpen);
-  const recentSessions = chatSessionsQuery.data?.items ?? [];
-  const openChat = openChatId(locationSearch);
-  // Only when the open chat falls outside the recent few — the sidebar has to say where you are, and that
-  // is the one case the list query cannot answer on its own.
-  const pinnedQuery = useChatSessionQuery(novelId ?? '', openChat ?? '', inProject && chatListOpen && openChat != null && !recentSessions.some(s => s.id === openChat));
 
   const project = projectQuery.data;
   const status = statusQuery.data;
@@ -135,40 +109,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     badge: badges[screen.segment],
   });
 
-  // The one list that is genuinely navigation lives here rather than in a column of its own.
-  const chatBranch = (screen: ProjectScreen): NavBranch => {
-    const params = { novelId: novelId ?? '' };
-    const rows = recentChats(recentSessions, pinnedQuery.data);
-    const items: NavLeaf[] =
-      rows.length === 0 && !chatSessionsQuery.isLoading
-        ? [{ id: 'chat-first', to: screen.to, params, search: { session: 'new' }, label: 'Start the first chat', indent: true }]
-        : rows.map(session => ({ id: session.id, to: screen.to, params, search: { session: session.id }, label: chatTitle(session), indent: true, clamp: true }));
-    // Unconditional: the rows above are the active few, so this is the only route to an archived chat,
-    // to a row's rename/archive/delete, and to the history when nothing is open.
-    items.push({ id: 'chat-all', to: screen.to, params, search: { session: 'all' }, label: allChatsLabel(chatSessionsQuery.data?.total ?? 0), indent: true });
-
-    return {
-      label: screen.label,
-      icon: screen.icon,
-      to: screen.to,
-      params,
-      action: (
-        <IconButton
-          size="sm"
-          variant="ghost"
-          aria-label="Start a new chat"
-          icon={<PlusIcon size={14} />}
-          onClick={() => void navigate({ to: screen.to, params, search: { session: 'new' } })}
-        />
-      ),
-      open: chatListOpen,
-      onOpenChange: open => setChatList({ kind: 'pinned', open }),
-      items,
-    };
-  };
-
-  const toNode = (screen: ProjectScreen): NavNode => (screen.segment === 'chat' ? chatBranch(screen) : toLeaf(screen));
-
   const isAdmin = useIsAdmin();
   const screens = useMemo(() => screensForWorkflow(project?.kind).filter(screen => !screen.adminOnly || isAdmin), [project?.kind, isAdmin]);
   const nav: NavConfig = inProject
@@ -182,7 +122,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           onSelect: id => void navigate({ to: '/novels/$novelId/overview', params: { novelId: id } }),
           footerAction: { label: 'View all projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
         },
-        sections: [{ items: screens.filter(screen => !screen.trailing).map(toNode) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
+        sections: [{ items: screens.filter(screen => !screen.trailing).map(toLeaf) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
       }
     : {
         variant: 'sections',
