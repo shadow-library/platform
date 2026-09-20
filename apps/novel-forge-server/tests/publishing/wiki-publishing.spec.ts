@@ -128,6 +128,17 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
     return db.query.wikiPublications.findFirst({ where: and(eq(schema.wikiPublications.projectId, projectId), eq(schema.wikiPublications.entryKey, entryKey)) });
   }
 
+  /** The sweep dispatches without awaiting, and the executor settles the job row after the wiki write — so only a terminal job row means the executor is done */
+  async function settledPublishJob(projectId: bigint): Promise<schema.Job.Row> {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const job = await db.query.jobs.findFirst({ where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'publish')) });
+      if (job && job.status !== 'pending' && job.status !== 'in_progress') return job;
+      if (Date.now() > deadline) throw new Error(`publish job never settled (status: ${job?.status ?? 'missing'})`);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  }
+
   it('should push each visible entity as a wiki entry after the chapters converge and ledger it pushed', async () => {
     const { projectId, slug } = await seedProject(1);
     await addEntity(projectId, { aliases: ['The Hound'] });
@@ -277,8 +288,7 @@ describe.if(pgAvailable)('Wiki publish pipeline (mocked reader service)', () => 
     const swept = await janitor.sweep();
     expect(swept.map(String)).toContain(String(projectId));
 
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && (await wikiRow(projectId, 'amara'))?.state !== 'pushed') await new Promise(resolve => setTimeout(resolve, 50));
+    expect((await settledPublishJob(projectId)).status).toBe('done');
     expect(await wikiRow(projectId, 'amara')).toMatchObject({ state: 'pushed', error: null });
   });
 });
