@@ -7,6 +7,7 @@ import {
   ArchiveIcon,
   BookIcon,
   ChatIcon,
+  ClockIcon,
   EditIcon,
   ListIcon,
   PlusIcon,
@@ -21,12 +22,13 @@ import {
 import { type ChipIntent, CollectionPage, EmptyState, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, SidePanel, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
-  type ApiError,
   type ChangeItemResponse,
   type ChatMessageResponse,
   type ChatMode,
   type ChatSessionResponse,
   isTurnFailureRecorded,
+  type ListChangesResponse,
+  type ListProposalResponse,
   turnState,
   useApplyProposalMutation,
   useChatMessagesQuery,
@@ -34,6 +36,7 @@ import {
   useCreateChatSessionMutation,
   useDeleteChatSessionMutation,
   useDiscardProposalMutation,
+  useInfiniteChatSessionsQuery,
   useListChangesQuery,
   useListChatSessionsQuery,
   useListProposalsQuery,
@@ -44,8 +47,8 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
-import { bySession, chatChangesSummary, chatTitle } from '@/lib/chat-sessions';
-import { messageTime, projectTitle, relativeTime } from '@/lib/format';
+import { bySession, chatChangesSummary, chatColumnView, chatHistoryView, chatTitle, matchesChatQuery } from '@/lib/chat-sessions';
+import { groupByRecency, messageTime, projectTitle, relativeTime } from '@/lib/format';
 import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from '@/lib/proposals';
 
 import styles from './chat.module.css';
@@ -59,12 +62,11 @@ interface ChatSearch {
 // then there is nothing to name. Session ids are server-generated UUIDs, which can never spell `new`.
 const DRAFT_SESSION = 'new';
 
-// `?session=all` is the full directory — the state a list-detail page takes when no item is open.
-const ALL_SESSIONS = 'all';
-
 // Matches the shell's own pending-proposal query, so the changes panel reads that cache rather than
 // issuing a second request for the same rows.
 const PENDING_PROPOSAL_LIMIT = 50;
+
+const HISTORY_PAGE_SIZE = 25;
 
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
 // No loader by design: the refinement chat is a live, streaming conversation whose data is
@@ -93,7 +95,7 @@ interface RenameInputProps {
   className?: string;
 }
 
-// Shared by the sidebar row and the thread header: pre-filled and selected so typing replaces the title,
+// Shared by the history row and the thread header: pre-filled and selected so typing replaces the title,
 // Enter/blur commit, Escape cancels. `settledRef` guards against an Escape's cancel and the blur that
 // follows it (removing the input from the DOM) both firing — only the first one is allowed to act.
 function RenameInput({ label, value, loading, onCommit, onCancel, className }: RenameInputProps): React.JSX.Element {
@@ -266,13 +268,14 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
   );
 }
 
-interface HistoryDialogProps {
+interface ChangeHistoryDialogProps {
   novelId: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }
 
-function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): React.JSX.Element {
+/** What the chats changed, and the way back. Reached only from the changes panel — the header's History is the conversation list. */
+function ChangeHistoryDialog({ novelId, open, onOpenChange }: ChangeHistoryDialogProps): React.JSX.Element {
   const changesQuery = useListChangesQuery(novelId, open);
   const revert = useRevertProposalMutation(novelId);
   const rollback = useRollbackMutation(novelId);
@@ -308,22 +311,22 @@ function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): Rea
             description="Everything the chat (and the analysis passes) changed — newest first. Revert one change, or roll the project back to a point."
           />
           <Dialog.Body>
-            <div className={styles.historyList}>
+            <div className={styles.changeList}>
               {changesQuery.isLoading && <PaneLoader />}
               {changesQuery.error && <PaneError error={changesQuery.error} />}
               {!changesQuery.isLoading && changes.length === 0 && <div className="nf-emptynote">No applied changes yet.</div>}
               {changes.map(change => (
-                <div key={change.id} className={styles.historyRow} data-reverted={change.status === 'reverted'}>
-                  <div className={styles.historyRowTop}>
+                <div key={change.id} className={styles.changeRow} data-reverted={change.status === 'reverted'}>
+                  <div className={styles.changeRowTop}>
                     <StatusChip intent={change.status === 'applied' ? 'success' : 'info'}>{change.status}</StatusChip>
                     <StatusChip intent="neutral">{change.kind}</StatusChip>
                     {change.autoApplied && <StatusChip intent="info">auto</StatusChip>}
                     <div className={styles.spacer} />
-                    <span className={styles.historyTime}>{change.appliedAt ? relativeTime(change.appliedAt) : ''}</span>
+                    <span className={styles.changeTime}>{change.appliedAt ? relativeTime(change.appliedAt) : ''}</span>
                   </div>
-                  <div className={styles.historySummary}>{change.summary?.trim() || change.refs.join(', ') || 'pipeline actions'}</div>
-                  {change.refs.length > 0 && <div className={styles.historyRefs}>{change.refs.join(' · ')}</div>}
-                  <div className={styles.historyActions}>
+                  <div className={styles.changeSummary}>{change.summary?.trim() || change.refs.join(', ') || 'pipeline actions'}</div>
+                  {change.refs.length > 0 && <div className={styles.changeRefs}>{change.refs.join(' · ')}</div>}
+                  <div className={styles.changeActions}>
                     {change.revertible && (
                       <Button size="sm" variant="ghost" loading={revert.isPending} onClick={() => doRevert(change)}>
                         Revert
@@ -362,34 +365,289 @@ function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): Rea
   );
 }
 
+const HISTORY_EMPTY: Record<'no-match' | 'no-archived' | 'no-chats', { icon: React.JSX.Element; title: string; description: string }> = {
+  'no-match': { icon: <SearchIcon size={24} />, title: 'No chat matches that', description: 'Search reads the title and the summary of every conversation loaded so far.' },
+  'no-archived': {
+    icon: <ArchiveIcon size={24} />,
+    title: 'No archived chats',
+    description: 'Archiving a chat takes it off the active list without deleting anything it changed.',
+  },
+  'no-chats': { icon: <ChatIcon size={24} />, title: 'No chats yet', description: 'A chat is where you ask Forge to read, plan or rewrite anything in this novel.' },
+};
+
+interface ChatHistoryDialogProps {
+  novelId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  openSessionId?: string;
+  onDeleted: (sessionId: string) => void;
+}
+
+/**
+ * Every conversation, in one fixed 680×660 frame: search, Active/Archived, recency groups, and the
+ * rename/archive/delete that used to live on the directory rows. The frame never resizes with its
+ * contents — a list that shrinks under the pointer moves the row you were reaching for.
+ */
+function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDeleted }: ChatHistoryDialogProps): React.JSX.Element {
+  const [status, setStatus] = useState<'active' | 'archived'>('active');
+  const [query, setQuery] = useState('');
+  const [renamingId, setRenamingId] = useState<string>();
+  const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
+
+  const pages = useInfiniteChatSessionsQuery(novelId, { status, limit: HISTORY_PAGE_SIZE }, open);
+  const otherQuery = useListChatSessionsQuery(novelId, { status: status === 'active' ? 'archived' : 'active', limit: 1 }, open);
+  const rename = useUpdateChatSessionMutation(novelId);
+  const setSessionStatus = useSetSessionStatusMutation(novelId);
+  const remove = useDeleteChatSessionMutation(novelId);
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = pages;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasNextPage || isFetchingNextPage) return;
+    // Re-armed after every page lands: a sentinel still in view once the rows above it settle has to ask
+    // again, and an observer created while one fetch is in flight would fire a second for the same offset.
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void fetchNextPage();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  // Ideation chats belong to the studio, not the hub; they are keyed by seed rather than novel, so this
+  // only ever trims a stray, and the segment counts stay the server's own totals.
+  const loaded = (pages.data?.pages ?? []).flatMap(page => page.items).filter(session => session.scopeType !== 'ideation');
+  const matches = loaded.filter(session => matchesChatQuery(session, query));
+  const groups = groupByRecency(matches, session => session.lastTurnAt ?? session.updatedAt);
+  const view = chatHistoryView({ loading: pages.isLoading, error: Boolean(pages.error), matches: matches.length, query, status });
+
+  const statusTotal = pages.data?.pages[0]?.total ?? 0;
+  const otherTotal = otherQuery.data?.total ?? 0;
+  const counts = status === 'active' ? { active: statusTotal, archived: otherTotal } : { active: otherTotal, archived: statusTotal };
+
+  const doRename = (sessionId: string, title: string): void => {
+    rename.mutate(
+      { sessionId, title },
+      {
+        onSuccess: () => setRenamingId(undefined),
+        onError: err => {
+          setRenamingId(undefined);
+          toast.danger(err.message);
+        },
+      },
+    );
+  };
+
+  const doArchive = (session: ChatSessionResponse): void => {
+    setSessionStatus.mutate({ sessionId: session.id, status: session.status === 'active' ? 'archived' : 'active' }, { onError: err => toast.danger(err.message) });
+  };
+
+  const doDelete = (): void => {
+    if (!deleteTarget) return;
+    const { id, title } = deleteTarget;
+    remove.mutate(id, {
+      onSuccess: () => {
+        toast.success(`Deleted “${chatTitle({ id, title })}” and its history`);
+        setDeleteTarget(undefined);
+        onDeleted(id);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog.Content size="lg" className={styles.historyPanel}>
+          <Dialog.Header title="History" description="Every conversation with Forge about this novel." />
+          <div className={styles.historyToolbar}>
+            <Input
+              className={styles.historySearch}
+              type="search"
+              size="sm"
+              clearable
+              aria-label="Search chats"
+              placeholder="Search chats"
+              prefix={<SearchIcon size={14} />}
+              value={query}
+              onValueChange={setQuery}
+            />
+            <SegmentedControl size="sm" aria-label="Chat status" value={status} onValueChange={value => setStatus(value as 'active' | 'archived')}>
+              <SegmentedControl.Item value="active">
+                Active<span className={styles.segmentCount}>{counts.active}</span>
+              </SegmentedControl.Item>
+              <SegmentedControl.Item value="archived">
+                Archived<span className={styles.segmentCount}>{counts.archived}</span>
+              </SegmentedControl.Item>
+            </SegmentedControl>
+          </div>
+          <Dialog.Body>
+            {view.kind === 'loading' && <PaneLoader />}
+            {view.kind === 'error' && pages.error && <PaneError error={pages.error} />}
+            {view.kind === 'empty' && <EmptyState {...HISTORY_EMPTY[view.reason]} />}
+            {view.kind === 'rows' &&
+              groups.map(group => (
+                <section key={group.label} className={styles.historyGroup}>
+                  <h3 className={styles.historyGroupLabel}>{group.label}</h3>
+                  <CollectionPage.Rows actionReveal="always">
+                    {group.items.map(session => {
+                      const isRenaming = renamingId === session.id;
+                      return (
+                        <CollectionPage.Row
+                          key={session.id}
+                          link={
+                            isRenaming ? undefined : <Link to="/novels/$novelId/chat" params={{ novelId }} search={{ session: session.id }} onClick={() => onOpenChange(false)} />
+                          }
+                          title={
+                            isRenaming ? (
+                              <RenameInput
+                                label={`Rename “${chatTitle(session)}”`}
+                                value={session.title ?? ''}
+                                loading={rename.isPending}
+                                onCommit={title => doRename(session.id, title)}
+                                onCancel={() => setRenamingId(undefined)}
+                              />
+                            ) : (
+                              chatTitle(session)
+                            )
+                          }
+                          caption={!isRenaming && session.summary}
+                          clampCaption
+                          trailing={
+                            !isRenaming && (
+                              <>
+                                {session.id === openSessionId && <StatusChip intent="accent">open</StatusChip>}
+                                {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
+                              </>
+                            )
+                          }
+                          meta={!isRenaming && relativeTime(session.lastTurnAt ?? session.updatedAt)}
+                          actions={
+                            <>
+                              <RowAction label="Rename chat" onClick={() => setRenamingId(session.id)}>
+                                <EditIcon size={13} />
+                              </RowAction>
+                              <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => doArchive(session)}>
+                                <ArchiveIcon size={13} />
+                              </RowAction>
+                              <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
+                                <TrashIcon size={13} />
+                              </RowAction>
+                            </>
+                          }
+                        />
+                      );
+                    })}
+                  </CollectionPage.Rows>
+                </section>
+              ))}
+            {/* Rendered whatever the body shows: a search that hides every loaded row still has to reach the pages behind it. */}
+            {hasNextPage && (
+              <div ref={sentinelRef} className={styles.historySentinel}>
+                {isFetchingNextPage && <Spinner size="sm" label="Loading more chats" />}
+              </div>
+            )}
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
+        <Dialog.Content size="sm">
+          <Dialog.Header
+            title={`Delete “${deleteTarget ? chatTitle(deleteTarget) : 'this chat'}”?`}
+            description="The conversation and its full history are removed permanently. Proposals it already staged are kept."
+          />
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={remove.isPending} onClick={doDelete}>
+              Delete chat
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
+    </>
+  );
+}
+
 function lastAssistantOrdinal(messages: ChatMessageResponse[]): number {
   return messages.reduce((ordinal, message) => (message.role === 'assistant' ? Math.max(ordinal, message.ordinal) : ordinal), 0);
 }
 
-interface ChatThreadProps {
+interface DraftSuggestion {
+  label: string;
+  prompt: string;
+  icon: React.JSX.Element;
+}
+
+const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
+  {
+    label: 'Check what canon says',
+    prompt: 'What does canon currently say about my protagonist — traits, relationships, and everything that has changed about them across the volumes so far?',
+    icon: <SearchIcon size={14} />,
+  },
+  {
+    label: 'Plan the next arc',
+    prompt: 'Look at where the story stands and propose the next arc: the chapters it spans, the beats it has to hit, and what it sets up for later.',
+    icon: <ListIcon size={14} />,
+  },
+  {
+    label: 'Write a chapter brief',
+    prompt: 'Write the brief for the next chapter that has none — POV, scene beats, and the ending contract it has to land.',
+    icon: <EditIcon size={14} />,
+  },
+  {
+    label: 'Draft the next chapter',
+    prompt: 'Generate a draft of the next unwritten chapter from its brief, then tell me where you departed from the plan and why.',
+    icon: <SparkIcon size={14} />,
+  },
+  {
+    label: 'Audit for contradictions',
+    prompt: 'Audit the story bible against the drafts so far for contradictions — names, timeline, and facts that no longer line up — and list what needs fixing.',
+    icon: <WarningIcon size={14} />,
+  },
+];
+
+interface ChatColumnProps {
   novelId: string;
-  session: ChatSessionResponse;
+  /** Absent until the first message creates one — the centred state, not a different screen. */
+  session?: ChatSessionResponse;
   onOpenHistory: () => void;
-  // The just-created session's first message, queued by the draft screen — this is the one place a turn
-  // is ever sent without the author touching this thread's own composer.
+  onNewChat: () => void;
+  onStart: (content: string, mode: ChatMode) => void;
+  // True while the session create this column handed off is in flight — locks the composer so a second
+  // Enter or Send click can't spawn a second session from the same opening message.
+  starting: boolean;
+  // The just-created session's first message, queued by the screen — this is the one place a turn is
+  // ever sent without the author touching this column's own composer.
   initialTurn?: string;
   onInitialTurnSent?: () => void;
 }
 
-function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTurnSent }: ChatThreadProps): React.JSX.Element {
-  const messagesQuery = useChatMessagesQuery(novelId, session.id);
+/**
+ * The conversation, in its two states. Centred while there is nothing in it, transcript-above-composer
+ * once there is — one tree either way, so the draft, the focus and the model picker survive the move.
+ */
+function ChatColumn({ novelId, session, onOpenHistory, onNewChat, onStart, starting, initialTurn, onInitialTurnSent }: ChatColumnProps): React.JSX.Element {
+  const projectQuery = useProjectQuery(novelId);
+  const messagesQuery = useChatMessagesQuery(novelId, session?.id);
   const queryClient = useQueryClient();
-  const turn = useChatTurnStream(novelId, session.id);
+  const turn = useChatTurnStream(novelId, session?.id ?? '');
   const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
+  const [draftMode, setDraftMode] = useState<ChatMode>('manual');
   const [renamingHeader, setRenamingHeader] = useState(false);
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the
   // first one past it. Zero until a turn is sent, which is also right for a session whose transcript has none.
   const [assistantWatermark, setAssistantWatermark] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const messages = messagesQuery.data?.messages ?? [];
-  const isAuto = session.mode === 'auto';
+  const mode = session?.mode ?? draftMode;
+  const isAuto = mode === 'auto';
+  const name = projectQuery.data ? projectTitle(projectQuery.data) : 'this novel';
   // The composer locks on this tab's own request OR a turn the server still has running — the latter is
   // what lets a refresh or a second tab recover an in-flight turn instead of showing a silent message.
   const state = turnState(messagesQuery.data);
@@ -416,6 +674,8 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   // reason and the retry while the streamed bubble only keeps whatever the model managed to say. A stopped
   // turn needs neither — the author asked for it, there is nothing to explain and nowhere to retry from.
   const showTurnStatus = !showStream || stream.status === 'failed';
+  const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream });
+  const locked = session ? session.status !== 'active' : starting;
 
   const stop = (): void => {
     if (!activeRunId) return;
@@ -458,7 +718,14 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
 
   const send = (): void => {
     const content = input.trim();
-    if (!content || pending) return;
+    if (!content) return;
+    if (!session) {
+      // The draft is kept, not cleared: a create that fails leaves the opening message where it was typed.
+      // The turn that finally carries it clears it, in the `initialTurn` effect below.
+      if (!starting) onStart(content, draftMode);
+      return;
+    }
+    if (pending) return;
     setInput('');
     resend(content, content);
   };
@@ -466,14 +733,14 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   // A retry re-sends the message that never got an answer, so there is nothing in the composer to
   // restore on a second failure; the ordinary send passes its draft so a failure hands it back.
   const resend = (content: string, draft?: string): void => {
-    if (!content || pending) return;
+    if (!session || !content || pending) return;
     setAssistantWatermark(lastAssistantOrdinal(messages));
     turn.send(content, {
       onSuccess: result => {
         if (result.applied) {
           // A turn whose every op was declined applied nothing and left the proposal pending, so it is not
           // a success — only the note, naming the door the author has to walk through themselves, is true.
-          if (result.applied.opResults.some(op => op.status === 'applied')) toast.success('Changes applied — revert anytime from History');
+          if (result.applied.opResults.some(op => op.status === 'applied')) toast.success('Changes applied — revert anytime from the changes panel');
           if (result.applyNote) toast.warning(result.applyNote);
         } else if (result.applyNote) toast.danger(result.applyNote);
         else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
@@ -488,11 +755,13 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
     });
   };
 
-  const switchMode = (mode: 'manual' | 'auto'): void => {
-    updateSession.mutate({ sessionId: session.id, mode }, { onError: err => toast.danger(err.message) });
+  const switchMode = (next: ChatMode): void => {
+    if (!session) return void setDraftMode(next);
+    updateSession.mutate({ sessionId: session.id, mode: next }, { onError: err => toast.danger(err.message) });
   };
 
   const renameSession = (title: string): void => {
+    if (!session) return;
     updateSession.mutate(
       { sessionId: session.id, title },
       {
@@ -505,235 +774,181 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
     );
   };
 
-  // Fires once per freshly created session: the draft screen hands off its content and unmounts, so this
-  // is the only place it can be sent. Clearing the parent's queue up front — before the request settles —
-  // means a remount (StrictMode, or the author bouncing back to this session) never re-sends it.
+  // Fires once per freshly created session: the screen hands off the opening message and this column,
+  // still mounted from the centred state, is the only place it can be sent. Clearing the parent's queue up
+  // front — before the request settles — means a remount (StrictMode) never re-sends it.
   const sentInitialRef = useRef(false);
   useEffect(() => {
     if (!initialTurn || sentInitialRef.current) return;
     sentInitialRef.current = true;
     onInitialTurnSent?.();
+    setInput(current => (current === initialTurn ? '' : current));
     // Pass the content as the draft too: on an UNRECORDED failure (network error, 500 before the workflow
     // starts) there is no failed-turn card to retry from — the turn sender rolls a brand-new session's
     // optimistic message back to an empty transcript, so without this the author's opening message is
-    // just gone. `resend` hands it back into this thread's own composer.
+    // just gone. `resend` hands it back into this column's own composer.
     resend(initialTurn, initialTurn);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- guarded by sentInitialRef; re-running on every resend identity change would defeat the once-only guard
   }, [initialTurn]);
-
-  return (
-    <div className={styles.thread}>
-      <div className={styles.threadHead}>
-        {renamingHeader ? (
-          <RenameInput
-            label={`Rename “${chatTitle(session)}”`}
-            value={session.title ?? ''}
-            loading={updateSession.isPending}
-            onCommit={renameSession}
-            onCancel={() => setRenamingHeader(false)}
-            className={styles.threadTitleInput}
-          />
-        ) : (
-          <button type="button" className={styles.threadTitleButton} onClick={() => setRenamingHeader(true)}>
-            {/* The namer runs alongside the first turn (ac3d730d), so a null title while that turn is
-                still pending is genuinely being named, not just untitled — `state.kind` already tracks
-                that turn for the composer lock, so this reuses it rather than adding a flag. */}
-            <span className={styles.threadTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
-            <EditIcon size={13} className={styles.threadTitleEdit} />
-          </button>
-        )}
-        <StatusChip intent={session.status === 'active' ? 'success' : 'neutral'} dot>
-          {session.status}
-        </StatusChip>
-        <div className={styles.spacer} />
-        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
-          History
-        </Button>
-      </div>
-
-      <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
-        <div className={styles.msgList}>
-          {messagesQuery.isLoading && <PaneLoader />}
-          {messagesQuery.error && <PaneError error={messagesQuery.error} />}
-          {!messagesQuery.isLoading && messages.length === 0 && (
-            <p className={styles.emptyHint}>
-              {isAuto
-                ? 'Ask for anything — edits land immediately and every change is revertible from History.'
-                : 'Ask for anything — content edits, prose rewrites, or pipeline runs. You accept or decline each change.'}
-            </p>
-          )}
-          {messages.map(m =>
-            m.role === 'user' ? (
-              <div key={m.id} className={styles.userRow}>
-                <div className={styles.userCol}>
-                  <div className={styles.userBubble}>{m.content}</div>
-                  <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
-                    {messageTime(m.createdAt)}
-                  </time>
-                </div>
-              </div>
-            ) : (
-              <div key={m.id} className={styles.assistantRow}>
-                <div className={styles.avatar}>
-                  <BookIcon size={15} />
-                </div>
-                <div className={styles.assistantCol}>
-                  <Markdown content={m.content} className={styles.assistantBubble} />
-                  <MessageModelTag message={m} />
-                  {m.proposalId && <TurnProposalCard novelId={novelId} proposalId={m.proposalId} />}
-                </div>
-              </div>
-            ),
-          )}
-          {showStream && (
-            <div className={styles.assistantRow}>
-              <div className={styles.avatar}>
-                <BookIcon size={15} />
-              </div>
-              <div className={`${styles.assistantCol} ${styles.streamCol}`}>
-                <LookupTrace lookups={stream.lookups} running={stream.status === 'streaming'} />
-                {stream.reply && (
-                  <Markdown
-                    content={stream.reply}
-                    className={
-                      stream.status === 'failed'
-                        ? `${styles.assistantBubble} ${styles.streamFailed}`
-                        : stream.status === 'stopped'
-                          ? `${styles.assistantBubble} ${styles.streamStopped}`
-                          : styles.assistantBubble
-                    }
-                  />
-                )}
-                {stream.status === 'stopped' && <div className={styles.streamStoppedNote}>Stopped</div>}
-              </div>
-            </div>
-          )}
-          {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'} onRetry={resend} />}
-        </div>
-      </div>
-
-      <div className={styles.composer}>
-        <div className={styles.composerInner}>
-          <Textarea
-            value={input}
-            onValueChange={setInput}
-            placeholder="Ask for anything — edits, prose, pipeline runs…"
-            minRows={1}
-            maxRows={6}
-            autoGrow
-            disabled={session.status !== 'active'}
-            className={styles.input}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-          />
-          <div className={styles.composerBar}>
-            <ChatModelMenu novelId={novelId} session={session} disabled={session.status !== 'active'} />
-            <SegmentedControl value={session.mode} onValueChange={v => switchMode(v as 'manual' | 'auto')} size="sm" disabled={session.status !== 'active'}>
-              <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
-              <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
-            </SegmentedControl>
-            <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
-            <div className={styles.spacer} />
-            {pending && activeRunId ? (
-              <Button variant="danger" size="sm" prefix={<StopIcon size={14} />} loading={turn.stopping} disabled={turn.stopping} onClick={stop}>
-                Stop
-              </Button>
-            ) : (
-              <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={session.status !== 'active' || pending} onClick={send}>
-                Send
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface DraftSuggestion {
-  label: string;
-  prompt: string;
-  icon: React.JSX.Element;
-}
-
-const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
-  {
-    label: 'Check what canon says',
-    prompt: 'What does canon currently say about my protagonist — traits, relationships, and everything that has changed about them across the volumes so far?',
-    icon: <SearchIcon size={14} />,
-  },
-  {
-    label: 'Plan the next arc',
-    prompt: 'Look at where the story stands and propose the next arc: the chapters it spans, the beats it has to hit, and what it sets up for later.',
-    icon: <ListIcon size={14} />,
-  },
-  {
-    label: 'Write a chapter brief',
-    prompt: 'Write the brief for the next chapter that has none — POV, scene beats, and the ending contract it has to land.',
-    icon: <EditIcon size={14} />,
-  },
-  {
-    label: 'Draft the next chapter',
-    prompt: 'Generate a draft of the next unwritten chapter from its brief, then tell me where you departed from the plan and why.',
-    icon: <SparkIcon size={14} />,
-  },
-  {
-    label: 'Audit for contradictions',
-    prompt: 'Audit the story bible against the drafts so far for contradictions — names, timeline, and facts that no longer line up — and list what needs fixing.',
-    icon: <WarningIcon size={14} />,
-  },
-];
-
-interface DraftChatProps {
-  novelId: string;
-  onOpenHistory: () => void;
-  onStart?: (content: string, mode: ChatMode) => void;
-  // True while the session create this draft handed off is in flight — locks the composer so a second
-  // Enter or Send click can't spawn a second session from the same opening message.
-  starting?: boolean;
-}
-
-function DraftChat({ novelId, onOpenHistory, onStart, starting = false }: DraftChatProps): React.JSX.Element {
-  const projectQuery = useProjectQuery(novelId);
-  const [input, setInput] = useState('');
-  const [mode, setMode] = useState<ChatMode>('manual');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const isAuto = mode === 'auto';
-  const name = projectQuery.data ? projectTitle(projectQuery.data) : 'this novel';
-  const canStart = Boolean(onStart) && input.trim().length > 0 && !starting;
 
   const fill = (prompt: string): void => {
     setInput(prompt);
     inputRef.current?.focus();
   };
 
-  const start = (): void => {
-    if (!canStart) return;
-    onStart?.(input.trim(), mode);
-  };
-
   return (
-    <div className={styles.thread}>
-      <div className={styles.threadHead}>
-        <span className={styles.threadTitle}>New chat</span>
+    <div className={styles.column}>
+      <div className={styles.head}>
+        {session && renamingHeader ? (
+          <RenameInput
+            label={`Rename “${chatTitle(session)}”`}
+            value={session.title ?? ''}
+            loading={updateSession.isPending}
+            onCommit={renameSession}
+            onCancel={() => setRenamingHeader(false)}
+            className={styles.headTitleInput}
+          />
+        ) : session ? (
+          <button type="button" className={styles.headTitleButton} onClick={() => setRenamingHeader(true)}>
+            {/* The namer runs alongside the first turn (ac3d730d), so a null title while that turn is
+                still pending is genuinely being named, not just untitled — `state.kind` already tracks
+                that turn for the composer lock, so this reuses it rather than adding a flag. */}
+            <span className={styles.headTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
+            <EditIcon size={13} className={styles.headTitleEdit} />
+          </button>
+        ) : (
+          <span className={styles.headTitle}>New chat</span>
+        )}
+        {session && session.status !== 'active' && (
+          <StatusChip intent="neutral" dot>
+            {session.status}
+          </StatusChip>
+        )}
         <div className={styles.spacer} />
-        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+        <Button variant="ghost" size="sm" prefix={<ClockIcon size={14} />} onClick={onOpenHistory}>
           History
+        </Button>
+        <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={onNewChat}>
+          New chat
         </Button>
       </div>
 
-      <div className={`nf-scroll ${styles.scroll}`}>
-        <div className={styles.hero}>
-          <h2 className={styles.heroTitle}>What are we working on?</h2>
-          <p className={styles.heroSub}>
-            Forge reads every part of “{name}” — canon, plans, and prose — and{' '}
-            {isAuto ? 'applies changes as it goes, every one revertible from History' : 'checks with you before it changes anything'}.
-          </p>
+      {/* One flex column in two states: `data-view` moves the stack between centred and
+          transcript-above-composer. Every branch below keeps its slot, so the composer element is never
+          unmounted and the typed draft, the focus and the model picker survive the first turn. */}
+      <div className={styles.body} data-view={view.kind}>
+        <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
+          <div className={styles.msgList}>
+            {messagesQuery.isLoading && <PaneLoader />}
+            {messagesQuery.error && <PaneError error={messagesQuery.error} />}
+            {messages.map(m =>
+              m.role === 'user' ? (
+                <div key={m.id} className={styles.userRow}>
+                  <div className={styles.userCol}>
+                    <div className={styles.userBubble}>{m.content}</div>
+                    <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
+                      {messageTime(m.createdAt)}
+                    </time>
+                  </div>
+                </div>
+              ) : (
+                <div key={m.id} className={styles.assistantRow}>
+                  <div className={styles.avatar}>
+                    <BookIcon size={15} />
+                  </div>
+                  <div className={styles.assistantCol}>
+                    <Markdown content={m.content} className={styles.assistantBubble} />
+                    <MessageModelTag message={m} />
+                    {m.proposalId && <TurnProposalCard novelId={novelId} proposalId={m.proposalId} />}
+                  </div>
+                </div>
+              ),
+            )}
+            {showStream && (
+              <div className={styles.assistantRow}>
+                <div className={styles.avatar}>
+                  <BookIcon size={15} />
+                </div>
+                <div className={`${styles.assistantCol} ${styles.streamCol}`}>
+                  <LookupTrace lookups={stream.lookups} running={stream.status === 'streaming'} />
+                  {stream.reply && (
+                    <Markdown
+                      content={stream.reply}
+                      className={
+                        stream.status === 'failed'
+                          ? `${styles.assistantBubble} ${styles.streamFailed}`
+                          : stream.status === 'stopped'
+                            ? `${styles.assistantBubble} ${styles.streamStopped}`
+                            : styles.assistantBubble
+                      }
+                    />
+                  )}
+                  {stream.status === 'stopped' && <div className={styles.streamStoppedNote}>Stopped</div>}
+                </div>
+              </div>
+            )}
+            {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel={isAuto ? 'Forge is working' : 'Forge is reading your ask'} onRetry={resend} />}
+          </div>
+        </div>
+
+        {view.kind === 'centred' && (
+          <div className={styles.hero}>
+            <h2 className={styles.heroTitle}>What are we working on?</h2>
+            <p className={styles.heroSub}>
+              Forge reads every part of “{name}” — canon, plans, and prose — and{' '}
+              {isAuto ? 'applies changes as it goes, every one revertible' : 'checks with you before it changes anything'}.
+            </p>
+          </div>
+        )}
+
+        <div className={styles.composer}>
+          <div className={styles.composerInner}>
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onValueChange={setInput}
+              placeholder="Ask for anything — edits, prose, pipeline runs…"
+              minRows={1}
+              maxRows={6}
+              autoGrow
+              disabled={locked}
+              className={styles.input}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+            />
+            <div className={styles.composerBar}>
+              <ChatModelMenu novelId={novelId} session={session} disabled={locked} />
+              <SegmentedControl value={mode} onValueChange={v => switchMode(v as ChatMode)} size="sm" disabled={locked}>
+                <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
+                <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
+              </SegmentedControl>
+              <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, every one revertible' : 'Manual — you accept or decline each change'}</span>
+              <div className={styles.spacer} />
+              {pending && activeRunId ? (
+                <Button variant="danger" size="sm" prefix={<StopIcon size={14} />} loading={turn.stopping} disabled={turn.stopping} onClick={stop}>
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  prefix={<SendIcon size={14} />}
+                  loading={session ? pending : starting}
+                  disabled={locked || pending || input.trim().length === 0}
+                  onClick={send}
+                >
+                  Send
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {view.kind === 'centred' && (
           <div className={styles.suggestions}>
             {DRAFT_SUGGESTIONS.map(suggestion => (
               <Button key={suggestion.label} variant="secondary" size="sm" className={styles.suggestion} prefix={suggestion.icon} onClick={() => fill(suggestion.prompt)}>
@@ -741,41 +956,7 @@ function DraftChat({ novelId, onOpenHistory, onStart, starting = false }: DraftC
               </Button>
             ))}
           </div>
-        </div>
-      </div>
-
-      <div className={styles.composer}>
-        <div className={styles.composerInner}>
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onValueChange={setInput}
-            placeholder="Ask for anything — edits, prose, pipeline runs…"
-            minRows={1}
-            maxRows={6}
-            autoGrow
-            disabled={starting}
-            className={styles.input}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                start();
-              }
-            }}
-          />
-          <div className={styles.composerBar}>
-            <ChatModelMenu novelId={novelId} />
-            <SegmentedControl value={mode} onValueChange={v => setMode(v as ChatMode)} size="sm" disabled={starting}>
-              <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
-              <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
-            </SegmentedControl>
-            <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
-            <div className={styles.spacer} />
-            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={starting} disabled={!canStart} onClick={start}>
-              Send
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -783,19 +964,14 @@ function DraftChat({ novelId, onOpenHistory, onStart, starting = false }: DraftC
 
 interface ChangesPanelProps {
   novelId: string;
-  sessionId: string;
-  onOpenHistory: () => void;
+  waiting: ListProposalResponse['items'];
+  changed: ListChangesResponse['items'];
+  onOpenChangeHistory: () => void;
 }
 
 /** The right-hand context panel: what this conversation changed, and the way back out of it. */
-function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps): React.JSX.Element {
-  // Same params as the shell's own pending-proposal query, so this reads that cache instead of fetching again.
-  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: PENDING_PROPOSAL_LIMIT });
-  const changesQuery = useListChangesQuery(novelId);
+function ChangesPanel({ novelId, waiting, changed, onOpenChangeHistory }: ChangesPanelProps): React.JSX.Element {
   const revert = useRevertProposalMutation(novelId);
-
-  const waiting = bySession(proposalsQuery.data?.items ?? [], sessionId);
-  const changed = bySession(changesQuery.data?.items ?? [], sessionId);
 
   const doRevert = (id: string): void => {
     revert.mutate(id, {
@@ -806,13 +982,14 @@ function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps):
 
   return (
     <SidePanel
+      className={styles.panel}
       title="Changes in this chat"
       titleAccessory={waiting.length > 0 ? <StatusChip intent="warning">{waiting.length}</StatusChip> : undefined}
       summary={chatChangesSummary(waiting.length, changed.length)}
       total={waiting.length + changed.length}
       empty="Nothing changed yet. When Forge proposes an edit it lands here, with a Revert beside it."
       footer={
-        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+        <Button variant="ghost" size="sm" onClick={onOpenChangeHistory}>
           Roll back to a point…
         </Button>
       }
@@ -857,182 +1034,50 @@ function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps):
   );
 }
 
-interface ChatDirectoryProps {
-  novelId: string;
-  onOpenHistory: () => void;
-  sessions: ChatSessionResponse[];
-  loading: boolean;
-  error: ApiError | null;
-  statusFilter: 'active' | 'archived';
-  onStatusFilterChange: (status: 'active' | 'archived') => void;
-  renamingSessionId?: string;
-  renaming: boolean;
-  onRename: (sessionId: string, title: string) => void;
-  onRenameStart: (sessionId: string) => void;
-  onRenameCancel: () => void;
-  onArchive: (session: ChatSessionResponse) => void;
-  onDelete: (session: ChatSessionResponse) => void;
-  onNewChat: () => void;
-}
-
-/**
- * Every conversation, full width — reached from the sidebar's "All N chats" and from a delete that
- * left nothing open. The row actions the old rail carried live here now; nothing else has them.
- */
-function ChatDirectory({
-  novelId,
-  onOpenHistory,
-  sessions,
-  loading,
-  error,
-  statusFilter,
-  onStatusFilterChange,
-  renamingSessionId,
-  renaming,
-  onRename,
-  onRenameStart,
-  onRenameCancel,
-  onArchive,
-  onDelete,
-  onNewChat,
-}: ChatDirectoryProps): React.JSX.Element {
-  return (
-    <CollectionPage
-      title="Chats"
-      subtitle="Every conversation with Forge about this novel."
-      total={sessions.length}
-      actions={
-        <>
-          <Button variant="ghost" size="sm" onClick={onOpenHistory}>
-            History
-          </Button>
-          <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={onNewChat}>
-            New chat
-          </Button>
-        </>
-      }
-      segments={{
-        label: 'Chat status',
-        value: statusFilter,
-        onValueChange: value => onStatusFilterChange(value as 'active' | 'archived'),
-        items: [
-          { value: 'active', label: 'Active' },
-          { value: 'archived', label: 'Archived' },
-        ],
-      }}
-      empty={
-        statusFilter === 'active' ? (
-          <EmptyState
-            icon={<ChatIcon size={24} />}
-            title="No chats yet"
-            description="A chat is where you ask Forge to read, plan or rewrite anything in this novel — it stages every change for you to accept."
-            actions={
-              <Button variant="primary" onClick={onNewChat}>
-                Start a chat
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState icon={<ArchiveIcon size={24} />} title="No archived chats" description="Archiving a chat takes it out of the sidebar without deleting anything it changed." />
-        )
-      }
-    >
-      {loading ? (
-        <PaneLoader />
-      ) : error ? (
-        <PaneError error={error} />
-      ) : (
-        <CollectionPage.Rows actionReveal="always">
-          {sessions.map(session => {
-            const isRenaming = renamingSessionId === session.id;
-            return (
-              <CollectionPage.Row
-                key={session.id}
-                link={isRenaming ? undefined : <Link to="/novels/$novelId/chat" params={{ novelId }} search={{ session: session.id }} />}
-                title={
-                  isRenaming ? (
-                    <RenameInput
-                      label={`Rename “${chatTitle(session)}”`}
-                      value={session.title ?? ''}
-                      loading={renaming}
-                      onCommit={title => onRename(session.id, title)}
-                      onCancel={onRenameCancel}
-                    />
-                  ) : (
-                    chatTitle(session)
-                  )
-                }
-                caption={!isRenaming && session.summary}
-                clampCaption
-                trailing={!isRenaming && session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
-                meta={!isRenaming && relativeTime(session.lastTurnAt ?? session.updatedAt)}
-                actions={
-                  <>
-                    <RowAction label="Rename chat" onClick={() => onRenameStart(session.id)}>
-                      <EditIcon size={13} />
-                    </RowAction>
-                    <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => onArchive(session)}>
-                      <ArchiveIcon size={13} />
-                    </RowAction>
-                    <RowAction label="Delete chat & history" danger onClick={() => onDelete(session)}>
-                      <TrashIcon size={13} />
-                    </RowAction>
-                  </>
-                }
-              />
-            );
-          })}
-        </CollectionPage.Rows>
-      )}
-    </CollectionPage>
-  );
-}
-
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const { session: sessionParam } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
-  // Unfiltered on purpose: the status filter belongs to the directory, and resolving the open chat against
-  // a filtered list would answer an archived link with whichever active chat happened to sort first.
+  // Unfiltered on purpose: the status filter belongs to the history modal, and resolving the open chat
+  // against a filtered list would answer an archived link with whichever active chat happened to sort first.
   const sessionsQuery = useListChatSessionsQuery(novelId, { limit: 50 });
-  const setStatus = useSetSessionStatusMutation(novelId);
-  const deleteSession = useDeleteChatSessionMutation(novelId);
   const createSession = useCreateChatSessionMutation(novelId);
-  const renameSession = useUpdateChatSessionMutation(novelId);
-  // The one row (if any) whose title is an editable input right now — never more than one at a time.
-  const [renamingSessionId, setRenamingSessionId] = useState<string>();
+  // Same params as the shell's own pending-proposal query, so this reads that cache instead of fetching again.
+  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: PENDING_PROPOSAL_LIMIT });
+  const changesQuery = useListChangesQuery(novelId);
   // Bridges the gap between a create succeeding and the sessions list re-fetching to include the new row:
   // without it, `selected` would fall back to `sessions[0]` — a different chat — for one render.
   const [draftSession, setDraftSession] = useState<ChatSessionResponse>();
-  // The opening message, queued for the one `ChatThread` mount that owns sending it.
+  // The opening message, queued for the one `ChatColumn` render that owns sending it.
   const [pendingFirstTurn, setPendingFirstTurn] = useState<{ sessionId: string; content: string }>();
   // A synchronous latch against a second create: `createSession.isPending` only becomes true once the
   // mutate call's internal dispatch runs, and both a very fast double-submit and a stray render in that
   // gap could otherwise slip a second `mutate` through. Held until `selectSession` actually resolves —
-  // `isPending` (and so `starting` on `DraftChat`) goes false the instant `onSuccess` runs, before the
-  // navigation away from the draft screen has landed, and the composer re-enables in that window.
+  // `isPending` (and so `starting` on the column) goes false the instant `onSuccess` runs, before the
+  // navigation away from the draft has landed, and the composer re-enables in that window.
   const startingRef = useRef(false);
   // Which `startDraft` call is still current: `newChat` bumps it so an earlier, now-abandoned create's
   // `onSuccess` can tell it was superseded and skip navigating the author away from what they're doing now.
   const startRequestRef = useRef(0);
+  // Bumped whenever the column must start over. It is the only thing that remounts the column, which is how
+  // the centred composer survives becoming a conversation: the session it grows into keeps the same key.
+  const [columnEpoch, setColumnEpoch] = useState(0);
+  const [grownFromDraft, setGrownFromDraft] = useState<string>();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [changeHistoryOpen, setChangeHistoryOpen] = useState(false);
 
   // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
   // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
   const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
-  const listed = sessions.filter(session => session.status === statusFilter);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
   // The URL param wins when it names a session still in the list; otherwise fall back to the first
   // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.
-  // The two sentinels outrank both — they mean the author asked for something none of these rows can be.
+  // `?session=new` outranks both — it means the author asked for a chat none of these rows can be.
   const selectSession = (id?: string): Promise<void> => navigate({ search: { session: id } });
-  const showDirectory = sessionParam === ALL_SESSIONS;
   // The implicit pick stays the newest ACTIVE chat even though the list now carries archived ones too:
   // the list is sorted newest-first, so the first active row is it.
   const selected =
-    sessionParam === DRAFT_SESSION || showDirectory
+    sessionParam === DRAFT_SESSION
       ? undefined
       : (sessions.find(s => s.id === sessionParam) ?? (draftSession?.id === sessionParam ? draftSession : sessions.find(s => s.status === 'active')));
 
@@ -1041,19 +1086,31 @@ function ChatScreen(): React.JSX.Element {
   // synchronizing with an external system) so a later archive/delete of it isn't shadowed by a stale snapshot.
   if (draftSession && sessions.some(s => s.id === draftSession.id)) setDraftSession(undefined);
 
+  const waiting = selected ? bySession(proposalsQuery.data?.items ?? [], selected.id) : [];
+  const changed = selected ? bySession(changesQuery.data?.items ?? [], selected.id) : [];
+  // The panel earns its place the first time this chat has a change and keeps it for the rest of the chat,
+  // so declining the only pending proposal does not take the panel — and its Revert — away with it.
+  const [panelSession, setPanelSession] = useState<string>();
+  if (selected && panelSession !== selected.id && waiting.length + changed.length > 0) setPanelSession(selected.id);
+
+  const resetColumn = (): void => {
+    setColumnEpoch(epoch => epoch + 1);
+    setGrownFromDraft(undefined);
+  };
+
   const newChat = (): void => {
-    setStatusFilter('active');
     // Invalidates any create still in flight: its `onSuccess` checks this token and, finding it stale,
     // leaves the author here instead of navigating them to a chat they didn't ask to open. The session it
     // created is not lost — it still lands in the list once the invalidation the mutation already does
     // resolves — just not auto-opened.
     startRequestRef.current += 1;
     startingRef.current = false;
+    resetColumn();
     void selectSession(DRAFT_SESSION);
   };
 
-  // The first message of a brand-new chat: create the session, then hand its content to the `ChatThread`
-  // that mounts for it so the same turn-sending path sends it — never sent from here directly.
+  // The first message of a brand-new chat: create the session, then leave the column that typed it mounted
+  // so the same turn-sending path sends it — never sent from here directly.
   const startDraft = (content: string, mode: ChatMode): void => {
     if (startingRef.current) return;
     startingRef.current = true;
@@ -1063,12 +1120,12 @@ function ChatScreen(): React.JSX.Element {
       {
         onSuccess: async session => {
           if (startRequestRef.current !== requestId) return;
-          setStatusFilter('active');
           setDraftSession(session);
+          setGrownFromDraft(session.id);
           setPendingFirstTurn({ sessionId: session.id, content });
-          // Held until the navigation away from the draft screen actually lands — releasing it on
-          // `onSuccess` alone re-enables the still-mounted `DraftChat` composer while `sessionParam` is
-          // still the draft sentinel, letting a second Enter in that window fire a second create.
+          // Held until the navigation away from the draft actually lands — releasing it on `onSuccess`
+          // alone re-enables the still-mounted composer while `sessionParam` is still the draft sentinel,
+          // letting a second Enter in that window fire a second create.
           await selectSession(session.id);
           startingRef.current = false;
         },
@@ -1080,103 +1137,36 @@ function ChatScreen(): React.JSX.Element {
     );
   };
 
-  const archive = (session: ChatSessionResponse): void => {
-    setStatus.mutate({ sessionId: session.id, status: session.status === 'active' ? 'archived' : 'active' }, { onError: err => toast.danger(err.message) });
+  // Deleting the open chat drops the author into the next active one, or into a fresh centred composer when
+  // there is none; either way the column starts over rather than inheriting the dead chat's state.
+  const onChatDeleted = (sessionId: string): void => {
+    if (sessionId !== selected?.id) return;
+    resetColumn();
+    void selectSession(undefined);
   };
 
-  const rename = (sessionId: string, title: string): void => {
-    renameSession.mutate(
-      { sessionId, title },
-      {
-        onSuccess: () => setRenamingSessionId(undefined),
-        onError: err => {
-          setRenamingSessionId(undefined);
-          toast.danger(err.message);
-        },
-      },
-    );
-  };
-
-  const doDelete = (): void => {
-    if (!deleteTarget) return;
-    deleteSession.mutate(deleteTarget.id, {
-      onSuccess: () => {
-        toast.success(`Deleted “${chatTitle(deleteTarget)}” and its history`);
-        setDeleteTarget(undefined);
-        // Nothing to fall back to in place: the directory is where a deleted chat leaves you.
-        if (deleteTarget.id === sessionParam) selectSession(ALL_SESSIONS);
-      },
-      onError: err => toast.danger(err.message),
-    });
-  };
-
-  const dialogs = (
-    <>
-      <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
-
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
-        <Dialog.Content size="sm">
-          <Dialog.Header
-            title={`Delete “${deleteTarget ? chatTitle(deleteTarget) : 'this chat'}”?`}
-            description="The conversation and its full history are removed permanently. Proposals it already staged are kept."
-          />
-          <Dialog.Footer>
-            <Dialog.Close asChild>
-              <Button variant="ghost">Cancel</Button>
-            </Dialog.Close>
-            <Button variant="danger" loading={deleteSession.isPending} onClick={doDelete}>
-              Delete chat
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog>
-    </>
-  );
-
-  if (showDirectory)
-    return (
-      <>
-        <ChatDirectory
-          novelId={novelId}
-          onOpenHistory={() => setHistoryOpen(true)}
-          sessions={listed}
-          loading={sessionsQuery.isLoading}
-          error={sessionsQuery.error}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          renamingSessionId={renamingSessionId}
-          renaming={renameSession.isPending}
-          onRename={rename}
-          onRenameStart={setRenamingSessionId}
-          onRenameCancel={() => setRenamingSessionId(undefined)}
-          onArchive={archive}
-          onDelete={setDeleteTarget}
-          onNewChat={newChat}
-        />
-        {dialogs}
-      </>
-    );
+  const columnKey = selected && selected.id !== grownFromDraft ? selected.id : `draft-${columnEpoch}`;
 
   return (
     <div className={styles.screen}>
       <div className={styles.main}>
-        {selected ? (
-          <ChatThread
-            key={selected.id}
-            novelId={novelId}
-            session={selected}
-            onOpenHistory={() => setHistoryOpen(true)}
-            initialTurn={pendingFirstTurn?.sessionId === selected.id ? pendingFirstTurn.content : undefined}
-            onInitialTurnSent={() => setPendingFirstTurn(undefined)}
-          />
-        ) : (
-          <DraftChat novelId={novelId} onOpenHistory={() => setHistoryOpen(true)} onStart={startDraft} starting={createSession.isPending} />
-        )}
+        <ChatColumn
+          key={columnKey}
+          novelId={novelId}
+          session={selected}
+          onOpenHistory={() => setHistoryOpen(true)}
+          onNewChat={newChat}
+          onStart={startDraft}
+          starting={createSession.isPending}
+          initialTurn={pendingFirstTurn?.sessionId === selected?.id ? pendingFirstTurn?.content : undefined}
+          onInitialTurnSent={() => setPendingFirstTurn(undefined)}
+        />
       </div>
 
-      {selected && <ChangesPanel novelId={novelId} sessionId={selected.id} onOpenHistory={() => setHistoryOpen(true)} />}
+      {selected && panelSession === selected.id && <ChangesPanel novelId={novelId} waiting={waiting} changed={changed} onOpenChangeHistory={() => setChangeHistoryOpen(true)} />}
 
-      {dialogs}
+      <ChatHistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} openSessionId={selected?.id} onDeleted={onChatDeleted} />
+      <ChangeHistoryDialog novelId={novelId} open={changeHistoryOpen} onOpenChange={setChangeHistoryOpen} />
     </div>
   );
 }

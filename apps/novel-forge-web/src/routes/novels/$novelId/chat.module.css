@@ -2,8 +2,9 @@
   flex: 1;
 }
 
-/* The page owns the viewport the way the old split pane did — the composer is pinned, only the
-   transcript scrolls — but there is one column now, and the panel beside it is context, not an index. */
+/* The page owns the viewport — the composer is pinned, only the transcript scrolls. Nothing here is a
+   card: the ground is the page's own surface and only the composer, a proposal and a change row draw a
+   border. The panel beside the column is separated by a rule, not floated off it. */
 .screen {
   position: absolute;
   inset: 0;
@@ -12,8 +13,6 @@
   max-width: var(--sh-page-max);
   margin-inline: auto;
   display: flex;
-  gap: 16px;
-  padding: 16px;
   overflow: hidden;
   background: var(--sh-surface-app);
 }
@@ -26,25 +25,17 @@
   flex-direction: column;
 }
 
-@media (max-width: 960px) {
-  .screen {
-    flex-direction: column;
-    overflow-y: auto;
-    padding: 0;
-  }
-}
-
-.thread {
+.column {
   flex: 1;
   min-width: 0;
-  /* A column-flex item defaults to min-height:auto (= content height); without this the thread
-     grows past the pane, the composer lands offscreen, and the message pane cannot scroll. */
+  /* A column-flex item defaults to min-height:auto (= content height); without this the column grows
+     past the pane, the composer lands offscreen, and the transcript cannot scroll. */
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.threadHead {
+.head {
   flex-shrink: 0;
   height: 52px;
   display: flex;
@@ -52,10 +43,9 @@
   gap: 10px;
   padding: 0 20px;
   border-bottom: 1px solid var(--sh-border-subtle);
-  background: var(--sh-surface-card);
 }
 
-.threadTitleButton {
+.headTitleButton {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -68,11 +58,11 @@
   color: inherit;
 }
 
-.threadTitleButton:hover {
+.headTitleButton:hover {
   background: var(--sh-bg-hover);
 }
 
-.threadTitle {
+.headTitle {
   min-width: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 700;
@@ -81,13 +71,28 @@
   white-space: nowrap;
 }
 
-.threadTitleEdit {
+.headTitleEdit {
   flex-shrink: 0;
   color: var(--sh-text-tertiary);
 }
 
-.threadTitleInput {
+.headTitleInput {
   width: 260px;
+}
+
+/* The two states of one column. `centred` gathers the question, the composer and the chips into a single
+   block in the middle of the page; `conversation` fills from the top with the composer pinned under it.
+   Only `justify-content` and the transcript's flex move — the composer element itself never unmounts. */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.body[data-view='centred'] {
+  justify-content: center;
+  padding-bottom: 6vh;
 }
 
 .scroll {
@@ -96,19 +101,18 @@
   padding: 24px 20px;
 }
 
+.body[data-view='centred'] .scroll {
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+}
+
 .msgList {
   max-width: 720px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.emptyHint {
-  text-align: center;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-  line-height: 1.6;
 }
 
 .userRow {
@@ -173,7 +177,7 @@
 }
 
 .composer {
-  flex-shrink: 0;
+  flex: none;
   padding: 6px 20px 16px;
 }
 
@@ -210,14 +214,15 @@
 }
 
 .hero {
-  min-height: 100%;
+  flex: none;
+  width: 100%;
   max-width: 720px;
   margin: 0 auto;
+  padding: 0 20px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 10px;
   text-align: center;
 }
 
@@ -239,7 +244,11 @@
 }
 
 .suggestions {
-  margin-top: 12px;
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -248,6 +257,15 @@
 
 .suggestion {
   border-radius: 99px;
+}
+
+/* SidePanel draws itself as a card; here it is context beside the transcript, so the frame becomes a
+   single rule. Doubled to outrank the primitive's own single-class root, which import order does not settle. */
+.panel.panel {
+  border: 0;
+  border-left: 1px solid var(--sh-border-subtle);
+  border-radius: 0;
+  background: transparent;
 }
 
 .turnCard {
@@ -354,49 +372,101 @@
   border-top: 1px solid var(--sh-border-subtle);
 }
 
-.historyList {
+/* Doubled to outrank ui's own `.panel[data-size]`, which CSS-module import order does not settle. Fixed on
+   both axes: sixty-three conversations, one, or a search that matches none must all draw the same frame. */
+.historyPanel.historyPanel[data-size] {
+  width: 680px;
+  max-width: 100%;
+  height: 660px;
+}
+
+.historyToolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.historySearch {
+  flex: 1;
+  min-width: 200px;
+}
+
+.segmentCount {
+  margin-left: 6px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.historyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historyGroup + .historyGroup {
+  margin-top: 16px;
+}
+
+.historyGroupLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.historySentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.changeList {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 60vh;
-  overflow: auto;
 }
 
-.historyRow {
+.changeRow {
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
   padding: 10px 12px;
 }
 
-.historyRow[data-reverted='true'] {
+.changeRow[data-reverted='true'] {
   opacity: 0.55;
 }
 
-.historyRowTop {
+.changeRowTop {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.historyTime {
+.changeTime {
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-tertiary);
 }
 
-.historySummary {
+.changeSummary {
   margin-top: 6px;
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-primary);
 }
 
-.historyRefs {
+.changeRefs {
   margin-top: 4px;
   font-family: var(--sh-font-mono);
   font-size: 11px;
   color: var(--sh-text-tertiary);
 }
 
-.historyActions {
+.changeActions {
   display: flex;
   gap: 6px;
   margin-top: 8px;
@@ -443,7 +513,7 @@
   padding: 10px;
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-app);
+  background: var(--sh-surface-card);
 }
 
 .panelRow[data-reverted='true'] {
@@ -466,4 +536,16 @@
   font-size: 12px;
   line-height: 1.5;
   color: var(--sh-text-secondary);
+}
+
+@media (max-width: 960px) {
+  .screen {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel.panel {
+    border-left: 0;
+    border-top: 1px solid var(--sh-border-subtle);
+  }
 }

@@ -29,6 +29,8 @@ export interface SidePanelProps {
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  /** Merged onto the panel's own `<aside>`, for a host that has to restate its frame — a border-left in place of the card. */
+  className?: string;
   children: ReactNode;
 }
 
@@ -44,6 +46,7 @@ export function SidePanel({
   collapsed,
   defaultCollapsed = false,
   onCollapsedChange,
+  className,
   children,
 }: SidePanelProps): ReactElement {
   const bodyId = useId();
@@ -60,7 +63,7 @@ export function SidePanel({
   const toggleLabel = panelToggleLabel(title, state, summary);
 
   return (
-    <aside className={styles.root} data-state={state} aria-label={title}>
+    <aside className={className ? `${styles.root} ${className}` : styles.root} data-state={state} aria-label={title}>
       {state === 'collapsed' ? (
         <button type="button" className={styles.reopen} aria-label={toggleLabel} aria-expanded={false} aria-controls={bodyId} onClick={toggle}>
           <ChevronLeftIcon size={14} />

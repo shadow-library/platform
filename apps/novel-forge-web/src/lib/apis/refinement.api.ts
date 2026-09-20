@@ -1,7 +1,10 @@
 import {
+  type InfiniteData,
   type Query,
   type QueryClient,
   queryOptions,
+  useInfiniteQuery,
+  type UseInfiniteQueryResult,
   useMutation,
   type UseMutationResult,
   useQuery,
@@ -60,6 +63,11 @@ interface ListSessionsParams {
   limit?: number;
 }
 
+interface InfiniteSessionsParams {
+  status: ChatSessionResponse['status'];
+  limit: number;
+}
+
 interface ForgeTurnVariables {
   sessionId: string;
   content: string;
@@ -111,6 +119,28 @@ export function useListChatSessionsQuery(projectId: string, params?: ListSession
   return useQuery<ListChatSessionResponse, ApiError>({
     queryKey: [...refinementKeys.sessions(projectId), params],
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions`).query({ scopeType: params?.scopeType, status: params?.status, limit: params?.limit }).execute(),
+    enabled: enabled && Boolean(projectId),
+  });
+}
+
+/**
+ * The session list one page at a time, for the history modal. The endpoint takes `limit`/`offset` and
+ * answers with `total`, so the next offset is derivable; a page that comes back empty ends the list
+ * regardless of what `total` claims, so a shrinking collection cannot loop.
+ */
+export function useInfiniteChatSessionsQuery(
+  projectId: string,
+  params: InfiniteSessionsParams,
+  enabled = true,
+): UseInfiniteQueryResult<InfiniteData<ListChatSessionResponse, number>, ApiError> {
+  return useInfiniteQuery<ListChatSessionResponse, ApiError, InfiniteData<ListChatSessionResponse, number>, readonly unknown[], number>({
+    queryKey: [...refinementKeys.sessions(projectId), { ...params, paged: true }],
+    queryFn: ({ pageParam }) => APIRequest.get(`/projects/${projectId}/chat/sessions`).query({ status: params.status, limit: params.limit, offset: pageParam }).execute(),
+    initialPageParam: 0,
+    getNextPageParam: last => {
+      const loaded = last.offset + last.items.length;
+      return last.items.length === 0 || loaded >= last.total ? undefined : loaded;
+    },
     enabled: enabled && Boolean(projectId),
   });
 }
