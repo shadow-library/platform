@@ -11,7 +11,7 @@ import { StorageErrorCode } from '@shadow-library/modules';
 import { ProjectEventService } from '@modules/events';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { getProfileDefaults } from '@modules/ai/defaults';
+import { PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { type AppearanceDescriberService, type AppearanceDescription, type DescribeAppearanceRequest } from '@modules/ai/appearance-describer.service';
 import { ModelRouterService } from '@modules/ai/model-router.service';
@@ -706,7 +706,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
     const projectId = await seedProject('illustration-default-model');
     await harness.service.start(projectId, { subjectType: 'cover' });
 
-    expect(harness.imageRequests[0]?.model).toBe(getProfileDefaults()['image'].model);
+    expect(harness.imageRequests[0]?.model).toBe(PRODUCTION_DEFAULTS['image'].model);
   });
 
   it("should honour the project's image model override", async () => {
@@ -934,7 +934,7 @@ describe.if(pgAvailable)('IllustrationService — canon-driven generation', () =
     });
 
     async function withCapacity<T>(capacity: number, run: () => Promise<T>): Promise<T> {
-      const entry = MODEL_MAP[getProfileDefaults()['image'].model]!;
+      const entry = MODEL_MAP[PRODUCTION_DEFAULTS['image'].model]!;
       const previous = entry.maxInputReferences;
       entry.maxInputReferences = capacity;
       try {

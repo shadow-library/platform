@@ -17,10 +17,10 @@ import { type PrimaryDatabase, schema } from '@server/database';
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import {
   type AiRole,
-  getGroupDefaults,
-  getProfileDefaults,
   isRegisteredModel,
   isUnrestrictedAllowed,
+  PRODUCTION_DEFAULTS,
+  PRODUCTION_GROUP_DEFAULTS,
   type ResolvedModel,
   resolveReasoningEffort,
   ROLE_GROUP,
@@ -246,7 +246,7 @@ export class ModelRouterService {
       if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
       return projectModel;
     }
-    return accountDefault ?? getProfileDefaults()[role] ?? getGroupDefaults().writing;
+    return accountDefault ?? PRODUCTION_DEFAULTS[role] ?? PRODUCTION_GROUP_DEFAULTS.writing;
   }
 
   async resolveFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ResolvedModel> {

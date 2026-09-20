@@ -3,7 +3,7 @@ import { Body, Get, HttpController, Put, RespondFor } from '@shadow-library/fast
 
 import { ACCOUNT_MODEL_GROUPS, AccountSettingsService } from './account-settings.service';
 import { AccountSettingsResponse, AiModelOption, AiModelsResponse, UpdateAccountSettingsBody } from './ai.dto';
-import { getGroupDefaults, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
+import { PRODUCTION_GROUP_DEFAULTS, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
 import { MODEL_REGISTRY } from './models';
 
 @Authenticated()
@@ -47,7 +47,7 @@ export class AiController {
     return {
       profile: 'production',
       models: registry,
-      defaults: toRoleDefaults(getGroupDefaults()),
+      defaults: toRoleDefaults(PRODUCTION_GROUP_DEFAULTS),
       unrestrictedDefaults: toRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS),
       unrestrictedAllowlist: [...UNRESTRICTED_LLM_ALLOWLIST, ...UNRESTRICTED_IMAGE_ALLOWLIST],
     };

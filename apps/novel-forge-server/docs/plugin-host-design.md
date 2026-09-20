@@ -194,7 +194,7 @@ type WriterClass = 'standard' | 'permissive';
 
 The plugin returns a class or `undefined` (no opinion). Core resolves it:
 
-- `standard` → `getGroupDefaults()` / `getProfileDefaults()`, exactly as today.
+- `standard` → `PRODUCTION_GROUP_DEFAULTS` / `PRODUCTION_DEFAULTS`, exactly as today.
 - `permissive` → `UNRESTRICTED_GROUP_DEFAULTS`, clamped by `isUnrestrictedAllowed`.
 
 **`call.route` reaches every role, not only `generation`.** It lives in `resolveModel`, so `outline`, `plan`,

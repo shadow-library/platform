@@ -82,7 +82,7 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // anthropic/claude-opus-5 (the ideation studio has no settings screen, so this is the studio's fixed
 // default rather than a group an author configures), vision → openai/gpt-5.6-luna (the cheapest registered model OpenRouter lists
 // with image input; like ideation it is a fixed default, not an author-configured group).
-const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
+export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
   review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
@@ -135,15 +135,6 @@ function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<A
 }
 
 export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
-
-export function getProfileDefaults(): Record<AiRole, ResolvedModel> {
-  return PRODUCTION_DEFAULTS;
-}
-
-// The group-level defaults — what the settings UI shows as each group's inherited model.
-export function getGroupDefaults(): Record<ModelGroup, ResolvedModel> {
-  return PRODUCTION_GROUP_DEFAULTS;
-}
 
 // How hard each group is allowed to think. Hidden reasoning tokens bill as output, so the mechanical
 // helper roles (title, compact, epitome) ask for none at all; every authoring group buys the cheapest
