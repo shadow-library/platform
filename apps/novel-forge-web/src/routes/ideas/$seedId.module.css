@@ -7,9 +7,13 @@
 .screen {
   position: absolute;
   inset: 0;
+  /* Centred on the same column every other screen uses: `inset: 0` with `max-width` leaves the
+     over-constrained width to the auto margins, which is what centres an absolutely positioned box. */
+  max-width: var(--sh-page-max);
+  margin-inline: auto;
   display: flex;
   gap: 16px;
-  padding: 16px 16px 16px 0;
+  padding: 16px;
   overflow: hidden;
   background: var(--sh-surface-app);
 }

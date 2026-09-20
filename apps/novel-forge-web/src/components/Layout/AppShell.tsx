@@ -139,12 +139,13 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const chatBranch = (screen: ProjectScreen): NavBranch => {
     const params = { novelId: novelId ?? '' };
     const rows = recentChats(recentSessions, pinnedQuery.data);
-    const seeAll = allChatsLabel(chatSessionsQuery.data?.total ?? 0, rows.length);
     const items: NavLeaf[] =
       rows.length === 0 && !chatSessionsQuery.isLoading
         ? [{ id: 'chat-first', to: screen.to, params, search: { session: 'new' }, label: 'Start the first chat', indent: true }]
         : rows.map(session => ({ id: session.id, to: screen.to, params, search: { session: session.id }, label: chatTitle(session), indent: true, clamp: true }));
-    if (seeAll) items.push({ id: 'chat-all', to: screen.to, params, search: { session: 'all' }, label: seeAll, indent: true });
+    // Unconditional: the rows above are the active few, so this is the only route to an archived chat,
+    // to a row's rename/archive/delete, and to the history when nothing is open.
+    items.push({ id: 'chat-all', to: screen.to, params, search: { session: 'all' }, label: allChatsLabel(chatSessionsQuery.data?.total ?? 0), indent: true });
 
     return {
       label: screen.label,

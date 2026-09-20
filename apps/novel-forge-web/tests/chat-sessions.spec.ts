@@ -38,26 +38,25 @@ describe('recentChats', () => {
 });
 
 describe('allChatsLabel', () => {
-  it('should stay silent while the list hides nothing', () => {
-    expect(allChatsLabel(4, 4)).toBeNull();
-    expect(allChatsLabel(3, 4)).toBeNull();
-    expect(allChatsLabel(0, 0)).toBeNull();
+  it('should still offer the directory while the nav hides nothing', () => {
+    expect(allChatsLabel(4)).toBe('All 4 chats');
+    expect(allChatsLabel(1)).toBe('All 1 chats');
   });
 
-  it('should name the whole collection once rows are hidden', () => {
-    expect(allChatsLabel(14, 4)).toBe('All 14 chats');
+  it('should name the whole collection', () => {
+    expect(allChatsLabel(14)).toBe('All 14 chats');
   });
 
-  it('should count a pinned open chat as shown', () => {
-    expect(allChatsLabel(5, 5)).toBeNull();
+  it('should drop the count rather than the link when there is nothing active to count', () => {
+    expect(allChatsLabel(0)).toBe('All chats');
   });
 
   it('should group a long count', () => {
-    expect(allChatsLabel(1200, 4)).toBe('All 1,200 chats');
+    expect(allChatsLabel(1200)).toBe('All 1,200 chats');
   });
 
-  it('should refuse a count it cannot trust', () => {
-    expect(allChatsLabel(Number.NaN, 4)).toBeNull();
+  it('should drop a count it cannot trust', () => {
+    expect(allChatsLabel(Number.NaN)).toBe('All chats');
   });
 });
 

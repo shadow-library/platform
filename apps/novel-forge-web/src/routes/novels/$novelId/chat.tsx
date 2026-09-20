@@ -690,13 +690,14 @@ const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
 
 interface DraftChatProps {
   novelId: string;
+  onOpenHistory: () => void;
   onStart?: (content: string, mode: ChatMode) => void;
   // True while the session create this draft handed off is in flight — locks the composer so a second
   // Enter or Send click can't spawn a second session from the same opening message.
   starting?: boolean;
 }
 
-function DraftChat({ novelId, onStart, starting = false }: DraftChatProps): React.JSX.Element {
+function DraftChat({ novelId, onOpenHistory, onStart, starting = false }: DraftChatProps): React.JSX.Element {
   const projectQuery = useProjectQuery(novelId);
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<ChatMode>('manual');
@@ -718,6 +719,14 @@ function DraftChat({ novelId, onStart, starting = false }: DraftChatProps): Reac
 
   return (
     <div className={styles.thread}>
+      <div className={styles.threadHead}>
+        <span className={styles.threadTitle}>New chat</span>
+        <div className={styles.spacer} />
+        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+          History
+        </Button>
+      </div>
+
       <div className={`nf-scroll ${styles.scroll}`}>
         <div className={styles.hero}>
           <h2 className={styles.heroTitle}>What are we working on?</h2>
@@ -850,6 +859,7 @@ function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps):
 
 interface ChatDirectoryProps {
   novelId: string;
+  onOpenHistory: () => void;
   sessions: ChatSessionResponse[];
   loading: boolean;
   error: ApiError | null;
@@ -871,6 +881,7 @@ interface ChatDirectoryProps {
  */
 function ChatDirectory({
   novelId,
+  onOpenHistory,
   sessions,
   loading,
   error,
@@ -891,9 +902,14 @@ function ChatDirectory({
       subtitle="Every conversation with Forge about this novel."
       total={sessions.length}
       actions={
-        <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={onNewChat}>
-          New chat
-        </Button>
+        <>
+          <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+            History
+          </Button>
+          <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={onNewChat}>
+            New chat
+          </Button>
+        </>
       }
       segments={{
         label: 'Chat status',
@@ -1122,6 +1138,7 @@ function ChatScreen(): React.JSX.Element {
       <>
         <ChatDirectory
           novelId={novelId}
+          onOpenHistory={() => setHistoryOpen(true)}
           sessions={listed}
           loading={sessionsQuery.isLoading}
           error={sessionsQuery.error}
@@ -1153,7 +1170,7 @@ function ChatScreen(): React.JSX.Element {
             onInitialTurnSent={() => setPendingFirstTurn(undefined)}
           />
         ) : (
-          <DraftChat novelId={novelId} onStart={startDraft} starting={createSession.isPending} />
+          <DraftChat novelId={novelId} onOpenHistory={() => setHistoryOpen(true)} onStart={startDraft} starting={createSession.isPending} />
         )}
       </div>
 

@@ -19,10 +19,9 @@ export function recentChats<T extends ChatListEntry>(sessions: readonly T[], ope
   return [...recent, open];
 }
 
-/** Null until the list is actually hiding something — a link to a directory of what is already on screen is noise. */
-export function allChatsLabel(total: number, shown: number): string | null {
-  if (!Number.isFinite(total) || total <= shown) return null;
-  return `All ${formatCount(total)} chats`;
+/** Always present: the directory is the only way to the archived chats and the row actions, so it cannot depend on the nav hiding something. */
+export function allChatsLabel(total: number): string {
+  return Number.isFinite(total) && total > 0 ? `All ${formatCount(total)} chats` : 'All chats';
 }
 
 /** The chat the URL has open, narrowed out of the router's loosely-typed search. The `new` and `all` sentinels name no session, and no session id can spell them. */

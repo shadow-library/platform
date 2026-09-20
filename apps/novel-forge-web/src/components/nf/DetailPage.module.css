@@ -1,4 +1,6 @@
 .root {
+  max-width: var(--sh-page-max);
+  margin-inline: auto;
   padding-block: 28px 80px;
   padding-inline: var(--nf-page-pad-inline);
 }
