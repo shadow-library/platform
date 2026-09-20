@@ -14,10 +14,15 @@
       "command": "bunx",
       "args": ["@playwright/mcp@latest"]
     },
-    "shadow-logs": {
+    "shadow-logs-dev": {
       "type": "stdio",
       "command": "gitops",
       "args": ["mcp", "dev"]
+    },
+    "shadow-logs-prod": {
+      "type": "stdio",
+      "command": "gitops",
+      "args": ["mcp", "prod"]
     }
   }
 }

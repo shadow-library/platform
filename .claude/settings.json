@@ -27,7 +27,8 @@
       "Bash(uniq:*)",
       "Bash(cut:*)",
       "Bash(jq:*)",
-      "mcp__shadow-logs"
+      "mcp__shadow-logs-dev",
+      "mcp__shadow-logs-prod"
     ],
     "deny": ["Bash(sed -i:*)", "Bash(sed --in-place:*)"]
   },
