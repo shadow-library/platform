@@ -33,7 +33,7 @@ import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { ReplyStreamScanner } from './reply-stream-scanner';
-import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toJsonSchemaFormat } from './schemas/validate';
+import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toHostedPromptSchema, toOllamaFormatSchema } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 export type ProjectConfig = OwnerFields & {
@@ -399,7 +399,7 @@ export class ModelRouterService {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = await this.resolveFor(role, project, ctx.projectId, policy);
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
-    const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema), role });
+    const llm = this.buildClient(resolved, { format: toOllamaFormatSchema(promptModule.schema), role });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
     const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err })) : null;
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
@@ -618,7 +618,8 @@ export class ModelRouterService {
   // Anthropic models get cache_control breakpoints on cacheStrategy modules, and every provider EXCEPT
   // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
   // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
-  // never mention JSON) answer with plain prose.
+  // never mention JSON) answer with plain prose. The in-band form keeps the descriptions and constraints
+  // the AJV pass judges the reply against; stripping them is an Ollama concession only.
   private async buildMessages<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,
@@ -634,7 +635,7 @@ export class ModelRouterService {
       messages = [
         ...messages,
         new HumanMessage(
-          `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toJsonSchemaFormat(promptModule.schema))}`,
+          `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`,
         ),
       ];
     }
