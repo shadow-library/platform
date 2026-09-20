@@ -6,11 +6,14 @@ import {
   CHAPTER_STATE_INTENT,
   CHAPTER_STATE_LABEL,
   chapterAttentionNote,
+  chapterNeighbour,
+  chapterPosition,
   chapterRowState,
   chapterStaleNote,
   finalizeBlockers,
   finalizeTooltip,
   pasteStatsLabel,
+  queueHotkey,
   startActionLabel,
   TRANSLATION_PHASE_LABEL,
   TREATMENT_INTENT,
@@ -160,5 +163,68 @@ describe('pasteStatsLabel', () => {
   it('should count paragraphs and characters for the paste dialog', () => {
     expect(pasteStatsLabel('one\n\ntwo')).toBe('2 paragraphs · 8 characters');
     expect(pasteStatsLabel('')).toBe('0 paragraphs · 0 characters');
+  });
+});
+
+describe('chapterNeighbour', () => {
+  const walk = { chapter: 12, page: 1, pageSize: 25, total: 60, filtered: false, chapters: [11, 12, 13] };
+
+  it('should step within the loaded page without changing page', () => {
+    expect(chapterNeighbour(walk, 1)).toEqual({ chapter: 13, page: 1 });
+    expect(chapterNeighbour(walk, -1)).toEqual({ chapter: 11, page: 1 });
+  });
+
+  it('should cross the page edge on an unfiltered list, where originals are contiguous', () => {
+    expect(chapterNeighbour({ ...walk, chapter: 25, chapters: [24, 25] }, 1)).toEqual({ chapter: 26, page: 2 });
+    expect(chapterNeighbour({ ...walk, chapter: 26, page: 2, chapters: [26, 27] }, -1)).toEqual({ chapter: 25, page: 1 });
+  });
+
+  it('should stop at the page edge once a status filter breaks contiguity', () => {
+    expect(chapterNeighbour({ ...walk, chapter: 25, chapters: [24, 25], filtered: true }, 1)).toBeNull();
+    expect(chapterNeighbour({ ...walk, chapter: 26, page: 2, chapters: [26, 27], filtered: true }, -1)).toBeNull();
+  });
+
+  it('should stop at the ends of the collection', () => {
+    expect(chapterNeighbour({ ...walk, chapter: 1, page: 1, chapters: [1, 2] }, -1)).toBeNull();
+    expect(chapterNeighbour({ ...walk, chapter: 60, page: 3, total: 60, chapters: [59, 60] }, 1)).toBeNull();
+  });
+
+  it('should refuse to guess for a chapter the loaded page does not hold', () => {
+    expect(chapterNeighbour({ ...walk, chapter: 99 }, 1)).toEqual({ chapter: 100, page: 2 });
+    expect(chapterNeighbour({ ...walk, chapter: 99, filtered: true }, 1)).toBeNull();
+  });
+});
+
+describe('chapterPosition', () => {
+  it('should count against the collection rather than the loaded page', () => {
+    expect(chapterPosition({ chapter: 27, page: 2, pageSize: 25, total: 480, chapters: [26, 27, 28] })).toBe('27 of 480');
+  });
+
+  it('should report nothing when the chapter is off the loaded page or the collection is empty', () => {
+    expect(chapterPosition({ chapter: 99, page: 1, pageSize: 25, total: 480, chapters: [1, 2] })).toBeNull();
+    expect(chapterPosition({ chapter: 1, page: 1, pageSize: 25, total: 0, chapters: [1] })).toBeNull();
+  });
+});
+
+describe('queueHotkey', () => {
+  const event = { key: 'a', ctrlKey: false, metaKey: false, altKey: false, editableTarget: false };
+
+  it('should map the bare triage letters', () => {
+    expect(queueHotkey(event)).toBe('approve');
+    expect(queueHotkey({ ...event, key: 'R' })).toBe('reject');
+    expect(queueHotkey({ ...event, key: 'j' })).toBe('next');
+    expect(queueHotkey({ ...event, key: 'k' })).toBe('previous');
+    expect(queueHotkey({ ...event, key: 'z' })).toBeNull();
+  });
+
+  it('should leave the browser its own chords', () => {
+    expect(queueHotkey({ ...event, metaKey: true })).toBeNull();
+    expect(queueHotkey({ ...event, ctrlKey: true })).toBeNull();
+    expect(queueHotkey({ ...event, altKey: true })).toBeNull();
+  });
+
+  it('should never fire while the key lands in text entry', () => {
+    expect(queueHotkey({ ...event, editableTarget: true })).toBeNull();
+    expect(queueHotkey({ ...event, key: 'j', editableTarget: true })).toBeNull();
   });
 });

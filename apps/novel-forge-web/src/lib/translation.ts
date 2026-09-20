@@ -139,3 +139,58 @@ export function alignParagraphs(original: string, english: string): ParagraphPai
 export function pasteStatsLabel(text: string): string {
   return `${count(splitParagraphs(text).length, 'paragraph')} · ${count(text.length, 'character')}`;
 }
+
+export interface ChapterStep {
+  chapter: number;
+  page: number;
+}
+
+export interface ChapterWalk {
+  chapter: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  /** True when the directory is narrowed by status, which breaks the contiguity the page-crossing step relies on. */
+  filtered: boolean;
+  /** Chapter numbers on the page the reader was opened from, in directory order. */
+  chapters: readonly number[];
+}
+
+/**
+ * Off the end of the page the neighbour is on the next one, and unfiltered originals are contiguous
+ * (the ingest door refuses a gap), so chapter ± 1 names it without fetching that page first. A filtered
+ * list has no such guarantee, so stepping stops at the page edge there.
+ */
+export function chapterNeighbour(walk: ChapterWalk, delta: 1 | -1): ChapterStep | null {
+  const index = walk.chapters.indexOf(walk.chapter);
+  const neighbour = index >= 0 ? walk.chapters[index + delta] : undefined;
+  if (neighbour !== undefined) return { chapter: neighbour, page: walk.page };
+  if (walk.filtered) return null;
+  if (delta === -1) return walk.page > 1 ? { chapter: walk.chapter - 1, page: walk.page - 1 } : null;
+  return walk.page * walk.pageSize < walk.total ? { chapter: walk.chapter + 1, page: walk.page + 1 } : null;
+}
+
+/** Counts across the whole paginated collection, not the loaded page — "12 of 480" rather than "12 of 25". */
+export function chapterPosition(walk: Pick<ChapterWalk, 'chapter' | 'page' | 'pageSize' | 'total' | 'chapters'>): string | null {
+  const index = walk.chapters.indexOf(walk.chapter);
+  if (index < 0 || walk.total === 0) return null;
+  return `${(walk.page - 1) * walk.pageSize + index + 1} of ${walk.total}`;
+}
+
+export type QueueHotkey = 'next' | 'previous' | 'approve' | 'reject';
+
+const QUEUE_HOTKEYS: Record<string, QueueHotkey> = { j: 'next', k: 'previous', a: 'approve', r: 'reject' };
+
+export interface QueueHotkeyEvent {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  /** The event landed in a field, a Radix listbox or an open dialog, where a bare letter is typing. */
+  editableTarget: boolean;
+}
+
+export function queueHotkey(event: QueueHotkeyEvent): QueueHotkey | null {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.editableTarget) return null;
+  return QUEUE_HOTKEYS[event.key.toLowerCase()] ?? null;
+}
