@@ -1,11 +1,13 @@
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { Alert, Button, EmptyState, Spinner } from '@shadow-library/ui';
+import { Alert, Button, Spinner, EmptyState as UiEmptyState } from '@shadow-library/ui';
 import { SparkIcon, StopIcon } from '../icons';
 import styles from './nf.module.css';
 
+export { CollectionPage, type CollectionFilter, type CollectionPageProps, type CollectionSectionProps, type CollectionSegment, type CollectionSegments } from './CollectionPage';
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
+export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { IdeaRename } from './IdeaRename';
 export { LookupTrace } from './LookupTrace';
 export { Markdown } from './Markdown';
@@ -143,7 +145,7 @@ export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing he
         {error.message}
       </Alert>
     );
-  if (isEmpty) return <EmptyState size="inline" title={emptyTitle} description={emptyDescription} action={emptyAction} />;
+  if (isEmpty) return <UiEmptyState size="inline" title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   return children;
 }
 

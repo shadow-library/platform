@@ -1,0 +1,132 @@
+.root {
+  padding-block: 28px 80px;
+  padding-inline: var(--nf-page-pad-inline);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerMain {
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--sh-text-primary);
+}
+
+.count {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.filter {
+  width: 260px;
+  max-width: 100%;
+}
+
+/* WebKit draws its own, unfocusable clear button on type=search; the Input's own `clearable` is the
+   keyboard-reachable one, so suppress the duplicate. */
+.filter input::-webkit-search-cancel-button,
+.filter input::-webkit-search-decoration {
+  appearance: none;
+}
+
+.segmentLabel {
+  font-weight: 600;
+}
+
+.segment[data-state='checked'] .segmentLabel {
+  font-weight: 700;
+}
+
+.segmentCount {
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.body {
+  margin-top: 24px;
+}
+
+.empty {
+  margin-top: 40px;
+}
+
+.section + .section {
+  margin-top: 32px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+}
+
+.sectionCount {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionRule {
+  flex: 1;
+  height: 1px;
+  min-width: 16px;
+  background: var(--sh-border-subtle);
+}
+
+.sectionSeeAll {
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
