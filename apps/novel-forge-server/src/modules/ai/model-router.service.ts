@@ -217,6 +217,9 @@ export class ModelRouterService {
   private readonly llmTimeoutMs = Config.get('ai.llm.timeout-ms') ?? 300_000;
   private readonly llmMaxRetries = Config.get('ai.llm.max-retries') ?? 2;
   private readonly llmBackoffMs = Config.get('ai.llm.backoff-ms') ?? 500;
+  // Process-local by design (rail-stop-admin §2.1): a cancel only reaches a run owned by the replica
+  // that received it, exactly like ProjectEventService's in-process fan-out.
+  private readonly runAborts = new Map<string, AbortController>();
 
   constructor(
     private readonly telemetry: TelemetryHandler,
@@ -225,6 +228,29 @@ export class ModelRouterService {
     private readonly accountSettings: AccountSettingsService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+  }
+
+  /**
+   * Opens the cancellation channel for a run: every subsequent call carrying this `runId` in its
+   * telemetry context is made under the returned signal. `WorkflowRunService` owns the pairing and must
+   * call `releaseRunSignal` on every exit path.
+   */
+  bindRunSignal(runId: string): AbortSignal {
+    const controller = this.runAborts.get(runId) ?? new AbortController();
+    this.runAborts.set(runId, controller);
+    return controller.signal;
+  }
+
+  releaseRunSignal(runId: string): void {
+    this.runAborts.delete(runId);
+  }
+
+  /** Returns whether a run was registered on this replica; aborting an already-aborted run is a no-op. */
+  abortRun(runId: string): boolean {
+    const controller = this.runAborts.get(runId);
+    if (!controller) return false;
+    controller.abort();
+    return true;
   }
 
   // `call.route`: a plugin may raise this call to the permissive class, and no policy can lower a project
@@ -405,8 +431,11 @@ export class ModelRouterService {
       }
     }
 
+    const runSignal = ctx.runId ? this.runAborts.get(ctx.runId)?.signal : undefined;
     const firstConfig = this.invokeConfig(ctx, resolved, 0, policy);
-    const rawOutput1 = relay ? await this.streamResilient(llm, messages, firstConfig, role, relay) : await this.invokeResilient(llm, messages, firstConfig, role);
+    const rawOutput1 = relay
+      ? await this.streamResilient(llm, messages, firstConfig, role, relay, runSignal)
+      : await this.invokeResilient(llm, messages, firstConfig, role, runSignal);
     // Design §4.1: a response carrying no top-level `reply` string produced no delta at all, so the author
     // saw a dead composer until `done`. (The scanner is key-order agnostic — `changeSet` first only costs
     // latency — so this is the whole of the degradation.) Logged per provider/model/prompt to make it
@@ -441,7 +470,7 @@ export class ModelRouterService {
       ),
     ];
 
-    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1, policy), role);
+    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1, policy), role, runSignal);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
@@ -608,14 +637,18 @@ export class ModelRouterService {
   }
 
   // Invoke the model with a per-call timeout budget and transient-error backoff. Retries only cover
-  // transport/timeout failures; a returned (parseable-or-not) response is never retried here.
-  private async invokeResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string): Promise<string> {
+  // transport/timeout failures; a returned (parseable-or-not) response is never retried here, and a
+  // cancelled run leaves the ladder at once rather than being mistaken for a transport error.
+  private async invokeResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, runSignal?: AbortSignal): Promise<string> {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
+      if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
       try {
-        const result = await this.withTimeout(llm.invoke(messages, config), this.llmTimeoutMs);
+        const result = await this.withTimeout(llm.invoke(messages, { ...config, signal: runSignal }), this.llmTimeoutMs);
+        if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
         return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
       } catch (err) {
+        if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
         lastErr = err;
         if (attempt < this.llmMaxRetries) {
           const backoff = this.llmBackoffMs * 2 ** attempt;
@@ -632,18 +665,25 @@ export class ModelRouterService {
   // plus the two things `withTimeout` alone cannot do, since it only races and never cancels: the abort is
   // taken before the backoff sleep rather than after it, so an abandoned attempt cannot go on feeding the
   // relay for the whole backoff window, and it reaches the provider so the losing HTTP leg is not leaked.
-  private async streamResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, relay: ReplyStreamRelay): Promise<string> {
+  private async streamResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, relay: ReplyStreamRelay, runSignal?: AbortSignal): Promise<string> {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
+      if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
       const abandon = new AbortController();
+      const signal = runSignal ? AbortSignal.any([abandon.signal, runSignal]) : abandon.signal;
       try {
         relay.restart();
-        return await this.withTimeout(
-          this.consumeStream(llm, messages, config, abandon.signal, chunk => relay.push(chunk)),
+        const output = await this.withTimeout(
+          this.consumeStream(llm, messages, config, signal, chunk => relay.push(chunk)),
           this.llmTimeoutMs,
         );
+        // `consumeStream` returns the partial text it had when the signal fired, so without this a
+        // cancelled stream would feed the repair ladder and buy another model call.
+        if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
+        return output;
       } catch (err) {
         abandon.abort();
+        if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
         lastErr = err;
         if (attempt < this.llmMaxRetries) {
           const backoff = this.llmBackoffMs * 2 ** attempt;

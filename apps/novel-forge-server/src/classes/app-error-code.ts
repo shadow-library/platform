@@ -103,6 +103,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_010 = AppErrorCode.badRequest('AI_010', 'Model {model} accepts at most {max} reference image(s), but {count} were supplied');
   static readonly AI_011 = AppErrorCode.badRequest('AI_011', 'Model {model} does not accept image input');
   static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'Appearance description needs the reference image as an inline base64 data: URL');
+  static readonly AI_013 = AppErrorCode.conflict('AI_013', 'Workflow run was cancelled');
 
   /*!
    * Illustration Errors
