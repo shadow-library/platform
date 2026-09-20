@@ -328,6 +328,24 @@ export class WorkflowRunResponse {
 }
 
 @Schema()
+export class CancelRunResponse {
+  @Field()
+  runId: string;
+
+  @Field(() => WorkflowRunStatus, {
+    description: 'The run status as recorded right now — a `stopping` outcome still reads `running` because the run itself writes `cancelled` as it unwinds.',
+  })
+  status: Ai.WorkflowRunStatus;
+
+  @Field(() => String, {
+    enum: ['stopping', 'already_settled', 'not_delivered'],
+    description:
+      "'stopping': a live run on this replica was just signalled to abort. 'already_settled': the run had already reached a terminal status, so nothing was done. 'not_delivered': the run is still `running` in the database but not live on this replica — cancellation is process-local, so the signal could not be delivered; the run may be owned by another replica or may have crashed.",
+  })
+  outcome: 'stopping' | 'already_settled' | 'not_delivered';
+}
+
+@Schema()
 export class DraftResponse {
   @Field(() => String)
   id: bigint;

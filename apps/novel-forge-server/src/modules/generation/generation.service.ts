@@ -40,6 +40,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
 import {
+  type CancelRunResponse,
   type ChapterSummarizeResponse,
   type FeedbackBody,
   type FinalizeBody,
@@ -1409,6 +1410,22 @@ export class GenerationService {
     ]);
     // Omitted (never null) when unlinked — the route serialiser cannot build nullable nested objects.
     return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
+  }
+
+  // Never writes 'not_delivered' as a status: cancellation is process-local (design §2.1), so a
+  // running row not live here may still be owned by another replica. Flipping it to 'cancelled'
+  // unconditionally would race completeRun/failRun's unguarded write and could silently clobber a
+  // run that finishes normally moments later. Reporting the delivery failure honestly instead.
+  async cancelRun(projectId: bigint, runId: string): Promise<CancelRunResponse> {
+    const run = await this.db.query.workflowRuns.findFirst({
+      where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)),
+      columns: { status: true },
+    });
+    if (!run) throw AppErrorCode.PRJ_001.create();
+    if (run.status !== 'running') return { runId, status: run.status, outcome: 'already_settled' };
+
+    const live = this.workflowRunService.cancel(runId);
+    return { runId, status: 'running', outcome: live ? 'stopping' : 'not_delivered' };
   }
 
   private async loadPackSummary(contextPackId: bigint | null): Promise<RunContextPackSummary | null> {

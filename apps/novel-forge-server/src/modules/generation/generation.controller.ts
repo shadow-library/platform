@@ -11,6 +11,7 @@ import {
   ApprovePlanResponse,
   ArcOutlineParams,
   BriefResponse,
+  CancelRunResponse,
   ChapterParams,
   ChapterReviewResponse,
   ChapterSummarizeResponse,
@@ -319,6 +320,14 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunDetailResponse)
   getRun(@Params() params: RunParams): Promise<WorkflowRunDetailResponse> {
     return this.generationService.getRun(params.projectId, params.runId);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
+  @Post('/runs/:runId/cancel')
+  @RespondFor(200, CancelRunResponse)
+  cancelRun(@Params() params: RunParams): Promise<CancelRunResponse> {
+    return this.generationService.cancelRun(params.projectId, params.runId);
   }
 
   @Get('/runs/:runId/context')
