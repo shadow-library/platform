@@ -69,7 +69,7 @@ export class JobService {
     this.logger.info('Job re-enqueued (terminal job reset to pending)', { jobId: existing.id, kind, target, previousStatus: existing.status });
     await this.db
       .update(schema.jobs)
-      .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, updatedAt: new Date() })
+      .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, cancelRequestedAt: null, updatedAt: new Date() })
       .where(eq(schema.jobs.id, existing.id));
     this.announce(existing.id, { projectId, kind, status: 'pending' });
     return existing.id;
@@ -116,6 +116,18 @@ export class JobService {
     const [job] = await this.db
       .update(schema.jobs)
       .set({ status: 'failed', lastError: error.slice(0, 2000), updatedAt: new Date() })
+      .where(eq(schema.jobs.id, jobId))
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (job) this.announce(jobId, job);
+  }
+
+  // The terminal write for a job the executor stopped: `cancel()` deliberately leaves an in_progress
+  // job's status alone (D5), so this is the only path that converts the request into a settled row.
+  async settleCancelled(jobId: string): Promise<void> {
+    this.logger.info('marking job cancelled', { jobId });
+    const [job] = await this.db
+      .update(schema.jobs)
+      .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(schema.jobs.id, jobId))
       .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
     if (job) this.announce(jobId, job);

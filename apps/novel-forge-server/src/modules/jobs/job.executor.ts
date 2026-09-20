@@ -68,10 +68,16 @@ interface ImportPayload {
   cover?: { mimeType: string; dataBase64: string };
 }
 
+// A cancel request only lands in the job row, so the executor polls for it while a step is in flight.
+// Without the poll a single-run phase (a glossary seed, a source analysis) would keep spending for the
+// whole of a model call after the author hit stop; the boundary checks alone only catch it between steps.
+const CANCEL_POLL_MS = 1000;
+
 @Injectable()
 export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
   private readonly db: PrimaryDatabase;
+  private readonly cancelWatches = new Map<string, { observed: boolean }>();
 
   constructor(
     private readonly jobService: JobService,
@@ -126,20 +132,70 @@ export class JobExecutor {
         this.logger.warn('dispatch: job already claimed by another worker', { jobId });
         return;
       }
+
+      // The claim is what earns the right to refuse to start. Two paths reach here already cancelled: a
+      // job cancelled while it queued behind the lock but after the status read above, and one that crash
+      // recovery reset from in_progress back to pending with its request still on the row.
+      if (await this.cancelRequested(jobId)) return this.markCancelled(job);
+
       const startedAt = Date.now();
       // Payload can carry chapter lists, guidance, limits — sensitive/verbose, so it rides on debug.
       this.logger.info('Job started', { jobId, kind: job.kind, projectId, target: job.target });
       this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
+      const stopWatching = this.watchForCancellation(jobId);
       try {
         await this.runJob(job);
+        if (await this.cancelRequested(jobId)) return this.markCancelled(job);
         await this.jobService.succeed(jobId);
         this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
       } catch (err) {
+        // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and D6 makes
+        // the job terminal-cancelled with its finished work kept, not failed into a retry ladder.
+        if (await this.cancelRequested(jobId)) return this.markCancelled(job);
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.error('Job failed', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt, err });
         await this.jobService.fail(jobId, msg);
+      } finally {
+        stopWatching();
       }
     });
+  }
+
+  private watchForCancellation(jobId: string): () => void {
+    this.cancelWatches.set(jobId, { observed: false });
+    const timer = setInterval(() => void this.cancelRequested(jobId).catch(err => this.logger.warn('cancel poll failed', { err, jobId })), CANCEL_POLL_MS);
+    timer.unref();
+    return () => {
+      clearInterval(timer);
+      this.cancelWatches.delete(jobId);
+    };
+  }
+
+  // Latches on first observation so the per-chapter boundary checks cost nothing once the answer is yes,
+  // and cancels the runs the job is driving as it latches — including runs a collaborator started, which
+  // are reachable only through `workflow_runs.job_id` (the job row itself has no run id to hand back).
+  private async cancelRequested(jobId: string): Promise<boolean> {
+    const watch = this.cancelWatches.get(jobId);
+    if (watch?.observed) return true;
+    const job = await this.jobService.get(jobId);
+    if (!job?.cancelRequestedAt) return false;
+    if (watch) watch.observed = true;
+    this.logger.info('Job cancellation observed', { jobId });
+    await this.cancelLiveRuns(jobId);
+    return true;
+  }
+
+  private async cancelLiveRuns(jobId: string): Promise<void> {
+    const live = await this.db
+      .select({ id: schema.workflowRuns.id })
+      .from(schema.workflowRuns)
+      .where(and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.status, 'running')));
+    for (const run of live) this.workflowRunService.cancel(run.id);
+  }
+
+  private async markCancelled(job: Job.Row): Promise<void> {
+    await this.jobService.settleCancelled(job.id);
+    this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
   }
 
   private async runJob(job: Job.Row): Promise<void> {
@@ -172,10 +228,12 @@ export class JobExecutor {
     this.logger.debug('runGenerate: starting', { jobId: job.id, chapters, total, autoFix, maxFixes, guidance });
 
     for (const [i, chapter] of chapters.entries()) {
+      if (await this.cancelRequested(job.id)) return;
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating' });
       this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
       this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, outcome: result.outcome, runId: result.runId });
+      if (result.status === 'cancelled') return;
       // The run service swallows its own errors into a `failed` result; surface that as a job failure
       // instead of quietly marking the job done with no draft persisted.
       if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} generation failed (run ${result.runId})`);
@@ -197,10 +255,12 @@ export class JobExecutor {
     this.logger.debug('runExtract: starting', { jobId: job.id, chapters, total });
 
     for (const [i, chapter] of chapters.entries()) {
+      if (await this.cancelRequested(job.id)) return;
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'extracting' });
       this.logger.debug('runExtract: extracting chapter', { jobId: job.id, chapter, index: i, total });
-      const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter });
+      const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter, jobId: job.id });
       this.logger.debug('runExtract: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
+      if (result.status === 'cancelled') return;
       if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} extraction failed (run ${result.runId})`);
     }
   }
@@ -245,6 +305,7 @@ export class JobExecutor {
       this.logger.debug('runRebrand: conversion targets', { jobId: job.id, targets });
       let failed = 0;
       for (const [i, chapter] of targets.entries()) {
+        if (await this.cancelRequested(job.id)) return;
         await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'converting' });
         this.logger.debug('runRebrand: converting chapter', { jobId: job.id, chapter, index: i, total });
         const result = await this.workflowRunService.runChapterRebrand({ projectId, chapter, jobId: job.id });
@@ -329,6 +390,7 @@ export class JobExecutor {
       this.logger.info('runReforgeTransform: writing outputs', { jobId: job.id, projectId, planId: String(plan.id), revision: plan.revision, total });
       let failed = 0;
       for (const [i, outputChapter] of targets.entries()) {
+        if (await this.cancelRequested(job.id)) return;
         await this.jobService.progress(job.id, { done: i, total, current: String(outputChapter), phase: 'transforming' });
         const result = await this.workflowRunService.runSpanTransform({ projectId, planId: plan.id, outputChapter, jobId: job.id });
         this.logger.debug('runReforgeTransform: output finished', { jobId: job.id, outputChapter, status: result.status, runId: result.runId });
@@ -398,6 +460,7 @@ export class JobExecutor {
       this.logger.debug('runReforge: reforge targets', { jobId: job.id, targets });
       let failed = 0;
       for (const [i, chapter] of targets.entries()) {
+        if (await this.cancelRequested(job.id)) return;
         await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'reforging' });
         this.logger.debug('runReforge: reforging chapter', { jobId: job.id, chapter, index: i, total });
         const result = await this.workflowRunService.runChapterReforge({ projectId, chapter, jobId: job.id });
@@ -461,6 +524,11 @@ export class JobExecutor {
       },
     });
 
+    // The only boundary an import has: the chapters are landed and kept (D6), the cover and the
+    // recombine pass are abandoned. The payload is still compacted, so a cancelled import never leaves
+    // the whole bundle's prose sitting on the row.
+    if (await this.cancelRequested(job.id)) return this.compactImportPayload(job.id, total, !!cover);
+
     if (cover) {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });
       const bytes = new Uint8Array(Buffer.from(cover.dataBase64, 'base64'));
@@ -476,16 +544,19 @@ export class JobExecutor {
       await this.recombineService.autoRecombine(projectId);
     }
 
-    // The chapters/cover are now durably in the `chapters`/`projects` tables — the full bundle prose
-    // sitting in `jobs.payload` (up to the novel-import size limit) has no further purpose and must
-    // not linger. Compact it to a small summary; `redactJobForResponse` keeps the wire safe regardless
-    // (mid-run or on a failed job, where this line is never reached), but this keeps the row itself small.
+    await this.compactImportPayload(job.id, total, !!cover);
+    this.logger.info('runImport: complete', { jobId: job.id, projectId, mode, chapters: total });
+  }
+
+  // The chapters/cover are now durably in the `chapters`/`projects` tables — the full bundle prose
+  // sitting in `jobs.payload` (up to the novel-import size limit) has no further purpose and must not
+  // linger. `redactJobForResponse` keeps the wire safe regardless (mid-run or on a failed job, where
+  // this is never reached), but this keeps the row itself small.
+  private async compactImportPayload(jobId: string, chapters: number, hasCover: boolean): Promise<void> {
     await this.db
       .update(schema.jobs)
-      .set({ payload: { chapters: total, hasCover: !!cover } as never, updatedAt: new Date() })
-      .where(eq(schema.jobs.id, job.id));
-
-    this.logger.info('runImport: complete', { jobId: job.id, projectId, mode, chapters: total });
+      .set({ payload: { chapters, hasCover } as never, updatedAt: new Date() })
+      .where(eq(schema.jobs.id, jobId));
   }
 
   /** payload.chapters wins; otherwise every source chapter without a converted/attention row (failed rows always retry). */
@@ -689,6 +760,7 @@ export class JobExecutor {
       this.logger.debug('runTranslate: translation targets', { jobId: job.id, targets });
       let failed = 0;
       for (const [i, chapter] of targets.entries()) {
+        if (await this.cancelRequested(job.id)) return;
         await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'translating' });
         const result = await this.workflowRunService.runChapterTranslation({ projectId, chapter, jobId: job.id });
         this.logger.debug('runTranslate: chapter finished', { jobId: job.id, chapter, outcome: result.outcome, runId: result.runId });

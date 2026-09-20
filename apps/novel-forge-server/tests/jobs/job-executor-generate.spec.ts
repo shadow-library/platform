@@ -11,7 +11,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const progress = mock(async (jobId: string, snapshot: JobProgress) => {
     progressCalls.push([jobId, snapshot]);
   });
-  const jobService = { progress } as never;
+  const jobService = { progress, get: async () => ({ cancelRequestedAt: null }) } as never;
   const concurrency = {} as never;
   const runChapterGenerationMock = mock(runChapterGeneration);
   const workflowRunService = { runChapterGeneration: runChapterGenerationMock } as never;

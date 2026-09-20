@@ -11,7 +11,7 @@ function makeExecutor(runSourceExtraction: (input: unknown) => Promise<WorkflowR
   const progress = mock(async (jobId: string, snapshot: JobProgress) => {
     progressCalls.push([jobId, snapshot]);
   });
-  const jobService = { progress } as never;
+  const jobService = { progress, get: async () => ({ cancelRequestedAt: null }) } as never;
   const concurrency = {} as never;
   const runSourceExtractionMock = mock(runSourceExtraction);
   const workflowRunService = { runSourceExtraction: runSourceExtractionMock } as never;
@@ -62,9 +62,9 @@ describe('JobExecutor.runExtract', () => {
     await (executor as unknown as { runExtract(job: Job.Row): Promise<void> }).runExtract(job);
 
     expect(runSourceExtraction).toHaveBeenCalledTimes(3);
-    expect(runSourceExtraction).toHaveBeenNthCalledWith(1, { projectId: 1n, chapter: 3 });
-    expect(runSourceExtraction).toHaveBeenNthCalledWith(2, { projectId: 1n, chapter: 4 });
-    expect(runSourceExtraction).toHaveBeenNthCalledWith(3, { projectId: 1n, chapter: 7 });
+    expect(runSourceExtraction).toHaveBeenNthCalledWith(1, { projectId: 1n, chapter: 3, jobId: 'job-1' });
+    expect(runSourceExtraction).toHaveBeenNthCalledWith(2, { projectId: 1n, chapter: 4, jobId: 'job-1' });
+    expect(runSourceExtraction).toHaveBeenNthCalledWith(3, { projectId: 1n, chapter: 7, jobId: 'job-1' });
     expect(progressCalls.at(-1)?.[1]).toMatchObject({ done: 2, total: 3, current: '7' });
   });
 
