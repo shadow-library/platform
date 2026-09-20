@@ -86,6 +86,19 @@ describe('chat message payload serialisation', () => {
     expect(body.messages[1]).not.toHaveProperty('payload');
   });
 
+  it('should serialise a legacy questions payload whose questions carry no select', async () => {
+    const { select: _select, ...legacyQuestion } = questionsPayload.questions[0]!;
+    const body = await serve([row(2, 'assistant', { ...questionsPayload, questions: [legacyQuestion] })]);
+    expect(body.messages[0]?.payload).toStrictEqual(questionsPayload as never);
+  });
+
+  it('should fall back to single-select for a question id the bank no longer owns', async () => {
+    const { select: _select, ...legacyQuestion } = questionsPayload.questions[0]!;
+    const retired = { ...legacyQuestion, id: 'spark.retired' };
+    const body = await serve([row(2, 'assistant', { ...questionsPayload, questions: [retired] })]);
+    expect(body.messages[0]?.payload).toStrictEqual({ ...questionsPayload, questions: [{ ...retired, select: 'one' }] } as never);
+  });
+
   it('should drop a payload of an unrecognised kind rather than fail the transcript', async () => {
     const body = await serve([row(2, 'assistant', { kind: 'diverge', cards: [] })]);
     expect(body.messages).toHaveLength(1);

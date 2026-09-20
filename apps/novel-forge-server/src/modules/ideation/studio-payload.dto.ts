@@ -3,6 +3,7 @@ import { Field, Integer, Schema, SchemaComposer } from '@shadow-library/class-sc
 import { type Ideation } from '@server/database';
 
 import { ConceptCardResponse, ReadinessEntryResponse } from './ideation.dto';
+import { getQuestion } from './question-bank';
 
 @Schema({ description: 'One question the studio is asking this turn.' })
 export class StudioQuestionResponse {
@@ -103,5 +104,11 @@ const STUDIO_PAYLOAD_KINDS = new Set<unknown>(['questions', 'cards', 'readiness'
  */
 export function asStudioPayload(payload: Record<string, unknown> | null | undefined): StudioPayload | undefined {
   if (!payload || !STUDIO_PAYLOAD_KINDS.has(payload['kind'])) return undefined;
+  if (payload['kind'] === 'questions' && Array.isArray(payload['questions'])) return withBankSelect(payload as unknown as StudioQuestionsPayloadResponse);
   return payload as unknown as StudioPayload;
+}
+
+/** Rows written before multi-select existed, and ids the bank has since dropped, were all answered single-select — 'one' is the truth, not a default. */
+function withBankSelect(payload: StudioQuestionsPayloadResponse): StudioQuestionsPayloadResponse {
+  return { ...payload, questions: payload.questions.map(question => ({ ...question, select: getQuestion(question.id)?.select ?? 'one' })) };
 }
