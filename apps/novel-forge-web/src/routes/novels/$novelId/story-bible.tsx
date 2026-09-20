@@ -4,7 +4,20 @@ import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, 
 
 import { SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
-import { CollectionPage, DetailPage, EmptyState, FieldCard, ItemPager, type ItemPagerJump, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import {
+  BibleDocumentList,
+  BibleReadiness,
+  CollectionPage,
+  DetailPage,
+  EmptyState,
+  FieldCard,
+  ItemPager,
+  type ItemPagerJump,
+  Markdown,
+  PaneError,
+  PaneLoader,
+  StatusChip,
+} from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import { ImageUpload } from '@/components/nf/ImageUpload';
@@ -16,11 +29,13 @@ import {
   type UpdateEntityBody,
   useAddEntityImageMutation,
   useAuditBibleMutation,
+  useBibleReadinessQuery,
   useCreateEntityMutation,
   useDeleteEntityImageByIdMutation,
   useDeleteEntityImageMutation,
   useDeleteEntityMutation,
   useEntityQuery,
+  useListBibleDocsQuery,
   useListEntitiesQuery,
   useListFactsQuery,
   useProjectQuery,
@@ -419,6 +434,8 @@ function StoryBibleScreen(): React.JSX.Element {
   const createEntity = useCreateEntityMutation(novelId);
   const seed = useSeedFromBriefMutation(novelId);
   const audit = useAuditBibleMutation(novelId);
+  const readiness = useBibleReadinessQuery(novelId);
+  const bibleDocs = useListBibleDocsQuery(novelId);
   const deleteEntity = useDeleteEntityMutation(novelId);
   const [query, setQuery] = useState('');
   const [dialog, setDialog] = useState<EntityDialogState | null>(null);
@@ -595,7 +612,7 @@ function StoryBibleScreen(): React.JSX.Element {
         total={total}
         actions={
           <>
-            <Button variant="secondary" loading={audit.isPending} disabled={entities.length === 0} onClick={runAudit}>
+            <Button variant="secondary" loading={audit.isPending} onClick={runAudit}>
               Run bible audit
             </Button>
             <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm(typeParam ?? 'character') })}>
@@ -605,12 +622,14 @@ function StoryBibleScreen(): React.JSX.Element {
         }
         filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
         notice={
-          resolved &&
-          entityParam && (
-            <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
-              It was deleted, renamed, or the link was typed by hand.
-            </Alert>
-          )
+          <>
+            {readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
+            {resolved && entityParam && (
+              <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
+                It was deleted, renamed, or the link was typed by hand.
+              </Alert>
+            )}
+          </>
         }
         segments={{
           label: 'Entity type',
@@ -619,22 +638,25 @@ function StoryBibleScreen(): React.JSX.Element {
           items: [{ value: 'all', label: 'All', count: entities.length }, ...order.map(type => ({ value: type, label: TYPE_LABEL[type], count: counts.get(type) ?? 0 }))],
         }}
         empty={
-          <EmptyState
-            icon={<SparkIcon size={24} />}
-            title="Draft the story bible"
-            description="Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take a few minutes."
-            actions={
-              brief ? (
-                <Button variant="primary" prefix={<SparkIcon />} loading={seed.isPending} onClick={runSeed}>
-                  Generate story bible
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })}>
-                  Add a brief in Settings
-                </Button>
-              )
-            }
-          />
+          <>
+            <EmptyState
+              icon={<SparkIcon size={24} />}
+              title="Draft the story bible"
+              description="Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take a few minutes."
+              actions={
+                brief ? (
+                  <Button variant="primary" prefix={<SparkIcon />} loading={seed.isPending} onClick={runSeed}>
+                    Generate story bible
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })}>
+                    Add a brief in Settings
+                  </Button>
+                )
+              }
+            />
+            <BibleDocumentList novelId={novelId} />
+          </>
         }
       >
         {entitiesQuery.isLoading ? (
@@ -675,6 +697,9 @@ function StoryBibleScreen(): React.JSX.Element {
                 </CollectionPage.Section>
               ))
             )}
+            <CollectionPage.Section label="Documents" total={bibleDocs.data?.docs.length ?? 0}>
+              <BibleDocumentList novelId={novelId} />
+            </CollectionPage.Section>
           </>
         )}
       </CollectionPage>

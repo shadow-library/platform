@@ -189,10 +189,13 @@ describe('Prompt modules', () => {
 
   describe('refinement prompt modules', () => {
     it('registers the five new prompt keys', () => {
-      for (const key of ['bible-audit', 'chat-compact', 'arc-plan'] as const) {
+      for (const key of ['chat-compact', 'arc-plan'] as const) {
         expect(PROMPT_REGISTRY[key]).toBeDefined();
         expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
       }
+      // bible-audit v2 audits entity records alongside documents: a document-only audit could never
+      // repair a bible whose canon exists as prose the Story Bible screen cannot read.
+      expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.0.0');
       // premise-enhance v1.1 reframes the enhanced premise as an enticing summary, not a plot walkthrough.
       expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.1.0');
       // chat-refine v2 added the declared-lookup protocol (chat-hub design §6); v2.1 instructs partial

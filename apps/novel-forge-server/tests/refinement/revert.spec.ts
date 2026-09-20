@@ -100,6 +100,7 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
       { op: 'premise.update', premise: 'rewritten premise' },
       { op: 'bible_document.upsert', section: 'project', slug: 'reader-promise', body: 'rewritten promise' },
       { op: 'bible_document.upsert', section: 'world', slug: 'new-doc', body: 'created doc' },
+      { op: 'entity.upsert', entityKey: 'spire', type: 'location', name: 'The Spire' },
       { op: 'entity.upsert', entityKey: 'hero', type: 'character', motivation: 'rewritten drive' },
       { op: 'entity.upsert', entityKey: 'rival', type: 'character', name: 'Rival' },
       { op: 'volume.upsert', volumeKey: 'vol_new', ordinal: 1, objective: 'created volume' },

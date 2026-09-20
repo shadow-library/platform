@@ -63,6 +63,8 @@ function CollectionPageRoot({ title, subtitle, total, actions, filter, segments,
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>
 
+      {notice && <div className={styles.notice}>{notice}</div>}
+
       {view.kind === 'empty' ? (
         <div className={styles.empty}>{empty}</div>
       ) : (
@@ -99,7 +101,6 @@ function CollectionPageRoot({ title, subtitle, total, actions, filter, segments,
               )}
             </div>
           )}
-          {notice && <div className={styles.notice}>{notice}</div>}
           <div className={styles.body}>{children}</div>
         </>
       )}

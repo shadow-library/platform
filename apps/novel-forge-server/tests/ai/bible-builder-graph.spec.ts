@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createBibleBuilderGraph } from '@modules/ai/graphs/bible-builder.graph';
 import { BIBLE_STAGE_OUTPUT_SHAPE } from '@modules/ai/prompts/authoring-preamble';
 import { type BibleStageOutput } from '@modules/ai/schemas';
+import { BIBLE_MANIFEST } from '@modules/bible/bible-manifest';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -174,7 +175,7 @@ describe.if(pgAvailable)('bible-builder.graph characters stage persistence', () 
   });
 });
 
-describe.if(pgAvailable)('bible-builder.graph world-power stage persistence', () => {
+describe.if(pgAvailable)('bible-builder.graph world-fact persistence', () => {
   let db: PrimaryDatabase;
   let checkpointer: PostgresSaver;
 
@@ -199,7 +200,7 @@ describe.if(pgAvailable)('bible-builder.graph world-power stage persistence', ()
     await graph.invoke({ projectId: String(projectId), brief: 'A test brief.', force, runId }, { configurable: { thread_id: runId } });
   }
 
-  it('persists world facts from the world-power stage, retrievable via db.query.worldFacts', async () => {
+  it('persists world facts from a stage that emits them, retrievable via db.query.worldFacts', async () => {
     const projectId = await seedProject(`bible-world-facts-${Date.now()}`);
     await runBibleBuilder(
       projectId,
@@ -257,7 +258,7 @@ describe.if(pgAvailable)('bible-builder.graph world-power stage persistence', ()
     expect(fact?.value).toBe('Veyrath, rebuilt as the inland fortress-capital.');
   });
 
-  it('skips the world-power stage entirely (no world-fact writes) when force is false and the document already exists', async () => {
+  it('skips a stage entirely (no world-fact writes) when force is false and the document already exists', async () => {
     const projectId = await seedProject(`bible-world-skip-${Date.now()}`);
     await runBibleBuilder(projectId, { body: 'World and power bible prose.', worldFacts: [{ category: 'geography', key: 'capital_city', value: 'Original.' }] }, false, 'first');
 
@@ -333,7 +334,7 @@ describe.if(pgAvailable)('bible-builder.graph stage atomicity and lore indexing'
     await runBibleBuilder(projectId, { body: 'Foundation bible prose, retried.', entities: [{ entityKey: 'amara', name: 'Detective Amara', type: 'character' }] }, false, 'retry');
 
     const doc = await db.query.bibleDocuments.findFirst({
-      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'project'), eq(schema.bibleDocuments.slug, 'foundation')),
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'project'), eq(schema.bibleDocuments.slug, 'premise')),
     });
     expect(doc?.body).toBe('Foundation bible prose, retried.');
 
@@ -348,8 +349,7 @@ describe.if(pgAvailable)('bible-builder.graph stage atomicity and lore indexing'
 
     await runBibleBuilder(projectId, { body: 'Bible prose for every stage.' }, false, 'lore', indexingService);
 
-    expect(labels).toContain('bible_doc:ai/characters');
-    expect(labels).toContain('bible_doc:project/foundation');
+    for (const chapter of BIBLE_MANIFEST) expect(labels).toContain(`bible_doc:${chapter.section}/${chapter.slug}`);
     for (const label of labels) expect(label.slice('bible_doc:'.length)).toContain('/');
   });
 });

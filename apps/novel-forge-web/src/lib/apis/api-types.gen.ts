@@ -1983,6 +1983,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/bible/readiness': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Readiness */
+    get: operations['get_api_v1_projects_projectId_bible_readiness'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/seeds': {
     parameters: {
       query?: never;
@@ -4696,7 +4713,7 @@ export interface components {
       runId: string;
     };
     AuditFindingResponse: {
-      docRef: string;
+      ref: string;
       action: string;
       finding: string;
     };
@@ -5007,6 +5024,28 @@ export interface components {
       chapter: number;
       note?: string;
     };
+    BibleReadinessResponse: {
+      dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
+      /** @description false while canon is absent or exists only as prose the Story Bible cannot read */
+      readyToDraft: boolean;
+      /** @description the coverage and record gaps that hold `readyToDraft` false */
+      blockingGaps: string[];
+    };
+    BibleReadinessDimensionResponse: {
+      dimension: components['schemas']['BibleReadinessDimension'];
+      /** @description strong = every check passed, thin = some passed, empty = none passed */
+      verdict: components['schemas']['BibleReadinessVerdict'];
+      /** @description checks this dimension passed */
+      satisfied: number;
+      /** @description checks this dimension ran; zero means the dimension had nothing to judge and reads as strong */
+      total: number;
+      /** @description what to fix, phrased as an action an author can take */
+      gaps: string[];
+    };
+    /** @enum {string} */
+    BibleReadinessDimension: 'coverage' | 'records' | 'substance' | 'integrity' | 'reveal';
+    /** @enum {string} */
+    BibleReadinessVerdict: 'strong' | 'thin' | 'empty';
     CreateSeedBody: {
       /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
       spark?: string;
@@ -12311,6 +12350,46 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_bible_readiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleReadinessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_seeds: {
     parameters: {
       query?: {
@@ -15877,6 +15956,10 @@ export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryRespon
 export type FactSource = components['schemas']['FactSource'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
+export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
+export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
+export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
+export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
 export type CreateSeedBody = components['schemas']['CreateSeedBody'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
@@ -16124,6 +16207,7 @@ export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
+export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
 export type ListSeedsQueryParams = Exclude<paths['/api/v1/seeds']['get']['parameters']['query'], undefined>;
 export type GetSeedPathParams = Exclude<paths['/api/v1/projects/{projectId}/seed']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;

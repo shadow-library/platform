@@ -371,9 +371,11 @@ describe.if(pgAvailable)('GraduationService', () => {
 
       expect(state.stagesDone).toContain('foundation');
       const written = await docs(projectId);
-      // The handoff documents are untouched — the builder writes its own stage slugs beside them.
+      // Graduation and the builder's foundation stage share one address (`project/premise`), so a
+      // non-force build inherits the graduated premise rather than writing a rival copy beside it.
       expect(written.find(doc => doc.slug === 'premise')?.body).toContain(SHEET.premise as string);
-      expect(written.some(doc => doc.section === 'project' && doc.slug === 'foundation')).toBe(true);
+      expect(written.some(doc => doc.section === 'project' && doc.slug === 'foundation')).toBe(false);
+      expect(written.some(doc => doc.section === 'power' && doc.slug === 'system-and-limits')).toBe(true);
       expect(await db.query.chatSessions.findFirst({ where: and(eq(schema.chatSessions.projectId, projectId), eq(schema.chatSessions.status, 'active')) })).toBeUndefined();
     });
   });

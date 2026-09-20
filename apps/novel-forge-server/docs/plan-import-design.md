@@ -31,7 +31,7 @@ rows; database ids never appear.
 a v1 bundle is exactly a v2 bundle that omits both.
 
 - **bible**: `{section, slug, frontmatter?, body}`. `section` ∈ `project|world|power|plot|lore` — `story_state` and `ai` are app-managed and rejected. The
-  `REQUIRED_BIBLE_DOCS` manifest (refinement §7) is the authoring checklist but is not enforced server-side: partial bundles are legal.
+  `BIBLE_MANIFEST` (refinement §7) is the authoring checklist but is not enforced server-side: partial bundles are legal.
 - **entities**: `{entityKey, type, name, significance?, status?, motivation?, notes?, body?}` — field parity with `CreateEntityBody`; `origin` is forced to `seeded`.
 - **facts** (v2): `{factKey, text, subjects?, constraintNote?, terms?, revealChapter?}` — canon facts for the character-knowledge ledger (character-knowledge design §3).
   `text` is the spoiler statement, `constraintNote` the POV-safe behavior injected while hidden, `terms` the lexical leak-scan list. No ledger rows import — knowledge is

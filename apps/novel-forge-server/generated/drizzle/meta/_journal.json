@@ -281,6 +281,13 @@
       "when": 1789880746419,
       "tag": "0039_mean_black_widow",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789913516803,
+      "tag": "0040_bible_manifest_slugs",
+      "breakpoints": true
     }
   ]
 }

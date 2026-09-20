@@ -62,7 +62,7 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
       probe('emit-rationale', [
         { op: 'fact.upsert', factKey: 'reasoned-fact', body: 'a fact', rationale: 'the ledger had no entry for this' },
         { op: 'entity.upsert', entityKey: 'reasoned-entity', type: 'character', name: 'Named', rationale: 'the cast list was missing a name' },
-        { op: 'bible_document.upsert', section: 'world', slug: 'reasoned-doc', body: 'doc body', rationale: 'the section had no such document' },
+        { op: 'bible_document.upsert', section: 'lore', slug: 'reasoned-doc', body: 'doc body', rationale: 'the section had no such document' },
         { op: 'brief.update', chapter: 3, body: 'brief body', rationale: 'the chapter had no brief' },
       ]),
     );
@@ -70,7 +70,7 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
       probe('emit-unreasoned', [
         { op: 'fact.upsert', factKey: 'reasoned-fact', body: 'a fact' },
         { op: 'entity.upsert', entityKey: 'reasoned-entity', type: 'character', name: 'Named' },
-        { op: 'bible_document.upsert', section: 'world', slug: 'reasoned-doc', body: 'doc body' },
+        { op: 'bible_document.upsert', section: 'lore', slug: 'reasoned-doc', body: 'doc body' },
         { op: 'brief.update', chapter: 3, body: 'brief body' },
       ]),
     );
@@ -343,7 +343,7 @@ describe.if(pgAvailable)('plugins that propose changes', () => {
       fact: db().query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, BigInt(projectId)), eq(schema.canonFacts.factKey, 'reasoned-fact')) }),
       entity: db().query.entities.findFirst({ where: and(eq(schema.entities.projectId, BigInt(projectId)), eq(schema.entities.entityKey, 'reasoned-entity')) }),
       doc: db().query.bibleDocuments.findFirst({
-        where: and(eq(schema.bibleDocuments.projectId, BigInt(projectId)), eq(schema.bibleDocuments.section, 'world'), eq(schema.bibleDocuments.slug, 'reasoned-doc')),
+        where: and(eq(schema.bibleDocuments.projectId, BigInt(projectId)), eq(schema.bibleDocuments.section, 'lore'), eq(schema.bibleDocuments.slug, 'reasoned-doc')),
       }),
       brief: briefRow(projectId, 3),
     });

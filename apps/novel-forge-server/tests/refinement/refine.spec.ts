@@ -11,7 +11,7 @@ import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { RefineService } from '@modules/refinement/refine.service';
-import { REQUIRED_BIBLE_DOCS } from '@modules/refinement/required-bible-docs';
+import { BIBLE_MANIFEST } from '@modules/bible/bible-manifest';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { runCancellationStub } from '@tests/fixtures/model-router';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
@@ -42,10 +42,13 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
 
 const auditOutput = {
   findings: [
-    { docRef: 'doc:project/reader-promise', action: 'keep', finding: 'clear and specific' },
-    { docRef: 'doc:power/progression-ladder', action: 'add', finding: 'a cultivation story needs a visible ladder' },
+    { ref: 'doc:project/premise', action: 'keep', finding: 'clear and specific' },
+    { ref: 'doc:power/system-and-limits', action: 'add', finding: 'a cultivation story needs a visible ladder' },
   ],
-  changeSet: [{ op: 'bible_document.upsert', section: 'power', slug: 'progression-ladder', body: 'Nine mortal ranks, then ascension.' }],
+  changeSet: [
+    { op: 'bible_document.upsert', section: 'power', slug: 'system-and-limits', body: 'Nine mortal ranks, then ascension.' },
+    { op: 'entity.upsert', entityKey: 'mortal_ranks', type: 'power_rule', name: 'The nine mortal ranks' },
+  ],
 };
 
 describe.if(pgAvailable)('RefineService', () => {
@@ -169,7 +172,7 @@ describe.if(pgAvailable)('RefineService', () => {
     expect(second.findings).toHaveLength(2);
     expect(llmInvoke.mock.calls.length).toBe(callsBefore + 1);
 
-    expect(REQUIRED_BIBLE_DOCS.some(doc => `${doc.section}/${doc.slug}` === 'power/progression-ladder')).toBe(true);
+    expect(BIBLE_MANIFEST.some(chapter => `${chapter.section}/${chapter.slug}` === 'power/system-and-limits')).toBe(true);
   });
 
   it('previews context packs for the refinement purposes without touching a model', async () => {

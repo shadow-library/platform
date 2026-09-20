@@ -260,7 +260,7 @@ their names/args/purposes.
 ### 6.1 Context: `forHubTurn` (purpose `chat_hub`)
 
 Stable segment: premise + bible doc inventory (section/slug/first-lines) + volume/arc catalog with statuses
-and chapter ranges + entity catalog (keys, types, one-liners) + REQUIRED_BIBLE_DOCS gaps.
+and chapter ranges + entity catalog (keys, types, one-liners) + `BIBLE_MANIFEST` gaps.
 Volatile segment: pipeline status (story cursor, drafts by reviewStatus, stale artifacts, pending proposals,
 running jobs/runs) + artifacts changed since session start (existing volatile machinery).
 Budget: new `chat_hub` purpose entry sized like `chat` + catalog headroom; same byte-identical-stable

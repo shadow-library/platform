@@ -3,6 +3,7 @@ import { type ReactElement, type ReactNode } from 'react';
 
 import { Alert, Button, Spinner, EmptyState as UiEmptyState } from '@shadow-library/ui';
 import { SparkIcon, StopIcon } from '../icons';
+import { StatusChip } from './StatusChip';
 import styles from './nf.module.css';
 
 export { CollectionPage, type CollectionFilter, type CollectionPageProps, type CollectionSectionProps, type CollectionSegment, type CollectionSegments } from './CollectionPage';
@@ -21,24 +22,9 @@ export { PageSkeleton } from './PageSkeleton';
 export { RouteNotFound } from './NotFound';
 export { TurnStatus } from './TurnStatus';
 export { DefaultCatchBoundary } from './DefaultCatchBoundary';
-
-export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'ai';
-
-interface StatusChipProps {
-  intent?: ChipIntent;
-  dot?: boolean;
-  className?: string;
-  children: ReactNode;
-}
-
-export function StatusChip({ intent = 'neutral', dot = false, className, children }: StatusChipProps): ReactElement {
-  return (
-    <span className={className ? `nf-chip ${className}` : 'nf-chip'} data-intent={intent}>
-      {dot && <span className="nf-dot" />}
-      {children}
-    </span>
-  );
-}
+export { BibleDocumentList, type BibleDocumentListProps } from './BibleDocumentList';
+export { BibleReadiness, type BibleReadinessProps } from './BibleReadiness';
+export { type ChipIntent, StatusChip, type StatusChipProps } from './StatusChip';
 
 interface StopButtonProps {
   onStop: () => void;

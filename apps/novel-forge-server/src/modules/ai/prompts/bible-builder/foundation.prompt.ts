@@ -4,15 +4,17 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { type BibleStageOutput, BibleStageSchema } from '../../schemas/new-novel.schema';
 import { AUTHORING_STYLE_PLANNING, BIBLE_STAGE_OUTPUT_SHAPE } from '../authoring-preamble';
 import { type PromptModule } from '../types';
+import { renderStageContract, validateStageCoverage } from './stage-contract';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the foundation bible document for a new novel. The foundation covers: the core premise (what the story is fundamentally about), the central conflict (the force that drives the narrative), the world's hook (what makes this world distinct), and the authorial intent (theme and emotional truth). Write as concrete prose, not bullet points. This is the anchor document — every other section must be consistent with it.\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
+const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the foundation bible document for a new novel. The foundation covers: the core premise (what the story is fundamentally about), the central conflict (the force that drives the narrative), the world's hook (what makes this world distinct), and the authorial intent (theme and emotional truth). State the reader promise plainly — what a reader reliably gets per chapter and per arc, the contract that keeps them subscribed — and the tone register the serial is allowed to swing between. Write as concrete prose, not bullet points. This is the anchor document: every other section must be consistent with it.\n\n${renderStageContract('foundation')}\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
 
 export const foundationPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:foundation',
-  version: '1.1.0',
+  version: '2.0.0',
   kind: 'authoring',
   role: 'bible',
   system,
   template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', 'Project brief:\n{projectBrief}']]),
   schema: BibleStageSchema,
+  postValidate: data => validateStageCoverage('foundation', data),
 };

@@ -14,11 +14,12 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildArcPlanPrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { type ArcPlanOutput, type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { renderDocInventory, renderEntityInventory } from '../bible/bible-inventory';
+import { renderManifest } from '../bible/bible-manifest';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
 import { type ContextPreviewResponse } from './refine.dto';
-import { renderManifest } from './required-bible-docs';
 
 export interface PremiseEnhanceResult {
   proposal: Refinement.Proposal;
@@ -122,19 +123,21 @@ export class RefineService {
 
     const prompt = PROMPT_REGISTRY['bible-audit'];
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'audit' }, project);
-    const [pack, docs] = await Promise.all([
+    const [pack, docs, entities] = await Promise.all([
       this.contextAssembler.forAudit(projectId, { policy }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true, name: true, type: true } }),
     ]);
-    const docInventory = docs.length > 0 ? docs.map(d => `${d.section}/${d.slug} (revision ${d.revision})`).join('\n') : 'none';
-    this.logger.info('auditBible: starting', { projectId, existingDocs: docs.length });
+    const docInventory = renderDocInventory(docs);
+    const entityInventory = renderEntityInventory(entities);
+    this.logger.info('auditBible: starting', { projectId, existingDocs: docs.length, existingEntities: entities.length });
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'bible-audit', 'bible', {}, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'bible-audit', promptKey: prompt.key, promptVersion: prompt.version, role: 'audit' };
       const output = (await this.modelRouter.structured(
         prompt,
-        { stableContext: pack.rendered, docInventory, manifest: renderManifest() },
+        { stableContext: pack.rendered, docInventory, entityInventory, manifest: renderManifest() },
         ctx,
         project as ProjectConfig,
         policy,
@@ -146,9 +149,9 @@ export class RefineService {
       const proposal = await this.proposalService.create(projectId, {
         scopeType: 'novel',
         kind: 'bible_audit',
-        summary: `bible audit: ${output.changeSet.length} document change(s) proposed`,
+        summary: `bible audit: ${output.changeSet.length} canon change(s) proposed`,
         changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: ['bible_document.upsert', 'bible_document.remove'],
+        allowedOps: ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'],
         runId,
       });
       return { proposal, findings: output.findings };

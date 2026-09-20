@@ -60,7 +60,7 @@ export class EnhancePremiseResponse {
 @Schema()
 export class AuditFindingResponse {
   @Field()
-  docRef: string;
+  ref: string;
 
   @Field()
   action: string;

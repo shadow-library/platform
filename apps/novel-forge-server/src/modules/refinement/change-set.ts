@@ -1,6 +1,7 @@
 import { type Bible, type Generation, type Ideation } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
+import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
 
 interface EndingContract {
   hookType: HookTypeValue;
@@ -577,6 +578,39 @@ function normalizeBibleDocumentOp(record: Record<string, unknown>): void {
 }
 
 /**
+ * The Story Bible screen lists `entities`, never document bodies, so canon written only as prose into an
+ * entity-bearing section is invisible to the author and to every downstream step that reads records.
+ * `requiredEntityTypesForSlug` decides what a given address owes, which is what catches an author-named
+ * document like `power/supers-and-rifts`. Frontmatter-only edits are exempt, and the rule stays silent for a
+ * scope whose vocabulary cannot express `entity.upsert` at all — that scope could never satisfy it.
+ */
+function validateEntityMaterialization(ops: readonly unknown[], allowedOps?: readonly OpType[]): string[] {
+  if (allowedOps && !allowedOps.includes('entity.upsert')) return [];
+
+  const records = ops.filter((op): op is Record<string, unknown> => isKind(op, 'object'));
+  const staged = new Set(records.filter(op => op['op'] === 'entity.upsert').map(op => String(op['type'])));
+  const errors: string[] = [];
+
+  ops.forEach((item, index) => {
+    if (!isKind(item, 'object')) return;
+    const op = item as Record<string, unknown>;
+    if (op['op'] !== 'bible_document.upsert') return;
+    if (typeof op['body'] !== 'string' || op['body'].trim() === '') return;
+
+    const section = String(op['section']);
+    const slug = String(op['slug']);
+    const required = requiredEntityTypesForSlug(section, slug);
+    if (required.length === 0 || required.some(type => staged.has(type))) return;
+
+    errors.push(
+      `changeSet[${index}]: bible_document.upsert into '${section}/${slug}' establishes canon the Story Bible reads as records, so it must be accompanied by entity.upsert op(s) of type ${required.join(' or ')} — a document body alone leaves this canon invisible`,
+    );
+  });
+
+  return errors;
+}
+
+/**
  * Validates an untrusted change-set structurally, optionally against a scope's allowed-op vocabulary.
  * Returns human-readable errors; an empty array means `value` is a well-formed `ChangeOp[]`.
  * Obviously-malformed-but-unambiguous bible_document refs are normalized in place first (see above),
@@ -629,6 +663,8 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
     if (op === 'action.graduate_seed' && typeof record['title'] === 'string' && record['title'].trim() === '') errors.push(`${path}: title must be a non-empty string`);
   });
+
+  if (errors.length === 0) errors.push(...validateEntityMaterialization(value, allowedOps));
 
   return errors;
 }

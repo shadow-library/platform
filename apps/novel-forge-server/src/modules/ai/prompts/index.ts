@@ -5,8 +5,9 @@ import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
 import { plotPrompt } from './bible-builder/plot.prompt';
+import { powerPrompt } from './bible-builder/power.prompt';
 import { volumesPrompt } from './bible-builder/volumes.prompt';
-import { worldPowerPrompt } from './bible-builder/world-power.prompt';
+import { worldPrompt } from './bible-builder/world.prompt';
 import { chapterExpandPrompt } from './chapter-expand.prompt';
 import { chapterExtractPrompt } from './chapter-extract.prompt';
 import { chapterSummarizePrompt } from './chapter-summarize.prompt';
@@ -68,7 +69,8 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   plan: planPrompt as PromptModule<unknown>,
   skeleton: skeletonPrompt as PromptModule<unknown>,
   'bible:foundation': foundationPrompt as PromptModule<unknown>,
-  'bible:world-power': worldPowerPrompt as PromptModule<unknown>,
+  'bible:world': worldPrompt as PromptModule<unknown>,
+  'bible:power': powerPrompt as PromptModule<unknown>,
   'bible:factions-locations': factionsLocationsPrompt as PromptModule<unknown>,
   'bible:characters': charactersPrompt as PromptModule<unknown>,
   'bible:plot': plotPrompt as PromptModule<unknown>,

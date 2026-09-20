@@ -9,13 +9,15 @@ import { EntityController } from './entity/entity.controller';
 import { EntityService } from './entity/entity.service';
 import { FactController } from './fact/fact.controller';
 import { FactService } from './fact/fact.service';
+import { BibleReadinessController } from './readiness/bible-readiness.controller';
+import { BibleReadinessService } from './readiness/bible-readiness.service';
 import { VolumeController } from './volume/volume.controller';
 import { VolumeService } from './volume/volume.service';
 
 @Module({
   imports: [DatabaseModule, StorageModule],
-  controllers: [EntityController, VolumeController, ArcController, BibleDocumentController, FactController],
-  providers: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService],
-  exports: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService],
+  controllers: [EntityController, VolumeController, ArcController, BibleDocumentController, FactController, BibleReadinessController],
+  providers: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService, BibleReadinessService],
+  exports: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService, BibleReadinessService],
 })
 export class BibleModule {}
