@@ -75,8 +75,15 @@ function NavLeafItem({ leaf }: { leaf: NavLeaf }): ReactElement {
   // No `active` prop: the router link marks itself, and `Sidebar.Item` already keys its treatment off
   // `data-status="active"`. Computing it here as well would fight the link over `aria-current`.
   return (
-    <Sidebar.Item asChild icon={leaf.icon} badge={renderBadge(leaf)} label={leaf.label} indent={leaf.indent}>
-      <Link to={leaf.to} params={leaf.params} search={leaf.search} activeOptions={{ exact: leaf.exact ?? false }} activeProps={{ 'aria-current': 'page' }}>
+    <Sidebar.Item asChild icon={leaf.icon} badge={renderBadge(leaf)} label={leaf.label} indent={leaf.indent} clamp={leaf.clamp}>
+      <Link
+        to={leaf.to}
+        params={leaf.params}
+        search={leaf.search}
+        title={leaf.clamp === true ? leaf.label : undefined}
+        activeOptions={{ exact: leaf.exact ?? false }}
+        activeProps={{ 'aria-current': 'page' }}
+      >
         {leaf.label}
       </Link>
     </Sidebar.Item>

@@ -120,8 +120,7 @@ function SplitSkeleton(): React.JSX.Element {
 
 function ChatSkeleton(): React.JSX.Element {
   return (
-    <div className={styles.splitPane}>
-      <RailSkeleton />
+    <div className={styles.chatPane}>
       <div className={styles.chatDetail}>
         <div className={styles.chatThread}>
           {Array.from({ length: 5 }).map((_, i) => (
@@ -131,6 +130,12 @@ function ChatSkeleton(): React.JSX.Element {
           ))}
         </div>
         <Skeleton shape="rect" height={56} radius="var(--sh-radius-md)" className={styles.composer} />
+      </div>
+      <div className={styles.chatPanel}>
+        <Skeleton shape="line" width="60%" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} shape="rect" height={56} radius="var(--sh-radius-md)" />
+        ))}
       </div>
     </div>
   );

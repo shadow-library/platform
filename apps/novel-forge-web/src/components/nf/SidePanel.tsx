@@ -17,6 +17,8 @@ export interface SidePanelProps {
    */
   titleAccessory?: ReactNode;
   actions?: ReactNode;
+  /** What the panel holds, in a few words — "2 waiting". Joined to the collapse control's name, so the count the rail shows sighted readers is announced too. */
+  summary?: string;
   /** Size of what the panel holds, and the trigger for the `empty` slot. */
   total?: number;
   /** Rendered instead of the body when `total` is 0 — a sentence, not an `EmptyState`; 300px is too narrow for one. */
@@ -34,6 +36,7 @@ export function SidePanel({
   title,
   titleAccessory,
   actions,
+  summary,
   total,
   empty,
   footer,
@@ -54,7 +57,7 @@ export function SidePanel({
     onCollapsedChange?.(next === 'collapsed');
   };
 
-  const toggleLabel = panelToggleLabel(title, state);
+  const toggleLabel = panelToggleLabel(title, state, summary);
 
   return (
     <aside className={styles.root} data-state={state} aria-label={title}>

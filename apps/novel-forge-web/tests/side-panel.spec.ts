@@ -25,4 +25,12 @@ describe('panelToggleLabel', () => {
     expect(panelToggleLabel('Story seed', 'expanded')).toBe('Collapse the Story seed panel');
     expect(panelToggleLabel('Story seed', 'collapsed')).toBe('Expand the Story seed panel');
   });
+
+  it('should announce what a collapsed panel is hiding', () => {
+    expect(panelToggleLabel('Changes in this chat', 'collapsed', '2 waiting, 5 changed')).toBe('Expand the Changes in this chat panel — 2 waiting, 5 changed');
+  });
+
+  it('should leave the name alone when there is nothing to summarise', () => {
+    expect(panelToggleLabel('Story seed', 'collapsed', '')).toBe('Expand the Story seed panel');
+  });
 });

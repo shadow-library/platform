@@ -355,6 +355,34 @@
   padding-left: 0;
 }
 
+/* A name the reader chose survives two lines rather than being cut mid-word on one. */
+.item[data-clamp] {
+  height: auto;
+  min-height: 34px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+[data-density='compact'] .item[data-clamp] {
+  min-height: 28px;
+}
+[data-density='touch'] .item[data-clamp] {
+  min-height: var(--sh-tap-target);
+}
+.item[data-clamp] .label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  text-overflow: clip;
+}
+.groupList .item[data-clamp],
+.root[data-collapsed] .item[data-clamp] {
+  height: auto;
+}
+.groupList .item[data-clamp] {
+  min-height: 30px;
+}
+
 /* ── Group header ────────────────────────────────────────── */
 /* Only rendered when the group carries a destination or an action; a plain group stays a single button. */
 .groupHeader {

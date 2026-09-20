@@ -169,7 +169,7 @@ const SidebarSection = forwardRef<HTMLDivElement, SidebarSectionProps>(function 
 
 /** A navigation destination — a real link with active state, icon, and optional badge. */
 const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function SidebarItem(
-  { icon, badge, active = false, asChild = false, label, indent = false, className, onClick, children, ...props },
+  { icon, badge, active = false, asChild = false, label, indent = false, clamp = false, className, onClick, children, ...props },
   ref,
 ) {
   const { collapsed } = useContext(SidebarContext);
@@ -193,6 +193,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
       className={cn(styles.item, className)}
       data-active={active || undefined}
       data-indent={indent || undefined}
+      data-clamp={clamp || undefined}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? name : undefined}
       onClick={handleClick}

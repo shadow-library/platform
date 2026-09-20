@@ -52,6 +52,12 @@ export interface SidebarItemProps extends ComponentPropsWithoutRef<'a'> {
    * ones that have no group. Ignored in rail mode, where there is no room to express depth.
    */
   indent?: boolean;
+  /**
+   * Let the label wrap to two lines instead of ellipsising on one. For rows whose text is a name the
+   * reader chose — a conversation, a saved view — where a mid-word cut loses the thing that identifies it.
+   * Pair with a `title` so the full string is still reachable. Ignored in rail mode.
+   */
+  clamp?: boolean;
 }
 
 export interface SidebarSwitcherOption {

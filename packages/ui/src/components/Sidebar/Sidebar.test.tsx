@@ -334,6 +334,21 @@ describe('Sidebar', () => {
     expect(css).toMatch(/\.item\[data-indent\]\s*{\s*padding-left:\s*36px;/);
   });
 
+  it('wraps a clamped label to two lines instead of ellipsising it', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Item href="/chat?session=a" clamp title="The betrayal at Meridian Gate, and what it costs">
+          The betrayal at Meridian Gate, and what it costs
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    const link = screen.getByRole('link', { name: 'The betrayal at Meridian Gate, and what it costs' });
+    expect(link).toHaveAttribute('data-clamp');
+    expect(link).toHaveAttribute('title');
+    expect(css).toMatch(/\.item\[data-clamp\] \.label \{[^}]*-webkit-line-clamp: 2;/);
+    expect(css).toMatch(/\.item\[data-clamp\] \.label \{[^}]*white-space: normal;/);
+  });
+
   it('chains the caller onClick through an asChild item', async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

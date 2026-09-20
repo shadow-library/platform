@@ -31,6 +31,11 @@ export interface NavLeaf {
   search?: Record<string, unknown>;
   /** Step the row in one level, for a nested run inside a flat section. */
   indent?: boolean;
+  /**
+   * Let the label wrap to two lines rather than ellipsising, and hang the full string off a `title`.
+   * For rows named by the reader — a conversation — where a mid-word cut loses what identifies it.
+   */
+  clamp?: boolean;
   label: string;
   /** Leading 16px icon. Pass the element, not the component. */
   icon?: ReactNode;

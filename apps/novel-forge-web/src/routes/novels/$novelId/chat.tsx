@@ -1,12 +1,27 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { ArchiveIcon, BookIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, StopIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { type ChipIntent, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
+import {
+  ArchiveIcon,
+  BookIcon,
+  ChatIcon,
+  EditIcon,
+  ListIcon,
+  PlusIcon,
+  ProposalsIcon,
+  SearchIcon,
+  SendIcon,
+  SparkIcon,
+  StopIcon,
+  TrashIcon,
+  WarningIcon,
+} from '@/components/icons';
+import { type ChipIntent, CollectionPage, EmptyState, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, SidePanel, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
+  type ApiError,
   type ChangeItemResponse,
   type ChatMessageResponse,
   type ChatMode,
@@ -21,6 +36,7 @@ import {
   useDiscardProposalMutation,
   useListChangesQuery,
   useListChatSessionsQuery,
+  useListProposalsQuery,
   useProjectQuery,
   useProposalQuery,
   useRevertProposalMutation,
@@ -28,7 +44,8 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
-import { groupByRecency, messageTime, projectTitle, relativeTime } from '@/lib/format';
+import { bySession, chatChangesSummary, chatTitle } from '@/lib/chat-sessions';
+import { messageTime, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
 import { ChangeOpBody, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel, PluginSourceChip } from './proposals';
@@ -40,6 +57,13 @@ interface ChatSearch {
 // `?session=new` is the chat that does not exist yet: the row is written on the first message, so until
 // then there is nothing to name. Session ids are server-generated UUIDs, which can never spell `new`.
 const DRAFT_SESSION = 'new';
+
+// `?session=all` is the full directory — the state D2 gives a list-detail page when no item is open.
+const ALL_SESSIONS = 'all';
+
+// Matches the shell's own pending-proposal query, so the changes panel reads that cache rather than
+// issuing a second request for the same rows.
+const PENDING_PROPOSAL_LIMIT = 50;
 
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
 // No loader by design (category D): the refinement chat is a live, streaming conversation whose data is
@@ -501,7 +525,7 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
       <div className={styles.threadHead}>
         {renamingHeader ? (
           <RenameInput
-            label={`Rename “${session.title ?? 'New chat'}”`}
+            label={`Rename “${chatTitle(session)}”`}
             value={session.title ?? ''}
             loading={updateSession.isPending}
             onCommit={renameSession}
@@ -747,12 +771,210 @@ function DraftChat({ novelId, onStart, starting = false }: DraftChatProps): Reac
   );
 }
 
+interface ChangesPanelProps {
+  novelId: string;
+  sessionId: string;
+  onOpenHistory: () => void;
+}
+
+/** The right-hand context panel (D4): what this conversation changed, and the way back out of it. */
+function ChangesPanel({ novelId, sessionId, onOpenHistory }: ChangesPanelProps): React.JSX.Element {
+  // Same params as the shell's own pending-proposal query, so this reads that cache instead of fetching again.
+  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: PENDING_PROPOSAL_LIMIT });
+  const changesQuery = useListChangesQuery(novelId);
+  const revert = useRevertProposalMutation(novelId);
+
+  const waiting = bySession(proposalsQuery.data?.items ?? [], sessionId);
+  const changed = bySession(changesQuery.data?.items ?? [], sessionId);
+
+  const doRevert = (id: string): void => {
+    revert.mutate(id, {
+      onSuccess: r => toast.success(`Reverted ${r.reverted.length} artifact(s)`),
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  return (
+    <SidePanel
+      title="Changes in this chat"
+      titleAccessory={waiting.length > 0 ? <StatusChip intent="warning">{waiting.length}</StatusChip> : undefined}
+      summary={chatChangesSummary(waiting.length, changed.length)}
+      total={waiting.length + changed.length}
+      empty="Nothing changed yet. When Forge proposes an edit it lands here, with a Revert beside it."
+      footer={
+        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+          Roll back to a point…
+        </Button>
+      }
+    >
+      {waiting.length > 0 && (
+        <section className={styles.panelGroup}>
+          <h3 className={styles.panelGroupLabel}>Waiting on you</h3>
+          {waiting.map(proposal => (
+            <div key={proposal.id} className={styles.panelRow}>
+              <div className={styles.panelRowTop}>
+                <StatusChip intent="warning">
+                  {proposal.changeSet.length} change{proposal.changeSet.length === 1 ? '' : 's'}
+                </StatusChip>
+              </div>
+              <div className={styles.panelRowSummary}>{proposal.summary?.trim() || 'Accept or decline it on the card in the transcript.'}</div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {changed.length > 0 && (
+        <section className={styles.panelGroup}>
+          <h3 className={styles.panelGroupLabel}>Applied</h3>
+          {changed.map(change => (
+            <div key={change.id} className={styles.panelRow} data-reverted={change.status === 'reverted'}>
+              <div className={styles.panelRowTop}>
+                <StatusChip intent={change.status === 'applied' ? 'success' : 'info'}>{change.status}</StatusChip>
+                <div className={styles.spacer} />
+                <span className={styles.panelRowTime}>{change.appliedAt ? relativeTime(change.appliedAt) : ''}</span>
+              </div>
+              <div className={styles.panelRowSummary}>{change.summary?.trim() || change.refs.join(', ') || 'pipeline actions'}</div>
+              {change.revertible && (
+                <Button size="sm" variant="ghost" loading={revert.isPending} onClick={() => doRevert(change.id)}>
+                  Revert
+                </Button>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+    </SidePanel>
+  );
+}
+
+interface ChatDirectoryProps {
+  novelId: string;
+  sessions: ChatSessionResponse[];
+  loading: boolean;
+  error: ApiError | null;
+  statusFilter: 'active' | 'archived';
+  onStatusFilterChange: (status: 'active' | 'archived') => void;
+  renamingSessionId?: string;
+  renaming: boolean;
+  onRename: (sessionId: string, title: string) => void;
+  onRenameStart: (sessionId: string) => void;
+  onRenameCancel: () => void;
+  onArchive: (session: ChatSessionResponse) => void;
+  onDelete: (session: ChatSessionResponse) => void;
+  onNewChat: () => void;
+}
+
+/**
+ * Every conversation, full width (D2) — reached from the sidebar's "All N chats" and from a delete that
+ * left nothing open. The rail's own row actions live here now; nothing else has them.
+ */
+function ChatDirectory({
+  novelId,
+  sessions,
+  loading,
+  error,
+  statusFilter,
+  onStatusFilterChange,
+  renamingSessionId,
+  renaming,
+  onRename,
+  onRenameStart,
+  onRenameCancel,
+  onArchive,
+  onDelete,
+  onNewChat,
+}: ChatDirectoryProps): React.JSX.Element {
+  return (
+    <CollectionPage
+      title="Chats"
+      subtitle="Every conversation with Forge about this novel."
+      total={sessions.length}
+      actions={
+        <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={onNewChat}>
+          New chat
+        </Button>
+      }
+      segments={{
+        label: 'Chat status',
+        value: statusFilter,
+        onValueChange: value => onStatusFilterChange(value as 'active' | 'archived'),
+        items: [
+          { value: 'active', label: 'Active' },
+          { value: 'archived', label: 'Archived' },
+        ],
+      }}
+      empty={
+        statusFilter === 'active' ? (
+          <EmptyState
+            icon={<ChatIcon size={24} />}
+            title="No chats yet"
+            description="A chat is where you ask Forge to read, plan or rewrite anything in this novel — it stages every change for you to accept."
+            actions={
+              <Button variant="primary" onClick={onNewChat}>
+                Start a chat
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState icon={<ArchiveIcon size={24} />} title="No archived chats" description="Archiving a chat takes it out of the sidebar without deleting anything it changed." />
+        )
+      }
+    >
+      {loading ? (
+        <PaneLoader />
+      ) : error ? (
+        <PaneError error={error} />
+      ) : (
+        <ul className={styles.rows}>
+          {sessions.map(session => (
+            <li key={session.id} className={styles.row}>
+              {renamingSessionId === session.id ? (
+                <div className={styles.rowRename}>
+                  <RenameInput
+                    label={`Rename “${chatTitle(session)}”`}
+                    value={session.title ?? ''}
+                    loading={renaming}
+                    onCommit={title => onRename(session.id, title)}
+                    onCancel={onRenameCancel}
+                  />
+                </div>
+              ) : (
+                <Link to="/novels/$novelId/chat" params={{ novelId }} search={{ session: session.id }} className={styles.rowLink}>
+                  <span className={styles.rowMain}>
+                    <span className={styles.rowTitle}>{chatTitle(session)}</span>
+                    {session.summary && <span className={styles.rowSummary}>{session.summary}</span>}
+                  </span>
+                  {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
+                  <span className={styles.rowMeta}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
+                </Link>
+              )}
+              <div className={styles.rowActions}>
+                <RowAction label="Rename chat" onClick={() => onRenameStart(session.id)}>
+                  <EditIcon size={13} />
+                </RowAction>
+                <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => onArchive(session)}>
+                  <ArchiveIcon size={13} />
+                </RowAction>
+                <RowAction label="Delete chat & history" danger onClick={() => onDelete(session)}>
+                  <TrashIcon size={13} />
+                </RowAction>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CollectionPage>
+  );
+}
+
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const { session: sessionParam } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
-  const sessionsQuery = useListChatSessionsQuery(novelId, { status: statusFilter, limit: 50 });
+  // Unfiltered on purpose: the status filter belongs to the directory, and resolving the open chat against
+  // a filtered list would answer an archived link with whichever active chat happened to sort first.
+  const sessionsQuery = useListChatSessionsQuery(novelId, { limit: 50 });
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
   const createSession = useCreateChatSessionMutation(novelId);
@@ -777,19 +999,21 @@ function ChatScreen(): React.JSX.Element {
   // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
   // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
   const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
-  // The server sorts by `updatedAt`, which a rename, archive, or mode switch also bumps without
-  // touching `lastTurnAt` — so a chat's row can move without it having been spoken to. Bucketing
-  // reads `lastTurnAt ?? updatedAt` (recency is "last spoken to"), and `groupByRecency` re-sorts on
-  // that same field before grouping so the two never disagree on order.
-  const sessionGroups = groupByRecency(sessions, session => session.lastTurnAt ?? session.updatedAt);
+  const listed = sessions.filter(session => session.status === statusFilter);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
   // The URL param wins when it names a session still in the list; otherwise fall back to the first
   // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.
-  // The draft sentinel outranks both — it means the author asked for a chat none of these rows can be.
+  // The two sentinels outrank both — they mean the author asked for something none of these rows can be.
   const selectSession = (id?: string): Promise<void> => navigate({ search: { session: id } });
-  const selected = sessionParam === DRAFT_SESSION ? undefined : (sessions.find(s => s.id === sessionParam) ?? (draftSession?.id === sessionParam ? draftSession : sessions[0]));
+  const showDirectory = sessionParam === ALL_SESSIONS;
+  // The implicit pick stays the newest ACTIVE chat even though the list now carries archived ones too:
+  // the list is sorted newest-first, so the first active row is it.
+  const selected =
+    sessionParam === DRAFT_SESSION || showDirectory
+      ? undefined
+      : (sessions.find(s => s.id === sessionParam) ?? (draftSession?.id === sessionParam ? draftSession : sessions.find(s => s.status === 'active')));
 
   // Once the invalidated sessions list actually carries the new row, the lookup above finds it on its own
   // — drop the stand-in during render (not an effect: this is adjusting state from props, not
@@ -800,8 +1024,8 @@ function ChatScreen(): React.JSX.Element {
     setStatusFilter('active');
     // Invalidates any create still in flight: its `onSuccess` checks this token and, finding it stale,
     // leaves the author here instead of navigating them to a chat they didn't ask to open. The session it
-    // created is not lost — it still lands in the rail once the list invalidation the mutation already
-    // does resolves — just not auto-opened.
+    // created is not lost — it still lands in the list once the invalidation the mutation already does
+    // resolves — just not auto-opened.
     startRequestRef.current += 1;
     startingRef.current = false;
     void selectSession(DRAFT_SESSION);
@@ -856,95 +1080,64 @@ function ChatScreen(): React.JSX.Element {
     if (!deleteTarget) return;
     deleteSession.mutate(deleteTarget.id, {
       onSuccess: () => {
-        toast.success(`Deleted “${deleteTarget.title ?? 'chat'}” and its history`);
+        toast.success(`Deleted “${chatTitle(deleteTarget)}” and its history`);
         setDeleteTarget(undefined);
-        if (deleteTarget.id === sessionParam) selectSession(undefined);
+        // Nothing to fall back to in place: the directory is where a deleted chat leaves you.
+        if (deleteTarget.id === sessionParam) selectSession(ALL_SESSIONS);
       },
       onError: err => toast.danger(err.message),
     });
   };
 
-  return (
-    <div className="nf-splitpane">
-      {/* sessions */}
-      <div className="nf-rail">
-        <div className="nf-railhead">
-          <div className={styles.railTitleRow}>
-            <span className={styles.railTitle}>Chats</span>
-            <div className={styles.spacer} />
-            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
-              History
-            </Button>
-            <Button variant="secondary" size="sm" onClick={newChat}>
-              New
-            </Button>
-          </div>
-          <div className={styles.filterRow}>
-            {(['active', 'archived'] as const).map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} className={styles.filterPill} data-active={statusFilter === s}>
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="nf-scroll nf-raillist">
-          {sessionsQuery.isLoading && <PaneLoader />}
-          {sessionsQuery.error && <PaneError error={sessionsQuery.error} />}
-          {!sessionsQuery.isLoading && sessions.length === 0 && (
-            <div className="nf-emptynote">{statusFilter === 'active' ? 'No chats yet — start one to run the whole novel.' : 'No archived chats.'}</div>
-          )}
-          {sessionGroups.map(group => (
-            <div key={group.label} className={styles.railGroup}>
-              <h3 className={styles.railGroupHeading}>{group.label}</h3>
-              {group.items.map(session => (
-                <div
-                  key={session.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => selectSession(session.id)}
-                  onKeyDown={e => e.key === 'Enter' && selectSession(session.id)}
-                  className="nf-selrow nf-selrow-flat"
-                  data-active={session.id === selected?.id}
-                >
-                  <div className={styles.sessionTop}>
-                    {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
-                    {renamingSessionId === session.id ? (
-                      <RenameInput
-                        label={`Rename “${session.title ?? 'New chat'}”`}
-                        value={session.title ?? ''}
-                        loading={renameSession.isPending}
-                        onCommit={title => rename(session.id, title)}
-                        onCancel={() => setRenamingSessionId(undefined)}
-                        className={styles.sessionTitleInput}
-                      />
-                    ) : (
-                      <div className={styles.sessionTitle}>{session.title ?? 'New chat'}</div>
-                    )}
-                    <div className="nf-selrow-meta">
-                      <span className="nf-selrow-meta-time">{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
-                      <div className="nf-rowactions">
-                        <RowAction label="Rename chat" onClick={() => setRenamingSessionId(session.id)}>
-                          <EditIcon size={13} />
-                        </RowAction>
-                        <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
-                          <ArchiveIcon size={13} />
-                        </RowAction>
-                        <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
-                          <TrashIcon size={13} />
-                        </RowAction>
-                      </div>
-                    </div>
-                  </div>
-                  {session.summary && renamingSessionId !== session.id && <div className={styles.sessionSummary}>{session.summary}</div>}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
+  const dialogs = (
+    <>
+      <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
 
-      {/* thread */}
-      <div className="nf-detail">
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
+        <Dialog.Content size="sm">
+          <Dialog.Header
+            title={`Delete “${deleteTarget ? chatTitle(deleteTarget) : 'this chat'}”?`}
+            description="The conversation and its full history are removed permanently. Proposals it already staged are kept."
+          />
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={deleteSession.isPending} onClick={doDelete}>
+              Delete chat
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
+    </>
+  );
+
+  if (showDirectory)
+    return (
+      <>
+        <ChatDirectory
+          novelId={novelId}
+          sessions={listed}
+          loading={sessionsQuery.isLoading}
+          error={sessionsQuery.error}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          renamingSessionId={renamingSessionId}
+          renaming={renameSession.isPending}
+          onRename={rename}
+          onRenameStart={setRenamingSessionId}
+          onRenameCancel={() => setRenamingSessionId(undefined)}
+          onArchive={archive}
+          onDelete={setDeleteTarget}
+          onNewChat={newChat}
+        />
+        {dialogs}
+      </>
+    );
+
+  return (
+    <div className={styles.screen}>
+      <div className={styles.main}>
         {selected ? (
           <ChatThread
             key={selected.id}
@@ -959,24 +1152,9 @@ function ChatScreen(): React.JSX.Element {
         )}
       </div>
 
-      <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
+      {selected && <ChangesPanel novelId={novelId} sessionId={selected.id} onOpenHistory={() => setHistoryOpen(true)} />}
 
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
-        <Dialog.Content size="sm">
-          <Dialog.Header
-            title={`Delete “${deleteTarget?.title ?? 'this chat'}”?`}
-            description="The conversation and its full history are removed permanently. Proposals it already staged are kept."
-          />
-          <Dialog.Footer>
-            <Dialog.Close asChild>
-              <Button variant="ghost">Cancel</Button>
-            </Dialog.Close>
-            <Button variant="danger" loading={deleteSession.isPending} onClick={doDelete}>
-              Delete chat
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog>
+      {dialogs}
     </div>
   );
 }

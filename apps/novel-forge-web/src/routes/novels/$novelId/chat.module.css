@@ -2,6 +2,34 @@
   flex: 1;
 }
 
+/* The page owns the viewport the way the old split pane did — the composer is pinned, only the
+   transcript scrolls — but there is one column now, and the panel beside it is context, not an index. */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 16px;
+  padding: 16px 16px 16px 0;
+  overflow: hidden;
+  background: var(--sh-surface-app);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 960px) {
+  .screen {
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 0;
+  }
+}
+
 .thread {
   flex: 1;
   min-width: 0;
@@ -65,7 +93,7 @@
 }
 
 .msgList {
-  max-width: 960px;
+  max-width: 720px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -140,45 +168,13 @@
   line-height: 1.6;
 }
 
-.proposalBtn {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  width: 100%;
-  background: var(--sh-warning-bg-subtle);
-  border: 1px solid var(--sh-warning-border);
-  border-radius: var(--sh-radius-md);
-  cursor: pointer;
-  text-align: left;
-}
-
-.proposalIcon {
-  color: var(--sh-warning-solid);
-}
-
-.proposalMain {
-  flex: 1;
-}
-
-.proposalTitle {
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-}
-
-.proposalSub {
-  font-size: 11px;
-  color: var(--sh-text-tertiary);
-}
-
 .composer {
   flex-shrink: 0;
   padding: 6px 20px 16px;
 }
 
 .composerInner {
-  max-width: 960px;
+  max-width: 720px;
   margin: 0 auto;
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
@@ -209,90 +205,10 @@
   white-space: nowrap;
 }
 
-.railTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.railTitle {
-  font-size: var(--sh-text-body);
-  font-weight: 700;
-}
-
-.filterRow {
-  display: flex;
-  gap: 5px;
-}
-
-.filterPill {
-  padding: 3px 10px;
-  border: none;
-  border-radius: 99px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 500;
-  background: transparent;
-  color: var(--sh-text-secondary);
-  text-transform: capitalize;
-}
-
 .filterPill[data-active='true'] {
   font-weight: 600;
   background: var(--sh-accent-soft);
   color: var(--sh-accent);
-}
-
-.railGroup:first-child .railGroupHeading {
-  margin-top: 2px;
-}
-
-.railGroupHeading {
-  margin: 16px 6px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--sh-text-tertiary);
-}
-
-.sessionTop {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 8px;
-  min-height: 22px;
-}
-
-.sessionTitle {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-  color: var(--sh-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-[data-active='true'] .sessionTitle {
-  color: var(--sh-accent);
-}
-
-.sessionTitleInput {
-  flex: 1;
-  min-width: 0;
-}
-
-.sessionSummary {
-  font-size: 11px;
-  color: var(--sh-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
 }
 
 .hero {
@@ -506,4 +422,132 @@
 .streamStoppedNote {
   font-size: 12px;
   color: var(--sh-text-tertiary);
+}
+
+.panelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panelGroupLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+}
+
+.panelRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-app);
+}
+
+.panelRow[data-reverted='true'] {
+  opacity: 0.55;
+}
+
+.panelRowTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.panelRowTime {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.panelRowSummary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.row:hover {
+  border-color: var(--sh-border-interactive);
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.rowLink {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0 12px 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.rowRename {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0 10px 16px;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Two lines and a title attribute, never an ellipsised one: cutting a conversation's name mid-word is
+   the fault this redesign exists to remove. */
+.rowTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.rowSummary {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.rowMeta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.rowActions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
 }
