@@ -26,7 +26,12 @@
 ### 2.1 Known limits
 
 - **Cancellation is process-local.** The abort registry lives in memory, so a cancel only reaches a run owned by the replica that received the request. This matches `ProjectEventService`'s existing in-process fan-out and its comment; the fix for both is the same (Postgres LISTEN/NOTIFY) and is out of scope.
-- **A job is cancelled at a step boundary, not mid-model-call.** An `in_progress` job inside a long LLM call finishes that call before it notices. Aborting mid-call would mean threading cancellation through every generation graph, not just the chat one — deliberately excluded (the product owner was offered it and chose not to).
+- **A job IS aborted mid-model-call.** Superseded 2026-09-20: this section originally said a job stops
+  only at a step boundary, because aborting mid-call was thought to require threading cancellation through
+  every generation graph. S1's abort registry removed that cost — the signal already reaches `llm.stream`
+  for every run — so S5 polls for a cancel request and calls `WorkflowRunService.cancel` on the run the job
+  is driving. The product owner was shown the deviation and chose to keep it. The boundary checks remain and
+  are what settle the row; the poller only stops the spend.
 - **Granting the scope is a manual step.** Workflow Runs disappears for everyone until `novel-forge:admin` is granted in the identity provider.
 
 ## 3. Migration
