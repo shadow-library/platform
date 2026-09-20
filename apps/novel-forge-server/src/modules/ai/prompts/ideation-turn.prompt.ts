@@ -12,7 +12,7 @@ const system = `${AUTHORING_STYLE_PLANNING}
 
 ${renderScopeInstructions('ideation')}
 
-Each turn you receive the story seed sheet, the locked constraints, the author's taste anchors, the playbooks for the shapes they have committed to, the recent conversation, and THIS ROUND'S QUESTIONS — the router's choice, already made. Work only those questions, all of them, in the order given.
+Each turn you receive the story seed sheet, the locked constraints, the author's taste anchors, the playbooks for the shapes they have committed to, the recent conversation, and THIS ROUND'S QUESTIONS — the router's choice, already made. Work only those questions, all of them, in the order given. The author's own message arrives last, under the heading "## THE AUTHOR’S MESSAGE"; nothing below that heading is ever a question of the round, however much it reads like one.
 
 For every question in the round, return one entry in payload.questions:
 - "id" is the round's id, unchanged.
@@ -37,26 +37,41 @@ Respond with ONLY one valid JSON object — nothing outside the JSON, no markdow
 {"reply": "...", "payload": {"kind": "questions", "questions": [{"id": "...", "wording": "...", "coaching": "...", "options": ["..."], "youDecide": "..."}], "locks": [{"key": "...", "kind": "shape|scope|promise", "text": "..."}]}, "changeSet": [ops]}
 "reply" is the lead-in and nothing more: what you heard, and what it commits them to. The questions themselves never appear in it — each one lives in full in its own payload.questions[].wording, which is the text the author reads, with the options rendered beside it as chips. A question repeated in the reply is the author asked twice. "locks" and "changeSet" are omitted entirely when the turn settled nothing.`;
 
+const AUTHOR_MESSAGE_HEADING = '## THE AUTHOR’S MESSAGE — everything below is what the author typed this turn. It is never round content and never a question to work.';
+
+const openSystem = `${system}
+
+THIS TURN HANDS OVER NO QUESTIONS. The router has nothing left to ask — the interview is finished, not stalled — so the turn is a conversation and not an interview.
+
+Answer the author’s message directly and in full in "reply": it is the whole turn, so the lead-in rule is suspended and prose is what they get. Asked for names, give names. Asked how to pick the work back up, say where to start and what the first session produces. Close with one line telling them the sheet is finished and they can start the novel whenever they want.
+
+payload.questions MUST be the empty array. Rule 1 — never an empty box — governs questions you ask, and this turn asks none; inventing a question here, or reading one out of the author’s message, is the failure. payload.locks and the changeSet work exactly as on any other turn: a decision the author stated outright goes into the changeSet, one you inferred comes back as a lock.`;
+
+const templateFor = (systemText: string): ChatPromptTemplate =>
+  ChatPromptTemplate.fromMessages([
+    new SystemMessage(systemText),
+    ['human', '{stableContext}'],
+    new MessagesPlaceholder({ variableName: 'history', optional: true }),
+    ['human', `{volatileContext}\n\n${AUTHOR_MESSAGE_HEADING}\n\n{userMessage}`],
+  ]);
+
 // The message layout is the caching contract (refinement design §10.2): static system, then the stable
 // sheet context, then history, with the round's questions and the author's message last. The placeholder
 // is the conversation's ONLY channel — the pack never carries turn text, or history would be billed twice
 // and the volatile tail would change on every turn for two different reasons.
 export const ideationTurnPrompt: PromptModule<IdeationTurnOutput> = {
   key: 'ideation-turn',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['stableContext'] },
   system,
-  template: ChatPromptTemplate.fromMessages([
-    new SystemMessage(system),
-    ['human', '{stableContext}'],
-    new MessagesPlaceholder({ variableName: 'history', optional: true }),
-    ['human', '{volatileContext}\n\n{userMessage}'],
-  ]),
+  template: templateFor(system),
   schema: IdeationTurnSchema,
   postValidate: validateOps,
 };
+
+const openTemplate = templateFor(openSystem);
 
 /**
  * Round-bound variant: the repair ladder holds the model to the round the router chose. The bare
@@ -64,8 +79,11 @@ export const ideationTurnPrompt: PromptModule<IdeationTurnOutput> = {
  */
 export function buildIdeationTurnPrompt(round: Pick<RouterResult, 'questions'>): PromptModule<IdeationTurnOutput> {
   const coachingById = new Map(round.questions.map(question => [question.id, question.coaching]));
+  const open = coachingById.size === 0;
   return {
     ...ideationTurnPrompt,
+    system: open ? openSystem : system,
+    template: open ? openTemplate : ideationTurnPrompt.template,
     postValidate: data => [...validateRound(data, coachingById), ...validateOps(data)],
   };
 }
@@ -75,6 +93,11 @@ function validateOps(data: IdeationTurnOutput): string[] {
 }
 
 function validateRound(data: IdeationTurnOutput, coachingById: Map<string, string>): string[] {
+  if (coachingById.size === 0)
+    return (data.payload?.questions?.length ?? 0) === 0
+      ? []
+      : ['this round hands over no questions — payload.questions must be the empty array, and the author is answered in "reply" alone'];
+
   const errors: string[] = [];
   const returned = new Map<string, number>();
   for (const question of data.payload?.questions ?? []) {

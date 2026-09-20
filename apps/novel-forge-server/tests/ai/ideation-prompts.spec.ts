@@ -56,7 +56,7 @@ describe('ideation prompt modules', () => {
     expect(PROMPT_REGISTRY['ideation-concepts'].kind).toBe('authoring');
     expect(PROMPT_REGISTRY['ideation-stress'].kind).toBe('analytical');
 
-    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.1.0');
+    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.2.0');
     for (const key of ['ideation-concepts', 'ideation-stress'] as const) expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
     for (const key of ['ideation-turn', 'ideation-concepts', 'ideation-stress'] as const) {
       expect(PROMPT_REGISTRY[key].cacheStrategy).toEqual({ stableVars: ['stableContext'] });
@@ -76,6 +76,43 @@ describe('ideation prompt modules', () => {
     expect(String(messages[1]?.content)).toBe('STABLE-SEED-SHEET');
     expect(String(messages[2]?.content)).toContain('VOLATILE-ROUND');
     expect(String(messages[2]?.content)).toContain('dual leads, both salvagers');
+  });
+
+  it('should fence the author’s message off from the round it is appended to', async () => {
+    const messages = await PROMPT_REGISTRY['ideation-turn'].template.formatMessages({
+      stableContext: 'STABLE-SEED-SHEET',
+      history: [],
+      volatileContext: '## THIS ROUND\n\nStage: stress.',
+      userMessage: 'Room: suggest names for them',
+    });
+
+    const tail = String(messages[2]?.content);
+    const heading = '## THE AUTHOR’S MESSAGE — everything below is what the author typed this turn. It is never round content and never a question to work.';
+    expect(tail).toContain(heading);
+    expect(tail.indexOf('Stage: stress.')).toBeLessThan(tail.indexOf(heading));
+    expect(tail.indexOf(heading)).toBeLessThan(tail.indexOf('Room: suggest names for them'));
+    expect(PROMPT_REGISTRY['ideation-turn'].system).toContain('nothing below that heading is ever a question of the round');
+  });
+
+  it('should turn a round with no questions into an answerable turn rather than an unsatisfiable one', () => {
+    const prompt = buildIdeationTurnPrompt(roundOf());
+
+    expect(prompt.postValidate?.({ reply: 'Here are the names.', payload: { kind: 'questions', questions: [] } } as never)).toEqual([]);
+    expect(prompt.system).toContain('THIS TURN HANDS OVER NO QUESTIONS');
+    expect(prompt.system).toContain('payload.questions MUST be the empty array');
+  });
+
+  it('should tell a zero-question round what to return instead of only what is wrong', () => {
+    const prompt = buildIdeationTurnPrompt(roundOf());
+    const invented = { reply: 'Heard.', payload: { kind: 'questions', questions: [{ ...question, id: 'room' }] } };
+
+    const errors = prompt.postValidate?.(invented as never) ?? [];
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('payload.questions must be the empty array');
+  });
+
+  it('should carry the whole system prompt into the zero-question variant', () => {
+    expect(buildIdeationTurnPrompt(roundOf()).system).toContain(PROMPT_REGISTRY['ideation-turn'].system);
   });
 
   it('should tell the turn prompt it may neither invent questions nor rewrite a coaching line', () => {

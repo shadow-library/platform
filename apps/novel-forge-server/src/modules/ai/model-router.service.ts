@@ -459,14 +459,17 @@ export class ModelRouterService {
       return parsed1.data;
     }
 
-    this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
-    this.logger.debug('Attempt 1 raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput1, issues: renderSchemaIssues(parsed1.issues) });
+    // The issue strings are structural field paths and validator messages — no author prose — so they ride
+    // on warn, where production keeps them. The raw output is the author's material and stays on debug.
+    const issues1 = renderSchemaIssues(parsed1.issues);
+    this.logger.warn('Attempt 1 parse failed — repairing', { role, runId: ctx.runId, promptKey: promptModule.key, promptVersion: promptModule.version, issues: issues1 });
+    this.logger.debug('Attempt 1 raw output', { role, runId: ctx.runId, rawOutput: rawOutput1 });
 
     const repairMessages: BaseMessage[] = [
       ...messages,
       new AIMessage(rawOutput1),
       new HumanMessage(
-        `That response could not be used. Issues:\n${renderSchemaIssues(parsed1.issues)}\n\nRespond again with ONLY one valid JSON object matching the required schema — fix the listed issues, keep the content, no prose outside the JSON, no markdown fences.`,
+        `That response could not be used. Issues:\n${issues1}\n\nRespond again with ONLY one valid JSON object matching the required schema — fix the listed issues, keep the content, no prose outside the JSON, no markdown fences.`,
       ),
     ];
 
@@ -479,8 +482,15 @@ export class ModelRouterService {
       return parsed2.data;
     }
 
-    this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
-    this.logger.debug('Repair raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput2, issues: renderSchemaIssues(parsed2.issues) });
+    const issues2 = renderSchemaIssues(parsed2.issues);
+    this.logger.warn('Repair parse failed — trying tolerant extraction', {
+      role,
+      runId: ctx.runId,
+      promptKey: promptModule.key,
+      promptVersion: promptModule.version,
+      issues: issues2,
+    });
+    this.logger.debug('Repair raw output', { role, runId: ctx.runId, rawOutput: rawOutput2 });
     const extracted = extractJsonBlock(rawOutput2);
     if (extracted) {
       const parsed3 = this.parseOutput(promptModule, extracted);
@@ -493,7 +503,16 @@ export class ModelRouterService {
       }
     }
 
-    this.logger.error('All parse attempts failed', { role, runId: ctx.runId, rawOutput1: rawOutput1.slice(0, 200) });
+    this.logger.error('All parse attempts failed', {
+      role,
+      runId: ctx.runId,
+      node: ctx.node,
+      promptKey: promptModule.key,
+      promptVersion: promptModule.version,
+      issues1,
+      issues2,
+      rawOutput1: rawOutput1.slice(0, 200),
+    });
     // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
     this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });
     throw AppErrorCode.AI_001.create();

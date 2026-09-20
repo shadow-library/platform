@@ -1513,6 +1513,14 @@ describe('ContextAssembler.forIdeationTurn', () => {
     expect(second.renderedVolatile).toContain('The Salvage Line');
   });
 
+  it('should say outright that a round with no questions asks nothing', async () => {
+    const pack = await makeAssembler().forIdeationTurn(seed(), { ...round(), questions: [] }, { dryRun: true });
+
+    expect(pack.renderedVolatile).toContain('No questions this round');
+    expect(pack.renderedVolatile).toContain('return an empty payload.questions');
+    expect(pack.renderedVolatile).not.toContain('Coaching (reproduce verbatim)');
+  });
+
   it('should hand the model each question with its intent and its coaching line unaltered', async () => {
     const result = round();
     const pack = await makeAssembler().forIdeationTurn(seed(), result, { dryRun: true });

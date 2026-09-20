@@ -442,6 +442,27 @@ describe('ModelRouterService.structured (repair ladder)', () => {
     expect(callCount).toBe(2);
   });
 
+  it('reports the schema issues, the prompt and its version above debug level', async () => {
+    const fakeChain = { invoke: mock(async () => ({ content: JSON.stringify({ verdict: 'consistent' }) })) };
+    const router = makeRouter(fakeChain);
+    const records: { level: string; message: string; meta: Record<string, unknown> }[] = [];
+    const record = (level: string) => (message: string, meta: Record<string, unknown>) => void records.push({ level, message, meta });
+    (router as unknown as Record<string, unknown>)['logger'] = { debug: record('debug'), info: record('info'), warn: record('warn'), error: record('error') };
+
+    await expect(router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
+
+    const above = records.filter(entry => entry.level !== 'debug');
+    const warned = above.find(entry => entry.message.startsWith('Attempt 1 parse failed'));
+    expect(warned?.meta).toMatchObject({ promptKey: 'judge', promptVersion: '1.0.0' });
+    expect(String(warned?.meta['issues'])).toContain('findings');
+
+    const failed = above.find(entry => entry.message === 'All parse attempts failed');
+    expect(failed?.level).toBe('error');
+    expect(failed?.meta).toMatchObject({ promptKey: 'judge', promptVersion: '1.0.0' });
+    expect(String(failed?.meta['issues1'])).toContain('findings');
+    expect(String(failed?.meta['issues2'])).toContain('findings');
+  });
+
   it('throws when all attempts fail', async () => {
     const fakeChain = { invoke: mock(async () => ({ content: 'not json' })) };
     const router = makeRouter(fakeChain);

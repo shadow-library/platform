@@ -191,11 +191,13 @@ function renderPlaybookExcerpts(constraints: schema.Ideation.SeedConstraint[]): 
 }
 
 function renderRoundQuestions(router: RouterResult, commitIds: string[]): string {
-  const backfilled = new Set(router.backfilled);
-  const commit = new Set(commitIds);
   const header = router.done
     ? `Stage: ${router.stage}. Every stress-ready field is filled — the author can start the novel whenever they want, and should hear that.`
     : `Stage: ${router.stage}.`;
+  if (router.questions.length === 0) return `${header}\n\nNo questions this round: there is nothing left to ask. Answer the author in prose and return an empty payload.questions.`;
+
+  const backfilled = new Set(router.backfilled);
+  const commit = new Set(commitIds);
   const blocks = router.questions.map(question => {
     const lines = [
       `[${question.id}] fills: ${question.fills.length > 0 ? question.fills.join(', ') : 'nothing — this answer is a locked constraint'}`,

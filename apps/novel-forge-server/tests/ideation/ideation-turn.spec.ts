@@ -546,6 +546,33 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
     });
   });
 
+  describe('the turn after the interview is over', () => {
+    const exhausted = () => makeSeed({ fields: FULL_SHEET, askedQuestions: [...ORIENTED, 'diverge.cards', ...QUESTION_IDS_DEEPEN, 'stress.readiness'] });
+
+    it('answers the author in prose instead of demanding questions the round cannot supply', async () => {
+      const { projectId, sessionId } = await exhausted();
+      const round = await roundOf(projectId);
+      expect(round.questions).toHaveLength(0);
+      expect(round.done).toBe(true);
+
+      structuredMock.mockImplementationOnce(answering({ reply: 'Names: the Tessel Reach, the Owed Coast.', payload: { kind: 'questions', questions: [] } }));
+
+      const result = await ideation.turn(projectId, sessionId, 'Room: suggest names, and how do we pick this up?');
+
+      expect(result.assistantMessage.content).toContain('the Owed Coast');
+      expect(result.assistantMessage.payload as { kind: string; questions: unknown[] }).toMatchObject({ kind: 'questions', questions: [] });
+      expect(lastInput()['volatileContext']).toContain('No questions this round');
+    });
+
+    it('rejects a question invented out of the author’s own sentences', async () => {
+      const { projectId, sessionId } = await exhausted();
+      const invented = { id: 'room', wording: 'w', coaching: 'c', options: ['a', 'b'], youDecide: 'a' };
+      structuredMock.mockImplementationOnce(answering({ reply: 'Heard.', payload: { kind: 'questions', questions: [invented] } }));
+
+      await expect(ideation.turn(projectId, sessionId, 'Room: suggest names for them')).rejects.toThrow('payload.questions must be the empty array');
+    });
+  });
+
   describe('the stress pass', () => {
     const readiness = () =>
       readinessDimensions(
