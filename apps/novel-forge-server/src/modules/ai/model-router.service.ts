@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, type BaseMessage, HumanMessage, type MessageContent, SystemMessage } from '@langchain/core/messages';
-import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
@@ -34,7 +33,7 @@ import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { ReplyStreamScanner } from './reply-stream-scanner';
-import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toHostedPromptSchema, toOllamaFormatSchema } from './schemas/validate';
+import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toHostedPromptSchema } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 export type ProjectConfig = OwnerFields & {
@@ -99,9 +98,9 @@ function withImageAttached(messages: BaseMessage[], image: string): BaseMessage[
   return messages.map((message, index) => (index === lastHuman ? new HumanMessage({ content: [...textParts, imagePart] }) : message));
 }
 
-// Ollama's JSON mode biases toward objects, so a schema expecting a top-level array frequently arrives
-// wrapped as `{ <key>: [...] }`. When the schema is a top-level array and the parsed value is an object
-// with exactly one array-valued property, unwrap that array so it validates.
+// A model asked for a top-level array often returns it wrapped as `{ <key>: [...] }`. Unwrapping is
+// doubly gated — the schema must be a top-level array and the value a non-array object with exactly
+// one array-valued property — so it can only turn a certain AJV failure into a possible success.
 function normalizeForSchema(schema: SchemaClass, data: unknown): unknown {
   if (!Array.isArray(schema)) return data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
@@ -184,8 +183,6 @@ class ReplyStreamRelay {
 export class ModelRouterService {
   private readonly logger = Logger.getLogger(APP_NAME, ModelRouterService.name);
   private readonly db: PrimaryDatabase;
-  // Local models (e.g. qwen3:14b) legitimately spend 60–120s on the heavier authoring stages, so the
-  // per-call budget defaults generously; tune ai.llm.timeout-ms downward for fast hosted providers.
   private readonly llmTimeoutMs = Config.get('ai.llm.timeout-ms') ?? 300_000;
   private readonly llmMaxRetries = Config.get('ai.llm.max-retries') ?? 2;
   private readonly llmBackoffMs = Config.get('ai.llm.backoff-ms') ?? 500;
@@ -265,53 +262,32 @@ export class ModelRouterService {
     return MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
   }
 
-  // Every hosted vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client
-  // covers them all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the
-  // same wire protocol. Ollama stays local and keeps its own client.
-  buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown>; role?: AiRole }): BaseChatModel {
+  // Every vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client covers them
+  // all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the same wire
+  // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
+  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole }): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
-    // design (see resolveProvider) and routes to that provider, never the platform's OpenRouter key.
+    // design (see resolveProvider) and must not silently route to the platform's OpenRouter key.
     if (!MODEL_MAP[resolved.model]) throw AppErrorCode.AI_002.create();
-    switch (resolveProvider(resolved)) {
-      case 'openrouter': {
-        // OpenRouter takes reasoning control as a top-level `reasoning: { effort }` body field, which is
-        // not part of the OpenAI chat-completions schema — modelKwargs is what ChatOpenAI splices into
-        // the request verbatim. Omitting it entirely is what disables reasoning on `optional` models.
-        const effort = opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
-        // Without this, ChatOpenAI falls back to OPENAI_API_KEY, fails deep inside the SDK, and the
-        // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
-        const apiKey = Config.get('ai.openrouter.api.key');
-        if (!apiKey) throw AppErrorCode.AI_006.create();
-        // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
-        // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
-        return new ChatOpenAI({
-          model: resolved.model,
-          apiKey,
-          maxRetries: 0,
-          configuration: { baseURL: Config.get('ai.openrouter.api.url') },
-          ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
-        });
-      }
-      case 'ollama':
-        // Local reasoning models (e.g. qwen3) otherwise wrap answers in <think> blocks and prose that
-        // make structured output unparseable. Disable thinking on every call, and — for structured
-        // requests — grammar-constrain decoding to the exact JSON schema so field names/shape match.
-        // Prose roles (generation/revision) pass no format and stay free-form.
-        return new ChatOllama({
-          model: resolved.model,
-          baseUrl: Config.get('ai.ollama.host'),
-          temperature: 0,
-          think: false,
-          // Bun's fetch aborts after ~300s without socket activity, and a long-context prompt eval
-          // streams no bytes for minutes — so long generations die as DOMException transport errors.
-          // Disable that idle timeout (Bun RequestInit extension); the per-call timeout budget still bounds the call.
-          fetch: ((input, init) => fetch(input, { ...init, ...({ timeout: false } as object) })) as typeof fetch,
-          ...(opts?.format ? { format: opts.format } : {}),
-        });
-      default:
-        throw AppErrorCode.AI_002.create();
-    }
+    if (resolveProvider(resolved) !== 'openrouter') throw AppErrorCode.AI_002.create();
+    // OpenRouter takes reasoning control as a top-level `reasoning: { effort }` body field, which is
+    // not part of the OpenAI chat-completions schema — modelKwargs is what ChatOpenAI splices into
+    // the request verbatim. Omitting it entirely is what disables reasoning on `optional` models.
+    const effort = opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
+    // Without this, ChatOpenAI falls back to OPENAI_API_KEY, fails deep inside the SDK, and the
+    // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
+    const apiKey = Config.get('ai.openrouter.api.key');
+    if (!apiKey) throw AppErrorCode.AI_006.create();
+    // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
+    // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
+    return new ChatOpenAI({
+      model: resolved.model,
+      apiKey,
+      maxRetries: 0,
+      configuration: { baseURL: Config.get('ai.openrouter.api.url') },
+      ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
+    });
   }
 
   // `projectId` is optional only so the smoke/local harnesses can build a raw client without a project;
@@ -371,7 +347,7 @@ export class ModelRouterService {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = await this.resolveFor(role, project, ctx.projectId, policy);
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
-    const llm = this.buildClient(resolved, { format: toOllamaFormatSchema(promptModule.schema), role });
+    const llm = this.buildClient(resolved, { role });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
     const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err })) : null;
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
@@ -584,19 +560,17 @@ export class ModelRouterService {
       .catch(insertErr => this.logger.warn('Failed to write model_calls row for an image call', { err: insertErr }));
   }
 
-  // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays from
-  // local JSON mode), validate it, then fold in any postValidate business rules.
+  // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays),
+  // validate it, then fold in any postValidate business rules.
   private parseOutput<T>(promptModule: PromptModule<T>, data: unknown): SchemaParseResult<T> {
     const normalized = normalizeForSchema(promptModule.schema, data);
     return applyPostValidate(parseSchema<T>(promptModule.schema, normalized), promptModule.postValidate);
   }
 
-  // Formats the module's template into messages, applying two provider-specific adjustments:
-  // Anthropic models get cache_control breakpoints on cacheStrategy modules, and every provider EXCEPT
-  // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
-  // on Ollama, so API models must be told the exact output shape or the creative roles (whose prompts
-  // never mention JSON) answer with plain prose. The in-band form keeps the descriptions and constraints
-  // the AJV pass judges the reply against; stripping them is an Ollama concession only.
+  // Formats the module's template into messages. Anthropic models get cache_control breakpoints on
+  // cacheStrategy modules, and every call gets the required JSON schema appended in-band — without it
+  // the creative roles, whose prompts never mention JSON, answer with plain prose. The in-band schema
+  // carries the descriptions and constraints the AJV pass judges the reply against.
   private async buildMessages<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,
@@ -604,19 +578,15 @@ export class ModelRouterService {
     policy?: ForgeCallPolicy,
     image?: string,
   ): Promise<BaseMessage[]> {
-    const provider = resolveProvider(resolved);
     let messages = withPluginSystemMessages(await promptModule.template.formatMessages(input), policy);
     if (image !== undefined) messages = withImageAttached(messages, image);
     if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
-    if (provider !== 'ollama') {
-      messages = [
-        ...messages,
-        new HumanMessage(
-          `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`,
-        ),
-      ];
-    }
-    return messages;
+    return [
+      ...messages,
+      new HumanMessage(
+        `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`,
+      ),
+    ];
   }
 
   // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).

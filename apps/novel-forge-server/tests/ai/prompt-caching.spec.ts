@@ -86,7 +86,7 @@ describe('ModelRouterService cacheStrategy integration', () => {
   it('keeps messages unmarked for non-anthropic models while preserving stable-first order', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
     const router = makeRouter(fakeLlm);
-    const project = { config: { models: { chat: { provider: 'ollama', model: 'qwen3:14b' } } } } as never;
+    const project = { config: { models: { chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' } } } } as never;
 
     await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
 

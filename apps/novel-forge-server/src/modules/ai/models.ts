@@ -26,7 +26,7 @@ export interface ModelEntry {
 }
 
 // All supported models. New entries land here; the router validates against this registry. Every LLM
-// id is an OpenRouter `vendor/model` slug — the gateway every hosted chat call goes through.
+// id is an OpenRouter `vendor/model` slug — the gateway every chat call goes through.
 export const MODEL_REGISTRY: ModelEntry[] = [
   // xAI / Grok LLMs
   {
@@ -216,9 +216,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsImageInput: true,
     reasoning: { mode: 'mandatory', efforts: ['high', 'medium', 'low'] },
   },
-  // Ollama (local — no pricing, variable context)
-  { id: 'qwen3:14b', provider: 'ollama', kind: 'llm', supportsTools: false, supportsStructuredOutput: false },
-  { id: 'qwen3:8b', provider: 'ollama', kind: 'llm', supportsTools: false, supportsStructuredOutput: false },
+  // The only local model left: `EmbeddingService` calls Ollama directly, and the pgvector columns are
+  // sized to this model's 1024 dimensions. No chat call ever routes to `ollama`.
   { id: 'qwen3-embedding:8b', provider: 'ollama', kind: 'embedding' },
 ];
 

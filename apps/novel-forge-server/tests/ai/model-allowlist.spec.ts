@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ChatOllama } from '@langchain/ollama';
-
 import { isRegisteredModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { Config } from '@shadow-library/common';
@@ -21,7 +19,7 @@ function setConfig(key: string, value: unknown): void {
 describe('isRegisteredModel', () => {
   it('should accept a registry model paired with its registry provider', () => {
     expect(isRegisteredModel({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
-    expect(isRegisteredModel({ provider: 'ollama', model: 'qwen3:14b' })).toBe(true);
+    expect(isRegisteredModel({ provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(true);
   });
 
   it('should reject a model id that is not in the registry', () => {
@@ -31,7 +29,7 @@ describe('isRegisteredModel', () => {
 
   it('should reject a registry model id paired with the wrong provider', () => {
     expect(isRegisteredModel({ provider: 'ollama', model: 'anthropic/claude-sonnet-5' })).toBe(false);
-    expect(isRegisteredModel({ provider: 'openrouter', model: 'qwen3:14b' })).toBe(false);
+    expect(isRegisteredModel({ provider: 'openrouter', model: 'qwen3-embedding:8b' })).toBe(false);
   });
 });
 
@@ -81,7 +79,7 @@ describe('ModelRouterService.buildClient fail-closed backstop', () => {
     expect(() => router.buildClient({ provider: 'openrouter', model: 'evil/unbounded-spend' })).toThrow();
   });
 
-  it('should keep the explicit-provider-wins precedence for a registry id, never rerouting it to the platform key', () => {
-    expect(router.buildClient({ provider: 'ollama', model: 'x-ai/grok-4.6' })).toBeInstanceOf(ChatOllama);
+  it('should refuse a registry id pinned to a provider the router cannot serve, never rerouting it to the platform key', () => {
+    expect(() => router.buildClient({ provider: 'ollama', model: 'x-ai/grok-4.6' })).toThrow();
   });
 });

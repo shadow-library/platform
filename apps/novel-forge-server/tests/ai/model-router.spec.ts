@@ -3,11 +3,9 @@ import { describe, expect, it, mock } from 'bun:test';
 import { awaitAllCallbacks } from '@langchain/core/callbacks/promises';
 import { type BaseMessage } from '@langchain/core/messages';
 import { FakeListChatModel } from '@langchain/core/utils/testing';
-import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 
 import {
-  LOCAL_TEST_DEFAULTS,
   PRODUCTION_DEFAULTS,
   REASONING_POLICY,
   resolveReasoningEffort,
@@ -167,8 +165,8 @@ describe('ModelRouterService.buildClient', () => {
   setConfig('ai.openrouter.api.key', 'test-openrouter-key');
   setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
 
-  it('should let an explicitly resolved provider win over the registry entry for that model', () => {
-    expect(router.buildClient({ provider: 'ollama', model: 'x-ai/grok-4.6' })).toBeInstanceOf(ChatOllama);
+  it('should refuse an explicitly resolved provider the router cannot serve rather than rerouting the model', () => {
+    expect(() => router.buildClient({ provider: 'ollama', model: 'x-ai/grok-4.6' })).toThrow();
   });
 
   it('should fall back to the registry provider when the resolution names none', () => {
@@ -211,12 +209,6 @@ describe('ModelRouterService.buildClient', () => {
     setConfig('ai.openrouter.api.url', 'http://gateway/openrouter');
     expect((router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) as ChatOpenAI).clientConfig.baseURL).toBe('http://gateway/openrouter');
     setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
-  });
-
-  it('should keep the local-test profile on ollama', () => {
-    for (const role of ['generation', 'judge', 'chat'] as const) {
-      expect(router.buildClient(LOCAL_TEST_DEFAULTS[role])).toBeInstanceOf(ChatOllama);
-    }
   });
 
   describe('against a model endpoint that keeps failing', () => {
@@ -282,7 +274,7 @@ describe('resolveReasoningEffort', () => {
   });
 
   it('should send nothing for a model with no reasoning metadata', () => {
-    expect(resolveReasoningEffort('qwen3:14b', 'writing')).toBeUndefined();
+    expect(resolveReasoningEffort('qwen3-embedding:8b', 'writing')).toBeUndefined();
     expect(resolveReasoningEffort('not-a-real-model', 'writing')).toBeUndefined();
   });
 });
@@ -312,10 +304,6 @@ describe('ModelRouterService.buildClient reasoning', () => {
     const client = router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' }, { role: 'epitome' }) as ChatOpenAI;
     expect(client.modelKwargs).toEqual({});
   });
-
-  it('should not disturb the ollama client, which disables thinking on its own', () => {
-    expect(router.buildClient({ provider: 'ollama', model: 'qwen3:14b' }, { role: 'title' })).toBeInstanceOf(ChatOllama);
-  });
 });
 
 describe('supportsPromptCaching', () => {
@@ -323,7 +311,7 @@ describe('supportsPromptCaching', () => {
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'x-ai/grok-4.6' })).toBe(false);
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'openai/gpt-5.4' })).toBe(false);
-    expect(supportsPromptCaching({ provider: 'ollama', model: 'qwen3:14b' })).toBe(false);
+    expect(supportsPromptCaching({ provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(false);
   });
 
   it('resolves the provider from the registry when the resolution names none', () => {
@@ -339,7 +327,7 @@ describe('MODEL_REGISTRY', () => {
   });
 
   it('all LLM entries have contextWindow > 0', () => {
-    for (const m of MODEL_REGISTRY.filter(m => m.kind === 'llm' && m.provider !== 'ollama')) {
+    for (const m of MODEL_REGISTRY.filter(m => m.kind === 'llm')) {
       expect(m.contextWindow).toBeGreaterThan(0);
     }
   });
@@ -348,30 +336,24 @@ describe('MODEL_REGISTRY', () => {
     for (const m of MODEL_REGISTRY.filter(m => m.supportsImageInput)) expect(m.kind).toBe('llm');
     expect(MODEL_MAP['z-ai/glm-5.2']?.supportsImageInput).toBeUndefined();
     expect(MODEL_MAP['deepseek/deepseek-v4-pro']?.supportsImageInput).toBeUndefined();
-    expect(MODEL_MAP['qwen3:8b']?.supportsImageInput).toBeUndefined();
+    expect(MODEL_MAP['qwen3-embedding:8b']?.supportsImageInput).toBeUndefined();
   });
 
-  it('every hosted llm entry is an openrouter vendor/model slug', () => {
-    for (const m of MODEL_REGISTRY.filter(m => m.kind === 'llm' && m.provider !== 'ollama')) {
+  it('every llm entry is an openrouter vendor/model slug', () => {
+    for (const m of MODEL_REGISTRY.filter(m => m.kind === 'llm')) {
       expect(m.provider).toBe('openrouter');
       expect(m.id).toMatch(/^[a-z0-9-]+\/.+$/);
     }
   });
 });
 
-describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
+describe('PRODUCTION_DEFAULTS', () => {
   it('production defaults route generation through openrouter', () => {
     expect(PRODUCTION_DEFAULTS.generation.provider).toBe('openrouter');
     expect(PRODUCTION_DEFAULTS.generation.model).toBe('moonshotai/kimi-k3');
   });
 
-  it('local-test defaults use ollama for all LLM roles', () => {
-    for (const role of ['extraction', 'generation', 'judge'] as const) {
-      expect(LOCAL_TEST_DEFAULTS[role].provider).toBe('ollama');
-    }
-  });
-
-  it('both profiles cover all required roles', () => {
+  it('covers all required roles', () => {
     const requiredRoles = [
       'extraction',
       'generation',
@@ -391,7 +373,6 @@ describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
     ];
     for (const role of requiredRoles) {
       expect(PRODUCTION_DEFAULTS[role as keyof typeof PRODUCTION_DEFAULTS]).toBeDefined();
-      expect(LOCAL_TEST_DEFAULTS[role as keyof typeof LOCAL_TEST_DEFAULTS]).toBeDefined();
     }
   });
 });

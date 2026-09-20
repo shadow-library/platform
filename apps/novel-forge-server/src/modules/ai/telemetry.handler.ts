@@ -39,16 +39,16 @@ export interface TokenUsage {
 
 type UsageBag = Record<string, unknown> | undefined;
 
-const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens', 'prompt_eval_count'];
-const OUTPUT_KEYS = ['output_tokens', 'completion_tokens', 'completionTokens', 'eval_count'];
+const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens'];
+const OUTPUT_KEYS = ['output_tokens', 'completion_tokens', 'completionTokens'];
 const CACHE_READ_KEYS = ['cache_read', 'cached_tokens', 'cache_read_input_tokens'];
 const CACHE_CREATION_KEYS = ['cache_creation', 'cache_creation_input_tokens', 'cache_creation_tokens'];
 
-// `minimum` is what separates a reported count from a missing one: @langchain/ollama seeds
-// `usage_metadata` with zeros and @langchain/core's `mergeUsageMetadata` zero-fills every field it
-// merges across stream chunks, while @langchain/openai only assigns `usage_metadata.input_tokens`
-// when the provider sent a truthy `prompt_tokens`. So a 0 prompt/completion count means "not
-// reported" and must keep falling through — while a 0 cache read genuinely means "no cache hit".
+// `minimum` is what separates a reported count from a missing one: @langchain/core's
+// `mergeUsageMetadata` zero-fills every field it merges across stream chunks, while @langchain/openai
+// only assigns `usage_metadata.input_tokens` when the provider sent a truthy `prompt_tokens`. So a 0
+// prompt/completion count means "not reported" and must keep falling through — while a 0 cache read
+// genuinely means "no cache hit".
 function readTokens(sources: UsageBag[], keys: string[], minimum = 1): number | undefined {
   for (const source of sources) {
     for (const key of keys) {
@@ -65,9 +65,8 @@ export function extractTokenUsage(output: LLMResult, promptTokensEstimate: numbe
     { message?: { usage_metadata?: Record<string, unknown> & { input_token_details?: UsageBag } }; generationInfo?: UsageBag } | undefined;
   const usageMetadata = generation?.message?.usage_metadata;
   // Counts live in a different place per provider and in a different spelling per transport: cloud SDKs
-  // put them on `llmOutput.usage`, LangChain normalises them onto the message's `usage_metadata`,
-  // @langchain/openai reports camelCase `tokenUsage` (or `estimatedTokenUsage` when streaming), and
-  // Ollama reports raw `*_eval_count` on the generation info.
+  // put them on `llmOutput.usage`, LangChain normalises them onto the message's `usage_metadata`, and
+  // @langchain/openai reports camelCase `tokenUsage` (or `estimatedTokenUsage` when streaming).
   const sources: UsageBag[] = [llmOutput?.['usage'], usageMetadata, llmOutput?.['tokenUsage'], generation?.generationInfo, llmOutput?.['estimatedTokenUsage']];
   const cacheSources: UsageBag[] = [usageMetadata?.input_token_details, llmOutput?.['usage']?.['prompt_tokens_details'] as UsageBag, ...sources];
 

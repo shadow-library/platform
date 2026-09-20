@@ -5,7 +5,7 @@ import { type BaseMessage } from '@langchain/core/messages';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ideationTurnPrompt } from '@modules/ai/prompts/ideation-turn.prompt';
 import { IdeationTurnSchema } from '@modules/ai/schemas/ideation.schema';
-import { toHostedPromptSchema, toOllamaFormatSchema } from '@modules/ai/schemas/validate';
+import { toHostedPromptSchema } from '@modules/ai/schemas/validate';
 
 function stubDatabaseService(): never {
   const noopInsert = { values: () => ({ onConflictDoNothing: () => Promise.resolve() }) };
@@ -46,23 +46,6 @@ describe('toHostedPromptSchema', () => {
     expect(serialized).not.toContain('"$ref"');
     expect(serialized).not.toContain('"$id"');
     expect(serialized).not.toContain('"definitions"');
-  });
-});
-
-describe('toOllamaFormatSchema', () => {
-  const serialized = JSON.stringify(toOllamaFormatSchema(IdeationTurnSchema));
-
-  it('should strip the validation-only keywords llama.cpp cannot convert to a grammar', () => {
-    expect(serialized).not.toContain('"description"');
-    expect(serialized).not.toContain('"minItems"');
-    expect(serialized).not.toContain('"minLength"');
-    expect(serialized).not.toContain('"pattern"');
-  });
-
-  it('should keep the structure the grammar is built from', () => {
-    expect(serialized).toContain('"required"');
-    expect(serialized).toContain('"properties"');
-    expect(serialized).not.toContain('"$ref"');
   });
 });
 

@@ -25,7 +25,7 @@ export type QuotaBreach = 'rate' | 'spend' | null;
 // provider response omitted `usage.cost`) fall back to token counts times the registry's
 // per-million-token prices. Cached input tokens are billed at full input price here — an
 // over-estimate that makes the ceiling conservative, which is the safe direction for a spend guard.
-// Ollama and any unpriced model contribute nothing.
+// A model the registry prices at nothing contributes nothing.
 export function estimateCallCostUsd(model: string, inputTokens: number, outputTokens: number): number {
   const entry = MODEL_MAP[model];
   if (!entry) return 0;

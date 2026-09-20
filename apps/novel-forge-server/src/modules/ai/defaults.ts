@@ -129,42 +129,19 @@ export function isRegisteredModel(resolved: ResolvedModel): boolean {
   return MODEL_MAP[resolved.model]?.provider === resolved.provider;
 }
 
-// Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
-const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
-  writing: { provider: 'ollama', model: 'qwen3:14b' },
-  planning: { provider: 'ollama', model: 'qwen3:14b' },
-  // review needs the 14b model: qwen3:8b fixes one audit gap per round and oscillates on taste
-  // instead of settling at `keep`, so judge loops never converge on the smaller model.
-  review: { provider: 'ollama', model: 'qwen3:14b' },
-  chat: { provider: 'ollama', model: 'qwen3:14b' },
-  helper: { provider: 'ollama', model: 'qwen3:8b' },
-  image: { provider: 'ollama', model: 'qwen3:8b' },
-  // No registered local model accepts images, so vision calls fail with AI_011 under this profile.
-  vision: { provider: 'ollama', model: 'qwen3:8b' },
-  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
-  ideation: { provider: 'ollama', model: 'qwen3:14b' },
-};
-
 function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<AiRole, ResolvedModel> {
   const entries = (Object.keys(ROLE_GROUP) as AiRole[]).map(role => [role, groups[ROLE_GROUP[role]]] as const);
   return Object.fromEntries(entries) as Record<AiRole, ResolvedModel>;
 }
 
 export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
-export const LOCAL_TEST_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(LOCAL_TEST_GROUP_DEFAULTS);
 
-// Read directly from process.env so smoke scripts can override it at runtime
-// without needing to re-bootstrap Config (which caches at load time).
 export function getProfileDefaults(): Record<AiRole, ResolvedModel> {
-  const profile = process.env['AI_PROFILE'] ?? 'production';
-  if (profile === 'local-test') return LOCAL_TEST_DEFAULTS;
   return PRODUCTION_DEFAULTS;
 }
 
-// The group-level defaults for the active profile — what the settings UI shows as each group's inherited model.
+// The group-level defaults — what the settings UI shows as each group's inherited model.
 export function getGroupDefaults(): Record<ModelGroup, ResolvedModel> {
-  const profile = process.env['AI_PROFILE'] ?? 'production';
-  if (profile === 'local-test') return LOCAL_TEST_GROUP_DEFAULTS;
   return PRODUCTION_GROUP_DEFAULTS;
 }
 

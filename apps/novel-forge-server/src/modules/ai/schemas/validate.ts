@@ -74,21 +74,15 @@ export function renderSchemaIssues(issues: SchemaIssue[]): string {
   return issues.map(i => `- ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n');
 }
 
-// Validation-only keywords that constrain values but not structure. llama.cpp's schema→grammar
-// converter (used by Ollama structured outputs) either ignores or chokes on these, so the `format`
-// schema drops them — the router's own AJV pass still enforces them after generation.
-const GRAMMAR_HOSTILE_KEYWORDS = ['minLength', 'maxLength', 'minimum', 'maximum', 'minItems', 'maxItems', 'pattern', 'format', 'description'];
-
 // Keywords the AJV pass never enforces: the instance is built without `useDefaults`, so a `default`
 // fills nothing and only invites a model to omit a required key, and `$schema` names a dialect.
-const UNENFORCED_KEYWORDS = ['$schema', 'default'];
+const UNENFORCED_KEYWORDS = new Set(['$schema', 'default']);
 
-const OLLAMA_FORMAT_DROPPED = new Set([...GRAMMAR_HOSTILE_KEYWORDS, ...UNENFORCED_KEYWORDS]);
-const HOSTED_PROMPT_DROPPED = new Set(UNENFORCED_KEYWORDS);
-
-// Grammar-constrained decoding needs the whole schema inline, and the `class-schema:` `$id` scheme
-// confuses every consumer of the result, so both forms dereference `$ref` and drop ids/definitions.
-function dereferenced(Class: SchemaClass, dropped: Set<string>): Record<string, unknown> {
+// The schema a provider is shown in-band. It keeps every keyword the AJV pass will judge the reply
+// against — field descriptions above all, which are the only steering the model gets. The
+// `class-schema:` `$id` scheme confuses every consumer of the result, so `$ref`s are dereferenced
+// and ids/definitions dropped.
+export function toHostedPromptSchema(Class: SchemaClass): Record<string, unknown> {
   const raw = inlinePrimitiveRefs(ClassSchema.generate(Class)) as Record<string, unknown>;
   const definitions = (raw['definitions'] ?? {}) as Record<string, Record<string, unknown>>;
 
@@ -100,21 +94,11 @@ function dereferenced(Class: SchemaClass, dropped: Set<string>): Record<string, 
     if (typeof ref === 'string' && definitions[ref]) return deref(definitions[ref]);
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      if (key === '$id' || key === 'definitions' || dropped.has(key)) continue;
+      if (key === '$id' || key === 'definitions' || UNENFORCED_KEYWORDS.has(key)) continue;
       out[key] = deref(value);
     }
     return out;
   }
 
   return deref(raw) as Record<string, unknown>;
-}
-
-export function toOllamaFormatSchema(Class: SchemaClass): Record<string, unknown> {
-  return dereferenced(Class, OLLAMA_FORMAT_DROPPED);
-}
-
-// The schema a hosted provider is shown in-band. It keeps every keyword the AJV pass will judge the
-// reply against — field descriptions above all, which are the only steering a hosted model gets.
-export function toHostedPromptSchema(Class: SchemaClass): Record<string, unknown> {
-  return dereferenced(Class, HOSTED_PROMPT_DROPPED);
 }

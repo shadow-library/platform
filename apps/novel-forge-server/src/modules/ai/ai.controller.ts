@@ -45,7 +45,7 @@ export class AiController {
       ACCOUNT_MODEL_GROUPS.map(group => ({ role: group, provider: groups[group].provider, model: groups[group].model }));
 
     return {
-      profile: process.env['AI_PROFILE'] ?? 'production',
+      profile: 'production',
       models: registry,
       defaults: toRoleDefaults(getGroupDefaults()),
       unrestrictedDefaults: toRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS),

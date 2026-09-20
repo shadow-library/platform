@@ -38,7 +38,7 @@ const pgAvailable = await (async () => {
 const fixtures = await loadPlugins(join(import.meta.dir, 'fixtures'), id => ({ log: createPluginLogger(id) }));
 
 const NOTE = 'staging detail the standard writer must never read';
-const OLLAMA = { provider: 'ollama', model: 'qwen3:14b' };
+const RESOLVED = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
 
 interface RouterInternals {
   buildMessages(promptModule: unknown, input: Record<string, unknown>, resolved: { provider: string; model: string }, policy?: ForgeCallPolicy): Promise<BaseMessage[]>;
@@ -126,12 +126,12 @@ describe.if(pgAvailable)('plugin contributions', () => {
 
   function buildMessages(policy?: ForgeCallPolicy): Promise<BaseMessage[]> {
     const input = { stableContext: 'stable', volatileContext: 'volatile', chapterBrief: 'brief', endingContract: 'none', guidance: 'none' };
-    return (router as unknown as RouterInternals).buildMessages(generationPrompt, input, OLLAMA, policy);
+    return (router as unknown as RouterInternals).buildMessages(generationPrompt, input, RESOLVED, policy);
   }
 
   const wireOf = (messages: BaseMessage[]): string => JSON.stringify(messages.map(message => [message.getType(), message.content]));
 
-  const cacheKeyOf = (policy?: ForgeCallPolicy): string => (router as unknown as RouterInternals).hashRequest(OLLAMA, generationPrompt, { catalog: 'c' }, policy);
+  const cacheKeyOf = (policy?: ForgeCallPolicy): string => (router as unknown as RouterInternals).hashRequest(RESOLVED, generationPrompt, { catalog: 'c' }, policy);
 
   describe('ContextAssembler.forChapter — the minWriterClass guard', () => {
     it('should carry a permissive-only section into a marked chapter pack and withhold it from an unmarked one', async () => {
@@ -460,7 +460,7 @@ describe.if(pgAvailable)('plugin contributions', () => {
 
       const messages = await buildMessages(await policyService.resolve(projectId, { role: 'generation', chapter: 1 }));
 
-      expect(messages.map(message => message.getType())).toEqual(['system', 'system', 'human', 'human']);
+      expect(messages.map(message => message.getType())).toEqual(['system', 'system', 'human', 'human', 'human']);
       expect(messages[0]?.content).toBe(generationPrompt.system);
       expect(messages[1]?.content).toBe(NOTE);
     });

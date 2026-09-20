@@ -5,12 +5,12 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
-    'ai.profile': 'production' | 'local-test';
-    /** Credential for every hosted chat model — they all route through OpenRouter. */
+    /** Credential for every chat and image model — they all route through OpenRouter. */
     'ai.openrouter.api.key': string | undefined;
     /** Points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
     'ai.openrouter.api.url': string;
 
+    /** Host of the local Ollama used for embeddings only; no chat call routes there. */
     'ai.ollama.host': string;
     'ai.embedding.model': string;
 
@@ -43,7 +43,6 @@ declare module '@shadow-library/common' {
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
-Config.load('ai.profile', { defaultValue: 'production', allowedValues: ['production', 'local-test'] });
 Config.load('ai.openrouter.api.key');
 Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });

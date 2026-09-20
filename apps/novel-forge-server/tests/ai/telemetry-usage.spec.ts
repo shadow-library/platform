@@ -95,12 +95,6 @@ describe('extractTokenUsage', () => {
     expect(extractTokenUsage(buildResult(TEXT, { usageMetadata: { input_tokens: 1804, output_tokens: 296 } }), 1700, TEXT).cachedInputTokens).toBeNull();
   });
 
-  it('should read the eval counts ollama reports on the generation info', () => {
-    const result = buildResult(TEXT, { generationInfo: { prompt_eval_count: 1804, eval_count: 296 } });
-
-    expect(extractTokenUsage(result, 1700, TEXT)).toEqual({ inputTokens: 1804, cachedInputTokens: null, outputTokens: 296 });
-  });
-
   it('should read the OpenRouter cache read nested under prompt_tokens_details', () => {
     const result = buildResult(TEXT, { llmOutput: { usage: { prompt_tokens: 4000, completion_tokens: 512, prompt_tokens_details: { cached_tokens: 3500 } } } });
 
