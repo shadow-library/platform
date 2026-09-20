@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
-import { type PropsWithChildren, useMemo, useState } from 'react';
+import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
@@ -21,12 +21,14 @@ import {
   useTranslationStatusQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
+import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { useIsAdmin } from '@/lib/session';
 
 import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
+import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
 import { type ProjectScreen, SCREEN_LABEL, screensForWorkflow } from './screens';
@@ -51,9 +53,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const inProject = Boolean(novelId);
   const inIdeas = pathname === '/ideas' || pathname.startsWith('/ideas/');
   const onIdeaStudio = inIdeas && Boolean(seedId);
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [palette, setPalette] = useState<PaletteState>({ kind: 'closed' });
   const [renamingIdea, setRenamingIdea] = useState(false);
   const renameIdea = useUpdateProjectMutation(seedId ?? '');
+
+  const openScope = useCallback((scope: JumpScope) => setPalette({ kind: 'scoped', scope }), []);
+  const dropScope = useCallback(() => setPalette(current => (current.kind === 'scoped' ? { kind: 'closed' } : current)), []);
 
   const meQuery = useMeQuery();
   const logout = useLogoutMutation();
@@ -181,6 +186,8 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     });
   };
 
+  const paletteView = resolvePaletteView(palette, commands);
+
   const leafSegment = pathname.split('/').filter(Boolean).pop();
   const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : undefined;
   const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : pathname === '/settings' ? 'Settings' : 'Projects';
@@ -229,50 +236,61 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   );
 
   return (
-    <Chrome
-      brand={{ icon: <BookIcon size={17} />, name: 'Novel Forge', to: '/' }}
-      nav={nav}
-      account={{
-        name: userDisplayName(meQuery.data),
-        items: [
-          { id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
-          { id: 'settings', label: 'Settings', icon: <SettingsIcon />, onSelect: () => void navigate({ to: '/settings' }) },
-        ],
-        onSignOut: signOut,
-      }}
-      breadcrumb={breadcrumb}
-      search={
-        <>
-          <button className={`nf-search ${styles.search}`} onClick={() => setPaletteOpen(true)}>
-            <SearchIcon size={15} />
-            <span className={styles.searchLabel}>Search or run a command…</span>
-            <Kbd keys="mod+k" />
-          </button>
-          <CommandPalette commands={commands} open={paletteOpen} onOpenChange={setPaletteOpen} hotkey="mod+k" placeholder="Search screens, projects, commands…" />
-        </>
-      }
-      actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
-      utility={<ThemeToggle />}
-      sidebarFooter={
-        inProject && phase.total > 0 ? (
-          <div className={styles.lifecycle}>
-            <div className={styles.lifecycleHeading}>Lifecycle</div>
-            <div className={styles.lifecycleBar}>
-              {Array.from({ length: phase.total }).map((_, index) => (
-                <div key={index} className={styles.lifecycleSeg} data-state={index < phase.completed ? 'done' : index === phase.completed ? 'current' : 'todo'} />
-              ))}
+    <CommandScopeProvider onOpenScope={openScope} onScopeGone={dropScope}>
+      <Chrome
+        brand={{ icon: <BookIcon size={17} />, name: 'Novel Forge', to: '/' }}
+        nav={nav}
+        account={{
+          name: userDisplayName(meQuery.data),
+          items: [
+            { id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
+            { id: 'settings', label: 'Settings', icon: <SettingsIcon />, onSelect: () => void navigate({ to: '/settings' }) },
+          ],
+          onSignOut: signOut,
+        }}
+        breadcrumb={breadcrumb}
+        search={
+          <>
+            <button className={`nf-search ${styles.search}`} onClick={() => setPalette({ kind: 'global' })}>
+              <SearchIcon size={15} />
+              <span className={styles.searchLabel}>Search or run a command…</span>
+              <Kbd keys="mod+k" />
+            </button>
+            {/* keyed on the view: the palette clears its query only when its own hotkey opens it, so an external open reuses the last one */}
+            <CommandPalette
+              key={paletteView.key}
+              commands={paletteView.commands}
+              open={paletteView.open}
+              onOpenChange={next => setPalette(next ? { kind: 'global' } : { kind: 'closed' })}
+              hotkey="mod+k"
+              placeholder={paletteView.placeholder}
+              emptyMessage={paletteView.emptyMessage}
+            />
+          </>
+        }
+        actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
+        utility={<ThemeToggle />}
+        sidebarFooter={
+          inProject && phase.total > 0 ? (
+            <div className={styles.lifecycle}>
+              <div className={styles.lifecycleHeading}>Lifecycle</div>
+              <div className={styles.lifecycleBar}>
+                {Array.from({ length: phase.total }).map((_, index) => (
+                  <div key={index} className={styles.lifecycleSeg} data-state={index < phase.completed ? 'done' : index === phase.completed ? 'current' : 'todo'} />
+                ))}
+              </div>
+              <div className={styles.lifecycleLabel}>
+                {phase.label} · {phase.completed} of {phase.total} phases
+              </div>
             </div>
-            <div className={styles.lifecycleLabel}>
-              {phase.label} · {phase.completed} of {phase.total} phases
-            </div>
-          </div>
-        ) : undefined
-      }
-      contentWidth="fluid"
-      contentPadding="none"
-      className={styles.shellRoot}
-    >
-      <div className={`nf-scroll ${styles.content}`}>{children}</div>
-    </Chrome>
+          ) : undefined
+        }
+        contentWidth="fluid"
+        contentPadding="none"
+        className={styles.shellRoot}
+      >
+        <div className={`nf-scroll ${styles.content}`}>{children}</div>
+      </Chrome>
+    </CommandScopeProvider>
   );
 }
