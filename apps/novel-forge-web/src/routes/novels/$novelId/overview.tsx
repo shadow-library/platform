@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
-import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
+import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   aiUsageQueryOptions,
@@ -15,11 +15,13 @@ import {
   useAiUsageQuery,
   useCloneProjectMutation,
   useDeleteCoverMutation,
+  useJobStop,
   useListJobsQuery,
   useListRunsQuery,
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
+  useRunStop,
   useTranslationStatusQuery,
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
@@ -124,10 +126,12 @@ const RUN_INTENT: Record<string, RunIntentMeta> = {
 };
 
 interface RunRowProps {
+  novelId: string;
   run: WorkflowRunDetailResponse;
 }
 
-function RunRow({ run }: RunRowProps): React.JSX.Element {
+function RunRow({ novelId, run }: RunRowProps): React.JSX.Element {
+  const runStop = useRunStop(novelId);
   const intent = RUN_INTENT[run.status] ?? { color: 'var(--sh-text-tertiary)', label: run.status };
   return (
     <div className={styles.runRow}>
@@ -140,6 +144,7 @@ function RunRow({ run }: RunRowProps): React.JSX.Element {
           {intent.label} · {relativeTime(run.endedAt ?? run.startedAt)}
         </div>
       </div>
+      {run.status === 'running' && <StopButton onStop={() => runStop.stop(run.id)} stopping={runStop.stopping} />}
     </div>
   );
 }
@@ -165,28 +170,34 @@ const IMPORT_PHASE_LABEL: Record<string, string> = {
 };
 
 interface ImportJobBannerProps {
+  novelId: string;
   job: GenerationJobItem;
   onDismiss?: () => void;
 }
 
-function ImportJobBanner({ job, onDismiss }: ImportJobBannerProps): React.JSX.Element {
+function ImportJobBanner({ novelId, job, onDismiss }: ImportJobBannerProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const progress = (job.progress ?? null) as ImportJobProgress | null;
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
+  const active = job.status === 'pending' || job.status === 'in_progress';
   const failed = job.status === 'failed';
+  const cancelled = job.status === 'cancelled';
+  const title = cancelled ? 'Import stopped' : failed ? 'Import failed' : 'Importing novel';
 
   return (
     <SectionCard className={styles.sectionSpacer}>
       <div className={styles.progressHead}>
-        <h3 className={styles.usageTitle}>{failed ? 'Import failed' : 'Importing novel'}</h3>
+        <h3 className={styles.usageTitle}>{title}</h3>
         <div className={styles.progressHeadActions}>
-          <StatusChip intent={failed ? 'danger' : 'info'}>
-            {!failed && <Spinner size="sm" />}
-            {failed ? 'failed' : (IMPORT_PHASE_LABEL[progress?.phase ?? ''] ?? 'working')}
+          <StatusChip intent={failed ? 'danger' : cancelled ? 'neutral' : 'info'}>
+            {active && <Spinner size="sm" />}
+            {failed ? 'failed' : cancelled ? 'cancelled' : (IMPORT_PHASE_LABEL[progress?.phase ?? ''] ?? 'working')}
           </StatusChip>
+          {active && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
           {onDismiss && <IconButton size="sm" variant="ghost" aria-label="Dismiss" icon={<CloseIcon size={14} />} onClick={onDismiss} />}
         </div>
       </div>
-      {!failed && progress && (
+      {active && progress && (
         <div className={styles.progressRow}>
           <span className={styles.progressLabel}>
             {progress.phase === 'inserting' && progress.current !== 'chapters'
@@ -199,6 +210,14 @@ function ImportJobBanner({ job, onDismiss }: ImportJobBannerProps): React.JSX.El
             </div>
           )}
         </div>
+      )}
+      {cancelled && (
+        <p className={styles.progressLabel}>
+          {progress?.done
+            ? `${progress.done} of ${progress.total ?? '?'} chapters were inserted before stopping — nothing already written was undone.`
+            : 'Stopped before any chapters landed.'}{' '}
+          Re-import the bundle to pick up where this left off.
+        </p>
       )}
       {failed && job.lastError && <p className={styles.error}>{job.lastError}</p>}
     </SectionCard>
@@ -309,9 +328,15 @@ function OverviewScreen(): React.JSX.Element {
         <EmptyState size="inline" title="Project not found" />
       ) : (
         <>
-          {importJob && importJob.id !== dismissedImportJobId && (importJob.status === 'pending' || importJob.status === 'in_progress' || importJob.status === 'failed') && (
-            <ImportJobBanner job={importJob} onDismiss={importJob.status === 'failed' ? () => setDismissedImportJobId(importJob.id) : undefined} />
-          )}
+          {importJob &&
+            importJob.id !== dismissedImportJobId &&
+            (importJob.status === 'pending' || importJob.status === 'in_progress' || importJob.status === 'failed' || importJob.status === 'cancelled') && (
+              <ImportJobBanner
+                novelId={novelId}
+                job={importJob}
+                onDismiss={importJob.status === 'failed' || importJob.status === 'cancelled' ? () => setDismissedImportJobId(importJob.id) : undefined}
+              />
+            )}
           <div className={styles.header}>
             <ImageUpload
               className={styles.headerCover}
@@ -453,7 +478,7 @@ function OverviewScreen(): React.JSX.Element {
               ) : (
                 <div>
                   {runs.slice(0, 5).map(run => (
-                    <RunRow key={run.id} run={run} />
+                    <RunRow key={run.id} novelId={novelId} run={run} />
                   ))}
                 </div>
               )}

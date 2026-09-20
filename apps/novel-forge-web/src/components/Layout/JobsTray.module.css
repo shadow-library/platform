@@ -52,6 +52,10 @@
   background: var(--sh-danger-solid);
 }
 
+.jobDot[data-cancelled] {
+  background: var(--sh-text-tertiary);
+}
+
 .jobBody {
   flex: 1;
   min-width: 0;

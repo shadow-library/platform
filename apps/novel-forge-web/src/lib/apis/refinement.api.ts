@@ -10,6 +10,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from '@shadow-library/ui';
 
 import {
   type ApplyProposalResponse,
@@ -34,6 +35,7 @@ import {
 } from './api-types.gen';
 import { flushInvalidations, invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
+import { invalidateRuns } from './run.api';
 import { ApiError, APIRequest, isApiError } from './transport';
 
 /**
@@ -258,6 +260,37 @@ export function useCancelRunMutation(projectId: string): UseMutationResult<Cance
   return useMutation<CancelRunResponse, ApiError, string>({
     mutationFn: runId => APIRequest.post(`/projects/${projectId}/runs/${runId}/cancel`).execute(),
   });
+}
+
+export interface RunStopAction {
+  stop: (runId: string) => void;
+  stopping: boolean;
+}
+
+/**
+ * Idempotent Stop for a run shown outside the chat composer (S7) — the ref guard mirrors
+ * `useChatTurnStream`'s own `stop`, and `not_delivered` gets the same "may still be running" warning
+ * rather than a claim that nothing happened.
+ */
+export function useRunStop(projectId: string): RunStopAction {
+  const queryClient = useQueryClient();
+  const cancelRun = useCancelRunMutation(projectId);
+  const stoppingRef = useRef(false);
+  const stop = (runId: string): void => {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    cancelRun.mutate(runId, {
+      onSuccess: result => {
+        invalidateRuns(queryClient, projectId);
+        if (result.outcome === 'not_delivered') toast.warning("Couldn't confirm the stop — it may still be running. Try again in a moment.");
+      },
+      onSettled: () => {
+        stoppingRef.current = false;
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+  return { stop, stopping: cancelRun.isPending };
 }
 
 /**

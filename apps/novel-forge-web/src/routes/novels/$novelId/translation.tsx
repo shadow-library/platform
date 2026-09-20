@@ -19,7 +19,7 @@ import {
 } from '@shadow-library/ui';
 
 import { DownloadIcon, PlusIcon, WarningIcon } from '@/components/icons';
-import { PageHeader, PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
+import { PageHeader, PaneError, PaneLoader, QueryState, StatusChip, StopButton } from '@/components/nf';
 import {
   type ApiError,
   type ChapterTranslationStatus,
@@ -39,6 +39,7 @@ import {
   useDeleteOriginalMutation,
   useEditTranslationMutation,
   useFinalizeTranslationChapterMutation,
+  useJobStop,
   useLastOriginalChapterQuery,
   useRejectTranslationTermMutation,
   useReopenTranslationChapterMutation,
@@ -148,8 +149,12 @@ interface ProgressCardProps {
 }
 
 function ProgressCard({ novelId, status, onOpenQueue }: ProgressCardProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const job = translationJob(status);
   const active = translationJobActive(status);
+  // `TranslationPhase` has no `cancelled` value (out of scope schema change) — the job's own status
+  // overrides the stale phase rather than letting the card keep reading "translating" after a stop.
+  const cancelled = job?.status === 'cancelled';
   const progress = job?.progress ?? null;
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
   const { counts, glossary } = status;
@@ -159,11 +164,18 @@ function ProgressCard({ novelId, status, onOpenQueue }: ProgressCardProps): Reac
     <div className={styles.card}>
       <div className={styles.cardHead}>
         <h3 className={styles.cardTitle}>Progress</h3>
-        <StatusChip intent={phase === 'done' ? 'success' : phase === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
+        <StatusChip intent={cancelled ? 'neutral' : phase === 'done' ? 'success' : phase === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
           {active && <Spinner size="sm" />}
-          {TRANSLATION_PHASE_LABEL[phase]}
+          {cancelled ? 'stopped' : TRANSLATION_PHASE_LABEL[phase]}
         </StatusChip>
+        {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
       </div>
+      {cancelled && (
+        <p className={styles.pushHint}>
+          Stopped before the batch finished — the {counts.translated} chapter{counts.translated === 1 ? '' : 's'} already translated were kept. Start translation again to pick up
+          the rest.
+        </p>
+      )}
 
       {progress && (progress.total ?? 0) > 0 && (
         <div className={styles.progressRow}>

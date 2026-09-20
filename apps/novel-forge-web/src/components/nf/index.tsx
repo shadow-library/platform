@@ -1,8 +1,8 @@
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { Alert, EmptyState, Spinner } from '@shadow-library/ui';
-import { SparkIcon } from '../icons';
+import { Alert, Button, EmptyState, Spinner } from '@shadow-library/ui';
+import { SparkIcon, StopIcon } from '../icons';
 import styles from './nf.module.css';
 
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
@@ -30,6 +30,22 @@ export function StatusChip({ intent = 'neutral', dot = false, className, childre
       {dot && <span className="nf-dot" />}
       {children}
     </span>
+  );
+}
+
+interface StopButtonProps {
+  onStop: () => void;
+  stopping: boolean;
+  label?: string;
+  size?: 'sm' | 'md';
+}
+
+/** The one Stop affordance every live run/job card reaches for (S7), so a double-press always reads the same loading state. */
+export function StopButton({ onStop, stopping, label = 'Stop', size = 'sm' }: StopButtonProps): ReactElement {
+  return (
+    <Button variant="danger" size={size} prefix={<StopIcon size={14} />} loading={stopping} disabled={stopping} onClick={onStop}>
+      {label}
+    </Button>
   );
 }
 

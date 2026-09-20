@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { Button, IconButton, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-import { EditIcon, ResetIcon, SourceIcon } from '@/components/icons';
+import { EditIcon, ResetIcon, SourceIcon, StopIcon } from '@/components/icons';
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
   type ChapterListResponse,
@@ -12,6 +12,7 @@ import {
   projectStatusQueryOptions,
   useConsolidateMutation,
   useExtractMutation,
+  useJobStop,
   useListChaptersQuery,
   useListJobsQuery,
   useProjectStatusQuery,
@@ -40,6 +41,8 @@ interface Stage {
   state: StageState;
   progress?: number;
   onRun?: () => void;
+  onStop?: () => void;
+  stopping?: boolean;
 }
 
 interface StageChipMeta {
@@ -82,6 +85,11 @@ function StageCard({ stage }: StageCardProps): React.JSX.Element {
           {stage.state === 'running' && <Spinner size="sm" />}
           {chip.label}
         </StatusChip>
+        {stage.state === 'running' && stage.onStop && (
+          <Tooltip content={`Stop ${stage.name.toLowerCase()}`}>
+            <IconButton size="sm" variant="ghost" aria-label={`Stop ${stage.name}`} icon={<StopIcon size={13} />} loading={stage.stopping} onClick={stage.onStop} />
+          </Tooltip>
+        )}
         {stage.onRun && stage.state !== 'running' && (
           <Button variant="text" size="sm" onClick={stage.onRun}>
             Run
@@ -124,11 +132,13 @@ function SourceScreen(): React.JSX.Element {
   const extract = useExtractMutation(novelId);
   const consolidate = useConsolidateMutation(novelId);
   const skeleton = useSkeletonMutation(novelId);
+  const jobStop = useJobStop(novelId);
 
   const status = statusQuery.data;
   const chapters = chaptersQuery.data?.items ?? [];
   const total = status?.chaptersTotal ?? chapters.length;
   const extracted = status?.chaptersExtracted ?? chapters.filter(c => c.status === 'done').length;
+  const extractJob = (jobsQuery.data?.items ?? []).find(j => j.kind === 'extract' && (j.status === 'pending' || j.status === 'in_progress'));
 
   // Only `import` (chapters still landing/recombining right after the bundle lands) and `extract` (the
   // one background job this screen's own actions enqueue — consolidate/skeleton are synchronous) can
@@ -152,7 +162,9 @@ function SourceScreen(): React.JSX.Element {
     else toast.success(`${label} started`);
   };
 
-  const extractState: StageState = total > 0 && extracted >= total ? 'done' : extracted > 0 ? 'running' : 'pending';
+  // Driven by the extract job's own liveness, not just the extracted count — a stopped job otherwise
+  // keeps reading "running" forever at whatever count it left behind.
+  const extractState: StageState = total > 0 && extracted >= total ? 'done' : extractJob ? 'running' : 'pending';
   const stages: Stage[] = [
     {
       n: 1,
@@ -162,6 +174,8 @@ function SourceScreen(): React.JSX.Element {
       state: extractState,
       progress: total > 0 ? Math.round((extracted / total) * 100) : 0,
       onRun: () => extract.mutate(undefined, { onSuccess: () => runToast('Extract'), onError: e => runToast('Extract', e.message) }),
+      onStop: extractJob ? () => jobStop.stop(extractJob.id) : undefined,
+      stopping: jobStop.stopping,
     },
     {
       n: 2,

@@ -22,7 +22,7 @@ import {
 } from '@shadow-library/ui';
 
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon, WarningIcon } from '@/components/icons';
-import { type ChipIntent, ContentRatingPicker, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
+import { type ChipIntent, ContentRatingPicker, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip, StopButton } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
@@ -48,6 +48,7 @@ import {
   useGenerateUnrestrictedMutation,
   useImportDraftMutation,
   useInsertChapterMutation,
+  useJobStop,
   useJudgeDraftMutation,
   useListBriefsQuery,
   useListDraftsQuery,
@@ -137,9 +138,12 @@ interface GenerationProgressProps {
 
 function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps): React.JSX.Element {
   const queryClient = useQueryClient();
+  const jobStop = useJobStop(novelId);
   const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: query => (hasActiveJob(query.state.data) ? 2500 : false) });
   const job = jobsQuery.data?.items.find(j => j.id === jobId);
-  const finished = job?.status === 'done' || job?.status === 'failed';
+  const active = job?.status === 'pending' || job?.status === 'in_progress';
+  const cancelled = job?.status === 'cancelled';
+  const finished = job?.status === 'done' || job?.status === 'failed' || cancelled;
   const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: () => (finished ? false : 2500) });
   const runs = (runsQuery.data?.items ?? []).filter(r => r.jobId === jobId);
   const notifiedRef = useRef(false);
@@ -150,17 +154,18 @@ function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps)
     queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'drafts'] });
     queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'runs'] });
     if (job?.status === 'done') toast.success(`Chapter${job.target.includes(',') ? 's' : ''} ${job?.target} drafted`);
-    else toast.danger(job?.lastError ?? 'Generation failed');
+    else if (job?.status === 'failed') toast.danger(job?.lastError ?? 'Generation failed');
   }, [finished, job, novelId, queryClient]);
 
   const chapters = job?.target ? job.target.split(',') : [];
+  const title = cancelled ? 'Generation stopped' : finished ? (job?.status === 'done' ? 'Generation complete' : 'Generation failed') : 'Generating…';
 
   return (
     <div className={`nf-scroll ${styles.progressScreen}`}>
       <div className={styles.progressInner}>
         <div className={styles.progressHead}>
           {!finished ? <Spinner size="md" /> : null}
-          <h1 className={styles.progressTitle}>{finished ? (job?.status === 'done' ? 'Generation complete' : 'Generation failed') : 'Generating…'}</h1>
+          <h1 className={styles.progressTitle}>{title}</h1>
         </div>
         <p className={styles.progressSub}>
           {chapters.length > 0 ? `Chapter${chapters.length > 1 ? 's' : ''} ${job?.target}` : 'Preparing the next chapter'} · drafted in order, judged, then queued for your review.
@@ -169,13 +174,19 @@ function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps)
         <div className={styles.jobCard}>
           <div className={styles.jobHead}>
             <span className={styles.jobLabel}>Job {jobId.slice(0, 8)}</span>
-            <StatusChip intent={job?.status === 'done' ? 'success' : job?.status === 'failed' ? 'danger' : 'info'} dot>
+            <StatusChip intent={job?.status === 'done' ? 'success' : job?.status === 'failed' ? 'danger' : cancelled ? 'neutral' : 'info'} dot>
               {job?.status ?? 'pending'}
             </StatusChip>
             <div className={styles.spacer} />
             <span className={styles.jobTarget}>target: {job?.target ?? '…'}</span>
+            {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
           </div>
           {job?.lastError && <pre className={styles.jobError}>{job.lastError}</pre>}
+          {cancelled && (
+            <p className={styles.progressSub}>
+              Whichever chapters in this batch already finished drafting were kept — check the chapter list below for what landed before the stop.
+            </p>
+          )}
         </div>
 
         <div className={styles.runList}>

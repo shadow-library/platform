@@ -2,13 +2,14 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Checkbox, Drawer, FormField, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
+import { type ChipIntent, PageHeader, QueryState, StatusChip, StopButton } from '@/components/nf';
 import {
   type ConversionStatus,
   type ConversionSummary,
   fetchRebrandManuscript,
   type RebrandOverview,
   useChapterQuery,
+  useJobStop,
   useListChaptersQuery,
   useRebrandChapterQuery,
   useRebrandConversionsQuery,
@@ -108,12 +109,19 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
 }
 
 interface ProgressCardProps {
+  novelId: string;
   status: RebrandOverview;
 }
 
-function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
+function ProgressCard({ novelId, status }: ProgressCardProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const active = jobIsActive(status);
-  const progress = (status.job?.progress ?? null) as JobProgress | null;
+  // `RebrandStatus` has no `cancelled` value (a schema change out of scope here) — the job's own status is
+  // the authority on whether the pipeline is still working, so a stopped job overrides the stale phase
+  // rather than letting the row keep reading "converting".
+  const job = status.job;
+  const cancelled = job?.status === 'cancelled';
+  const progress = (job?.progress ?? null) as JobProgress | null;
   const remaining = Math.max(status.sourceChapters - status.counts.converted - status.counts.attention, 0);
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
 
@@ -121,10 +129,11 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
     <div className={styles.card}>
       <div className={styles.progressHead}>
         <h3 className={styles.cardTitle}>Pipeline</h3>
-        <StatusChip intent={status.rebrand.status === 'done' ? 'success' : status.rebrand.status === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
+        <StatusChip intent={cancelled ? 'neutral' : status.rebrand.status === 'done' ? 'success' : status.rebrand.status === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
           {active && <Spinner size="sm" />}
-          {PHASE_LABEL[status.rebrand.status] ?? status.rebrand.status}
+          {cancelled ? 'stopped' : (PHASE_LABEL[status.rebrand.status] ?? status.rebrand.status)}
         </StatusChip>
+        {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
       </div>
       {active && progress && (
         <div className={styles.progressRow}>
@@ -137,6 +146,12 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
             </div>
           )}
         </div>
+      )}
+      {cancelled && (
+        <p className={styles.progressLabel}>
+          Stopped before the batch finished — the {status.counts.converted} chapter{status.counts.converted === 1 ? '' : 's'} already converted were kept. Start rebrand to pick up
+          the rest.
+        </p>
       )}
       {status.rebrand.lastError && <p className={styles.error}>{status.rebrand.lastError}</p>}
       <div className={styles.chips}>
@@ -263,7 +278,7 @@ function RebrandScreen(): React.JSX.Element {
       <QueryState isLoading={statusQuery.isLoading} error={statusQuery.error}>
         <div>
           <div className={styles.cards}>
-            {status && <ProgressCard status={status} />}
+            {status && <ProgressCard novelId={novelId} status={status} />}
             <ConfigCard novelId={novelId} status={status} />
           </div>
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button, Dialog, EmptyState, Spinner } from '@shadow-library/ui';
 
 import { LockIcon } from '@/components/icons';
-import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { type ChipIntent, PaneError, PaneLoader, StatusChip, StopButton } from '@/components/nf';
 import {
   hasRunningRun,
   listRunsQueryOptions,
@@ -15,6 +15,7 @@ import {
   useRunCallQuery,
   useRunContextQuery,
   useRunQuery,
+  useRunStop,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
@@ -313,6 +314,7 @@ interface RunDetailProps {
 
 function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
   const runQuery = useRunQuery(novelId, runId);
+  const runStop = useRunStop(novelId);
   if (runQuery.isLoading) return <PaneLoader />;
   if (runQuery.error) return <PaneError error={runQuery.error} />;
   const run = runQuery.data;
@@ -343,6 +345,8 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
             {run.graph} · {run.target}
           </span>
           <StatusChip intent={runIntent(run.status)}>{run.status}</StatusChip>
+          <div className={styles.spacer} />
+          {run.status === 'running' && <StopButton onStop={() => runStop.stop(run.id)} stopping={runStop.stopping} />}
         </div>
         <div className={styles.factRow}>
           {facts.map(f => (

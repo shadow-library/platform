@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Checkbox, Drawer, FormField, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
+import { type ChipIntent, PageHeader, QueryState, StatusChip, StopButton } from '@/components/nf';
 import {
   fetchReforgeManuscript,
   type ReforgeChapterStatus,
@@ -10,6 +10,7 @@ import {
   type ReforgeOverview,
   type ReforgeSummary,
   useChapterQuery,
+  useJobStop,
   useListChaptersQuery,
   useReforgeChapterQuery,
   useReforgeChaptersQuery,
@@ -122,12 +123,18 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
 }
 
 interface ProgressCardProps {
+  novelId: string;
   status: ReforgeOverview;
 }
 
-function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
+function ProgressCard({ novelId, status }: ProgressCardProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const active = jobIsActive(status);
-  const progress = (status.job?.progress ?? null) as JobProgress | null;
+  // `ReforgeStatus` has no `cancelled` value (out of scope schema change) — the job's own status overrides
+  // the stale phase rather than letting the row keep reading "reforging" after a stop.
+  const job = status.job;
+  const cancelled = job?.status === 'cancelled';
+  const progress = (job?.progress ?? null) as JobProgress | null;
   const remaining = Math.max(status.sourceChapters - status.counts.reforged - status.counts.attention, 0);
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
 
@@ -135,10 +142,11 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
     <div className={styles.card}>
       <div className={styles.progressHead}>
         <h3 className={styles.cardTitle}>Pipeline</h3>
-        <StatusChip intent={status.reforge.status === 'done' ? 'success' : status.reforge.status === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
+        <StatusChip intent={cancelled ? 'neutral' : status.reforge.status === 'done' ? 'success' : status.reforge.status === 'failed' ? 'danger' : active ? 'info' : 'neutral'}>
           {active && <Spinner size="sm" />}
-          {PHASE_LABEL[status.reforge.status] ?? status.reforge.status}
+          {cancelled ? 'stopped' : (PHASE_LABEL[status.reforge.status] ?? status.reforge.status)}
         </StatusChip>
+        {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
       </div>
       {active && progress && (
         <div className={styles.progressRow}>
@@ -151,6 +159,12 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
             </div>
           )}
         </div>
+      )}
+      {cancelled && (
+        <p className={styles.progressLabel}>
+          Stopped before the batch finished — the {status.counts.reforged} chapter{status.counts.reforged === 1 ? '' : 's'} already reforged were kept. Start reforge to pick up the
+          rest.
+        </p>
       )}
       {status.reforge.lastError && <p className={styles.error}>{status.reforge.lastError}</p>}
       <div className={styles.chips}>
@@ -290,7 +304,7 @@ function ReforgeScreen(): React.JSX.Element {
       <QueryState isLoading={statusQuery.isLoading} error={statusQuery.error}>
         <div>
           <div className={styles.cards}>
-            {status && <ProgressCard status={status} />}
+            {status && <ProgressCard novelId={novelId} status={status} />}
             <ConfigCard novelId={novelId} status={status} />
           </div>
 

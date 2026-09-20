@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Fragment, useState } from 'react';
 import { Alert, Button, Checkbox, Drawer, FormField, Input, Select, Spinner, Tabs, Textarea, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, Markdown, PageHeader, QueryState, StatusChip } from '@/components/nf';
+import { type ChipIntent, Markdown, PageHeader, QueryState, StatusChip, StopButton } from '@/components/nf';
 import {
   type FindingType,
   type OutputStatus,
@@ -14,6 +14,7 @@ import {
   useApprovePlanMutation,
   useChapterQuery,
   useDraftPlanMutation,
+  useJobStop,
   usePromoteReforgeMutation,
   useReforgeAnalysisQuery,
   useReforgeCutsQuery,
@@ -111,7 +112,12 @@ function ProgressBar({ progress }: { progress: JobProgress | null }): React.JSX.
 }
 
 function AnalysisTab({ novelId, status }: TabProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const active = jobIsActive(status);
+  const job = status?.job;
+  // The analysis row has no `cancelled` value of its own (out of scope schema change) — the job's status
+  // overrides it rather than leaving the chip claiming the analysis is still running.
+  const cancelled = job?.status === 'cancelled';
   const analysisQuery = useReforgeAnalysisQuery(novelId, active);
   const reportQuery = useAnalysisReportQuery(novelId);
   const [type, setType] = useState<string>(ALL_TYPES);
@@ -126,24 +132,28 @@ function AnalysisTab({ novelId, status }: TabProps): React.JSX.Element {
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>Source analysis</h3>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={active}
-            loading={start.isPending}
-            onClick={() => start.mutate(undefined, { onSuccess: () => toast.success('Analysis started'), onError: e => toast.danger(e.message) })}
-          >
-            {analysis ? 'Re-run analysis' : 'Run analysis'}
-          </Button>
+          <div className={styles.actions}>
+            {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={active}
+              loading={start.isPending}
+              onClick={() => start.mutate(undefined, { onSuccess: () => toast.success('Analysis started'), onError: e => toast.danger(e.message) })}
+            >
+              {analysis ? 'Re-run analysis' : 'Run analysis'}
+            </Button>
+          </div>
         </div>
         <p className={styles.hint}>
           One windowed reading pass over the whole source: what each chapter does, where it repeats itself, where it stalls, and which threads the original author abandoned.
         </p>
         {active && <ProgressBar progress={(status?.job?.progress ?? null) as JobProgress | null} />}
+        {cancelled && <p className={styles.hint}>Stopped before the pass finished — whatever this run already found is kept below. Run analysis again to pick up the rest.</p>}
         {analysis && (
           <div className={styles.chips}>
-            <StatusChip intent={analysis.status === 'done' ? 'success' : analysis.status === 'failed' ? 'danger' : 'info'}>
-              {analysis.status === 'done' ? 'analysed' : analysis.status}
+            <StatusChip intent={cancelled ? 'neutral' : analysis.status === 'done' ? 'success' : analysis.status === 'failed' ? 'danger' : 'info'}>
+              {cancelled ? 'stopped' : analysis.status === 'done' ? 'analysed' : analysis.status}
               {active && <Spinner size="sm" />}
             </StatusChip>
             <StatusChip intent="neutral">{analysis.chaptersAnalyzed} chapters read</StatusChip>
@@ -237,7 +247,11 @@ function SpanEditor({ span, onChange }: { span: EditableSpan; onChange: (next: E
 }
 
 function PlanTab({ novelId, status }: TabProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const active = jobIsActive(status);
+  const job = status?.job;
+  // The plan's own `status` has no `cancelled` value — a stopped draft otherwise keeps reading `pending`.
+  const cancelled = job?.status === 'cancelled';
   const planQuery = useReforgePlanQuery(novelId, active);
   const draft = useDraftPlanMutation(novelId);
   const save = useReplacePlanSpansMutation(novelId);
@@ -264,6 +278,7 @@ function PlanTab({ novelId, status }: TabProps): React.JSX.Element {
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>Transformation plan</h3>
           <div className={styles.actions}>
+            {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
             <Button
               variant="secondary"
               size="sm"
@@ -298,11 +313,12 @@ function PlanTab({ novelId, status }: TabProps): React.JSX.Element {
           approved automatically.
         </p>
         <div className={styles.chips}>
-          {plan && <StatusChip intent={approved ? 'success' : 'info'}>{plan.status}</StatusChip>}
+          {plan && <StatusChip intent={cancelled ? 'neutral' : approved ? 'success' : 'info'}>{cancelled ? 'stopped' : plan.status}</StatusChip>}
           {plan && <StatusChip intent="neutral">revision {plan.revision}</StatusChip>}
           <StatusChip intent="neutral">{sourceChapterCount} source chapters</StatusChip>
           <StatusChip intent="neutral">{outputCount(spans)} output chapters</StatusChip>
         </div>
+        {cancelled && <p className={styles.hint}>Stopped before drafting finished — whatever spans exist below were kept. Draft again to retry.</p>}
         {issues.length > 0 && spans.length > 0 && (
           <Alert intent="warning" title="The plan does not partition the source yet">
             <ul>
@@ -429,7 +445,10 @@ function OutputReader({ novelId, outputChapter, onClose }: { novelId: string; ou
 }
 
 function OutputsTab({ novelId, status }: TabProps): React.JSX.Element {
+  const jobStop = useJobStop(novelId);
   const active = jobIsActive(status);
+  const job = status?.job;
+  const cancelled = job?.status === 'cancelled';
   const outputsQuery = useReforgeOutputsQuery(novelId, active);
   const start = useStartTransformMutation(novelId);
   const rerun = useRerunOutputMutation(novelId);
@@ -446,6 +465,7 @@ function OutputsTab({ novelId, status }: TabProps): React.JSX.Element {
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>Write the output chapters</h3>
           <div className={styles.actions}>
+            {active && job && <StopButton onStop={() => jobStop.stop(job.id)} stopping={jobStop.stopping} />}
             <Input type="number" value={limit} onChange={e => setLimit(e.target.value)} placeholder="limit, e.g. 10" aria-label="Output limit" />
             <Button
               variant="primary"
@@ -466,6 +486,9 @@ function OutputsTab({ novelId, status }: TabProps): React.JSX.Element {
         {!planApproved && <p className={styles.hint}>The writer only runs against an approved plan — approve one on the Plan tab first.</p>}
         <p className={styles.hint}>A limit writes a trial run before the whole book is committed; re-running picks up wherever the last run left off.</p>
         {active && <ProgressBar progress={(status?.job?.progress ?? null) as JobProgress | null} />}
+        {cancelled && (
+          <p className={styles.hint}>Stopped before the batch finished — the {counts?.written ?? 0} chapter(s) already written were kept. Start transform again to continue.</p>
+        )}
         <div className={styles.chips}>
           <StatusChip intent="success">{counts?.written ?? 0} written</StatusChip>
           <StatusChip intent="warning">{counts?.attention ?? 0} attention</StatusChip>
