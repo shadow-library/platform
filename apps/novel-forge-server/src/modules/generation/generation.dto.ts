@@ -16,7 +16,7 @@ import {
   ViolenceRating,
   WorkflowRunStatus,
 } from '@server/common';
-import { type Ai, type Generation } from '@server/database';
+import { type Ai, type Generation, type Job } from '@server/database';
 
 import { KnowledgeContractSchema } from '../ai/schemas';
 
@@ -76,6 +76,16 @@ export class RunParams {
 
   @Field()
   runId: string;
+}
+
+@Schema()
+export class JobParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field()
+  jobId: string;
 }
 
 @Schema()
@@ -343,6 +353,24 @@ export class CancelRunResponse {
       "'stopping': a live run on this replica was just signalled to abort. 'already_settled': the run had already reached a terminal status, so nothing was done. 'not_delivered': the run is still `running` in the database but not live on this replica — cancellation is process-local, so the signal could not be delivered; the run may be owned by another replica or may have crashed.",
   })
   outcome: 'stopping' | 'already_settled' | 'not_delivered';
+}
+
+@Schema()
+export class CancelJobResponse {
+  @Field()
+  jobId: string;
+
+  @Field(() => JobStatus, {
+    description: 'The job status as recorded right now — a `stopping` outcome still reads `in_progress` because the worker writes `cancelled` as it settles.',
+  })
+  status: Job.Status;
+
+  @Field(() => String, {
+    enum: ['cancelled', 'stopping', 'already_settled'],
+    description:
+      "'cancelled': the job was still pending and was cancelled immediately, never dispatched. 'stopping': the job was in progress; cancellation was requested and the worker will settle it as cancelled at its next step boundary. 'already_settled': the job had already reached a terminal status (done, failed, or cancelled), so nothing was done.",
+  })
+  outcome: 'cancelled' | 'stopping' | 'already_settled';
 }
 
 @Schema()

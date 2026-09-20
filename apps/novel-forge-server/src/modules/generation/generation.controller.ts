@@ -11,6 +11,7 @@ import {
   ApprovePlanResponse,
   ArcOutlineParams,
   BriefResponse,
+  CancelJobResponse,
   CancelRunResponse,
   ChapterParams,
   ChapterReviewResponse,
@@ -24,6 +25,7 @@ import {
   GenerateUnrestrictedBody,
   ImportDraftBody,
   JobEnqueueResponse,
+  JobParams,
   JudgeResponse,
   ListBriefSummaryResponse,
   ListDraftResponse,
@@ -135,6 +137,14 @@ export class GenerationController {
   async listJobs(@Params() params: ProjectParams): Promise<ListGenerationJobResponse> {
     const items = await this.generationService.listJobs(params.projectId);
     return { items };
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
+  @Post('/jobs/:jobId/cancel')
+  @RespondFor(200, CancelJobResponse)
+  cancelJob(@Params() params: JobParams): Promise<CancelJobResponse> {
+    return this.generationService.cancelJob(params.projectId, params.jobId);
   }
 
   @Get('/drafts')

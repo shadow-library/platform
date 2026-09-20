@@ -17,6 +17,11 @@ export interface JobProgress {
   skipped?: number[];
 }
 
+export interface JobCancelResult {
+  status: Job.Status;
+  outcome: 'cancelled' | 'stopping' | 'already_settled';
+}
+
 @Injectable()
 export class JobService {
   private readonly logger = Logger.getLogger(APP_NAME, JobService.name);
@@ -114,6 +119,42 @@ export class JobService {
       .where(eq(schema.jobs.id, jobId))
       .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
     if (job) this.announce(jobId, job);
+  }
+
+  // A pending job is claimed by a conditional UPDATE, exactly like `start()` — never read-then-write —
+  // so a cancel racing a dispatch cannot land after the worker has already claimed the row. The two
+  // conditional updates are tried in the order a job actually progresses (pending, then in_progress),
+  // which is why trying both is race-safe rather than a plain if/else on a stale read: whichever state
+  // the row is in by the time each UPDATE runs is the one that matches, and a job never moves backwards.
+  // An `in_progress` job only gets `cancelRequestedAt` (D5): the worker calls `succeed()`/`fail()` when
+  // `runJob` returns and would overwrite a status written underneath it, so this never touches `status`.
+  async cancel(jobId: string, projectId: bigint): Promise<JobCancelResult | undefined> {
+    const [cancelledPending] = await this.db
+      .update(schema.jobs)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.projectId, projectId), eq(schema.jobs.status, 'pending')))
+      .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
+    if (cancelledPending) {
+      this.logger.info('job cancelled before dispatch', { jobId });
+      this.announce(jobId, cancelledPending);
+      return { status: 'cancelled', outcome: 'cancelled' };
+    }
+
+    const [flagged] = await this.db
+      .update(schema.jobs)
+      .set({ cancelRequestedAt: sql`coalesce(${schema.jobs.cancelRequestedAt}, now())`, updatedAt: new Date() })
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.projectId, projectId), eq(schema.jobs.status, 'in_progress')))
+      .returning({ status: schema.jobs.status });
+    if (flagged) {
+      this.logger.info('job cancellation requested; worker will settle it at the next step boundary', { jobId });
+      return { status: 'in_progress', outcome: 'stopping' };
+    }
+
+    const row = await this.db.query.jobs.findFirst({
+      where: and(eq(schema.jobs.id, jobId), eq(schema.jobs.projectId, projectId)),
+      columns: { status: true },
+    });
+    return row ? { status: row.status, outcome: 'already_settled' } : undefined;
   }
 
   async get(jobId: string): Promise<Job.Row | undefined> {

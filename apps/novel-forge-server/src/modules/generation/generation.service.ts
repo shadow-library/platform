@@ -40,6 +40,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
 import {
+  type CancelJobResponse,
   type CancelRunResponse,
   type ChapterSummarizeResponse,
   type FeedbackBody,
@@ -1425,6 +1426,16 @@ export class GenerationService {
 
     const live = this.workflowRunService.cancel(runId);
     return { runId, status: 'running', outcome: live ? 'stopping' : 'not_delivered' };
+  }
+
+  // The state transition itself is JobService.cancel's atomic conditional update (D5/D6); this only
+  // translates its result. A job driving a workflow run is not cancelled here — the job row does not
+  // know which run it currently owns, only the executor does mid-dispatch, so S5 must cancel that run
+  // itself when it observes `cancelRequestedAt` at the next step boundary.
+  async cancelJob(projectId: bigint, jobId: string): Promise<CancelJobResponse> {
+    const result = await this.jobService.cancel(jobId, projectId);
+    if (!result) throw AppErrorCode.JOB_001.create();
+    return { jobId, status: result.status, outcome: result.outcome };
   }
 
   private async loadPackSummary(contextPackId: bigint | null): Promise<RunContextPackSummary | null> {

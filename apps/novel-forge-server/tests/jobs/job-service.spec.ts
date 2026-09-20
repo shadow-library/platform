@@ -111,3 +111,149 @@ describe.if(pgAvailable)('JobService dedup/retry semantics', () => {
     expect(row?.id).toBe(jobId);
   });
 });
+
+describe.if(pgAvailable)('JobService.cancel', () => {
+  let db: PrimaryDatabase;
+
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
+  let service: JobService;
+
+  beforeAll(async () => {
+    const url = await createDatabaseFromTemplate(`${dbName}_cancel`);
+    db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
+    service = new JobService({ getPostgresClient: () => db } as never, new ProjectEventService());
+  });
+
+  async function createProject(): Promise<bigint> {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `job-cancel-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+    return project.id;
+  }
+
+  it('cancels a pending job straight to cancelled and reports the same', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+
+    const result = await service.cancel(jobId, projectId);
+
+    expect(result).toEqual({ status: 'cancelled', outcome: 'cancelled' });
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(row?.status).toBe('cancelled');
+    expect(row?.cancelRequestedAt).toBeNull();
+  });
+
+  it('a cancelled pending job is never dispatchable — start() fails after cancel()', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+
+    await service.cancel(jobId, projectId);
+    const claimed = await service.start(jobId);
+
+    expect(claimed).toBe(false);
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(row?.status).toBe('cancelled');
+  });
+
+  it('flags an in_progress job with cancelRequestedAt without touching status', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+    await service.start(jobId);
+
+    const result = await service.cancel(jobId, projectId);
+
+    expect(result).toEqual({ status: 'in_progress', outcome: 'stopping' });
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(row?.status).toBe('in_progress');
+    expect(row?.cancelRequestedAt).not.toBeNull();
+  });
+
+  it('is idempotent for an in_progress job that already has cancelRequestedAt set', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+    await service.start(jobId);
+
+    const first = await service.cancel(jobId, projectId);
+    const firstRow = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    const second = await service.cancel(jobId, projectId);
+    const secondRow = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+
+    expect(first).toEqual({ status: 'in_progress', outcome: 'stopping' });
+    expect(second).toEqual({ status: 'in_progress', outcome: 'stopping' });
+    expect(secondRow?.cancelRequestedAt).toEqual(firstRow?.cancelRequestedAt ?? null);
+  });
+
+  it('reports already_settled without changes for a job that finished as done', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+    await service.start(jobId);
+    await service.succeed(jobId);
+
+    const result = await service.cancel(jobId, projectId);
+
+    expect(result).toEqual({ status: 'done', outcome: 'already_settled' });
+  });
+
+  it('reports already_settled without changes for a job that finished as failed', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+    await service.start(jobId);
+    await service.fail(jobId, 'boom');
+
+    const result = await service.cancel(jobId, projectId);
+
+    expect(result).toEqual({ status: 'failed', outcome: 'already_settled' });
+  });
+
+  it('reports already_settled, idempotently, for a job that already settled as cancelled', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+    await service.cancel(jobId, projectId);
+
+    const result = await service.cancel(jobId, projectId);
+
+    expect(result).toEqual({ status: 'cancelled', outcome: 'already_settled' });
+  });
+
+  it('returns undefined for an unknown job id', async () => {
+    const projectId = await createProject();
+
+    const result = await service.cancel('00000000-0000-0000-0000-000000000000', projectId);
+
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined (404-shaped) for a job that belongs to a different project', async () => {
+    const projectId = await createProject();
+    const otherProjectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+
+    const result = await service.cancel(jobId, otherProjectId);
+
+    expect(result).toBeUndefined();
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(row?.status).toBe('pending');
+  });
+
+  it('races a dispatch: cancelling a pending job concurrently with start() never leaves both effects applied', async () => {
+    const projectId = await createProject();
+    const jobId = await service.enqueue(projectId, 'generate', '1', { chapters: [1] });
+
+    const [claimed, cancelResult] = await Promise.all([service.start(jobId), service.cancel(jobId, projectId)]);
+
+    const row = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    if (claimed) {
+      // start() won the race: the job is live and cancel() could only flag it, never overwrite status.
+      expect(row?.status).toBe('in_progress');
+      expect(cancelResult).toEqual({ status: 'in_progress', outcome: 'stopping' });
+      expect(row?.cancelRequestedAt).not.toBeNull();
+    } else {
+      // cancel() won the race: the job never dispatched, and start()'s guarded claim correctly refused it.
+      expect(row?.status).toBe('cancelled');
+      expect(cancelResult).toEqual({ status: 'cancelled', outcome: 'cancelled' });
+      expect(row?.cancelRequestedAt).toBeNull();
+    }
+  });
+});
