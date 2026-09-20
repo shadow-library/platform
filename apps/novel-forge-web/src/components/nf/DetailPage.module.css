@@ -51,6 +51,15 @@
   flex-wrap: wrap;
 }
 
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -75,11 +84,28 @@
   width: 300px;
 }
 
+.body[data-aside='prose'] .aside {
+  width: 560px;
+}
+
 .prose {
   max-width: 660px;
   font-size: var(--sh-text-body);
   line-height: var(--sh-text-body--line-height);
   color: var(--sh-text-primary);
+}
+
+/* A prose aside needs its own stacking point: 560px beside a 660px measure runs out of room long before
+   a 300px one does. */
+@media (max-width: 1280px) {
+  .body[data-aside='prose'] {
+    display: block;
+  }
+
+  .body[data-aside='prose'] .aside {
+    width: auto;
+    margin-top: 32px;
+  }
 }
 
 @media (max-width: 960px) {

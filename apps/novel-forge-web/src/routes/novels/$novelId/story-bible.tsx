@@ -315,12 +315,10 @@ function EntityDetail({ novelId, entity, total, type, ids, jump, byKey, onSelect
         </Link>
       }
       identity={
-        <>
-          <EntityAvatar entity={entity} size={32} />
-          <h1 className={styles.detailName}>{entity.name}</h1>
+        <DetailPage.Identity avatar={<EntityAvatar entity={entity} size={32} />} title={entity.name}>
           <StatusChip intent="neutral">{TYPE_SINGULAR[entity.type]}</StatusChip>
           <StatusChip intent={entity.significance === 'major' ? 'accent' : 'neutral'}>{entity.significance ?? 'minor'}</StatusChip>
-        </>
+        </DetailPage.Identity>
       }
       pager={<ItemPager ids={ids} currentId={entityKey} onSelect={onSelect} itemNoun="entity" jump={jump} />}
       actions={
@@ -606,6 +604,14 @@ function StoryBibleScreen(): React.JSX.Element {
           </>
         }
         filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
+        notice={
+          resolved &&
+          entityParam && (
+            <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
+              It was deleted, renamed, or the link was typed by hand.
+            </Alert>
+          )
+        }
         segments={{
           label: 'Entity type',
           value: activeType,
@@ -637,11 +643,6 @@ function StoryBibleScreen(): React.JSX.Element {
           <PaneError error={entitiesQuery.error} />
         ) : (
           <>
-            {entityParam && (
-              <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
-                It was deleted, renamed, or the link was typed by hand.
-              </Alert>
-            )}
             {visible.length === 0 ? (
               <EmptyState
                 icon={<SearchIcon size={24} />}
@@ -660,9 +661,9 @@ function StoryBibleScreen(): React.JSX.Element {
                   label={TYPE_LABEL[section.type]}
                   total={section.total}
                   shown={section.items.length}
-                  seeAll={count => (
+                  seeAll={sectionTotal => (
                     <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type: section.type }}>
-                      See all {count}
+                      See all {sectionTotal}
                     </Link>
                   )}
                 >

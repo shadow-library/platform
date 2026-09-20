@@ -37,12 +37,14 @@ export interface CollectionPageProps {
   actions?: ReactNode;
   filter?: CollectionFilter;
   segments?: CollectionSegments;
+  /** A page-level banner — a stale-link warning, a counts strip. Pins below the toolbar rather than scrolling away with the body. */
+  notice?: ReactNode;
   /** Rendered instead of the toolbar and body when `total` is 0. */
   empty?: ReactNode;
   children: ReactNode;
 }
 
-function CollectionPageRoot({ title, subtitle, total, actions, filter, segments, empty, children }: CollectionPageProps): ReactElement {
+function CollectionPageRoot({ title, subtitle, total, actions, filter, segments, notice, empty, children }: CollectionPageProps): ReactElement {
   const filterId = useId();
   const view = resolveCollectionView(total, empty != null);
   const showSegments = segments != null && shouldRenderSegments(segments.items.length);
@@ -97,6 +99,7 @@ function CollectionPageRoot({ title, subtitle, total, actions, filter, segments,
               )}
             </div>
           )}
+          {notice && <div className={styles.notice}>{notice}</div>}
           <div className={styles.body}>{children}</div>
         </>
       )}
@@ -109,14 +112,15 @@ export interface CollectionSectionProps {
   total: number;
   /** How many of `total` the body below actually renders; a shortfall reveals the "See all" link. */
   shown?: number;
-  seeAll?: (count: number) => ReactNode;
+  /** Receives the section's **total**, not the remainder: the label the board draws is "See all 18". */
+  seeAll?: (total: number) => ReactNode;
   children: ReactNode;
 }
 
 function CollectionSection({ label, total, shown, seeAll, children }: CollectionSectionProps): ReactElement | null {
   const headingId = useId();
   if (!shouldRenderSection(total)) return null;
-  const overflow = shown === undefined ? null : seeAllCount(total, shown);
+  const seeAllTotal = shown === undefined ? null : seeAllCount(total, shown);
 
   return (
     <section className={styles.section} aria-labelledby={headingId}>
@@ -126,7 +130,7 @@ function CollectionSection({ label, total, shown, seeAll, children }: Collection
         </h2>
         <span className={styles.sectionCount}>{formatCount(total)}</span>
         <span className={styles.sectionRule} aria-hidden="true" />
-        {overflow !== null && seeAll && <span className={styles.sectionSeeAll}>{seeAll(overflow)}</span>}
+        {seeAllTotal !== null && seeAll && <span className={styles.sectionSeeAll}>{seeAll(seeAllTotal)}</span>}
       </div>
       {children}
     </section>

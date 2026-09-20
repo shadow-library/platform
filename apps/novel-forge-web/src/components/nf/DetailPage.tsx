@@ -2,10 +2,16 @@ import { type ReactElement, type ReactNode } from 'react';
 
 import styles from './DetailPage.module.css';
 
+/**
+ * The width bands D5 allows a right-hand panel. `summary` holds labels, chips and clamped summaries;
+ * `prose` is the narrowest column prose reads at, below which a field belongs in a `ReadingSheet`.
+ */
+export type DetailAsideWidth = 'summary' | 'prose';
+
 export interface DetailPageProps {
   /** A `Link` back to the directory, named with its count — "All 39 entities". Never a button. */
   back: ReactNode;
-  /** Avatar, title and status chips for the item on screen. */
+  /** A `DetailPage.Identity`, or arbitrary nodes for an item the common arrangement does not fit. */
   identity: ReactNode;
   /** An `ItemPager`, which carries the jump button. */
   pager?: ReactNode;
@@ -14,10 +20,11 @@ export interface DetailPageProps {
   aside?: ReactNode;
   /** Accessible name for the `aside` region. */
   asideLabel?: string;
+  asideWidth?: DetailAsideWidth;
   children: ReactNode;
 }
 
-function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'Details', children }: DetailPageProps): ReactElement {
+function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'Details', asideWidth = 'summary', children }: DetailPageProps): ReactElement {
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -33,7 +40,7 @@ function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'D
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>
 
-      <div className={styles.body}>
+      <div className={styles.body} data-aside={asideWidth}>
         <div className={styles.main}>{children}</div>
         {aside && (
           <aside className={styles.aside} aria-label={asideLabel}>
@@ -42,6 +49,23 @@ function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'D
         )}
       </div>
     </div>
+  );
+}
+
+export interface DetailIdentityProps {
+  avatar?: ReactNode;
+  title: ReactNode;
+  /** Status chips beside the name — type, importance, state. */
+  children?: ReactNode;
+}
+
+function DetailIdentity({ avatar, title, children }: DetailIdentityProps): ReactElement {
+  return (
+    <>
+      {avatar}
+      <h1 className={styles.title}>{title}</h1>
+      {children}
+    </>
   );
 }
 
@@ -54,4 +78,4 @@ function DetailProse({ children, className }: DetailProseProps): ReactElement {
   return <div className={className ? `${styles.prose} ${className}` : styles.prose}>{children}</div>;
 }
 
-export const DetailPage = Object.assign(DetailPageRoot, { Prose: DetailProse });
+export const DetailPage = Object.assign(DetailPageRoot, { Identity: DetailIdentity, Prose: DetailProse });

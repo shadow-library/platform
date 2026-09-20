@@ -83,6 +83,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The shell owns the scroll port, so the banner cannot sit outside it — it pins to the port's top edge
+   instead, and paints the app surface so the body scrolls under rather than through it. */
+.notice {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-top: 20px;
+  padding-block: 8px;
+  background: var(--sh-surface-app);
+}
+
 .body {
   margin-top: 24px;
 }

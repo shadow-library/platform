@@ -7,7 +7,7 @@ import styles from './nf.module.css';
 
 export { CollectionPage, type CollectionFilter, type CollectionPageProps, type CollectionSectionProps, type CollectionSegment, type CollectionSegments } from './CollectionPage';
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
-export { DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
+export { type DetailAsideWidth, type DetailIdentityProps, DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { FieldCard, type FieldCardProps } from './FieldCard';
 export { IdeaRename } from './IdeaRename';
