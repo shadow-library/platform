@@ -10,37 +10,56 @@
 }
 
 .sectionLabel {
-  margin: 20px 0 8px;
+  margin: 24px 0 8px;
 }
 
-.rowTopRow {
+.sectionLabel:first-child {
+  margin-top: 0;
+}
+
+.asideBlock {
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  padding: 14px 16px;
+}
+
+.asideTitle {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+}
+
+.factGrid {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
 }
 
-.rowTime {
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.factLabel {
   font-size: 10px;
   color: var(--sh-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.rowTitle {
+.factValue {
+  margin: 0;
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
-  color: var(--sh-text-primary);
-  text-align: left;
-}
-
-[data-active='true'] .rowTitle {
-  color: var(--sh-accent);
-}
-
-.rowMeta {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
-  text-align: left;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .tableWrap {
@@ -83,55 +102,6 @@
   color: var(--sh-warning-solid);
 }
 
-.detailHead {
-  flex-shrink: 0;
-  padding: 16px 26px;
-  border-bottom: 1px solid var(--sh-border-subtle);
-  background: var(--sh-surface-card);
-}
-
-.detailTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.detailTitle {
-  font-size: var(--sh-text-h3);
-  font-weight: 700;
-}
-
-.factRow {
-  display: flex;
-  gap: 26px;
-  flex-wrap: wrap;
-}
-
-.factLabel {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.factValue {
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.detailScroll {
-  flex: 1;
-  min-height: 0;
-  padding: 4px 26px 22px;
-}
-
-.detailInner {
-  max-width: 780px;
-  margin: 0 auto;
-}
-
 .para {
   margin: 0;
   font-size: var(--sh-text-body-sm);
@@ -159,6 +129,12 @@
   background: var(--sh-surface-well);
 }
 
+/* Raw model output is unbounded — a refusal is two lines, a rewritten chapter is thousands. */
+.preScroll {
+  max-height: 60vh;
+  overflow: auto;
+}
+
 .steps {
   display: flex;
   gap: 6px;
@@ -181,22 +157,6 @@
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-lg);
   overflow: hidden;
-}
-
-.railHeadFlex {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.railTitle {
-  font-size: var(--sh-text-body);
-  font-weight: 700;
-}
-
-.railCount {
-  font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
 }
 
 .callRow {

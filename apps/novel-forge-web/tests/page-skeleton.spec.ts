@@ -38,8 +38,8 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/proposals')).toBe('rows');
   });
 
-  it('should resolve rail-and-detail workspace routes to the split variant', () => {
-    expect(resolveSkeletonVariant('/novels/abc123/runs')).toBe('split');
+  it('should resolve the migrated workflow runs directory to the rows variant rather than a rail it no longer renders', () => {
+    expect(resolveSkeletonVariant('/novels/abc123/runs')).toBe('rows');
   });
 
   it('should resolve form-shaped project routes to the form variant', () => {

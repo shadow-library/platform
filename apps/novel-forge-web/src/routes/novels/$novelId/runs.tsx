@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
-import { Button, Dialog, EmptyState, Spinner } from '@shadow-library/ui';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { useMemo, useState } from 'react';
+import { Alert, Button, Dialog, Spinner, EmptyState as UiEmptyState } from '@shadow-library/ui';
 
-import { LockIcon } from '@/components/icons';
-import { type ChipIntent, PaneError, PaneLoader, StatusChip, StopButton } from '@/components/nf';
+import { LockIcon, RunsIcon } from '@/components/icons';
+import { useCollectionJump } from '@/components/Layout';
+import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, StatusChip, StopButton } from '@/components/nf';
 import {
   hasRunningRun,
   listRunsQueryOptions,
@@ -19,9 +20,14 @@ import {
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { formatCost, formatMillis, formatSeconds, formatTokens, resolveRunView, runDuration, runIds, runsBackLabel, runTitle, runTotals, sectionShare } from '@/lib/runs';
 import { isAdminSession } from '@/lib/session';
 
 import styles from './runs.module.css';
+
+interface RunsSearch {
+  run?: string;
+}
 
 /**
  * `/novels/$novelId` already ensured the session in its own `beforeLoad`, so this reads the warm cache —
@@ -30,6 +36,7 @@ import styles from './runs.module.css';
  * loader skips prefetching the list too: a non-admin never issues a request this route can't show.
  */
 export const Route = createFileRoute('/novels/$novelId/runs')({
+  validateSearch: (search: Record<string, unknown>): RunsSearch => ({ run: typeof search.run === 'string' && search.run ? search.run : undefined }),
   beforeLoad: async ({ context }) => ({ isAdmin: isAdminSession(await context.queryClient.ensureQueryData(sessionQuery)) }),
   loader: ({ context, params }) => (context.isAdmin ? context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)) : undefined),
   component: RunsScreen,
@@ -45,7 +52,7 @@ function AdminRequired(): React.JSX.Element {
   const { novelId } = Route.useParams();
   return (
     <div className={styles.adminGate}>
-      <EmptyState
+      <UiEmptyState
         size="page"
         illustration={<LockIcon size={28} />}
         title="Workflow Runs needs the admin scope"
@@ -73,16 +80,17 @@ interface RunFact {
   value: string;
 }
 
-function duration(startedAt: string, endedAt?: string | null): string {
-  const start = new Date(startedAt).getTime();
-  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const secs = Math.max(0, Math.round((end - start) / 1000));
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+interface RunStatusChipProps {
+  status: string;
 }
 
-function tokens(n?: number | null): string {
-  return n == null ? '—' : n.toLocaleString();
+function RunStatusChip({ status }: RunStatusChipProps): React.JSX.Element {
+  return (
+    <StatusChip intent={runIntent(status)} dot={status !== 'running'}>
+      {status === 'running' && <Spinner size="sm" />}
+      {status}
+    </StatusChip>
+  );
 }
 
 interface SectionLabelProps {
@@ -91,31 +99,6 @@ interface SectionLabelProps {
 
 function SectionLabel({ children }: SectionLabelProps): React.JSX.Element {
   return <div className={`nf-eyebrow ${styles.sectionLabel}`}>{children}</div>;
-}
-
-interface RunListItemProps {
-  run: WorkflowRunDetailResponse;
-  selected: boolean;
-  onSelect: () => void;
-}
-
-function RunListItem({ run, selected, onSelect }: RunListItemProps): React.JSX.Element {
-  return (
-    <button onClick={onSelect} className="nf-selrow nf-selrow-stack" data-active={selected}>
-      <div className={styles.rowTopRow}>
-        <StatusChip intent={runIntent(run.status)} dot={run.status !== 'running'}>
-          {run.status === 'running' && <Spinner size="sm" />}
-          {run.status}
-        </StatusChip>
-        <div className={styles.spacer} />
-        <span className={styles.rowTime}>{relativeTime(run.startedAt)}</span>
-      </div>
-      <div className={styles.rowTitle}>
-        {run.graph} · {run.target}
-      </div>
-      <div className={styles.rowMeta}>{duration(run.startedAt, run.endedAt)}</div>
-    </button>
-  );
 }
 
 interface ModelCallRowProps {
@@ -142,10 +125,10 @@ function ModelCallRow({ novelId, runId, call }: ModelCallRowProps): React.JSX.El
         <td>
           <StatusChip intent={call.status === 'ok' ? 'success' : call.status === 'repaired' ? 'warning' : 'danger'}>{call.status}</StatusChip>
         </td>
-        <td>{tokens(call.inputTokens)}</td>
-        <td>{tokens(call.outputTokens)}</td>
-        <td>{call.latencyMs != null ? `${(call.latencyMs / 1000).toFixed(1)}s` : '—'}</td>
-        <td>{call.costUsd != null ? `$${Number(call.costUsd).toFixed(4)}` : '—'}</td>
+        <td>{formatTokens(call.inputTokens)}</td>
+        <td>{formatTokens(call.outputTokens)}</td>
+        <td>{formatSeconds(call.latencyMs)}</td>
+        <td>{formatCost(call.costUsd != null ? Number(call.costUsd) : null)}</td>
       </tr>
       {expanded && (
         <tr>
@@ -161,7 +144,7 @@ function ModelCallRow({ novelId, runId, call }: ModelCallRowProps): React.JSX.El
             {detailQuery.data && (
               <>
                 <div className={styles.callDetailLabel}>Raw model output</div>
-                <pre className={`${styles.pre} ${styles.preWell}`}>{detailQuery.data.rawOutput ?? '(not recorded)'}</pre>
+                <pre className={`${styles.pre} ${styles.preWell} ${styles.preScroll}`}>{detailQuery.data.rawOutput ?? '(not recorded)'}</pre>
               </>
             )}
           </td>
@@ -229,7 +212,7 @@ function ToolCallsTable({ calls }: ToolCallsTableProps): React.JSX.Element {
               <td>
                 <StatusChip intent={c.status === 'ok' ? 'success' : 'danger'}>{c.status}</StatusChip>
               </td>
-              <td>{c.latencyMs != null ? `${c.latencyMs}ms` : '—'}</td>
+              <td>{formatMillis(c.latencyMs)}</td>
             </tr>
           ))}
         </tbody>
@@ -258,7 +241,7 @@ function PromptAnatomy({ novelId, runId, pack }: PromptAnatomyProps): React.JSX.
       <div className={styles.anatomyHead}>
         <StatusChip intent="info">{pack.purpose}</StatusChip>
         <span className={styles.anatomySummary}>
-          {tokens(pack.usedTokens ?? sectionTotal)} of {tokens(pack.budgetTokens)} budget tokens
+          {formatTokens(pack.usedTokens ?? sectionTotal)} of {formatTokens(pack.budgetTokens)} budget tokens
         </span>
         <div className={styles.spacer} />
         <Button size="sm" variant="ghost" onClick={() => setContextOpen(true)}>
@@ -285,8 +268,8 @@ function PromptAnatomy({ novelId, runId, pack }: PromptAnatomyProps): React.JSX.
                 </td>
                 <td>{s.segment}</td>
                 <td>{s.tier}</td>
-                <td>{tokens(s.tokens)}</td>
-                <td>{sectionTotal > 0 ? `${Math.round((s.tokens / sectionTotal) * 100)}%` : '—'}</td>
+                <td>{formatTokens(s.tokens)}</td>
+                <td>{sectionShare(s.tokens, sectionTotal)}</td>
               </tr>
             ))}
           </tbody>
@@ -309,146 +292,209 @@ function PromptAnatomy({ novelId, runId, pack }: PromptAnatomyProps): React.JSX.
 
 interface RunDetailProps {
   novelId: string;
-  runId: string;
+  run: WorkflowRunDetailResponse;
+  total: number | undefined;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  onSelect: (runId?: string) => void;
 }
 
-function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
-  const runQuery = useRunQuery(novelId, runId);
-  const runStop = useRunStop(novelId);
-  if (runQuery.isLoading) return <PaneLoader />;
-  if (runQuery.error) return <PaneError error={runQuery.error} />;
-  const run = runQuery.data;
-  if (!run) return <PaneLoader />;
+interface RunDetailPendingProps {
+  novelId: string;
+  runId: string;
+  summary: WorkflowRunDetailResponse | undefined;
+  total: number | undefined;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  onSelect: (runId?: string) => void;
+}
 
+/** The directory already knows a listed run's name and status, so opening one keeps the page rather than blanking it while the internals load. */
+function RunDetailPending({ novelId, runId, summary, total, ids, jump, onSelect }: RunDetailPendingProps): React.JSX.Element {
+  return (
+    <DetailPage
+      back={
+        <Link to="/novels/$novelId/runs" params={{ novelId }}>
+          {runsBackLabel(total)}
+        </Link>
+      }
+      identity={<DetailPage.Identity title={summary ? runTitle(summary) : 'Workflow run'}>{summary && <RunStatusChip status={summary.status} />}</DetailPage.Identity>}
+      pager={<ItemPager ids={ids} currentId={runId} onSelect={onSelect} itemNoun="run" jump={jump} />}
+    >
+      <PaneLoader />
+    </DetailPage>
+  );
+}
+
+function RunDetail({ novelId, run, total, ids, jump, onSelect }: RunDetailProps): React.JSX.Element {
+  const runStop = useRunStop(novelId);
   const calls = run.modelCalls ?? [];
   const toolCalls = run.toolCalls ?? [];
-  const totalIn = calls.reduce((sum, c) => sum + (c.inputTokens ?? 0), 0);
-  const totalOut = calls.reduce((sum, c) => sum + (c.outputTokens ?? 0), 0);
-  const totalCost = calls.reduce((sum, c) => sum + (c.costUsd != null ? Number(c.costUsd) : 0), 0);
+  const totals = runTotals(calls);
   const trace = run.nodeTrace ?? [];
 
   const facts: RunFact[] = [
-    { label: 'Duration', value: duration(run.startedAt, run.endedAt) },
+    { label: 'Duration', value: runDuration(run) },
     { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
     { label: 'Model calls', value: String(calls.length) },
     { label: 'Tool calls', value: String(toolCalls.length) },
-    { label: 'Tokens in / out', value: `${totalIn.toLocaleString()} / ${totalOut.toLocaleString()}` },
-    { label: 'Cost', value: totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—' },
+    { label: 'Tokens in / out', value: `${totals.inputTokens.toLocaleString()} / ${totals.outputTokens.toLocaleString()}` },
+    { label: 'Cost', value: totals.costUsd > 0 ? formatCost(totals.costUsd) : '—' },
     ...(run.jobId ? [{ label: 'Job', value: run.jobId }] : []),
   ];
 
   return (
-    <>
-      <div className={styles.detailHead}>
-        <div className={styles.detailTitleRow}>
-          <span className={styles.detailTitle}>
-            {run.graph} · {run.target}
-          </span>
-          <StatusChip intent={runIntent(run.status)}>{run.status}</StatusChip>
-          <div className={styles.spacer} />
-          {run.status === 'running' && <StopButton onStop={() => runStop.stop(run.id)} stopping={runStop.stopping} />}
-        </div>
-        <div className={styles.factRow}>
-          {facts.map(f => (
-            <div key={f.label}>
-              <div className={styles.factLabel}>{f.label}</div>
-              <div className={styles.factValue}>{f.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className={`nf-scroll ${styles.detailScroll}`}>
-        <div className={styles.detailInner}>
-          {run.outcome && (
-            <>
-              <SectionLabel>Outcome</SectionLabel>
-              <p className={styles.para}>{run.outcome}</p>
-            </>
-          )}
-          {run.error && (
-            <>
-              <SectionLabel>Run error</SectionLabel>
-              <div className={styles.errorBox}>
-                <pre className={styles.pre}>{JSON.stringify(run.error, null, 2)}</pre>
+    <DetailPage
+      back={
+        <Link to="/novels/$novelId/runs" params={{ novelId }}>
+          {runsBackLabel(total)}
+        </Link>
+      }
+      identity={
+        <DetailPage.Identity title={runTitle(run)}>
+          <RunStatusChip status={run.status} />
+        </DetailPage.Identity>
+      }
+      pager={<ItemPager ids={ids} currentId={run.id} onSelect={onSelect} itemNoun="run" jump={jump} />}
+      actions={run.status === 'running' && <StopButton onStop={() => runStop.stop(run.id)} stopping={runStop.stopping} />}
+      asideLabel="Run ledger"
+      aside={
+        <section className={styles.asideBlock}>
+          <h2 className={styles.asideTitle}>Ledger</h2>
+          <dl className={styles.factGrid}>
+            {facts.map(fact => (
+              <div key={fact.label} className={styles.fact}>
+                <dt className={styles.factLabel}>{fact.label}</dt>
+                <dd className={styles.factValue}>{fact.value}</dd>
               </div>
-            </>
-          )}
-          {trace.length > 0 && (
-            <>
-              <SectionLabel>Steps</SectionLabel>
-              <div className={styles.steps}>
-                {trace.map((node, i) => (
-                  <span key={`${node}-${i}`} className={styles.step}>
-                    {i > 0 && <span className={styles.arrow}>→</span>}
-                    <StatusChip intent="neutral">{node}</StatusChip>
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-          {run.contextPack && (
-            <>
-              <SectionLabel>Prompt anatomy — where the input tokens go</SectionLabel>
-              <PromptAnatomy novelId={novelId} runId={runId} pack={run.contextPack} />
-            </>
-          )}
-          {calls.length > 0 && (
-            <>
-              <SectionLabel>Model calls</SectionLabel>
-              <ModelCallsTable novelId={novelId} runId={runId} calls={calls} />
-              <p className={styles.tableNote}>
-                Click a call to see its raw model output. Input tokens include the assembled context, playbook, and history — not just the trigger below.
-              </p>
-            </>
-          )}
-          {toolCalls.length > 0 && (
-            <>
-              <SectionLabel>Tool calls</SectionLabel>
-              <ToolCallsTable calls={toolCalls} />
-            </>
-          )}
-          {run.input && (
-            <>
-              <SectionLabel>Chain input — the trigger, not the prompt</SectionLabel>
-              <div className={styles.inputBox}>
-                <pre className={`${styles.pre} ${styles.preWell}`}>{JSON.stringify(run.input, null, 2)}</pre>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </>
+            ))}
+          </dl>
+        </section>
+      }
+    >
+      {run.outcome && (
+        <>
+          <SectionLabel>Outcome</SectionLabel>
+          <p className={styles.para}>{run.outcome}</p>
+        </>
+      )}
+      {run.error && (
+        <>
+          <SectionLabel>Run error</SectionLabel>
+          <div className={styles.errorBox}>
+            <pre className={styles.pre}>{JSON.stringify(run.error, null, 2)}</pre>
+          </div>
+        </>
+      )}
+      {trace.length > 0 && (
+        <>
+          <SectionLabel>Steps</SectionLabel>
+          <div className={styles.steps}>
+            {trace.map((node, i) => (
+              <span key={`${node}-${i}`} className={styles.step}>
+                {i > 0 && <span className={styles.arrow}>→</span>}
+                <StatusChip intent="neutral">{node}</StatusChip>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {run.contextPack && (
+        <>
+          <SectionLabel>Prompt anatomy — where the input tokens go</SectionLabel>
+          <PromptAnatomy novelId={novelId} runId={run.id} pack={run.contextPack} />
+        </>
+      )}
+      {calls.length > 0 && (
+        <>
+          <SectionLabel>Model calls</SectionLabel>
+          <ModelCallsTable novelId={novelId} runId={run.id} calls={calls} />
+          <p className={styles.tableNote}>
+            Click a call to see its raw model output. Input tokens include the assembled context, playbook, and history — not just the trigger below.
+          </p>
+        </>
+      )}
+      {toolCalls.length > 0 && (
+        <>
+          <SectionLabel>Tool calls</SectionLabel>
+          <ToolCallsTable calls={toolCalls} />
+        </>
+      )}
+      {run.input && (
+        <>
+          <SectionLabel>Chain input — the trigger, not the prompt</SectionLabel>
+          <div className={styles.inputBox}>
+            <pre className={`${styles.pre} ${styles.preWell} ${styles.preScroll}`}>{JSON.stringify(run.input, null, 2)}</pre>
+          </div>
+        </>
+      )}
+    </DetailPage>
   );
 }
 
 function RunsScreen(): React.JSX.Element {
   const { isAdmin } = Route.useRouteContext();
   const { novelId } = Route.useParams();
+  const { run: runParam } = Route.useSearch();
+  const goSearch = Route.useNavigate();
   const runsQuery = useListRunsQuery(novelId, isAdmin, { refetchInterval: query => (hasRunningRun(query.state.data) ? 4000 : false) });
-  const [selectedId, setSelectedId] = useState<string | undefined>();
+  const runQuery = useRunQuery(novelId, runParam, isAdmin);
+
+  const runs = useMemo(() => runsQuery.data?.items ?? [], [runsQuery.data]);
+  const resolved = !runsQuery.isLoading && !runsQuery.error;
+  const total = resolved ? runs.length : undefined;
+  const ids = useMemo(() => (resolved ? runIds(runs) : undefined), [resolved, runs]);
+  const jumpItems = useMemo(() => runs.map(run => ({ id: run.id, label: runTitle(run), caption: `${run.status} · ${relativeTime(run.startedAt)}` })), [runs]);
+
+  const selectRun = (runId?: string): void => void goSearch({ search: { run: runId } });
+  const jump = useCollectionJump(resolved ? { collection: 'runs', items: jumpItems, currentId: runParam, onSelect: selectRun } : null);
+  const view = resolveRunView({ runId: runParam, run: runQuery.data, isLoading: runQuery.isLoading, error: runQuery.error });
 
   if (!isAdmin) return <AdminRequired />;
-  const runs = runsQuery.data?.items ?? [];
-  const activeId = selectedId ?? runs[0]?.id;
+  if (view.kind === 'loading')
+    return <RunDetailPending novelId={novelId} runId={view.runId} summary={runs.find(run => run.id === view.runId)} total={total} ids={ids} jump={jump} onSelect={selectRun} />;
+  if (view.kind === 'failed') return <PaneError error={view.error} />;
+  if (view.kind === 'detail') return <RunDetail novelId={novelId} run={view.run} total={total} ids={ids} jump={jump} onSelect={selectRun} />;
 
   return (
-    <div className="nf-splitpane">
-      <div className="nf-rail">
-        <div className={`nf-railhead ${styles.railHeadFlex}`}>
-          <span className={styles.railTitle}>Workflow Runs</span>
-          <div className={styles.spacer} />
-          <span className={styles.railCount}>latest {runs.length}</span>
-        </div>
-        <div className="nf-scroll nf-raillist">
-          {runsQuery.isLoading && <PaneLoader />}
-          {runsQuery.error && <PaneError error={runsQuery.error} />}
-          {!runsQuery.isLoading && runs.length === 0 && <div className="nf-emptynote">No runs yet.</div>}
+    <CollectionPage
+      title="Workflow Runs"
+      subtitle="The most recent graph runs for this project — prompts, raw model output, token counts and cost, exactly as recorded."
+      total={total}
+      notice={
+        view.kind === 'missing' && (
+          <Alert intent="warning" title="That run is no longer here." action={{ label: 'Back to the directory', onClick: () => selectRun(undefined) }}>
+            It belongs to another project, or the link was typed by hand.
+          </Alert>
+        )
+      }
+      empty={
+        <EmptyState
+          icon={<RunsIcon size={24} />}
+          title="No runs yet"
+          description="A run is recorded every time a workflow graph executes for this project. This is the operator's record — prompts, raw model output, token counts and cost — not an authoring screen."
+        />
+      }
+    >
+      {runsQuery.isLoading ? (
+        <PaneLoader />
+      ) : runsQuery.error ? (
+        <PaneError error={runsQuery.error} />
+      ) : (
+        <CollectionPage.Rows>
           {runs.map(run => (
-            <RunListItem key={run.id} run={run} selected={run.id === activeId} onSelect={() => setSelectedId(run.id)} />
+            <CollectionPage.Row
+              key={run.id}
+              link={<Link to="/novels/$novelId/runs" params={{ novelId }} search={{ run: run.id }} />}
+              title={runTitle(run)}
+              caption={run.outcome ?? undefined}
+              clampCaption
+              trailing={<RunStatusChip status={run.status} />}
+              meta={`${relativeTime(run.startedAt)} · ${runDuration(run)}`}
+            />
           ))}
-        </div>
-      </div>
-      <div className="nf-detail">{activeId ? <RunDetail novelId={novelId} runId={activeId} /> : <div className="nf-pane-empty">Select a run to see its detail.</div>}</div>
-    </div>
+        </CollectionPage.Rows>
+      )}
+    </CollectionPage>
   );
 }
