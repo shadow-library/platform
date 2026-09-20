@@ -36,12 +36,12 @@ Load this when writing or changing tests in any `apps/*`/`packages/*` workspace.
 ## What belongs where
 
 - **This file:** conventions that hold across every workspace in this monorepo.
-- **The workspace's own `CLAUDE.md`/`README.md`** (`apps/<name>/CLAUDE.md`, `packages/<name>/CLAUDE.md`):
+- **The workspace's own `package.json`, `tests/` setup files and `docs/<app>.md`:**
   workspace-specific test infrastructure — e.g. a server whose specs need a running PostgreSQL and a
   template database (`bun scripts/db.ts <workspace> create-template`, from the repo root — there is no
   `db:*` package.json script), or a web app whose e2e suite is Playwright (`bun run test`; install its
   browser once with `bunx playwright install --with-deps chromium` — only `e2e/` and `packages/ui` still
-  carry their own `test:setup` script for this). MUST read the workspace's own doc before running its
+  carry their own `test:setup` script for this). MUST check the workspace's own setup before running its
   tests and MUST NOT assume `bun test` alone is sufficient.
 - **The root `e2e/` workspace:** cross-app flows against already-deployed service URLs (`E2E_*` env
   vars) — not a substitute for a workspace's own tests, and not something you drive by standing up a

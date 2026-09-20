@@ -191,7 +191,7 @@ Before writing code, confirm ALL of:
       workspaces verify includes the test suite; on others tests are a separate script — verify runs
       `test` for everything except web apps and `e2e`, unless the workspace's `package.json` `"shadow"`
       key sets `verifyTest`.
-- [ ] Type-appropriate build/tests run: backend → `bun test` (+ any workspace DB setup per its CLAUDE.md);
+- [ ] Type-appropriate build/tests run: backend → `bun test` (+ `bun scripts/db.ts <workspace> create-template` for DB-backed specs);
       library/component → `bun scripts/build.ts <workspace>`; spa/ssr → the same build and the app's own
       e2e suite when UI behaviour changed.
 - [ ] DB schema changed → migrations regenerated and clean

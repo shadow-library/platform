@@ -272,12 +272,3 @@ Integration specs boot a real graph (`ShadowFactory.create`) and drive the route
     env var doesn't exist (see §4). If you see the old sealed/store-backed design (`LoginStateStore`,
     `InMemoryLoginStateStore`, `SealedLoginStateStore`, or a caveat about needing a shared secret in a
     multi-replica deploy) referenced anywhere, that's stale.
-15. **Stale identity docs — do not propagate:** `service-integration-guide.md` (seeded novel-forge/web-novel
-    clients as a `<app>`/`<app>-server` pair — see §3 for the current one-client model; UUID client ids,
-    `ECOSYSTEM_*` env vars, lowercase `aal1`/`aal2`, `checkAll` batch PDP — note its `app-session:manage`
-    grant description at line 73 is otherwise consistent with current source); `auth/api-contract.md`
-    (`POST /auth/step-up`); `architecture.md` (`acr`/`amr` on access tokens, `GET /oauth2/logout`, batch
-    PDP, BCL destroying app sessions). `packages/auth/docs/sdk.md` is **not** stale on this point — it
-    correctly documents the SDK's history: "this repository — originally developed inside
-    `identity-server` as the workspace package `packages/auth`, since extracted so consumers version the
-    SDK independently" (`sdk.md:8`).

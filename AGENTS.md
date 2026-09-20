@@ -6,33 +6,40 @@ This file is the cross-agent source of truth for working in this repository. `CL
 
 The Bun-workspaces monorepo for the Shadow Library platform: every first-party application and shared package, developed and verified as one system. The root is configuration and tooling only — it is never a runtime package, and nothing here is published to npm.
 
+## Product context
+
+Read `docs/overview.md` and the app's own `docs/<app>.md` before working in an app; read `docs/architecture.md` before cross-app work and `docs/packages.md` before touching a package. Docs hold intent and
+invariants only — anything derivable from code is read from code, and where they disagree the code wins and the doc is fixed. Do not add task lists, changelogs or status banners to `docs/`.
+
 ## Workspace map
 
-| Path                                                                                                                                               | Contents                                                                                                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/identity-server`, `apps/identity-web`                                                                                                        | Identity: the platform's OIDC provider and its web app                                                                                                           |
-| `apps/novel-forge-server`, `apps/novel-forge-web`                                                                                                  | Novel Forge: AI-assisted novel authoring                                                                                                                         |
-| `apps/pulse-server`, `apps/pulse-web`                                                                                                              | Pulse: notifications and platform activity                                                                                                                       |
-| `apps/web-novel-server`, `apps/web-novel-web`                                                                                                      | Web Novel: the public reading platform                                                                                                                           |
-| `packages/app`, `packages/auth`, `packages/class-schema`, `packages/common`, `packages/fastify`, `packages/modules`, `packages/ui`, `packages/web` | The shared ecosystem packages every app builds on                                                                                                                |
-| `e2e/`                                                                                                                                             | Whole-platform Playwright suite — cross-app flows against already-deployed service URLs supplied via `E2E_*` environment variables (no local compose deployment) |
-| `scripts/`                                                                                                                                         | Root tooling — directly-runnable Bun scripts (`bun scripts/verify.ts …`), not a workspace                                                                        |
+| Path                                                                                                                                               | Contents                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/identity-server`, `apps/identity-web`                                                                                                        | Identity: the platform's OIDC provider and its web app                                                                                                                |
+| `apps/novel-forge-server`, `apps/novel-forge-web`                                                                                                  | Novel Forge: AI-assisted novel authoring                                                                                                                              |
+| `apps/pulse-server`, `apps/pulse-web`                                                                                                              | Pulse: notifications and platform activity                                                                                                                            |
+| `apps/web-novel-server`, `apps/web-novel-web`                                                                                                      | Web Novel: the public reading platform                                                                                                                                |
+| `apps/shadow-memoir-server`, `apps/shadow-memoir-web`                                                                                              | Shadow Memoir: gamified life-tracking, offline-first                                                                                                                  |
+| `packages/app`, `packages/auth`, `packages/class-schema`, `packages/common`, `packages/fastify`, `packages/modules`, `packages/ui`, `packages/web` | The shared ecosystem packages every app builds on                                                                                                                     |
+| `packages/sdk`                                                                                                                                     | Shared novel vocabulary and the Novel Forge → Web Novel content-hash contract                                                                                         |
+| `e2e/`                                                                                                                                             | Whole-platform Playwright suite — cross-app flows against reachable service URLs (default: the local k3d ingress; override with `E2E_*`; no local compose deployment) |
+| `scripts/`                                                                                                                                         | Root tooling — directly-runnable Bun scripts (`bun scripts/verify.ts …`), not a workspace                                                                             |
 
-Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `modules` (+ `auth` for non-identity servers). Web apps build on `ui` and `web`.
+Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `modules` (+ `auth` for non-identity servers). Web apps build on `ui` and `web` (identity-web also on `common`).
 
 ## Hard rules
 
 - Internal dependencies are `workspace:*`. Nothing is published; there are no release workflows; `version` fields are frozen and carry no meaning.
-- A breaking change in `packages/*` must fix all its first-party consumers in the same change — affected-workspace CI and the e2e suite enforce this.
+- A breaking change in `packages/*` must fix all its first-party consumers in the same change — affected-workspace CI enforces this.
 - Per-workspace config files exist only where behavior genuinely differs from the defaults. A new workspace needs only `package.json`, a `tsconfig.json` extending its family file (`apps/tsconfig.server.json`, `apps/tsconfig.web.json`, or `packages/tsconfig.lib.json` — each in turn extending the root `tsconfig.base.json`), and source.
-- The server↔web API contract is **not** atomic: each web app's `api-types.gen.ts` is generated from a _running_ server (`generate:api-types` → `http://localhost:8080`). A server contract change requires regenerating consumer types and updating callers as coordinated work. Drift is CI-checked — `bun scripts/gen-api-types.ts <web-app>|--all --check` boots the paired server hermetically (no dev server needed) and fails if a fresh regeneration differs from the committed file.
+- The server↔web API contract is **not** atomic: each web app's `api-types.gen.ts` is generated from a _running_ server (`bun scripts/gen-api-types.ts <web-app>`, default `http://localhost:8080/dev/api-docs/openapi.json`). A server contract change requires regenerating consumer types and updating callers as coordinated work. Drift is CI-checked — `bun scripts/gen-api-types.ts <web-app>|--all --check` boots the paired server hermetically (no dev server needed) and fails if a fresh regeneration differs from the committed file.
 - Apps remain independently built, imaged, and deployed; the monorepo changes development, not runtime architecture.
 
 ## Working across workspaces
 
 - **A breaking change is one change.** If it originates in `packages/*`, fix every first-party `apps/*`
   consumer in the same change — never land the package change and leave callers to a follow-up.
-  Affected-workspace CI and the e2e suite both enforce this.
+  Affected-workspace CI enforces this; the e2e suite is run manually against a deployed environment.
 - **The server↔web contract is not atomic.** A server API change requires regenerating the consuming web
   app's `api-types.gen.ts` from a _running_ server and updating its callers as part of the same
   coordinated change (see Hard rules above).
@@ -55,13 +62,13 @@ Shell search remains the right tool where there are no symbols to resolve: the g
 
 ## Validation
 
-Every command runs **from the repo root** — workspaces carry no tooling scripts of their own.
+Every command runs **from the repo root** — workspaces carry no build/verify/generate scripts of their own (a `test` script, and `build:app` referenced from the `"shadow"` key, are the exceptions).
 
 - Single workspace: `bun scripts/verify.ts <workspace>` (format + lint + type-check, plus tests where the workspace opts in). Add `--fix` to apply fixes, `--fast` to stop after lint.
 - The root tooling itself: `bun scripts/verify.ts scripts` — covers `scripts/` and the root-level configs.
 - Everything: `bun scripts/verify.ts --all`, or `bun run verify`.
 - Building: `bun scripts/build.ts <workspace>`, `--deps` for its dependency closure, `--all` for the whole repo in dependency order.
-- Whole platform: the `e2e` workspace runs cross-app flows against already-deployed service URLs supplied via environment variables (see `e2e/.env.example`) — there is no local compose deployment in this plan.
+- Whole platform: the `e2e` workspace runs cross-app flows against reachable service URLs (default: the local k3d ingress, overridable via `E2E_*` variables, see `e2e/.env.example`); there is no local compose deployment.
 
 ## Tooling configuration
 
@@ -79,4 +86,4 @@ the component build's alias/CSS options — go in a `"shadow"` key in that works
 - TypeScript strict everywhere; workspace `tsconfig.json` extends its family file — backends `apps/tsconfig.server.json`, web apps `apps/tsconfig.web.json`, `@lib/*`-style packages `packages/tsconfig.lib.json` — which in turn extends the root `tsconfig.base.json`.
 - Kebab-case filenames with role suffixes (`*.service.ts`, `*.controller.ts`, `*.dto.ts`, `*.spec.ts`); named exports with barrel `index.ts` files. Implementation comments are rare and rationale-first: remove them whenever names, types, or control flow explain the behavior; keep only non-obvious constraints, deviations, failure ordering, or interoperability details. Never add restatements or organizational banners. Reusable type and option fields retain caller-facing JSDoc when their semantics or accepted values are not evident from the type alone; schema DTO guidance belongs in the field decorator's `description` so API consumers receive it. Preserve established import order and treat `@shadow-library/*` as external npm packages rather than internal aliases. Use 2-space indent, semicolons, and a 180-column width.
 - Conventional Commits (`<type>(<scope>): <subject>`, imperative, lowercase).
-- Backends compose `@shadow-library/{common,app,class-schema,fastify,modules,auth}`; web apps compose `@shadow-library/{ui,web}`. Reach for the ecosystem packages before hand-rolling DI, config, logging, validation, HTTP, DB access, caching, UI, or transport.
+- Backends compose `@shadow-library/{common,app,class-schema,fastify,modules,auth}` (identity-server has no `auth`); web apps compose `@shadow-library/{ui,web}`. Reach for the ecosystem packages before hand-rolling DI, config, logging, validation, HTTP, DB access, caching, UI, or transport.
