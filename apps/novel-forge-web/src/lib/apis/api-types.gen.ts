@@ -4457,6 +4457,11 @@ export interface components {
       options: string[];
       /** @description The commit-and-explain escape hatch: the answer the studio would pick, and why. */
       youDecide: string;
+      /**
+       * @description Whether the author can hold only one of the options at a time, or several at once. 'one' renders as radio buttons, 'many' as checkboxes; 'many' also makes "You decide" mutually exclusive with picking any option.
+       * @enum {string}
+       */
+      select: 'one' | 'many';
     };
     /** @description A decision inferred from material the author supplied, offered back for confirmation before anything is written to the sheet. */
     StudioLockResponse: {
