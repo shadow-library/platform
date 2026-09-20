@@ -315,23 +315,23 @@ function ReviewScreen(): React.JSX.Element {
       ) : queueQuery.error ? (
         <PaneError error={queueQuery.error} />
       ) : (
-        <ul className={styles.rows}>
+        <CollectionPage.Rows>
           {drafts.map(draft => (
-            <li key={draft.id} className={styles.row}>
-              <Link to="/novels/$novelId/review" params={{ novelId }} search={{ chapter: draft.chapter }} className={styles.rowLink}>
-                <span className={styles.rowChapter}>{chapterBadge(draft.chapter)}</span>
-                <span className={styles.rowMain}>
-                  <span className={styles.rowTitle}>{chapterTitle(draft)}</span>
-                  <span className={styles.rowReason}>{queueReason(draft)}</span>
-                </span>
+            <CollectionPage.Row
+              key={draft.id}
+              link={<Link to="/novels/$novelId/review" params={{ novelId }} search={{ chapter: draft.chapter }} />}
+              leading={<span className={styles.chapNum}>{chapterBadge(draft.chapter)}</span>}
+              title={chapterTitle(draft)}
+              caption={queueReason(draft)}
+              trailing={
                 <StatusChip intent={REVIEW_INTENT[draft.reviewStatus] ?? 'neutral'} dot>
                   {draft.reviewStatus}
                 </StatusChip>
-                <span className={styles.rowMeta}>{queueMeta(draft)}</span>
-              </Link>
-            </li>
+              }
+              meta={queueMeta(draft)}
+            />
           ))}
-        </ul>
+        </CollectionPage.Rows>
       )}
     </CollectionPage>
   );

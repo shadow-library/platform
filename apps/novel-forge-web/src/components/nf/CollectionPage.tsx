@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode, useId } from 'react';
+import { cloneElement, type ReactElement, type ReactNode, useId } from 'react';
 
 import { Input, SegmentedControl } from '@shadow-library/ui';
 
@@ -138,4 +138,66 @@ function CollectionSection({ label, total, shown, seeAll, children }: Collection
   );
 }
 
-export const CollectionPage = Object.assign(CollectionPageRoot, { Section: CollectionSection });
+export type RowActionReveal = 'hover' | 'always';
+
+export interface CollectionRowsProps {
+  /** Whether row actions wait for a pointer. `always` suits a list whose actions are the reason it exists. */
+  actionReveal?: RowActionReveal;
+  children: ReactNode;
+}
+
+function CollectionRows({ actionReveal = 'hover', children }: CollectionRowsProps): ReactElement {
+  return (
+    <ul className={styles.rows} data-reveal={actionReveal}>
+      {children}
+    </ul>
+  );
+}
+
+type RowLink = ReactElement<{ className?: string; children?: ReactNode }>;
+
+export interface CollectionRowProps {
+  /** The `Link` the row navigates by — cloned with the row's own class and content. Omit it and the row stops being a link, which is how an inline rename reaches its input. */
+  link?: RowLink;
+  /** Fixed-width lead-in: a chapter number, a status dot, an avatar. */
+  leading?: ReactNode;
+  /** Never clamped or ellipsised — a row's name may be an identifier whose every character is meaning. */
+  title: ReactNode;
+  /** The second line of the main stack — a queue reason, a summary. */
+  caption?: ReactNode;
+  /** Holds a long `caption` to two lines. */
+  clampCaption?: boolean;
+  /** Chips that sit after the main stack. */
+  trailing?: ReactNode;
+  /** Right-most tertiary text — a relative time, a word count. */
+  meta?: ReactNode;
+  /** `RowAction` buttons. They render beside the link, never inside it. */
+  actions?: ReactNode;
+}
+
+function CollectionRow({ link, leading, title, caption, clampCaption, trailing, meta, actions }: CollectionRowProps): ReactElement {
+  const content = (
+    <>
+      {leading && <span className={styles.rowLeading}>{leading}</span>}
+      <span className={styles.rowMain}>
+        <span className={styles.rowTitle}>{title}</span>
+        {caption && (
+          <span className={styles.rowCaption} data-clamp={clampCaption || undefined}>
+            {caption}
+          </span>
+        )}
+      </span>
+      {trailing}
+      {meta && <span className={styles.rowMeta}>{meta}</span>}
+    </>
+  );
+
+  return (
+    <li className={styles.row} data-actions={actions ? 'true' : undefined}>
+      {link ? cloneElement(link, { className: [link.props.className, styles.rowLink].filter(Boolean).join(' ') }, content) : <div className={styles.rowContent}>{content}</div>}
+      {actions && <div className={styles.rowActions}>{actions}</div>}
+    </li>
+  );
+}
+
+export const CollectionPage = Object.assign(CollectionPageRoot, { Section: CollectionSection, Rows: CollectionRows, Row: CollectionRow });

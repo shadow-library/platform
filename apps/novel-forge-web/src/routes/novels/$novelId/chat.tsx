@@ -925,43 +925,47 @@ function ChatDirectory({
       ) : error ? (
         <PaneError error={error} />
       ) : (
-        <ul className={styles.rows}>
-          {sessions.map(session => (
-            <li key={session.id} className={styles.row}>
-              {renamingSessionId === session.id ? (
-                <div className={styles.rowRename}>
-                  <RenameInput
-                    label={`Rename “${chatTitle(session)}”`}
-                    value={session.title ?? ''}
-                    loading={renaming}
-                    onCommit={title => onRename(session.id, title)}
-                    onCancel={onRenameCancel}
-                  />
-                </div>
-              ) : (
-                <Link to="/novels/$novelId/chat" params={{ novelId }} search={{ session: session.id }} className={styles.rowLink}>
-                  <span className={styles.rowMain}>
-                    <span className={styles.rowTitle}>{chatTitle(session)}</span>
-                    {session.summary && <span className={styles.rowSummary}>{session.summary}</span>}
-                  </span>
-                  {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
-                  <span className={styles.rowMeta}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
-                </Link>
-              )}
-              <div className={styles.rowActions}>
-                <RowAction label="Rename chat" onClick={() => onRenameStart(session.id)}>
-                  <EditIcon size={13} />
-                </RowAction>
-                <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => onArchive(session)}>
-                  <ArchiveIcon size={13} />
-                </RowAction>
-                <RowAction label="Delete chat & history" danger onClick={() => onDelete(session)}>
-                  <TrashIcon size={13} />
-                </RowAction>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <CollectionPage.Rows actionReveal="always">
+          {sessions.map(session => {
+            const isRenaming = renamingSessionId === session.id;
+            return (
+              <CollectionPage.Row
+                key={session.id}
+                link={isRenaming ? undefined : <Link to="/novels/$novelId/chat" params={{ novelId }} search={{ session: session.id }} />}
+                title={
+                  isRenaming ? (
+                    <RenameInput
+                      label={`Rename “${chatTitle(session)}”`}
+                      value={session.title ?? ''}
+                      loading={renaming}
+                      onCommit={title => onRename(session.id, title)}
+                      onCancel={onRenameCancel}
+                    />
+                  ) : (
+                    chatTitle(session)
+                  )
+                }
+                caption={!isRenaming && session.summary}
+                clampCaption
+                trailing={!isRenaming && session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
+                meta={!isRenaming && relativeTime(session.lastTurnAt ?? session.updatedAt)}
+                actions={
+                  <>
+                    <RowAction label="Rename chat" onClick={() => onRenameStart(session.id)}>
+                      <EditIcon size={13} />
+                    </RowAction>
+                    <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => onArchive(session)}>
+                      <ArchiveIcon size={13} />
+                    </RowAction>
+                    <RowAction label="Delete chat & history" danger onClick={() => onDelete(session)}>
+                      <TrashIcon size={13} />
+                    </RowAction>
+                  </>
+                }
+              />
+            );
+          })}
+        </CollectionPage.Rows>
       )}
     </CollectionPage>
   );

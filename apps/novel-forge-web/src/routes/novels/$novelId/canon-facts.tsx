@@ -590,21 +590,25 @@ function CanonFactsScreen(): React.JSX.Element {
             }
           />
         ) : (
-          <ul className={styles.rows}>
+          <CollectionPage.Rows>
             {visible.map(fact => (
-              <li key={fact.id} className={styles.row}>
-                <Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: stateParam, fact: fact.factKey }} className={styles.rowLink}>
-                  <span className={styles.rowKey}>{fact.factKey}</span>
+              <CollectionPage.Row
+                key={fact.id}
+                link={<Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: stateParam, fact: fact.factKey }} />}
+                title={<span className={styles.rowKey}>{fact.factKey}</span>}
+                trailing={
                   <StatusChip intent={factState(fact) === 'revealed' ? 'success' : 'warning'} dot>
                     {factCaption(fact)}
                   </StatusChip>
-                </Link>
-                <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
-                  <TrashIcon size={13} />
-                </RowAction>
-              </li>
+                }
+                actions={
+                  <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
+                    <TrashIcon size={13} />
+                  </RowAction>
+                }
+              />
             ))}
-          </ul>
+          </CollectionPage.Rows>
         )}
       </CollectionPage>
       {dialogs}

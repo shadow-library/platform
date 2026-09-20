@@ -146,3 +146,130 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.row:hover {
+  border-color: var(--sh-border-interactive);
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.row[data-actions] {
+  padding-right: 12px;
+}
+
+.rowLink,
+.rowContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-radius: var(--sh-radius-lg);
+  text-decoration: none;
+  color: inherit;
+}
+
+/* A form control brings its own vertical padding; matching the link's would make the row jump on rename. */
+.rowContent {
+  padding-block: 10px;
+}
+
+.row[data-actions] .rowLink,
+.row[data-actions] .rowContent {
+  padding-right: 4px;
+}
+
+.rowLink:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+
+.rowLeading {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A row's name may be an identifier, where the characters an ellipsis eats are the meaning. */
+.rowTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.rowCaption {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.rowCaption[data-clamp] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.rowMeta {
+  flex: none;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Opacity, never `visibility`: the buttons stay focusable, so tabbing off the link reveals them via
+   `:focus-within` before focus reaches one. */
+.rows[data-reveal='hover'] .rowActions {
+  opacity: 0;
+  transition: opacity var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.rows[data-reveal='hover'] .row:hover .rowActions,
+.rows[data-reveal='hover'] .row:focus-within .rowActions {
+  opacity: 1;
+}
+
+/* Hover-reveal on a touch screen is never-reveal. */
+@media (hover: none) {
+  .rows[data-reveal='hover'] .rowActions {
+    opacity: 1;
+  }
+}

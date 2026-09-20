@@ -1,71 +1,7 @@
-.rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-right: 8px;
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-lg);
-  background: var(--sh-surface-card);
-  transition:
-    border-color var(--sh-duration-fast) var(--sh-ease-standard),
-    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
-}
-
-.row:hover {
-  border-color: var(--sh-border-interactive);
-  box-shadow: var(--sh-shadow-e1);
-}
-
-.row :global(.nf-rowaction) {
-  opacity: 0;
-  transition: opacity var(--sh-duration-fast) var(--sh-ease-standard);
-}
-
-.row:hover :global(.nf-rowaction),
-.row:focus-within :global(.nf-rowaction) {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .row :global(.nf-rowaction) {
-    opacity: 1;
-  }
-}
-
-.rowLink {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 11px 4px 11px 14px;
-  border-radius: var(--sh-radius-lg);
-  text-decoration: none;
-}
-
-.rowLink:focus-visible {
-  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
-  outline-offset: 2px;
-}
-
-/* A fact key is an identifier: the characters an ellipsis would eat are the meaning, so it wraps instead. */
+/* A fact key is an identifier: the characters an ellipsis would eat are the meaning, and the row's own
+   title rule already declines to cut them — this only makes it mono. */
 .rowKey {
   font-family: var(--sh-font-mono);
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-  color: var(--sh-text-primary);
-  overflow-wrap: anywhere;
 }
 
 .identityKey {

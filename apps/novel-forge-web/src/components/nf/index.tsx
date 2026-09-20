@@ -6,7 +6,17 @@ import { SparkIcon, StopIcon } from '../icons';
 import { StatusChip } from './StatusChip';
 import styles from './nf.module.css';
 
-export { CollectionPage, type CollectionFilter, type CollectionPageProps, type CollectionSectionProps, type CollectionSegment, type CollectionSegments } from './CollectionPage';
+export {
+  CollectionPage,
+  type CollectionFilter,
+  type CollectionPageProps,
+  type CollectionRowProps,
+  type CollectionRowsProps,
+  type CollectionSectionProps,
+  type CollectionSegment,
+  type CollectionSegments,
+  type RowActionReveal,
+} from './CollectionPage';
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
 export { type DetailAsideWidth, type DetailIdentityProps, DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
