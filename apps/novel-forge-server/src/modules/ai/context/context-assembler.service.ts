@@ -201,6 +201,7 @@ function renderRoundQuestions(router: RouterResult, commitIds: string[]): string
   const blocks = router.questions.map(question => {
     const lines = [
       `[${question.id}] fills: ${question.fills.length > 0 ? question.fills.join(', ') : 'nothing — this answer is a locked constraint'}`,
+      `Select: ${question.select} — ${question.select === 'many' ? 'options must be independently selectable, never mutually exclusive' : 'options are mutually exclusive alternatives'}`,
       `Intent: ${question.intent}`,
       `Coaching (reproduce verbatim): ${question.coaching}`,
     ];

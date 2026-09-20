@@ -1529,6 +1529,9 @@ describe('ContextAssembler.forIdeationTurn', () => {
       expect(pack.renderedVolatile).toContain(`[${question.id}]`);
       expect(pack.renderedVolatile).toContain(question.coaching);
       expect(pack.renderedVolatile).toContain(question.intent);
+      expect(pack.renderedVolatile).toContain(
+        `Select: ${question.select} — ${question.select === 'many' ? 'options must be independently selectable, never mutually exclusive' : 'options are mutually exclusive alternatives'}`,
+      );
     }
   });
 

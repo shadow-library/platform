@@ -145,8 +145,8 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
   /** The round the turn about to run will be handed — the only questions its answer may carry. */
   const roundOf = async (projectId: bigint) => nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
 
-  const asked = (round: { questions: { id: string; coaching: string }[] }) =>
-    round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+  const asked = (round: { questions: { id: string; coaching: string; select: 'one' | 'many' }[] }) =>
+    round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, select: question.select, options: ['a', 'b'], youDecide: 'a' }));
 
   /** A contract-satisfying interview answer for whatever the router is about to ask. */
   const answersRound = async (projectId: bigint, output: { reply: string; changeSet?: unknown[] }) => {
@@ -278,7 +278,14 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const offered = offeredCards('Wreck');
       const { projectId, sessionId } = await makeSeed({ askedQuestions: [...ORIENTED, 'diverge.cards'], concepts: offered });
       const round = nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
-      const questions = round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+      const questions = round.questions.map(question => ({
+        id: question.id,
+        wording: 'w',
+        coaching: question.coaching,
+        select: question.select,
+        options: ['a', 'b'],
+        youDecide: 'a',
+      }));
       const verdicts = offered.map((card, index) => (index === 0 ? { ...card, fate: 'kept' as const } : card));
 
       structuredMock.mockImplementationOnce(
@@ -295,7 +302,14 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       const offered = offeredCards('Wreck');
       const { projectId, sessionId } = await makeSeed({ askedQuestions: [...ORIENTED, 'diverge.cards'], concepts: offered });
       const round = nextQuestions(toRouterSeedState((await sheet(projectId)) as Ideation.StorySeed));
-      const questions = round.questions.map(question => ({ id: question.id, wording: 'w', coaching: question.coaching, options: ['a', 'b'], youDecide: 'a' }));
+      const questions = round.questions.map(question => ({
+        id: question.id,
+        wording: 'w',
+        coaching: question.coaching,
+        select: question.select,
+        options: ['a', 'b'],
+        youDecide: 'a',
+      }));
       const judged = offered[2] as Ideation.ConceptCard;
       const reordered = [...offered].reverse().map(card => (card.id === judged.id ? { ...card, fate: 'kept' as const, reason: 'the tide one' } : card));
 

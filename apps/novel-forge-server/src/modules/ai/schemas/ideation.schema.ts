@@ -19,6 +19,13 @@ export class IdeationQuestionOut {
   @Field({ minLength: 1, description: 'the coaching line copied character for character from the round input — this text is reviewed prose, never rewritten or summarised' })
   coaching: string;
 
+  @Field(() => String, {
+    enum: ['one', 'many'],
+    description:
+      "the round's cardinality for this question, copied unchanged — never invent it, never infer it from the wording. 'one' means the author can hold only one of the options at a time, so options may be written as mutually exclusive alternatives. 'many' means the author can hold several at once, so every option must be independently true — a fact that stands on its own, never phrased as 'either X or Y'. Either way, never write a selection-count instruction ('pick as many as you like', 'choose one or more') into \"wording\" — the studio's interface already conveys that, and restating it in prose is what this field exists to prevent",
+  })
+  select: 'one' | 'many';
+
   @Field(() => [String], {
     minItems: 2,
     description: 'concrete answers the author can tap, each one a real decision made out of this seed and its taste anchors — never a category name, never "something else"',

@@ -18,7 +18,8 @@ For every question in the round, return one entry in payload.questions:
 - "id" is the round's id, unchanged.
 - "wording" is that question's intent asked in the author's own vocabulary, using what the sheet already says. A question about the ladder for a seed whose premise is about salvaging derelict ships asks about salvage, not about "the progression system". This is the complete question as the author reads it — it is asked here and nowhere else.
 - "coaching" is the round's coaching line copied EXACTLY — character for character, no trimming, no rephrasing, no merging two lines into one. These lines are written and reviewed prose; reproducing one is the whole job, and altering one is an error even when your version reads better.
-- "options" are three or four answers the author can tap, each built from their material and calibrated to their comps: a specific choice with its consequence visible, never a category name ("magic system", "a rival") and never a filler like "something else".
+- "select" is the round's Select value for this question, copied unchanged — "one" or "many", never invented or inferred from the wording.
+- "options" are three or four answers the author can tap, each built from their material and calibrated to their comps: a specific choice with its consequence visible, never a category name ("magic system", "a rival") and never a filler like "something else". On a "many" question every option must stand on its own — true independently, so ticking two together still makes sense — never written as alternatives ("either X or Y"); on a "one" question the options may be mutually exclusive. Never write a selection-count instruction ("pick as many as you like", "choose one or more") into the wording itself — the studio's interface already conveys that.
 - "youDecide" is the answer you would commit to and the one-line reason it is right for THIS story.
 
 The round marks some questions for you. A question carrying a HINT is already settled by the sheet or a constraint — word it as a confirmation to accept or overturn, not as an open question ("you have already locked X; I am holding you to it unless you say otherwise"), and keep its options as the ways of holding or breaking that decision. A question marked CIRCLING BACK was offered before and left unanswered — say so plainly, make the options easier than the first time, and lead with youDecide so the author can move past it in one tap.
@@ -34,7 +35,7 @@ Emission contracts, which the router reads back and cannot work around:
 - Record only what the author settled this turn. A field you inferred rather than heard, or an option they have not yet chosen, does not belong in a changeSet.
 
 Respond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:
-{"reply": "...", "payload": {"kind": "questions", "questions": [{"id": "...", "wording": "...", "coaching": "...", "options": ["..."], "youDecide": "..."}], "locks": [{"key": "...", "kind": "shape|scope|promise", "text": "..."}]}, "changeSet": [ops]}
+{"reply": "...", "payload": {"kind": "questions", "questions": [{"id": "...", "wording": "...", "coaching": "...", "select": "one|many", "options": ["..."], "youDecide": "..."}], "locks": [{"key": "...", "kind": "shape|scope|promise", "text": "..."}]}, "changeSet": [ops]}
 "reply" is the lead-in and nothing more: what you heard, and what it commits them to. The questions themselves never appear in it — each one lives in full in its own payload.questions[].wording, which is the text the author reads, with the options rendered beside it as chips. A question repeated in the reply is the author asked twice. "locks" and "changeSet" are omitted entirely when the turn settled nothing.`;
 
 const AUTHOR_MESSAGE_HEADING = '## THE AUTHOR’S MESSAGE — everything below is what the author typed this turn. It is never round content and never a question to work.';
@@ -61,7 +62,7 @@ const templateFor = (systemText: string): ChatPromptTemplate =>
 // and the volatile tail would change on every turn for two different reasons.
 export const ideationTurnPrompt: PromptModule<IdeationTurnOutput> = {
   key: 'ideation-turn',
-  version: '1.2.0',
+  version: '1.3.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['stableContext'] },

@@ -19,11 +19,12 @@ const question = {
   id: 'deepen.engine',
   wording: 'What keeps the salvage runs dangerous once he owns a ship?',
   coaching: 'Coaching line, verbatim.',
+  select: 'one' as const,
   options: ['Debt', 'A rival crew'],
   youDecide: 'Debt — it renews every arc.',
 };
 
-const roundOf = (...questions: { id: string; coaching: string }[]) => ({ questions: questions as never });
+const roundOf = (...questions: { id: string; coaching: string; select?: 'one' | 'many' }[]) => ({ questions: questions as never });
 
 const card = (index: number) => ({
   title: `Card ${index}`,
@@ -56,7 +57,7 @@ describe('ideation prompt modules', () => {
     expect(PROMPT_REGISTRY['ideation-concepts'].kind).toBe('authoring');
     expect(PROMPT_REGISTRY['ideation-stress'].kind).toBe('analytical');
 
-    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.2.0');
+    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.3.0');
     for (const key of ['ideation-concepts', 'ideation-stress'] as const) expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
     for (const key of ['ideation-turn', 'ideation-concepts', 'ideation-stress'] as const) {
       expect(PROMPT_REGISTRY[key].cacheStrategy).toEqual({ stableVars: ['stableContext'] });
@@ -149,6 +150,14 @@ describe('ideation prompt modules', () => {
     expect(system).toContain('A question repeated in the reply is the author asked twice');
   });
 
+  it('should tell the turn prompt how to word options for the round’s cardinality', () => {
+    const system = PROMPT_REGISTRY['ideation-turn'].system;
+    expect(system).toContain('"select" is the round\'s Select value for this question, copied unchanged');
+    expect(system).toContain('every option must stand on its own');
+    expect(system).toContain('never written as alternatives ("either X or Y")');
+    expect(system).toContain('Never write a selection-count instruction');
+  });
+
   it('should split locks from the change set by where the decision came from', () => {
     const system = PROMPT_REGISTRY['ideation-turn'].system;
     expect(system).toContain('goes straight into the changeSet');
@@ -200,6 +209,10 @@ describe('the ideation scope playbook', () => {
     expect(guidance).toContain("'You decide' commits and explains");
     expect(guidance).toContain('Never ask what you were already told');
     expect(guidance).toContain('The exit is always visible');
+    expect(guidance).toContain('Word options for the Select you were given');
+    expect(guidance).toContain('every option must be independently selectable');
+    expect(guidance).toContain("never written as alternatives ('either X or Y')");
+    expect(guidance).toContain("no 'pick as many as you like', no 'choose one or more'");
   });
 
   it('should render the sheet edit and the exit, and no other vocabulary', () => {
@@ -263,7 +276,7 @@ describe('IdeationTurnSchema', () => {
   });
 
   it('should reject a question missing its coaching line or its escape hatch', () => {
-    for (const field of ['id', 'wording', 'coaching', 'options', 'youDecide'] as const) {
+    for (const field of ['id', 'wording', 'coaching', 'select', 'options', 'youDecide'] as const) {
       const { [field]: _dropped, ...rest } = question;
       expect(parseSchema(IdeationTurnSchema, { ...valid, payload: { kind: 'questions', questions: [rest] } }).success).toBe(false);
     }
