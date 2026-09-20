@@ -1,22 +1,44 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
-import { Button, Dialog, FormField, IconButton, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Dialog, FormField, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { WarningIcon } from '@/components/icons';
-import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { CheckIcon, WarningIcon } from '@/components/icons';
+import { useCollectionJump } from '@/components/Layout';
+import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   type DraftResponse,
   type FeedbackBody,
   reviewQueueQueryOptions,
   useApproveDraftMutation,
   useDraftFeedbackMutation,
+  useListDraftsQuery,
   useReviewQueueQuery,
   useReviseDraftMutation,
 } from '@/lib/apis';
+import {
+  backLabel,
+  chapterBadge,
+  chapterKey,
+  chapterTitle,
+  isEditableElement,
+  nextAfterApproval,
+  parseChapterParam,
+  queueIds,
+  queueMeta,
+  queueReason,
+  reviewCounts,
+  reviewHotkey,
+  wordCount,
+} from '@/lib/review-queue';
 
 import styles from './review.module.css';
 
+interface ReviewSearch {
+  chapter?: number;
+}
+
 export const Route = createFileRoute('/novels/$novelId/review')({
+  validateSearch: (search: Record<string, unknown>): ReviewSearch => ({ chapter: parseChapterParam(search.chapter) }),
   loader: ({ context, params }) => context.queryClient.prefetchQuery(reviewQueueQueryOptions(params.novelId)),
   component: ReviewScreen,
 });
@@ -28,10 +50,6 @@ const REVIEW_INTENT: Record<string, ChipIntent> = {
   approved: 'success',
   final: 'success',
 };
-
-function wordCount(body?: string | null): number {
-  return body ? body.trim().split(/\s+/).filter(Boolean).length : 0;
-}
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -74,10 +92,13 @@ function FeedbackDialog({ open, onOpenChange, disposition, pending, onSubmit }: 
 interface ReviewDetailProps {
   novelId: string;
   draft: DraftResponse;
+  total: number | undefined;
+  ids: readonly string[] | undefined;
+  jump?: ItemPagerJump;
+  onSelect: (chapter: number | undefined) => void;
 }
 
-function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element {
-  const navigate = useNavigate();
+function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDetailProps): React.JSX.Element {
   const approveDraft = useApproveDraftMutation(novelId);
   const feedback = useDraftFeedbackMutation(novelId, draft.chapter);
   const revise = useReviseDraftMutation(novelId, draft.chapter);
@@ -85,6 +106,7 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
 
   const intent = REVIEW_INTENT[draft.reviewStatus] ?? 'neutral';
   const isContradiction = draft.reviewStatus === 'contradiction';
+  const nextId = nextAfterApproval(ids, chapterKey(draft.chapter));
 
   // A revision request actually runs the AI revision pass against the note; a rejection only records
   // the disposition. Both leave an audit row on the draft.
@@ -115,61 +137,92 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
   };
 
   const approve = (): void => {
-    approveDraft.mutate(draft.chapter, { onSuccess: () => toast.success(`Chapter ${draft.chapter} approved`), onError: err => toast.danger(err.message) });
+    if (isContradiction || approveDraft.isPending) return;
+    approveDraft.mutate(draft.chapter, {
+      onSuccess: () => {
+        toast.success(`Chapter ${draft.chapter} approved`);
+        onSelect(nextId === undefined ? undefined : Number(nextId));
+      },
+      onError: err => toast.danger(err.message),
+    });
   };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (dialog !== null) return;
+      const target = event.target as HTMLElement | null;
+      const editableTarget = target != null && isEditableElement(target.tagName, target.isContentEditable);
+      const hotkey = reviewHotkey({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editableTarget });
+      if (!hotkey) return;
+      event.preventDefault();
+      if (hotkey === 'approve') approve();
+      else setDialog(hotkey === 'revise' ? 'revision_requested' : 'rejected');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const excerpt = draft.body ?? draft.summary ?? 'No prose available for this draft yet.';
 
   return (
     <>
-      <div className={styles.head}>
-        <span className={styles.chapNum}>CH.{String(draft.chapter).padStart(2, '0')}</span>
-        <span className={styles.chapTitle}>{draft.title ?? 'Untitled chapter'}</span>
-        <StatusChip intent={intent}>{draft.reviewStatus}</StatusChip>
-        <div className={styles.spacer} />
-        <Tooltip content="Open in chapters">
-          <IconButton
-            variant="secondary"
-            size="sm"
-            aria-label="Open in chapters"
-            icon={<span className={styles.glyph}>↗</span>}
-            onClick={() => navigate({ to: '/novels/$novelId/chapters', params: { novelId } })}
-          />
-        </Tooltip>
-      </div>
-
-      <div className={`nf-scroll ${styles.detailScroll}`}>
-        <div className={styles.detailInner}>
-          <div className={styles.verdict} data-contradiction={isContradiction}>
-            <div className={styles.verdictHead}>
-              <WarningIcon size={16} className={styles.verdictIcon} />
-              <span className={styles.verdictTitle}>Judge verdict: {draft.judge ?? draft.reviewStatus}</span>
-            </div>
-            <p className={styles.verdictNote}>{draft.judgeNote ?? 'Awaiting reviewer sign-off. Read the draft and approve, request a revision, or reject.'}</p>
-          </div>
-
-          <div className={`nf-eyebrow ${styles.excerptLabel}`}>Draft excerpt</div>
-          <div className={styles.excerpt}>
-            {(draft.body ?? draft.summary ?? 'No prose available for this draft yet.').slice(0, 900)}
-            {(draft.body?.length ?? 0) > 900 ? '…' : ''}
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.footer}>
-        <div className={styles.hotkeys}>
-          <Kbd keys="A" /> approve <Kbd keys="R" /> revise <Kbd keys="X" /> reject
-        </div>
-        <Button variant="danger" onClick={() => setDialog('rejected')}>
-          Reject
-        </Button>
-        <Button variant="secondary" onClick={() => setDialog('revision_requested')}>
-          Request revision
-        </Button>
-        <Tooltip content={isContradiction ? 'Resolve the contradiction before approving' : 'Approve this draft'}>
-          <Button variant="primary" disabled={isContradiction} loading={approveDraft.isPending} onClick={approve}>
-            Approve draft
+      <DetailPage
+        back={
+          <Link to="/novels/$novelId/review" params={{ novelId }}>
+            {backLabel(total)}
+          </Link>
+        }
+        identity={
+          <DetailPage.Identity avatar={<span className={styles.chapNum}>{chapterBadge(draft.chapter)}</span>} title={chapterTitle(draft)}>
+            <StatusChip intent={intent} dot>
+              {draft.reviewStatus}
+            </StatusChip>
+          </DetailPage.Identity>
+        }
+        pager={<ItemPager ids={ids} currentId={chapterKey(draft.chapter)} onSelect={id => onSelect(Number(id))} itemNoun="chapter" jump={jump} />}
+        actions={
+          <Button variant="secondary" size="sm" asChild>
+            <Link to="/novels/$novelId/chapters" params={{ novelId }}>
+              Open in chapters
+            </Link>
           </Button>
-        </Tooltip>
-      </div>
+        }
+        asideLabel={`Chapter ${draft.chapter} review decision`}
+        aside={
+          <>
+            <section className={styles.verdict} data-contradiction={isContradiction}>
+              <div className={styles.verdictHead}>
+                <WarningIcon size={16} className={styles.verdictIcon} />
+                <h2 className={styles.verdictTitle}>Judge verdict: {draft.judge ?? draft.reviewStatus}</h2>
+              </div>
+              <p className={styles.verdictNote}>{draft.judgeNote ?? 'Awaiting reviewer sign-off. Read the draft and approve, request a revision, or reject.'}</p>
+            </section>
+
+            <div className={styles.decision}>
+              <Tooltip content={isContradiction ? 'Resolve the contradiction before approving' : 'Approve this draft'}>
+                <Button variant="primary" fullWidth disabled={isContradiction} loading={approveDraft.isPending} onClick={approve}>
+                  Approve draft
+                </Button>
+              </Tooltip>
+              <Button variant="secondary" fullWidth onClick={() => setDialog('revision_requested')}>
+                Request revision
+              </Button>
+              <Button variant="danger" fullWidth onClick={() => setDialog('rejected')}>
+                Reject
+              </Button>
+              <p className={styles.hotkeys}>
+                <Kbd keys="A" /> approve <Kbd keys="R" /> revise <Kbd keys="X" /> reject
+              </p>
+            </div>
+          </>
+        }
+      >
+        <div className={`nf-eyebrow ${styles.excerptLabel}`}>Draft excerpt · {wordCount(draft.body).toLocaleString()} words</div>
+        <DetailPage.Prose className={styles.excerpt}>
+          {excerpt.slice(0, 900)}
+          {excerpt.length > 900 ? '…' : ''}
+        </DetailPage.Prose>
+      </DetailPage>
 
       <FeedbackDialog
         open={dialog !== null}
@@ -184,41 +237,102 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
 
 function ReviewScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
+  const { chapter: chapterParam } = Route.useSearch();
+  const goSearch = Route.useNavigate();
   const queueQuery = useReviewQueueQuery(novelId);
-  const drafts = queueQuery.data?.drafts ?? [];
-  const [selectedChapter, setSelectedChapter] = useState<number | undefined>();
+  const drafts = useMemo(() => queueQuery.data?.drafts ?? [], [queueQuery.data]);
+  const proposals = queueQuery.data?.proposals ?? [];
 
-  const selected = selectedChapter == null ? drafts[0] : drafts.find(d => d.chapter === selectedChapter);
+  const resolved = !queueQuery.isLoading && !queueQuery.error;
+  const total = resolved ? drafts.length : undefined;
+  const ids = useMemo(() => (resolved ? queueIds(drafts) : undefined), [resolved, drafts]);
+
+  // The counts strip has no endpoint of its own; it reads the drafts list the chapters screen already
+  // caches, and only once the queue is known to be empty — the one state that renders it.
+  const draftsQuery = useListDraftsQuery(novelId, resolved && drafts.length === 0);
+  const counts = draftsQuery.data ? reviewCounts(draftsQuery.data.items) : undefined;
+
+  const selected = chapterParam === undefined ? undefined : drafts.find(draft => draft.chapter === chapterParam);
+  const selectChapter = (chapter: number | undefined): void => void goSearch({ search: { chapter } });
+
+  const jumpItems = useMemo(
+    () => drafts.map(draft => ({ id: chapterKey(draft.chapter), label: `${chapterBadge(draft.chapter)} · ${chapterTitle(draft)}`, caption: queueReason(draft) })),
+    [drafts],
+  );
+  const jump = useCollectionJump(
+    resolved
+      ? {
+          collection: 'queued chapters',
+          items: jumpItems,
+          currentId: chapterParam === undefined ? undefined : chapterKey(chapterParam),
+          onSelect: id => selectChapter(Number(id)),
+        }
+      : null,
+  );
+
+  if (selected) return <ReviewDetail novelId={novelId} draft={selected} total={total} ids={ids} jump={jump} onSelect={selectChapter} />;
 
   return (
-    <div className="nf-splitpane">
-      <div className="nf-rail">
-        <div className={`nf-railhead ${styles.railHeadFlex}`}>
-          <span className={styles.railTitle}>Review Queue</span>
-          {drafts.length > 0 && <StatusChip intent="warning">{drafts.length} open</StatusChip>}
-        </div>
-        <div className="nf-scroll nf-raillist">
-          {queueQuery.isLoading && <PaneLoader />}
-          {queueQuery.error && <PaneError error={queueQuery.error} />}
-          {!queueQuery.isLoading && drafts.length === 0 && <div className="nf-emptynote">Nothing awaiting review. 🎉</div>}
-          {drafts.map(draft => {
-            const intent = REVIEW_INTENT[draft.reviewStatus] ?? 'neutral';
-            return (
-              <button key={draft.id} className="nf-selrow nf-selrow-stack" data-active={draft.chapter === selected?.chapter} onClick={() => setSelectedChapter(draft.chapter)}>
-                <div className={styles.rowTopRow}>
-                  <div className={styles.spacer} />
-                  <StatusChip intent={intent}>{draft.reviewStatus}</StatusChip>
-                </div>
-                <div className={styles.rowTitle}>
-                  Ch. {draft.chapter} · {draft.title ?? 'Untitled'}
-                </div>
-                <div className={styles.rowWords}>{wordCount(draft.body).toLocaleString()} words</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="nf-detail">{selected ? <ReviewDetail novelId={novelId} draft={selected} /> : <div className="nf-pane-empty">Select a chapter to review.</div>}</div>
-    </div>
+    <CollectionPage
+      title="Review Queue"
+      subtitle="Chapters the judge flagged, and finished drafts waiting on a human read."
+      total={total}
+      notice={
+        resolved &&
+        chapterParam !== undefined && (
+          <Alert intent="warning" title={`Chapter ${chapterParam} is no longer in the queue.`} action={{ label: 'Back to the queue', onClick: () => selectChapter(undefined) }}>
+            It was approved, its draft was replaced, or the link was typed by hand.
+          </Alert>
+        )
+      }
+      empty={
+        <EmptyState
+          icon={<CheckIcon size={24} />}
+          title="Nothing is waiting on you"
+          description="A chapter lands here when the judge flags a contradiction in it, or when a draft finishes generating and asks for a human read."
+          actions={
+            <>
+              <Button variant="primary" asChild>
+                <Link to="/novels/$novelId/chapters" params={{ novelId }}>
+                  Go to chapters
+                </Link>
+              </Button>
+              {proposals.length > 0 && (
+                <Button variant="secondary" asChild>
+                  <Link to="/novels/$novelId/proposals" params={{ novelId }}>
+                    {proposals.length === 1 ? 'Review 1 continuity proposal' : `Review ${proposals.length} continuity proposals`}
+                  </Link>
+                </Button>
+              )}
+            </>
+          }
+          counts={counts}
+        />
+      }
+    >
+      {queueQuery.isLoading ? (
+        <PaneLoader />
+      ) : queueQuery.error ? (
+        <PaneError error={queueQuery.error} />
+      ) : (
+        <ul className={styles.rows}>
+          {drafts.map(draft => (
+            <li key={draft.id} className={styles.row}>
+              <Link to="/novels/$novelId/review" params={{ novelId }} search={{ chapter: draft.chapter }} className={styles.rowLink}>
+                <span className={styles.rowChapter}>{chapterBadge(draft.chapter)}</span>
+                <span className={styles.rowMain}>
+                  <span className={styles.rowTitle}>{chapterTitle(draft)}</span>
+                  <span className={styles.rowReason}>{queueReason(draft)}</span>
+                </span>
+                <StatusChip intent={REVIEW_INTENT[draft.reviewStatus] ?? 'neutral'} dot>
+                  {draft.reviewStatus}
+                </StatusChip>
+                <span className={styles.rowMeta}>{queueMeta(draft)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </CollectionPage>
   );
 }
