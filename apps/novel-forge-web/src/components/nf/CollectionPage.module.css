@@ -94,6 +94,11 @@
   background: var(--sh-surface-app);
 }
 
+/* A fragment of conditional banners is truthy even when every one of them renders nothing. */
+.notice:empty {
+  display: none;
+}
+
 .body {
   margin-top: 24px;
 }
