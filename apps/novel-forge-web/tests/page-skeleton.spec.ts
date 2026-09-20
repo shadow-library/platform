@@ -22,12 +22,16 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/story-bible')).toBe('list');
   });
 
+  it('should resolve the migrated illustrations gallery to the card-grid variant rather than a rail it no longer renders', () => {
+    expect(resolveSkeletonVariant('/novels/abc123/illustrations')).toBe('list');
+  });
+
   it('should resolve the migrated canon facts directory to the rows variant rather than a rail it no longer renders', () => {
     expect(resolveSkeletonVariant('/novels/abc123/canon-facts')).toBe('rows');
   });
 
   it('should resolve rail-and-detail workspace routes to the split variant', () => {
-    for (const segment of ['review', 'proposals', 'runs', 'illustrations']) {
+    for (const segment of ['review', 'proposals', 'runs']) {
       expect(resolveSkeletonVariant(`/novels/abc123/${segment}`)).toBe('split');
     }
   });
