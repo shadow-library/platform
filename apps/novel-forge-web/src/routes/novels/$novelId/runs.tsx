@@ -1,7 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, Dialog, Spinner } from '@shadow-library/ui';
+import { Button, Dialog, EmptyState, Spinner } from '@shadow-library/ui';
 
+import { LockIcon } from '@/components/icons';
 import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   hasRunningRun,
@@ -9,6 +10,7 @@ import {
   type RunContextPackResponse,
   type RunModelCallResponse,
   type RunToolCallResponse,
+  sessionQuery,
   useListRunsQuery,
   useRunCallQuery,
   useRunContextQuery,
@@ -16,13 +18,42 @@ import {
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { isAdminSession } from '@/lib/session';
 
 import styles from './runs.module.css';
 
+/**
+ * `/novels/$novelId` already ensured the session in its own `beforeLoad`, so this reads the warm cache —
+ * no extra round trip, and no flash of the admin-only screen before the check resolves, on the server or
+ * the client. The detail endpoints (`getRun`, `getRunContext`, `getRunCall`) 403 for a non-admin, so the
+ * loader skips prefetching the list too: a non-admin never issues a request this route can't show.
+ */
 export const Route = createFileRoute('/novels/$novelId/runs')({
-  loader: ({ context, params }) => context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)),
+  beforeLoad: async ({ context }) => ({ isAdmin: isAdminSession(await context.queryClient.ensureQueryData(sessionQuery)) }),
+  loader: ({ context, params }) => (context.isAdmin ? context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)) : undefined),
   component: RunsScreen,
 });
+
+/**
+ * The person most likely to hit this is the product owner before granting themselves the scope — a silent
+ * bounce to Overview would just look like the nav entry doesn't exist. This names the scope and stays on
+ * the URL they asked for, rather than redirecting or rendering a generic 404.
+ */
+function AdminRequired(): React.JSX.Element {
+  const navigate = useNavigate();
+  const { novelId } = Route.useParams();
+  return (
+    <div className={styles.adminGate}>
+      <EmptyState
+        size="page"
+        illustration={<LockIcon size={28} />}
+        title="Workflow Runs needs the admin scope"
+        description="This screen exposes run internals — prompts, raw model output, cost. Grant yourself novel-forge:admin in the identity provider to see it."
+        action={{ label: 'Back to Overview', onClick: () => navigate({ to: '/novels/$novelId/overview', params: { novelId } }) }}
+      />
+    </div>
+  );
+}
 
 const RUN_INTENT: Record<string, ChipIntent> = {
   running: 'info',
@@ -387,10 +418,13 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
 }
 
 function RunsScreen(): React.JSX.Element {
+  const { isAdmin } = Route.useRouteContext();
   const { novelId } = Route.useParams();
-  const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: query => (hasRunningRun(query.state.data) ? 4000 : false) });
-  const runs = runsQuery.data?.items ?? [];
+  const runsQuery = useListRunsQuery(novelId, isAdmin, { refetchInterval: query => (hasRunningRun(query.state.data) ? 4000 : false) });
   const [selectedId, setSelectedId] = useState<string | undefined>();
+
+  if (!isAdmin) return <AdminRequired />;
+  const runs = runsQuery.data?.items ?? [];
   const activeId = selectedId ?? runs[0]?.id;
 
   return (

@@ -23,6 +23,7 @@ import {
 } from '@/lib/apis';
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
+import { useIsAdmin } from '@/lib/session';
 
 import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
@@ -103,7 +104,8 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     badge: badges[screen.segment],
   });
 
-  const screens = useMemo(() => screensForWorkflow(project?.kind), [project?.kind]);
+  const isAdmin = useIsAdmin();
+  const screens = useMemo(() => screensForWorkflow(project?.kind).filter(screen => !screen.adminOnly || isAdmin), [project?.kind, isAdmin]);
   const nav: NavConfig = inProject
     ? {
         variant: 'project',

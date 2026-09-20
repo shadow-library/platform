@@ -37,6 +37,13 @@ export interface ProjectScreen {
   workflows: ProjectKind[];
   /** Sits below the nav divider rather than in the main run. */
   trailing?: boolean;
+  /**
+   * Requires the `novel-forge:admin` scope regardless of workflow — a session concern, not a project-kind
+   * one, so it is a field callers compose with `workflows` rather than a case folded into it (see D7 in
+   * rail-stop-admin-design.md). `screensForWorkflow` stays workflow-only; a caller that also cares about
+   * admin-gating filters this field itself, the way `AppShell` does.
+   */
+  adminOnly?: boolean;
 }
 
 /**
@@ -60,7 +67,7 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon />, workflows: AUTHORING },
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon />, workflows: AUTHORING },
   { segment: 'proposals', to: '/novels/$novelId/proposals', label: 'Proposals', icon: <ProposalsIcon />, workflows: AUTHORING },
-  { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, workflows: ALL_WORKFLOWS },
+  { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, workflows: ALL_WORKFLOWS, adminOnly: true },
   { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon />, workflows: ALL_WORKFLOWS },
   { segment: 'settings', to: '/novels/$novelId/settings', label: 'Project Settings', icon: <SettingsIcon />, workflows: ALL_WORKFLOWS, trailing: true },
 ];
