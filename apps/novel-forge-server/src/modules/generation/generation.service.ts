@@ -1412,10 +1412,9 @@ export class GenerationService {
     return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
   }
 
-  // Never writes 'not_delivered' as a status: cancellation is process-local (design §2.1), so a
-  // running row not live here may still be owned by another replica. Flipping it to 'cancelled'
-  // unconditionally would race completeRun/failRun's unguarded write and could silently clobber a
-  // run that finishes normally moments later. Reporting the delivery failure honestly instead.
+  // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local (design §2.1),
+  // so a running row with no controller here is owned by another replica that never saw the request and is
+  // still working. The abort is what was undeliverable, not the status.
   async cancelRun(projectId: bigint, runId: string): Promise<CancelRunResponse> {
     const run = await this.db.query.workflowRuns.findFirst({
       where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)),

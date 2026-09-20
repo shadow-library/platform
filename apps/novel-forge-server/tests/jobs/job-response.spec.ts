@@ -15,6 +15,7 @@ function baseJob(overrides: Partial<Job.Row> = {}): Job.Row {
     payload: null,
     progress: null,
     nextAttemptAt: null,
+    cancelRequestedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

@@ -14,7 +14,7 @@ export namespace Job {
 }
 
 export const jobKind = pgEnum('job_kind', ['extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish', 'import', 'translate']);
-export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed']);
+export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter']);
 
 export const jobs = pgTable(
@@ -32,6 +32,7 @@ export const jobs = pgTable(
     payload: jsonb('payload'),
     progress: jsonb('progress'),
     nextAttemptAt: timestamp('next_attempt_at'),
+    cancelRequestedAt: timestamp('cancel_requested_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

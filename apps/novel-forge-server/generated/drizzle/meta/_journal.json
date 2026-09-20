@@ -274,6 +274,13 @@
       "when": 1789394504435,
       "tag": "0038_wild_sleepwalker",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789880746419,
+      "tag": "0039_mean_black_widow",
+      "breakpoints": true
     }
   ]
 }
