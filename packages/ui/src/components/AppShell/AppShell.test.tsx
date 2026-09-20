@@ -16,7 +16,7 @@ import { type AppShellProps } from './AppShell.types';
 /**
  * Declaring the constants
  */
-const PATHS = ['/', '/account', '/account/security', '/account/sessions', '/console', '/novels/$novelId/overview'];
+const PATHS = ['/', '/account', '/account/security', '/account/sessions', '/console', '/novels/$novelId/overview', '/novels/$novelId/chat'];
 
 /**
  * Mounts the shell inside a real router at `initialPath`, so active state is resolved the way it is in an
@@ -124,6 +124,74 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('button', { name: /Access/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('link', { name: 'Console' })).not.toBeInTheDocument();
+  });
+
+  it('should keep destinations that share a route distinct by search', async () => {
+    // `id` is what stops two rows on one route colliding on React's key — the warning is the regression.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await renderShell(
+      {
+        nav: section([
+          { to: '/novels/$novelId/chat', params: { novelId: 'abc' }, id: 'chat-a', search: { session: 'a' }, label: 'Opening scene' },
+          { to: '/novels/$novelId/chat', params: { novelId: 'abc' }, id: 'chat-b', search: { session: 'b' }, label: 'The betrayal' },
+        ]),
+      },
+      '/novels/abc/chat?session=b',
+    );
+
+    expect(screen.getByRole('link', { name: 'Opening scene' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'The betrayal' })).toHaveAttribute('aria-current', 'page');
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('should carry a search-scoped destination into its href', async () => {
+    await renderShell(
+      { nav: section([{ to: '/novels/$novelId/chat', params: { novelId: 'abc' }, id: 'chat-a', search: { session: 'a' }, label: 'Opening scene' }]) },
+      '/novels/abc/chat',
+    );
+
+    expect(screen.getByRole('link', { name: 'Opening scene' })).toHaveAttribute('href', '/novels/abc/chat?session=a');
+  });
+
+  it('should open a branch whose own header owns the route, and light that header', async () => {
+    await renderShell(
+      {
+        nav: section([
+          {
+            label: 'Refinement Chat',
+            to: '/novels/$novelId/chat',
+            params: { novelId: 'abc' },
+            action: (
+              <button type="button" onClick={() => {}}>
+                New chat
+              </button>
+            ),
+            items: [{ to: '/novels/$novelId/chat', params: { novelId: 'abc' }, id: 'chat-a', search: { session: 'a' }, label: 'Opening scene' }],
+          },
+        ]),
+      },
+      '/novels/abc/chat',
+    );
+
+    expect(screen.getByRole('link', { name: 'Refinement Chat' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Collapse Refinement Chat' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Opening scene' })).toBeInTheDocument();
+  });
+
+  it('should hand branch disclosure to the caller when it is controlled', async () => {
+    const onOpenChange = vi.fn();
+    await renderShell(
+      {
+        nav: section([{ label: 'Access', open: false, onOpenChange, items: [{ to: '/account/security', label: 'Security' }] }]),
+      },
+      '/account/security',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Access/ }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('link', { name: 'Security' })).not.toBeInTheDocument();
   });
 
   it('should render an external item as a new-tab anchor that is never active', async () => {

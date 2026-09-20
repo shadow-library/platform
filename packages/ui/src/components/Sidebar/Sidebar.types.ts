@@ -46,6 +46,12 @@ export interface SidebarItemProps extends ComponentPropsWithoutRef<'a'> {
   asChild?: boolean;
   /** Explicit label for rail tooltip / aria-label when children aren't a plain string. */
   label?: string;
+  /**
+   * Step the row in one level, for a nested run inside a flat section — a conversation list under the
+   * screen that owns it. Group children are already indented by the list's own guide; this is for the
+   * ones that have no group. Ignored in rail mode, where there is no room to express depth.
+   */
+  indent?: boolean;
 }
 
 export interface SidebarSwitcherOption {
@@ -89,4 +95,16 @@ export interface SidebarGroupProps extends ComponentPropsWithoutRef<'div'> {
   onOpenChange?: (open: boolean) => void;
   /** The group contains the active item (shows the edge bar while collapsed). */
   active?: boolean;
+  /**
+   * Makes the header itself a destination: pass the router link element, and the disclosure moves to its
+   * own chevron button beside it. The link is named by its own children, so `label` is what names the
+   * disclosure — give a string one, or the toggle has no useful accessible name. In rail mode the
+   * destination becomes the first row of the flyout, so collapsing never strands it.
+   */
+  link?: ReactNode;
+  /**
+   * A control pinned to the header row, right of the label — "new chat". In rail mode it moves below the
+   * flyout's list, since the rail's header is an icon with no room beside it.
+   */
+  action?: ReactNode;
 }

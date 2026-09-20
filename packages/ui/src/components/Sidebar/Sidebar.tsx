@@ -169,7 +169,7 @@ const SidebarSection = forwardRef<HTMLDivElement, SidebarSectionProps>(function 
 
 /** A navigation destination — a real link with active state, icon, and optional badge. */
 const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function SidebarItem(
-  { icon, badge, active = false, asChild = false, label, className, onClick, children, ...props },
+  { icon, badge, active = false, asChild = false, label, indent = false, className, onClick, children, ...props },
   ref,
 ) {
   const { collapsed } = useContext(SidebarContext);
@@ -192,6 +192,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
       ref={ref}
       className={cn(styles.item, className)}
       data-active={active || undefined}
+      data-indent={indent || undefined}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? name : undefined}
       onClick={handleClick}
@@ -219,7 +220,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
  * disclosure whose panel can never render is a dead control.
  */
 const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function SidebarGroup(
-  { label, icon, open: openProp, defaultOpen = false, onOpenChange, active = false, className, children, ...props },
+  { label, icon, link, action, open: openProp, defaultOpen = false, onOpenChange, active = false, className, children, ...props },
   ref,
 ) {
   const { collapsed } = useContext(SidebarContext);
@@ -236,6 +237,13 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
     </ul>
   );
 
+  const destination =
+    link != null ? (
+      <SidebarItem asChild icon={icon} label={name}>
+        {link}
+      </SidebarItem>
+    ) : null;
+
   if (collapsed) {
     return (
       <div ref={ref} className={cn(styles.group, className)} {...props}>
@@ -247,20 +255,44 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
           </Popover.Trigger>
           <Popover.Content className={styles.railGroup} side="right" align="start" style={{ padding: 4, minWidth: 180 }} aria-label={name}>
             {/* The flyout has room for labels even though the rail behind it does not. */}
-            <SidebarContext.Provider value={{ collapsed: false }}>{list}</SidebarContext.Provider>
+            <SidebarContext.Provider value={{ collapsed: false }}>
+              {destination}
+              {list}
+              {action != null ? <div className={styles.railAction}>{action}</div> : null}
+            </SidebarContext.Provider>
           </Popover.Content>
         </Popover>
       </div>
     );
   }
 
+  const toggle = (
+    <button
+      type="button"
+      className={link != null ? styles.groupToggle : styles.item}
+      data-active={link == null && active && !open ? '' : undefined}
+      aria-expanded={open}
+      aria-controls={listId}
+      aria-label={link != null ? `${open ? 'Collapse' : 'Expand'} ${name ?? 'group'}` : undefined}
+      onClick={() => setOpen(!open)}
+    >
+      {link == null && icon != null ? <span className={styles.icon}>{icon}</span> : null}
+      {link == null ? <span className={styles.label}>{label}</span> : null}
+      <ChevronDown />
+    </button>
+  );
+
   return (
     <div ref={ref} className={cn(styles.group, className)} {...props}>
-      <button type="button" className={styles.item} data-active={active && !open ? '' : undefined} aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
-        {icon != null ? <span className={styles.icon}>{icon}</span> : null}
-        <span className={styles.label}>{label}</span>
-        <ChevronDown />
-      </button>
+      {link != null || action != null ? (
+        <div className={styles.groupHeader}>
+          {destination ?? toggle}
+          {action}
+          {link != null ? toggle : null}
+        </div>
+      ) : (
+        toggle
+      )}
       {open ? list : null}
     </div>
   );

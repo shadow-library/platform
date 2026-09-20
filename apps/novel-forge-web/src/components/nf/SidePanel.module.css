@@ -45,6 +45,26 @@
   display: none;
 }
 
+.empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+/* Upright inside the vertical rail, so a count still reads as a count. */
+.railAccessory {
+  writing-mode: horizontal-tb;
+}
+
 .reopen {
   display: flex;
   align-items: center;

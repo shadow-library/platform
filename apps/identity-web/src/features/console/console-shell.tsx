@@ -32,7 +32,7 @@ const NAV: NavConfig = {
   ],
 };
 
-const CRUMB = new Map(NAV.sections.flatMap(section => section.items).map(item => ('to' in item ? [item.to, item.label] : [item.label, item.label])));
+const CRUMB = new Map(NAV.sections.flatMap(section => section.items).map(item => ('items' in item ? [item.label, item.label] : [item.to, item.label])));
 
 export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.Element {
   const me = useMeQuery();

@@ -237,6 +237,103 @@ describe('Sidebar', () => {
     expect(link).toHaveTextContent('');
   });
 
+  // A regression net for the additive group props: a group that asks for neither a destination nor a
+  // header action must emit what it emitted before they existed — one disclosure button, no header row.
+  it('renders a plain group as a single disclosure button with no header row', () => {
+    const { container } = render(
+      <Sidebar>
+        <Sidebar.Group label="Settings" icon={<svg aria-hidden="true" />} defaultOpen>
+          <Sidebar.Item href="/settings/general">General</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    const group = container.querySelector('[class*="group_"]');
+    const [header, list] = [...(group?.children ?? [])];
+    expect(header?.tagName).toBe('BUTTON');
+    expect(header).toHaveClass(/item/);
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(header?.querySelector('[class*="chevron"]')).toBeInTheDocument();
+    expect(list?.tagName).toBe('UL');
+    expect(container.querySelector('[class*="groupHeader"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[class*="groupToggle"]')).not.toBeInTheDocument();
+  });
+
+  it('makes the group header a destination with its own disclosure toggle', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar>
+        <Sidebar.Group label="Refinement Chat" icon={<svg aria-hidden="true" />} link={<a href="/chat">Refinement Chat</a>} defaultOpen>
+          <Sidebar.Item href="/chat?session=a">Opening scene</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    expect(screen.getByRole('link', { name: 'Refinement Chat' })).toHaveAttribute('href', '/chat');
+    const toggle = screen.getByRole('button', { name: 'Collapse Refinement Chat' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(toggle);
+    expect(screen.queryByRole('link', { name: 'Opening scene' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand Refinement Chat' })).toBeInTheDocument();
+  });
+
+  it('pins a header action beside the label without folding it into the disclosure', async () => {
+    const user = userEvent.setup();
+    const onNew = vi.fn();
+    render(
+      <Sidebar>
+        <Sidebar.Group
+          label="Refinement Chat"
+          action={
+            <button type="button" onClick={onNew}>
+              New chat
+            </button>
+          }
+        >
+          <Sidebar.Item href="/chat?session=a">Opening scene</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    await user.click(screen.getByRole('button', { name: 'New chat' }));
+    expect(onNew).toHaveBeenCalledOnce();
+    // Starting a chat is not opening a disclosure — the group stays exactly as it was.
+    expect(screen.getByRole('button', { name: 'Refinement Chat' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps the header destination and its action reachable from the rail flyout', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar collapsed>
+        <Sidebar.Group
+          label="Refinement Chat"
+          icon={<svg aria-hidden="true" />}
+          link={<a href="/chat">Refinement Chat</a>}
+          action={
+            <button type="button" onClick={() => {}}>
+              New chat
+            </button>
+          }
+        >
+          <Sidebar.Item href="/chat?session=a">Opening scene</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Refinement Chat' }));
+    expect(await screen.findByRole('link', { name: 'Refinement Chat' })).toHaveAttribute('href', '/chat');
+    expect(screen.getByRole('link', { name: 'Opening scene' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeInTheDocument();
+  });
+
+  it('steps an indented item in past the icon column', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Item href="/chat?session=a" indent>
+          Opening scene
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    expect(screen.getByRole('link', { name: 'Opening scene' })).toHaveAttribute('data-indent');
+    expect(css).toMatch(/\.item\[data-indent\]\s*{\s*padding-left:\s*36px;/);
+  });
+
   it('chains the caller onClick through an asChild item', async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();

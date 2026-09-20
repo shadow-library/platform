@@ -35,7 +35,8 @@ function navConfig(isStaff: boolean): NavConfig {
 
 function activeLabel(nav: NavConfig, pathname: string): string {
   const leaves = nav.sections.filter(section => section.hidden !== true).flatMap(section => section.items);
-  const match = leaves.find(item => 'to' in item && (item.exact === true ? pathname === item.to : pathname.startsWith(item.to)));
+  // `items` is what makes a node a branch; a branch may carry a `to` of its own, so that is not the test.
+  const match = leaves.find(item => !('items' in item) && (item.exact === true ? pathname === item.to : pathname.startsWith(item.to)));
   return match != null && 'label' in match ? match.label : 'Account';
 }
 

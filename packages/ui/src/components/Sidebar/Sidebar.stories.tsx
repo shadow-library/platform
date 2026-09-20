@@ -9,6 +9,7 @@ import { useState } from 'react';
  * Importing user defined packages
  */
 import { Badge } from '../Badge';
+import { IconButton } from '../IconButton';
 import { Sidebar, useSidebar } from './Sidebar';
 
 /**
@@ -46,6 +47,14 @@ function WorkspaceMark() {
       </span>
       {!collapsed ? <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>acme-prod</span> : null}
     </span>
+  );
+}
+
+function Plus() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M8 3.5v9M3.5 8h9" />
+    </svg>
   );
 }
 
@@ -164,4 +173,47 @@ export const ProjectSwitcher: Story = {
       </div>
     );
   },
+};
+
+/**
+ * A screen that owns a list — conversations, saved views — nests it under its own destination rather than
+ * opening a second column. The header stays navigable, the disclosure moves to its own chevron, and the
+ * action starts a new one without going through the screen first. In rail mode the flyout carries all three.
+ */
+export const NestedDestinations: Story = {
+  render: () => (
+    <div style={{ display: 'flex', height: 380 }}>
+      <Sidebar workspace={<WorkspaceMark />}>
+        <Sidebar.Section>
+          <Sidebar.Item icon={<Dot />} href="#overview">
+            Overview
+          </Sidebar.Item>
+          <Sidebar.Group
+            label="Refinement Chat"
+            icon={<Dot />}
+            defaultOpen
+            link={
+              <a href="#chat" data-status="active">
+                Refinement Chat
+              </a>
+            }
+            action={<IconButton size="sm" variant="ghost" aria-label="New chat" icon={<Plus />} />}
+          >
+            <Sidebar.Item href="#chat-a">The betrayal at Meridian Gate</Sidebar.Item>
+            <Sidebar.Item href="#chat-b">Naming the second volume</Sidebar.Item>
+            <Sidebar.Item href="#chat-c">Timeline audit</Sidebar.Item>
+            <Sidebar.Item href="#chat-all">All 14 chats</Sidebar.Item>
+          </Sidebar.Group>
+          <Sidebar.Item icon={<Dot />} href="#publish">
+            Publish
+          </Sidebar.Item>
+          {/* Outside a group there is no indent guide to sit under, so the row asks for the step itself. */}
+          <Sidebar.Item href="#draft" indent>
+            Untitled draft
+          </Sidebar.Item>
+        </Sidebar.Section>
+      </Sidebar>
+      <div style={{ flex: 1, padding: 24, color: 'var(--sh-text-tertiary)' }}>Content region</div>
+    </div>
+  ),
 };

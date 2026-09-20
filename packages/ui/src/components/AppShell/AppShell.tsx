@@ -39,9 +39,12 @@ function resolvePath(to: string, params?: Record<string, string>): string {
   return Object.entries(params).reduce((path, [key, value]) => path.replaceAll(`$${key}`, value), to);
 }
 
-function isLeafActive(pathname: string, leaf: NavLeaf): boolean {
+type Search = Record<string, unknown>;
+
+function isLeafActive(pathname: string, search: Search, leaf: NavLeaf): boolean {
   if (leaf.external) return false;
-  return matchPath(pathname, resolvePath(leaf.to, leaf.params), { exact: leaf.exact });
+  if (!matchPath(pathname, resolvePath(leaf.to, leaf.params), { exact: leaf.exact })) return false;
+  return leaf.search == null || Object.entries(leaf.search).every(([key, value]) => search[key] === value);
 }
 
 function visible<T extends { hidden?: boolean }>(entries: T[]): T[] {
@@ -72,23 +75,38 @@ function NavLeafItem({ leaf }: { leaf: NavLeaf }): ReactElement {
   // No `active` prop: the router link marks itself, and `Sidebar.Item` already keys its treatment off
   // `data-status="active"`. Computing it here as well would fight the link over `aria-current`.
   return (
-    <Sidebar.Item asChild icon={leaf.icon} badge={renderBadge(leaf)} label={leaf.label}>
-      <Link to={leaf.to} params={leaf.params} activeOptions={{ exact: leaf.exact ?? false }} activeProps={{ 'aria-current': 'page' }}>
+    <Sidebar.Item asChild icon={leaf.icon} badge={renderBadge(leaf)} label={leaf.label} indent={leaf.indent}>
+      <Link to={leaf.to} params={leaf.params} search={leaf.search} activeOptions={{ exact: leaf.exact ?? false }} activeProps={{ 'aria-current': 'page' }}>
         {leaf.label}
       </Link>
     </Sidebar.Item>
   );
 }
 
-function NavNodeItem({ node, pathname }: { node: NavNode; pathname: string }): ReactElement {
+function NavNodeItem({ node, pathname, search }: { node: NavNode; pathname: string; search: Search }): ReactElement {
   if (!isBranch(node)) return <NavLeafItem leaf={node} />;
   const children = visible(node.items);
   // A branch opens itself when it owns the current route, so a deep link never lands on a collapsed group.
-  const active = children.some(leaf => isLeafActive(pathname, leaf));
+  const active = children.some(leaf => isLeafActive(pathname, search, leaf)) || (node.to != null && matchPath(pathname, resolvePath(node.to, node.params)));
   return (
-    <Sidebar.Group label={node.label} icon={node.icon} active={active} defaultOpen={active}>
+    <Sidebar.Group
+      label={node.label}
+      icon={node.icon}
+      active={active}
+      defaultOpen={node.defaultOpen ?? active}
+      open={node.open}
+      onOpenChange={node.onOpenChange}
+      action={node.action}
+      link={
+        node.to != null ? (
+          <Link to={node.to} params={node.params} activeProps={{ 'aria-current': 'page' }}>
+            {node.label}
+          </Link>
+        ) : undefined
+      }
+    >
       {children.map(leaf => (
-        <NavLeafItem key={leaf.to} leaf={leaf} />
+        <NavLeafItem key={leaf.id ?? leaf.to} leaf={leaf} />
       ))}
     </Sidebar.Group>
   );
@@ -149,6 +167,8 @@ export function AppShell({
   children,
 }: AppShellProps): ReactElement {
   const pathname = useRouterState({ select: state => state.location.pathname });
+  // Selected apart from the pathname so a location change that touches neither never re-renders the shell.
+  const locationSearch = useRouterState({ select: state => state.location.search as Search });
   const sections: NavSection[] = visible(nav.sections);
 
   const sidebar = (
@@ -173,7 +193,7 @@ export function AppShell({
       {sections.map((section, index) => (
         <Sidebar.Section key={section.label ?? `section-${index}`} label={section.label}>
           {visible(section.items).map(node => (
-            <NavNodeItem key={isBranch(node) ? node.label : node.to} node={node} pathname={pathname} />
+            <NavNodeItem key={isBranch(node) ? node.label : (node.id ?? node.to)} node={node} pathname={pathname} search={locationSearch} />
           ))}
         </Sidebar.Section>
       ))}

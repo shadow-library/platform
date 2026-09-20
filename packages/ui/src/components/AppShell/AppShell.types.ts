@@ -19,6 +19,18 @@ import { type SidebarSwitcherOption } from '../Sidebar';
 export interface NavLeaf {
   to: string;
   params?: Record<string, string>;
+  /**
+   * React key and identity. Needed whenever several destinations share one `to` and differ only by
+   * `search` — a conversation list, a saved-view list. Defaults to `to`.
+   */
+  id?: string;
+  /**
+   * Query params for the destination. They also narrow the active match: the item lights only while the
+   * current location carries every one of them, so sibling rows on the same route stay distinct.
+   */
+  search?: Record<string, unknown>;
+  /** Step the row in one level, for a nested run inside a flat section. */
+  indent?: boolean;
   label: string;
   /** Leading 16px icon. Pass the element, not the component. */
   icon?: ReactNode;
@@ -44,6 +56,23 @@ export interface NavBranch {
   icon?: ReactNode;
   items: NavLeaf[];
   hidden?: boolean;
+  /** Makes the group header a destination of its own; the disclosure moves to a chevron button beside it. */
+  to?: string;
+  params?: Record<string, string>;
+  /** A control pinned to the header row — "new chat". */
+  action?: ReactNode;
+  /**
+   * Starting disclosure state. Defaults to open when the branch owns the current route, so a deep link
+   * never lands on a collapsed group.
+   */
+  defaultOpen?: boolean;
+  /** Controlled disclosure state — pair with `onOpenChange`. */
+  open?: boolean;
+  /**
+   * Fires with the next disclosure state, in both controlled and uncontrolled modes. Uncontrolled it
+   * reports the reader's own toggles only, never the route-driven opening — read `defaultOpen` for that.
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export type NavNode = NavBranch | NavLeaf;

@@ -347,6 +347,60 @@
   transform: rotate(180deg);
 }
 
+/* Aligns the row's text under the label of the row above it, past the 16px icon and its 10px gap. */
+.item[data-indent] {
+  padding-left: 36px;
+}
+.root[data-collapsed] .item[data-indent] {
+  padding-left: 0;
+}
+
+/* ── Group header ────────────────────────────────────────── */
+/* Only rendered when the group carries a destination or an action; a plain group stays a single button. */
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.groupHeader .item {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.groupToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+[data-density='touch'] .groupToggle {
+  width: var(--sh-tap-target);
+  height: var(--sh-tap-target);
+}
+.groupToggle:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.groupToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.groupToggle[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+.railAction {
+  display: flex;
+  padding: 4px 4px 0;
+}
+
 /* ── Group children ──────────────────────────────────────── */
 .groupList {
   margin: 2px 0 0;
