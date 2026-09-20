@@ -497,3 +497,13 @@
 .streamFailed {
   border-color: var(--sh-danger-border, var(--sh-border-default));
 }
+
+.streamStopped {
+  border-color: var(--sh-border-default);
+  opacity: 0.75;
+}
+
+.streamStoppedNote {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}

@@ -113,4 +113,10 @@ describe('reduceChatTurnStream', () => {
   it('should ignore anything that arrives after the turn has ended', () => {
     expect(play([{ type: 'done', turn }, delta(' and more')]).reply).toBe('Vex is the exiled cartographer.');
   });
+
+  it('should treat a stopped turn as terminal, keeping its partial text and ignoring anything after', () => {
+    const stopped: ChatTurnStreamState = { status: 'stopped', reply: 'half a rep', lookups: [], userMessage: null };
+
+    expect(reduceChatTurnStream(stopped, delta(' more'))).toBe(stopped);
+  });
 });

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Dialog, Input, SegmentedControl, Spinner, Textarea, toast } from '@shadow-library/ui';
 
-import { ArchiveIcon, BookIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, TrashIcon, WarningIcon } from '@/components/icons';
+import { ArchiveIcon, BookIcon, EditIcon, ListIcon, ProposalsIcon, SearchIcon, SendIcon, SparkIcon, StopIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { type ChipIntent, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
@@ -368,7 +368,6 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   // The composer locks on this tab's own request OR a turn the server still has running — the latter is
   // what lets a refresh or a second tab recover an in-flight turn instead of showing a silent message.
   const state = turnState(messagesQuery.data);
-  const pending = turn.isPending || state.kind === 'pending';
   // The stream is never cleared, so a finished turn's text would render twice — once live, once from the
   // refreshed transcript. The streamed row stands down on the transcript alone, the instant it carries an
   // assistant message past where this turn started: the reply reaches the transcript over the 1.5s status
@@ -376,11 +375,35 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
   // safe signal. Reading only the transcript covers both orders, and holds the reply on screen through the
   // gap between `done` and that refetch, when nothing else is showing it.
   const stream = turn.stream;
+  // Once this tab has stopped its own turn, the server's view lags behind (its `pendingTurn` query only
+  // clears once the run leaves `running`, and its `failedTurn` query never picks up a `cancelled` run at
+  // all — that gap is server-side and out of this task's reach) and would otherwise keep reading as the
+  // "just sent, still spinning up" stranded case for up to two minutes, wedging Send. The stream already
+  // knows better the instant the cancel confirms, so it overrides the stale server read.
+  const pending = turn.isPending || (state.kind === 'pending' && stream.status !== 'stopped');
+  // This tab's own live turn, or — recovered after a refresh or from another tab, before this tab has sent
+  // anything of its own — the one the transcript's own poll says is still running. Either way, what Stop targets.
+  const activeRunId = turn.runId ?? (state.kind === 'pending' ? (state.pending?.runId ?? null) : null);
   const settled = lastAssistantOrdinal(messages) > assistantWatermark;
-  const showStream = !settled && (stream.lookups.length > 0 || stream.reply.length > 0);
+  // `stopped` always shows, even with no partial text yet, so pressing Stop always leaves a visible mark.
+  const showStream = !settled && (stream.status === 'stopped' || stream.lookups.length > 0 || stream.reply.length > 0);
   // A live stream is its own progress indicator; `TurnStatus` stays for the failed-turn card, which owns the
-  // reason and the retry while the streamed bubble only keeps whatever the model managed to say.
+  // reason and the retry while the streamed bubble only keeps whatever the model managed to say. A stopped
+  // turn needs neither — the author asked for it, there is nothing to explain and nowhere to retry from.
   const showTurnStatus = !showStream || stream.status === 'failed';
+
+  const stop = (): void => {
+    if (!activeRunId) return;
+    turn.stop(
+      {
+        onOutcome: outcome => {
+          if (outcome === 'not_delivered') toast.warning("Couldn't confirm the stop — Forge may still be working. Try again in a moment.");
+        },
+        onError: err => toast.danger(err.message),
+      },
+      activeRunId,
+    );
+  };
 
   // Stay pinned to the newest message ChatGPT-style: inline change cards load after the transcript,
   // so a one-shot scroll lands short — follow content growth while the user is near the bottom, and
@@ -545,8 +568,18 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
               <div className={`${styles.assistantCol} ${styles.streamCol}`}>
                 <LookupTrace lookups={stream.lookups} running={stream.status === 'streaming'} />
                 {stream.reply && (
-                  <Markdown content={stream.reply} className={stream.status === 'failed' ? `${styles.assistantBubble} ${styles.streamFailed}` : styles.assistantBubble} />
+                  <Markdown
+                    content={stream.reply}
+                    className={
+                      stream.status === 'failed'
+                        ? `${styles.assistantBubble} ${styles.streamFailed}`
+                        : stream.status === 'stopped'
+                          ? `${styles.assistantBubble} ${styles.streamStopped}`
+                          : styles.assistantBubble
+                    }
+                  />
                 )}
+                {stream.status === 'stopped' && <div className={styles.streamStoppedNote}>Stopped</div>}
               </div>
             </div>
           )}
@@ -580,9 +613,15 @@ function ChatThread({ novelId, session, onOpenHistory, initialTurn, onInitialTur
             </SegmentedControl>
             <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
             <div className={styles.spacer} />
-            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={session.status !== 'active' || pending} onClick={send}>
-              Send
-            </Button>
+            {pending && activeRunId ? (
+              <Button variant="danger" size="sm" prefix={<StopIcon size={14} />} loading={turn.stopping} disabled={turn.stopping} onClick={stop}>
+                Stop
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={session.status !== 'active' || pending} onClick={send}>
+                Send
+              </Button>
+            )}
           </div>
         </div>
       </div>

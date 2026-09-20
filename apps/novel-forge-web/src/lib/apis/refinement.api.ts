@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   type ApplyProposalResponse,
   type AuditBibleResponse,
+  type CancelRunResponse,
   type ChatMessageResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
@@ -252,6 +253,13 @@ export function useChatTurnMutation(projectId: string, sessionId: string): UseMu
   });
 }
 
+/** Cancels a live workflow run. Shared by the chat composer's Stop and (S7) the run/job cards — the endpoint is generic to any run. */
+export function useCancelRunMutation(projectId: string): UseMutationResult<CancelRunResponse, ApiError, string> {
+  return useMutation<CancelRunResponse, ApiError, string>({
+    mutationFn: runId => APIRequest.post(`/projects/${projectId}/runs/${runId}/cancel`).execute(),
+  });
+}
+
 /**
  * The turn stream (design §4). The SSE route hijacks its reply, so it has no generated response type and the
  * frames are hand-typed here; `user` and `done` carry generated shapes and reuse them.
@@ -285,7 +293,10 @@ interface ChatTurnProgress {
 export type ChatTurnStreamState =
   | (ChatTurnProgress & { status: 'idle' | 'streaming' })
   | (ChatTurnProgress & { status: 'done'; turn: ChatTurnResponse })
-  | (ChatTurnProgress & { status: 'failed'; failure: ChatTurnFailure });
+  | (ChatTurnProgress & { status: 'failed'; failure: ChatTurnFailure })
+  // The author stopped the turn themselves — distinct from `failed`: nothing went wrong, and there is no
+  // error to show. Reuses the `error` precedent of keeping the partial reply rather than voiding it (§4).
+  | (ChatTurnProgress & { status: 'stopped' });
 
 export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], userMessage: null };
 
@@ -335,7 +346,7 @@ function mergeLookup(lookups: ChatTurnLookup[], lookup: ChatTurnLookup): ChatTur
  * marks the turn failed: it is what the model actually said, and no better text is coming.
  */
 export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurnStreamEvent): ChatTurnStreamState {
-  if (state.status === 'done' || state.status === 'failed') return state;
+  if (state.status === 'done' || state.status === 'failed' || state.status === 'stopped') return state;
   const progress: ChatTurnProgress = { reply: state.reply, lookups: state.lookups, userMessage: state.userMessage };
   if (event.type === 'reset') return { ...progress, status: 'streaming', reply: '' };
   if (event.type === 'delta') return { ...progress, status: 'streaming', reply: state.reply + event.text };
@@ -351,10 +362,22 @@ export interface ChatTurnHandlers {
   onError?: (error: ApiError, context: ChatTurnContext | undefined) => void;
 }
 
+export interface ChatTurnStopHandlers {
+  onOutcome?: (outcome: CancelRunResponse['outcome']) => void;
+  onError?: (error: ApiError) => void;
+}
+
 export interface ChatTurnSender {
   send: (content: string, handlers?: ChatTurnHandlers) => void;
   isPending: boolean;
   stream: ChatTurnStreamState;
+  // The run this tab's own POST opened, without the composer having to read the stream's internals to find it.
+  // Null once the turn ends, or if this tab has not sent one — a turn recovered from another tab or a refresh
+  // is not represented here at all; the composer falls back to `TurnState.pending.runId` for that case, passing
+  // it as `stop`'s override.
+  runId: string | null;
+  stop: (handlers?: ChatTurnStopHandlers, overrideRunId?: string) => void;
+  stopping: boolean;
 }
 
 const UNKNOWN_TURN_FAILURE: ChatTurnFailure = { code: 'UNKNOWN', message: 'Something went wrong. Please try again later' };
@@ -376,11 +399,17 @@ function turnFailureError(failure: ChatTurnFailure): ApiError {
 export function useChatTurnStream(projectId: string, sessionId: string): ChatTurnSender {
   const queryClient = useQueryClient();
   const fallback = useChatTurnMutation(projectId, sessionId);
+  const cancelRun = useCancelRunMutation(projectId);
   const [stream, setStream] = useState<ChatTurnStreamState>(idleChatTurnStream);
   const [streaming, setStreaming] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   const sourceRef = useRef<EventSource | undefined>(undefined);
   const mountedRef = useRef(true);
   const tokenRef = useRef(0);
+  // Set synchronously on the first press, ahead of the mutation resolving, so a double-press before the
+  // network answers is a no-op rather than a second cancel in flight.
+  const stoppingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -403,11 +432,12 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     sourceRef.current = undefined;
     setStream(idleChatTurnStream);
     setStreaming(true);
+    setRunId(null);
     const context = await beginChatTurn(queryClient, projectId, sessionId, content);
 
-    let runId: string;
+    let openedRunId: string;
     try {
-      ({ runId } = await APIRequest.post(`/projects/${projectId}/chats/${sessionId}/turn/stream`).body({ content }).execute<ChatTurnStreamResponse>());
+      ({ runId: openedRunId } = await APIRequest.post(`/projects/${projectId}/chats/${sessionId}/turn/stream`).body({ content }).execute<ChatTurnStreamResponse>());
     } catch (err) {
       rollbackChatTurn(queryClient, projectId, sessionId, context);
       invalidateChat(queryClient, projectId, sessionId);
@@ -416,8 +446,9 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
       return;
     }
     if (!current()) return;
+    setRunId(openedRunId);
 
-    const source = new EventSource(`${APIRequest.basePath}/projects/${projectId}/turns/${runId}/stream`);
+    const source = new EventSource(`${APIRequest.basePath}/projects/${projectId}/turns/${openedRunId}/stream`);
     sourceRef.current = source;
     const close = (): void => {
       source.close();
@@ -432,7 +463,10 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
         if (terminal) close();
         if (current()) setStream(state => reduceChatTurnStream(state, event));
         if (!terminal) return;
-        if (current()) setStreaming(false);
+        if (current()) {
+          setStreaming(false);
+          setRunId(null);
+        }
         invalidateChat(queryClient, projectId, sessionId);
         if (event.type === 'done') handlers?.onSuccess?.(event.turn);
         // The turn recorded its own failure, so the transcript's failed-turn card is the authority and the
@@ -446,7 +480,13 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     source.onerror = () => {
       if (source.readyState !== EventSource.CLOSED) return;
       close();
-      if (current()) setStreaming(false);
+      // The turn itself is not known to have ended — only this stream — so `TurnState.pending.runId`
+      // (read off the transcript's own poll, which is still authoritative) is what a Stop press falls
+      // back to once this tab's own runId goes null.
+      if (current()) {
+        setStreaming(false);
+        setRunId(null);
+      }
       invalidateChat(queryClient, projectId, sessionId);
     };
   };
@@ -459,7 +499,52 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     void run(content, handlers);
   };
 
-  return { send, isPending: streaming || fallback.isPending, stream };
+  // Idempotent: the ref guard blocks a double-press before the mutation resolves, and the state guard
+  // blocks one queued after it resolved but before this render committed.
+  const stop = (handlers?: ChatTurnStopHandlers, overrideRunId?: string): void => {
+    // `overrideRunId` is a turn this hook never opened — recovered from `TurnState.pending` after a refresh
+    // or from another tab — so cancelling it must not touch this hook's own (unrelated, likely idle) stream.
+    const target = overrideRunId ?? runId;
+    const ownTurn = target === runId;
+    if (!target || stoppingRef.current || stopping) return;
+    stoppingRef.current = true;
+    setStopping(true);
+    // Freezes the token this cancel belongs to: if a new turn starts (or the component unmounts) before
+    // the mutation resolves, `current()` goes false and the stale response can no longer touch this turn's
+    // now-irrelevant stream or state.
+    const token = tokenRef.current;
+    const current = (): boolean => mountedRef.current && tokenRef.current === token;
+    cancelRun.mutate(target, {
+      onSuccess: result => {
+        stoppingRef.current = false;
+        setStopping(false);
+        // `stopping`: the signal reached the run. `already_settled` and `not_delivered` touch nothing here:
+        // the first means the turn's own `done`/`error` frame has already arrived or is about to, over
+        // whichever stream is watching it; the second means the abort was never delivered, so the run may
+        // still be going and must not be told otherwise.
+        if (result.outcome === 'stopping') {
+          invalidateChat(queryClient, projectId, sessionId);
+          // Freeze whatever text streamed so far as `stopped` (§S6) — the same partial-text-survives
+          // treatment `error` gets, never `reset`'s discard — but only for the stream this hook owns.
+          if (ownTurn && current()) {
+            sourceRef.current?.close();
+            sourceRef.current = undefined;
+            setStreaming(false);
+            setRunId(null);
+            setStream(state => (state.status === 'idle' || state.status === 'streaming' ? { ...state, status: 'stopped' } : state));
+          }
+        }
+        handlers?.onOutcome?.(result.outcome);
+      },
+      onError: err => {
+        stoppingRef.current = false;
+        setStopping(false);
+        handlers?.onError?.(err);
+      },
+    });
+  };
+
+  return { send, isPending: streaming || fallback.isPending, stream, runId, stop, stopping };
 }
 
 export function useForgeTurnMutation(projectId: string): UseMutationResult<ChatTurnResponse, ApiError, ForgeTurnVariables> {
