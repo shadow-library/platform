@@ -230,6 +230,17 @@ describe.if(pgAvailable)('IdeationService turn pipeline', () => {
       expect(lastInput()['volatileContext']).toContain('[spark.idea]');
     });
 
+    it('sources the payload’s select from the bank rather than the model’s echoed value', async () => {
+      const { projectId, sessionId } = await makeSeed();
+      const wrongEcho = { id: 'spark.idea', wording: 'w', coaching: getQuestion('spark.idea')?.coaching as string, select: 'one' as const, options: ['a', 'b'], youDecide: 'a' };
+      structuredMock.mockImplementationOnce(answering({ reply: 'Heard.', payload: { kind: 'questions', questions: [wrongEcho] } }));
+
+      const result = await ideation.turn(projectId, sessionId, 'a salvager who hears dead ships');
+
+      const persisted = (result.assistantMessage.payload as { questions: { id: string; select: string }[] }).questions;
+      expect(persisted).toEqual([{ id: 'spark.idea', wording: 'w', coaching: getQuestion('spark.idea')?.coaching, select: 'many', options: ['a', 'b'], youDecide: 'a' }]);
+    });
+
     it('reverts an auto-applied sheet edit back to the byte the turn started from', async () => {
       const { projectId, sessionId } = await makeSeed();
       structuredMock.mockImplementationOnce(await answersRound(projectId, { reply: 'Locking the shelf.', changeSet: [{ op: 'seed.update', fields: { genre: 'cosy mystery' } }] }));

@@ -36,6 +36,7 @@ const questionsPayload = {
       coaching: 'Start anywhere.',
       options: ['The romance is the spine', 'The no-crossover rule'],
       youDecide: 'All three together.',
+      select: 'many',
     },
   ],
   locks: [{ key: 'dual-lead', kind: 'shape', text: 'Villain and villainess are the two leads.' }],

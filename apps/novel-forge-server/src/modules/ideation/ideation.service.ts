@@ -18,7 +18,7 @@ import { isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildIdeationStressPrompt, buildIdeationTurnPrompt, PROMPT_REGISTRY, renderReadinessPrecheck, scopeAllowedOps } from '../ai/prompts';
-import { type IdeationConceptsOutput, type IdeationStressOutput, type IdeationTurnOutput } from '../ai/schemas';
+import { type IdeationConceptsOutput, type IdeationStressOutput, type IdeationTurnOutput, type IdeationTurnPayload } from '../ai/schemas';
 import { type ChangeOp } from '../refinement/change-set';
 import { ChatCompactionService } from '../refinement/chat-compaction.service';
 import { chatRoleForScope, ChatService } from '../refinement/chat.service';
@@ -365,7 +365,7 @@ export class IdeationService {
           session,
           userMessage.ordinal + 1,
           output.reply,
-          output.payload as unknown as Record<string, unknown>,
+          withBankSelect(output.payload) as unknown as Record<string, unknown>,
           runId,
           model,
         );
@@ -759,6 +759,17 @@ function coachingOf(questionId: string): string {
   const coaching = getQuestion(questionId)?.coaching;
   if (!coaching) throw AppErrorCode.IDE_003.create();
   return coaching;
+}
+
+/** The bank's `select`, never the model's echo — `validateRound` already rejects any id the bank does not own. */
+function selectOf(questionId: string): 'one' | 'many' {
+  const select = getQuestion(questionId)?.select;
+  if (!select) throw AppErrorCode.IDE_003.create();
+  return select;
+}
+
+function withBankSelect(payload: IdeationTurnPayload): IdeationTurnPayload {
+  return { ...payload, questions: payload.questions.map(question => ({ ...question, select: selectOf(question.id) })) };
 }
 
 function offeredQuestionIds(payload: Record<string, unknown> | null): string[] {
