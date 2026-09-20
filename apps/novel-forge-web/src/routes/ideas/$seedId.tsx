@@ -5,15 +5,13 @@ import { Button, Dialog, FormField, IconButton, Input, Textarea, toast } from '@
 
 import { AppShell } from '@/components/Layout';
 import { ChevronLeftIcon, ChevronRightIcon, ProposalsIcon, SendIcon, SparkIcon } from '@/components/icons';
-import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
+import { type ChipIntent, FieldCard, Markdown, PaneError, PaneLoader, SidePanel, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ConceptCardResponse,
-  type FieldProvenanceResponse,
   isApiError,
   isTurnFailureRecorded,
   type ReadinessEntryResponse,
-  type SeedFieldsResponse,
   seedQueryOptions,
   type SeedResponse,
   type StudioCardsPayloadResponse,
@@ -34,6 +32,18 @@ import {
 import { messageTime } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { requireSession } from '@/lib/session';
+import {
+  fieldValue,
+  missingSummary,
+  provenanceText,
+  readinessHeadline,
+  readinessIntent,
+  settledSummary,
+  SHEET_FIELDS,
+  type SheetFieldKey,
+  sheetReadiness,
+  SOURCE_INTENT,
+} from '@/lib/seed-sheet';
 import {
   answeredCount,
   answerText,
@@ -70,24 +80,6 @@ export const Route = createFileRoute('/ideas/$seedId')({
   ),
 });
 
-type SheetField = keyof SeedFieldsResponse;
-
-const SHEET_FIELDS: { key: SheetField; label: string }[] = [
-  { key: 'workingTitle', label: 'Working title' },
-  { key: 'genre', label: 'Genre' },
-  { key: 'premise', label: 'Premise' },
-  { key: 'hook', label: 'Hook' },
-  { key: 'castShape', label: 'Cast shape' },
-  { key: 'protagonistDrive', label: 'What they want' },
-  { key: 'stakes', label: 'Stakes' },
-  { key: 'progressionSystem', label: 'Progression' },
-  { key: 'voice', label: 'Voice' },
-  { key: 'themes', label: 'Themes' },
-  { key: 'serializationNotes', label: 'Serialization' },
-];
-
-const SOURCE_INTENT: Record<FieldProvenanceResponse['source'], ChipIntent> = { author: 'success', studio: 'info', crossed: 'accent' };
-const SOURCE_LABEL: Record<FieldProvenanceResponse['source'], string> = { author: 'yours', studio: 'studio', crossed: 'crossed' };
 const VERDICT_INTENT: Record<ReadinessEntryResponse['verdict'], ChipIntent> = { strong: 'success', thin: 'warning', empty: 'danger' };
 
 type Fate = 'kept' | 'killed' | 'crossed';
@@ -99,12 +91,6 @@ const FATE_SENTENCE: Record<Fate, string> = { kept: 'Keeping', killed: 'Killing'
 function documentLabel(ref: string): string {
   const words = (ref.split('/').pop() ?? ref).replaceAll('-', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-function fieldValue(fields: SeedFieldsResponse, key: SheetField): string | undefined {
-  const value = fields[key];
-  if (Array.isArray(value)) return value.length > 0 ? value.join(' · ') : undefined;
-  return value?.trim() || undefined;
 }
 
 interface ProvenanceSplit {
@@ -696,13 +682,15 @@ function GraduateDialog({ seed, open, onOpenChange }: GraduateDialogProps): Reac
   );
 }
 
-function SheetPane({ seed, onGraduate }: { seed: SeedResponse; onGraduate: () => void }): React.JSX.Element {
+function SeedPanel({ seed, onGraduate }: { seed: SeedResponse; onGraduate: () => void }): React.JSX.Element {
   const stress = useStressSeedMutation(seed.projectId);
   const changesQuery = useListChangesQuery(seed.projectId);
   const revert = useRevertProposalMutation(seed.projectId);
 
   const sheetChanges = (changesQuery.data?.items ?? []).filter(change => change.scopeType === 'ideation' && change.revertible);
   const readinessBy = new Map(seed.readiness.map(entry => [entry.dimension, entry]));
+  const readiness = sheetReadiness(seed.fields);
+  const stillToSettle = missingSummary(readiness.missing);
 
   const runStress = (): void =>
     stress.mutate(undefined, {
@@ -724,99 +712,103 @@ function SheetPane({ seed, onGraduate }: { seed: SeedResponse; onGraduate: () =>
         ),
     });
 
+  const fieldProvenance = (key: SheetFieldKey): React.JSX.Element | undefined => {
+    const provenance = seed.provenance[key];
+    if (!provenance) return undefined;
+    return <StatusChip intent={SOURCE_INTENT[provenance.source]}>{provenanceText(provenance)}</StatusChip>;
+  };
+
   return (
-    <div className={styles.sheet}>
-      <div className={styles.sheetHead}>
-        <SparkIcon size={15} />
-        <span className={styles.sheetTitle}>Story seed</span>
-        <div className={styles.spacer} />
-        <Button size="sm" variant="primary" onClick={onGraduate}>
+    <SidePanel
+      title="Story seed"
+      titleAccessory={
+        <StatusChip intent={readinessIntent(readiness)}>
+          {readiness.settled}/{readiness.total}
+        </StatusChip>
+      }
+      summary={settledSummary(readiness)}
+      footer={
+        <Button size="sm" variant="primary" className={styles.graduate} onClick={onGraduate}>
           Start the novel
         </Button>
-      </div>
+      }
+    >
+      <section className={styles.section}>
+        <div className={styles.readinessHead}>
+          <SparkIcon size={14} />
+          <span className={styles.readinessHeadline}>{readinessHeadline(readiness)}</span>
+        </div>
+        <span className={styles.meter} aria-hidden="true">
+          <span className={styles.meterFill} style={{ inlineSize: `${Math.round((readiness.settled / readiness.total) * 100)}%` }} />
+        </span>
+        {stillToSettle && <p className={styles.hint}>{stillToSettle}</p>}
+      </section>
 
-      <div className={`nf-scroll ${styles.sheetBody}`}>
+      <section className={styles.fields}>
+        {SHEET_FIELDS.map(({ key, label }) => (
+          <FieldCard key={key} label={label} value={fieldValue(seed.fields, key)} provenance={fieldProvenance(key)} />
+        ))}
+      </section>
+
+      {seed.constraints.length > 0 && (
         <section className={styles.section}>
-          {SHEET_FIELDS.map(({ key, label }) => {
-            const value = fieldValue(seed.fields, key);
-            const provenance = seed.provenance[key];
-            return (
-              <div key={key} className={styles.field} data-empty={value === undefined}>
-                <div className={styles.fieldHead}>
-                  <span className={styles.fieldLabel}>{label}</span>
-                  {value !== undefined && provenance && (
-                    <StatusChip intent={SOURCE_INTENT[provenance.source]}>
-                      {SOURCE_LABEL[provenance.source]}
-                      {provenance.turnOrdinal !== null ? ` · turn ${provenance.turnOrdinal}` : ''}
-                    </StatusChip>
-                  )}
-                </div>
-                <div className={styles.fieldValue}>{value ?? 'not settled yet'}</div>
-              </div>
-            );
-          })}
+          <div className={styles.blockLabel}>Locked constraints</div>
+          {seed.constraints.map(constraint => (
+            <div key={constraint.key} className={styles.lockRow}>
+              <StatusChip intent={constraint.lockedBy === 'author' ? 'success' : 'neutral'}>{constraint.kind}</StatusChip>
+              <span className={styles.lockText}>{constraint.text}</span>
+            </div>
+          ))}
         </section>
+      )}
 
-        {seed.constraints.length > 0 && (
-          <section className={styles.section}>
-            <div className={styles.blockLabel}>Locked constraints</div>
-            {seed.constraints.map(constraint => (
-              <div key={constraint.key} className={styles.lockRow}>
-                <StatusChip intent={constraint.lockedBy === 'author' ? 'success' : 'neutral'}>{constraint.kind}</StatusChip>
-                <span className={styles.lockText}>{constraint.text}</span>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {(seed.tasteAnchors.comps.length > 0 || seed.tasteAnchors.preferences.length > 0) && (
-          <section className={styles.section}>
-            <div className={styles.blockLabel}>Taste anchors</div>
-            {seed.tasteAnchors.comps.length > 0 && <div className={styles.fieldValue}>{seed.tasteAnchors.comps.join(' · ')}</div>}
-            {seed.tasteAnchors.preferences.map(preference => (
-              <div key={preference} className={styles.anchorRow}>
-                {preference}
-              </div>
-            ))}
-          </section>
-        )}
-
+      {(seed.tasteAnchors.comps.length > 0 || seed.tasteAnchors.preferences.length > 0) && (
         <section className={styles.section}>
-          <div className={styles.sectionHead}>
-            <div className={styles.blockLabel}>Readiness</div>
-            <Button size="sm" variant="ghost" loading={stress.isPending} onClick={runStress}>
-              Run stress check
-            </Button>
-          </div>
-          {seed.readiness.length === 0 ? (
-            <p className={styles.hint}>Nothing stressed yet — the check names what a planner could and couldn’t build on.</p>
-          ) : (
-            [...readinessBy.values()].map(entry => (
-              <div key={entry.dimension} className={styles.readinessRow}>
-                <StatusChip intent={VERDICT_INTENT[entry.verdict]}>{entry.verdict}</StatusChip>
-                <span className={styles.readinessDim}>{entry.dimension}</span>
-                <span className={styles.readinessNote}>{entry.fix ?? entry.note}</span>
-              </div>
-            ))
-          )}
+          <div className={styles.blockLabel}>Taste anchors</div>
+          {seed.tasteAnchors.comps.length > 0 && <div className={styles.anchorRow}>{seed.tasteAnchors.comps.join(' · ')}</div>}
+          {seed.tasteAnchors.preferences.map(preference => (
+            <div key={preference} className={styles.anchorRow}>
+              {preference}
+            </div>
+          ))}
         </section>
+      )}
 
-        {sheetChanges.length > 0 && (
-          <section className={styles.section}>
-            <div className={styles.blockLabel}>Recent sheet changes</div>
-            <p className={styles.hint}>A change the sheet has since moved past can no longer be taken back — say what you want instead.</p>
-            {sheetChanges.slice(0, 8).map(change => (
-              <div key={change.id} className={styles.changeRow}>
-                <span className={styles.changeSummary}>{change.summary?.trim() || change.refs.join(', ') || 'sheet update'}</span>
-                <Button size="sm" variant="ghost" loading={revert.isPending} onClick={() => doRevert(change.id)}>
-                  Undo
-                </Button>
-              </div>
-            ))}
-          </section>
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <div className={styles.blockLabel}>Stress check</div>
+          <Button size="sm" variant="ghost" loading={stress.isPending} onClick={runStress}>
+            Run stress check
+          </Button>
+        </div>
+        {seed.readiness.length === 0 ? (
+          <p className={styles.hint}>Nothing stressed yet — the check names what a planner could and couldn’t build on.</p>
+        ) : (
+          [...readinessBy.values()].map(entry => (
+            <div key={entry.dimension} className={styles.readinessRow}>
+              <StatusChip intent={VERDICT_INTENT[entry.verdict]}>{entry.verdict}</StatusChip>
+              <span className={styles.readinessDim}>{entry.dimension}</span>
+              <span className={styles.readinessNote}>{entry.fix ?? entry.note}</span>
+            </div>
+          ))
         )}
-      </div>
-    </div>
+      </section>
+
+      {sheetChanges.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.blockLabel}>Recent sheet changes</div>
+          <p className={styles.hint}>A change the sheet has since moved past can no longer be taken back — say what you want instead.</p>
+          {sheetChanges.slice(0, 8).map(change => (
+            <div key={change.id} className={styles.changeRow}>
+              <span className={styles.changeSummary}>{change.summary?.trim() || change.refs.join(', ') || 'sheet update'}</span>
+              <Button size="sm" variant="ghost" loading={revert.isPending} onClick={() => doRevert(change.id)}>
+                Undo
+              </Button>
+            </div>
+          ))}
+        </section>
+      )}
+    </SidePanel>
   );
 }
 
@@ -913,7 +905,7 @@ function StudioScreen(): React.JSX.Element {
   if (!seed) return <PaneLoader />;
 
   return (
-    <div className="nf-splitpane">
+    <div className={styles.screen}>
       <div className={styles.thread}>
         <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
           <div className={styles.msgList}>
@@ -1009,7 +1001,7 @@ function StudioScreen(): React.JSX.Element {
         </div>
       </div>
 
-      <SheetPane seed={seed} onGraduate={() => setGraduateOpen(true)} />
+      <SeedPanel seed={seed} onGraduate={() => setGraduateOpen(true)} />
       {/* Mounted only while open so the title field starts from whatever the sheet says at that moment, and a
           turn landing behind the dialog never rewrites what the author is typing. */}
       {graduateOpen && <GraduateDialog seed={seed} open onOpenChange={setGraduateOpen} />}

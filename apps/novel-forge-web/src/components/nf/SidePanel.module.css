@@ -1,7 +1,10 @@
 .root {
   flex: none;
+  display: flex;
+  flex-direction: column;
   width: clamp(300px, 22vw, 340px);
   max-width: 100%;
+  min-height: 0;
   border: 1px solid var(--sh-border-subtle);
   border-radius: var(--sh-radius-lg);
   background: var(--sh-surface-card);
@@ -35,6 +38,9 @@
 }
 
 .body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -53,11 +59,16 @@
 }
 
 .footer {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding-top: 14px;
+  padding: 12px 14px;
   border-top: 1px solid var(--sh-border-subtle);
+}
+
+.footer[hidden] {
+  display: none;
 }
 
 /* Upright inside the vertical rail, so a count still reads as a count. */

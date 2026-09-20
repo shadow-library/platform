@@ -86,8 +86,12 @@ export function SidePanel({
       )}
       <div className={styles.body} id={bodyId} hidden={state === 'collapsed'}>
         {view.kind === 'empty' ? <p className={styles.empty}>{empty}</p> : children}
-        {footer != null && <div className={styles.footer}>{footer}</div>}
       </div>
+      {footer != null && (
+        <div className={styles.footer} hidden={state === 'collapsed'}>
+          {footer}
+        </div>
+      )}
     </aside>
   );
 }
