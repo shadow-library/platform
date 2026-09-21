@@ -8,6 +8,7 @@ import { assertAuthoringProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
+import { loadRevealGuard, sanitiseArcReveals } from '../ai/context/canon-guard';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
@@ -182,9 +183,12 @@ export class RefineService {
     const startChapter = volume.startChapter as number;
     const endChapter = volume.endChapter as number;
     this.logger.info('planArcs: starting', { projectId, volumeKey, startChapter, endChapter, arcCount: opts?.arcCount });
-    const prompt = buildArcPlanPrompt(startChapter, endChapter);
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'arc' }, project);
-    const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey, { policy });
+    const [pack, guard] = await Promise.all([
+      this.contextAssembler.forArcPlanning(projectId, volumeKey, { policy }),
+      loadRevealGuard(this.db, projectId, { start: startChapter, end: endChapter }),
+    ]);
+    const prompt = buildArcPlanPrompt(startChapter, endChapter, guard.advised);
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'arc-plan', `volume:${volumeKey}`, { arcCount: opts?.arcCount }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -197,7 +201,10 @@ export class RefineService {
         arcCount: opts?.arcCount ?? 'decide from the material',
         guidance: opts?.guidance ?? '',
       };
-      const output = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig, policy)) as ArcPlanOutput;
+      const raw = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig, policy)) as ArcPlanOutput;
+      const { arcs, sanitised } = sanitiseArcReveals(raw.arcs, guard.all);
+      if (sanitised.length > 0) this.logger.warn('planArcs: sanitised arcs that surfaced facts before their reveal chapter', { projectId, runId, sanitised });
+      const output = { ...raw, arcs };
 
       const changeSet: ChangeOp[] = output.arcs.map((arc, index) => ({
         op: 'arc.upsert',

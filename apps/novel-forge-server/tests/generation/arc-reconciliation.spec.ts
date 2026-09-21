@@ -261,7 +261,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
     await service.finalize(projectId, { chapter: 5 });
 
-    expect(forOutline).toHaveBeenCalledWith(projectId, 5, { policy: emptyPolicy() });
+    expect(forOutline).toHaveBeenCalledWith(projectId, 5, { policy: emptyPolicy(), span: { start: 1, end: 10 } });
     expect(structured.mock.calls[0]?.[1]).toMatchObject({ catalog: expect.stringContaining('the mentor betrays the crew') });
   });
 
@@ -271,7 +271,7 @@ describe.if(pgAvailable)('arc reconciliation on finalization', () => {
 
     await service.outlineArc(projectId, 'vol_1_arc_1', {});
 
-    expect(forOutline).toHaveBeenCalledWith(projectId, 1, { policy: emptyPolicy() });
+    expect(forOutline).toHaveBeenCalledWith(projectId, 1, { policy: emptyPolicy(), span: { start: 1, end: 10 } });
   });
 
   it('should skip persisting a brief whose chapter already has a non-final draft', async () => {

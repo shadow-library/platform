@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { findBriefRevealViolations } from '@modules/ai/context/canon-guard';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { GenerationService, MAX_WHOLE_BOOK_OUTLINE_SPAN } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
@@ -124,6 +125,67 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
     const broken = [brief(1, [], { continuesIntoNextChapter: true }), brief(2, [])];
     const errors = prompt.postValidate?.(broken as never) ?? [];
     expect(errors.some(e => e.includes('chapter 1 sets continuesIntoNextChapter'))).toBe(true);
+  });
+
+  it('should hand the router a prompt that flags, without blocking, a brief surfacing a project fact before its reveal chapter', async () => {
+    const projectId = await createApprovedVolume();
+    await db.insert(schema.canonFacts).values([
+      { projectId, factKey: 'miller_forged_the_deed', text: 'The miller forged the deed.', terms: ['forged deed'], revealChapter: 3 },
+      { projectId, factKey: 'seed_promise', text: 'The mill survives.', terms: ['mill survives'], revealChapter: 3, source: 'seed' },
+    ]);
+    const { service, structured } = buildSpanService();
+
+    await service.outline(projectId, { start: 1, count: 3 });
+
+    const prompt = structured.mock.calls.at(-1)?.[0] as { postValidate: (briefs: unknown[]) => string[]; advise: (briefs: unknown[]) => string[] };
+    const leaky = [brief(1, [], { objective: 'Find the forged deed; the mill survives.' } as never), brief(2, []), brief(3, [], { objective: 'The forged deed.' } as never)];
+    expect(prompt.postValidate(leaky)).toEqual([]);
+    expect(prompt.advise(leaky)).toEqual([
+      'chapter 1 objective names a REVEAL SCHEDULE term of miller_forged_the_deed, whose reveal is scheduled for chapter 3 — keep it out until then',
+    ]);
+  });
+
+  it('should keep every brief of an outline whose briefs still surface a fact early', async () => {
+    const projectId = await createApprovedVolume();
+    await db.insert(schema.canonFacts).values({ projectId, factKey: 'miller_forged_the_deed', text: 'The miller forged the deed.', terms: ['forged deed'], revealChapter: 3 });
+    const output = [brief(1, [], { objective: 'Find the forged deed.' } as never), brief(2, []), brief(3, [])];
+
+    const { briefs } = await buildService(output, new Set()).outline(projectId, { start: 1, count: 3 });
+
+    expect(briefs.map(b => b.chapter)).toEqual([1, 2, 3]);
+  });
+
+  it('should persist briefs with zero reveal violations after the final guard', async () => {
+    const projectId = await createApprovedVolume();
+    await db.insert(schema.canonFacts).values({
+      projectId,
+      factKey: 'miller_forged_the_deed',
+      text: 'The miller forged the deed.',
+      terms: ['forged deed'],
+      writerNote: 'The deed is not what it seems.',
+      revealChapter: 3,
+    });
+    const output = [
+      brief(1, [], { title: 'The Forged Deed', objective: 'Find the forged deed. Leave town.', events: ['The forged deed burns.', 'Rain.'] } as never),
+      brief(2, [], { chapterPurpose: 'The forged deed surfaces.' } as never),
+      brief(3, [], { objective: 'The forged deed comes to light.' } as never),
+    ];
+
+    await buildService(output, new Set()).outline(projectId, { start: 1, count: 3 });
+
+    const persisted = await db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: schema.briefs.chapter });
+    const reveals = [{ factKey: 'miller_forged_the_deed', revealChapter: 3, terms: ['forged deed'], writerNote: 'The deed is not what it seems.' }];
+    const stored = persisted.map(row => ({
+      chapter: row.chapter,
+      title: row.title ?? undefined,
+      objective: row.body,
+      chapterPurpose: row.chapterPurpose ?? undefined,
+      endingContract: row.endingContract as never,
+      knowledgeContract: row.knowledgeContract as never,
+    }));
+    expect(findBriefRevealViolations(stored, reveals)).toEqual([]);
+    expect(persisted[0]?.title).toBe('The deed is not what it seems.');
+    expect(persisted[2]?.body).toContain('The forged deed comes to light.');
   });
 
   it('clamps a no-count whole-book outline to MAX_WHOLE_BOOK_OUTLINE_SPAN when the volumes sum to more', async () => {

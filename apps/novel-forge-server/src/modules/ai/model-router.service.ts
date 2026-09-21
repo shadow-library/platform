@@ -406,7 +406,7 @@ export class ModelRouterService {
       });
     }
 
-    const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
+    const { parsed: parsed1, usable: usable1 } = this.parseFirstAttempt(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
       this.logger.debug('structured: parsed on first attempt', { role, runId: ctx.runId, outputLength: rawOutput1.length });
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
@@ -417,7 +417,9 @@ export class ModelRouterService {
     // The issue strings are structural field paths and validator messages — no author prose — so they ride
     // on warn, where production keeps them. The raw output is the author's material and stays on debug.
     const issues1 = renderSchemaIssues(parsed1.issues);
-    this.logger.warn('Attempt 1 parse failed — repairing', { role, runId: ctx.runId, promptKey: promptModule.key, promptVersion: promptModule.version, issues: issues1 });
+    const attempt1Meta = { role, runId: ctx.runId, promptKey: promptModule.key, promptVersion: promptModule.version, issues: issues1 };
+    if (usable1 === undefined) this.logger.warn('Attempt 1 parse failed — repairing', attempt1Meta);
+    else this.logger.warn('Attempt 1 has advisory issues only — repairing once', { ...attempt1Meta, advisory: true });
     this.logger.debug('Attempt 1 raw output', { role, runId: ctx.runId, rawOutput: rawOutput1 });
 
     const repairMessages: BaseMessage[] = [
@@ -461,6 +463,13 @@ export class ModelRouterService {
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, extractedRaw);
       relay?.settle(extractedRaw);
       return parsedExtracted.data;
+    }
+
+    if (usable1 !== undefined) {
+      this.logger.warn('Repair unusable — keeping attempt 1 despite its advisory issues', { role, runId: ctx.runId, promptKey: promptModule.key, advisory: true, issues2 });
+      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
+      relay?.settle(rawOutput1);
+      return usable1;
     }
 
     this.logger.error('All parse attempts failed', {
@@ -572,6 +581,19 @@ export class ModelRouterService {
   private parseOutput<T>(promptModule: PromptModule<T>, data: unknown): SchemaParseResult<T> {
     const normalized = normalizeForSchema(promptModule.schema, data);
     return applyPostValidate(parseSchema<T>(promptModule.schema, normalized), promptModule.postValidate);
+  }
+
+  // Advisory rules count only here, beside the blocking ones, so one repair request carries both. An output that fails
+  // only advisory rules stays `usable`: tolerant extraction cannot rebuild a top-level array, so it is the fallback
+  // that keeps an advisory issue from ever failing the call.
+  private parseFirstAttempt<T>(promptModule: PromptModule<T>, data: unknown): { parsed: SchemaParseResult<T>; usable?: T } {
+    const parsed = parseSchema<T>(promptModule.schema, normalizeForSchema(promptModule.schema, data));
+    if (!parsed.success) return { parsed };
+    const blocking = promptModule.postValidate?.(parsed.data) ?? [];
+    const advisory = promptModule.advise?.(parsed.data) ?? [];
+    if (blocking.length === 0 && advisory.length === 0) return { parsed };
+    const issues: SchemaIssue[] = [...blocking, ...advisory].map(message => ({ path: [], message }));
+    return { parsed: { success: false, issues }, usable: blocking.length === 0 ? parsed.data : undefined };
   }
 
   // Formats the module's template into messages. Anthropic models get cache_control breakpoints on

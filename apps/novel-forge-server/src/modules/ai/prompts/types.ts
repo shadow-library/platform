@@ -76,5 +76,8 @@ export interface PromptModule<TOut> {
   // Cross-field/cross-item business rules JSON Schema can't express declaratively (e.g. comparing
   // adjacent array items). Runs after schema validation succeeds; a non-empty return re-enters the repair ladder.
   postValidate?: (data: TOut) => string[];
+  // Rules worth one repair but never a failure: issues found on the first attempt join the repair request, and whatever
+  // the repair or tolerant extraction returns is accepted. The caller re-runs the rule on the result to surface what remains.
+  advise?: (data: TOut) => string[];
   fewShots?: BaseMessage[];
 }

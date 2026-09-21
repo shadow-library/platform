@@ -30,6 +30,7 @@ import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { type BibleDocRow, renderBibleDigest } from './bible-docs';
+import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { pluginContextSections } from './plugin-sections';
@@ -53,6 +54,13 @@ export interface PackPolicyOptions {
 
 export interface PackOptions extends PackPolicyOptions {
   budgetTokens?: number;
+}
+
+export interface OutlinePackOptions extends PackOptions {
+  /** The chapters the outline call plans; without it the reveal schedule covers the arc, else the volume, around the chapter. */
+  span?: ChapterSpan;
+  /** Planning a chapter to be inserted after this one: reveal chapters are rendered as they will read once it commits. */
+  insertAfter?: number;
 }
 
 export interface ChapterPackOptions extends PackOptions {
@@ -288,6 +296,12 @@ function sumTokens(sections: ContextSection[]): number {
 /** The content a section may hold when the section itself, heading included, must fit in `available`. */
 function sizedSectionCeiling(key: string, available: number): number {
   return Math.max(0, available - countTokens(renderSection(key, '')) - SIZED_SECTION_MARGIN);
+}
+
+function outlineSpan(chapter: number, arc?: Pick<schema.Plan.Arc, 'chapterStart' | 'chapterEnd'>, volume?: Pick<schema.Plan.Volume, 'startChapter' | 'endChapter'>): ChapterSpan {
+  if (arc?.chapterStart != null && arc.chapterEnd != null) return { start: arc.chapterStart, end: arc.chapterEnd };
+  if (volume?.startChapter != null && volume.endChapter != null) return { start: volume.startChapter, end: volume.endChapter };
+  return { start: chapter, end: chapter };
 }
 
 function castKeys(cast: unknown): string[] {
@@ -868,7 +882,7 @@ export class ContextAssembler {
     return sections;
   }
 
-  async forOutline(projectId: bigint, chapter: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
+  async forOutline(projectId: bigint, chapter: number, opts?: OutlinePackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? OUTLINE_BUDGET;
 
     const [currentVolume, recentChapters, prevVolumes, currentArc] = await Promise.all([
@@ -919,7 +933,8 @@ export class ContextAssembler {
     // what the other required sections leave, so none of them can be crowded out.
     const focusEntityKeys = [...castKeys(currentArc?.cast), ...castKeys(currentVolume?.cast)];
     const maxTokens = sizedSectionCeiling('catalog', budgetTokens - sumTokens(sections));
-    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys, documents: true, maxTokens });
+    const span = opts?.span ?? outlineSpan(chapter, currentArc, currentVolume);
+    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys, documents: true, maxTokens, span, insertAfter: opts?.insertAfter });
     if (catalogText) sections.push({ ...makeSection('catalog', catalogText, 'canonical', []), required: true });
 
     if (this.retrievalService) {
@@ -1219,7 +1234,8 @@ export class ContextAssembler {
 
     const cachedBudget = budgetTokens - ARC_PLAN_UNCACHED_RESERVE;
     const catalogCeiling = sizedSectionCeiling('catalog', cachedBudget - sumTokens(sections) - ARC_PLAN_BIBLE_FLOOR);
-    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys: castKeys(volume?.cast), maxTokens: catalogCeiling });
+    const span = volume?.startChapter != null && volume.endChapter != null ? { start: volume.startChapter, end: volume.endChapter } : undefined;
+    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys: castKeys(volume?.cast), maxTokens: catalogCeiling, span });
     if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
 
     const bibleSection = this.planningBibleSection(projectId, documents, cachedBudget - sumTokens(sections));

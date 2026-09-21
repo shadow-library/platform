@@ -197,8 +197,8 @@ describe('Prompt modules', () => {
     it('registers the five new prompt keys', () => {
       for (const key of ['chat-compact', 'arc-plan'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
       expect(PROMPT_REGISTRY['chat-compact'].version).toBe('1.0.0');
-      // arc-plan v1.1 reads the governing bible documents and names the only valid cast entries.
-      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.1.0');
+      // arc-plan v1.2 binds the catalog's reveal schedule and hard limits.
+      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.2.0');
       // bible-audit v2 audits entity records alongside documents: a document-only audit could never
       // repair a bible whose canon exists as prose the Story Bible screen cannot read.
       expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.0.0');
@@ -1071,7 +1071,7 @@ describe('Prompt modules', () => {
     });
 
     it('should tell the outliner to cite governing bible documents by their catalog ref and never a canon fact', () => {
-      expect(PROMPT_REGISTRY.outline.version).toBe('2.4.0');
+      expect(PROMPT_REGISTRY.outline.version).toBe('2.5.0');
       expect(PROMPT_REGISTRY.outline.system).toContain('bible_doc:<section>/<slug> copied exactly as the BIBLE DOCUMENTS list writes it');
       expect(PROMPT_REGISTRY.outline.system).toContain('Never cite a canon fact');
     });

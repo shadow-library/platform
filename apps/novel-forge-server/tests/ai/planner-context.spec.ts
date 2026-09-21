@@ -286,6 +286,31 @@ describe.if(pgAvailable)('planner context', () => {
     expect(pack.rendered.indexOf('lockkeeper — ')).toBeLessThan(pack.rendered.indexOf('ferrywoman — '));
   });
 
+  it('should scope the outline pack reveal schedule to the arc being outlined and list the hard limits', async () => {
+    const projectId = await seedProject('outline-guard');
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, status: 'approved', startChapter: 1, endChapter: 30 });
+    await db.insert(schema.arcs).values({ projectId, arcKey: 'arc_two', volumeKey: 'v1', ordinal: 2, chapterStart: 6, chapterEnd: 10 });
+    await db
+      .insert(schema.entities)
+      .values({ projectId, entityKey: 'current_sense', type: 'power_rule', name: 'Current sense', body: 'A keeper feels the current downstream only.' });
+    await db.insert(schema.canonFacts).values([
+      { projectId, factKey: 'weir_was_sabotaged', text: 'The weir was cut on purpose.', terms: ['cut chain'], revealChapter: 18 },
+      { projectId, factKey: 'keeper_owes_toll', text: 'The keeper owes the toll house.', revealChapter: 8 },
+      { projectId, factKey: 'ferry_is_stolen', text: 'The ferry was stolen.', revealChapter: 4 },
+    ]);
+
+    const pack = await assembler.forOutline(projectId, 7);
+
+    expect(pack.rendered).toContain(
+      [
+        'REVEAL SCHEDULE (binding for chapters 6–10):',
+        'keeper_owes_toll — reveals ch 8: nothing before ch 8 may surface it',
+        'weir_was_sabotaged — reveals ch 18: hidden for this whole span; never name: cut chain',
+      ].join('\n'),
+    );
+    expect(pack.rendered).toContain('HARD LIMITS (no planned event may break these):\nentity:current_sense — A keeper feels the current downstream only.');
+  });
+
   it('should keep the volume objective and memory in an outline pack whose catalog outgrows the budget', async () => {
     const projectId = await seedProject('outline-ceiling');
     await db.insert(schema.volumes).values([
@@ -336,6 +361,26 @@ describe.if(pgAvailable)('planner context', () => {
       for (const marker of ['PREMISE_DOC_MARKER', 'PROMISE_DOC_MARKER', 'PLOT_DOC_MARKER', 'WORLD_DOC_MARKER', 'POWER_DOC_MARKER']) expect(section?.rendered).toContain(marker);
       for (const marker of ['ART_STYLE_MARKER', 'LORE_DOC_MARKER', 'STATE_DOC_MARKER']) expect(pack.rendered).not.toContain(marker);
       expect(pack.rendered.indexOf('## CANON CATALOG')).toBeLessThan(pack.rendered.indexOf('## BIBLE DOCUMENTS'));
+    });
+
+    it('should scope the reveal schedule to the volume in the cached catalog', async () => {
+      const projectId = await seedArcProject('arc-guard');
+      await db.insert(schema.canonFacts).values([
+        { projectId, factKey: 'weir_was_sabotaged', text: 'The weir was cut on purpose.', revealChapter: 18 },
+        { projectId, factKey: 'next_volume_secret', text: 'The toll house is empty.', revealChapter: 25 },
+      ]);
+
+      const pack = await assembler.forArcPlanning(projectId, 'v1');
+      const catalog = pack.sections.find(s => s.key === 'catalog');
+
+      expect(catalog?.segment).toBe('stable');
+      expect(catalog?.rendered).toContain(
+        [
+          'REVEAL SCHEDULE (binding for chapters 1–20):',
+          'weir_was_sabotaged — reveals ch 18: nothing before ch 18 may surface it',
+          'next_volume_secret — reveals ch 25: hidden for this whole span',
+        ].join('\n'),
+      );
     });
 
     it('should cut oversized documents to fit the pack budget rather than drop the section', async () => {

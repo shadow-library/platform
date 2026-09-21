@@ -10,6 +10,7 @@ import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { renderBibleDigest } from '../ai/context/bible-docs';
+import { loadRevealGuard, sanitiseBriefReveals, type ScheduledReveal } from '../ai/context/canon-guard';
 import { ContextAssembler, OUTLINE_BUDGET } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
@@ -27,6 +28,7 @@ import { renderEndingContract } from '../ai/schemas/ending-contract.schema';
 import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
+import { type OutlineOutput } from '../ai/schemas/outline.schema';
 import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
@@ -309,7 +311,10 @@ export class GenerationService {
     }
     this.logger.info('outline: generating briefs', { projectId, start, end, volumes: relevantVolumes.length });
     const focusEntityKeys = relevantVolumes.flatMap(v => (Array.isArray(v.cast) ? v.cast.filter((key): key is string => typeof key === 'string') : []));
-    const catalog = await this.contextAssembler.catalog(projectId, { focusEntityKeys, documents: true, maxTokens: OUTLINE_BUDGET });
+    const [catalog, guard] = await Promise.all([
+      this.contextAssembler.catalog(projectId, { focusEntityKeys, documents: true, maxTokens: OUTLINE_BUDGET, span: { start, end } }),
+      loadRevealGuard(this.db, projectId, { start, end }),
+    ]);
 
     const volumePlan = relevantVolumes
       .map(
@@ -318,9 +323,10 @@ export class GenerationService {
       )
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(start, end);
+    const prompt = buildOutlinePrompt(start, end, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const outlineOutput = await this.modelRouter.structured(prompt, { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '' }, ctx);
+    const rawOutline = await this.modelRouter.structured(prompt, { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '' }, ctx);
+    const outlineOutput = this.withheldEarlyReveals(projectId, rawOutline, guard.all);
 
     const chapters = outlineOutput as unknown as {
       chapter: number;
@@ -405,10 +411,12 @@ export class GenerationService {
     const asOfChapter = latestFinalized ? latestFinalized.number + 1 : arc.chapterStart;
 
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: asOfChapter });
-    const [contextPack, siblings, project] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, asOfChapter, { policy }),
+    const span = { start: arc.chapterStart, end: arc.chapterEnd };
+    const [contextPack, siblings, project, guard] = await Promise.all([
+      this.contextAssembler.forOutline(projectId, asOfChapter, { policy, span }),
       this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      loadRevealGuard(this.db, projectId, span),
     ]);
     if (siblings.some(a => a.status !== 'approved')) throw AppErrorCode.ARC_004.create();
     this.logger.info('outlineArc: generating briefs for arc', { projectId, arcKey, chapterStart: arc.chapterStart, chapterEnd: arc.chapterEnd });
@@ -425,15 +433,16 @@ export class GenerationService {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd);
+    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const outlineOutput = await this.modelRouter.structured(
+    const rawOutline = await this.modelRouter.structured(
       prompt,
       { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '' },
       ctx,
       project as never,
       policy,
     );
+    const outlineOutput = this.withheldEarlyReveals(projectId, rawOutline, guard.all);
 
     const chapters = (
       outlineOutput as unknown as {
@@ -489,6 +498,12 @@ export class GenerationService {
     const briefs = upserted.filter(Boolean) as Generation.Brief[];
     await this.stagePluginBriefPolicy(projectId, briefs);
     return { briefs };
+  }
+
+  private withheldEarlyReveals(projectId: bigint, outline: OutlineOutput, reveals: readonly ScheduledReveal[]): OutlineOutput {
+    const { briefs, sanitised } = sanitiseBriefReveals(outline, reveals);
+    if (sanitised.length > 0) this.logger.warn('outline: sanitised briefs that surfaced facts before their reveal chapter', { projectId, sanitised });
+    return briefs;
   }
 
   private async stagePluginBriefPolicy(projectId: bigint, briefs: Generation.Brief[]): Promise<void> {

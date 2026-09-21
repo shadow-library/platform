@@ -19,6 +19,7 @@ import { MODEL_MAP, MODEL_REGISTRY } from '@modules/ai/models';
 import { appearanceDescribePrompt } from '@modules/ai/prompts/appearance-describe.prompt';
 import { type AppearanceDescribeOutput } from '@modules/ai/schemas/appearance-describe.schema';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
+import { type OutlineOutput, OutlineSchema, validateOutlineCoverage } from '@modules/ai/schemas/outline.schema';
 import { TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { type AppError, Config } from '@shadow-library/common';
 
@@ -506,6 +507,133 @@ describe('ModelRouterService.structured (repair ladder)', () => {
     const repairConversation = (seen[1] ?? []).map(message => String(message.content)).join('\n');
     expect(repairConversation).toContain('matching this JSON schema');
     expect(repairConversation).toContain('one finding, citing the canon it conflicts with');
+  });
+
+  describe('with an advisory rule', () => {
+    const ctx = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
+    const flagged = JSON.stringify({ verdict: 'consistent', findings: [{ severity: 'soft', text: 'flagged' }] });
+    const clean = JSON.stringify({ verdict: 'consistent', findings: [] });
+    const advisoryPrompt = { ...fakePrompt, advise: (data: JudgeOutput) => (data.findings.length > 0 ? ['advisory: finding present'] : []) };
+
+    it('should spend one repair on an advisory issue and show it to the repair', async () => {
+      const seen: BaseMessage[][] = [];
+      const fakeChain = {
+        invoke: mock(async (messages: BaseMessage[]) => {
+          seen.push(messages);
+          return { content: seen.length === 1 ? flagged : clean };
+        }),
+      };
+
+      const result = await makeRouter(fakeChain).structured<JudgeOutput>(advisoryPrompt, {}, ctx);
+
+      expect(result.findings).toEqual([]);
+      expect(seen).toHaveLength(2);
+      expect((seen[1] ?? []).map(message => String(message.content)).join('\n')).toContain('advisory: finding present');
+    });
+
+    it('should accept the repair when the advisory issue survives it', async () => {
+      const fakeChain = { invoke: mock(async () => ({ content: flagged })) };
+
+      const result = await makeRouter(fakeChain).structured<JudgeOutput>(advisoryPrompt, {}, ctx);
+
+      expect(result.findings).toHaveLength(1);
+      expect(fakeChain.invoke).toHaveBeenCalledTimes(2);
+    });
+
+    it('should log an advisory-only repair apart from a parse failure', async () => {
+      const fakeChain = { invoke: mock(async () => ({ content: flagged })) };
+      const router = makeRouter(fakeChain);
+      const records: { message: string; meta: Record<string, unknown> }[] = [];
+      const record = (message: string, meta: Record<string, unknown>) => void records.push({ message, meta });
+      (router as unknown as Record<string, unknown>)['logger'] = { debug: () => undefined, info: record, warn: record, error: record };
+
+      await router.structured<JudgeOutput>(advisoryPrompt, {}, ctx);
+
+      expect(records.some(entry => entry.message.startsWith('Attempt 1 parse failed'))).toBe(false);
+      expect(records.find(entry => entry.message.startsWith('Attempt 1 has advisory issues only'))?.meta).toMatchObject({ advisory: true });
+    });
+
+    it('should send blocking and advisory issues in one repair request', async () => {
+      const seen: BaseMessage[][] = [];
+      const both = { ...advisoryPrompt, postValidate: (data: JudgeOutput) => (data.verdict === 'consistent' && data.findings.length > 0 ? ['blocking: verdict'] : []) };
+      const fakeChain = {
+        invoke: mock(async (messages: BaseMessage[]) => {
+          seen.push(messages);
+          return { content: seen.length === 1 ? flagged : clean };
+        }),
+      };
+
+      await makeRouter(fakeChain).structured<JudgeOutput>(both, {}, ctx);
+
+      const repair = (seen[1] ?? []).map(message => String(message.content)).join('\n');
+      expect(repair).toContain('blocking: verdict');
+      expect(repair).toContain('advisory: finding present');
+    });
+
+    it('should fall back to the first attempt when the repair breaks the schema', async () => {
+      let callCount = 0;
+      const fakeChain = {
+        invoke: mock(async () => {
+          callCount++;
+          return { content: callCount === 1 ? flagged : 'no longer json' };
+        }),
+      };
+
+      const result = await makeRouter(fakeChain).structured<JudgeOutput>(advisoryPrompt, {}, ctx);
+
+      expect(result.findings).toHaveLength(1);
+    });
+
+    describe('on an array-schema prompt', () => {
+      const brief = (title: string) => ({
+        chapter: 1,
+        volumeKey: 'vol_01',
+        title,
+        objective: 'Cross the salt flats.',
+        events: ['The caravan stalls.'],
+        requiredContext: [],
+        endingContract: { hookType: 'turn', emotionalBeat: 'dread', openQuestion: 'who cut the rope?', handoffState: 'stranded', mustNotResolve: [] },
+        chapterPurpose: 'Strands the caravan.',
+        readerValue: ['world_state_change'],
+      });
+      const arrayPrompt = {
+        ...fakePrompt,
+        key: 'outline' as const,
+        schema: OutlineSchema,
+        postValidate: (briefs: OutlineOutput) => validateOutlineCoverage(briefs, 1, 1),
+        advise: (briefs: OutlineOutput) => (briefs.some(b => b.title.includes('secret')) ? ['advisory: early reveal'] : []),
+      };
+      const outlineCtx = { ...ctx, promptKey: 'outline', role: 'outline' };
+      const firstAttempt = JSON.stringify([brief('The secret road')]);
+
+      it('should keep the first attempt when the repair breaks the schema', async () => {
+        let callCount = 0;
+        const fakeChain = {
+          invoke: mock(async () => {
+            callCount++;
+            return { content: callCount === 1 ? firstAttempt : 'I would rather not.' };
+          }),
+        };
+
+        const result = await makeRouter(fakeChain).structured<OutlineOutput>(arrayPrompt, {}, outlineCtx);
+
+        expect(result.map(b => b.title)).toEqual(['The secret road']);
+      });
+
+      it('should keep the first attempt when the repair passes the schema but fails a blocking rule', async () => {
+        let callCount = 0;
+        const fakeChain = {
+          invoke: mock(async () => {
+            callCount++;
+            return { content: callCount === 1 ? firstAttempt : JSON.stringify([{ ...brief('Salt'), chapter: 2 }]) };
+          }),
+        };
+
+        const result = await makeRouter(fakeChain).structured<OutlineOutput>(arrayPrompt, {}, outlineCtx);
+
+        expect(result.map(b => [b.chapter, b.title])).toEqual([[1, 'The secret road']]);
+      });
+    });
   });
 });
 

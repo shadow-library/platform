@@ -9,6 +9,7 @@ import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, shiftB
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type Plan, type PrimaryDatabase, schema } from '@server/database';
 
+import { loadRevealGuard, sanitiseBriefReveals } from '../ai/context/canon-guard';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt } from '../ai/prompts';
@@ -318,8 +319,9 @@ export class ChapterInsertService {
   private async planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
     const newChapter = afterChapter + 1;
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: newChapter });
+    const span = { start: newChapter, end: newChapter };
     const [pack, volume, arc, neighbours] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, newChapter, { policy }),
+      this.contextAssembler.forOutline(projectId, newChapter, { policy, span, insertAfter: afterChapter }),
       this.coveringVolume(projectId, afterChapter, this.db),
       this.coveringArc(projectId, afterChapter, this.db),
       this.db.query.briefs.findMany({
@@ -327,7 +329,10 @@ export class ChapterInsertService {
         orderBy: asc(schema.briefs.chapter),
       }),
     ]);
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const [project, guard] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      loadRevealGuard(this.db, projectId, span, afterChapter),
+    ]);
 
     const surrounding = neighbours.map(brief => `## Chapter ${brief.chapter > afterChapter ? brief.chapter + 1 : brief.chapter}: ${brief.title ?? ''}\n${brief.body}`).join('\n\n');
     const catalog = [pack.rendered, surrounding && `## Surrounding chapters (as they will be numbered)\n${surrounding}`].filter(Boolean).join('\n\n');
@@ -338,10 +343,12 @@ export class ChapterInsertService {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(newChapter, newChapter);
+    const prompt = buildOutlinePrompt(newChapter, newChapter, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
     const vars = { catalog, volumePlan, startChapter: newChapter, endChapter: newChapter, extraContext: `Insert a single new chapter here. Author's intent: ${intent}` };
-    const outlined = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
+    const raw = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
+    const { briefs: outlined, sanitised } = sanitiseBriefReveals(raw, guard.all);
+    if (sanitised.length > 0) this.logger.warn('insert: sanitised a brief that surfaced facts before their reveal chapter', { projectId, sanitised });
 
     const chapter = outlined[0];
     if (!chapter) throw AppErrorCode.BRF_001.create();

@@ -685,6 +685,28 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
       expect(brief.contextRefs).toEqual(['entity:li_wei']);
     });
 
+    it('should plan an insert just before a reveal chapter against the post-insert reveal numbers', async () => {
+      const databaseService = { getPostgresClient: () => db } as never;
+      const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
+      const packs: string[] = [];
+      const forOutline = assembler.forOutline.bind(assembler);
+      assembler.forOutline = (async (...args: Parameters<typeof forOutline>) => {
+        const pack = await forOutline(...args);
+        packs.push(pack.rendered);
+        return pack;
+      }) as never;
+      const structured = mock(async () => PLANNER_OUTPUT);
+      const service = new ChapterInsertService(databaseService, { structured } as never, assembler, noPluginPolicy());
+      const projectId = await seed({ chapters: 8 });
+
+      await service.insertAfter(projectId, 6, { briefOrigin: 'planner', intent: 'Li Wei burns the manifest.' });
+
+      expect(packs[0]).toContain('REVEAL SCHEDULE (binding for chapters 7–7):\nfact_late — reveals ch 8: hidden for this whole span');
+      const prompt = (structured.mock.calls.at(-1) as unknown[] | undefined)?.[0] as { advise: (briefs: unknown[]) => string[] };
+      const early = { ...PLANNER_OUTPUT[0], chapter: 7, knowledgeContract: { pov: ['li_wei'], learns: [{ entityKey: 'li_wei', factKey: 'fact_late' }] } };
+      expect(prompt.advise([early])).toEqual(['chapter 7 knowledgeContract.learns names fact_late, whose reveal is scheduled for chapter 8 — move the discovery there']);
+    });
+
     it('should mark every descendant draft stale from the insert point', async () => {
       const { service } = buildService();
       const projectId = await seed({ chapters: 8 });

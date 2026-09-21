@@ -8,6 +8,7 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { bibleDocExcerpt, bibleDocLabel, bibleDocRef, type BibleDocRow, clipAtBoundary, hasBibleContent, rankBibleDocs } from './bible-docs';
+import { type ChapterSpan, renderHardLimits, renderRevealSchedule, scheduledReveals, shiftRevealsForInsert } from './canon-guard';
 import { countTokens } from './token-budget';
 
 // A long-running project's chapters/entities grow unboundedly; canon facts and world facts (already
@@ -33,9 +34,13 @@ export interface CatalogOptions {
   descriptors?: 'rich' | 'compact';
   /** A hard ceiling on the rendered catalog; lines are left out in `TRIM_ORDER`, each section losing its lowest-priority lines first. */
   maxTokens?: number;
+  /** The chapters being planned: adds the reveal schedule scoped to them and the hard limits of the power system and world. */
+  span?: ChapterSpan;
+  /** Renders reveal chapters as they will read once a chapter is inserted after this one. */
+  insertAfter?: number;
 }
 
-type CatalogPartKey = 'chapters' | 'volumes' | 'entities' | 'world_facts' | 'threads' | 'mysteries' | 'canon_facts' | 'documents';
+type CatalogPartKey = 'chapters' | 'volumes' | 'entities' | 'world_facts' | 'threads' | 'mysteries' | 'canon_facts' | 'documents' | 'reveal_schedule' | 'hard_limits';
 
 interface CatalogPart {
   key: CatalogPartKey;
@@ -48,8 +53,9 @@ interface CatalogPart {
 }
 
 // World facts resolve by category even when unlisted and old chapters survive as summaries, so they go first; the entity roster,
-// which every other ref and the POV hang off, goes last.
-const TRIM_ORDER: readonly CatalogPartKey[] = ['world_facts', 'chapters', 'mysteries', 'threads', 'documents', 'canon_facts', 'entities'];
+// which every other ref and the POV hang off, goes last. The reveal schedule is never trimmed: the planner's reveal check enforces
+// exactly what it lists, and it is already capped by its own budget.
+const TRIM_ORDER: readonly CatalogPartKey[] = ['world_facts', 'chapters', 'mysteries', 'threads', 'documents', 'canon_facts', 'hard_limits', 'entities'];
 
 type EntityRow = typeof schema.entities.$inferSelect;
 
@@ -161,7 +167,7 @@ export class CatalogService {
   // prose-writing pack — the outliner cannot schedule a reveal it is not allowed to read.
   // Every section is sorted in memory with a key as the last tiebreak: the catalog sits in cached prefixes, so row order must never move it.
   async render(projectId: bigint, options: CatalogOptions = {}): Promise<string> {
-    const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, canonFacts, revealedRows, documents] = await Promise.all([
+    const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, storedFacts, revealedRows, documents] = await Promise.all([
       this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: asc(schema.chapters.number) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) }),
       // Entity deletion is a hard delete; a `ne(origin, 'deleted')` filter here previously crashed
@@ -186,6 +192,7 @@ export class CatalogService {
         : [],
     ]);
     const revealedFactIds = new Set(revealedRows.map(row => row.factId));
+    const canonFacts = options.insertAfter === undefined ? storedFacts : shiftRevealsForInsert(storedFacts, options.insertAfter);
 
     const parts: CatalogPart[] = [];
     const part = (key: CatalogPartKey, header: string, lines: string[], omittedLabel: string, omitted = 0, trimFrom: CatalogPart['trimFrom'] = 'end'): void => {
@@ -255,6 +262,14 @@ export class CatalogService {
 
     const documentLines = renderDocumentLines(documents);
     part('documents', 'BIBLE DOCUMENTS (cite with the ref exactly as written):', documentLines.lines, 'lower-priority documents', documentLines.omitted);
+
+    if (options.span) {
+      const { start, end } = options.span;
+      const schedule = renderRevealSchedule(scheduledReveals(canonFacts), options.span);
+      part('reveal_schedule', `REVEAL SCHEDULE (binding for chapters ${start}–${end}):`, schedule.lines, 'later reveals', schedule.omitted);
+      const limits = renderHardLimits(entities, worldFacts);
+      part('hard_limits', 'HARD LIMITS (no planned event may break these):', limits.lines, 'further limits', limits.omitted);
+    }
 
     if (options.maxTokens !== undefined) {
       const trimmed = trimToCeiling(parts, options.maxTokens);
