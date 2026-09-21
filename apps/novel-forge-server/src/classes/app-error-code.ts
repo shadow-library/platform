@@ -149,6 +149,7 @@ export class AppErrorCode extends ServerErrorCode {
    * Bible Document Errors
    */
   static readonly DOC_001 = AppErrorCode.notFound('DOC_001', 'Bible document not found');
+  static readonly DOC_002 = AppErrorCode.conflict('DOC_002', 'The Story Bible changed since the tidy-up preview — reload the preview and choose again');
 
   /*!
    * Job Errors

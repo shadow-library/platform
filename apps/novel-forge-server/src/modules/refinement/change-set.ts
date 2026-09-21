@@ -611,13 +611,18 @@ function validateEntityMaterialization(ops: readonly unknown[], allowedOps?: rea
   return errors;
 }
 
+export interface ChangeSetValidationOptions {
+  /** `false` only for a change-set that rearranges prose the bible already holds, and so cannot be the one that leaves canon unrecorded. */
+  entityMaterialization?: boolean;
+}
+
 /**
  * Validates an untrusted change-set structurally, optionally against a scope's allowed-op vocabulary.
  * Returns human-readable errors; an empty array means `value` is a well-formed `ChangeOp[]`.
  * Obviously-malformed-but-unambiguous bible_document refs are normalized in place first (see above),
  * so every staging and apply path repairs them consistently.
  */
-export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]): string[] {
+export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
   const errors: string[] = [];
   if (!Array.isArray(value)) return ['changeSet must be an array of operations'];
   if (value.length === 0) return ['changeSet must contain at least one operation'];
@@ -665,7 +670,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'action.graduate_seed' && typeof record['title'] === 'string' && record['title'].trim() === '') errors.push(`${path}: title must be a non-empty string`);
   });
 
-  if (errors.length === 0) errors.push(...validateEntityMaterialization(value, allowedOps));
+  if (errors.length === 0 && options?.entityMaterialization !== false) errors.push(...validateEntityMaterialization(value, allowedOps));
 
   return errors;
 }

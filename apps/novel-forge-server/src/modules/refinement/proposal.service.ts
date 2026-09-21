@@ -8,7 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { loadArtifactStates } from './artifact-state';
-import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
+import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 export interface ChangeItem {
@@ -35,6 +35,8 @@ export interface CreateProposalInput {
   summary?: string | null;
   changeSet: ChangeOp[];
   allowedOps?: readonly OpType[];
+  /** Off for the bible tidy-up, whose document writes only move or retitle prose that is already there. */
+  entityMaterialization?: boolean;
   model?: string | null;
   runId?: string | null;
 }
@@ -50,8 +52,8 @@ function supersessionOwner(input: CreateProposalInput): SQL | undefined {
 }
 
 /** A plugin-kind proposal carries the plugin allowlist by virtue of its kind, so a hand-edit cannot widen it either. */
-function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[]): string[] {
-  return kind === 'plugin' ? validatePluginChangeSet(changeSet) : validateChangeSet(changeSet, allowedOps);
+function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
+  return kind === 'plugin' ? validatePluginChangeSet(changeSet) : validateChangeSet(changeSet, allowedOps, options);
 }
 
 @Injectable()
@@ -69,7 +71,7 @@ export class ProposalService {
    * pending proposals are left alone — the baseline check catches them at apply time.
    */
   async create(projectId: bigint, input: CreateProposalInput, executor: DbExecutor = this.db): Promise<Refinement.Proposal> {
-    const errors = validateOps(input.kind, input.changeSet, input.allowedOps);
+    const errors = validateOps(input.kind, input.changeSet, input.allowedOps, { entityMaterialization: input.entityMaterialization });
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const refs = changeSetRefs(input.changeSet);

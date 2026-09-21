@@ -1,11 +1,14 @@
 import { type ReactElement, useState } from 'react';
 
-import { ChevronDownIcon } from '@/components/icons';
+import { Button } from '@shadow-library/ui';
+
+import { ChevronDownIcon, SparkIcon } from '@/components/icons';
 import { type BibleDocListItem, type BibleSection, useBibleDocQuery, useListBibleDocsQuery } from '@/lib/apis';
-import { emptyPagesLabel, groupBibleDocs } from '@/lib/bible-documents';
+import { emptyToggleLabel, groupBibleDocs } from '@/lib/bible-documents';
 
 import { BibleDocumentSheet } from './BibleDocumentSheet';
 import styles from './BibleDocumentList.module.css';
+import { BibleTidyDialog } from './BibleTidyDialog';
 import { StatusChip } from './StatusChip';
 
 interface OpenDoc {
@@ -27,18 +30,30 @@ export interface BibleDocumentListProps {
 export function BibleDocumentList({ novelId }: BibleDocumentListProps): ReactElement | null {
   const [open, setOpen] = useState<OpenDoc | null>(null);
   const [revealed, setRevealed] = useState<ReadonlySet<BibleSection>>(new Set());
+  const [tidying, setTidying] = useState(false);
   const docs = useListBibleDocsQuery(novelId);
   const body = useBibleDocQuery(novelId, open?.section, open?.slug);
 
   if (docs.isLoading || docs.error || !docs.data || docs.data.docs.length === 0) return null;
 
   const groups = groupBibleDocs(docs.data.docs);
-  const reveal = (section: BibleSection): void => setRevealed(prev => new Set(prev).add(section));
+  const toggleEmpty = (section: BibleSection): void =>
+    setRevealed(prev => {
+      const next = new Set(prev);
+      if (!next.delete(section)) next.add(section);
+      return next;
+    });
   const openDoc = (doc: BibleDocListItem, sectionLabel: string): void =>
     setOpen({ section: doc.section, slug: doc.slug, title: doc.title, sectionLabel, wordCount: doc.wordCount });
 
   return (
     <>
+      <div className={styles.toolbar}>
+        <Button variant="secondary" size="sm" prefix={<SparkIcon />} onClick={() => setTidying(true)}>
+          Tidy up
+        </Button>
+      </div>
+
       <div className={styles.groups}>
         {groups.map(group => (
           <section key={group.section} className={styles.group}>
@@ -62,26 +77,34 @@ export function BibleDocumentList({ novelId }: BibleDocumentListProps): ReactEle
               </ul>
             )}
 
-            {group.empty.length > 0 &&
-              (revealed.has(group.section) ? (
-                <ul className={styles.list}>
-                  {group.empty.map(doc => (
-                    <li key={`${doc.section}/${doc.slug}`}>
-                      <button type="button" className={styles.row} onClick={() => openDoc(doc, group.label)}>
-                        <span className={styles.rowHead}>
-                          <span className={styles.title}>{doc.title}</span>
-                          <StatusChip intent="neutral">Empty</StatusChip>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <button type="button" className={styles.emptyToggle} onClick={() => reveal(group.section)}>
+            {group.empty.length > 0 && (
+              <>
+                {revealed.has(group.section) && (
+                  <ul className={styles.list}>
+                    {group.empty.map(doc => (
+                      <li key={`${doc.section}/${doc.slug}`}>
+                        <button type="button" className={styles.row} onClick={() => openDoc(doc, group.label)}>
+                          <span className={styles.rowHead}>
+                            <span className={styles.title}>{doc.title}</span>
+                            <StatusChip intent="neutral">Empty</StatusChip>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  className={styles.emptyToggle}
+                  aria-expanded={revealed.has(group.section)}
+                  data-expanded={revealed.has(group.section) || undefined}
+                  onClick={() => toggleEmpty(group.section)}
+                >
                   <ChevronDownIcon size={12} />
-                  {emptyPagesLabel(group.empty.length)}
+                  {emptyToggleLabel(group.empty.length, revealed.has(group.section))}
                 </button>
-              ))}
+              </>
+            )}
           </section>
         ))}
       </div>
@@ -96,6 +119,8 @@ export function BibleDocumentList({ novelId }: BibleDocumentListProps): ReactEle
         loading={body.isLoading}
         body={body.data?.body}
       />
+
+      <BibleTidyDialog novelId={novelId} open={tidying} onOpenChange={setTidying} />
     </>
   );
 }

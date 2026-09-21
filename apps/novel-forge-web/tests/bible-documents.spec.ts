@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type BibleDocListItem } from '../src/lib/apis/api-types.gen';
-import { BIBLE_DOC_SECTION_LABEL, emptyPagesLabel, groupBibleDocs } from '../src/lib/bible-documents';
+import { BIBLE_DOC_SECTION_LABEL, emptyPagesLabel, emptyToggleLabel, groupBibleDocs } from '../src/lib/bible-documents';
 
 function doc(overrides: Partial<BibleDocListItem> & Pick<BibleDocListItem, 'section' | 'slug'>): BibleDocListItem {
   return { title: overrides.slug, wordCount: 10, isEmpty: false, updatedAt: '2026-01-01T00:00:00.000Z', ...overrides };
@@ -44,5 +44,13 @@ describe('emptyPagesLabel', () => {
   it('should use the plural otherwise', () => {
     expect(emptyPagesLabel(0)).toBe('0 empty pages');
     expect(emptyPagesLabel(3)).toBe('3 empty pages');
+  });
+});
+
+describe('emptyToggleLabel', () => {
+  it('should offer to reveal while collapsed and to hide again once revealed', () => {
+    expect(emptyToggleLabel(1, false)).toBe('1 empty page');
+    expect(emptyToggleLabel(2, false)).toBe('2 empty pages');
+    expect(emptyToggleLabel(1, true)).toBe('Hide empty pages');
   });
 });

@@ -22,13 +22,13 @@
 - **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter. Facts
   with `source = 'seed'` are reader promises written at graduation, not withheld truths.
 - **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
-- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
+- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
 - **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
 
 ## Capabilities
 
-- Ideation, bible building and audit, volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
+- Ideation, bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
 - Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, curated ingest, per-novel plugins, per-account AI quota.
 - Source pipeline (extract, consolidate, skeleton, recombine, rebrand, reforge, transform), translation, and publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 

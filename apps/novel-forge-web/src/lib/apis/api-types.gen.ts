@@ -1700,6 +1700,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/bible/tidy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Preview Bible Tidy */
+    get: operations['get_api_v1_projects_projectId_bible_tidy'];
+    put?: never;
+    /** Apply Bible Tidy */
+    post: operations['post_api_v1_projects_projectId_bible_tidy'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/entities': {
     parameters: {
       query?: never;
@@ -4798,6 +4816,48 @@ export interface components {
       /** @description why the section did not reach the model: 'budget' (evicted) or 'unresolved' (ref never resolved) */
       reason: string;
     };
+    BibleTidyPreviewResponse: {
+      items: components['schemas']['BibleTidyItem'][];
+    };
+    BibleTidyItem: {
+      /** @description Pins the content the change was computed from; send it back to apply the change. */
+      id: string;
+      kind: components['schemas']['BibleTidyKind'];
+      /** @description Section of the document the change comes from. */
+      section: components['schemas']['BibleSection'];
+      slug: string;
+      /** @description The document title as the Story Bible shows it now. */
+      docTitle: string;
+      /** @description retitle: the stored title being replaced. */
+      currentTitle?: string;
+      /** @description retitle: the title the document would get. */
+      proposedTitle?: string;
+      /** @description split: key of the entity record that would be created. */
+      entityKey?: string;
+      /** @description split: name of the entity record that would be created. */
+      entityName?: string;
+      /** @description split: the suggested entity type; the author may pick another when applying. */
+      entityType?: components['schemas']['EntityType'];
+      /** @description split: the entity body; move_ai_notes: the note being moved. */
+      text?: string;
+      /** @description move_ai_notes: slug of the notes-for-the-AI document the note moves into. */
+      targetSlug?: string;
+    };
+    /** @enum {string} */
+    BibleTidyKind: 'remove_empty' | 'retitle' | 'split' | 'move_ai_notes';
+    /** @enum {string} */
+    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
+    /** @enum {string} */
+    EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
+    ApplyBibleTidyBody: {
+      /** @description The preview items to apply; everything left out stays as it is. */
+      items: components['schemas']['BibleTidySelection'][];
+    };
+    BibleTidySelection: {
+      id: string;
+      /** @description split only: overrides the suggested entity type. */
+      entityType?: components['schemas']['EntityType'];
+    };
     CreateEntityBody: {
       entityKey: string;
       type: components['schemas']['EntityType'];
@@ -4812,8 +4872,6 @@ export interface components {
       appearance?: string;
       aliases?: string[];
     };
-    /** @enum {string} */
-    EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
     /** @enum {string} */
     EntitySignificance: 'major' | 'minor';
     /** @enum {string} */
@@ -5001,8 +5059,6 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @enum {string} */
-    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
     BibleDocResponse: {
       id: string;
       projectId: string;
@@ -5072,6 +5128,8 @@ export interface components {
     };
     BibleReadinessResponse: {
       dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
+      /** @description one entry per bible role, in manifest order, explaining what the coverage dimension counted */
+      roles?: components['schemas']['BibleReadinessRoleResponse'][];
       /** @description false while canon is absent or exists only as prose the Story Bible cannot read */
       readyToDraft: boolean;
       /** @description the coverage and record gaps that hold `readyToDraft` false */
@@ -5092,6 +5150,19 @@ export interface components {
     BibleReadinessDimension: 'coverage' | 'records' | 'substance' | 'integrity' | 'reveal';
     /** @enum {string} */
     BibleReadinessVerdict: 'strong' | 'thin' | 'empty';
+    BibleReadinessRoleResponse: {
+      stage: components['schemas']['BibleStage'];
+      /** @description what the role is called on the readiness banner */
+      label: string;
+      /** @description the canonical `section/slug` the bible builder writes this role to */
+      address: string;
+      /** @description true when any document or record set carries the substance this role needs, whatever it is named */
+      covered: boolean;
+      /** @description the documents (`section/slug`) and record summaries that cover the role; empty when it is uncovered */
+      coveredBy: string[];
+    };
+    /** @enum {string} */
+    BibleStage: 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
     CreateSeedBody: {
       /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
       spark?: string;
@@ -11279,6 +11350,90 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_bible_tidy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleTidyPreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_bible_tidy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApplyBibleTidyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_entities: {
     parameters: {
       query?: {
@@ -16028,8 +16183,14 @@ export type PlannedArcItem = components['schemas']['PlannedArcItem'];
 export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
 export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
 export type OmittedSectionPreview = components['schemas']['OmittedSectionPreview'];
-export type CreateEntityBody = components['schemas']['CreateEntityBody'];
+export type BibleTidyPreviewResponse = components['schemas']['BibleTidyPreviewResponse'];
+export type BibleTidyItem = components['schemas']['BibleTidyItem'];
+export type BibleTidyKind = components['schemas']['BibleTidyKind'];
+export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
+export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
+export type BibleTidySelection = components['schemas']['BibleTidySelection'];
+export type CreateEntityBody = components['schemas']['CreateEntityBody'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];
 export type EntityOrigin = components['schemas']['EntityOrigin'];
 export type EntityResponse = components['schemas']['EntityResponse'];
@@ -16049,7 +16210,6 @@ export type ApproveArcsResponse = components['schemas']['ApproveArcsResponse'];
 export type UpsertArcBody = components['schemas']['UpsertArcBody'];
 export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
 export type BibleDocListItem = components['schemas']['BibleDocListItem'];
-export type BibleSection = components['schemas']['BibleSection'];
 export type BibleDocResponse = components['schemas']['BibleDocResponse'];
 export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
 export type ListFactsResponse = components['schemas']['ListFactsResponse'];
@@ -16062,6 +16222,8 @@ export type BibleReadinessResponse = components['schemas']['BibleReadinessRespon
 export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
 export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
 export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
+export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRoleResponse'];
+export type BibleStage = components['schemas']['BibleStage'];
 export type CreateSeedBody = components['schemas']['CreateSeedBody'];
 export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
 export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
@@ -16297,6 +16459,7 @@ export type TurnStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/c
 export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/turns/{runId}/stream']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
+export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;

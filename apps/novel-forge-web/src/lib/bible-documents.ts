@@ -36,3 +36,8 @@ export function groupBibleDocs(docs: readonly BibleDocListItem[]): BibleDocSecti
 export function emptyPagesLabel(count: number): string {
   return count === 1 ? '1 empty page' : `${count} empty pages`;
 }
+
+/** The same control collapses what it revealed, so opening a section's empty pages is never a one-way trip. */
+export function emptyToggleLabel(count: number, revealed: boolean): string {
+  return revealed ? 'Hide empty pages' : emptyPagesLabel(count);
+}
