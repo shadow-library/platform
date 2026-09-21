@@ -1,3 +1,4 @@
+import { deriveBibleDocTitle } from '@server/common';
 import { type Bible } from '@server/database/schemas';
 
 import { countTokens } from './token-budget';
@@ -69,12 +70,7 @@ export function bibleDocRef(doc: Pick<BibleDocRow, 'section' | 'slug'>): string 
 }
 
 export function bibleDocLabel(doc: BibleDocRow): string {
-  const title = doc.frontmatter?.['title'];
-  if (typeof title === 'string' && title.trim() !== '') return title.trim();
-  const heading = /^#\s+(.+)$/m.exec(doc.body ?? '')?.[1]?.trim();
-  if (heading) return heading;
-  const words = doc.slug.replace(/[-_]+/g, ' ').trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
+  return deriveBibleDocTitle(doc);
 }
 
 export function bibleDocExcerpt(doc: BibleDocRow, maxChars: number): string {

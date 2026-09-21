@@ -4,7 +4,7 @@ import { Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { arcContentHash, briefContentHash, computeBibleDocHash, renderBriefBody, volumeContentHash } from '@server/common';
+import { arcContentHash, briefContentHash, computeBibleDocHash, ensureBibleDocTitle, renderBriefBody, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -143,8 +143,17 @@ export class PlanImportService {
 
     for (const doc of docs) {
       const row = existingByKey.get(`${doc.section}/${doc.slug}`);
-      const contentHash = computeBibleDocHash(doc.frontmatter ?? null, doc.body);
+      // Hashed both ways: a title folded into a document whose stored hash predates title derivation
+      // must read as the same content, not as an edit — the raw hash is what that stored hash was computed from.
+      const rawHash = computeBibleDocHash(doc.frontmatter ?? null, doc.body);
+      const frontmatter = ensureBibleDocTitle({ slug: doc.slug, frontmatter: doc.frontmatter ?? null, body: doc.body });
+      const contentHash = computeBibleDocHash(frontmatter, doc.body);
       if (row && row.contentHash === contentHash) {
+        result.unchanged += 1;
+        continue;
+      }
+      if (row && row.contentHash === rawHash) {
+        await tx.update(schema.bibleDocuments).set({ frontmatter, contentHash, updatedAt: new Date() }).where(eq(schema.bibleDocuments.id, row.id));
         result.unchanged += 1;
         continue;
       }
@@ -152,11 +161,11 @@ export class PlanImportService {
       if (row) {
         await tx
           .update(schema.bibleDocuments)
-          .set({ frontmatter: doc.frontmatter ?? null, body: doc.body, contentHash, revision: row.revision + 1, updatedAt: new Date() })
+          .set({ frontmatter, body: doc.body, contentHash, revision: row.revision + 1, updatedAt: new Date() })
           .where(eq(schema.bibleDocuments.id, row.id));
         result.updated += 1;
       } else {
-        await tx.insert(schema.bibleDocuments).values({ projectId, section: doc.section, slug: doc.slug, frontmatter: doc.frontmatter ?? null, body: doc.body, contentHash });
+        await tx.insert(schema.bibleDocuments).values({ projectId, section: doc.section, slug: doc.slug, frontmatter, body: doc.body, contentHash });
         result.created += 1;
       }
     }

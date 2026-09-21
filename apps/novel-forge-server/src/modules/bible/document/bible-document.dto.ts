@@ -1,4 +1,4 @@
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
 import { BibleSection } from '@server/common';
@@ -40,6 +40,18 @@ export class BibleDocListItem {
 
   @Field()
   slug: string;
+
+  @Field({ description: 'frontmatter.title, else the first "# " heading, else the slug read as words.' })
+  title: string;
+
+  @Field(() => Integer)
+  wordCount: number;
+
+  @Field()
+  isEmpty: boolean;
+
+  @Field({ optional: true, description: 'First prose sentence or two, omitted for an empty document.' })
+  excerpt?: string;
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;

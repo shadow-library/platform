@@ -639,6 +639,8 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: 'premise', newRevision: null });
   }
 
+  // Deliberately does not derive a title into frontmatter here: this op also replays as an inverse op
+  // on revert/rollback, and that replay must restore the prior row's exact frontmatter, byte for byte.
   private async applyBibleDocUpsert(ctx: ApplyContext, op: BibleDocumentUpsertOp): Promise<void> {
     const contentHash = computeBibleDocHash(op.frontmatter, op.body);
     const [row] = await ctx.tx

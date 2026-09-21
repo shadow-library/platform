@@ -4992,6 +4992,12 @@ export interface components {
     BibleDocListItem: {
       section: components['schemas']['BibleSection'];
       slug: string;
+      /** @description frontmatter.title, else the first "# " heading, else the slug read as words. */
+      title: string;
+      wordCount: number;
+      isEmpty: boolean;
+      /** @description First prose sentence or two, omitted for an empty document. */
+      excerpt?: string;
       /** Format: date-time */
       updatedAt: string;
     };

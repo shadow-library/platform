@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { BibleDocumentService } from '@modules/bible/document/bible-document.service';
+import { computeBibleDocHash } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -68,5 +69,59 @@ describe.if(pgAvailable)('BibleDocumentService versioning + invalidation', () =>
     const v2 = await service.upsert(projectId, 'world', 'magic', { body: 'Fire magic was outlawed.' });
     expect(v2.revision).toBe(2);
     expect(await chapterFlag(projectId)).toBe(true);
+  });
+
+  it('derives and persists a title on write, and reports it in list() alongside word count and emptiness', async () => {
+    const { projectId } = await seed();
+
+    await service.upsert(projectId, 'world', 'lock-law', { body: '# Lock Law\n\nEvery barge pays at the upper lock.' });
+    await service.upsert(projectId, 'project', 'art-style', { frontmatter: { title: 'Kept Title' }, body: 'Body only, no heading.' });
+    await service.upsert(projectId, 'plot', 'blank', { body: '   \n  ' });
+
+    const docs = await service.list(projectId);
+    const byKey = new Map(docs.map(d => [`${d.section}/${d.slug}`, d]));
+
+    const lockLaw = byKey.get('world/lock-law');
+    expect(lockLaw?.title).toBe('Lock Law');
+    expect(lockLaw?.isEmpty).toBe(false);
+    expect(lockLaw?.wordCount).toBeGreaterThan(0);
+    expect(lockLaw?.excerpt).toBeTruthy();
+
+    const artStyle = byKey.get('project/art-style');
+    expect(artStyle?.title).toBe('Kept Title');
+
+    const blank = byKey.get('plot/blank');
+    expect(blank?.isEmpty).toBe(true);
+    expect(blank?.wordCount).toBe(0);
+    expect(blank?.excerpt).toBeUndefined();
+    expect(blank?.title).toBe('Blank');
+
+    const stored = await service.get(projectId, 'world', 'lock-law');
+    expect(stored?.frontmatter).toEqual({ title: 'Lock Law' });
+  });
+
+  it('folding a derived title into a pre-existing title-less document is not a content change', async () => {
+    const { projectId } = await seed();
+    const body = '# Old Doc\n\nBody text unchanged.';
+    const rawHash = computeBibleDocHash(null, body);
+
+    // A row written before title derivation existed: no frontmatter, hash computed without a title.
+    await db.insert(schema.bibleDocuments).values({ projectId, section: 'world', slug: 'old-doc', frontmatter: null, body, contentHash: rawHash, revision: 3 });
+    await db.update(schema.chapters).set({ needsRevalidation: false }).where(eq(schema.chapters.projectId, projectId));
+
+    const result = await service.upsert(projectId, 'world', 'old-doc', { body });
+
+    expect(result.revision).toBe(3);
+    expect(result.frontmatter).toEqual({ title: 'Old Doc' });
+    expect(result.contentHash).not.toBe(rawHash);
+    expect(await chapterFlag(projectId)).toBe(false);
+
+    const stored = await service.get(projectId, 'world', 'old-doc');
+    expect(stored?.revision).toBe(3);
+    expect(stored?.frontmatter).toEqual({ title: 'Old Doc' });
+
+    // Re-upserting again now that the title is folded in is the ordinary "identical content" path.
+    const again = await service.upsert(projectId, 'world', 'old-doc', { body });
+    expect(again.revision).toBe(3);
   });
 });

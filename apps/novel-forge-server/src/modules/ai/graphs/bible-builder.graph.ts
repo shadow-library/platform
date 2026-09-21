@@ -4,6 +4,7 @@ import { AppError, Logger } from '@shadow-library/common';
 
 import { type BibleStage, chapterForStage } from '@modules/bible/bible-manifest';
 
+import { ensureBibleDocTitle } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -93,15 +94,23 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
 
     const result = (await modelRouter.structured(prompt, promptInput, ctx, projectRow as ProjectConfig | undefined)) as BibleStageOutput;
 
+    const existingFrontmatter = (
+      await db.query.bibleDocuments.findFirst({
+        where: sql`${schema.bibleDocuments.projectId} = ${projectId} AND ${schema.bibleDocuments.section} = ${section} AND ${schema.bibleDocuments.slug} = ${slug}`,
+        columns: { frontmatter: true },
+      })
+    )?.frontmatter;
+    const frontmatter = ensureBibleDocTitle({ slug, frontmatter: existingFrontmatter, body: result.body });
+
     // A stage's document and its structured records are one unit: a partially-written stage would still
     // satisfy the `existing?.body` skip-check above and never be retried by a non-force rebuild.
     await db.transaction(async tx => {
       await tx
         .insert(schema.bibleDocuments)
-        .values({ projectId, section, slug, body: result.body })
+        .values({ projectId, section, slug, frontmatter, body: result.body })
         .onConflictDoUpdate({
           target: [schema.bibleDocuments.projectId, schema.bibleDocuments.section, schema.bibleDocuments.slug],
-          set: { body: sql`EXCLUDED.body`, updatedAt: new Date() },
+          set: { frontmatter, body: sql`EXCLUDED.body`, updatedAt: new Date() },
         });
 
       for (const e of result.entities ?? []) {

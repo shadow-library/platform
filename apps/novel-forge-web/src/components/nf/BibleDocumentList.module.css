@@ -1,3 +1,25 @@
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.groupLabel {
+  margin: 0;
+  padding: 0 10px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
 .list {
   margin: 0;
   padding: 0;
@@ -10,8 +32,8 @@
 .row {
   width: 100%;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  flex-direction: column;
+  gap: 3px;
   padding: 8px 10px;
   border: 0;
   border-radius: var(--sh-radius-sm);
@@ -30,18 +52,17 @@
   outline-offset: var(--sh-focus-ring-offset);
 }
 
-.slug {
+.rowHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.title {
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);
   overflow-wrap: anywhere;
-}
-
-.section {
-  font-size: var(--sh-text-caption);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--sh-text-tertiary);
 }
 
 .updated {
@@ -50,4 +71,36 @@
   font-variant-numeric: tabular-nums;
   color: var(--sh-text-tertiary);
   white-space: nowrap;
+}
+
+.excerpt {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyToggle {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 10px 0;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+}
+
+.emptyToggle:hover {
+  color: var(--sh-text-secondary);
+}
+
+.emptyToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
 }

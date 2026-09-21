@@ -6,7 +6,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
 
 import { type ImportPlanBody, type PlanBundle } from '@modules/plan-import/plan-import.dto';
 import { PlanImportService } from '@modules/plan-import/plan-import.service';
-import { renderChapterBrief } from '@server/common';
+import { computeBibleDocHash, renderChapterBrief } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -173,6 +173,49 @@ describe.if(pgAvailable)('plan import', () => {
 
     const volumes = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId) });
     expect(volumes.every(v => v.status === 'draft' && v.startChapter === null)).toBe(true);
+  });
+
+  it('should derive and store a title for an imported bible document that has none, without touching other frontmatter keys', async () => {
+    const projectId = await createProject();
+    await service.import(projectId, { bundle: buildBundle() });
+
+    const premise = await db.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'project'), eq(schema.bibleDocuments.slug, 'premise')),
+    });
+    expect(premise?.frontmatter).toEqual({ genre: 'dark fantasy', title: 'Premise' });
+
+    const endingVision = await db.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'plot'), eq(schema.bibleDocuments.slug, 'ending-vision')),
+    });
+    expect(endingVision?.frontmatter).toEqual({ title: 'Ending vision' });
+  });
+
+  it('should count folding a derived title into a pre-existing title-less document as unchanged, not updated', async () => {
+    const projectId = await createProject();
+    const body = 'A gravekeeper inherits a dead god.';
+    const rawHash = computeBibleDocHash({ genre: 'dark fantasy' }, body);
+
+    // A row written before title derivation existed: frontmatter has no title, hash computed without one.
+    // Re-importing it needs `overwrite` — a project with existing plan data otherwise rejects any import
+    // for that collection outright, which is also why this scenario cannot carry an existing chapter:
+    // `overwrite` itself refuses once prose exists (IMP_003), regardless of what the bundle changes.
+    await db
+      .insert(schema.bibleDocuments)
+      .values({ projectId, section: 'project', slug: 'premise', frontmatter: { genre: 'dark fantasy' }, body, contentHash: rawHash, revision: 4 });
+
+    const response = await service.import(projectId, {
+      bundle: { format: 'novel-forge-plan', version: 1, bible: [{ section: 'project', slug: 'premise', body, frontmatter: { genre: 'dark fantasy' } }] },
+      overwrite: true,
+    });
+
+    expect(response.results.bible).toEqual({ created: 0, updated: 0, unchanged: 1, pruned: 0 });
+
+    const premise = await db.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'project'), eq(schema.bibleDocuments.slug, 'premise')),
+    });
+    expect(premise?.revision).toBe(4);
+    expect(premise?.frontmatter).toEqual({ genre: 'dark fantasy', title: 'Premise' });
+    expect(premise?.contentHash).not.toBe(rawHash);
   });
 
   it('should store the pov, purpose, reader value, repetition risks and guidance of every brief', async () => {
