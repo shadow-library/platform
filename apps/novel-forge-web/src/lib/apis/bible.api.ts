@@ -10,6 +10,7 @@ import {
   type BibleTidyPreviewResponse,
   type ListBibleDocResponse,
   type RevertProposalResponse,
+  type UpsertBibleDocBody,
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
@@ -37,6 +38,20 @@ export function useBibleDocQuery(projectId: string, section: BibleSection | unde
     queryKey: bibleKeys.doc(projectId, section as BibleSection, slug ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/bible/${section}/${slug}`).execute(),
     enabled: Boolean(projectId) && Boolean(section) && Boolean(slug),
+  });
+}
+
+export interface UpsertBibleDocVariables extends UpsertBibleDocBody {
+  section: BibleSection;
+  slug: string;
+}
+
+/** The PUT replaces frontmatter and body together, so a caller editing only the body sends the frontmatter it read back unchanged. */
+export function useUpsertBibleDocMutation(projectId: string): UseMutationResult<BibleDocResponse, ApiError, UpsertBibleDocVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<BibleDocResponse, ApiError, UpsertBibleDocVariables>({
+    mutationFn: ({ section, slug, ...body }) => APIRequest.put(`/projects/${projectId}/bible/${section}/${slug}`).body(body).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId] }),
   });
 }
 

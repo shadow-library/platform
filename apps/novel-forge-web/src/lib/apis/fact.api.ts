@@ -43,10 +43,12 @@ export function useDeleteFactMutation(projectId: string): UseMutationResult<unde
   });
 }
 
-export function useRevealFactMutation(projectId: string, factKey: string): UseMutationResult<FactResponse, ApiError, RevealFactBody> {
+export type RevealFactVariables = RevealFactBody & { factKey: string };
+
+export function useRevealFactMutation(projectId: string): UseMutationResult<FactResponse, ApiError, RevealFactVariables> {
   const queryClient = useQueryClient();
-  return useMutation<FactResponse, ApiError, RevealFactBody>({
-    mutationFn: data => APIRequest.post(`/projects/${projectId}/facts/${factKey}/reveal`).body(data).execute(),
+  return useMutation<FactResponse, ApiError, RevealFactVariables>({
+    mutationFn: ({ factKey, ...data }) => APIRequest.post(`/projects/${projectId}/facts/${factKey}/reveal`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: factKeys.all(projectId) }),
   });
 }

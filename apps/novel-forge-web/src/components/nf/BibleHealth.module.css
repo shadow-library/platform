@@ -36,6 +36,16 @@
   color: var(--sh-text-primary);
 }
 
+.spacer {
+  flex: 1;
+}
+
+.tidy {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .topics {
   max-width: 100%;
   white-space: normal;
@@ -71,4 +81,37 @@
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
   overflow-wrap: anywhere;
+}
+
+.tidyLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.tidyCount {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .health {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+
+  .stat[data-secondary],
+  .tidyLabel,
+  .suggestions {
+    display: none;
+  }
+
+  .tidyCount {
+    display: inline;
+  }
+
+  .topics {
+    min-width: 0;
+  }
 }

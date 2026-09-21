@@ -1,40 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type BibleDocListItem, type BibleReadinessRoleResponse } from '../src/lib/apis/api-types.gen';
-import {
-  BIBLE_DOC_SECTION_LABEL,
-  bibleHealth,
-  docAddress,
-  docLengthLabel,
-  emptyPagesLabel,
-  emptyToggleLabel,
-  groupBibleDocs,
-  topicCoverageLabel,
-  topicsByDocument,
-} from '../src/lib/bible-documents';
+import { type BibleReadinessRoleResponse } from '../src/lib/apis/api-types.gen';
+import { BIBLE_DOC_SECTION_LABEL, bibleHealth, docAddress, emptyPlaceholdersLabel, topicCoverageLabel, topicsByDocument } from '../src/lib/bible-documents';
 
-function doc(overrides: Partial<BibleDocListItem> & Pick<BibleDocListItem, 'section' | 'slug'>): BibleDocListItem {
-  return { title: overrides.slug, wordCount: 10, isEmpty: false, updatedAt: '2026-01-01T00:00:00.000Z', ...overrides };
-}
-
-describe('groupBibleDocs', () => {
-  it('should order sections project, world, power, plot, story_state, ai, lore regardless of input order', () => {
-    const docs = [doc({ section: 'lore', slug: 'songs' }), doc({ section: 'project', slug: 'premise' }), doc({ section: 'power', slug: 'gauges' })];
-    expect(groupBibleDocs(docs).map(g => g.section)).toEqual(['project', 'power', 'lore']);
-  });
-
-  it('should leave out sections with no documents', () => {
-    const docs = [doc({ section: 'world', slug: 'canal' })];
-    expect(groupBibleDocs(docs).map(g => g.section)).toEqual(['world']);
-  });
-
-  it('should split a section into filled and empty documents', () => {
-    const docs = [doc({ section: 'world', slug: 'canal' }), doc({ section: 'world', slug: 'default', isEmpty: true, wordCount: 0 })];
-    const [group] = groupBibleDocs(docs);
-    expect(group?.filled.map(d => d.slug)).toEqual(['canal']);
-    expect(group?.empty.map(d => d.slug)).toEqual(['default']);
-  });
-
+describe('BIBLE_DOC_SECTION_LABEL', () => {
   it('should label every section the way the owner named it', () => {
     expect(BIBLE_DOC_SECTION_LABEL.project).toBe('Core');
     expect(BIBLE_DOC_SECTION_LABEL.world).toBe('World');
@@ -46,22 +15,13 @@ describe('groupBibleDocs', () => {
   });
 });
 
-describe('emptyPagesLabel', () => {
+describe('emptyPlaceholdersLabel', () => {
   it('should use the singular for exactly one', () => {
-    expect(emptyPagesLabel(1)).toBe('1 empty page');
+    expect(emptyPlaceholdersLabel(1)).toBe('1 empty placeholder page');
   });
 
   it('should use the plural otherwise', () => {
-    expect(emptyPagesLabel(0)).toBe('0 empty pages');
-    expect(emptyPagesLabel(3)).toBe('3 empty pages');
-  });
-});
-
-describe('emptyToggleLabel', () => {
-  it('should offer to reveal while collapsed and to hide again once revealed', () => {
-    expect(emptyToggleLabel(1, false)).toBe('1 empty page');
-    expect(emptyToggleLabel(2, false)).toBe('2 empty pages');
-    expect(emptyToggleLabel(1, true)).toBe('Hide empty pages');
+    expect(emptyPlaceholdersLabel(3)).toBe('3 empty placeholder pages');
   });
 });
 
@@ -95,32 +55,19 @@ describe('topicsByDocument', () => {
   });
 });
 
-describe('docLengthLabel', () => {
-  it('should say a page is empty rather than counting zero words', () => {
-    expect(docLengthLabel({ isEmpty: true, wordCount: 0 })).toBe('Empty');
-  });
-
-  it('should count the words of a written page', () => {
-    expect(docLengthLabel({ isEmpty: false, wordCount: 1 })).toBe('1 word');
-    expect(docLengthLabel({ isEmpty: false, wordCount: 420 })).toBe('420 words');
-  });
-});
-
 describe('bibleHealth', () => {
-  const docs = [{ isEmpty: false }, { isEmpty: false }, { isEmpty: true }];
-
-  it('should count written pages apart from empty ones', () => {
-    const health = bibleHealth({ docs, entities: 5, facts: 2, roles: undefined });
-    expect(health).toEqual({ pages: 2, emptyPages: 1, entities: 5, facts: 2 });
+  it('should count records and guides together as entries', () => {
+    const health = bibleHealth({ records: 5, guides: 2, secrets: 3, emptyPages: 1, roles: undefined });
+    expect(health).toEqual({ entries: 7, records: 5, guides: 2, secrets: 3, emptyPages: 1 });
   });
 
   it('should leave topic coverage out until readiness reports roles', () => {
-    expect(bibleHealth({ docs, entities: 0, facts: 0, roles: [] }).topics).toBeUndefined();
+    expect(bibleHealth({ records: 0, guides: 0, secrets: 0, emptyPages: 0, roles: [] }).topics).toBeUndefined();
   });
 
   it('should report covered topics and name the missing ones in manifest order', () => {
     const roles = [role({ label: 'Premise', covered: true }), role({ label: 'Power system', covered: false }), role({ label: 'Cast', covered: false })];
-    expect(bibleHealth({ docs, entities: 0, facts: 0, roles }).topics).toEqual({ covered: 1, total: 3, missing: ['Power system', 'Cast'] });
+    expect(bibleHealth({ records: 0, guides: 0, secrets: 0, emptyPages: 0, roles }).topics).toEqual({ covered: 1, total: 3, missing: ['Power system', 'Cast'] });
   });
 });
 

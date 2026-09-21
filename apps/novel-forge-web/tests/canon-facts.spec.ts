@@ -1,23 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  backLabel,
   type CanonFact,
-  countByState,
   emptyFactForm,
   factAttachments,
-  factCaption,
   factFormFromFact,
   factHiddenFromWriter,
   factReveal,
-  factRevealLabel,
   factState,
   filterFacts,
-  initialSpoilerState,
   listToText,
-  parseFactState,
-  sortFactsByKey,
-  spoilerToggleLabel,
+  parseChapter,
   textToList,
 } from '../src/lib/canon-facts';
 
@@ -38,34 +31,6 @@ describe('factState', () => {
 
   it('should read a fact with a ledger entry as revealed', () => {
     expect(factState(fact({ factKey: 'a', knowledge: [{ entityKey: 'amara' }] }))).toBe('revealed');
-  });
-});
-
-describe('parseFactState', () => {
-  it('should accept the two states the segmented control offers', () => {
-    expect(parseFactState('hidden')).toBe('hidden');
-    expect(parseFactState('revealed')).toBe('revealed');
-  });
-
-  it('should reject anything else, including the all pseudo-state', () => {
-    expect(parseFactState('all')).toBeUndefined();
-    expect(parseFactState(undefined)).toBeUndefined();
-    expect(parseFactState(3)).toBeUndefined();
-  });
-});
-
-describe('countByState', () => {
-  it('should count both states, including the one with nothing in it', () => {
-    expect(countByState(ledger)).toEqual({ hidden: 1, revealed: 2 });
-    expect(countByState([])).toEqual({ hidden: 0, revealed: 0 });
-  });
-});
-
-describe('sortFactsByKey', () => {
-  it('should order by key without mutating its input', () => {
-    const input = [...ledger];
-    expect(sortFactsByKey(input).map(f => f.factKey)).toEqual(['boone_took_the_bribe', 'families_survived_me', 'ledger_forgery']);
-    expect(input.map(f => f.factKey)).toEqual(['ledger_forgery', 'families_survived_me', 'boone_took_the_bribe']);
   });
 });
 
@@ -96,29 +61,6 @@ describe('filterFacts', () => {
   });
 });
 
-describe('factCaption', () => {
-  it('should read hidden when no character knows it', () => {
-    expect(factCaption(fact({ factKey: 'a' }))).toBe('hidden');
-  });
-
-  it('should count the characters who know it, singular and plural', () => {
-    expect(factCaption(fact({ factKey: 'a', knowledge: [{ entityKey: 'amara' }] }))).toBe('revealed to 1 character');
-    expect(factCaption(fact({ factKey: 'a', knowledge: [{ entityKey: 'amara' }, { entityKey: 'boone' }] }))).toBe('revealed to 2 characters');
-  });
-});
-
-describe('backLabel', () => {
-  it('should name the collection size, singular and plural', () => {
-    expect(backLabel(7)).toBe('All 7 facts');
-    expect(backLabel(1)).toBe('All 1 fact');
-    expect(backLabel(0)).toBe('All 0 facts');
-  });
-
-  it('should drop the count while the collection has not resolved', () => {
-    expect(backLabel(undefined)).toBe('All facts');
-  });
-});
-
 describe('factAttachments', () => {
   const names = new Map([['detective_amara', 'Detective Amara']]);
 
@@ -133,20 +75,6 @@ describe('factAttachments', () => {
   it('should return nothing for a fact with no subjects', () => {
     expect(factAttachments({ subjects: null }, names)).toEqual([]);
     expect(factAttachments({}, names)).toEqual([]);
-  });
-});
-
-describe('initialSpoilerState', () => {
-  it('should conceal a hidden fact and open a revealed one', () => {
-    expect(initialSpoilerState('hidden')).toBe('concealed');
-    expect(initialSpoilerState('revealed')).toBe('shown');
-  });
-});
-
-describe('spoilerToggleLabel', () => {
-  it('should name the fact the control acts on', () => {
-    expect(spoilerToggleLabel('concealed', 'families_survived_me')).toBe('Reveal the judge-only truth of families_survived_me');
-    expect(spoilerToggleLabel('shown', 'families_survived_me')).toBe('Hide the judge-only truth of families_survived_me');
   });
 });
 
@@ -169,15 +97,6 @@ describe('factReveal', () => {
       ],
     });
     expect(factReveal(revealed)).toEqual({ kind: 'revealed', chapter: 5 });
-  });
-});
-
-describe('factRevealLabel', () => {
-  it('should format each reveal kind', () => {
-    expect(factRevealLabel({ kind: 'revealed', chapter: 5 })).toBe('Reader learns: ch 5');
-    expect(factRevealLabel({ kind: 'revealed', chapter: undefined })).toBe('Reader learns');
-    expect(factRevealLabel({ kind: 'planned', chapter: 12 })).toBe('Planned · ch 12');
-    expect(factRevealLabel({ kind: 'unscheduled' })).toBe('Not scheduled');
   });
 });
 
@@ -250,5 +169,20 @@ describe('factFormFromFact', () => {
       terms: 'ledger, service corridor',
       revealChapter: '20',
     });
+  });
+});
+
+describe('parseChapter', () => {
+  it('should read a whole chapter number from 1', () => {
+    expect(parseChapter('12')).toBe(12);
+    expect(parseChapter(' 3 ')).toBe(3);
+  });
+
+  it('should reject blanks, zero, fractions and anything else', () => {
+    expect(parseChapter('')).toBeUndefined();
+    expect(parseChapter('0')).toBeUndefined();
+    expect(parseChapter('2.5')).toBeUndefined();
+    expect(parseChapter('-4')).toBeUndefined();
+    expect(parseChapter('ch 4')).toBeUndefined();
   });
 });

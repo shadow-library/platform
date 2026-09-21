@@ -299,3 +299,51 @@ export const EyeOffIcon = (p: IconProps): React.JSX.Element => (
     <path d="M1 1l22 22" />
   </SvgIcon>
 );
+
+export const PersonIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+  </SvgIcon>
+);
+
+export const FlagIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M4 22V4" />
+    <path d="M4 4h13l-2 4 2 4H4" />
+  </SvgIcon>
+);
+
+export const PinIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z" />
+    <circle cx="12" cy="10" r="2.5" />
+  </SvgIcon>
+);
+
+export const BoltIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+  </SvgIcon>
+);
+
+export const GemIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M6 3h12l4 6-10 12L2 9z" />
+    <path d="M2 9h20M12 21 8 9l4-6 4 6z" />
+  </SvgIcon>
+);
+
+export const ConceptIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+  </SvgIcon>
+);
+
+export const DocIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M6 2h9l5 5v15H6z" />
+    <path d="M14 2v6h6M9 13h7M9 17h7" />
+  </SvgIcon>
+);
