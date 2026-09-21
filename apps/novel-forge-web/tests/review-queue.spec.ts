@@ -4,9 +4,14 @@ import {
   backLabel,
   chapterBadge,
   chapterTitle,
+  continuityCaption,
+  continuityHasHeldEntries,
+  continuityIds,
+  continuityTitle,
   isEditableElement,
   nextAfterApproval,
   parseChapterParam,
+  parseReviewView,
   queueIds,
   queueMeta,
   queueReason,
@@ -140,6 +145,59 @@ describe('isEditableElement', () => {
   it('should treat ordinary elements as not editable', () => {
     expect(isEditableElement('DIV', false)).toBe(false);
     expect(isEditableElement('BUTTON', false)).toBe(false);
+  });
+});
+
+describe('parseReviewView', () => {
+  it('should accept only the two known views', () => {
+    expect(parseReviewView('chapters')).toBe('chapters');
+    expect(parseReviewView('proposals')).toBe('proposals');
+  });
+
+  it('should reject anything else rather than guessing', () => {
+    for (const value of [undefined, null, '', 'open', 7]) expect(parseReviewView(value)).toBeUndefined();
+  });
+});
+
+describe('continuityTitle', () => {
+  it('should name the chapter the finding is about', () => {
+    expect(continuityTitle(4)).toBe('Chapter 4 continuity');
+  });
+});
+
+describe('continuityIds', () => {
+  it('should key the pager by proposal id in queue order', () => {
+    expect(continuityIds([{ id: 'a' }, { id: 'b' }])).toEqual(['a', 'b']);
+  });
+});
+
+describe('continuityCaption', () => {
+  it('should count every list field across the finding', () => {
+    expect(continuityCaption({ threads: [{ threadKey: 't1', status: 'open' }], mysteries: [], characterStates: [{ entityKey: 'e1' }] })).toBe('2 continuity updates');
+  });
+
+  it('should singularise a single update', () => {
+    expect(continuityCaption({ threads: [{ threadKey: 't1', status: 'open' }] })).toBe('1 continuity update');
+  });
+
+  it('should flag a low-confidence entry as needing another look', () => {
+    expect(continuityCaption({ threads: [{ threadKey: 't1', status: 'open', confidence: 'low' }] })).toBe('1 continuity update · needs a closer look');
+  });
+
+  it('should report zero updates for an empty finding without a trailing separator', () => {
+    expect(continuityCaption({})).toBe('0 continuity updates');
+  });
+});
+
+describe('continuityHasHeldEntries', () => {
+  it('should detect a low-confidence entry on any confidence-bearing field', () => {
+    expect(continuityHasHeldEntries({ relationships: [{ entityKey: 'a', targetKey: 'b', kind: 'ally', confidence: 'low' }] })).toBe(true);
+  });
+
+  it('should ignore a high-confidence or absent confidence', () => {
+    expect(continuityHasHeldEntries({ threads: [{ threadKey: 't1', status: 'open', confidence: 'high' }] })).toBe(false);
+    expect(continuityHasHeldEntries({ threads: [{ threadKey: 't1', status: 'open' }] })).toBe(false);
+    expect(continuityHasHeldEntries({})).toBe(false);
   });
 });
 

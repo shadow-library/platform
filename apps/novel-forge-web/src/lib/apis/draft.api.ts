@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
+  type ContinuityProposalResponse,
   type DraftResponse,
   type FeedbackBody,
   type GenerateBody,
@@ -114,6 +115,27 @@ export function useJudgeDraftMutation(projectId: string, n: number): UseMutation
   const queryClient = useQueryClient();
   return useMutation<JudgeResponse, ApiError, undefined>({
     mutationFn: () => APIRequest.post(`/projects/${projectId}/drafts/${n}/judge`).body({}).execute(),
+    onSuccess: () => invalidateDraft(queryClient, projectId),
+  });
+}
+
+export function useApplyContinuityProposalMutation(projectId: string): UseMutationResult<ContinuityProposalResponse, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<ContinuityProposalResponse, ApiError, number>({
+    mutationFn: n => APIRequest.post(`/projects/${projectId}/chapters/${n}/continuity-proposal/apply`).body({}).execute(),
+    // Applying writes entities, appearances, threads, mysteries, relationships and character states — every
+    // project-scoped read those feed, not just the drafts/review-queue cache, so this invalidates broadly.
+    onSuccess: () => {
+      invalidateDraft(queryClient, projectId);
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+    },
+  });
+}
+
+export function useDiscardContinuityProposalMutation(projectId: string): UseMutationResult<ContinuityProposalResponse, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<ContinuityProposalResponse, ApiError, number>({
+    mutationFn: n => APIRequest.post(`/projects/${projectId}/chapters/${n}/continuity-proposal/discard`).body({}).execute(),
     onSuccess: () => invalidateDraft(queryClient, projectId),
   });
 }

@@ -81,10 +81,14 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     ? translationLifecycle(translation && { counts: translation.counts, glossary: translation.glossary, jobActive: translationJobActive(translation) })
     : lifecyclePhase(status, project?.kind);
 
+  // The Review Queue badge folds in every pending proposal type alongside queued chapters — it is the
+  // one inbox count for "things awaiting the author", not just chapters.
   const badges: Record<string, NavLeaf['badge']> = {
     chapters: { count: status?.chaptersTotal ?? 0 },
-    review: { count: reviewQuery.data?.drafts.length ?? 0, intent: 'warning' },
-    proposals: { count: proposalsQuery.data?.items.length ?? 0, intent: 'warning' },
+    review: {
+      count: (reviewQuery.data?.drafts.length ?? 0) + (reviewQuery.data?.proposals.length ?? 0) + (proposalsQuery.data?.items.length ?? 0),
+      intent: 'warning',
+    },
     translation: { count: translation?.glossary.suggested ?? 0, intent: 'warning' },
   };
 

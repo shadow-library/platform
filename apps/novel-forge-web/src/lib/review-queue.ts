@@ -11,6 +11,12 @@ export interface ReviewQueueDraft {
   updatedAt: string;
 }
 
+export type ReviewView = 'chapters' | 'proposals';
+
+export function parseReviewView(value: unknown): ReviewView | undefined {
+  return value === 'chapters' || value === 'proposals' ? value : undefined;
+}
+
 export type ReviewHotkey = 'approve' | 'revise' | 'reject';
 
 export interface ReviewHotkeyEvent {
@@ -93,6 +99,33 @@ export function nextAfterApproval(ids: readonly string[] | undefined, currentId:
   if (!ids) return undefined;
   const index = ids.indexOf(currentId);
   return index < 0 ? undefined : ids[index + 1];
+}
+
+export function continuityTitle(chapter: number): string {
+  return `Chapter ${chapter} continuity`;
+}
+
+export function continuityIds(proposals: readonly { id: string }[]): string[] {
+  return proposals.map(proposal => proposal.id);
+}
+
+const CONTINUITY_LIST_FIELDS = ['newEntities', 'threads', 'mysteries', 'timeline', 'relationships', 'power', 'characterStates', 'knowledgeChanges'] as const;
+
+const CONFIDENCE_BEARING_FIELDS = ['threads', 'mysteries', 'relationships', 'characterStates'] as const;
+
+function continuityEntryCount(blob: Record<string, unknown>): number {
+  return CONTINUITY_LIST_FIELDS.reduce((sum, key) => sum + (Array.isArray(blob[key]) ? (blob[key] as unknown[]).length : 0), 0);
+}
+
+/** A held entry is one the continuity model marked `confidence: 'low'` — applying skips it and it stays pending for a human look. */
+export function continuityHasHeldEntries(blob: Record<string, unknown>): boolean {
+  return CONFIDENCE_BEARING_FIELDS.some(key => Array.isArray(blob[key]) && (blob[key] as { confidence?: string }[]).some(entry => entry?.confidence === 'low'));
+}
+
+export function continuityCaption(blob: Record<string, unknown>): string {
+  const count = continuityEntryCount(blob);
+  const base = `${count} continuity update${count === 1 ? '' : 's'}`;
+  return continuityHasHeldEntries(blob) ? `${base} · needs a closer look` : base;
 }
 
 export function isEditableElement(tagName: string, contentEditable: boolean): boolean {
