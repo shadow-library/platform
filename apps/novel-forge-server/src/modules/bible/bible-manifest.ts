@@ -2,6 +2,16 @@ import { type Bible, type Knowledge } from '@server/database';
 
 export type BibleStage = 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
 
+/**
+ * How readiness recognises a chapter's substance when an imported or author-named bible files it under another
+ * address. Keywords are whole words (a plain plural also matches) read from a document's slug and title.
+ */
+export interface BibleChapterRole {
+  label: string;
+  sections: readonly Bible.Section[];
+  keywords: readonly string[];
+}
+
 export interface BibleChapterSpec {
   stage: BibleStage;
   section: Bible.Section;
@@ -13,6 +23,7 @@ export interface BibleChapterSpec {
   minEntities: number;
   /** Judged inside the body by the auditor, so one chapter can carry several concerns without one document per concern. */
   requiredTopics: readonly string[];
+  role: BibleChapterRole;
 }
 
 export const BIBLE_STAGE_ORDER: readonly BibleStage[] = ['foundation', 'world', 'power', 'factionsAndLocations', 'characters', 'plot', 'volumes'];
@@ -26,6 +37,7 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: [],
     minEntities: 0,
     requiredTopics: ['hook', 'stakes', 'protagonist drive', 'reader promise', 'pacing and tone'],
+    role: { label: 'Premise', sections: ['project'], keywords: ['premise', 'pitch', 'logline', 'hook', 'synopsis', 'concept', 'summary'] },
   },
   {
     stage: 'world',
@@ -35,6 +47,11 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: ['location', 'concept'],
     minEntities: 3,
     requiredTopics: ['era and place', 'rules of normal life', 'geopolitical shape'],
+    role: {
+      label: 'World and setting',
+      sections: ['world', 'lore'],
+      keywords: ['setting', 'world', 'overview', 'era', 'history', 'society', 'culture', 'cosmology', 'background', 'geography'],
+    },
   },
   {
     stage: 'power',
@@ -44,6 +61,11 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: ['power_rule', 'concept'],
     minEntities: 4,
     requiredTopics: ['progression ladder', 'costs and limits', 'consequences of breaking the rules'],
+    role: {
+      label: 'Power system',
+      sections: ['power'],
+      keywords: ['system', 'limit', 'rule', 'law', 'cost', 'ladder', 'progression', 'rank', 'tier', 'level', 'ability', 'class', 'skill', 'magic', 'power', 'cultivation'],
+    },
   },
   {
     stage: 'factionsAndLocations',
@@ -53,6 +75,28 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: ['faction', 'location'],
     minEntities: 4,
     requiredTopics: ['faction goals', 'faction conflicts', 'locations that matter to the plot'],
+    role: {
+      label: 'Factions and locations',
+      sections: ['world', 'lore'],
+      keywords: [
+        'faction',
+        'location',
+        'place',
+        'region',
+        'nation',
+        'kingdom',
+        'empire',
+        'city',
+        'territory',
+        'organization',
+        'organisation',
+        'guild',
+        'politics',
+        'political',
+        'map',
+        'travel',
+      ],
+    },
   },
   {
     stage: 'characters',
@@ -62,6 +106,11 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: ['character'],
     minEntities: 3,
     requiredTopics: ['protagonist', 'antagonist', 'supporting cast', 'relationships'],
+    role: {
+      label: 'Cast',
+      sections: ['project', 'ai', 'lore'],
+      keywords: ['cast', 'character', 'protagonist', 'antagonist', 'roster', 'people', 'relationship', 'dramatis'],
+    },
   },
   {
     stage: 'plot',
@@ -71,6 +120,11 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: [],
     minEntities: 0,
     requiredTopics: ['escalation per volume', 'endgame vision'],
+    role: {
+      label: 'Escalation map',
+      sections: ['plot', 'story_state'],
+      keywords: ['escalation', 'plot', 'arc', 'outline', 'endgame', 'spine', 'stakes', 'beat', 'structure', 'storyline'],
+    },
   },
   {
     stage: 'volumes',
@@ -80,6 +134,7 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     materializes: [],
     minEntities: 0,
     requiredTopics: ['volume objectives', 'per-volume payoff'],
+    role: { label: 'Volume plan', sections: ['story_state', 'plot'], keywords: ['volume', 'book', 'season', 'roadmap'] },
   },
 ];
 

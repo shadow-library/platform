@@ -911,17 +911,22 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
 - **Preconditions:** any active project; meaningful after the builder ran.
 - **Input:** none.
 - **Run:** GET, before and after each bible-writing step.
-- **Verify:** five dimensions in order — `coverage` (all 7 manifest chapters exist with a non-empty body),
-  `records` (each of the 4 entity-bearing chapters' `minEntities` met by entity **rows**, counted project-wide by
-  type — a `concept` row therefore counts toward both `world` and `power`), `substance` (every written doc ≥ **250 words** and free
-  of `tbd|todo|fixme|[placeholder]|lorem ipsum`), `integrity` (every `canon_facts.subjects` entry resolves to an
+- **Verify:** five dimensions in order — `coverage` (each of the 7 manifest **roles** is covered: by its canonical
+  address, by any non-empty document in the role's sections whose slug or title carries one of the role's keywords
+  (`BibleChapterSpec.role`), or — for three roles — by records: factions/locations by ≥4 `faction|location` rows with at
+  least one faction, the cast by ≥3 `character` rows not all `minor`, the volume plan by any `volumes` row with an
+  objective), `records` (each of the 4 entity-bearing chapters' `minEntities` met by entity **rows**, counted project-wide by
+  type — a `concept` row therefore counts toward both `world` and `power`), `substance` (each role's documents
+  together ≥ **250 words** — 100 for the premise — and every written doc free of
+  `tbd|todo|fixme|[placeholder]|lorem ipsum`; documents outside every role are never held to a length), `integrity` (every `canon_facts.subjects` entry resolves to an
   entity key; every `significance='major'` entity has a non-empty `body`), `reveal` (share of facts with a
   `reveal_chapter`). `readyToDraft` is true only when `coverage` **and** `records` are both `strong`; `blockingGaps`
-  holds exactly those gaps. No model call — the response must be byte-identical on two consecutive GETs.
+  holds exactly those gaps. `roles` lists every role with `coveredBy` (the addresses and record summaries that covered
+  it), so an imported bible filed under other names reads as covered rather than missing. No model call — the response
+  must be byte-identical on two consecutive GETs.
   **Quality:** the `gaps` strings are author-actionable (`"project/cast needs at least 3 character record(s) — found 1"`).
 - **Fails when:** `readyToDraft` true while the Story Bible screen shows no entities (records dimension miscounted);
-  `substance` thin only because of graduation's short `project/premise` + `project/reader-promise` (expected — see
-  Findings); `reveal` empty because every generated fact omitted `revealChapter`. For the low-fantasy sample, `power`
+  a role reported missing while a document or record set named in its `role` carries it; `reveal` empty because every generated fact omitted `revealChapter`. For the low-fantasy sample, `power`
   still demands 4 `power_rule|concept` rows even with no numeric ladder — `concept` rows satisfy it, so a shortfall
   here means the builder emitted prose instead of records, not that the floor is wrong for the genre.
 
@@ -1020,8 +1025,9 @@ required to test the screen and optional if you only drive `POST …/seed-from-b
 brief in Settings**.
 
 **Stage 5 — readiness, before.** `GET …/bible/readiness`.
-☐ `coverage` thin — 1 of 7, since `project/reader-promise` is not a manifest chapter ☐ `records` empty (0 of 4)
-☐ `substance` empty (both graduated documents are under the 250-word floor) ☐ `readyToDraft` false
+☐ `coverage` thin — 1 of 7, since `project/reader-promise` serves no role ☐ `records` empty (0 of 4)
+☐ `substance` judges only the premise role (against its 100-word floor); `project/reader-promise` is checked for
+placeholder text only ☐ `readyToDraft` false
 ☐ `blockingGaps` holds 10 strings: the 6 missing manifest chapters plus the 4 unmet entity floors.
 
 **Stage 6 — build the bible.** `POST …/seed-from-brief` with the brief, `force: false`.
@@ -1031,8 +1037,7 @@ confirm `counts.foundation = 0` and that downstream stages received the graduate
 ≥3 character) ☐ character cards each have want + cost + a voice tic ☐ `lore_chunks` populated.
 
 **Stage 7 — readiness, after.** `GET …/bible/readiness`.
-☐ `coverage` strong ☐ `records` strong ☐ `readyToDraft` true ☐ note which docs `substance` still flags (graduation's two
-short documents are the usual ones) ☐ `reveal` shows how many generated facts got a `revealChapter`.
+☐ `coverage` strong ☐ `records` strong ☐ `readyToDraft` true ☐ note which roles `substance` still flags ☐ `reveal` shows how many generated facts got a `revealChapter`.
 
 **Stage 8 — audit.** Delete one `character` entity, then `POST …/bible/audit` (empty body).
 ☐ an `entity:<key>` finding with `action: add` ☐ a staged `bible_audit` proposal containing the matching
@@ -1077,11 +1082,10 @@ volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
    (`apps/novel-forge-server/src/modules/generation/generation.service.ts:182`,
    `apps/novel-forge-server/src/modules/ai/graphs/workflow-run.service.ts:346`) with no job row unless a caller
    supplies `jobId`. Expect minute-scale requests and client timeouts that do not reflect the run's real outcome.
-6. **Substance floor vs graduation output.** `apps/novel-forge-server/src/modules/eval/bible-readiness.ts:54` sets a
-   250-word floor on _every_ written document, including graduation's deliberately short `project/premise` and the
-   non-manifest `project/reader-promise`, so a correctly graduated idea scores `substance: empty` before the builder
-   runs and can never score `strong` after it. Non-blocking (`readyToDraft` reads coverage + records only), but it
-   makes the banner read worse than the bible is.
+6. **Substance floor vs graduation output.** The floor is judged per role (`apps/novel-forge-server/src/modules/eval/bible-readiness.ts`,
+   `substance`), with a 100-word floor for the premise; graduation's `project/reader-promise` serves no role and is only
+   checked for placeholder text. A graduated idea whose premise is under 100 words still reads `substance: thin` —
+   non-blocking, since `readyToDraft` reads coverage + records only.
 7. Product doc `docs/novel-forge/novel-forge.md:55` and `:109` match the code (graduation deterministic; only proposal
    applies write domain tables, studio `readiness`/`concepts` excepted). No contradiction found on this path.
 8. **Several reader promises graduate as one canon fact.** `deepen.promise`'s emission contract tells the model to

@@ -5,7 +5,7 @@ export type ReadinessIntent = 'success' | 'warning' | 'danger';
 export const DIMENSION_ORDER: BibleReadinessDimension[] = ['coverage', 'records', 'substance', 'integrity', 'reveal'];
 
 export const DIMENSION_LABEL: Record<BibleReadinessDimension, string> = {
-  coverage: 'Chapters present',
+  coverage: 'Essentials covered',
   records: 'Canon as records',
   substance: 'Enough detail',
   integrity: 'References resolve',
@@ -13,9 +13,9 @@ export const DIMENSION_LABEL: Record<BibleReadinessDimension, string> = {
 };
 
 export const DIMENSION_HINT: Record<BibleReadinessDimension, string> = {
-  coverage: 'Every document a serial needs exists and has been written.',
+  coverage: 'Premise, world, power system, factions and locations, cast, escalation and volume plan each have substance — in a document under any name, or as records.',
   records: 'Cast, factions, locations and power rules exist as records, not only as prose — this screen reads records.',
-  substance: 'Each document is long enough, and free of placeholder text, to write a scene from.',
+  substance: 'Each essential has enough written about it, and no document carries placeholder text.',
   integrity: 'Every canon fact names a real entity, and every major entity has a card body.',
   reveal: 'Withheld truths carry the chapter they are revealed in, so the mystery has a pace.',
 };
