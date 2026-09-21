@@ -73,7 +73,7 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly DRF_001 = AppErrorCode.notFound('DRF_001', 'Draft not found');
   static readonly DRF_002 = AppErrorCode.badRequest('DRF_002', 'Draft is already finalized');
-  static readonly DRF_003 = AppErrorCode.badRequest('DRF_003', 'Unresolved contradiction — resolve or use autoFix before generating next chapter');
+  static readonly DRF_003 = AppErrorCode.badRequest('DRF_003', 'Unresolved contradiction — repair or regenerate the contradicted draft before generating further chapters');
   static readonly DRF_004 = AppErrorCode.badRequest('DRF_004', 'Draft is not approved — approve draft before finalizing');
   static readonly DRF_005 = AppErrorCode.badRequest('DRF_005', 'Chapter adds no new canon to the bible');
   static readonly DRF_006 = AppErrorCode.notFound('DRF_006', 'Chapter scene image not found');

@@ -440,6 +440,12 @@
   color: var(--sh-text-tertiary);
 }
 
+.reviewActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 .switchNum {
   font-family: var(--sh-font-mono);
   font-size: 11px;

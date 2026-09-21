@@ -8,6 +8,7 @@ import {
   Button,
   ButtonGroup,
   Checkbox,
+  ConfirmDialog,
   Dialog,
   Drawer,
   DropdownMenu,
@@ -55,6 +56,7 @@ import {
   useListJobsQuery,
   useListRunsQuery,
   useProjectStatusQuery,
+  useReviseDraftMutation,
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
 } from '@/lib/apis';
@@ -109,6 +111,15 @@ const STATUS_META: Record<ReviewStatus, StatusMeta> = {
 function statusMeta(draft: DraftResponse): StatusMeta {
   if (draft.status === 'final') return { intent: 'success', label: 'Final' };
   return STATUS_META[draft.reviewStatus] ?? { intent: 'neutral', label: 'Draft' };
+}
+
+// reviseDraft has no judge loop of its own — it rewrites from a feedback note, so the note carries the
+// judge's own findings back in as the instruction to fix.
+function buildRepairNote(draft: DraftResponse): string {
+  const findings = draft.judgeNote?.trim();
+  return findings
+    ? `Resolve the following continuity findings without changing anything else:\n${findings}`
+    : 'Resolve the continuity contradiction the judge flagged for this chapter.';
 }
 
 function wordCount(body?: string | null): number {
@@ -449,16 +460,20 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
   const nextBriefChapter = briefs.find(b => !drafted.has(b.chapter))?.chapter;
   const lastChapter = Math.max(0, ...drafts.map(d => d.chapter), ...briefs.map(b => b.chapter));
   const nextManualChapter = lastChapter + 1;
-  const hasContradiction = drafts.some(d => d.reviewStatus === 'contradiction');
+  const contradictedDrafts = useMemo(() => drafts.filter(d => d.reviewStatus === 'contradiction').sort((a, b) => a.chapter - b.chapter), [drafts]);
+  const nextContradiction = contradictedDrafts[0];
   const planApproved = statusQuery.data?.planApproved ?? false;
+
+  // Judge + repair costs more per draft, so it stays a per-run choice — on by default per product decision.
+  const [autoFix, setAutoFix] = useState(true);
 
   // Generation gates mirror the backend (PLN_001 / DRF_003); surface the reason rather than let the call throw.
   const generateReason = !nextBriefChapter
     ? 'No brief to generate from — write it yourself'
     : !planApproved
       ? 'Approve the volume plan first'
-      : hasContradiction
-        ? 'Resolve the flagged contradiction first'
+      : nextContradiction
+        ? `Resolve chapter ${nextContradiction.chapter}’s flagged contradiction first`
         : undefined;
   const canGenerate = !generateReason;
 
@@ -468,7 +483,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
   // that slot in the row list regardless, but the toast still gives immediate feedback on *this* run.
   const runGenerate = (limit: number): void => {
     generate.mutate(
-      { limit },
+      { limit, autoFix },
       {
         onSuccess: job => {
           const stopped = externalStopChapter(job);
@@ -540,8 +555,12 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                 {!canGenerate && generateReason && <div className={styles.menuNote}>{generateReason}</div>}
                 <DropdownMenu.Separator />
                 <DropdownMenu.Label>Advanced</DropdownMenu.Label>
+                <DropdownMenu.CheckboxItem checked={autoFix} onCheckedChange={checked => setAutoFix(checked === true)}>
+                  Auto-fix contradictions
+                </DropdownMenu.CheckboxItem>
+                <div className={styles.menuNote}>Judge + repair reviews every draft and rewrites it when flagged — costs more per chapter.</div>
                 <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
-                  Draft the next 5 chapters (no review)
+                  Draft the next 5 chapters
                 </DropdownMenu.Item>
                 <DropdownMenu.Item disabled={frontier > 0} onSelect={() => setInsertAfter(0)}>
                   Insert a chapter ahead of ch 1
@@ -556,6 +575,22 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
             <Spinner size="sm" />
             <span className={styles.activeJobLabel}>Generating chapter {activeJob.target} — view progress</span>
           </button>
+        )}
+
+        {nextContradiction && (
+          <Alert
+            intent="danger"
+            title={
+              contradictedDrafts.length > 1
+                ? `Chapter ${nextContradiction.chapter} was flagged by the judge (${contradictedDrafts.length} chapters need attention)`
+                : `Chapter ${nextContradiction.chapter} was flagged by the judge`
+            }
+            action={{ label: `Review chapter ${nextContradiction.chapter}`, onClick: () => onOpen(nextContradiction.chapter) }}
+            className={styles.notice}
+          >
+            {nextContradiction.judgeNote?.trim() || 'The judge found a continuity issue. Open the chapter to repair or regenerate it.'} Further generation is blocked until it’s
+            resolved.
+          </Alert>
         )}
 
         <div className={styles.filterWrap}>
@@ -713,13 +748,101 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
 interface ReviewDrawerProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  novelId: string;
   draft: DraftResponse;
+  onRegenerated: () => void;
 }
 
-function ReviewDrawer({ open, onOpenChange, draft }: ReviewDrawerProps): React.JSX.Element {
+function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: ReviewDrawerProps): React.JSX.Element {
   const meta = statusMeta(draft);
   const clean = draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';
-  const tone = clean ? 'success' : draft.reviewStatus === 'contradiction' ? 'danger' : 'warning';
+  const contradicted = draft.reviewStatus === 'contradiction';
+  const tone = clean ? 'success' : contradicted ? 'danger' : 'warning';
+  // A finalized draft can still land in "contradiction" from a later manual Verify, but revise/delete
+  // both refuse a finalized draft (DRF_002) — Amend is the only path past that lock.
+  const recoverable = contradicted && draft.status !== 'final';
+
+  // DRF_003 blocks /generate while ANY draft in the project is contradicted, not just this one — so
+  // deleting this draft and calling generate only succeeds when it is the last contradiction standing.
+  const draftsQuery = useListDraftsQuery(novelId, open && recoverable);
+  const briefsQuery = useListBriefsQuery(novelId, open && recoverable);
+  const otherContradiction = (draftsQuery.data?.items ?? []).find(d => d.reviewStatus === 'contradiction' && d.chapter !== draft.chapter);
+
+  // Mirrors selectGenerationBatch (generation.service.ts): scanning briefs in ascending order, an
+  // unfinalized external-write-mode brief truncates the batch to zero — even one that already has a
+  // draft — before any chapter is picked; otherwise the first brief without a draft is what /generate
+  // with limit 1 would actually draft next. Deleting this draft and calling generate only regenerates
+  // *this* chapter when that target is this chapter.
+  const briefs = useMemo(() => [...(briefsQuery.data?.items ?? [])].sort((a, b) => a.chapter - b.chapter), [briefsQuery.data]);
+  const draftedElsewhere = useMemo(() => new Set((draftsQuery.data?.items ?? []).filter(d => d.chapter !== draft.chapter).map(d => d.chapter)), [draftsQuery.data, draft.chapter]);
+  const finalizedElsewhere = useMemo(() => new Set((draftsQuery.data?.items ?? []).filter(d => d.status === 'final').map(d => d.chapter)), [draftsQuery.data]);
+  let nextGenerateTarget: number | undefined;
+  let externalBlock: number | undefined;
+  for (const brief of briefs) {
+    if (brief.writeMode === 'external' && !finalizedElsewhere.has(brief.chapter)) {
+      externalBlock = brief.chapter;
+      break;
+    }
+    if (!draftedElsewhere.has(brief.chapter)) {
+      nextGenerateTarget = brief.chapter;
+      break;
+    }
+  }
+  const hasBrief = briefs.some(b => b.chapter === draft.chapter);
+
+  const regenerateBlockedReason = otherContradiction
+    ? `Chapter ${otherContradiction.chapter} is also contradicted — generation stays blocked until every contradiction is resolved. Repair this draft, or open chapter ${otherContradiction.chapter} to resolve it first.`
+    : !hasBrief
+      ? `Chapter ${draft.chapter} has no generation brief on file — regenerating can't redraft it automatically. Repair this draft instead, or delete and rewrite it manually.`
+      : externalBlock !== undefined
+        ? `Chapter ${externalBlock} is an unfinalized external slot — generation stays blocked there until it's filled and finalized. Resolve chapter ${externalBlock} first, or repair this draft instead.`
+        : nextGenerateTarget !== undefined && nextGenerateTarget !== draft.chapter
+          ? `Chapter ${nextGenerateTarget} has no draft yet — generating next would draft it, not chapter ${draft.chapter}. Generate or delete chapter ${nextGenerateTarget} first, or repair this draft instead.`
+          : undefined;
+  const canRegenerate = recoverable && !regenerateBlockedReason;
+
+  const revise = useReviseDraftMutation(novelId, draft.chapter);
+  const deleteDraft = useDeleteDraftMutation(novelId);
+  const regenerate = useGenerateMutation(novelId);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const regenerating = deleteDraft.isPending || regenerate.isPending;
+
+  const repair = (): void => {
+    revise.mutate(
+      { note: buildRepairNote(draft) },
+      { onSuccess: () => toast.success('Repair applied — run Verify to confirm it satisfies the judge'), onError: err => toast.danger(err.message) },
+    );
+  };
+
+  const runRegenerate = (): void => {
+    deleteDraft.mutate(draft.chapter, {
+      onSuccess: () =>
+        regenerate.mutate(
+          { limit: 1, autoFix: true },
+          {
+            onSuccess: job => {
+              setConfirmRegen(false);
+              // The guard above should already keep this aligned, but the job's own `target` is what
+              // actually got queued — say that, not what was merely intended, if the two ever diverge.
+              if (job.target === String(draft.chapter)) toast.success(`Regenerating chapter ${draft.chapter}`);
+              else if (!job.target) toast.warning(`Chapter ${draft.chapter}’s draft was removed, but nothing was queued to redraft it — check the chapters list.`);
+              else toast.warning(`Chapter ${draft.chapter}’s draft was removed, but chapter ${job.target} was queued to draft next instead.`);
+              onRegenerated();
+            },
+            onError: err => {
+              setConfirmRegen(false);
+              toast.danger(
+                `Chapter ${draft.chapter}’s draft was removed, but redrafting failed to start: ${err.message}. Resolve the blocker, then generate chapter ${draft.chapter} again from the chapters list.`,
+              );
+              onRegenerated();
+            },
+          },
+        ),
+      // Deleting itself failed — the draft is untouched, so there is nothing to navigate away from.
+      onError: err => toast.danger(err.message),
+    });
+  };
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange} placement="right" size="sm">
       <Drawer.Header title="Judge review" meta={draft.judge ?? undefined} />
@@ -736,7 +859,32 @@ function ReviewDrawer({ open, onOpenChange, draft }: ReviewDrawerProps): React.J
         ) : (
           <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>No judge notes recorded for this draft.</p>
         )}
+        {recoverable && (
+          <div className={styles.reviewActions}>
+            <Button variant="primary" size="sm" loading={revise.isPending} disabled={regenerating} onClick={repair}>
+              Repair with AI
+            </Button>
+            <Button variant="secondary" size="sm" loading={regenerating} disabled={revise.isPending || !canRegenerate} onClick={() => setConfirmRegen(true)}>
+              Regenerate chapter
+            </Button>
+          </div>
+        )}
+        {recoverable && regenerateBlockedReason && <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>Regenerate is disabled — {regenerateBlockedReason}</p>}
+        {contradicted && !recoverable && (
+          <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>This chapter is finalized — use Amend from the chapter view to rewrite its prose in place.</p>
+        )}
       </Drawer.Body>
+
+      <ConfirmDialog
+        open={confirmRegen}
+        onOpenChange={setConfirmRegen}
+        intent="danger"
+        title={`Regenerate chapter ${draft.chapter}?`}
+        description="Deletes this draft and its revision history, then redrafts it from the brief with judge and repair. This cannot be undone."
+        confirmLabel="Regenerate"
+        loading={regenerating}
+        onConfirm={runRegenerate}
+      />
     </Drawer>
   );
 }
@@ -1019,7 +1167,15 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
     if (editing && tab === 'write') editorRef.current?.focus();
   }, [editing, tab]);
 
-  if (draftQuery.isLoading) return <PaneLoader />;
+  // A draft that 404s (deleted out from under this view — e.g. by "Regenerate chapter") has no route to
+  // recover in place: bounce back to the list instead of stranding the author on a dead PaneError whose
+  // Retry only reloads the same missing chapter.
+  const draftMissing = draftQuery.error?.status === 404;
+  useEffect(() => {
+    if (draftMissing) onBack();
+  }, [draftMissing, onBack]);
+
+  if (draftQuery.isLoading || draftMissing) return <PaneLoader />;
   if (draftQuery.error) return <PaneError error={draftQuery.error} />;
   if (!draft) return <PaneLoader />;
 
@@ -1280,7 +1436,16 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
       {amendOpen && <AmendDialog novelId={novelId} chapter={chapter} draft={draft} onOpenChange={setAmendOpen} onAmended={setAmendResult} />}
 
-      <ReviewDrawer open={reviewOpen} onOpenChange={setReviewOpen} draft={draft} />
+      <ReviewDrawer
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        novelId={novelId}
+        draft={draft}
+        onRegenerated={() => {
+          setReviewOpen(false);
+          onBack();
+        }}
+      />
       <ChapterSwitchDrawer open={chaptersOpen} onOpenChange={setChaptersOpen} novelId={novelId} current={chapter} onPick={onPick} />
     </div>
   );
