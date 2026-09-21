@@ -11,6 +11,7 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
+  type FactLike,
   loadKnowledgeView,
   loadWriterForbiddenFacts,
   loadWriterHiddenFactKeys,
@@ -18,6 +19,7 @@ import {
   renderChapterReveals,
   renderHiddenConstraints,
   renderKnownFacts,
+  scanKnowledgeLeaks,
   scrubForWriter,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
@@ -72,6 +74,8 @@ export interface ChatScopeInput {
 export const DEFAULT_BUDGET = 24_000;
 export const PREV_ENDING_TAIL = 500;
 export const FULL_CAST_MAX = 5;
+const RECENT_SUMMARY_COUNT = 3;
+const ESTABLISHED_FACTS_MAX = 15;
 
 // Refinement budgets. History is prompt messages, not pack text, so it does not count
 // against the pack; the history budgets are enforced by ChatService compaction.
@@ -222,6 +226,7 @@ interface ResolvedRefRows {
   bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
   factMap: Map<string, CanonFactRow>;
   hiddenFactKeys: ReadonlySet<string> | null;
+  forbidden: FactLike[];
 }
 
 type CanonFactRow = typeof schema.canonFacts.$inferSelect;
@@ -304,6 +309,49 @@ function renderCharacterState(name: string, state: CharacterStateRow): string | 
   if (state.statusNote) lines.push(`Status: ${state.statusNote}`);
   if (lines.length === 0) return null;
   return [`**${name}** (as of ch ${state.lastUpdatedChapter})`, ...lines].join('\n');
+}
+
+interface RecentSummary {
+  chapter: number;
+  summary: string;
+  draft: boolean;
+}
+
+// A batch drafts chapter N before N-1 is finalized, so a chapter without a finalized row speaks through its draft's summary.
+function recentSummaries(finalized: { number: number; summary: string | null }[], drafts: { chapter: number; summary: string | null }[]): RecentSummary[] {
+  const byChapter = new Map<number, RecentSummary>();
+  for (const draft of drafts) if (draft.summary?.trim()) byChapter.set(draft.chapter, { chapter: draft.chapter, summary: draft.summary, draft: true });
+  for (const row of finalized) {
+    const summary = row.summary?.trim() ? row.summary : (byChapter.get(row.number)?.summary ?? '');
+    byChapter.set(row.number, { chapter: row.number, summary, draft: false });
+  }
+  return [...byChapter.values()].sort((a, b) => a.chapter - b.chapter).slice(-RECENT_SUMMARY_COUNT);
+}
+
+// Each value is scrubbed before serializing: scrubbing the JSON text would miss a fact whose quotes or line breaks the encoding escapes.
+function writerSafeState(value: unknown, forbidden: FactLike[]): unknown {
+  if (typeof value === 'string') return scrubForWriter(value, forbidden);
+  if (Array.isArray(value)) return value.map(item => writerSafeState(item, forbidden));
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, key === 'establishedFacts' && Array.isArray(item) ? writerSafeFacts(item, forbidden) : writerSafeState(item, forbidden)]),
+  );
+}
+
+// An entry tripping a hidden fact's tell-tale terms is dropped outright rather than scrubbed around, so the ledger never carries half a secret forward.
+function writerSafeFacts(entries: unknown[], forbidden: FactLike[]): string[] {
+  return entries
+    .filter((entry): entry is string => typeof entry === 'string' && scanKnowledgeLeaks(entry, forbidden).length === 0)
+    .slice(0, ESTABLISHED_FACTS_MAX)
+    .map(entry => scrubForWriter(entry, forbidden));
+}
+
+function renderCarriedState(state: unknown, forbidden: FactLike[]): string {
+  return typeof state === 'string' ? scrubForWriter(state, forbidden) : JSON.stringify(writerSafeState(state, forbidden));
+}
+
+function renderIsolatedEnding(summary: string | null, state: unknown, forbidden: FactLike[]): string {
+  return `Summary: ${scrubForWriter(summary ?? '', forbidden)}\nState: ${state ? renderCarriedState(state, forbidden) : 'null'}`;
 }
 
 // `entity_relationships` is append-only — one row per chapter that observed the pair — so current state
@@ -498,6 +546,7 @@ export class ContextAssembler {
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
     const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows) : null;
+    const forbidden = chapter !== undefined && chapterRows.length > 0 ? await loadWriterForbiddenFacts(this.db, projectId, chapter) : [];
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
@@ -507,7 +556,7 @@ export class ContextAssembler {
       const prefix = colon === -1 ? '' : ref.slice(0, colon);
       const value = ref.slice(colon + 1);
       if (prefix === 'fact' && hiddenFactKeys?.has(value) && !factMap.get(value)?.writerNote?.trim()) continue;
-      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap, hiddenFactKeys };
+      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap, hiddenFactKeys, forbidden };
       const section = this.resolveRef(ref, prefix, value, chapter, rows);
       if (section) resolved.push(section);
       else unresolved.push(ref);
@@ -560,7 +609,7 @@ export class ContextAssembler {
         const chapter = rows.chapterMap.get(n);
         if (!chapter) return null;
         const isDraft = chapter.status !== 'done';
-        const content = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${chapter.summary ?? ''}`;
+        const content = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${scrubForWriter(chapter.summary ?? '', rows.forbidden)}`;
         return makeRefSection(ref, `EARLIER CHAPTER: ${n}${chapter.title ? ` — ${chapter.title}` : ''}`, content, isDraft ? 'working' : 'canonical');
       }
       case 'volume': {
@@ -598,7 +647,7 @@ export class ContextAssembler {
   async forChapter(projectId: bigint, chapter: number, opts?: ChapterPackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
-    const [project, brief, prevChapter, currentVolume, recentChapters, prevDraft] = await Promise.all([
+    const [project, brief, prevChapter, currentVolume, recentChapters, recentDrafts, prevDraft] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter - 1)) }),
@@ -613,10 +662,21 @@ export class ContextAssembler {
       this.db.query.chapters.findMany({
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
-        limit: 3,
+        limit: RECENT_SUMMARY_COUNT,
+        columns: { number: true, summary: true },
       }),
-      this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter - 1)) }),
+      this.db.query.drafts.findMany({
+        where: and(eq(schema.drafts.projectId, projectId), between(schema.drafts.chapter, chapter - RECENT_SUMMARY_COUNT, chapter - 1)),
+        columns: { chapter: true, summary: true },
+      }),
+      this.db.query.drafts.findFirst({
+        where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter - 1)),
+        columns: { body: true, summary: true, state: true, isolated: true },
+      }),
     ]);
+
+    const carried = prevChapter != null || prevDraft != null || recentDrafts.some(draft => draft.summary) || recentChapters.length > 0;
+    const forbidden = carried ? await loadWriterForbiddenFacts(this.db, projectId, chapter) : [];
 
     const currentArc = brief?.arcKey ? await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, brief.arcKey)) }) : undefined;
 
@@ -627,27 +687,26 @@ export class ContextAssembler {
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isIsolated) {
-        const stateStr = prevDraft?.state ? JSON.stringify(prevDraft.state) : 'null';
-        const content = `Summary: ${prevChapter.summary ?? ''}\nState: ${stateStr}`;
-        sections.push(makeSection('prev_ending', content, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, forbidden), tier, [`chapter:${chapter - 1}`]));
       } else {
-        const raw = prevChapter.content ?? '';
+        const raw = scrubForWriter(prevChapter.content ?? '', forbidden);
         sections.push(makeSectionTail('prev_ending', raw, PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
+    } else if (prevDraft?.isolated) {
+      sections.push(
+        makeSection('prev_ending', `[DRAFT — not yet canon]\n${renderIsolatedEnding(prevDraft.summary, prevDraft.state, forbidden)}`, 'working', [`chapter:${chapter - 1}`]),
+      );
     } else if (prevDraft?.body) {
       // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
       // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
-      const { text, truncated } = truncateAtParagraphTail(prevDraft.body, PREV_ENDING_TAIL);
+      const { text, truncated } = truncateAtParagraphTail(scrubForWriter(prevDraft.body, forbidden), PREV_ENDING_TAIL);
       const content = `[DRAFT — not yet canon]\n${text}`;
       const rendered = renderSection('prev_ending', content);
       sections.push({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [`chapter:${chapter - 1}`], rendered });
     }
 
     const prevState = prevDraft?.state;
-    if (prevState != null) {
-      const content = typeof prevState === 'string' ? prevState : JSON.stringify(prevState);
-      sections.push(makeSection('continuation_state', content, 'working', [`chapter:${chapter - 1}`]));
-    }
+    if (prevState != null) sections.push(makeSection('continuation_state', renderCarriedState(prevState, forbidden), 'working', [`chapter:${chapter - 1}`]));
 
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
@@ -726,12 +785,11 @@ export class ContextAssembler {
 
     for (const s of await this.dynamicCastSections(projectId, entityRefSections, brief?.pov ?? null)) sections.push(s);
 
-    if (recentChapters.length > 0) {
-      const lines = recentChapters
-        .slice()
-        .reverse()
-        .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
-      sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
+    const recent = recentSummaries(recentChapters, recentDrafts);
+    if (recent.length > 0) {
+      const lines = recent.map((entry, i) => `${i + 1}. ${entry.draft ? '[DRAFT — not yet canon] ' : ''}Ch ${entry.chapter}: ${entry.summary}`);
+      const tier: ContextTier = recent.some(entry => entry.draft) ? 'working' : 'canonical';
+      sections.push(makeSection('memory', scrubForWriter(lines.join('\n'), forbidden), tier, []));
     }
 
     // Writing style is the generator's only source for voice, craft, and length, so it is required: the
@@ -916,24 +974,21 @@ export class ContextAssembler {
 
     void feedbackId; // Used for audit context, not for filtering here.
     const sections: ContextSection[] = [];
+    const forbidden = prevChapter || prevDraft || feedbackRows.length > 0 || recentChapters.length > 0 ? await loadWriterForbiddenFacts(this.db, projectId, chapter) : [];
 
     if (prevChapter) {
       const isIsolated = prevChapter.isolated;
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isIsolated) {
-        const stateStr = prevDraft?.state ? JSON.stringify(prevDraft.state) : 'null';
-        sections.push(makeSection('prev_ending', `Summary: ${prevChapter.summary ?? ''}\nState: ${stateStr}`, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, forbidden), tier, [`chapter:${chapter - 1}`]));
       } else {
-        sections.push(makeSectionTail('prev_ending', prevChapter.content ?? '', PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSectionTail('prev_ending', scrubForWriter(prevChapter.content ?? '', forbidden), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
     }
 
     const prevState = prevDraft?.state;
-    if (prevState != null) {
-      const content = typeof prevState === 'string' ? prevState : JSON.stringify(prevState);
-      sections.push(makeSection('continuation_state', content, 'working', [`chapter:${chapter - 1}`]));
-    }
+    if (prevState != null) sections.push(makeSection('continuation_state', renderCarriedState(prevState, forbidden), 'working', [`chapter:${chapter - 1}`]));
 
     if (brief) sections.push(makeSection('brief', brief.body, 'approved_intent', [`chapter:${chapter}`]));
     if (currentVolume) {
@@ -954,7 +1009,6 @@ export class ContextAssembler {
     }
 
     if (feedbackRows.length > 0) {
-      const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
       const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ? scrubForWriter(f.note, forbidden) : f.disposition}`).join('\n');
       sections.push(makeSection('feedback', notes, 'working', []));
     }
@@ -964,7 +1018,7 @@ export class ContextAssembler {
         .slice()
         .reverse()
         .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
-      sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
+      sections.push(makeSection('memory', scrubForWriter(lines.join('\n'), forbidden), 'canonical', []));
     }
     sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
 

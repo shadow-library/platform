@@ -25,6 +25,7 @@ import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema'
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { renderEndingContract } from '../ai/schemas/ending-contract.schema';
 import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
+import { type GenerationState } from '../ai/schemas/generation.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
 import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
@@ -718,7 +719,7 @@ export class GenerationService {
       ctx,
       project as never,
       policy,
-    )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+    )) as { title: string; body: string; summary: string; state?: GenerationState };
 
     const newRevision = draft.revision + 1;
     const [updated] = await this.db
@@ -1006,7 +1007,7 @@ export class GenerationService {
       prose: draft.body,
       summary: draft.summary ?? '',
       title: draft.title ?? undefined,
-      continuationState: draft.state as Record<string, string> | undefined,
+      continuationState: draft.state as GenerationState | undefined,
       generator: draft.generator,
       isolated: draft.isolated,
     });
@@ -1138,7 +1139,7 @@ export class GenerationService {
       title: string;
       body: string;
       summary: string;
-      state?: Record<string, string>;
+      state?: GenerationState;
     };
     const expansion = await expandShortDraft(this.modelRouter, { ...promptVars, guidance, body: generated.body }, { ...ctx, node: 'generateUnrestricted' }, routedProject, policy);
     const result = { ...generated, body: expansion.body };

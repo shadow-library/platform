@@ -101,6 +101,8 @@
   drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`, and a hidden
   fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list (seed-source facts excluded). A chapter-scoped `fact:` ref obeys the same gate (plus
   the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored.
+  Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
+  chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
   and never while a generate job is active. Recombine does not shift; it refuses once anything references chapter numbers.

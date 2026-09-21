@@ -120,7 +120,7 @@ function chapterOneDb(options: FixtureOptions = {}) {
       chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
       volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
       arcs: { findFirst: mock(async () => currentArc), findMany: mock(async () => [currentArc, ...arcs.slice(1)]) },
-      drafts: { findFirst: mock(async () => null) },
+      drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
       entities: { findFirst: mock(async () => wren), findMany: mock(async () => entities) },
       worldFacts: { findMany: mock(async () => worldFacts) },
       plotThreads: { findMany: mock(async () => []) },

@@ -11,7 +11,7 @@ import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
-import { type ContinuityOutput } from '../schemas';
+import { type ContinuityOutput, type GenerationState } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { applyContinuityDelta, continuityHasHeldEntries, type ContinuityTransaction, filterToHeldEntries } from './apply-continuity';
@@ -34,7 +34,7 @@ const ChapterFinalizationAnnotation = Annotation.Root({
   prose: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
-  continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
+  continuationState: Annotation<GenerationState>({ reducer: (_, n) => n, default: () => ({}) }),
   generator: Annotation<string>({ reducer: (_, n) => n, default: () => 'standard' }),
   isolated: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
   continuityDelta: Annotation<ContinuityOutput | null>({ reducer: (_, n) => n, default: () => null }),

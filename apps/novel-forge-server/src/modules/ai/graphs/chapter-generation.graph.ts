@@ -30,7 +30,7 @@ import { type ModelRouterService, type ProjectConfig } from '../model-router.ser
 import { PROMPT_REGISTRY } from '../prompts';
 import { generationWordTargetVars } from '../prompts/generation.prompt';
 import { type IndexingService } from '../retrieval/indexing.service';
-import { type FixOutput, type JudgeOutput, JudgeSchema, renderEndingContract } from '../schemas';
+import { type FixOutput, type GenerationState, type JudgeOutput, JudgeSchema, renderEndingContract } from '../schemas';
 import { parseSchema } from '../schemas/validate';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { runToolLoop } from '../tools/tool-loop';
@@ -64,7 +64,7 @@ const ChapterGenAnnotation = Annotation.Root({
   prose: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
-  continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
+  continuationState: Annotation<GenerationState>({ reducer: (_, n) => n, default: () => ({}) }),
   verdict: Annotation<'consistent' | 'contradiction' | 'evaluation_failed' | null>({ reducer: (_, n) => n, default: () => null }),
   endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
@@ -237,7 +237,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
-    )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+    )) as { title: string; body: string; summary: string; state?: GenerationState };
     const expansion = await expandShortDraft(
       modelRouter,
       { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
@@ -270,7 +270,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       prose: expansion.body,
       title,
       summary: result.summary,
-      continuationState: (result.state ?? {}) as Record<string, string>,
+      continuationState: result.state ?? {},
       writerClassRaised: raised,
       nodeTrace: ['draftChapter'],
     };
@@ -588,7 +588,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
-    )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+    )) as { title: string; body: string; summary: string; state?: GenerationState };
     const expansion = await expandShortDraft(
       modelRouter,
       { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
@@ -609,7 +609,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       prose: expansion.body,
       title: result.title || state.title,
       summary: result.summary,
-      continuationState: (result.state ?? {}) as Record<string, string>,
+      continuationState: result.state ?? {},
       attempt: state.attempt + 1,
       previousFindings: state.findings,
       repairMode: 'rewrite' as const,

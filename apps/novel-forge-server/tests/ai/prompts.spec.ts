@@ -76,6 +76,11 @@ describe('Prompt modules', () => {
         expect(p.system).toContain('Canon always wins over dramatic convenience');
       }
     });
+
+    it('should make revision carry the established facts forward', () => {
+      expect(PROMPT_REGISTRY.revision.version).toBe('1.2.0');
+      expect(PROMPT_REGISTRY.revision.system).toContain('carry forward the incoming "## CONTINUATION STATE" section\'s establishedFacts');
+    });
   });
 
   describe('EndingContractSchema', () => {
@@ -1036,11 +1041,17 @@ describe('Prompt modules', () => {
 
   describe('knowledge contract (generation/judge v2.2)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.6.0');
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.7.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');
       expect(PROMPT_REGISTRY.generation.system).toContain('does not exist for the cast');
+    });
+
+    it('should bind the writer to earlier chapters established facts and make it carry them forward', () => {
+      expect(PROMPT_REGISTRY.generation.system).toContain('never restate one differently or invent a replacement');
+      expect(PROMPT_REGISTRY.generation.system).toContain('Every chapter, whatever its ending, fills state.establishedFacts');
+      expect(PROMPT_REGISTRY.generation.system).toContain('what they witnessed on the page in earlier chapters');
     });
 
     it('judge v2.2 explains the forbidden-knowledge assessment and its JSON field', () => {
@@ -1324,7 +1335,7 @@ describe('Prompt modules', () => {
     it('is registered as analytical work routed through the continuity role', () => {
       expect(PROMPT_REGISTRY['chapter-summarize'].kind).toBe('analytical');
       expect(PROMPT_REGISTRY['chapter-summarize'].role).toBe('continuity');
-      expect(PROMPT_REGISTRY['chapter-summarize'].version).toBe('1.0.0');
+      expect(PROMPT_REGISTRY['chapter-summarize'].version).toBe('1.1.0');
     });
 
     it('renders the chapter prose into the human message', async () => {
@@ -1338,6 +1349,13 @@ describe('Prompt modules', () => {
       expect(parseSchema(ChapterSummarizeSchema, { summary: 'Ash fled the tower.', state: { lastBeat: 'Ash jumps' } }).success).toBe(true);
       expect(parseSchema(ChapterSummarizeSchema, { summary: '', state: {} }).success).toBe(false);
       expect(parseSchema(ChapterSummarizeSchema, { state: {} }).success).toBe(false);
+    });
+
+    it('should accept established facts in the continuation state and ask for them', () => {
+      const state = { lastBeat: 'Ash jumps', establishedFacts: ['The bell tower has 212 steps', 'Ash carries the copper key'] };
+      expect(parseSchema(ChapterSummarizeSchema, { summary: 'Ash fled the tower.', state }).success).toBe(true);
+      expect(parseSchema(ChapterSummarizeSchema, { summary: 'Ash fled the tower.', state: { establishedFacts: 'not a list' } }).success).toBe(false);
+      expect(PROMPT_REGISTRY['chapter-summarize'].system).toContain('establishedFacts');
     });
   });
 });

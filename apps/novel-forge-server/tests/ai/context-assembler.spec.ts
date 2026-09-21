@@ -129,13 +129,14 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     arcs: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-    drafts: { findFirst: mock(async () => null) },
+    drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     entities: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     worldFacts: { findMany: mock(async () => []) },
     plotThreads: { findMany: mock(async () => []) },
     mysteries: { findMany: mock(async () => []) },
     characterStates: { findMany: mock(async () => []) },
     entityRelationships: { findMany: mock(async () => []) },
+    canonFacts: { findMany: mock(async () => []) },
     contextPacks: { findFirst: mock(async () => null) },
     userFeedback: { findMany: mock(async () => []) },
   };
@@ -175,7 +176,7 @@ describe('ContextAssembler.forChapter — isolated-adjacency', () => {
           findMany: mock(async () => []),
         },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => prevDraft) },
+        drafts: { findFirst: mock(async () => prevDraft), findMany: mock(async () => [prevDraft]) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -236,7 +237,7 @@ describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
         briefs: { findFirst: mock(async () => null) },
         chapters: { findFirst: mock(async () => prevChapter), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -266,7 +267,7 @@ describe('ContextAssembler.forChapter — batch adjacency (unfinalized predecess
         briefs: { findFirst: mock(async () => null) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => prevDraft) },
+        drafts: { findFirst: mock(async () => prevDraft), findMany: mock(async () => [prevDraft]) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -296,7 +297,7 @@ describe('ContextAssembler.forChapter — batch adjacency (unfinalized predecess
         briefs: { findFirst: mock(async () => null) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -310,6 +311,150 @@ describe('ContextAssembler.forChapter — batch adjacency (unfinalized predecess
     const pack = await assembler.forChapter(1n, 5, { dryRun: true });
 
     expect(pack.sections.find(s => s.key === 'prev_ending')).toBeUndefined();
+  });
+});
+
+describe('ContextAssembler.forChapter — established state carry', () => {
+  const HIDDEN_TEXT = 'The lamplighter is the missing heir of the salt vault';
+  const hiddenFact = { id: 9n, factKey: 'lamplighter_heir', text: HIDDEN_TEXT, constraintNote: null, writerNote: null, revealChapter: 12, source: 'bible', terms: [] };
+
+  function carryOverrides(options: {
+    drafts: Record<string, unknown>[];
+    finalized?: Record<string, unknown>[];
+    facts?: Record<string, unknown>[];
+    prevChapter?: Record<string, unknown>;
+  }) {
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        chapters: { findFirst: mock(async () => options.prevChapter ?? null), findMany: mock(async () => options.finalized ?? []) },
+        drafts: { findFirst: mock(async () => options.drafts.find(draft => draft.chapter === 4) ?? null), findMany: mock(async () => options.drafts) },
+        canonFacts: { findMany: mock(async () => options.facts ?? []) },
+        characterKnowledge: { findMany: mock(async () => []) },
+      },
+    };
+  }
+
+  it('should list unfinalized predecessors by their draft summaries in chapter order', async () => {
+    const drafts = [
+      { chapter: 4, body: 'Tail of four.', summary: 'The pump failed at the ninth lock.', state: null },
+      { chapter: 2, body: 'Tail of two.', summary: 'The barge ran aground on the third shoal.', state: null },
+      { chapter: 3, body: 'Tail of three.', summary: '', state: null },
+    ];
+    const pack = await makeAssembler(carryOverrides({ drafts })).forChapter(1n, 5, { dryRun: true });
+
+    const memory = pack.sections.find(s => s.key === 'memory');
+    expect(memory?.tier).toBe('working');
+    expect(memory?.rendered).toContain('1. [DRAFT — not yet canon] Ch 2: The barge ran aground on the third shoal.');
+    expect(memory?.rendered).toContain('2. [DRAFT — not yet canon] Ch 4: The pump failed at the ninth lock.');
+    expect(memory?.rendered).not.toContain('Ch 3:');
+  });
+
+  it('should prefer a finalized chapter summary over its draft and keep only the three latest chapters', async () => {
+    const finalized = [
+      { number: 3, summary: 'CANON_THREE' },
+      { number: 1, summary: 'CANON_ONE' },
+    ];
+    const drafts = [
+      { chapter: 3, body: 'x', summary: 'DRAFT_THREE', state: null },
+      { chapter: 4, body: 'x', summary: 'DRAFT_FOUR', state: null },
+      { chapter: 2, body: 'x', summary: 'DRAFT_TWO', state: null },
+    ];
+    const pack = await makeAssembler(carryOverrides({ drafts, finalized })).forChapter(1n, 5, { dryRun: true });
+
+    const rendered = pack.sections.find(s => s.key === 'memory')?.rendered ?? '';
+    expect(rendered).toContain('1. [DRAFT — not yet canon] Ch 2: DRAFT_TWO');
+    expect(rendered).toContain('2. Ch 3: CANON_THREE');
+    expect(rendered).toContain('3. [DRAFT — not yet canon] Ch 4: DRAFT_FOUR');
+    expect(rendered).not.toContain('DRAFT_THREE');
+    expect(rendered).not.toContain('CANON_ONE');
+  });
+
+  it('should carry the previous chapter established facts into the continuation state', async () => {
+    const state = { lastBeat: 'She pockets the brass key.', establishedFacts: ['The tide gauge read 7 at dusk', 'Her left wrist is sprained'] };
+    const pack = await makeAssembler(carryOverrides({ drafts: [{ chapter: 4, body: 'Tail.', summary: 'Four.', state }] })).forChapter(1n, 5, { dryRun: true });
+
+    const continuation = pack.sections.find(s => s.key === 'continuation_state')?.rendered ?? '';
+    expect(continuation).toContain('The tide gauge read 7 at dusk');
+    expect(continuation).toContain('Her left wrist is sprained');
+  });
+
+  it('should withhold a still-hidden fact from the carried state and summaries', async () => {
+    const state = { establishedFacts: [HIDDEN_TEXT, 'The ledger sits in the blue chest'] };
+    const drafts = [{ chapter: 4, body: 'Tail.', summary: `She guessed it: ${HIDDEN_TEXT}.`, state }];
+    const pack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true });
+
+    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+    expect(pack.sections.find(s => s.key === 'continuation_state')?.rendered).toContain('The ledger sits in the blue chest');
+    expect(pack.sections.find(s => s.key === 'memory')?.rendered).toContain('[withheld]');
+  });
+
+  it('should withhold a hidden fact whose text carries quotes and line breaks from the continuation state', async () => {
+    const quoted = 'The widow said "the vault key is mine"\nand meant the salt vault';
+    const fact = { ...hiddenFact, text: quoted };
+    const state = { lastBeat: `She hears it: ${quoted}`, establishedFacts: ['The ledger sits in the blue chest'] };
+    const pack = await makeAssembler(carryOverrides({ drafts: [{ chapter: 4, body: 'Tail.', summary: 'Four.', state }], facts: [fact] })).forChapter(1n, 5, { dryRun: true });
+
+    const continuation = pack.sections.find(s => s.key === 'continuation_state')?.rendered ?? '';
+    expect(continuation).toContain('[withheld]');
+    expect(continuation).not.toContain('the vault key is mine');
+    expect(continuation).toContain('The ledger sits in the blue chest');
+  });
+
+  it('should drop an established fact that trips a hidden fact term and cap the rest at fifteen', async () => {
+    const fact = { ...hiddenFact, terms: ['salt vault'] };
+    const entries = ['The lamplighter guards the salt vault door', ...Array.from({ length: 20 }, (_, i) => `Crate ${i} holds ${i + 3} lamps`)];
+    const drafts = [{ chapter: 4, body: 'Tail.', summary: 'Four.', state: { establishedFacts: entries } }];
+    const pack = await makeAssembler(carryOverrides({ drafts, facts: [fact] })).forChapter(1n, 5, { dryRun: true });
+
+    const continuation = pack.sections.find(s => s.key === 'continuation_state')?.rendered ?? '';
+    const rendered = Array.from({ length: 20 }, (_, i) => `Crate ${i} holds ${i + 3} lamps`).filter(entry => continuation.includes(`"${entry}"`));
+    expect(rendered).toEqual(Array.from({ length: 15 }, (_, i) => `Crate ${i} holds ${i + 3} lamps`));
+    expect(continuation).not.toContain('salt vault');
+  });
+
+  it('should render an isolated unfinalized predecessor as scrubbed summary and state, never its prose tail', async () => {
+    const drafts = [{ chapter: 4, body: 'ISOLATED_PROSE_TAIL', summary: `Four. ${HIDDEN_TEXT}.`, state: { lastBeat: 'She shuts the gate.' }, isolated: true }];
+    const pack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true });
+
+    const ending = pack.sections.find(s => s.key === 'prev_ending')?.rendered ?? '';
+    expect(ending).toContain('[DRAFT — not yet canon]');
+    expect(ending).toContain('Summary: Four. [withheld].');
+    expect(ending).toContain('She shuts the gate.');
+    expect(pack.rendered).not.toContain('ISOLATED_PROSE_TAIL');
+    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+  });
+
+  it('should scrub the isolated finalized predecessor summary and the prose tail of a finalized one', async () => {
+    const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { lastBeat: HIDDEN_TEXT } }];
+    const isolated = { number: 4, status: 'done', summary: `Four. ${HIDDEN_TEXT}.`, content: 'x', isolated: true };
+    const isolatedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], prevChapter: isolated })).forChapter(1n, 5, { dryRun: true });
+    expect(isolatedPack.rendered).not.toContain(HIDDEN_TEXT);
+    expect(isolatedPack.sections.find(s => s.key === 'prev_ending')?.rendered).toContain('Summary: Four. [withheld].');
+
+    const finalized = { number: 4, status: 'done', summary: 'Four.', content: `The gate shut. ${HIDDEN_TEXT}.`, isolated: false };
+    const tailPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], prevChapter: finalized })).forChapter(1n, 5, { dryRun: true });
+    expect(tailPack.sections.find(s => s.key === 'prev_ending')?.rendered).toContain('The gate shut. [withheld].');
+  });
+
+  it('should scrub chapter ref summaries for a writer pack but not for the planner', async () => {
+    const finalized = [{ number: 3, status: 'done', title: null, summary: `Three. ${HIDDEN_TEXT}.` }];
+    const assembler = makeAssembler(carryOverrides({ drafts: [], finalized, facts: [hiddenFact] }));
+
+    const { resolved: writer } = await assembler.resolveRefs(1n, ['chapter:3'], 5);
+    expect(writer[0]?.rendered).toContain('Ch 3: Three. [withheld].');
+
+    const { resolved: planner } = await assembler.resolveRefs(1n, ['chapter:3']);
+    expect(planner[0]?.rendered).toContain(HIDDEN_TEXT);
+  });
+
+  it('should fall back to the draft summary when a finalized chapter has none', async () => {
+    const drafts = [{ chapter: 3, body: 'x', summary: 'The weir held overnight.', state: null }];
+    const pack = await makeAssembler(carryOverrides({ drafts, finalized: [{ number: 3, summary: '' }] })).forChapter(1n, 5, { dryRun: true });
+
+    const memory = pack.sections.find(s => s.key === 'memory');
+    expect(memory?.rendered).toContain('1. Ch 3: The weir held overnight.');
+    expect(memory?.tier).toBe('canonical');
   });
 });
 
@@ -332,7 +477,7 @@ describe('ContextAssembler.forChapter — no brief', () => {
         briefs: { findFirst: mock(async () => null) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -357,7 +502,7 @@ describe('ContextAssembler.forChapter — no brief', () => {
         briefs: { findFirst: mock(async () => null) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -389,7 +534,7 @@ describe('ContextAssembler.forChapter — arc_objective', () => {
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -418,7 +563,7 @@ describe('ContextAssembler.forChapter — arc_objective', () => {
         briefs: { findFirst: mock(async () => brief) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -452,7 +597,7 @@ describe('ContextAssembler.forChapter — stable/volatile split', () => {
         },
         volumes: { findFirst: mock(async () => volume), findMany: mock(async () => []) },
         arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => ({ state: { lastBeat: 'CONTINUATION_MARKER' } })) },
+        drafts: { findFirst: mock(async () => ({ state: { lastBeat: 'CONTINUATION_MARKER' } })), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => [entity]) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -519,7 +664,7 @@ describe('ContextAssembler.forChapter — FULL_CAST_MAX', () => {
         briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 5, body: 'Brief body', contextRefs: entityRefs })) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => entityRows) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -786,7 +931,7 @@ describe('ContextAssembler — memory budget trimming', () => {
         briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 1, body: 'B'.repeat(5000), contextRefs: [] })) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => [{ number: 1, summary: 'A short prior chapter.' }]) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => []) },
         worldFacts: { findMany: mock(async () => []) },
         plotThreads: { findMany: mock(async () => []) },
@@ -1166,7 +1311,7 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
         briefs: { findFirst: mock(async () => brief) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => [{ id: 10n, entityKey: 'amara' }]) },
         canonFacts: { findMany: mock(async () => facts) },
         characterKnowledge: { findMany: mock(async () => [{ factId: 1n, entityId: 10n, learnedInChapter: 3 }]) },

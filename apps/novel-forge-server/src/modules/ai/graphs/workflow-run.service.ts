@@ -14,6 +14,7 @@ import { PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { ContextAssembler } from '../context/context-assembler.service';
 import { ModelRouterService } from '../model-router.service';
 import { IndexingService } from '../retrieval/indexing.service';
+import { type GenerationState } from '../schemas';
 import { TelemetryHandler } from '../telemetry.handler';
 import { ToolRegistryService } from '../tools/tool-registry.service';
 import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
@@ -43,7 +44,7 @@ export interface ChapterFinalizationInput {
   prose: string;
   summary: string;
   title?: string;
-  continuationState?: Record<string, string>;
+  continuationState?: GenerationState;
   generator?: string;
   isolated?: boolean;
   jobId?: string;
