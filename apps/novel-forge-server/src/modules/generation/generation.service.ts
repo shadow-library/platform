@@ -16,7 +16,7 @@ import { type ContextSection } from '../ai/context/sections';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
-import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
@@ -103,6 +103,23 @@ export interface AiUsageResult {
   totalCostUsd: number;
   callsPerRole: Record<string, number>;
   roles: RoleUsageResult[];
+}
+
+export type PresentedRun = Omit<Ai.WorkflowRun, 'nodeTrace'> & RunTrace;
+
+function presentRun(run: Ai.WorkflowRun): PresentedRun {
+  return { ...run, ...splitRunTrace(run.nodeTrace) };
+}
+
+export interface DraftSummary {
+  chapter: number;
+  title: string | null;
+  status: Generation.DraftStatus;
+  reviewStatus: Generation.DraftReviewStatus;
+  judge: Generation.JudgeVerdict | null;
+  isolated: boolean;
+  stale: boolean;
+  updatedAt: Date;
 }
 
 export interface SearchResult {
@@ -659,6 +676,24 @@ export class GenerationService {
 
   async listDrafts(projectId: bigint): Promise<Generation.Draft[]> {
     return this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: asc(schema.drafts.chapter) });
+  }
+
+  async listDraftSummaries(projectId: bigint): Promise<DraftSummary[]> {
+    const drafts = schema.drafts;
+    return this.db
+      .select({
+        chapter: drafts.chapter,
+        title: drafts.title,
+        status: drafts.status,
+        reviewStatus: drafts.reviewStatus,
+        judge: drafts.judge,
+        isolated: drafts.isolated,
+        stale: sql<boolean>`${drafts.staleReason} is not null`,
+        updatedAt: drafts.updatedAt,
+      })
+      .from(drafts)
+      .where(eq(drafts.projectId, projectId))
+      .orderBy(asc(drafts.chapter));
   }
 
   async getDraft(projectId: bigint, chapter: number): Promise<Generation.Draft> {
@@ -1409,15 +1444,16 @@ export class GenerationService {
   }
 
   // The runs screen is a reference view — only the latest 20 matter; older runs stay queryable by id.
-  async listRuns(projectId: bigint): Promise<Ai.WorkflowRun[]> {
-    return this.db.query.workflowRuns.findMany({
+  async listRuns(projectId: bigint): Promise<PresentedRun[]> {
+    const runs = await this.db.query.workflowRuns.findMany({
       where: and(eq(schema.workflowRuns.projectId, projectId), inArray(schema.workflowRuns.graph, AUTHOR_FACING_GRAPHS)),
       orderBy: [desc(schema.workflowRuns.startedAt)],
       limit: 20,
     });
+    return runs.map(presentRun);
   }
 
-  async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
+  async getRun(projectId: bigint, runId: string): Promise<PresentedRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw AppErrorCode.PRJ_001.create();
     const [modelCalls, toolCalls, contextPack] = await Promise.all([
@@ -1429,7 +1465,7 @@ export class GenerationService {
       this.loadPackSummary(run.contextPackId),
     ]);
     // Omitted (never null) when unlinked — the route serialiser cannot build nullable nested objects.
-    return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
+    return { ...presentRun(run), modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
   }
 
   // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local,

@@ -387,7 +387,7 @@ export class ModelRouterService {
     }
 
     const runSignal = ctx.runId ? this.runAborts.get(ctx.runId)?.signal : undefined;
-    const firstConfig = this.invokeConfig(ctx, resolved, 0, policy);
+    const firstConfig = this.invokeConfig(ctx, resolved, role, 0, policy);
     const rawOutput1 = relay
       ? await this.streamResilient(llm, messages, firstConfig, role, relay, runSignal)
       : await this.invokeResilient(llm, messages, firstConfig, role, runSignal);
@@ -430,7 +430,7 @@ export class ModelRouterService {
       ),
     ];
 
-    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1, policy), role, runSignal);
+    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, role, 1, policy), role, runSignal);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
@@ -622,13 +622,25 @@ export class ModelRouterService {
   private invokeConfig(
     ctx: TelemetryContext,
     resolved: ResolvedModel,
+    role: AiRole,
     attempt: number,
     policy?: ForgeCallPolicy,
   ): { callbacks: TelemetryHandler[]; metadata: Record<string, unknown> } {
     const stamps = policy?.plugins.length ? { plugins: policy.plugins, policyDigest: policy.digest } : {};
+    const reasoningEffort = resolveReasoningEffort(resolved.model, ROLE_GROUP[role]);
     return {
       callbacks: [this.telemetry],
-      metadata: { nfTelemetry: { ...ctx, projectId: String(ctx.projectId), provider: resolved.provider, model: resolved.model, attempt, ...stamps } },
+      metadata: {
+        nfTelemetry: {
+          ...ctx,
+          projectId: String(ctx.projectId),
+          provider: resolved.provider,
+          model: resolved.model,
+          attempt,
+          ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...stamps,
+        },
+      },
     };
   }
 

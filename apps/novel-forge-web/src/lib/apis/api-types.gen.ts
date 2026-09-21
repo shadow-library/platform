@@ -720,6 +720,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/drafts/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Draft Summaries */
+    get: operations['get_api_v1_projects_projectId_drafts_summary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/drafts/{n}': {
     parameters: {
       query?: never;
@@ -3702,8 +3719,37 @@ export interface components {
       tablesCleared: string[];
     };
     CostResponse: {
-      estimate: null | string;
-      message: string;
+      totalCostUsd: number;
+      /** @description The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded. */
+      estimatedCostUsd: number;
+      /** @description Spend by calls made in the last 7 days. */
+      last7DaysCostUsd: number;
+      /** @description Spend by calls made in the last 30 days. */
+      last30DaysCostUsd: number;
+      /** @description Every recorded model call, including transport-error calls that carry no tokens or cost. */
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      /** @description By user-facing model group, highest spend first. */
+      byGroup: components['schemas']['CostBreakdownItem'][];
+      /** @description By internal call role, highest spend first. */
+      byRole: components['schemas']['CostBreakdownItem'][];
+      /** @description By model, highest spend first. */
+      byModel: components['schemas']['CostBreakdownItem'][];
+    };
+    /** @description Spend and token totals for one slice of a project's model calls. */
+    CostBreakdownItem: {
+      /** @description The model group, role, or model id this row aggregates. */
+      key: string;
+      /** @description Display name: the registry label for a model, otherwise the key itself. */
+      label: string;
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
+      costUsd: number;
+      /** @description The part of `costUsd` estimated from registry list prices because the call recorded no cost. */
+      estimatedCostUsd: number;
     };
     UploadImageBody: {
       /** @enum {string} */
@@ -3719,6 +3765,8 @@ export interface components {
       runId: string;
       outcome: string;
       status: string;
+      /** @description Bible-builder only: stages a non-force run left untouched because their document already had content. */
+      skippedStages?: string[];
     };
     PlanBody: {
       volumeCount: number;
@@ -3915,6 +3963,22 @@ export interface components {
       violence?: components['schemas']['ViolenceRating'];
       /** @description Content rating level; an omitted dimension is unrated — never send "none" to say it. */
       darkContent?: components['schemas']['DarkContentRating'];
+    };
+    DraftSummaryResponse: {
+      items: components['schemas']['DraftSummaryItem'][];
+    };
+    /** @description One chapter's draft state without its prose. */
+    DraftSummaryItem: {
+      chapter: number;
+      title?: null | string;
+      status: components['schemas']['DraftStatus'];
+      reviewStatus: components['schemas']['DraftReviewStatus'];
+      judge?: null | string;
+      isolated: boolean;
+      /** @description An ancestor chapter changed since this draft was written; approval is refused until it is regenerated. */
+      stale: boolean;
+      /** Format: date-time */
+      updatedAt: string;
     };
     UpdateDraftBody: {
       title?: string;
@@ -4118,6 +4182,8 @@ export interface components {
         [key: string]: unknown;
       };
       nodeTrace?: null | string[];
+      /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
+      skippedStages: string[];
       /** @description Model calls made by this run. Included only by the run-detail endpoint. */
       modelCalls?: components['schemas']['RunModelCallResponse'][];
       /** @description Tool lookups performed by this run. Included only by the run-detail endpoint. */
@@ -4144,6 +4210,8 @@ export interface components {
       outputTokens?: null | number;
       latencyMs?: null | number;
       costUsd?: null | string;
+      /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
+      reasoningEffort?: null | string;
       attempt: number;
       /** Format: date-time */
       createdAt: string;
@@ -4210,6 +4278,8 @@ export interface components {
       outputTokens?: null | number;
       latencyMs?: null | number;
       costUsd?: null | string;
+      /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
+      reasoningEffort?: null | string;
       attempt: number;
       /** Format: date-time */
       createdAt: string;
@@ -8450,6 +8520,46 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ListDraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_drafts_summary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftSummaryResponse'];
         };
       };
       /** @description Default Response */
@@ -16045,6 +16155,7 @@ export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
+export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];
 export type UploadImageBody = components['schemas']['UploadImageBody'];
 export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
 export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
@@ -16075,6 +16186,8 @@ export type DraftResponse = components['schemas']['DraftResponse'];
 export type DraftStatus = components['schemas']['DraftStatus'];
 export type DraftReviewStatus = components['schemas']['DraftReviewStatus'];
 export type ContentRatingInput = components['schemas']['ContentRatingInput'];
+export type DraftSummaryResponse = components['schemas']['DraftSummaryResponse'];
+export type DraftSummaryItem = components['schemas']['DraftSummaryItem'];
 export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
 export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
 export type JudgeResponse = components['schemas']['JudgeResponse'];
@@ -16426,6 +16539,7 @@ export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/b
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
 export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
 export type ListDraftsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts']['get']['parameters']['path'], undefined>;
+export type ListDraftSummariesPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/summary']['get']['parameters']['path'], undefined>;
 export type GetDraftPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}']['get']['parameters']['path'], undefined>;
 export type ListRevisionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions']['get']['parameters']['path'], undefined>;
 export type GetRevisionPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions/{r}']['get']['parameters']['path'], undefined>;

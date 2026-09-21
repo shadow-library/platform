@@ -94,6 +94,8 @@ export const modelCalls = pgTable(
     outputTokens: integer('output_tokens'),
     latencyMs: integer('latency_ms'),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    // Null both when the call sent no reasoning field and on rows written before effort was recorded.
+    reasoningEffort: varchar('reasoning_effort'),
     attempt: smallint('attempt').notNull().default(0),
     rawOutput: text('raw_output'),
     error: jsonb('error').$type<Record<string, unknown>>(),

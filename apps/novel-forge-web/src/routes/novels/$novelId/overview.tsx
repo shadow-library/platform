@@ -6,22 +6,22 @@ import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } fr
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
-  aiUsageQueryOptions,
+  type CostBreakdownItem,
   type GenerationJobItem,
+  projectCostQueryOptions,
   projectStatusQueryOptions,
   type ResetBody,
-  type RoleUsage,
   translationJobActive,
-  useAiUsageQuery,
   useCloneProjectMutation,
   useDeleteCoverMutation,
+  useDraftSummaryQuery,
   useJobStop,
   useListBriefsQuery,
-  useListDraftsQuery,
   useListJobsQuery,
   useListProposalsQuery,
   useListRunsQuery,
   useListVolumesQuery,
+  useProjectCostQuery,
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
@@ -38,7 +38,7 @@ import styles from './overview.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/overview')({
   loader: async ({ context, params }) => {
-    await Promise.all([context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)), context.queryClient.prefetchQuery(aiUsageQueryOptions(params.novelId))]);
+    await Promise.all([context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)), context.queryClient.prefetchQuery(projectCostQueryOptions(params.novelId))]);
   },
   component: OverviewScreen,
 });
@@ -88,7 +88,7 @@ function StatCard({ label, children, footer }: StatCardProps): React.JSX.Element
 }
 
 interface RoleBarProps {
-  usage: RoleUsage;
+  usage: CostBreakdownItem;
   maxTokens: number;
 }
 
@@ -96,20 +96,58 @@ function roleLabel(role: string): string {
   return role.replace(/^bible:/, '');
 }
 
+function formatUsd(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
 function RoleBar({ usage, maxTokens }: RoleBarProps): React.JSX.Element {
   const tokens = usage.inputTokens + usage.outputTokens;
   const pct = maxTokens > 0 ? Math.max(4, Math.round((tokens / maxTokens) * 100)) : 4;
-  const cost = usage.costUsd > 0 ? ` · $${usage.costUsd.toFixed(2)}` : '';
-  const tip = `${usage.role} · ${usage.calls} call${usage.calls === 1 ? '' : 's'} · ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${cost}`;
+  const cost = usage.costUsd > 0 ? ` · ${formatUsd(usage.costUsd)}` : '';
+  const tip = `${usage.key} · ${usage.calls} call${usage.calls === 1 ? '' : 's'} · ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${cost}`;
   return (
     <Tooltip content={tip}>
       <div className={styles.barCol}>
         <div className={styles.barTrack}>
           <div className={styles.barFill} style={{ '--pct': `${pct}%` } as React.CSSProperties} />
         </div>
-        <span className={styles.barLabel}>{roleLabel(usage.role)}</span>
+        <span className={styles.barLabel}>{roleLabel(usage.key)}</span>
       </div>
     </Tooltip>
+  );
+}
+
+interface ModelCostTableProps {
+  models: CostBreakdownItem[];
+}
+
+function ModelCostTable({ models }: ModelCostTableProps): React.JSX.Element {
+  return (
+    <table className={styles.costTable}>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Calls</th>
+          <th>Tokens in / out</th>
+          <th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        {models.map(model => (
+          <tr key={model.key}>
+            <td>{model.label}</td>
+            <td>{model.calls.toLocaleString()}</td>
+            <td>
+              {model.inputTokens.toLocaleString()} / {model.outputTokens.toLocaleString()}
+            </td>
+            <td>
+              {formatUsd(model.costUsd)}
+              {model.estimatedCostUsd > 0 && <span className={styles.estimateMark}>*</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -230,7 +268,7 @@ function OverviewScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const statusQuery = useProjectStatusQuery(novelId);
-  const usageQuery = useAiUsageQuery(novelId);
+  const costQuery = useProjectCostQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
   const isTranslation = projectQuery.data?.kind === 'translation';
   // The Next step rule engine only covers the bible → plan → draft → arc → finalize pipeline, which is
@@ -241,10 +279,7 @@ function OverviewScreen(): React.JSX.Element {
   const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 }, isAuthoring);
   const briefsQuery = useListBriefsQuery(novelId, isAuthoring);
   const volumesQuery = useListVolumesQuery(novelId, { limit: 50 }, isAuthoring);
-  // Full per-chapter draft rows, not just the `draftsTotal` count — the rule engine needs the actual
-  // drafted-chapter set (which briefs still lack a draft) and each draft's status (which aren't final
-  // yet), and no lighter endpoint reports either. The chapter list pays this same cost already.
-  const draftsQuery = useListDraftsQuery(novelId, isAuthoring);
+  const draftsQuery = useDraftSummaryQuery(novelId, isAuthoring);
   // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
   // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
   // overview visit.
@@ -264,7 +299,7 @@ function OverviewScreen(): React.JSX.Element {
 
   const project = projectQuery.data;
   const status = statusQuery.data;
-  const usage = usageQuery.data;
+  const cost = costQuery.data;
   const runs = runsQuery.data?.items ?? [];
   const translation = translationQuery.data;
   const phase = isTranslation
@@ -341,9 +376,8 @@ function OverviewScreen(): React.JSX.Element {
 
   const importJob = latestJob(jobsQuery.data?.items ?? [], 'import');
 
-  const roles = usage?.roles ?? [];
+  const roles = [...(cost?.byRole ?? [])].sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
   const maxTokens = roles.reduce((m, r) => Math.max(m, r.inputTokens + r.outputTokens), 0);
-  const totalCalls = roles.reduce((s, r) => s + r.calls, 0);
 
   const doClone = (): void => {
     if (!cloneName.trim()) return;
@@ -542,30 +576,39 @@ function OverviewScreen(): React.JSX.Element {
                   <p className={styles.usageSub}>Tokens per role · all runs · hover a bar for detail</p>
                 </div>
                 <div className={styles.usageCostWrap}>
-                  <div className={styles.usageCost}>${(usage?.totalCostUsd ?? 0).toFixed(2)}</div>
+                  <div className={styles.usageCost}>{formatUsd(cost?.totalCostUsd ?? 0)}</div>
+                  <div className={styles.usageSub}>
+                    {formatUsd(cost?.last7DaysCostUsd ?? 0)} last 7 days · {formatUsd(cost?.last30DaysCostUsd ?? 0)} last 30
+                  </div>
                 </div>
               </div>
               {roles.length > 0 && (
                 <div className={styles.bars}>
                   {roles.map(r => (
-                    <RoleBar key={r.role} usage={r} maxTokens={maxTokens} />
+                    <RoleBar key={r.key} usage={r} maxTokens={maxTokens} />
                   ))}
                 </div>
               )}
               <div className={styles.tokenGrid}>
                 <div>
                   <div className={styles.tokenLabel}>Input tokens</div>
-                  <div className={styles.tokenValue}>{(usage?.totalInputTokens ?? 0).toLocaleString()}</div>
+                  <div className={styles.tokenValue}>{(cost?.inputTokens ?? 0).toLocaleString()}</div>
                 </div>
                 <div>
                   <div className={styles.tokenLabel}>Output tokens</div>
-                  <div className={styles.tokenValue}>{(usage?.totalOutputTokens ?? 0).toLocaleString()}</div>
+                  <div className={styles.tokenValue}>{(cost?.outputTokens ?? 0).toLocaleString()}</div>
                 </div>
                 <div>
                   <div className={styles.tokenLabel}>Model calls</div>
-                  <div className={styles.tokenValue}>{totalCalls.toLocaleString()}</div>
+                  <div className={styles.tokenValue}>{(cost?.calls ?? 0).toLocaleString()}</div>
                 </div>
               </div>
+              {cost && cost.byModel.length > 0 && <ModelCostTable models={cost.byModel} />}
+              {cost && cost.estimatedCostUsd > 0 && (
+                <p className={styles.estimateNote}>
+                  <span className={styles.estimateMark}>*</span> Includes {formatUsd(cost.estimatedCostUsd)} estimated from list prices for calls that recorded no cost.
+                </p>
+              )}
             </SectionCard>
 
             <SectionCard

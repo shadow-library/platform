@@ -115,6 +115,7 @@ function ModelCallRow({ novelId, runId, call }: ModelCallRowProps): React.JSX.El
       <tr className={styles.callRow} onClick={() => setExpanded(e => !e)}>
         <td className={styles.cellMono}>
           {call.provider}/{call.model}
+          {call.reasoningEffort && <span className={styles.retry}> · effort {call.reasoningEffort}</span>}
           {call.attempt > 0 && <span className={styles.retry}> · retry {call.attempt}</span>}
         </td>
         <td className={styles.cellMono}>
@@ -383,6 +384,15 @@ function RunDetail({ novelId, run, total, ids, jump, onSelect }: RunDetailProps)
           <div className={styles.errorBox}>
             <pre className={styles.pre}>{JSON.stringify(run.error, null, 2)}</pre>
           </div>
+        </>
+      )}
+      {run.skippedStages.length > 0 && (
+        <>
+          <SectionLabel>Skipped</SectionLabel>
+          <p className={styles.para}>
+            {run.skippedStages.join(', ')} — {run.skippedStages.length === 1 ? 'its document' : 'their documents'} already had content, so this run left{' '}
+            {run.skippedStages.length === 1 ? 'it' : 'them'} untouched.
+          </p>
         </>
       )}
       {trace.length > 0 && (

@@ -3,6 +3,7 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 import {
   type ContinuityProposalResponse,
   type DraftResponse,
+  type DraftSummaryResponse,
   type FeedbackBody,
   type GenerateBody,
   type JobEnqueueResponse,
@@ -22,6 +23,7 @@ import { ApiError, APIRequest } from './transport';
 const draftKeys = {
   all: (projectId: string) => ['projects', projectId, 'drafts'] as const,
   list: (projectId: string) => [...draftKeys.all(projectId), 'list'] as const,
+  summary: (projectId: string) => [...draftKeys.all(projectId), 'summary'] as const,
   detail: (projectId: string, n: number) => [...draftKeys.all(projectId), n] as const,
   revisions: (projectId: string, n: number) => [...draftKeys.all(projectId), n, 'revisions'] as const,
   reviewQueue: (projectId: string) => ['projects', projectId, 'review-queue'] as const,
@@ -35,6 +37,14 @@ export const listDraftsQueryOptions = (projectId: string): UseQueryOptions<ListD
 
 export function useListDraftsQuery(projectId: string, enabled = true): UseQueryResult<ListDraftResponse, ApiError> {
   return useQuery({ ...listDraftsQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+export function useDraftSummaryQuery(projectId: string, enabled = true): UseQueryResult<DraftSummaryResponse, ApiError> {
+  return useQuery<DraftSummaryResponse, ApiError>({
+    queryKey: draftKeys.summary(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/summary`).execute(),
+    enabled: enabled && Boolean(projectId),
+  });
 }
 
 export function useDraftQuery(projectId: string, n: number | undefined, enabled = true): UseQueryResult<DraftResponse, ApiError> {

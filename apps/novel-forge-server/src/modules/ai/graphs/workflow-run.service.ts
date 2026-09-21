@@ -101,6 +101,24 @@ export interface WorkflowRunResult {
   skippedStages?: string[];
 }
 
+const SKIPPED_STAGE_MARKER = 'skipped:';
+
+export interface RunTrace {
+  nodeTrace: string[];
+  skippedStages: string[];
+}
+
+// No dedicated column for a skipped stage, so it rides the persisted node trace as a marker entry.
+export function splitRunTrace(persisted: readonly string[] | null): RunTrace {
+  const nodeTrace: string[] = [];
+  const skippedStages: string[] = [];
+  for (const entry of persisted ?? []) {
+    if (entry.startsWith(SKIPPED_STAGE_MARKER)) skippedStages.push(entry.slice(SKIPPED_STAGE_MARKER.length));
+    else nodeTrace.push(entry);
+  }
+  return { nodeTrace, skippedStages };
+}
+
 interface GraphOutcome {
   outcome: string;
   status: 'completed' | 'awaiting_review';
@@ -194,9 +212,7 @@ export class WorkflowRunService {
   // first, so a late finish cannot reopen a cancelled row and leave the audit trail lying about it.
   private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[], skippedStages?: string[]): Promise<void> {
     this.logger.info('workflow run finished', { runId, status, outcome });
-    // No dedicated column for a skipped stage, so it rides the already-persisted node trace as a
-    // `skipped:` marker rather than needing a migration this task does not own.
-    const persistedTrace = skippedStages?.length ? [...nodeTrace, ...skippedStages.map(stage => `skipped:${stage}`)] : nodeTrace;
+    const persistedTrace = skippedStages?.length ? [...nodeTrace, ...skippedStages.map(stage => `${SKIPPED_STAGE_MARKER}${stage}`)] : nodeTrace;
     this.logger.debug('workflow run node trace', { runId, nodeTrace: persistedTrace });
     const [run] = await this.db
       .update(schema.workflowRuns)

@@ -609,7 +609,14 @@ function StoryBibleScreen(): React.JSX.Element {
       return;
     }
     toast.success('Generating story bible — this can take a few minutes.');
-    seed.mutate({ brief }, { onSuccess: () => toast.success('Story bible generated'), onError: err => toast.danger(err.message) });
+    seed.mutate(
+      { brief },
+      {
+        onSuccess: result =>
+          toast.success(result.skippedStages?.length ? `Story bible generated · skipped ${result.skippedStages.join(', ')}, which already had content` : 'Story bible generated'),
+        onError: err => toast.danger(err.message),
+      },
+    );
   };
 
   const runAudit = (): void => {

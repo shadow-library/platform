@@ -10,6 +10,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
+import { type ReasoningEffort } from './models';
 import { estimateCallCostUsd } from './quota';
 
 export interface TelemetryContext {
@@ -28,6 +29,7 @@ interface PendingCall {
   model: string;
   attempt: number;
   promptTokensEstimate: number;
+  reasoningEffort?: ReasoningEffort;
   plugins?: PluginStamp[];
   policyDigest?: string;
 }
@@ -133,21 +135,41 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const promptTokensEstimate = countTokens(prompts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join('\n'));
 
     const nf = metadata?.['nfTelemetry'] as
-      (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number; plugins?: PluginStamp[]; policyDigest?: string }) | undefined;
+      | (TelemetryContext & {
+          projectId: string;
+          provider: string;
+          model: string;
+          attempt: number;
+          reasoningEffort?: ReasoningEffort;
+          plugins?: PluginStamp[];
+          policyDigest?: string;
+        })
+      | undefined;
     if (nf) {
-      const { provider, model, attempt, projectId, plugins, policyDigest, ...ctx } = nf;
+      const { provider, model, attempt, projectId, reasoningEffort, plugins, policyDigest, ...ctx } = nf;
       this.logger.debug('LLM call started', {
         runId,
         provider,
         model,
         attempt,
+        reasoningEffort,
         role: ctx.role,
         promptKey: ctx.promptKey,
         node: ctx.node,
         workflowRunId: ctx.runId,
         promptTokensEstimate,
       });
-      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt, promptTokensEstimate, plugins, policyDigest });
+      this.pending.set(runId, {
+        startedAt: Date.now(),
+        ctx: { ...ctx, projectId: BigInt(projectId) },
+        provider,
+        model,
+        attempt,
+        promptTokensEstimate,
+        reasoningEffort,
+        plugins,
+        policyDigest,
+      });
       return;
     }
 
@@ -201,6 +223,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         status: 'ok',
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
+        reasoningEffort: call.reasoningEffort ?? null,
         inputTokens,
         cachedInputTokens,
         outputTokens,
@@ -234,6 +257,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         status: 'transport_error',
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
+        reasoningEffort: call.reasoningEffort ?? null,
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',

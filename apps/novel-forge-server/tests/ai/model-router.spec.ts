@@ -840,3 +840,39 @@ describe('ModelRouterService.structuredWithImage', () => {
     expect((rows[0] as { inputTokens: number }).inputTokens).toBeLessThan(2_000);
   });
 });
+
+describe('ModelRouterService telemetry reasoning effort', () => {
+  const judgePrompt = {
+    key: 'judge' as const,
+    version: '1.0.0',
+    kind: 'analytical' as const,
+    system: 'test',
+    template: { formatMessages: async () => [] } as never,
+    schema: JudgeSchema,
+  };
+  const ctx = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
+
+  async function recordedEffort(model: string): Promise<unknown> {
+    const rows: { reasoningEffort?: unknown }[] = [];
+    const telemetryDb = { insert: () => ({ values: async (row: { reasoningEffort?: unknown }) => void rows.push(row) }) };
+    const telemetry = new TelemetryHandler({ getPostgresClient: () => telemetryDb } as never);
+    const router = new ModelRouterService(telemetry, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
+    (router as unknown as Record<string, unknown>)['buildClient'] = () => new FakeListChatModel({ responses: [JSON.stringify({ verdict: 'consistent', findings: [] })] });
+
+    await router.structured<JudgeOutput>(judgePrompt, {}, ctx, { config: { models: { judge: { provider: 'openrouter', model } } } });
+    await awaitAllCallbacks();
+
+    expect(rows).toHaveLength(1);
+    return rows[0]?.reasoningEffort;
+  }
+
+  it('should record the effort the reasoning policy resolved for the call', async () => {
+    expect(resolveReasoningEffort('anthropic/claude-sonnet-5', ROLE_GROUP.judge)).toBe('low');
+    expect(await recordedEffort('anthropic/claude-sonnet-5')).toBe('low');
+  });
+
+  it('should record null when the call sent no reasoning field', async () => {
+    expect(resolveReasoningEffort('anthropic/claude-haiku-4.5', ROLE_GROUP.judge)).toBeUndefined();
+    expect(await recordedEffort('anthropic/claude-haiku-4.5')).toBeNull();
+  });
+});

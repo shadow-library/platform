@@ -2,26 +2,25 @@ import { type QueryClient, queryOptions, useMutation, type UseMutationResult, us
 import { useRef } from 'react';
 import { toast } from '@shadow-library/ui';
 
-import { type AiUsageResponse, type CancelJobResponse, type ListGenerationJobResponse } from './api-types.gen';
+import { type CancelJobResponse, type CostResponse, type ListGenerationJobResponse } from './api-types.gen';
 import { invalidateSoon } from './batched-invalidation';
 import { livePolling } from './live-polling';
 import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 const insightKeys = {
-  aiUsage: (projectId: string) => ['projects', projectId, 'ai-usage'] as const,
   jobs: (projectId: string) => ['projects', projectId, 'jobs'] as const,
   assets: (projectId: string) => ['projects', projectId, 'assets'] as const,
   cost: (projectId: string) => ['projects', projectId, 'cost'] as const,
 };
 
-export const aiUsageQueryOptions = (projectId: string): UseQueryOptions<AiUsageResponse, ApiError> =>
-  queryOptions<AiUsageResponse, ApiError>({
-    queryKey: insightKeys.aiUsage(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/ai-usage`).execute(),
+export const projectCostQueryOptions = (projectId: string): UseQueryOptions<CostResponse, ApiError> =>
+  queryOptions<CostResponse, ApiError>({
+    queryKey: insightKeys.cost(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/cost`).execute(),
   });
 
-export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResult<AiUsageResponse, ApiError> {
-  return useQuery({ ...aiUsageQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+export function useProjectCostQuery(projectId: string, enabled = true): UseQueryResult<CostResponse, ApiError> {
+  return useQuery({ ...projectCostQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export const hasActiveJob = (data?: ListGenerationJobResponse): boolean => data?.items.some(job => job.status === 'pending' || job.status === 'in_progress') ?? false;

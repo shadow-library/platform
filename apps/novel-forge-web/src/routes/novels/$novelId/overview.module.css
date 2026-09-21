@@ -391,6 +391,44 @@
   font-variant-numeric: tabular-nums;
 }
 
+.costTable {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font-size: var(--sh-text-body-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.costTable th {
+  padding: 0 0 6px;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
+.costTable td {
+  padding: 6px 0;
+  border-top: 1px solid var(--sh-border-subtle);
+  text-align: right;
+}
+
+.costTable th:first-child,
+.costTable td:first-child {
+  text-align: left;
+}
+
+.estimateMark {
+  margin-left: 2px;
+  color: var(--sh-warning-solid);
+}
+
+.estimateNote {
+  margin: 10px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
 .emptyRuns {
   margin: 0;
   font-size: var(--sh-text-body-sm);

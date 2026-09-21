@@ -19,6 +19,7 @@ import {
   ContinuityProposalResponse,
   DraftResponse,
   DraftRevisionResponse,
+  DraftSummaryResponse,
   FeedbackBody,
   FinalizeBody,
   GenerateBody,
@@ -151,6 +152,13 @@ export class GenerationController {
   @RespondFor(200, ListDraftResponse)
   async listDrafts(@Params() params: ProjectParams): Promise<ListDraftResponse> {
     const items = await this.generationService.listDrafts(params.projectId);
+    return { items };
+  }
+
+  @Get('/drafts/summary')
+  @RespondFor(200, DraftSummaryResponse)
+  async listDraftSummaries(@Params() params: ProjectParams): Promise<DraftSummaryResponse> {
+    const items = await this.generationService.listDraftSummaries(params.projectId);
     return { items };
   }
 

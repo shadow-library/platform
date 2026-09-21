@@ -47,6 +47,7 @@ describe.if(pgAvailable)('listRuns — background-graph filtering', () => {
       { projectId, graph: 'chat-title', target: 'session:x', status: 'running' },
       { projectId, graph: 'chat-compact', target: 'session:x', status: 'completed' },
       { projectId, graph: 'ideation-name', target: 'seed:1', status: 'running' },
+      { projectId, graph: 'bible-builder', target: 'bible', status: 'completed', nodeTrace: ['world', 'cast', 'skipped:world'] },
     ]);
   });
 
@@ -56,11 +57,19 @@ describe.if(pgAvailable)('listRuns — background-graph filtering', () => {
     const runs = await service.listRuns(projectId);
     const graphs = runs.map(run => run.graph).sort();
 
-    expect(graphs).toEqual(['bible-audit', 'chapter-generation']);
+    expect(graphs).toEqual(['bible-audit', 'bible-builder', 'chapter-generation']);
   });
 
   it('never reports a running background run, so hasRunningRun cannot fire on it', async () => {
     const runs = await service.listRuns(projectId);
     expect(runs.some(run => run.status === 'running')).toBe(false);
+  });
+
+  it('should report skipped stages apart from the steps the run took', async () => {
+    const runs = await service.listRuns(projectId);
+    const bible = runs.find(run => run.graph === 'bible-builder');
+
+    expect(bible).toMatchObject({ nodeTrace: ['world', 'cast'], skippedStages: ['world'] });
+    expect(runs.find(run => run.graph === 'chapter-generation')?.skippedStages).toEqual([]);
   });
 });

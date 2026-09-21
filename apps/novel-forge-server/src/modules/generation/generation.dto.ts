@@ -335,6 +335,9 @@ export class WorkflowRunResponse {
 
   @Field()
   status: string;
+
+  @Field(() => [String], { optional: true, description: 'Bible-builder only: stages a non-force run left untouched because their document already had content.' })
+  skippedStages?: string[];
 }
 
 @Schema()
@@ -643,6 +646,9 @@ export class RunModelCallResponse {
   @Field({ optional: true, nullable: true })
   costUsd?: string | null;
 
+  @Field(() => String, { optional: true, nullable: true, description: 'Reasoning effort sent with the call; null when the call sent none or predates effort tracking.' })
+  reasoningEffort?: string | null;
+
   @Field(() => Integer)
   attempt: number;
 
@@ -760,6 +766,9 @@ export class WorkflowRunDetailResponse {
   @Field(() => [String], { optional: true, nullable: true })
   nodeTrace?: string[] | null;
 
+  @Field(() => [String], { description: 'Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph.' })
+  skippedStages: string[];
+
   @Field(() => [RunModelCallResponse], { optional: true, description: 'Model calls made by this run. Included only by the run-detail endpoint.' })
   modelCalls?: RunModelCallResponse[];
 
@@ -864,6 +873,39 @@ export class OutlineResponse {
 export class ListDraftResponse {
   @Field(() => [DraftResponse])
   items: DraftResponse[];
+}
+
+@Schema({ description: "One chapter's draft state without its prose." })
+export class DraftSummaryItem {
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => DraftStatus)
+  status: Generation.DraftStatus;
+
+  @Field(() => DraftReviewStatus)
+  reviewStatus: Generation.DraftReviewStatus;
+
+  @Field(() => String, { optional: true, nullable: true })
+  judge?: Generation.JudgeVerdict | null;
+
+  @Field()
+  isolated: boolean;
+
+  @Field({ description: 'An ancestor chapter changed since this draft was written; approval is refused until it is regenerated.' })
+  stale: boolean;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class DraftSummaryResponse {
+  @Field(() => [DraftSummaryItem])
+  items: DraftSummaryItem[];
 }
 
 @Schema()

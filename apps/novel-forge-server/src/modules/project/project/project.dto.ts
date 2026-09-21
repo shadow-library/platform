@@ -318,11 +318,59 @@ export class ResetResponse {
   tablesCleared: string[];
 }
 
+@Schema({ description: "Spend and token totals for one slice of a project's model calls." })
+export class CostBreakdownItem {
+  @Field({ description: 'The model group, role, or model id this row aggregates.' })
+  key: string;
+
+  @Field({ description: 'Display name: the registry label for a model, otherwise the key itself.' })
+  label: string;
+
+  @Field(() => Integer)
+  calls: number;
+
+  @Field(() => Integer)
+  inputTokens: number;
+
+  @Field(() => Integer)
+  outputTokens: number;
+
+  @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
+  costUsd: number;
+
+  @Field({ description: 'The part of `costUsd` estimated from registry list prices because the call recorded no cost.' })
+  estimatedCostUsd: number;
+}
+
 @Schema()
 export class CostResponse {
-  @Field(() => String, { nullable: true })
-  estimate: null;
-
   @Field()
-  message: string;
+  totalCostUsd: number;
+
+  @Field({ description: 'The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded.' })
+  estimatedCostUsd: number;
+
+  @Field({ description: 'Spend by calls made in the last 7 days.' })
+  last7DaysCostUsd: number;
+
+  @Field({ description: 'Spend by calls made in the last 30 days.' })
+  last30DaysCostUsd: number;
+
+  @Field(() => Integer, { description: 'Every recorded model call, including transport-error calls that carry no tokens or cost.' })
+  calls: number;
+
+  @Field(() => Integer)
+  inputTokens: number;
+
+  @Field(() => Integer)
+  outputTokens: number;
+
+  @Field(() => [CostBreakdownItem], { description: 'By user-facing model group, highest spend first.' })
+  byGroup: CostBreakdownItem[];
+
+  @Field(() => [CostBreakdownItem], { description: 'By internal call role, highest spend first.' })
+  byRole: CostBreakdownItem[];
+
+  @Field(() => [CostBreakdownItem], { description: 'By model, highest spend first.' })
+  byModel: CostBreakdownItem[];
 }

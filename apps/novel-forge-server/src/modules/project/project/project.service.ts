@@ -15,6 +15,7 @@ import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { setProjectCover } from '../../illustration/uploaded-cover';
+import { type CostWindow, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
@@ -456,8 +457,24 @@ export class ProjectService {
     return { kind: project.kind, chaptersTotal, chaptersExtracted, draftsTotal, draftsFinal, planApproved, volumesTotal };
   }
 
-  cost(projectId: bigint): Promise<CostResponse> {
-    this.logger.debug(`Cost estimate requested for project ${String(projectId)}`);
-    return Promise.resolve({ estimate: null, message: 'AI module not yet initialized' });
+  async cost(projectId: bigint): Promise<CostResponse> {
+    const calls = schema.modelCalls;
+    const window = sql<CostWindow>`case when ${calls.createdAt} >= now() - interval '7 days' then 'last7Days' when ${calls.createdAt} >= now() - interval '30 days' then 'last30Days' else 'older' end`;
+    const rows = await this.db
+      .select({
+        role: calls.role,
+        model: calls.model,
+        window,
+        calls: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
+        outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
+        recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}), 0)`.mapWith(Number),
+        unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+        unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+      })
+      .from(calls)
+      .where(eq(calls.projectId, projectId))
+      .groupBy(calls.role, calls.model, window);
+    return summarizeCost(rows);
   }
 }
