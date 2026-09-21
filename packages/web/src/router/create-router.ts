@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { QueryClient, type QueryClientConfig } from '@tanstack/react-query';
-import { type AnyRoute, createRouter } from '@tanstack/react-router';
+import { type AnyRoute, createRouter, type Router } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
 /**
@@ -30,7 +30,9 @@ export interface CreateAppRouterOptions {
  * QueryClientProvider and wires dehydration/hydration, and `defaultPreloadStaleTime: 0` lets TanStack Query
  * — not the router — own staleness so the two caches never disagree.
  */
-export function createAppRouter<TRouteTree extends AnyRoute>(routeTree: TRouteTree, options: CreateAppRouterOptions = {}) {
+// Annotated so the emitted declaration names only `@tanstack/react-router`: the inferred type spells out
+// `@tanstack/router-core` and `@tanstack/history`, which a consumer's clean install does not resolve from here.
+export function createAppRouter<TRouteTree extends AnyRoute>(routeTree: TRouteTree, options: CreateAppRouterOptions = {}): Router<TRouteTree, 'never', true> {
   const queryClient = new QueryClient({
     ...options.queryClient,
     defaultOptions: {
