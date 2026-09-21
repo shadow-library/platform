@@ -458,6 +458,208 @@ describe('ContextAssembler.forChapter — established state carry', () => {
   });
 });
 
+describe('ContextAssembler — writer-pack scrub', () => {
+  const HIDDEN_TEXT = 'The ferryman is the drowned heir of the tide court';
+  const TERM = 'tide court';
+  const hiddenFact = { id: 21n, factKey: 'ferryman_heir', text: HIDDEN_TEXT, constraintNote: null, writerNote: null, revealChapter: 12, source: 'bible', terms: [TERM] };
+  const ferryman = {
+    id: 30n,
+    entityKey: 'ferryman',
+    name: 'Ferryman',
+    type: 'character',
+    status: 'active',
+    body: `Poles the night barge. ${HIDDEN_TEXT}.`,
+    notes: null,
+    aliases: [],
+  };
+
+  interface ScrubFixture {
+    brief?: Record<string, unknown>;
+    arc?: Record<string, unknown>;
+    volume?: Record<string, unknown>;
+    drafts?: Record<string, unknown>[];
+    prevChapter?: Record<string, unknown>;
+    characterStates?: Record<string, unknown>[];
+    entityRelationships?: Record<string, unknown>[];
+    bibleDocuments?: Record<string, unknown>[];
+    instructions?: string | null;
+  }
+
+  function scrubDb(fixture: ScrubFixture) {
+    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Brief body.', contextRefs: [], pov: null, arcKey: null, ...fixture.brief };
+    const drafts = fixture.drafts ?? [];
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: fixture.instructions ?? null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => brief) },
+        chapters: { findFirst: mock(async () => fixture.prevChapter ?? null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => fixture.volume ?? null), findMany: mock(async () => (fixture.volume ? [fixture.volume] : [])) },
+        arcs: { findFirst: mock(async () => fixture.arc ?? null), findMany: mock(async () => (fixture.arc ? [fixture.arc] : [])) },
+        drafts: { findFirst: mock(async () => drafts.find(draft => draft.chapter === 4) ?? null), findMany: mock(async () => drafts) },
+        entities: { findFirst: mock(async () => ferryman), findMany: mock(async () => [ferryman]) },
+        characterStates: { findMany: mock(async () => fixture.characterStates ?? []) },
+        entityRelationships: { findMany: mock(async () => fixture.entityRelationships ?? []) },
+        bibleDocuments: { findMany: mock(async () => fixture.bibleDocuments ?? []) },
+        canonFacts: { findMany: mock(async () => [hiddenFact]) },
+        characterKnowledge: { findMany: mock(async () => []) },
+      },
+    };
+  }
+
+  function sectionOf(pack: { sections: { key: string; rendered: string }[] }, key: string): string {
+    return pack.sections.find(section => section.key === key)?.rendered ?? '';
+  }
+
+  it('should withhold a hidden fact from the rendered character state', async () => {
+    const characterStates = [
+      {
+        id: 1n,
+        projectId: 1n,
+        entityKey: 'ferryman',
+        location: 'the lower quay',
+        conditions: null,
+        immediateGoal: null,
+        statusNote: `Suspects ${HIDDEN_TEXT}`,
+        lastUpdatedChapter: 4,
+      },
+    ];
+    const pack = await makeAssembler(scrubDb({ brief: { pov: 'ferryman' }, characterStates })).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const state = sectionOf(pack, 'character_state');
+    expect(state).toContain('Status: Suspects [withheld]');
+    expect(state).toContain('Location: the lower quay');
+    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+  });
+
+  it('should withhold a hidden fact from the rendered relationship notes', async () => {
+    const entityRelationships = [{ id: 1n, projectId: 1n, entityId: 30n, targetKey: 'warden', kind: 'rival', note: `Knows that ${HIDDEN_TEXT}`, chapter: 3 }];
+    const pack = await makeAssembler(scrubDb({ brief: { pov: 'ferryman' }, entityRelationships })).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    const relationships = sectionOf(pack, 'relationships');
+    expect(relationships).toContain('Ferryman → warden (rival): Knows that [withheld] [ch 3]');
+    expect(relationships).not.toContain(HIDDEN_TEXT);
+  });
+
+  it('should withhold a hidden fact from the POV card, entity refs, bible documents and writing style', async () => {
+    const bibleDocuments = [{ section: 'world', slug: 'river', body: `The river runs east. ${HIDDEN_TEXT}.` }];
+    const fixture = scrubDb({ brief: { pov: 'ferryman', contextRefs: ['bible_doc:world/river'] }, bibleDocuments, instructions: `Keep it quiet: ${HIDDEN_TEXT}.` });
+    const pack = await makeAssembler(fixture).forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(sectionOf(pack, 'ref:entity:ferryman')).toContain('Poles the night barge. [withheld].');
+    expect(sectionOf(pack, 'ref:bible_doc:world/river')).toContain('The river runs east. [withheld].');
+    expect(sectionOf(pack, 'writing_style')).toContain('Keep it quiet: [withheld].');
+    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+  });
+
+  it('should label a stale predecessor draft in its ending, carried state and summary', async () => {
+    const drafts = [
+      { chapter: 4, body: 'The barge slid under the bridge.', summary: 'The barge crossed.', state: { lastBeat: 'Lanterns out.' }, staleReason: 'ancestor chapter 2 was revised' },
+    ];
+    const pack = await makeAssembler(scrubDb({ drafts })).forChapter(1n, 5, { dryRun: true });
+
+    expect(sectionOf(pack, 'prev_ending')).toContain('[DRAFT — not yet canon]\n[STALE — may not match the current plan]\nThe barge slid under the bridge.');
+    expect(sectionOf(pack, 'continuation_state')).toContain('[STALE — may not match the current plan]\n{"lastBeat":"Lanterns out."}');
+    expect(sectionOf(pack, 'memory')).toContain('1. [DRAFT — not yet canon] [STALE — may not match the current plan] Ch 4: The barge crossed.');
+  });
+
+  it('should label a stale isolated predecessor draft', async () => {
+    const drafts = [{ chapter: 4, body: 'x', summary: 'The barge crossed.', state: null, isolated: true, staleReason: 'a chapter was inserted after this point' }];
+    const pack = await makeAssembler(scrubDb({ drafts })).forChapter(1n, 5, { dryRun: true });
+
+    expect(sectionOf(pack, 'prev_ending')).toContain('[DRAFT — not yet canon]\n[STALE — may not match the current plan]\nSummary: The barge crossed.');
+  });
+
+  it('should leave a fresh predecessor draft unlabelled', async () => {
+    const drafts = [{ chapter: 4, body: 'The barge slid under the bridge.', summary: 'The barge crossed.', state: { lastBeat: 'Lanterns out.' }, staleReason: null }];
+    const pack = await makeAssembler(scrubDb({ drafts })).forChapter(1n, 5, { dryRun: true });
+
+    expect(pack.rendered).not.toContain('[STALE');
+  });
+
+  it('should withhold a hidden fact named by a carried state key', async () => {
+    const state = { [HIDDEN_TEXT]: true, 'fact:ferryman_heir': 'settled', nested: { [`${HIDDEN_TEXT} (rumour)`]: 'spreading' }, barge: 'moored' };
+    const drafts = [{ chapter: 4, body: 'Tail.', summary: 'Four.', state, staleReason: null }];
+    const pack = await makeAssembler(scrubDb({ drafts })).forChapter(1n, 5, { dryRun: true });
+
+    const continuation = sectionOf(pack, 'continuation_state');
+    expect(continuation).toContain('"[withheld]":true');
+    expect(continuation).toContain('"[withheld] (2)":"settled"');
+    expect(continuation).toContain('"[withheld] (rumour)":"spreading"');
+    expect(continuation).toContain('"barge":"moored"');
+    expect(continuation).not.toContain(HIDDEN_TEXT);
+    expect(continuation).not.toContain('ferryman_heir');
+  });
+
+  it('should withhold a reveal term from the arc and volume objectives before the reveal chapter', async () => {
+    const arc = {
+      arcKey: 'arc_river',
+      volumeKey: 'vol_1',
+      objective: `The ferryman claims the ${TERM}.`,
+      escalation: 'The flood rises.',
+      hook: `A crown surfaces from the ${TERM}.`,
+    };
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: 'The wardens close the locks.' };
+    const pack = await makeAssembler(scrubDb({ brief: { arcKey: 'arc_river' }, arc, volume })).forChapter(1n, 5, { dryRun: true });
+
+    expect(sectionOf(pack, 'arc_objective')).toContain('The ferryman claims the [withheld].');
+    expect(sectionOf(pack, 'arc_objective')).toContain('A crown surfaces from the [withheld].');
+    expect(sectionOf(pack, 'volume_objective')).toContain('Win back the [withheld].');
+    expect(pack.rendered).not.toContain(TERM);
+  });
+
+  it('should let the reveal chapter read the arc objective in full', async () => {
+    const arc = { arcKey: 'arc_river', volumeKey: 'vol_1', objective: `The ferryman claims the ${TERM}.`, escalation: null, hook: null };
+    const pack = await makeAssembler(scrubDb({ brief: { chapter: 12, arcKey: 'arc_river' }, arc })).forChapter(1n, 12, { dryRun: true });
+
+    expect(sectionOf(pack, 'arc_objective')).toContain(`The ferryman claims the ${TERM}.`);
+  });
+
+  it('should withhold a reveal term from arc and volume refs for the writer but not for the planner', async () => {
+    const arc = {
+      arcKey: 'arc_later',
+      volumeKey: 'vol_1',
+      title: `Return to the ${TERM}`,
+      status: 'approved',
+      chapterStart: 9,
+      chapterEnd: 14,
+      objective: `Crown the heir of the ${TERM}.`,
+    };
+    const volume = { volumeKey: 'vol_1', title: 'The River', status: 'approved', objective: `Win back the ${TERM}.`, startChapter: 1, endChapter: 20 };
+    const assembler = makeAssembler(scrubDb({ arc, volume }));
+
+    const { resolved: writer } = await assembler.resolveRefs(1n, ['arc:arc_later', 'volume:vol_1'], 5);
+    expect(writer.map(section => section.rendered).join('\n')).not.toContain(TERM);
+    expect(writer[0]?.rendered).toContain('ARC: Return to the [withheld]');
+    expect(writer[0]?.rendered).toContain('Objective: Crown the heir of the [withheld].');
+    expect(writer[1]?.rendered).toContain('Objective: Win back the [withheld].');
+
+    const { resolved: planner } = await assembler.resolveRefs(1n, ['arc:arc_later', 'volume:vol_1']);
+    expect(planner[0]?.rendered).toContain(`Objective: Crown the heir of the ${TERM}.`);
+    expect(planner[1]?.rendered).toContain(`Objective: Win back the ${TERM}.`);
+  });
+
+  it('should leave the planner outline pack unscrubbed', async () => {
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: HIDDEN_TEXT, payoff: null };
+    const pack = await makeAssembler(scrubDb({ volume })).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(sectionOf(pack, 'volume_objective')).toContain(`Win back the ${TERM}.`);
+    expect(sectionOf(pack, 'volume_objective')).toContain(HIDDEN_TEXT);
+  });
+
+  it('should scrub the revision pack brief, volume objective and carried state keys and label a stale predecessor', async () => {
+    const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { [HIDDEN_TEXT]: 'yes' }, staleReason: 'ancestor chapter 3 was regenerated' }];
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: null };
+    const fixture = scrubDb({ brief: { body: `Hint that ${HIDDEN_TEXT}.` }, drafts, volume });
+    const pack = await makeAssembler(fixture).forRevision(1n, 5, 0n, { dryRun: true } as never);
+
+    expect(sectionOf(pack, 'brief')).toContain('Hint that [withheld].');
+    expect(sectionOf(pack, 'volume_objective')).toContain('Win back the [withheld].');
+    expect(sectionOf(pack, 'continuation_state')).toContain('[STALE — may not match the current plan]\n{"[withheld]":"yes"}');
+    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+    expect(pack.rendered).not.toContain(TERM);
+  });
+});
+
 describe('ContextAssembler.forOutline — retrieval absent', () => {
   it('returns pack with no lore_retrieved or prose_retrieved sections', async () => {
     const assembler = makeAssembler({}, 'catalog text');

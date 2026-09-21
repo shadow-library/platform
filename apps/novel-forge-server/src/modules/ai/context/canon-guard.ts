@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, ne } from 'drizzle-orm';
 
+import { revealTermPattern } from '@server/common';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 import { clipAtBoundary } from './bible-docs';
@@ -72,16 +73,11 @@ interface PlannedArc {
 const REVEAL_SCHEDULE_BUDGET = 1_200;
 const HARD_LIMIT_BUDGET = 1_500;
 const HARD_LIMIT_CHARS = 400;
-const MIN_TERM_LENGTH = 3;
 const LIMIT_CATEGORY_WORDS: ReadonlySet<string> = new Set(['limit', 'constraint', 'rule', 'cost', 'forbidden', 'restriction', 'law', 'taboo', 'power']);
 const LEARNS_FIELD = 'knowledgeContract.learns';
 
 function byKey(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function escapeRegExp(term: string): string {
-  return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Seed facts are reader promises the book obeys openly, so only the author's scheduled secrets are guarded. */
@@ -173,12 +169,8 @@ export function renderHardLimits(entities: readonly LimitEntityRow[], worldFacts
   return { lines, omitted: all.length - lines.length };
 }
 
-// A term carrying a capital is a name, matched case-sensitively so "Will" never fires on "will".
 function mentionsTerm(text: string, term: string): boolean {
-  const trimmed = term.trim();
-  if (trimmed.length < MIN_TERM_LENGTH) return false;
-  const flags = /\p{Lu}/u.test(trimmed) ? 'u' : 'iu';
-  return new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(trimmed)}(?![\\p{L}\\p{N}_])`, flags).test(text);
+  return revealTermPattern(term)?.test(text) ?? false;
 }
 
 function firstMentioningField(fields: [string, string | undefined][], reveal: ScheduledReveal): string | null {

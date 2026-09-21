@@ -404,6 +404,7 @@ describe('GenerationService.generateUnrestricted model routing', () => {
         drafts: { findFirst: async () => undefined },
         briefs: { findFirst: async () => undefined },
         projects: { findFirst: async () => project },
+        canonFacts: { findMany: async () => [] },
       },
       transaction: async (cb: (tx: unknown) => unknown) => cb(tx),
     } as unknown as PrimaryDatabase;

@@ -3,7 +3,6 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-import { renderChapterBrief } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -12,7 +11,6 @@ import {
   type FactLike,
   KNOWLEDGE_LEAK_PREFIX,
   type KnowledgeLeakIssue,
-  loadFactWriterNotes,
   loadKnowledgeView,
   loadWriterForbiddenFacts,
   parseKnowledgeContract,
@@ -25,6 +23,7 @@ import { resolveWordTarget } from '../../eval/deterministic-metrics';
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
+import { loadWriterBrief } from '../context/writer-brief';
 import { extractJsonCandidates, tryParseJson } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -227,8 +226,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
-    const chapterBrief = renderChapterBrief(brief);
-    const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
+    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief);
     const guidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
@@ -579,8 +577,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
-    const chapterBrief = renderChapterBrief(brief);
-    const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
+    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,

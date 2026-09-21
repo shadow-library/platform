@@ -5,3 +5,4 @@ export * from './context-assembler.service';
 export * from './plugin-sections';
 export * from './sections';
 export * from './token-budget';
+export * from './writer-brief';

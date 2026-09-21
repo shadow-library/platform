@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertAuthoringProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, renderChapterBrief, selectGenerationBatch } from '@server/common';
+import { assertAuthoringProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, selectGenerationBatch } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -13,6 +13,7 @@ import { renderBibleDigest } from '../ai/context/bible-docs';
 import { loadRevealGuard, sanitiseBriefReveals, type ScheduledReveal } from '../ai/context/canon-guard';
 import { ContextAssembler, OUTLINE_BUDGET } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
+import { loadWriterBrief } from '../ai/context/writer-brief';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
@@ -24,7 +25,6 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
-import { renderEndingContract } from '../ai/schemas/ending-contract.schema';
 import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
@@ -33,7 +33,7 @@ import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
-import { applyBriefReveals, loadFactWriterNotes, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
+import { applyBriefReveals, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { redactJobForResponse } from '../jobs/job-response';
@@ -765,7 +765,12 @@ export class GenerationService {
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,
-      { contextPack: pack.rendered, chapterBrief: renderChapterBrief(brief), draftBody: draft.body, feedback: scrubForWriter(body.note, forbidden) },
+      {
+        contextPack: pack.rendered,
+        chapterBrief: (await loadWriterBrief(this.db, projectId, chapter, brief, forbidden)).chapterBrief,
+        draftBody: draft.body,
+        feedback: scrubForWriter(body.note, forbidden),
+      },
       ctx,
       project as never,
       policy,
@@ -1175,16 +1180,16 @@ export class GenerationService {
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'generation', chapter }, { contentMode: 'unrestricted' });
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
+    const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
     const promptVars = {
       stableContext: pack.renderedStable,
       volatileContext: pack.renderedVolatile,
-      chapterBrief: renderChapterBrief(brief),
-      endingContract: renderEndingContract(brief?.endingContract, await loadFactWriterNotes(this.db, projectId, brief?.endingContract)),
+      ...(await loadWriterBrief(this.db, projectId, chapter, brief, forbidden)),
       ...generationWordTargetVars(resolveWordTarget(project)),
     };
     const routedProject = { ...project, contentMode: 'unrestricted' } as never;
 
-    const guidance = body.guidance ? scrubForWriter(body.guidance, await loadWriterForbiddenFacts(this.db, projectId, chapter)) : '';
+    const guidance = body.guidance ? scrubForWriter(body.guidance, forbidden) : '';
     const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, policy)) as {
       title: string;
       body: string;

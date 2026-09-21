@@ -194,12 +194,13 @@ describe.if(pgAvailable)('hidden facts in the chapter writer’s context', () =>
       `Also: fact:keeper_is_sister must stay buried (${AUTHOR_NOTE})`,
     ].join('\n');
 
-    function reviseService(feedbacks: string[]): GenerationService {
+    function reviseService(feedbacks: string[], briefs: string[] = []): GenerationService {
       const databaseService = { getPostgresClient: () => db } as never;
       const noop = {} as never;
       const modelRouter = {
-        structured: async (_prompt: unknown, vars: { feedback: string }) => {
+        structured: async (_prompt: unknown, vars: { feedback: string; chapterBrief: string }) => {
           feedbacks.push(vars.feedback);
+          briefs.push(vars.chapterBrief);
           return { title: 'revised', body: 'revised body', summary: 'revised summary', state: {} };
         },
       } as never;
@@ -241,6 +242,27 @@ describe.if(pgAvailable)('hidden facts in the chapter writer’s context', () =>
         expect(stored?.note).toBe(LEAKY_NOTE);
       });
     }
+
+    it('should withhold the fact and its terms from the brief the reviser reads until the reveal chapter', async () => {
+      const projectId = await seedProject(WRITER_NOTE, 'none');
+      await db
+        .update(schema.briefs)
+        .set({ body: `The keeper will not say she is his sister. ${SECRET_TEXT}` })
+        .where(eq(schema.briefs.projectId, projectId));
+      await db.insert(schema.drafts).values([
+        { projectId, chapter: 3, body: 'the draft' },
+        { projectId, chapter: REVEAL_CHAPTER, body: 'the draft' },
+      ]);
+      const briefs: string[] = [];
+      const service = reviseService([], briefs);
+
+      await service.reviseDraft(projectId, 3, { note: 'tighten it' });
+      await service.reviseDraft(projectId, REVEAL_CHAPTER, { note: 'tighten it' });
+
+      expect(briefs[0]).toContain('The keeper will not say she is his [withheld]. [withheld]');
+      expect(briefs[0]).not.toContain('sister');
+      expect(briefs[1]).toContain(SECRET_TEXT);
+    });
 
     it('should pass a note through untouched once the fact is revealed', async () => {
       const projectId = await seedProject(WRITER_NOTE, 'none');

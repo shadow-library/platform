@@ -1,6 +1,7 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
+import { revealTermPattern } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
@@ -172,7 +173,7 @@ async function writerVisibleFactKeys(db: KnowledgeDb, projectId: bigint, chapter
 
 /** The chapter's writer-hidden facts, minus seed reader promises (which the book obeys openly) — what writer-bound text must never carry. */
 export async function loadWriterForbiddenFacts(db: KnowledgeDb, projectId: bigint, chapter: number): Promise<FactLike[]> {
-  const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
+  const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), orderBy: schema.canonFacts.factKey });
   if (facts.length === 0) return [];
   const hidden = await loadWriterHiddenFactKeys(db, projectId, chapter, facts);
   return facts.filter(fact => fact.source !== 'seed' && hidden.has(fact.factKey));
@@ -248,7 +249,7 @@ function wholeMention(value: string): RegExp {
 /**
  * Makes author- or judge-written text (a revision note, regeneration guidance) safe for the writer: knowledge-leak
  * finding lines are replaced by their writer-safe forms, and any remaining mention of a forbidden fact's text,
- * author note or key is withheld.
+ * author note or key is withheld. A bare key is only a key when it has an underscore — `heir` alone is an ordinary word.
  */
 export function scrubForWriter(text: string, forbidden: FactLike[]): string {
   if (!text || forbidden.length === 0) return text;
@@ -268,7 +269,7 @@ export function scrubForWriter(text: string, forbidden: FactLike[]): string {
   }
 
   const secrets = forbidden
-    .flatMap(fact => [fact.text, fact.constraintNote, `fact:${fact.factKey}`, fact.factKey])
+    .flatMap(fact => [fact.text, fact.constraintNote, `fact:${fact.factKey}`, fact.factKey.includes('_') ? fact.factKey : null])
     .filter((secret): secret is string => typeof secret === 'string' && secret.trim().length >= MIN_TERM_LENGTH)
     .sort((a, b) => b.length - a.length);
   let scrubbed = kept.join('\n');
@@ -278,19 +279,29 @@ export function scrubForWriter(text: string, forbidden: FactLike[]): string {
   return [scrubbed.trim(), ...safe].filter(Boolean).join('\n');
 }
 
+/** For plan text — briefs, volumes and arcs can name a reveal's give-away terms without its text — so the terms are withheld as well. */
+export function scrubPlanForWriter(text: string, forbidden: FactLike[]): string {
+  const patterns = forbidden
+    .flatMap(fact => fact.terms ?? [])
+    .sort((a, b) => b.trim().length - a.trim().length)
+    .map(term => revealTermPattern(term, true))
+    .filter((pattern): pattern is RegExp => pattern !== null);
+  let scrubbed = scrubForWriter(text, forbidden);
+  for (const pattern of patterns) scrubbed = scrubbed.replace(pattern, WITHHELD);
+  return scrubbed;
+}
+
 /**
- * Deterministic leak gate: word-boundary, case-insensitive match of each hidden fact's
- * tell-tale terms against the draft. Free, so it runs on every attempt; one issue per fact is
- * enough to trigger a repair.
+ * Deterministic leak gate: each hidden fact's tell-tale terms matched against the draft by the same rule the planner
+ * guard and the writer scrub use. Free, so it runs on every attempt; one issue per fact is enough to trigger a repair.
  */
 export function scanKnowledgeLeaks(body: string, hidden: FactLike[]): KnowledgeLeakIssue[] {
   const issues: KnowledgeLeakIssue[] = [];
   for (const fact of hidden) {
     for (const term of fact.terms ?? []) {
-      if (term.length < MIN_TERM_LENGTH) continue;
-      const match = new RegExp(`\\b${escapeRegExp(term)}\\b`, 'i').exec(body);
+      const match = revealTermPattern(term)?.exec(body);
       if (!match) continue;
-      issues.push({ factKey: fact.factKey, term, excerpt: excerptAround(body, match.index, term.length) });
+      issues.push({ factKey: fact.factKey, term, excerpt: excerptAround(body, match.index, match[0].length) });
       break;
     }
   }

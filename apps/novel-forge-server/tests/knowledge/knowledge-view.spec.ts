@@ -9,6 +9,7 @@ import {
   renderKnownFacts,
   scanKnowledgeLeaks,
   scrubForWriter,
+  scrubPlanForWriter,
   splitKnowledgeView,
 } from '@modules/bible/fact/knowledge-view';
 
@@ -109,11 +110,13 @@ describe('scrubForWriter', () => {
     );
   });
 
-  it('should withhold a short key only as a whole word', () => {
+  it('should withhold a bare key only when it has an underscore, and a fact: ref always', () => {
     const heir: FactLike = { factKey: 'heir', text: 'Mara is the lost heir of the tide court.', writerNote: null };
     expect(scrubForWriter('Keep their plan, but never name the heir or fact:heir. During the storm, bring the Heir back.', [heir])).toBe(
-      'Keep their plan, but never name the [withheld] or [withheld]. During the storm, bring the [withheld] back.',
+      'Keep their plan, but never name the heir or [withheld]. During the storm, bring the Heir back.',
     );
+    const lostHeir: FactLike = { factKey: 'lost_heir', text: 'Mara is the lost heir of the tide court.', writerNote: null };
+    expect(scrubForWriter('Guard lost_heir, not lost_heirloom.', [lostHeir])).toBe('Guard [withheld], not lost_heirloom.');
   });
 
   it('should leave text alone when nothing is forbidden', () => {
@@ -123,6 +126,34 @@ describe('scrubForWriter', () => {
   it('should be stable when run twice', () => {
     const once = scrubForWriter('[soft] knowledge leak: [motive_debt] acts on the debt', facts);
     expect(scrubForWriter(once, facts)).toBe(once);
+  });
+});
+
+describe('scrubPlanForWriter', () => {
+  it('should withhold every give-away term as a whole word, longest first, alongside the fact text', () => {
+    const plan = 'Expose the Forgery; the planted ledger was planted early. The ledger in the study is a forgery planted by Elias. Forgeryless nights.';
+    expect(scrubPlanForWriter(plan, [ledgerFact])).toBe('Expose the [withheld]; the [withheld] ledger was [withheld] early. [withheld] Forgeryless nights.');
+  });
+
+  it('should match a capitalised term case-sensitively so the common word survives', () => {
+    const will: FactLike = { factKey: 'will_lives', text: 'Will survived the flood.', writerNote: null, terms: ['Will'] };
+    expect(scrubPlanForWriter('Will returns, and she will not forgive him.', [will])).toBe('[withheld] returns, and she will not forgive him.');
+  });
+
+  it('should match a lowercase term in any case with Unicode word boundaries', () => {
+    const court: FactLike = { factKey: 'tide_court', text: 'The court is drowned.', writerNote: null, terms: ['tide court'] };
+    expect(scrubPlanForWriter('The Tide Court waits; the tide courtiers do not; Ñtide court stays.', [court])).toBe(
+      'The [withheld] waits; the tide courtiers do not; Ñtide court stays.',
+    );
+  });
+
+  it('should skip terms too short to scan for', () => {
+    const shortTerm: FactLike = { factKey: 'oath_key', text: 'The oath is void.', writerNote: null, terms: ['ox', 'oath'] };
+    expect(scrubPlanForWriter('The ox keeps the oath.', [shortTerm])).toBe('The ox keeps the [withheld].');
+  });
+
+  it('should leave plan text alone when nothing is forbidden', () => {
+    expect(scrubPlanForWriter('Expose the forgery.', [])).toBe('Expose the forgery.');
   });
 });
 
@@ -141,6 +172,12 @@ describe('scanKnowledgeLeaks', () => {
   it('should report at most one issue per fact and skip facts without usable terms', () => {
     const issues = scanKnowledgeLeaks('The forgery was planted near the service door, settling the debt.', facts);
     expect(issues.map(i => i.factKey)).toEqual(['ledger_forgery', 'service_door']);
+  });
+
+  it('should flag a capitalised term only in its capitalised form', () => {
+    const will: FactLike = { factKey: 'will_lives', text: 'Will survived the flood.', terms: ['Will'] };
+    expect(scanKnowledgeLeaks('At dawn she will go.', [will])).toEqual([]);
+    expect(scanKnowledgeLeaks('At dawn Will came back.', [will])).toMatchObject([{ factKey: 'will_lives', term: 'Will' }]);
   });
 
   it('should skip terms shorter than three characters', () => {
