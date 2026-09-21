@@ -1,5 +1,6 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { noPluginProposals } from '@tests/fixtures/plugin-policy';
@@ -74,5 +75,21 @@ describe.if(pgAvailable)('GenerationService.listDraftSummaries', () => {
     expect(second).toMatchObject({ status: 'draft', reviewStatus: 'needs_review', isolated: false, stale: true });
     expect(third).toMatchObject({ title: null, stale: false });
     expect(first?.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it('should date the prose by its latest revision, not by judge or stale updates', async () => {
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 3)) });
+    if (!draft) throw new Error('missing draft');
+    const written = new Date('2031-04-05T06:07:08.000Z');
+    await db.insert(schema.draftRevisions).values({ projectId, draftId: draft.id, revision: 0, source: 'generated', body: '', createdAt: written });
+    await db
+      .update(schema.drafts)
+      .set({ judge: 'consistent', updatedAt: new Date('2032-01-01T00:00:00.000Z') })
+      .where(eq(schema.drafts.id, draft.id));
+
+    const [first, , third] = await service.listDraftSummaries(projectId);
+
+    expect(third?.writtenAt).toEqual(written);
+    expect(first?.writtenAt).toBeInstanceOf(Date);
   });
 });

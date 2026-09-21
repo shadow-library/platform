@@ -120,6 +120,7 @@ export interface DraftSummary {
   isolated: boolean;
   stale: boolean;
   updatedAt: Date;
+  writtenAt: Date;
 }
 
 export interface SearchResult {
@@ -652,8 +653,61 @@ export class GenerationService {
     const staleChapters = chapters.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
     if (staleChapters.length > 0) throw AppErrorCode.BRF_002.create({ chapters: staleChapters.join(', ') });
 
-    // Guard: when a chapter's volume has arcs, the covering arc must be approved.
-    // Arc-less volumes (e.g. source-imported ones) keep the volume-scoped path.
+    await this.assertCoveringArcsApproved(projectId, chapters, approvedVolumes);
+
+    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter });
+    const job = await this.enqueueGeneration(projectId, chapters, body);
+    return { ...job, stoppedAtExternalChapter };
+  }
+
+  /**
+   * Redrafts one chapter from its current brief through the same generation job as `generate` — judge, readability,
+   * writer scrubs and repairs — replacing the prose in place, so the old text stays in the draft's revision history.
+   * It keeps generate's rules: chapters are drafted in order, a contradiction elsewhere or an unfilled external chapter
+   * at or before this one blocks it, and only one generation job runs at a time.
+   */
+  async regenerateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
+    await this.assertActive(projectId);
+
+    const [approvedVolumes, brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
+      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) }),
+      this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
+      this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)), columns: { status: true } }),
+      this.db.query.jobs.findFirst({
+        where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
+        columns: { id: true },
+      }),
+      this.db.query.drafts.findFirst({
+        where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction'), ne(schema.drafts.chapter, chapter)),
+        columns: { chapter: true },
+      }),
+      this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), columns: { chapter: true, writeMode: true } }),
+      this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } }),
+      this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } }),
+    ]);
+
+    if (approvedVolumes.length === 0) throw AppErrorCode.PLN_001.create();
+    if (!brief) throw AppErrorCode.BRF_001.create();
+    if (brief.staleReason) throw AppErrorCode.BRF_002.create({ chapters: String(chapter) });
+    if (draft?.status === 'final') throw AppErrorCode.CHP_008.create();
+    if (activeJob) throw AppErrorCode.DRF_010.create();
+    if (otherContradiction) throw AppErrorCode.DRF_003.create();
+
+    const earlierDrafts = new Set(existingDrafts.map(d => d.chapter).filter(n => n !== chapter));
+    const finalized = new Set(finalizedChapters.map(c => c.number));
+    const { chapters, stoppedAtExternalChapter } = selectGenerationBatch(allBriefs, earlierDrafts, finalized, 1);
+    if (stoppedAtExternalChapter !== undefined) throw AppErrorCode.DRF_012.create({ chapter: String(chapter), blocker: String(stoppedAtExternalChapter) });
+    const [next] = chapters;
+    if (next !== chapter) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(next) });
+
+    await this.assertCoveringArcsApproved(projectId, chapters, approvedVolumes);
+
+    this.logger.info('regenerate: enqueueing chapter', { projectId, chapter, hadDraft: Boolean(draft) });
+    return this.enqueueGeneration(projectId, chapters, { autoFix: true });
+  }
+
+  /** When a chapter's volume has arcs, the covering arc must be approved; arc-less volumes (e.g. source-imported ones) keep the volume-scoped path. */
+  private async assertCoveringArcsApproved(projectId: bigint, chapters: readonly number[], approvedVolumes: readonly Plan.Volume[]): Promise<void> {
     const arcs = await this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
     for (const chapter of arcs.length > 0 ? chapters : []) {
       const volume = approvedVolumes.find(v => v.startChapter !== null && v.endChapter !== null && chapter >= v.startChapter && chapter <= v.endChapter);
@@ -663,15 +717,14 @@ export class GenerationService {
       const covering = volumeArcs.find(a => a.chapterStart !== null && a.chapterEnd !== null && chapter >= a.chapterStart && chapter <= a.chapterEnd);
       if (!covering || covering.status !== 'approved') throw AppErrorCode.ARC_004.create();
     }
+  }
 
+  private async enqueueGeneration(projectId: bigint, chapters: number[], options: Pick<GenerateBody, 'autoFix' | 'maxFixes' | 'guidance'>): Promise<JobEnqueueResult> {
     const target = [...chapters].sort((a, b) => a - b).join(',');
-    const payload = { chapters, autoFix: body.autoFix, maxFixes: body.maxFixes, guidance: body.guidance };
-    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter });
-
+    const payload = { chapters, autoFix: options.autoFix, maxFixes: options.maxFixes, guidance: options.guidance };
     const jobId = await this.jobService.enqueue(projectId, 'generate', target, payload);
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('generate job dispatch failed', { err, jobId }));
-
-    return { jobId, kind: 'generate', status: 'pending', target, stoppedAtExternalChapter };
+    return { jobId, kind: 'generate', status: 'pending', target };
   }
 
   async listDrafts(projectId: bigint): Promise<Generation.Draft[]> {
@@ -690,6 +743,10 @@ export class GenerationService {
         isolated: drafts.isolated,
         stale: sql<boolean>`${drafts.staleReason} is not null`,
         updatedAt: drafts.updatedAt,
+        writtenAt:
+          sql<Date>`coalesce((select max(${schema.draftRevisions.createdAt}) from ${schema.draftRevisions} where ${schema.draftRevisions.draftId} = "drafts"."id"), ${drafts.createdAt})`.mapWith(
+            drafts.createdAt,
+          ),
       })
       .from(drafts)
       .where(eq(drafts.projectId, projectId))

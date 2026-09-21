@@ -872,21 +872,24 @@ function StudioScreen(): React.JSX.Element {
       setInput('');
       setStaged({ messageId: '', answers: NO_ANSWERS });
     }
-    turn.mutate(text, {
-      onSuccess: result => {
-        syncSeed(result.seed);
-        if (result.applyNote) toast.warning(result.applyNote);
+    turn.mutate(
+      { content: text },
+      {
+        onSuccess: result => {
+          syncSeed(result.seed);
+          if (result.applyNote) toast.warning(result.applyNote);
+        },
+        // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
+        // reached the transcript needs the toast and the draft handed back.
+        onError: async (err, _content, context) => {
+          if (await isTurnFailureRecorded(queryClient, seedId, sessionId, context?.previous)) return;
+          toast.danger(err.message);
+          if (!cleared) return;
+          setInput(current => current || cleared.draft);
+          setStaged(current => (current.messageId ? current : cleared.staged));
+        },
       },
-      // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
-      // reached the transcript needs the toast and the draft handed back.
-      onError: async (err, _content, context) => {
-        if (await isTurnFailureRecorded(queryClient, seedId, sessionId, context?.previous)) return;
-        toast.danger(err.message);
-        if (!cleared) return;
-        setInput(current => current || cleared.draft);
-        setStaged(current => (current.messageId ? current : cleared.staged));
-      },
-    });
+    );
   };
 
   const sendComposer = (): void => send(openRound && answered > 0 ? composeAnswers(openRound.questions, openAnswers, input) : input, { draft: input, staged });

@@ -1,0 +1,16 @@
+.reason {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.applied {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}

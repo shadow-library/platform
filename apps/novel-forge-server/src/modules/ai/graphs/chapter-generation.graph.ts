@@ -3,6 +3,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
+import { markDescendantDraftsStale } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -299,6 +300,26 @@ export function createChapterGenerationGraph(services: GraphServices) {
     // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
     // node idempotent on checkpoint replay, but a real insert failure now rolls the draft back too.
     const draft = await db.transaction(async tx => {
+      const previous = await tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) });
+      // Paths such as unrestricted fill, import and hand edits change the body without logging a revision; snapshot it so replacing it never loses prose.
+      if (previous) {
+        await tx
+          .insert(schema.draftRevisions)
+          .values({
+            projectId,
+            draftId: previous.id,
+            revision: previous.revision,
+            source: previous.generator === 'human' ? 'imported' : 'generated',
+            body: previous.body,
+            summary: previous.summary,
+            state: previous.state,
+          })
+          .onConflictDoNothing();
+        await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
+      }
+
+      const generator = containment.generator ?? 'standard';
+      const isolated = containment.isolated ?? false;
       const [row] = await tx
         .insert(schema.drafts)
         .values({
@@ -312,7 +333,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
           revision: 0,
           reviewStatus: 'generating',
           staleReason: null,
-          ...containment,
+          generator,
+          isolated,
         })
         .onConflictDoUpdate({
           target: [schema.drafts.projectId, schema.drafts.chapter],
@@ -322,14 +344,18 @@ export function createChapterGenerationGraph(services: GraphServices) {
             summary: sql`EXCLUDED.summary`,
             state: sql`EXCLUDED.state`,
             revision: sql`drafts.revision + 1`,
+            reviewStatus: 'generating',
             staleReason: null,
-            ...containment,
+            generator,
+            isolated,
             updatedAt: new Date(),
           },
         })
         .returning();
 
       if (!row) throw AppError.internal('[persistDraft] unexpected null result');
+      // Later drafts were written against whatever this chapter held before, so new prose here leaves them resting on text that no longer exists.
+      await markDescendantDraftsStale(tx, projectId, state.chapter, `ancestor chapter ${state.chapter} was ${previous ? 'regenerated' : 'drafted'}`);
 
       await tx
         .insert(schema.draftRevisions)

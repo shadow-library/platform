@@ -36,6 +36,9 @@ export class ListProposalsQuery extends PaginationQuery(SortByTime, { sortBy: 'c
 
   @Field({ optional: true })
   sessionId?: string;
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'Only proposals with at least one operation aimed at this chapter.' })
+  chapter?: number;
 }
 
 @Schema()
@@ -138,6 +141,9 @@ export class ProposalResponse {
     description: 'Error-source-specific failure details recorded when proposal application fails.',
   })
   error?: Record<string, unknown> | null;
+
+  @Field(() => [String], { description: 'Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply.' })
+  warnings: string[];
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

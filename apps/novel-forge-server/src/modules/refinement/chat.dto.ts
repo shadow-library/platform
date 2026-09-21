@@ -240,6 +240,13 @@ export class ChatTurnBody {
     description: 'Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters.',
   })
   content: string;
+
+  @Field({
+    optional: true,
+    description:
+      "The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it.",
+  })
+  proseEdits?: boolean;
 }
 
 @Schema({ description: 'Proposal application outcome returned as part of an automatic-mode turn.' })

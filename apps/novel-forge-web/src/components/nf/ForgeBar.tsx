@@ -3,6 +3,7 @@ import { Button, IconButton, Textarea, toast } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
+import { ProseEditsToggle } from '@/components/nf/ProseEditsToggle';
 import { type ChatScope, type ChatSessionResponse, type ChatTurnResponse, useCreateChatSessionMutation, useForgeTurnMutation } from '@/lib/apis';
 
 import styles from './ForgeBar.module.css';
@@ -25,6 +26,7 @@ function contextLine(scope: ForgeScope): string {
 export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; scope: ForgeScope; placeholder?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [proseEdits, setProseEdits] = useState(false);
   const [createdSession, setCreatedSession] = useState<ChatSessionResponse | undefined>();
   const [last, setLast] = useState<ChatTurnResponse | undefined>();
   const creatingRef = useRef<string | null>(null);
@@ -75,7 +77,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
     const isFirstTurn = contextSentFor.current !== sessionId;
     const content = isFirstTurn ? `${contextLine(scope)}\n${message}` : message;
     turn.mutate(
-      { sessionId, content },
+      { sessionId, content, proseEdits },
       {
         onSuccess: result => {
           if (isFirstTurn) contextSentFor.current = sessionId;
@@ -140,6 +142,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
           scope · {scope.title}
         </span>
         <ChatModelMenu novelId={novelId} session={session} scopeType={scope.type} />
+        <ProseEditsToggle checked={proseEdits} onCheckedChange={setProseEdits} message={text} disabled={turn.isPending} />
         <span className={styles.hint}>Produces a reviewable proposal — canon isn&apos;t edited directly.</span>
         <div className={styles.spacer} />
         <Button variant="primary" size="sm" loading={turn.isPending} disabled={!sessionId || !text.trim()} onClick={propose}>

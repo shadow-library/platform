@@ -83,6 +83,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — an ancestor chapter changed; regenerate before approving');
   static readonly DRF_008 = AppErrorCode.badRequest('DRF_008', 'Chapter is isolated — continuity proposals and bible extraction are unavailable for isolated chapters');
   static readonly DRF_009 = AppErrorCode.badRequest('DRF_009', 'Draft approval is never applied automatically — select the approval step and apply it deliberately');
+  static readonly DRF_010 = AppErrorCode.conflict('DRF_010', 'A generation job is already running for this project — wait for it to finish before regenerating a chapter');
+  static readonly DRF_011 = AppErrorCode.badRequest('DRF_011', 'Chapter {chapter} cannot be regenerated before chapter {blocker} is drafted — chapters are generated in order');
+  static readonly DRF_012 = AppErrorCode.badRequest(
+    'DRF_012',
+    'Chapter {chapter} cannot be regenerated while chapter {blocker} is an unfinalized external chapter — fill and finalize it first',
+  );
 
   /*!
    * Finalize Errors

@@ -16,7 +16,7 @@ import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
-import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
+import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, renderTurnRules, scopeAllowedOps } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
@@ -24,8 +24,16 @@ import { ProjectEventService } from '../events/project-event.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
+import { requestedNegations } from './negation-echo';
 import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
+import { findNegationEchoWarnings } from './proposal-warnings';
+import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
+
+export interface ChatTurnOptions {
+  /** The author's explicit per-turn permission to rewrite chapter prose; without it a prose op is withheld. */
+  proseEdits?: boolean;
+}
 
 export interface CreateSessionInput {
   mode?: Refinement.ChatMode;
@@ -161,6 +169,19 @@ interface SessionListFilter {
 // execute before the model is told to answer with what it has.
 const MAX_LOOKUP_ROUNDS = 3;
 const CHAT_HUB_NODE = 'chat-hub';
+
+const AUTO_APPLY_HELD_NOTE = 'Not applied automatically: review the warnings on this proposal first.';
+
+function withheldProse(output: ChatRefineOutput, proseEdits: boolean): ChatRefineOutput {
+  if (proseEdits || !output.changeSet?.length) return output;
+  const { kept, withheld } = withoutProseEditOps(output.changeSet);
+  if (withheld === 0) return output;
+  return { reply: `${output.reply}\n\n${PROSE_EDIT_WITHHELD_NOTE}`, ...(kept.length > 0 ? { changeSet: kept } : {}) };
+}
+
+function negationFixRequest(warnings: string[]): string {
+  return `Your changeSet removes things by stating their absence, which hands them straight back to the chapter writer:\n${warnings.map(w => `- ${w}`).join('\n')}\n\nRespond again with the same JSON shape and no lookups: rewrite each of those passages without the removed idea, and keep every other change. Keep any line that withholds knowledge or schedules a reveal ("does not yet learn", "no longer") — that is plot, not a removal.`;
+}
 
 // An opener this short ("fix this") never earns an auto-title — it would name nothing worth keeping.
 const CHAT_TITLE_MIN_CONTENT_LENGTH = 15;
@@ -423,7 +444,7 @@ export class ChatService {
    * With an `emitter` the reply streams as it decodes and the declared lookups are reported as they run;
    * without one the turn is byte-for-byte what it was, down to going through `modelRouter.structured`.
    */
-  async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter): Promise<ChatTurnResult> {
+  async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter, options: ChatTurnOptions = {}): Promise<ChatTurnResult> {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
@@ -440,7 +461,9 @@ export class ChatService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    const prompt = buildChatRefinePrompt(session.scopeType);
+    const proseEdits = options.proseEdits === true;
+    const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
+    const turnRules = renderTurnRules({ proseEdits });
     const scopeInstructions = `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}`;
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
@@ -464,7 +487,14 @@ export class ChatService {
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
-        const input = { scopeInstructions, stableContext: pack.renderedStable, history: turnHistory, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content };
+        const input = {
+          scopeInstructions,
+          stableContext: pack.renderedStable,
+          history: turnHistory,
+          volatileContext: pack.renderedVolatile || 'nothing',
+          turnRules,
+          userMessage: content,
+        };
         const routed = effectiveProject as ProjectConfig | undefined;
         const output = streamHandlers
           ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, routed, policy)
@@ -487,11 +517,29 @@ export class ChatService {
       // A model that still asks for lookups after the budget note answers with its reply alone.
       if ((output.lookups?.length ?? 0) > 0) output = { reply: output.reply };
 
-      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel);
+      // A removal written as "no X" gets one chance to be rewritten as a deletion; whatever survives is kept and flagged for review.
+      const exempt = requestedNegations(content);
+      output = withheldProse(output, proseEdits);
+      let warnings = await this.negationWarnings(projectId, output, exempt);
+      if (warnings.length > 0) {
+        turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, changeSet: output.changeSet })), new HumanMessage(negationFixRequest(warnings)));
+        relay?.supersedeOnNextDelta();
+        const revised = await invoke().catch((err: unknown) => {
+          this.logger.warn('chat turn: negation fix round failed — keeping the flagged change-set', { projectId, sessionId, runId, err });
+          return null;
+        });
+        if (revised && (revised.lookups?.length ?? 0) === 0) {
+          output = withheldProse(revised, proseEdits);
+          warnings = await this.negationWarnings(projectId, output, exempt);
+        }
+      }
+
+      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, warnings);
     });
 
     this.logger.debug('chat turn complete', { projectId, sessionId, runId, hasProposal: !!result.proposal, proposalId: result.proposal?.id });
 
+    if (session.mode === 'auto' && result.proposal?.warnings?.length) return { ...result, applyNote: AUTO_APPLY_HELD_NOTE, runId };
     // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply).
     if (session.mode === 'auto' && result.proposal) {
       const settled = await this.autoApply(projectId, result.proposal);
@@ -654,6 +702,7 @@ export class ChatService {
     output: ChatRefineOutput,
     runId: string,
     model: { provider: string; model: string },
+    warnings: string[],
   ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const [assistantMessage] = await this.db
       .insert(schema.chatMessages)
@@ -684,6 +733,7 @@ export class ChatService {
         changeSet: output.changeSet as unknown as ChangeOp[],
         allowedOps: scopeAllowedOps(session.scopeType),
         runId,
+        warnings,
       });
       await this.db.update(schema.chatMessages).set({ proposalId: proposal.id }).where(eq(schema.chatMessages.id, assistantMessage.id));
       assistantMessage.proposalId = proposal.id;
@@ -691,6 +741,16 @@ export class ChatService {
 
     await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
     return { userMessage, assistantMessage, proposal };
+  }
+
+  private async negationWarnings(projectId: bigint, output: ChatRefineOutput, exempt: ReadonlySet<string>): Promise<string[]> {
+    if (!output.changeSet?.length) return [];
+    try {
+      return await findNegationEchoWarnings(this.db, projectId, output.changeSet as unknown as ChangeOp[], { exempt });
+    } catch (err) {
+      this.logger.warn('chat turn: negation check failed — staging without warnings', { projectId, err });
+      return [];
+    }
   }
 
   private async latestOrdinal(sessionId: string): Promise<number> {

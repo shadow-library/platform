@@ -62,6 +62,10 @@
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
 - **Ideation**: studio turns stage seed proposals; graduation is deterministic (premise, reader-promise documents, one seed-source fact per promise; no volumes or entities).
 - **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
+- **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
+  scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
+  it, one generation job at a time, finalized chapters change only through amend — and replaces the prose in place. Whatever the draft held, however it was written, stays in
+  the revision history; its continuity review is dropped and later drafts are marked stale only when the new draft lands, keeping any more specific stale reason they carry.
 - **Rebrand** (source only; runs recombine first, best-effort, merging translator-split parts): glossary seed, then per chapter convert -> deterministic residue scan -> audit -> at most
   one repair by default (`settings.maxRepairs`), else flagged. Output lives beside untouched source rows; the glossary only grows.
 - **Reforge** (source only): reuses the rebrand glossary. `chapter` mode rewrites each chapter under a fidelity judge (beat coverage, naming consistency and real-world residue; never taste). `transform` mode: analysis ->
@@ -123,6 +127,12 @@
 - `action.finalize`, `action.graduate_seed`, `action.approve_draft`, `action.approve_volume_plan` and `action.approve_arcs` MUST NEVER be auto-applied. Action ops run after the
   content transaction commits and stop at first failure.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
+- Plan edits stay plan edits: a chat turn MUST NEVER rewrite a chapter's prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose
+  for that turn; otherwise it changes the brief and the author regenerates from it. The toggle is the only permission — wording may suggest turning it on, never grant it. A
+  prose op without it costs the model one repair and is then withheld with a note, together with the judging, approval or finalize that depended on it.
+- To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X", "X is not…") unless the author asked for that rule, because a named idea
+  re-primes every later writer. Proposals carry a deterministic check for text a change removed and then mentioned only under a negation: a chat turn gets one retry, and what
+  survives is kept as a visible warning and never auto-applied.
 - Plugins MUST NEVER register routes, hold the database client, write domain tables, move chapter ranges/ordinals/parentage, or issue `action.*` ops; durable changes are
   allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated context, NEVER core artifacts. A failing
   plugin degrades its decision point and MUST NEVER fail a generation.

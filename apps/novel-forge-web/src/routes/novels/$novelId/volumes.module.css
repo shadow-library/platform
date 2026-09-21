@@ -1,9 +1,9 @@
 .pageVolumes {
-  padding-block: 32px 120px;
+  padding-block: 32px 40px;
 }
 
 .pageDetail {
-  padding-block: 32px 130px;
+  padding-block: 32px 40px;
 }
 
 .spacer {
@@ -34,6 +34,7 @@
 }
 
 .sectionLabel {
+  margin-top: 0;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -51,15 +52,18 @@
   text-align: justify;
 }
 
+/* Docked below the scroll area rather than floating over it, so an open Forge card pushes the record up instead of hiding it. */
 .forgeDock {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 22px;
-  width: min(680px, calc(100% - 60px));
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
-  z-index: 5;
+  padding: 10px 16px 18px;
+  border-top: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-app);
+}
+
+.forgeDock > * {
+  max-width: 680px;
 }
 
 .listHead {
@@ -312,6 +316,111 @@
   white-space: pre-wrap;
 }
 
+.briefSections {
+  display: flex;
+  flex-direction: column;
+}
+
+.briefSection {
+  margin-bottom: 26px;
+}
+
+.briefParagraph {
+  margin: 0 0 10px;
+  font-size: var(--sh-text-body);
+  line-height: 1.7;
+}
+
+.briefList {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--sh-text-body);
+  line-height: 1.6;
+}
+
+.endingGrid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  margin: 0;
+  font-size: var(--sh-text-body);
+  line-height: 1.6;
+}
+
+.endingGrid dt {
+  color: var(--sh-text-tertiary);
+}
+
+.endingGrid dd {
+  margin: 0;
+}
+
+.regenerateCallout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 12px 14px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+}
+
+.regenerateNote {
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.pendingProposals {
+  margin-bottom: 28px;
+}
+
+.pendingProposal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.pendingProposal + .pendingProposal {
+  margin-top: 8px;
+}
+
+.pendingProposal:hover {
+  background: var(--sh-surface-well);
+}
+
+.pendingSummary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sh-text-body-sm);
+}
+
+.pendingMore {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-accent);
+}
+
+.pendingLink {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-accent);
+}
+
 .dialogRow {
   display: flex;
   gap: 12px;
@@ -342,10 +451,11 @@
 .body {
   flex: 1;
   min-height: 0;
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .scrollFill {
-  position: absolute;
-  inset: 0;
+  flex: 1;
+  min-height: 0;
 }

@@ -1,0 +1,22 @@
+.toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--sh-warning-text);
+}
+
+.suggest {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}

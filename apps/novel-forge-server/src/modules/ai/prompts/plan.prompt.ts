@@ -2,18 +2,18 @@ import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type PlanOutput, PlanSchema, validatePlanContiguity } from '../schemas/plan.schema';
-import { AUTHORING_STYLE_PLANNING } from './authoring-preamble';
+import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system =
-  `${AUTHORING_STYLE_PLANNING}\n\nYou are a serialized novel planner. Given the novel skeleton (character arcs and power curve), the target volume count, chapters_per_volume, and the project's bible documents (if any have been written yet), produce a volume plan. Each volume is a self-contained arc with a clear objective, central conflict, and payoff. Volumes must together fulfill all major character arcs and the power curve trajectory. Chapter spans must be contiguous. Volumes should escalate in stakes. When the skeleton is missing or thin, derive the arcs from the brief — never return fewer volumes than requested.\n\n` +
+  `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a serialized novel planner. Given the novel skeleton (character arcs and power curve), the target volume count, chapters_per_volume, and the project's bible documents (if any have been written yet), produce a volume plan. Each volume is a self-contained arc with a clear objective, central conflict, and payoff. Volumes must together fulfill all major character arcs and the power curve trajectory. Chapter spans must be contiguous. Volumes should escalate in stakes. When the skeleton is missing or thin, derive the arcs from the brief — never return fewer volumes than requested.\n\n` +
   'The bible documents are canon reference, not raw material to restate — keep the plan consistent with the established world, characters, factions, and plot they describe, but never copy or summarize them verbatim into the plan output. Where the bible and the skeleton disagree, treat the bible as authoritative — it is later-stage, more specific canon — unless the disagreement is an obvious inconsistency the bible itself would not intend.\n\n' +
   'Respond with ONLY one valid JSON array — nothing outside the JSON, no markdown fences — of exactly this shape, with exactly the requested number of volumes:\n' +
   '[{"volumeKey": "vol_01_snake_case", "ordinal": 1, "title": "...", "objective": "...", "conflict": "...", "payoff": "...", "startChapter": 1, "endChapter": 8, "cast": ["entity-key"]}]';
 
 export const planPrompt: PromptModule<PlanOutput> = {
   key: 'plan',
-  version: '1.2.0',
+  version: '1.3.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

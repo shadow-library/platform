@@ -3,10 +3,10 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { findBriefRevealViolations, renderRevealViolation, type ScheduledReveal } from '../context/canon-guard';
 import { type OutlineOutput, OutlineSchema, validateOutlineCoverage } from '../schemas/outline.schema';
-import { AUTHORING_STYLE_PLANNING } from './authoring-preamble';
+import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\nYou are a chapter outliner for a serialized novel. You receive the current volume plan, the available context catalog (entities with a short description each, chapters, open threads, mysteries, world facts, canon facts, and the bible documents with a label and an excerpt), and the volume's cast and objectives. Produce a brief for each chapter in the volume, including: title, objective, key events in order, required context refs (most important first — select from the catalog only, do not invent refs), and the POV character. The requiredContext ordering is the eviction priority — put most essential items first.
+const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a chapter outliner for a serialized novel. You receive the current volume plan, the available context catalog (entities with a short description each, chapters, open threads, mysteries, world facts, canon facts, and the bible documents with a label and an excerpt), and the volume's cast and objectives. Produce a brief for each chapter in the volume, including: title, objective, key events in order, required context refs (most important first — select from the catalog only, do not invent refs), and the POV character. The requiredContext ordering is the eviction priority — put most essential items first.
 
 Each requiredContext ref takes one of these forms, built only from what the catalog lists: entity:<entityKey>, chapter:<number>, thread:<threadKey>, mystery:<mysteryKey>, world_fact:<category> or world_fact:<category>/<key>, and bible_doc:<section>/<slug> copied exactly as the BIBLE DOCUMENTS list writes it. Never cite a canon fact — facts reach the chapter author only through the knowledgeContract. A cited bible document reaches the chapter author in full and an uncited one does not reach it at all, so cite the documents that govern the chapter's events: the rules of a power or system the chapter uses, the place or institution it happens in, the plot document whose beats it enacts. Cite a plot or lore document only when the chapter enacts what it describes, because everything in it reaches the chapter author, including what the story has not revealed yet.
 
@@ -18,7 +18,7 @@ The catalog's CANON FACTS section lists every fact the story holds, revealed and
 
 export const outlinePrompt: PromptModule<OutlineOutput> = {
   key: 'outline',
-  version: '2.5.0',
+  version: '2.6.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

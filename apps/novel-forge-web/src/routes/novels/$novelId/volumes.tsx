@@ -1,18 +1,21 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 
 import { ChevronRightIcon, SparkIcon } from '@/components/icons';
-import { PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
+import { PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type ArcResponse,
+  type BriefResponse,
   listVolumesQueryOptions,
   useApproveArcsMutation,
   useApproveVolumesMutation,
   useBriefQuery,
+  useDraftSummaryQuery,
   useListArcsQuery,
   useListBriefsQuery,
+  useListProposalsQuery,
   useListVolumesQuery,
   useOutlineArcMutation,
   usePlanArcsMutation,
@@ -21,6 +24,9 @@ import {
   useVolumeQuery,
   type VolumeResponse,
 } from '@/lib/apis';
+
+import { endingContractOf, parseBriefBody } from '@/lib/chapter-brief';
+import { proposalTitle } from '@/lib/proposals';
 
 import styles from './volumes.module.css';
 
@@ -44,6 +50,8 @@ export const Route = createFileRoute('/novels/$novelId/volumes')({
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listVolumesQueryOptions(params.novelId, { limit: 50 })),
   component: VolumesScreen,
 });
+
+const PENDING_PROPOSALS_SHOWN = 5;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
@@ -75,7 +83,7 @@ function Field({ label, value }: FieldProps): React.JSX.Element | null {
   if (!value) return null;
   return (
     <>
-      <div className={styles.sectionLabel}>{label}</div>
+      <h2 className={styles.sectionLabel}>{label}</h2>
       <p className={styles.fieldText}>{value}</p>
     </>
   );
@@ -425,23 +433,124 @@ interface BriefDetailProps {
   chapter: number;
 }
 
+function BriefSections({ brief }: { brief: BriefResponse }): React.JSX.Element {
+  const sections = parseBriefBody(brief.body);
+  const ending = endingContractOf(brief.endingContract);
+  const readerValue = (brief.readerValue ?? []).map(value => value.replace(/_/g, ' '));
+
+  return (
+    <div className={styles.briefSections}>
+      <Field label="Purpose" value={brief.chapterPurpose} />
+      {sections.map((section, i) => (
+        <section key={`${section.heading ?? 'body'}-${i}`} className={styles.briefSection}>
+          {section.heading && <h2 className={styles.sectionLabel}>{section.heading}</h2>}
+          {section.paragraphs.map((paragraph, j) => (
+            <p key={j} className={styles.briefParagraph}>
+              {paragraph}
+            </p>
+          ))}
+          {section.items.length > 0 && (
+            <ul className={styles.briefList}>
+              {section.items.map((item, j) => (
+                <li key={j}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+      <Field label="POV" value={brief.pov} />
+      {ending && (
+        <section className={styles.briefSection}>
+          <h2 className={styles.sectionLabel}>Ending</h2>
+          <dl className={styles.endingGrid}>
+            {ending.hookType && (
+              <>
+                <dt>Hook</dt>
+                <dd>{ending.hookType}</dd>
+              </>
+            )}
+            {ending.emotionalBeat && (
+              <>
+                <dt>Feeling</dt>
+                <dd>{ending.emotionalBeat}</dd>
+              </>
+            )}
+            {ending.openQuestion && (
+              <>
+                <dt>Open question</dt>
+                <dd>{ending.openQuestion}</dd>
+              </>
+            )}
+            {ending.handoffState && (
+              <>
+                <dt>Hands off</dt>
+                <dd>{ending.handoffState}</dd>
+              </>
+            )}
+            {ending.mustNotResolve.length > 0 && (
+              <>
+                <dt>Leave open</dt>
+                <dd>{ending.mustNotResolve.join(', ')}</dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
+      <Field label="Delivers" value={readerValue.join(', ')} />
+      <Field label="Avoid repeating" value={(brief.repetitionRisks ?? []).join('; ')} />
+      <Field label="Author guidance" value={brief.guidance} />
+    </div>
+  );
+}
+
+function ChapterProposals({ novelId, chapter }: BriefDetailProps): React.JSX.Element | null {
+  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', chapter, limit: PENDING_PROPOSALS_SHOWN });
+  const pending = proposalsQuery.data?.items ?? [];
+  const more = (proposalsQuery.data?.total ?? 0) - pending.length;
+  if (pending.length === 0) return null;
+
+  return (
+    <section className={styles.pendingProposals}>
+      <h2 className={styles.sectionLabel}>Waiting for your review</h2>
+      {pending.map(proposal => (
+        <Link key={proposal.id} to="/novels/$novelId/review" params={{ novelId }} search={{ view: 'proposals', proposal: proposal.id }} className={styles.pendingProposal}>
+          <span className={styles.pendingSummary}>{proposalTitle(proposal)}</span>
+          {proposal.warnings.length > 0 && <StatusChip intent="warning">{proposal.warnings.length === 1 ? '1 warning' : `${proposal.warnings.length} warnings`}</StatusChip>}
+          <span className={styles.pendingLink}>Review →</span>
+        </Link>
+      ))}
+      {more > 0 && (
+        <Link to="/novels/$novelId/review" params={{ novelId }} search={{ view: 'proposals' }} className={styles.pendingMore}>
+          {more} more waiting in Review →
+        </Link>
+      )}
+    </section>
+  );
+}
+
 function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element {
   const navigate = useNavigate();
   const briefQuery = useBriefQuery(novelId, chapter);
+  const draftsQuery = useDraftSummaryQuery(novelId);
   const updateBrief = useUpdateBriefMutation(novelId, chapter);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [bodyDraft, setBodyDraft] = useState('');
 
   const brief = briefQuery.data;
   const [seededBrief, setSeededBrief] = useState<typeof brief>(undefined);
   if (brief && seededBrief !== brief) {
     setSeededBrief(brief);
-    setDraft(brief.body);
+    setBodyDraft(brief.body);
   }
+
+  const chapterDraft = draftsQuery.data?.items.find(item => item.chapter === chapter);
+  const regenerable = Boolean(brief && chapterDraft && chapterDraft.status !== 'final');
+  const staleReason = brief?.staleReason ? `The brief is stale (${brief.staleReason}) — refresh the outline before regenerating.` : undefined;
+  const briefIsNewer = Boolean(brief && chapterDraft && !staleReason && new Date(brief.updatedAt) > new Date(chapterDraft.writtenAt));
 
   const save = (): void => {
     updateBrief.mutate(
-      { body: draft, title: brief?.title ?? undefined },
+      { body: bodyDraft, title: brief?.title ?? undefined },
       {
         onSuccess: () => {
           toast.success('Brief saved');
@@ -460,8 +569,8 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
       <h1 className={`${styles.title} ${styles.titleBrief}`}>{brief?.title ?? `Chapter ${chapter}`}</h1>
       <div className={styles.briefMeta}>
         {brief ? (
-          <StatusChip intent="success" dot>
-            Brief ready
+          <StatusChip intent={brief.staleReason ? 'warning' : 'success'} dot>
+            {brief.staleReason ? 'Brief is stale' : 'Brief ready'}
           </StatusChip>
         ) : (
           <StatusChip intent="neutral" dot>
@@ -479,12 +588,21 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
             Edit brief
           </Button>
         )}
+        {regenerable && !briefIsNewer && <RegenerateChapterButton novelId={novelId} chapter={chapter} label="Regenerate chapter" disabledReason={staleReason} />}
       </div>
 
-      <div className={styles.sectionLabel}>Premise / synopsis</div>
+      {regenerable && briefIsNewer && (
+        <div className={styles.regenerateCallout}>
+          <p className={styles.regenerateNote}>The brief changed after chapter {chapter} was drafted. Regenerate it to write the chapter from the updated plan.</p>
+          <RegenerateChapterButton novelId={novelId} chapter={chapter} variant="primary" />
+        </div>
+      )}
+
+      <ChapterProposals novelId={novelId} chapter={chapter} />
+
       {editing ? (
         <div className={styles.editWrap}>
-          <Textarea value={draft} onValueChange={setDraft} minRows={8} autoGrow />
+          <Textarea value={bodyDraft} onValueChange={setBodyDraft} minRows={8} autoGrow />
           <div className={styles.editActions}>
             <Button variant="primary" loading={updateBrief.isPending} onClick={save}>
               Save
@@ -494,8 +612,10 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
             </Button>
           </div>
         </div>
+      ) : brief ? (
+        <BriefSections brief={brief} />
       ) : (
-        <p className={styles.briefBody}>{brief?.body || 'No brief has been written for this chapter yet.'}</p>
+        <p className={styles.briefBody}>No brief has been written for this chapter yet.</p>
       )}
     </div>
   );

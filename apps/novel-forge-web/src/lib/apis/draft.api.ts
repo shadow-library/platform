@@ -121,6 +121,17 @@ export function useGenerateMutation(projectId: string): UseMutationResult<JobEnq
   });
 }
 
+export function useRegenerateChapterMutation(projectId: string): UseMutationResult<JobEnqueueResponse, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<JobEnqueueResponse, ApiError, number>({
+    mutationFn: n => APIRequest.post(`/projects/${projectId}/chapters/${n}/regenerate`).body({}).execute(),
+    onSuccess: () => {
+      invalidateDraft(queryClient, projectId);
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'jobs'] });
+    },
+  });
+}
+
 export function useJudgeDraftMutation(projectId: string, n: number): UseMutationResult<JudgeResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<JudgeResponse, ApiError, undefined>({

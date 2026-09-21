@@ -69,6 +69,7 @@ export function serialiseProposal(proposal: Refinement.Proposal): ProposalRespon
     appliedAt: proposal.appliedAt,
     revertedAt: proposal.revertedAt,
     error: proposal.error as Record<string, unknown> | null,
+    warnings: proposal.warnings ?? [],
     createdAt: proposal.createdAt,
     updatedAt: proposal.updatedAt,
   };

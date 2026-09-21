@@ -4,3 +4,6 @@ export * from './artifact-state';
 export * from './proposal.service';
 export * from './proposal-apply.service';
 export * from './refinement.module';
+export * from './negation-echo';
+export * from './prose-intent';
+export * from './proposal-warnings';

@@ -68,9 +68,14 @@ interface InfiniteSessionsParams {
   limit: number;
 }
 
-interface ForgeTurnVariables {
-  sessionId: string;
+export interface ChatTurnRequest {
   content: string;
+  /** The author's Edit prose toggle: only with it may the turn rewrite chapter text. */
+  proseEdits?: boolean;
+}
+
+interface ForgeTurnVariables extends ChatTurnRequest {
+  sessionId: string;
 }
 
 // The optimistic-update rollback snapshot for a chat turn: the messages cache as it was before the
@@ -273,11 +278,11 @@ function rollbackChatTurn(queryClient: QueryClient, projectId: string, sessionId
   if (context?.previous) queryClient.setQueryData(refinementKeys.messages(projectId, sessionId), context.previous);
 }
 
-export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, string, ChatTurnContext> {
+export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, ChatTurnRequest, ChatTurnContext> {
   const queryClient = useQueryClient();
-  return useMutation<ChatTurnResponse, ApiError, string, ChatTurnContext>({
-    mutationFn: content => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body({ content }).execute(),
-    onMutate: content => beginChatTurn(queryClient, projectId, sessionId, content),
+  return useMutation<ChatTurnResponse, ApiError, ChatTurnRequest, ChatTurnContext>({
+    mutationFn: request => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body(request).execute(),
+    onMutate: ({ content }) => beginChatTurn(queryClient, projectId, sessionId, content),
     onError: (_err, _content, context) => rollbackChatTurn(queryClient, projectId, sessionId, context),
     // Reconcile against the server on both outcomes: on success the real exchange arrives; on a
     // post-persist failure the user message is still there, minus a reply.
@@ -431,7 +436,7 @@ export interface ChatTurnStopHandlers {
 }
 
 export interface ChatTurnSender {
-  send: (content: string, handlers?: ChatTurnHandlers) => void;
+  send: (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnRequest, 'content'>) => void;
   isPending: boolean;
   stream: ChatTurnStreamState;
   // The run this tab's own POST opened, without the composer having to read the stream's internals to find it.
@@ -488,7 +493,8 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     };
   }, [projectId, sessionId]);
 
-  const run = async (content: string, handlers?: ChatTurnHandlers): Promise<void> => {
+  const run = async (request: ChatTurnRequest, handlers?: ChatTurnHandlers): Promise<void> => {
+    const { content } = request;
     const token = ++tokenRef.current;
     const current = (): boolean => mountedRef.current && tokenRef.current === token;
     sourceRef.current?.close();
@@ -500,7 +506,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
 
     let openedRunId: string;
     try {
-      ({ runId: openedRunId } = await APIRequest.post(`/projects/${projectId}/chats/${sessionId}/turn/stream`).body({ content }).execute<ChatTurnStreamResponse>());
+      ({ runId: openedRunId } = await APIRequest.post(`/projects/${projectId}/chats/${sessionId}/turn/stream`).body(request).execute<ChatTurnStreamResponse>());
     } catch (err) {
       rollbackChatTurn(queryClient, projectId, sessionId, context);
       invalidateChat(queryClient, projectId, sessionId);
@@ -554,12 +560,13 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     };
   };
 
-  const send = (content: string, handlers?: ChatTurnHandlers): void => {
+  const send = (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnRequest, 'content'>): void => {
+    const request = { content, ...options };
     if (typeof EventSource === 'undefined') {
-      fallback.mutate(content, { onSuccess: turn => handlers?.onSuccess?.(turn), onError: (err, _content, context) => handlers?.onError?.(err, context) });
+      fallback.mutate(request, { onSuccess: turn => handlers?.onSuccess?.(turn), onError: (err, _request, context) => handlers?.onError?.(err, context) });
       return;
     }
-    void run(content, handlers);
+    void run(request, handlers);
   };
 
   // Idempotent: the ref guard blocks a double-press before the mutation resolves, and the state guard
@@ -613,7 +620,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
 export function useForgeTurnMutation(projectId: string): UseMutationResult<ChatTurnResponse, ApiError, ForgeTurnVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChatTurnResponse, ApiError, ForgeTurnVariables>({
-    mutationFn: ({ sessionId, content }) => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body({ content }).execute(),
+    mutationFn: ({ sessionId, ...request }) => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body(request).execute(),
     onSuccess: (_r, { sessionId }) => invalidateChat(queryClient, projectId, sessionId),
   });
 }

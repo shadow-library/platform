@@ -24,6 +24,8 @@ export { FieldCard, type FieldCardProps } from './FieldCard';
 export { IdeaRename } from './IdeaRename';
 export { ItemPager, type ItemPagerJump, type ItemPagerProps } from './ItemPager';
 export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';
+export { ProseEditsToggle, type ProseEditsToggleProps } from './ProseEditsToggle';
+export { RegenerateAppliedBriefs, type RegenerateAppliedBriefsProps, RegenerateChapterButton, type RegenerateChapterButtonProps } from './RegenerateChapter';
 export { SidePanel, type SidePanelProps } from './SidePanel';
 export { LookupTrace } from './LookupTrace';
 export { Markdown } from './Markdown';

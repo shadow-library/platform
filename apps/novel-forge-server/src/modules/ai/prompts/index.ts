@@ -110,7 +110,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
 export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
-export { buildChatRefinePrompt } from './chat-refine.prompt';
+export { buildChatRefinePrompt, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
 export { buildIdeationStressPrompt, renderReadinessPrecheck } from './ideation-stress.prompt';
 export { buildIdeationTurnPrompt } from './ideation-turn.prompt';
 export { CONCEPT_CARD_COUNT } from './ideation-concepts.prompt';

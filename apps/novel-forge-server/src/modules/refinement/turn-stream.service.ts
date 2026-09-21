@@ -4,7 +4,7 @@ import { AppError, ErrorCode, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { ChatService, type ChatTurnEmitter } from './chat.service';
+import { ChatService, type ChatTurnEmitter, type ChatTurnOptions } from './chat.service';
 import { serialiseMessage, serialiseTurn } from './serialise';
 
 export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'reset' | 'done' | 'error';
@@ -63,7 +63,7 @@ export class TurnStreamService {
   constructor(private readonly chatService: ChatService) {}
 
   /** Starts a turn and resolves with its run id as soon as the run exists — the turn goes on running behind the answer. */
-  async start(projectId: bigint, sessionId: string, content: string): Promise<string> {
+  async start(projectId: bigint, sessionId: string, content: string, options: ChatTurnOptions = {}): Promise<string> {
     const sink: { run: TurnStreamRun | null } = { run: null };
     let settle: (runId: string) => void = () => undefined;
     let fail: (err: unknown) => void = () => undefined;
@@ -83,7 +83,7 @@ export class TurnStreamService {
       onReset: () => this.emit(sink.run, 'reset', {}),
     };
 
-    this.chatService.turn(projectId, sessionId, content, emitter).then(
+    this.chatService.turn(projectId, sessionId, content, emitter, options).then(
       result => {
         // `onRunId` is the only thing that answers the POST, and `EmitterRelay` swallows a throw from it —
         // without this a turn that succeeded anyway would leave the request hanging forever.

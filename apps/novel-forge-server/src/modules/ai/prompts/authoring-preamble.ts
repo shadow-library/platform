@@ -22,6 +22,11 @@ export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
 ${VOICE_AND_CANON_RULES}`;
 
+// Shared by every prompt that edits canon, plans, briefs or prose: naming a removed idea, even to deny it, hands it back to
+// every later writer. `negation-echo.ts` is the deterministic check behind it.
+export const EDIT_BY_DELETION =
+  'EDITING RULE: To remove something, delete it. Never write that it is absent ("no X", "without X", "do not mention X", "X is not ...") unless the text is itself an explicit rule the author asked for.';
+
 // For fix and revision, which rewrite prose under the pack's `writing_style`: point of view and tense are only
 // a default there, because a project's writing-style additions may set their own.
 export const AUTHORING_STYLE_REPAIR = `AUTHORING GUIDELINES:

@@ -15,6 +15,7 @@ import { ChatCompactionService } from '@modules/refinement/chat-compaction.servi
 import { ChatService, type ChatTurnEmitter } from '@modules/refinement/chat.service';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
+import { PROSE_EDIT_WITHHELD_NOTE } from '@modules/refinement/prose-intent';
 import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase, schema } from '@server/database';
 import { runCancellationStub } from '@tests/fixtures/model-router';
@@ -579,5 +580,154 @@ describe.if(pgAvailable)('ChatService', () => {
 
     expect(result.assistantMessage.content).toBe('Persisted all the same.');
     expect((await chat.listMessages(projectId, session.id, {})).map(message => message.role)).toEqual(['user', 'assistant']);
+  });
+
+  describe('plan edits and removals', () => {
+    const BRIEF_BODY = 'Purpose: Veyl earns the lanternwright’s trust.\n\nBeats:\n- The Quillmark almanac marks the ninth thaw.\n- Veyl is feared as the Ashen Hand.';
+    const PLAN_REQUEST = '[context: chapter:7 — "Chapter 7"]\nDrop the almanac and make Veyl a trusted mender instead of the Ashen Hand.';
+    const CLEAN_BODY = 'Purpose: Veyl earns the lanternwright’s trust.\n\nBeats:\n- Veyl is known across the ward as a trusted mender.';
+    const ECHO_BODY = `${CLEAN_BODY}\n- No almanac, and nobody calls him the Ashen Hand.`;
+
+    beforeAll(async () => {
+      await db.insert(schema.briefs).values({ projectId, chapter: 7, body: BRIEF_BODY });
+      await db.insert(schema.drafts).values({ projectId, chapter: 7, body: 'Veyl opened the almanac to the ninth thaw.', status: 'draft', reviewStatus: 'needs_review' });
+    });
+
+    const lastInput = (): Record<string, string> => structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
+
+    it('should withhold a prose rewrite from a plan request and keep the brief change', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({
+        reply: 'Updated the plan.',
+        changeSet: [
+          { op: 'draft.update', chapter: 7, body: 'Veyl mended the lantern in silence.' },
+          { op: 'brief.update', chapter: 7, body: CLEAN_BODY },
+        ],
+      }));
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(lastInput()['turnRules']).toContain('OFF');
+      expect(result.proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 7, body: CLEAN_BODY }]);
+      expect(result.assistantMessage.content).toBe(`Updated the plan.\n\n${PROSE_EDIT_WITHHELD_NOTE}`);
+      const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 7)) });
+      expect(draft?.body).toBe('Veyl opened the almanac to the ninth thaw.');
+    });
+
+    it('should stage no proposal when the only op was a prose rewrite nobody asked for', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Rewrote it.', changeSet: [{ op: 'draft.update', chapter: 7, body: 'Veyl mended the lantern.' }] }));
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(result.proposal).toBeNull();
+      expect(result.assistantMessage.content).toContain(PROSE_EDIT_WITHHELD_NOTE);
+    });
+
+    it('should keep a prose edit when the author turned on Edit prose', async () => {
+      const session = await chat.createSession(projectId, {});
+      const op = { op: 'draft.update', chapter: 7, body: 'Veyl mended the lantern and left before the thaw.' };
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Tightened the scene.', changeSet: [op] }));
+
+      const result = await chat.turn(projectId, session.id, 'Make the thaw scene shorter.', undefined, { proseEdits: true });
+
+      expect(lastInput()['turnRules']).toContain('ON');
+      expect(result.proposal?.changeSet).toEqual([op]);
+    });
+
+    it('should withhold a prose rewrite the wording asks for while Edit prose is off', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Done.', changeSet: [{ op: 'draft.update', chapter: 7, body: 'Veyl mended the lantern.' }] }));
+
+      const result = await chat.turn(projectId, session.id, 'Rewrite the prose of chapter 7 so the thaw scene is shorter.');
+
+      expect(result.proposal).toBeNull();
+      expect(result.assistantMessage.content).toContain(PROSE_EDIT_WITHHELD_NOTE);
+    });
+
+    it('should drop the approval and judging that rode on a withheld rewrite', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({
+        reply: 'Rewrote and approved it.',
+        changeSet: [
+          { op: 'brief.update', chapter: 7, body: CLEAN_BODY },
+          { op: 'draft.update', chapter: 7, body: 'Veyl mended the lantern.' },
+          { op: 'action.judge_draft', chapter: 7 },
+          { op: 'action.approve_draft', chapter: 7 },
+        ],
+      }));
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(result.proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 7, body: CLEAN_BODY }]);
+    });
+
+    it('should send a removal written as a negation back to the model once and stage the rewrite', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Dropped them.', changeSet: [{ op: 'brief.update', chapter: 7, body: ECHO_BODY }] }));
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Dropped them cleanly.', changeSet: [{ op: 'brief.update', chapter: 7, body: CLEAN_BODY }] }));
+      const callsBefore = structuredMock.mock.calls.length;
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(structuredMock.mock.calls.length - callsBefore).toBe(2);
+      const history = (lastInput() as unknown as { history: { content: unknown }[] }).history;
+      expect(String(history.at(-1)?.content)).toContain('removes things by stating their absence');
+      expect(result.proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 7, body: CLEAN_BODY }]);
+      expect(result.proposal?.warnings).toBeNull();
+    });
+
+    it('should keep a negation the model will not fix and flag it on the proposal', async () => {
+      const session = await chat.createSession(projectId, {});
+      const echo = async (): Promise<unknown> => ({ reply: 'Dropped them.', changeSet: [{ op: 'brief.update', chapter: 7, body: ECHO_BODY }] });
+      structuredMock.mockImplementationOnce(echo);
+      structuredMock.mockImplementationOnce(echo);
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(result.proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 7, body: ECHO_BODY }]);
+      expect(result.proposal?.warnings).toHaveLength(1);
+      expect(result.proposal?.warnings?.[0]).toContain('"almanac"');
+      expect(result.proposal?.warnings?.[0]).toContain('"ashen"');
+    });
+
+    it('should keep the flagged change-set when the fix round fails', async () => {
+      const session = await chat.createSession(projectId, {});
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Dropped them.', changeSet: [{ op: 'brief.update', chapter: 7, body: ECHO_BODY }] }));
+      structuredMock.mockImplementationOnce(async () => {
+        throw AppErrorCode.AI_007.create();
+      });
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(result.proposal?.changeSet).toEqual([{ op: 'brief.update', chapter: 7, body: ECHO_BODY }]);
+      expect(result.proposal?.warnings).toHaveLength(1);
+    });
+
+    it('should not flag a negation the author asked for in their own words', async () => {
+      const session = await chat.createSession(projectId, {});
+      const body = `${CLEAN_BODY}\n- No almanac appears in this chapter.`;
+      structuredMock.mockImplementationOnce(async () => ({ reply: 'Added the rule.', changeSet: [{ op: 'brief.update', chapter: 7, body }] }));
+      const callsBefore = structuredMock.mock.calls.length;
+
+      const result = await chat.turn(projectId, session.id, 'Add a line to the brief saying no almanac appears, and make Veyl a trusted mender.');
+
+      expect(structuredMock.mock.calls.length - callsBefore).toBe(1);
+      expect(result.proposal?.warnings).toBeNull();
+    });
+
+    it('should hold a flagged proposal back from auto-apply', async () => {
+      const session = await chat.createSession(projectId, { mode: 'auto' });
+      const echo = async (): Promise<unknown> => ({ reply: 'Dropped them.', changeSet: [{ op: 'brief.update', chapter: 7, body: ECHO_BODY }] });
+      structuredMock.mockImplementationOnce(echo);
+      structuredMock.mockImplementationOnce(echo);
+
+      const result = await chat.turn(projectId, session.id, PLAN_REQUEST);
+
+      expect(result.proposal?.status).toBe('pending');
+      expect(result.applyNote).toContain('review the warnings');
+      const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 7)) });
+      expect(brief?.body).toBe(BRIEF_BODY);
+    });
   });
 });

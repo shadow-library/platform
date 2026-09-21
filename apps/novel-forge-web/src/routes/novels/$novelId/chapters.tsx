@@ -56,6 +56,7 @@ import {
   useListJobsQuery,
   useListRunsQuery,
   useProjectStatusQuery,
+  useRegenerateChapterMutation,
   useReviseDraftMutation,
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
@@ -759,50 +760,10 @@ function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: Rev
   // both refuse a finalized draft (DRF_002) — Amend is the only path past that lock.
   const recoverable = contradicted && draft.status !== 'final';
 
-  // DRF_003 blocks /generate while ANY draft in the project is contradicted, not just this one — so
-  // deleting this draft and calling generate only succeeds when it is the last contradiction standing.
-  const draftsQuery = useListDraftsQuery(novelId, open && recoverable);
-  const briefsQuery = useListBriefsQuery(novelId, open && recoverable);
-  const otherContradiction = (draftsQuery.data?.items ?? []).find(d => d.reviewStatus === 'contradiction' && d.chapter !== draft.chapter);
-
-  // Mirrors selectGenerationBatch (generation.service.ts): scanning briefs in ascending order, an
-  // unfinalized external-write-mode brief truncates the batch to zero — even one that already has a
-  // draft — before any chapter is picked; otherwise the first brief without a draft is what /generate
-  // with limit 1 would actually draft next. Deleting this draft and calling generate only regenerates
-  // *this* chapter when that target is this chapter.
-  const briefs = useMemo(() => [...(briefsQuery.data?.items ?? [])].sort((a, b) => a.chapter - b.chapter), [briefsQuery.data]);
-  const draftedElsewhere = useMemo(() => new Set((draftsQuery.data?.items ?? []).filter(d => d.chapter !== draft.chapter).map(d => d.chapter)), [draftsQuery.data, draft.chapter]);
-  const finalizedElsewhere = useMemo(() => new Set((draftsQuery.data?.items ?? []).filter(d => d.status === 'final').map(d => d.chapter)), [draftsQuery.data]);
-  let nextGenerateTarget: number | undefined;
-  let externalBlock: number | undefined;
-  for (const brief of briefs) {
-    if (brief.writeMode === 'external' && !finalizedElsewhere.has(brief.chapter)) {
-      externalBlock = brief.chapter;
-      break;
-    }
-    if (!draftedElsewhere.has(brief.chapter)) {
-      nextGenerateTarget = brief.chapter;
-      break;
-    }
-  }
-  const hasBrief = briefs.some(b => b.chapter === draft.chapter);
-
-  const regenerateBlockedReason = otherContradiction
-    ? `Chapter ${otherContradiction.chapter} is also contradicted — generation stays blocked until every contradiction is resolved. Repair this draft, or open chapter ${otherContradiction.chapter} to resolve it first.`
-    : !hasBrief
-      ? `Chapter ${draft.chapter} has no generation brief on file — regenerating can't redraft it automatically. Repair this draft instead, or delete and rewrite it manually.`
-      : externalBlock !== undefined
-        ? `Chapter ${externalBlock} is an unfinalized external slot — generation stays blocked there until it's filled and finalized. Resolve chapter ${externalBlock} first, or repair this draft instead.`
-        : nextGenerateTarget !== undefined && nextGenerateTarget !== draft.chapter
-          ? `Chapter ${nextGenerateTarget} has no draft yet — generating next would draft it, not chapter ${draft.chapter}. Generate or delete chapter ${nextGenerateTarget} first, or repair this draft instead.`
-          : undefined;
-  const canRegenerate = recoverable && !regenerateBlockedReason;
-
   const revise = useReviseDraftMutation(novelId, draft.chapter);
-  const deleteDraft = useDeleteDraftMutation(novelId);
-  const regenerate = useGenerateMutation(novelId);
+  const regenerate = useRegenerateChapterMutation(novelId);
   const [confirmRegen, setConfirmRegen] = useState(false);
-  const regenerating = deleteDraft.isPending || regenerate.isPending;
+  const regenerating = regenerate.isPending;
 
   const repair = (): void => {
     revise.mutate(
@@ -811,32 +772,19 @@ function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: Rev
     );
   };
 
+  // The server owns every rule that decides whether this chapter can be redrafted now (order, other contradictions,
+  // external chapters, a running job), so its refusal is the reason shown.
   const runRegenerate = (): void => {
-    deleteDraft.mutate(draft.chapter, {
-      onSuccess: () =>
-        regenerate.mutate(
-          { limit: 1, autoFix: true },
-          {
-            onSuccess: job => {
-              setConfirmRegen(false);
-              // The guard above should already keep this aligned, but the job's own `target` is what
-              // actually got queued — say that, not what was merely intended, if the two ever diverge.
-              if (job.target === String(draft.chapter)) toast.success(`Regenerating chapter ${draft.chapter}`);
-              else if (!job.target) toast.warning(`Chapter ${draft.chapter}’s draft was removed, but nothing was queued to redraft it — check the chapters list.`);
-              else toast.warning(`Chapter ${draft.chapter}’s draft was removed, but chapter ${job.target} was queued to draft next instead.`);
-              onRegenerated();
-            },
-            onError: err => {
-              setConfirmRegen(false);
-              toast.danger(
-                `Chapter ${draft.chapter}’s draft was removed, but redrafting failed to start: ${err.message}. Resolve the blocker, then generate chapter ${draft.chapter} again from the chapters list.`,
-              );
-              onRegenerated();
-            },
-          },
-        ),
-      // Deleting itself failed — the draft is untouched, so there is nothing to navigate away from.
-      onError: err => toast.danger(err.message),
+    regenerate.mutate(draft.chapter, {
+      onSuccess: () => {
+        setConfirmRegen(false);
+        toast.success(`Regenerating chapter ${draft.chapter} — its current prose stays in the revision history`);
+        onRegenerated();
+      },
+      onError: err => {
+        setConfirmRegen(false);
+        toast.danger(err.message);
+      },
     });
   };
 
@@ -861,12 +809,11 @@ function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: Rev
             <Button variant="primary" size="sm" loading={revise.isPending} disabled={regenerating} onClick={repair}>
               Repair with AI
             </Button>
-            <Button variant="secondary" size="sm" loading={regenerating} disabled={revise.isPending || !canRegenerate} onClick={() => setConfirmRegen(true)}>
+            <Button variant="secondary" size="sm" loading={regenerating} disabled={revise.isPending} onClick={() => setConfirmRegen(true)}>
               Regenerate chapter
             </Button>
           </div>
         )}
-        {recoverable && regenerateBlockedReason && <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>Regenerate is disabled — {regenerateBlockedReason}</p>}
         {contradicted && !recoverable && (
           <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>This chapter is finalized — use Amend from the chapter view to rewrite its prose in place.</p>
         )}
@@ -877,7 +824,7 @@ function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: Rev
         onOpenChange={setConfirmRegen}
         intent="danger"
         title={`Regenerate chapter ${draft.chapter}?`}
-        description="Deletes this draft and its revision history, then redrafts it from the brief with judge and repair. This cannot be undone."
+        description="Redrafts the chapter from its brief with the judge and repairs. The current prose stays in the revision history, and later chapters are marked stale once the new draft lands."
         confirmLabel="Regenerate"
         loading={regenerating}
         onConfirm={runRegenerate}
@@ -1436,16 +1383,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
       {amendOpen && <AmendDialog novelId={novelId} chapter={chapter} draft={draft} onOpenChange={setAmendOpen} onAmended={setAmendResult} />}
 
-      <ReviewDrawer
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        novelId={novelId}
-        draft={draft}
-        onRegenerated={() => {
-          setReviewOpen(false);
-          onBack();
-        }}
-      />
+      <ReviewDrawer open={reviewOpen} onOpenChange={setReviewOpen} novelId={novelId} draft={draft} onRegenerated={() => setReviewOpen(false)} />
       <ChapterSwitchDrawer open={chaptersOpen} onOpenChange={setChaptersOpen} novelId={novelId} current={chapter} onPick={onPick} />
     </div>
   );

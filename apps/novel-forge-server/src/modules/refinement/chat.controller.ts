@@ -79,7 +79,8 @@ export class ChatController {
   async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
     const session = await this.chatService.getSession(params.projectId, params.sessionId);
     const scoped = this.turnRegistry.get(session.scopeType);
-    const turn: ChatTurnHandler = scoped ?? ((projectId, sessionId, content) => this.chatService.turn(projectId, sessionId, content));
+    const turn: ChatTurnHandler =
+      scoped ?? ((projectId, sessionId, content) => this.chatService.turn(projectId, sessionId, content, undefined, { proseEdits: body.proseEdits ?? false }));
 
     return serialiseTurn(await turn(params.projectId, params.sessionId, body.content));
   }

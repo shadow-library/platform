@@ -1,4 +1,4 @@
-import { and, eq, gt, ne } from 'drizzle-orm';
+import { and, eq, gt, ne, sql } from 'drizzle-orm';
 
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -12,7 +12,11 @@ export type DraftWriter = Pick<PrimaryDatabase, 'update'>;
 export async function markDescendantDraftsStale(db: DraftWriter, projectId: bigint, chapter: number, reason: string): Promise<void> {
   const descendants = and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'));
 
-  await db.update(schema.drafts).set({ staleReason: reason, updatedAt: new Date() }).where(descendants);
+  // An earlier, more specific reason is kept: it names the change the draft actually rests on.
+  await db
+    .update(schema.drafts)
+    .set({ staleReason: sql`coalesce(${schema.drafts.staleReason}, ${reason})`, updatedAt: new Date() })
+    .where(descendants);
   await db
     .update(schema.drafts)
     .set({ reviewStatus: 'needs_review', updatedAt: new Date() })

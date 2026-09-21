@@ -19,7 +19,21 @@ import {
   TrashIcon,
   WarningIcon,
 } from '@/components/icons';
-import { type ChipIntent, CollectionPage, EmptyState, LookupTrace, Markdown, PaneError, PaneLoader, RowAction, SidePanel, StatusChip, TurnStatus } from '@/components/nf';
+import {
+  type ChipIntent,
+  CollectionPage,
+  EmptyState,
+  LookupTrace,
+  Markdown,
+  PaneError,
+  PaneLoader,
+  ProseEditsToggle,
+  RegenerateAppliedBriefs,
+  RowAction,
+  SidePanel,
+  StatusChip,
+  TurnStatus,
+} from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
@@ -47,6 +61,7 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
+import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { bySession, chatChangesSummary, chatColumnView, chatHistoryView, chatTitle, matchesChatQuery } from '@/lib/chat-sessions';
 import { groupByRecency, messageTime, projectTitle, relativeTime } from '@/lib/format';
 import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from '@/lib/proposals';
@@ -165,6 +180,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
   const isPending = proposal.status === 'pending';
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
   const revertible = proposal.revertible;
+  const regenerateChapters = appliedBriefChapters(proposal);
 
   const toggle = (set: Set<number>, index: number, update: (next: Set<number>) => void): void => {
     const next = new Set(set);
@@ -229,7 +245,17 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
         })}
       </div>
 
+      {proposal.warnings.map(warning => (
+        <div key={warning} className={styles.turnCardWarning}>
+          {warning}
+        </div>
+      ))}
       {proposal.status === 'conflicted' && <div className={styles.turnCardNote}>The canon moved on since this was drafted — ask again for a fresh change-set.</div>}
+      {regenerateChapters.length > 0 && (
+        <div className={styles.turnCardActions}>
+          <RegenerateAppliedBriefs novelId={novelId} chapters={regenerateChapters} />
+        </div>
+      )}
       {(isPending || revertible) && (
         <div className={styles.turnCardActions}>
           {isPending && (
@@ -636,6 +662,7 @@ function ChatColumn({ novelId, session, onOpenHistory, onNewChat, onStart, start
   const turn = useChatTurnStream(novelId, session?.id ?? '');
   const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
+  const [proseEdits, setProseEdits] = useState(false);
   const [draftMode, setDraftMode] = useState<ChatMode>('manual');
   const [renamingHeader, setRenamingHeader] = useState(false);
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the
@@ -735,24 +762,28 @@ function ChatColumn({ novelId, session, onOpenHistory, onNewChat, onStart, start
   const resend = (content: string, draft?: string): void => {
     if (!session || !content || pending) return;
     setAssistantWatermark(lastAssistantOrdinal(messages));
-    turn.send(content, {
-      onSuccess: result => {
-        if (result.applied) {
-          // A turn whose every op was declined applied nothing and left the proposal pending, so it is not
-          // a success — only the note, naming the door the author has to walk through themselves, is true.
-          if (result.applied.opResults.some(op => op.status === 'applied')) toast.success('Changes applied — revert anytime from the changes panel');
-          if (result.applyNote) toast.warning(result.applyNote);
-        } else if (result.applyNote) toast.danger(result.applyNote);
-        else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
+    turn.send(
+      content,
+      {
+        onSuccess: result => {
+          if (result.applied) {
+            // A turn whose every op was declined applied nothing and left the proposal pending, so it is not
+            // a success — only the note, naming the door the author has to walk through themselves, is true.
+            if (result.applied.opResults.some(op => op.status === 'applied')) toast.success('Changes applied — revert anytime from the changes panel');
+            if (result.applyNote) toast.warning(result.applyNote);
+          } else if (result.applyNote) toast.danger(result.applyNote);
+          else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
+        },
+        // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
+        // reached the transcript needs the toast and the draft handed back.
+        onError: async (err, context) => {
+          if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
+          toast.danger(err.message);
+          if (draft !== undefined) setInput(current => current || draft);
+        },
       },
-      // A failure the turn recorded shows as its own card, message kept and a retry offered; only one that never
-      // reached the transcript needs the toast and the draft handed back.
-      onError: async (err, context) => {
-        if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
-        toast.danger(err.message);
-        if (draft !== undefined) setInput(current => current || draft);
-      },
-    });
+      { proseEdits },
+    );
   };
 
   const switchMode = (next: ChatMode): void => {
@@ -926,6 +957,7 @@ function ChatColumn({ novelId, session, onOpenHistory, onNewChat, onStart, start
                 <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
                 <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
               </SegmentedControl>
+              <ProseEditsToggle checked={proseEdits} onCheckedChange={setProseEdits} message={input} disabled={locked} />
               <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, every one revertible' : 'Manual — you accept or decline each change'}</span>
               <div className={styles.spacer} />
               {pending && activeRunId ? (

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -9,6 +9,7 @@ import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '
 
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
+import { findNegationEchoWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 export interface ChangeItem {
@@ -39,6 +40,8 @@ export interface CreateProposalInput {
   entityMaterialization?: boolean;
   model?: string | null;
   runId?: string | null;
+  /** Precomputed by a caller that already ran the checks with more context (the chat turn knows the author's words); computed here otherwise. */
+  warnings?: string[];
 }
 
 /**
@@ -76,6 +79,7 @@ export class ProposalService {
 
     const refs = changeSetRefs(input.changeSet);
     const baseline = await loadArtifactStates(executor, projectId, refs);
+    const warnings = input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet));
 
     const [proposal] = await executor
       .insert(schema.refinementProposals)
@@ -91,6 +95,7 @@ export class ProposalService {
         baseline,
         model: input.model,
         runId: input.runId,
+        warnings: warnings.length > 0 ? warnings : null,
       })
       .returning();
     if (!proposal) throw AppErrorCode.RFN_001.create();
@@ -98,6 +103,16 @@ export class ProposalService {
     const owner = supersessionOwner(input);
     if (owner) await this.supersedeOverlapping(projectId, owner, proposal.id, refs, executor);
     return proposal;
+  }
+
+  /** Warnings are advisory: a failed check must never cost the author the proposal it was reviewing. */
+  private async reviewWarnings(executor: DbExecutor, projectId: bigint, ops: ChangeOp[]): Promise<string[]> {
+    try {
+      return await findNegationEchoWarnings(executor, projectId, ops);
+    } catch (err) {
+      this.logger.warn('proposal review warnings failed — staging without them', { projectId, err });
+      return [];
+    }
   }
 
   private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, refs: string[], executor: DbExecutor): Promise<void> {
@@ -120,6 +135,7 @@ export class ProposalService {
     if (filter.kind) conditions.push(eq(schema.refinementProposals.kind, filter.kind));
     if (filter.scopeType) conditions.push(eq(schema.refinementProposals.scopeType, filter.scopeType));
     if (filter.sessionId) conditions.push(eq(schema.refinementProposals.sessionId, filter.sessionId));
+    if (filter.chapter !== undefined) conditions.push(sql`${schema.refinementProposals.changeSet} @> jsonb_build_array(jsonb_build_object('chapter', ${filter.chapter}::int))`);
     const where = and(...conditions);
 
     const column = query.sortBy === 'createdAt' ? schema.refinementProposals.createdAt : schema.refinementProposals.updatedAt;
@@ -188,9 +204,10 @@ export class ProposalService {
 
     const ops = changeSet as ChangeOp[];
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
+    const warnings = await this.reviewWarnings(this.db, projectId, ops);
     const [updated] = await this.db
       .update(schema.refinementProposals)
-      .set({ changeSet: ops, baseline, updatedAt: new Date() })
+      .set({ changeSet: ops, baseline, warnings: warnings.length > 0 ? warnings : null, updatedAt: new Date() })
       .where(eq(schema.refinementProposals.id, existing.id))
       .returning();
     if (!updated) throw AppErrorCode.RFN_001.create();

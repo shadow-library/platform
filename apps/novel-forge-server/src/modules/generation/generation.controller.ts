@@ -255,6 +255,15 @@ export class GenerationController {
     return this.generationService.generateUnrestricted(params.projectId, params.n, body);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
+  @Post('/chapters/:n/regenerate')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  regenerateChapter(@Params() params: ChapterParams): Promise<JobEnqueueResponse> {
+    return this.generationService.regenerateChapter(params.projectId, params.n);
+  }
+
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/summarize')
   @RespondFor(200, ChapterSummarizeResponse)

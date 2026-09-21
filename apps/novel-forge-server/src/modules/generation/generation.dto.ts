@@ -462,6 +462,32 @@ export class BriefResponse {
   @Field(() => [String], { optional: true, nullable: true, description: 'Artifact keys for the retrieval context used to build this draft.' })
   contextRefs?: string[] | null;
 
+  @Field({ optional: true, nullable: true, description: 'Entity key of the point-of-view character.' })
+  pov?: string | null;
+
+  @Field({ optional: true, nullable: true, description: 'Why the chapter exists — its narrative job in the arc.' })
+  chapterPurpose?: string | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'What concretely changes for the reader in this chapter.' })
+  readerValue?: string[] | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'Recent scene patterns the chapter should avoid repeating.' })
+  repetitionRisks?: string[] | null;
+
+  @Field(() => Object, {
+    optional: true,
+    nullable: true,
+    additionalProperties: true,
+    description: 'How the chapter must end: hookType, emotionalBeat, openQuestion, handoffState and mustNotResolve. Older briefs may carry none.',
+  })
+  endingContract?: unknown;
+
+  @Field({ optional: true, nullable: true, description: "The author's standing guidance for this chapter's writer." })
+  guidance?: string | null;
+
+  @Field({ optional: true, nullable: true, description: 'Set when the plan changed under this brief; generation refuses a stale brief.' })
+  staleReason?: string | null;
+
   @Field(() => BriefWriteMode, {
     description:
       "'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button.",
@@ -900,6 +926,12 @@ export class DraftSummaryItem {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+
+  @Field(() => String, {
+    format: 'date-time',
+    description: "When the prose was last written (generated, revised, imported or hand-edited). Unlike updatedAt, judging and stale marks don't move it.",
+  })
+  writtenAt: Date;
 }
 
 @Schema()

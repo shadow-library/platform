@@ -926,6 +926,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chapters/{n}/regenerate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Regenerate Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_n_regenerate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/chapters/{n}/summarize': {
     parameters: {
       query?: never;
@@ -3848,6 +3865,22 @@ export interface components {
       body: string;
       /** @description Artifact keys for the retrieval context used to build this draft. */
       contextRefs?: null | string[];
+      /** @description Entity key of the point-of-view character. */
+      pov?: null | string;
+      /** @description Why the chapter exists — its narrative job in the arc. */
+      chapterPurpose?: null | string;
+      /** @description What concretely changes for the reader in this chapter. */
+      readerValue?: null | string[];
+      /** @description Recent scene patterns the chapter should avoid repeating. */
+      repetitionRisks?: null | string[];
+      /** @description How the chapter must end: hookType, emotionalBeat, openQuestion, handoffState and mustNotResolve. Older briefs may carry none. */
+      endingContract?: null | {
+        [key: string]: unknown;
+      };
+      /** @description The author's standing guidance for this chapter's writer. */
+      guidance?: null | string;
+      /** @description Set when the plan changed under this brief; generation refuses a stale brief. */
+      staleReason?: null | string;
       /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
       writeMode: components['schemas']['BriefWriteMode'];
       /**
@@ -4011,6 +4044,11 @@ export interface components {
       stale: boolean;
       /** Format: date-time */
       updatedAt: string;
+      /**
+       * Format: date-time
+       * @description When the prose was last written (generated, revised, imported or hand-edited). Unlike updatedAt, judging and stale marks don't move it.
+       */
+      writtenAt: string;
     };
     UpdateDraftBody: {
       title?: string;
@@ -4150,6 +4188,8 @@ export interface components {
       error?: null | {
         [key: string]: unknown;
       };
+      /** @description Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply. */
+      warnings: string[];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4736,6 +4776,8 @@ export interface components {
     ChatTurnBody: {
       /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
       content: string;
+      /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
+      proseEdits?: boolean;
     };
     ChatTurnResponse: {
       userMessage: components['schemas']['ChatMessageResponse'];
@@ -9166,6 +9208,47 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_chapters_n_regenerate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_chapters_n_summarize: {
     parameters: {
       query?: never;
@@ -10413,6 +10496,8 @@ export interface operations {
         kind?: components['schemas']['RefinementKind'];
         scopeType?: components['schemas']['ChatScope'];
         sessionId?: string;
+        /** @description Only proposals with at least one operation aimed at this chapter. */
+        chapter?: number | string;
       };
       header?: never;
       path: {

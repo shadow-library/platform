@@ -51,7 +51,14 @@ describe('applyAnthropicCacheControl', () => {
 });
 
 describe('ModelRouterService cacheStrategy integration', () => {
-  const input = { scopeInstructions: 'refine the volume', stableContext: bigText, history: [], volatileContext: 'nothing changed', userMessage: 'raise the stakes' };
+  const input = {
+    scopeInstructions: 'refine the volume',
+    stableContext: bigText,
+    history: [],
+    volatileContext: 'nothing changed',
+    turnRules: 'Prose edits: not requested.',
+    userMessage: 'raise the stakes',
+  };
   const ctx = { projectId: BigInt(1), promptKey: 'chat-refine', promptVersion: '1.0.0', role: 'chat' };
 
   it('injects cache_control blocks for anthropic models on openrouter (and routes by module role, not key)', async () => {

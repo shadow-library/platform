@@ -7,9 +7,10 @@ import {
   renderReforgeFidelityGuidance,
   renderReforgeFidelityRule,
   renderScopeInstructions,
+  renderTurnRules,
   SCOPE_PLAYBOOKS,
 } from '@modules/ai/prompts';
-import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR } from '@modules/ai/prompts/authoring-preamble';
+import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, EDIT_BY_DELETION } from '@modules/ai/prompts/authoring-preamble';
 import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import {
   AppearanceDescribeSchema,
@@ -86,7 +87,7 @@ describe('Prompt modules', () => {
     });
 
     it('should make revision carry the established facts forward', () => {
-      expect(PROMPT_REGISTRY.revision.version).toBe('1.3.0');
+      expect(PROMPT_REGISTRY.revision.version).toBe('1.4.0');
       expect(PROMPT_REGISTRY.revision.system).toContain('carry forward the incoming "## CONTINUATION STATE" section\'s establishedFacts');
     });
   });
@@ -205,16 +206,10 @@ describe('Prompt modules', () => {
     it('registers the five new prompt keys', () => {
       for (const key of ['chat-compact', 'arc-plan'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
       expect(PROMPT_REGISTRY['chat-compact'].version).toBe('1.0.0');
-      // arc-plan v1.2 binds the catalog's reveal schedule and hard limits.
-      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.2.0');
-      // bible-audit v2 audits entity records alongside documents: a document-only audit could never
-      // repair a bible whose canon exists as prose the Story Bible screen cannot read.
-      expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.0.0');
-      // premise-enhance v1.1 reframes the enhanced premise as an enticing summary, not a plot walkthrough.
-      expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.1.0');
-      // chat-refine v2 added the declared-lookup protocol; v2.1 instructs partial
-      // updates (emit only changed fields, since the apply engine merges) to cut output tokens.
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.1.0');
+      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.3.0');
+      expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.1.0');
+      expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.2.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.2.0');
     });
 
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
@@ -223,6 +218,7 @@ describe('Prompt modules', () => {
         stableContext: 'STABLE-CANON-BLOCK',
         history: [],
         volatileContext: 'VOLATILE-DELTA',
+        turnRules: 'TURN-RULES',
         userMessage: 'raise the stakes',
       });
       expect(messages).toHaveLength(3);
@@ -230,7 +226,37 @@ describe('Prompt modules', () => {
       expect(String(messages[1]?.content)).toContain('STABLE-CANON-BLOCK');
       expect(String(messages[1]?.content)).toContain(SCOPE_PLAYBOOKS.project.guidance.slice(0, 40));
       expect(String(messages[2]?.content)).toContain('VOLATILE-DELTA');
+      expect(String(messages[2]?.content)).toContain('TURN-RULES');
       expect(String(messages[2]?.content)).toContain('raise the stakes');
+    });
+
+    it('should tell every prompt that edits canon, plans, briefs or prose to remove by deleting', () => {
+      for (const key of ['chat-refine', 'premise-enhance', 'bible-audit', 'arc-plan', 'plan', 'outline', 'fix', 'revision'] as const) {
+        expect(PROMPT_REGISTRY[key].system).toContain(EDIT_BY_DELETION);
+      }
+    });
+
+    it('should keep a plan edit in the plan in the hub playbook', () => {
+      expect(SCOPE_PLAYBOOKS.project.guidance).toContain('Plan edits stay plan edits');
+      expect(SCOPE_PLAYBOOKS.project.guidance).toContain('only when the author has turned on Edit prose');
+    });
+
+    it('should advise against a prose op unless the author turned on Edit prose', () => {
+      const output = {
+        reply: 'done',
+        changeSet: [
+          { op: 'brief.update', chapter: 3, body: 'x' },
+          { op: 'draft.update', chapter: 3, body: 'y' },
+        ],
+      };
+      const planTurn = buildChatRefinePrompt('project', { proseEdits: false });
+      expect(planTurn.advise?.(output as never)).toHaveLength(1);
+      expect(planTurn.postValidate?.(output as never)).toEqual([]);
+      expect(planTurn.advise?.({ reply: 'checking', lookups: [{ tool: 'get_draft', args: {} }] } as never)).toEqual([]);
+      expect(buildChatRefinePrompt('project', { proseEdits: true }).advise?.(output as never)).toEqual([]);
+      expect(renderTurnRules({ proseEdits: false })).toStartWith('Prose edits: OFF');
+      expect(renderTurnRules({ proseEdits: true })).toStartWith('Prose edits: ON');
+      expect(buildChatRefinePrompt('project').advise?.(output as never)).toHaveLength(1);
     });
 
     it('chat-refine scope factory rejects ops outside the scope allowlist', () => {
@@ -1079,7 +1105,7 @@ describe('Prompt modules', () => {
     });
 
     it('should tell the outliner to cite governing bible documents by their catalog ref and never a canon fact', () => {
-      expect(PROMPT_REGISTRY.outline.version).toBe('2.5.0');
+      expect(PROMPT_REGISTRY.outline.version).toBe('2.6.0');
       expect(PROMPT_REGISTRY.outline.system).toContain('bible_doc:<section>/<slug> copied exactly as the BIBLE DOCUMENTS list writes it');
       expect(PROMPT_REGISTRY.outline.system).toContain('Never cite a canon fact');
     });
@@ -1182,7 +1208,7 @@ describe('Prompt modules', () => {
     });
 
     it('should tell the fixer to rewrite quoted sentences plainly without dropping content', () => {
-      expect(PROMPT_REGISTRY.fix.version).toBe('1.3.0');
+      expect(PROMPT_REGISTRY.fix.version).toBe('1.4.0');
       expect(PROMPT_REGISTRY.fix.system).toContain('Findings marked "readability:" quote the draft\'s own sentences');
       expect(PROMPT_REGISTRY.fix.system).toContain('keeping every fact, action, and line of dialogue');
     });

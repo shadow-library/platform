@@ -111,6 +111,8 @@ export const refinementProposals = pgTable(
     appliedAt: timestamp('applied_at'),
     revertedAt: timestamp('reverted_at'),
     error: jsonb('error').$type<Record<string, unknown>>(),
+    // Deterministic review findings on AI-authored text (e.g. a removal written as "no X"), shown beside the change-set.
+    warnings: jsonb('warnings').$type<string[]>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

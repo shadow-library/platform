@@ -2,8 +2,9 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { Fragment, useState } from 'react';
 import { Alert, Button, Checkbox, ConfirmDialog, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, DetailPage, ItemPager, type ItemPagerJump, Markdown, StatusChip } from '@/components/nf';
+import { type ChipIntent, DetailPage, ItemPager, type ItemPagerJump, Markdown, RegenerateAppliedBriefs, StatusChip } from '@/components/nf';
 import { type ProposalResponse, useAiModelsQuery, useApplyProposalMutation, useDiscardProposalMutation, useListPluginsQuery, useRevertProposalMutation } from '@/lib/apis';
+import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { relativeTime } from '@/lib/format';
 import { modelLabel } from '@/lib/model-defaults';
 import {
@@ -149,6 +150,7 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
+  const regenerateChapters = appliedBriefChapters(proposal);
 
   // The selection is keyed to one proposal's op indexes, so paging to another proposal resets it during
   // render rather than in an effect — an effect would paint one frame of the old selection.
@@ -258,6 +260,12 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
               {disposition.kind === 'settled' && <p className={styles.asideNote}>{disposition.note}</p>}
             </section>
 
+            {regenerateChapters.length > 0 && (
+              <section className={styles.asideBlock}>
+                <RegenerateAppliedBriefs novelId={novelId} chapters={regenerateChapters} fullWidth />
+              </section>
+            )}
+
             <section className={styles.asideBlock}>
               <h2 className={styles.asideTitle}>Origin</h2>
               <dl className={styles.originGrid}>
@@ -281,6 +289,16 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
         {disposition.kind === 'blocked' && (
           <Alert intent="danger" title="Baseline changed underneath this proposal" className={styles.conflict}>
             {disposition.note}
+          </Alert>
+        )}
+
+        {proposal.warnings.length > 0 && (
+          <Alert intent="warning" title="Check these before applying" className={styles.conflict}>
+            <ul className={styles.warningList}>
+              {proposal.warnings.map(warning => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
           </Alert>
         )}
 
