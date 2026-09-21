@@ -387,7 +387,15 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const tools = toolRegistry.forNode('judge', toolCtx);
     const rawTools = toolRegistry.getRaw('judge');
     const judgePolicy = await policyFor(projectId, { role: 'judge', chapter: state.chapter });
-    const model = await modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined, projectId, judgePolicy);
+    const judgeTelemetry = {
+      projectId,
+      runId: state.runId || undefined,
+      node: 'judge',
+      promptKey: PROMPT_REGISTRY.judge.key,
+      promptVersion: PROMPT_REGISTRY.judge.version,
+      role: 'judge',
+    };
+    const model = await modelRouter.chatFor('judge', judgeTelemetry, projectRow as ProjectConfig | undefined, judgePolicy);
 
     const renderedContract = renderEndingContract(brief?.endingContract);
     const contractBlock = renderedContract

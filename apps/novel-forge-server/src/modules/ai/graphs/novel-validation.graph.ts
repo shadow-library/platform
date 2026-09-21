@@ -135,7 +135,15 @@ export function createNovelValidationGraph(services: ValidationServices) {
         const tools = toolRegistry.forNode('validateWindow', toolCtx);
         const rawTools = toolRegistry.getRaw('validateWindow');
         const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        const model = await modelRouter.chatFor('validation', projectRow as ProjectConfig | undefined, projectId, policy);
+        const telemetry = {
+          projectId,
+          runId: state.runId || undefined,
+          node: 'validateWindow',
+          promptKey: PROMPT_REGISTRY.validation.key,
+          promptVersion: PROMPT_REGISTRY.validation.version,
+          role: 'validation',
+        };
+        const model = await modelRouter.chatFor('validation', telemetry, projectRow as ProjectConfig | undefined, policy);
 
         const systemMsg = new SystemMessage(PROMPT_REGISTRY.validation.system);
         const humanMsg = new HumanMessage(

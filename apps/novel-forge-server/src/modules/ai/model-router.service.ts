@@ -43,6 +43,11 @@ export type ProjectConfig = OwnerFields & {
   wordTargetMax?: number | null;
 };
 
+interface TelemetryConfig {
+  callbacks: TelemetryHandler[];
+  metadata: Record<string, unknown>;
+}
+
 export interface ImageRequest {
   prompt: string;
   n: number;
@@ -267,7 +272,7 @@ export class ModelRouterService {
   // Every vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client covers them
   // all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the same wire
   // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
-  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole }): BaseChatModel {
+  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig }): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
     // design (see resolveProvider) and must not silently route to the platform's OpenRouter key.
@@ -283,27 +288,27 @@ export class ModelRouterService {
     if (!apiKey) throw AppErrorCode.AI_006.create();
     // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
     // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
-    const llm = new ChatOpenAI({
+    // OpenRouter's `usage.cost` is dropped by @langchain/openai's parser; `__includeRawResponse` keeps it on
+    // `additional_kwargs.__raw_response` for TelemetryHandler. It must be a constructor field: ChatOpenAI delegates to a
+    // completions client built from its fields, and `bindTools` rebuilds from them too, so assigning it afterwards is lost.
+    return new ChatOpenAI({
       model: resolved.model,
       apiKey,
       maxRetries: 0,
       configuration: { baseURL: Config.get('ai.openrouter.api.url') },
+      __includeRawResponse: true,
       ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
+      ...opts?.telemetry,
     });
-    // OpenRouter always includes `usage.cost` in the completion response, but @langchain/openai's parser
-    // only lifts known OpenAI usage fields onto the message and drops the rest — this is the escape hatch
-    // that keeps the whole raw response on `additional_kwargs.__raw_response` for TelemetryHandler to read.
-    llm.__includeRawResponse = true;
-    return llm;
   }
 
-  // `projectId` is optional only so the smoke/local harnesses can build a raw client without a project;
-  // every product caller passes it, which is what gates the judge/validation raw-client paths on quota.
-  async chatFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
-    if (projectId !== undefined) await this.quota.enforce(projectId);
-    const resolved = await this.resolveFor(role, project, projectId, policy);
+  // `ctx` is optional only for the smoke harness, which has no project. Telemetry is bound into the client rather than
+  // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row.
+  async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
+    if (ctx) await this.quota.enforce(ctx.projectId);
+    const resolved = await this.resolveFor(role, project, ctx?.projectId, policy);
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
-    return this.buildClient(resolved, { role });
+    return this.buildClient(resolved, { role, ...(ctx ? { telemetry: this.invokeConfig(ctx, resolved, role, 0, policy) } : {}) });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
@@ -619,13 +624,7 @@ export class ModelRouterService {
   }
 
   // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).
-  private invokeConfig(
-    ctx: TelemetryContext,
-    resolved: ResolvedModel,
-    role: AiRole,
-    attempt: number,
-    policy?: ForgeCallPolicy,
-  ): { callbacks: TelemetryHandler[]; metadata: Record<string, unknown> } {
+  private invokeConfig(ctx: TelemetryContext, resolved: ResolvedModel, role: AiRole, attempt: number, policy?: ForgeCallPolicy): TelemetryConfig {
     const stamps = policy?.plugins.length ? { plugins: policy.plugins, policyDigest: policy.digest } : {};
     const reasoningEffort = resolveReasoningEffort(resolved.model, ROLE_GROUP[role]);
     return {

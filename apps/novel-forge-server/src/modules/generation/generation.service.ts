@@ -820,9 +820,9 @@ export class GenerationService {
 
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'judge', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
-    const model = await this.modelRouter.chatFor('judge', project as never, projectId, policy);
-
     const runId = `judge-${projectId}-${chapter}-${Date.now()}`;
+    const telemetry = { projectId, runId, node: 'judge', promptKey: PROMPT_REGISTRY.judge.key, promptVersion: PROMPT_REGISTRY.judge.version, role: 'judge' };
+    const model = await this.modelRouter.chatFor('judge', telemetry, project as never, policy);
     const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });
     const rawTools = this.toolRegistry.getRaw('judge');
 
