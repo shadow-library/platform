@@ -23,7 +23,8 @@
 - `AGENTS.md` is the entry point that points here; the `shadow-library-ecosystem` skill owns the package API catalog.
 - `docs/architecture.md` — topology, integrations, contract-first API types, monorepo rules.
 - `docs/packages.md` — shared package roles and hard rules.
-- `docs/identity.md`, `docs/novel-forge.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md` — one per product (server and web).
+- `docs/identity.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md` — one per product (server and web).
+- `docs/novel-forge/` — Novel Forge: `novel-forge.md` (the product doc) and `ai-testing.md` (manual test recipes for every AI feature).
 
 ## Reading rule
 

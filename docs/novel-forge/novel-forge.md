@@ -119,7 +119,7 @@
 - A transform write MUST NEVER invent structure: the approved plan is the only authority for output chapters; no write runs against an unapproved or superseded plan; plans are
   never auto-approved. Cut material MUST stay cut: the ledger is append-only, rendered into every later output chapter as a risk-ranked, token-budgeted slice, and a resurfaced cut is a judge issue.
 - Rebrand, reforge, recombine MUST refuse non-`source` projects; translation refuses non-`translation`; generation, planning and outlining refuse seeds, `translation`, `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
-- Pipelines flag and continue per chapter; a failed run NEVER overwrites a good translation row, and a finalized translation is never a target. Phase and resume state MUST be
+- Rebrand, reforge and translation flag and continue per chapter (extract and generate stop at the first failed chapter); a failed run NEVER overwrites a good translation row, and a finalized translation is never a target. Phase and resume state MUST be
   derived from data, never advisory status columns.
 - Translation glossary is pipeline data, not canon; nothing reaches `chapters.content` except through finalize, which refuses on pending terms, stale glossary or changed original.
 

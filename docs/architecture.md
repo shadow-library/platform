@@ -58,6 +58,6 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
 
 ## Agent doc-usage rule
 
-- Before working in an app, read `docs/overview.md` and `docs/<app>.md`; before cross-app work, this file; before touching a package, `docs/packages.md`.
+- Before working in an app, read `docs/overview.md` and `docs/<app>.md` (Novel Forge: `docs/novel-forge/novel-forge.md`; `ai-testing.md` beside it is manual QA material, not required reading); before cross-app work, this file; before touching a package, `docs/packages.md`.
 - Docs hold intent and invariants only; anything derivable from code is read from code. If code and a doc disagree, the code wins: fix the doc.
 - Load the `shadow-library-ecosystem` skill before writing code. Do not add task lists, changelogs or status banners to `docs/`.

@@ -8,7 +8,7 @@ The Bun-workspaces monorepo for the Shadow Library platform: every first-party a
 
 ## Product context
 
-Read `docs/overview.md` and the app's own `docs/<app>.md` before working in an app; read `docs/architecture.md` before cross-app work and `docs/packages.md` before touching a package. Docs hold intent and
+Read `docs/overview.md` and the app's own `docs/<app>.md` (Novel Forge: `docs/novel-forge/novel-forge.md`) before working in an app; read `docs/architecture.md` before cross-app work and `docs/packages.md` before touching a package. Docs hold intent and
 invariants only — anything derivable from code is read from code, and where they disagree the code wins and the doc is fixed. Do not add task lists, changelogs or status banners to `docs/`.
 
 ## Workspace map
