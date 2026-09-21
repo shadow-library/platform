@@ -28,6 +28,7 @@ export const getBriefTool: RegisteredTool = {
     if (brief.knowledgeContract) lines.push(`Knowledge contract: ${JSON.stringify(brief.knowledgeContract)}`);
     if (brief.readerValue) lines.push(`Reader value: ${JSON.stringify(brief.readerValue)}`);
     if (brief.repetitionRisks) lines.push(`Repetition risks: ${JSON.stringify(brief.repetitionRisks)}`);
+    if (brief.guidance) lines.push(`Author guidance: ${brief.guidance}`);
     return lines.join('\n');
   },
   inputSchema,

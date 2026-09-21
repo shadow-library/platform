@@ -4,10 +4,10 @@ import { Transform } from '@shadow-library/fastify';
 import { EntitySignificance, EntityType } from '@server/common';
 import { type Knowledge } from '@server/database';
 
-import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
+import { EndingContractSchema, KnowledgeContractSchema, READER_VALUE_CHANGES } from '../ai/schemas';
 
-// `story_state` and `ai` are app-managed sections; an authored bundle may only carry canon sections.
-export const PLAN_BUNDLE_SECTIONS = ['project', 'world', 'power', 'plot', 'lore'] as const;
+// `ai` is app-managed; `story_state` is importable because the bible manifest's volume plan lives there.
+export const PLAN_BUNDLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'lore'] as const;
 const PlanBundleSection = EnumType.create('PlanBundleSection', [...PLAN_BUNDLE_SECTIONS]);
 export type PlanBundleSectionValue = (typeof PLAN_BUNDLE_SECTIONS)[number];
 
@@ -197,6 +197,28 @@ export class PlanBundleBrief {
     description: 'Optional character-knowledge constraints; omission leaves the chapter unfiltered.',
   })
   knowledgeContract?: KnowledgeContractSchema;
+
+  @Field({
+    optional: true,
+    minLength: 1,
+    description: "entityKey of the point-of-view character; it pulls that entity's full card into the drafting context. An unknown key is stored and reported as a warning.",
+  })
+  pov?: string;
+
+  @Field({ optional: true, description: "One sentence on why the chapter exists — its narrative job in the arc, not a restatement of the objective's events." })
+  chapterPurpose?: string;
+
+  @Field(() => [String], {
+    optional: true,
+    description: `What must change for the reader in this chapter, drawn from ${READER_VALUE_CHANGES.join(', ')}; any other value is stored as written and reported as a warning.`,
+  })
+  readerValue?: string[];
+
+  @Field(() => [String], { optional: true, description: 'Scene patterns or beats this chapter must avoid repeating from recent chapters.' })
+  repetitionRisks?: string[];
+
+  @Field({ optional: true, description: 'Free-form authorial direction for the drafter, rendered as its own section of the chapter brief.' })
+  guidance?: string;
 }
 
 @Schema()
@@ -291,6 +313,6 @@ export class ImportPlanResponse {
   @Field(() => ApprovalResult, { optional: true })
   approval?: ApprovalResult;
 
-  @Field(() => [String])
+  @Field(() => [String], { description: 'Non-blocking findings, including every bundle field the import did not recognise and therefore ignored.' })
   warnings: string[];
 }

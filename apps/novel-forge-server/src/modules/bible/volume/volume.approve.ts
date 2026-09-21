@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, max, ne } from 'drizzle-orm';
 
 import { AppErrorCode } from '@server/classes';
 import { volumeContentHash } from '@server/common';
@@ -13,7 +13,7 @@ export interface ApprovePlanResult {
  * Approves the volume plan and lays out chapter ranges as cumulative `targetChapterCount` sums in
  * ordinal order. Shared by the `/approve` and `/volumes/approve` endpoints
  * so the two routes cannot drift. Rows imported from a source novel (`status: source`) keep their
- * original ranges and are never touched. A volume without a count derives it from its explicit
+ * original ranges and are never touched; the planned volumes continue after the last of them. A volume without a count derives it from its explicit
  * range (writers like the bible-builder emit ranges only); a volume with neither rejects the approve.
  */
 export async function approveVolumePlan(db: PrimaryDatabase, projectId: bigint): Promise<ApprovePlanResult> {
@@ -30,7 +30,11 @@ export async function approveVolumePlan(db: PrimaryDatabase, projectId: bigint):
   });
   if (counts.some(count => count === null)) throw AppErrorCode.PLN_002.create();
 
-  let nextStart = 1;
+  const [sourceEnd] = await db
+    .select({ endChapter: max(schema.volumes.endChapter) })
+    .from(schema.volumes)
+    .where(and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.status, 'source')));
+  let nextStart = (sourceEnd?.endChapter ?? 0) + 1;
   for (const [index, volume] of volumes.entries()) {
     const targetChapterCount = counts[index] as number;
     const startChapter = nextStart;

@@ -328,11 +328,11 @@ Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `in
   `CreateProjectBody` field, so no HTTP caller can mint one (`project.service.ts:101`).
 - A `new_novel` create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
   no `contentHash`, which is how the plan importer tells them from authored docs
-  (`src/modules/plan-import/plan-import.service.ts:106-112`).
+  (`src/modules/plan-import/plan-import.service.ts:114-120`).
 
 **For AI testing use `kind: "new_novel"`.** The bible builder's `assertAuthoringProject` gate
 (`src/modules/generation/generation.service.ts:189-193`) rejects anything else with `PRJ_009`, and the plan importer
-requires `new_novel` outright (`plan-import.service.ts:37`, `PRJ_003`).
+requires `new_novel` outright (`plan-import.service.ts:43`, `PRJ_003`).
 
 Then set the brief — it is a separate `PATCH`, not part of create:
 
@@ -1654,7 +1654,7 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
 - D3 The UI config cards overwrite `settings` wholesale: the Rebrand card sends exactly `{bannedExtra,auditEnabled}` (`rebrand.tsx:79`), the Reforge card sends `{judgeEnabled}` plus `targetWords` only when the field parses to a positive integer (`reforge.tsx:83`); `updateConfig` assigns the object as-is (`rebrand.service.ts:85`, `reforge.service.ts:95`). Saving in the UI silently drops `maxRepairs`, `termPacks`, `analysisWindow`, `targetCompression`, `maxSpanSourceChapters`. Set those via API after any UI save. The Transform screen has no control for them at all (they appear in the web app only in `api-types.gen.ts`).
 - D4 Chapter-mode reforge judge is blind to author instructions. `reforge-judge` says "a beat the AUTHOR INSTRUCTIONS declared removed is NOT missing", but `chapter-reforge.graph.ts:270-282` passes only `outline, worldNotes, glossarySlice, fidelityRule, writtenProse`, and the outline the judge scores against is built from a pack of world notes + glossary slice only (`:164-171` -> `context-assembler.service.ts:1122-1132`), so instructions never reach it either. Only `write` sees them. Predicted: any instruction that removes a beat yields `missing_beat` -> repair -> `attention`. Probe R-1 in recipe 2.7.
 - D5 Analysis aborts when `windowsFailed > 0.1 * windows` (`reforge-analysis.service.ts:62,201`): with fewer than 10 windows a single failed window kills the whole analysis.
-- D6 Import limits: `volumes[].title` and `novel.genre` are not persisted (`novel-import.service.ts:54-91`, `job.executor.ts:511-548` write project, placeholders and chapters only; the DTO documents `genre` as "accepted but not currently persisted", `novel-import.dto.ts:64`); a `source` import always auto-recombines with `useAi: true` (`job.executor.ts:538-544` -> `recombine.service.ts:102-108`), so you cannot import a raw ladder and inspect it un-merged.
+- D6 Import limits: a `final` import stores `novel.genre` in `projects.imported_meta` only when it matches a platform genre, and seeds one `source`-status volume per bundle volume carrying its title; a `source` import stores no volumes, and both cases come back as `warnings` on the response rather than being dropped silently. A `source` import always auto-recombines with `useAi: true` (`job.executor.ts:538-544` -> `recombine.service.ts:102-108`), so you cannot import a raw ladder and inspect it un-merged.
 - D7 Transform enqueues target `reforge-${P}` (`reforge.controller.ts:188`), the same kind and target as chapter-mode start (`:67`), and `enqueue` dedupes onto any `pending|in_progress` row for that `(project, kind, target)` (`job.service.ts:58-67`); a running chapter-mode job makes `POST /reforge/transform` return that active job and discard the `{stage:'transform'}` payload.
 - D8 Transform contract quirk: every output chapter of a span is rendered the span's whole `keptBeats` list as "the contract this chapter owes the reader" (`span-transform.graph.ts:89-101`, DTO says "Beats every output chapter of this span owes"), so a `keep`/`condense` span with N>1 outputs asks each output to cover all beats. Use one-chapter spans, or `merge`.
 - D9 Skeleton logs `runId: 'skeleton'` (`planning/skeleton.service.ts:55`): no `workflow_runs` row, invisible on Workflow Runs; its `model_calls.run_id` is the literal string `skeleton`, shared by every project.

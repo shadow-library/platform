@@ -7,7 +7,7 @@ import { KnowledgeContractSchema } from './knowledge-contract.schema';
 // or an array of Schema classes) — so readerValue stays a plain string array here and its membership is
 // enforced in validateOutlineCoverage, the same postValidate seam that already enforces span/chaining
 // invariants JSON Schema can't express.
-const READER_VALUE_CHANGES = ['new_information', 'relationship_change', 'power_or_stakes_change', 'goal_or_plan_change', 'world_state_change', 'emotional_turn'] as const;
+export const READER_VALUE_CHANGES = ['new_information', 'relationship_change', 'power_or_stakes_change', 'goal_or_plan_change', 'world_state_change', 'emotional_turn'] as const;
 export type ReaderValueChange = (typeof READER_VALUE_CHANGES)[number];
 
 @Schema()

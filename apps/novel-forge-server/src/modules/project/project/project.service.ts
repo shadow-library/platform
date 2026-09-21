@@ -413,7 +413,7 @@ export class ProjectService {
       this.db
         .select({
           total: sql<number>`count(*)::int`,
-          unapproved: sql<number>`(count(*) filter (where ${schema.volumes.status} <> 'approved'))::int`,
+          unapproved: sql<number>`(count(*) filter (where ${schema.volumes.status} not in ('approved', 'source')))::int`,
         })
         .from(schema.volumes)
         .where(eq(schema.volumes.projectId, id)),

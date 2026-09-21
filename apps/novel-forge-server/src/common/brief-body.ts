@@ -28,7 +28,10 @@ export interface ChapterBriefInput {
   chapterPurpose?: string | null;
   readerValue?: unknown;
   repetitionRisks?: unknown;
+  guidance?: string | null;
 }
+
+const GUIDANCE_HEADING = 'Author guidance:';
 
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -36,19 +39,19 @@ function stringList(value: unknown): string[] {
 }
 
 // The single authority for the `chapterBrief` prompt variable. Briefs written before the outliner
-// authored these fields — and every imported plan — carry them as null, and must render byte-identically
-// to the stored body alone.
+// authored these fields carry them as null, and must render byte-identically to the stored body alone.
 export function renderChapterBrief(brief: ChapterBriefInput | null | undefined): string {
   const body = brief?.body ?? '';
-  const guidance: string[] = [];
+  const directives: string[] = [];
   const pov = brief?.pov?.trim();
   const purpose = brief?.chapterPurpose?.trim();
   const readerValue = stringList(brief?.readerValue);
   const repetitionRisks = stringList(brief?.repetitionRisks);
-  if (pov) guidance.push(`POV: ${pov}`);
-  if (purpose) guidance.push(`Chapter purpose: ${purpose}`);
-  if (readerValue.length > 0) guidance.push(`This chapter must deliver: ${readerValue.join(', ')}`);
-  if (repetitionRisks.length > 0) guidance.push(`Avoid repeating recent patterns: ${repetitionRisks.join('; ')}`);
-  if (guidance.length === 0) return body;
-  return body ? `${body}\n\n${guidance.join('\n')}` : guidance.join('\n');
+  if (pov) directives.push(`POV: ${pov}`);
+  if (purpose) directives.push(`Chapter purpose: ${purpose}`);
+  if (readerValue.length > 0) directives.push(`This chapter must deliver: ${readerValue.join(', ')}`);
+  if (repetitionRisks.length > 0) directives.push(`Avoid repeating recent patterns: ${repetitionRisks.join('; ')}`);
+  const authorGuidance = brief?.guidance?.trim();
+  const sections = [body, directives.join('\n'), authorGuidance ? `${GUIDANCE_HEADING}\n${authorGuidance}` : ''];
+  return sections.filter(Boolean).join('\n\n');
 }

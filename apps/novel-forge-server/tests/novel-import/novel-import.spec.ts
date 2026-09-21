@@ -67,14 +67,14 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
   // Neutralizes the controller's own fire-and-forget dispatch (like rebrand.controller.spec.ts) so the
   // job never races the explicit, awaited dispatch below — then runs it for real and restores the
   // original method so later tests in this file keep their normal dispatch behavior.
-  async function importAndRun(bundle: NovelBundle): Promise<{ projectId: string; jobId: string }> {
+  async function importAndRun(bundle: NovelBundle): Promise<{ projectId: string; jobId: string; warnings: string[] }> {
     const executor = testEnv.getService(JobExecutor);
     const realDispatch = executor.dispatch.bind(executor);
     (executor as unknown as { dispatch: typeof executor.dispatch }).dispatch = async () => undefined;
     try {
       const response = await testEnv.getRouter().mockRequest().post('/api/v1/import').body({ bundle });
       expect(response.statusCode).toBe(202);
-      const body = response.json() as { projectId: string; jobId: string };
+      const body = response.json() as { projectId: string; jobId: string; warnings: string[] };
       await realDispatch(body.jobId);
       return body;
     } finally {
@@ -159,6 +159,63 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
       const scheduled = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/chapters/${n}/publish`).body({});
       expect(scheduled.statusCode).toBe(202);
     }
+  });
+
+  it('should store a known genre and seed one source volume per bundle volume, keeping its title', async () => {
+    const bundle = finalBundle('Genre And Volumes');
+    bundle.novel.genre = '  fantasy ';
+    const { projectId, warnings } = await importAndRun(bundle);
+    expect(warnings).toEqual([]);
+
+    const db = testEnv.getPostgresClient();
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, BigInt(projectId)) });
+    expect(project?.importedMeta).toEqual({ genres: ['Fantasy'] });
+
+    const volumes = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, BigInt(projectId)), orderBy: asc(schema.volumes.ordinal) });
+    expect(volumes.map(v => [v.volumeKey, v.ordinal, v.title, v.startChapter, v.endChapter, v.targetChapterCount, v.status])).toEqual([
+      ['volume_1', 1, 'The Quiet Coast', 1, 2, 2, 'source'],
+      ['volume_2', 2, 'What the Tide Keeps', 3, 3, 1, 'source'],
+    ]);
+    expect(volumes.every(v => v.contentHash !== null)).toBe(true);
+  });
+
+  it('should count imported volumes as approved and lay a continuation volume out after the imported chapters', async () => {
+    const { projectId } = await importAndRun(finalBundle('Continued Novel'));
+    const router = testEnv.getRouter();
+    const statusOf = async (): Promise<boolean> => (await router.mockRequest().get(`/api/v1/projects/${projectId}/status`)).json().planApproved as boolean;
+    expect(await statusOf()).toBe(true);
+
+    const created = await router
+      .mockRequest()
+      .post(`/api/v1/projects/${projectId}/volumes`)
+      .body({ volumeKey: 'volume_3', ordinal: 3, title: 'After the Tide', objective: 'o', conflict: 'c', payoff: 'p', targetChapterCount: 4 });
+    expect(created.statusCode).toBe(201);
+    expect(await statusOf()).toBe(false);
+
+    const approved = await router.mockRequest().post(`/api/v1/projects/${projectId}/volumes/approve`).body({});
+    expect(approved.statusCode).toBe(200);
+    expect(await statusOf()).toBe(true);
+
+    const volumes = await testEnv.getPostgresClient().query.volumes.findMany({ where: eq(schema.volumes.projectId, BigInt(projectId)), orderBy: asc(schema.volumes.ordinal) });
+    expect(volumes.map(v => [v.volumeKey, v.status, v.startChapter, v.endChapter])).toEqual([
+      ['volume_1', 'source', 1, 2],
+      ['volume_2', 'source', 3, 3],
+      ['volume_3', 'approved', 4, 7],
+    ]);
+  });
+
+  it('should warn instead of silently dropping an unknown genre or source-mode volume titles', async () => {
+    const final = finalBundle('Unknown Genre');
+    final.novel.genre = 'tidepunk';
+    const finalResponse = await importAndRun(final);
+    expect(finalResponse.warnings).toEqual(["novel.genre 'tidepunk' is not one of the platform genres and was not stored"]);
+
+    const source = sourceBundle('Source Volume Titles');
+    source.volumes[0]!.title = 'Part One';
+    const sourceResponse = await importAndRun(source);
+    expect(sourceResponse.warnings).toEqual(['volume titles are not stored for a source-mode import (1 ignored)']);
+    const volumeCount = await testEnv.getPostgresClient().$count(schema.volumes, eq(schema.volumes.projectId, BigInt(sourceResponse.projectId)));
+    expect(volumeCount).toBe(0);
   });
 
   it('should never echo the bundle prose/cover back through the jobs endpoints, and compact the stored payload on success', async () => {

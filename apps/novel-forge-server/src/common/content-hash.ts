@@ -23,11 +23,13 @@ const BRIEF_HASH_FIELDS = [
   'title',
   'body',
   'contextRefs',
+  'pov',
   'endingContract',
   'knowledgeContract',
   'chapterPurpose',
   'readerValue',
   'repetitionRisks',
+  'guidance',
 ] as const;
 
 function pickAndHash(record: Record<string, unknown>, fields: readonly string[]): string {

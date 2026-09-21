@@ -5380,7 +5380,7 @@ export interface components {
       title: string;
       /** @description Novel overview used as the project's brief and exported description. */
       synopsis: string;
-      /** @description Optional authoring metadata; accepted but not currently persisted. */
+      /** @description One of the platform genres, matched case-insensitively and offered as the default genre when the novel is first published; any other value is ignored with a warning. */
       genre?: string;
       /** @description Novel tags stored as project themes. */
       tags?: string[];
@@ -5392,6 +5392,7 @@ export interface components {
     NovelImportVolume: {
       /** @description One-based volume position; ordinals must be unique and contiguous across the bundle. */
       ordinal: number;
+      /** @description Volume title; a final-mode import stores it on the volume seeded for this group, a source-mode import ignores it with a warning. */
       title?: string;
       chapters: components['schemas']['NovelImportChapter'][];
     };
@@ -5411,6 +5412,8 @@ export interface components {
     ImportNovelResponse: {
       projectId: string;
       jobId: string;
+      /** @description Bundle content the import accepted but could not store. */
+      warnings: string[];
     };
     ExtractBody: {
       limit?: number;
@@ -6297,7 +6300,7 @@ export interface components {
       body: string;
     };
     /** @enum {string} */
-    PlanBundleSection: 'project' | 'world' | 'power' | 'plot' | 'lore';
+    PlanBundleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'lore';
     PlanBundleEntity: {
       entityKey: string;
       type: components['schemas']['EntityType'];
@@ -6357,6 +6360,16 @@ export interface components {
       endingContract: components['schemas']['EndingContractSchema'];
       /** @description Optional character-knowledge constraints; omission leaves the chapter unfiltered. */
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
+      /** @description entityKey of the point-of-view character; it pulls that entity's full card into the drafting context. An unknown key is stored and reported as a warning. */
+      pov?: string;
+      /** @description One sentence on why the chapter exists — its narrative job in the arc, not a restatement of the objective's events. */
+      chapterPurpose?: string;
+      /** @description What must change for the reader in this chapter, drawn from new_information, relationship_change, power_or_stakes_change, goal_or_plan_change, world_state_change, emotional_turn; any other value is stored as written and reported as a warning. */
+      readerValue?: string[];
+      /** @description Scene patterns or beats this chapter must avoid repeating from recent chapters. */
+      repetitionRisks?: string[];
+      /** @description Free-form authorial direction for the drafter, rendered as its own section of the chapter brief. */
+      guidance?: string;
     };
     EndingContractSchema: {
       /** @description the kind of hook the closing scene must land on */
@@ -6375,6 +6388,7 @@ export interface components {
     ImportPlanResponse: {
       results: components['schemas']['ImportResults'];
       approval?: components['schemas']['ApprovalResult'];
+      /** @description Non-blocking findings, including every bundle field the import did not recognise and therefore ignored. */
       warnings: string[];
     };
     ImportResults: {

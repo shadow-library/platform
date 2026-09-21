@@ -838,7 +838,7 @@ export class ProposalApplyService {
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
       knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
     };
-    const contentHash = briefContentHash({ chapter: op.chapter, ...merged });
+    const contentHash = briefContentHash({ ...existing, chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;
 
     if (existing) {

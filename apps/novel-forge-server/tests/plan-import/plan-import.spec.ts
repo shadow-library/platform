@@ -6,6 +6,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
 
 import { type ImportPlanBody, type PlanBundle } from '@modules/plan-import/plan-import.dto';
 import { PlanImportService } from '@modules/plan-import/plan-import.service';
+import { renderChapterBrief } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -166,6 +167,105 @@ describe.if(pgAvailable)('plan import', () => {
     expect(volumes.every(v => v.status === 'draft' && v.startChapter === null)).toBe(true);
   });
 
+  it('should store the pov, purpose, reader value, repetition risks and guidance of every brief', async () => {
+    const projectId = await createProject();
+    const bundle = buildBundle();
+    const first = bundle.briefs?.[0];
+    if (first) {
+      first.pov = 'mara';
+      first.chapterPurpose = 'Shows what the seal costs its keeper.';
+      first.readerValue = ['new_information', 'emotional_turn'];
+      first.repetitionRisks = ['another night-watch opening'];
+      first.guidance = 'Keep the prose close and quiet; no dialogue until the knock.';
+    }
+
+    const response = await service.import(projectId, { bundle });
+    expect(response.warnings).toEqual([]);
+
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 1)) });
+    expect(brief).toMatchObject({
+      pov: 'mara',
+      chapterPurpose: 'Shows what the seal costs its keeper.',
+      readerValue: ['new_information', 'emotional_turn'],
+      repetitionRisks: ['another night-watch opening'],
+      guidance: 'Keep the prose close and quiet; no dialogue until the knock.',
+    });
+
+    const rendered = renderChapterBrief(brief);
+    expect(rendered).toContain('POV: mara');
+    expect(rendered.endsWith('Author guidance:\nKeep the prose close and quiet; no dialogue until the knock.')).toBe(true);
+  });
+
+  it('should store absent or blank brief fields as null', async () => {
+    const projectId = await createProject();
+    const bundle = buildBundle();
+    const first = bundle.briefs?.[0];
+    if (first) {
+      first.guidance = '   ';
+      first.readerValue = [];
+      first.repetitionRisks = ['  '];
+    }
+
+    await service.import(projectId, { bundle });
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 1)) });
+    expect(brief).toMatchObject({ pov: null, chapterPurpose: null, readerValue: null, repetitionRisks: null, guidance: null });
+  });
+
+  it('should store a pov naming no known entity and warn about it', async () => {
+    const projectId = await createProject();
+    const bundle = buildBundle();
+    const first = bundle.briefs?.[0];
+    if (first) first.pov = 'stranger';
+
+    const response = await service.import(projectId, { bundle });
+    expect(response.warnings).toEqual([expect.stringContaining("brief 1 pov names unknown entity 'stranger'")]);
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 1)) });
+    expect(brief?.pov).toBe('stranger');
+  });
+
+  it('should rewrite a brief whose only change on re-import is its pov or guidance', async () => {
+    const projectId = await createProject();
+    await service.import(projectId, { bundle: buildBundle() });
+
+    const changed = buildBundle();
+    const [first, second] = changed.briefs ?? [];
+    if (first) first.pov = 'mara';
+    if (second) second.guidance = 'Let the omen stay ambiguous.';
+
+    const response = await service.import(projectId, { bundle: changed, overwrite: true });
+    expect(response.results.briefs).toEqual({ created: 0, updated: 2, unchanged: 5, pruned: 0 });
+  });
+
+  it('should warn about every field the request schema stripped', async () => {
+    const projectId = await createProject();
+    const bundle = buildBundle();
+    const sent = structuredClone({ bundle, dryRun: true }) as unknown as { bundle: Record<string, unknown> & { briefs: Record<string, unknown>[] } };
+    sent.bundle['notes'] = 'working copy';
+    for (const brief of sent.bundle.briefs) brief['povCharacter'] = 'mara';
+    (sent.bundle.briefs[0]?.['endingContract'] as Record<string, unknown>)['mood'] = 'grim';
+
+    const response = await service.import(projectId, { bundle }, sent);
+    expect(response.warnings).toEqual([
+      "field 'bundle.briefs[].endingContract.mood' is not part of the plan bundle format and was ignored",
+      "field 'bundle.briefs[].povCharacter' is not part of the plan bundle format and was ignored (7 occurrences)",
+      "field 'bundle.notes' is not part of the plan bundle format and was ignored",
+      "field 'dryRun' is not part of the plan bundle format and was ignored",
+    ]);
+  });
+
+  it('should import story_state documents such as the volume plan', async () => {
+    const projectId = await createProject();
+    const bundle = buildBundle();
+    bundle.bible?.push({ section: 'story_state', slug: 'volume-plan', body: 'Two volumes: the seal, then the crack.' });
+
+    const response = await service.import(projectId, { bundle });
+    expect(response.results.bible.created).toBe(3);
+    const doc = await db.query.bibleDocuments.findFirst({
+      where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'story_state'), eq(schema.bibleDocuments.slug, 'volume-plan')),
+    });
+    expect(doc?.body).toBe('Two volumes: the seal, then the crack.');
+  });
+
   it('should be idempotent — re-importing the same bundle with overwrite changes nothing', async () => {
     const projectId = await createProject();
     await service.import(projectId, { bundle: buildBundle() });
@@ -221,15 +321,15 @@ describe.if(pgAvailable)('plan import', () => {
     const projectId = await createProject();
     await db
       .update(schema.bibleDocuments)
-      .set({ body: 'extraction state', contentHash: 'hash' })
-      .where(and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'story_state')));
+      .set({ body: 'assistant state', contentHash: 'hash' })
+      .where(and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'ai')));
 
     const response = await service.import(projectId, { bundle: buildBundle(), overwrite: true });
     expect(response.results.bible).toEqual({ created: 2, updated: 0, unchanged: 0, pruned: 0 });
 
     const docs = await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId) });
     expect(docs).toHaveLength(schema.bibleSection.enumValues.length + 2);
-    expect(docs.some(d => d.section === 'story_state' && d.body === 'extraction state')).toBe(true);
+    expect(docs.some(d => d.section === 'ai' && d.body === 'assistant state')).toBe(true);
   });
 
   it('should refuse overwrite once drafts exist', async () => {

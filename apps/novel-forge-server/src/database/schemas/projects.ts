@@ -41,9 +41,10 @@ export interface ProjectConfigData {
   models?: ProjectModelOverridesData;
 }
 
-// The catalog vocabulary a curated ingest carried in from its source, kept verbatim in `projects.importedMeta`
-// so a curator can see what the source claimed. It is a suggestion for the publish step, never applied to the
-// project itself: once landed, the forge is source of truth, and the reader-facing values live on the publication.
+// The catalog vocabulary an import carried in — a curated ingest's source claims verbatim, or a novel-import
+// bundle's genre when it matches the platform list — kept in `projects.importedMeta`. It is a suggestion for the
+// publish step, never applied to the project itself: once landed, the forge is source of truth, and the
+// reader-facing values live on the publication.
 export interface ImportedNovelMetaData {
   genres?: Genre[];
   tags?: Tag[];

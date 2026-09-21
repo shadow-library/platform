@@ -16,6 +16,7 @@ const IMAGE_MIME_WHITELIST = ['image/png', 'image/jpeg', 'image/webp'] as const;
 // columns (unbounded) and are deliberately left uncapped here — `content` is the novel's actual prose.
 const PROJECT_TITLE_MAX_LENGTH = 255;
 const CHAPTER_TITLE_MAX_LENGTH = 500;
+const VOLUME_TITLE_MAX_LENGTH = 500;
 
 @Schema()
 export class NovelImportAsset {
@@ -46,7 +47,11 @@ export class NovelImportVolume {
   })
   ordinal: number;
 
-  @Field({ optional: true })
+  @Field({
+    optional: true,
+    maxLength: VOLUME_TITLE_MAX_LENGTH,
+    description: 'Volume title; a final-mode import stores it on the volume seeded for this group, a source-mode import ignores it with a warning.',
+  })
   title?: string;
 
   @Field(() => [NovelImportChapter], { minItems: 1 })
@@ -61,7 +66,11 @@ export class NovelImportMeta {
   @Field({ minLength: 1, description: "Novel overview used as the project's brief and exported description." })
   synopsis: string;
 
-  @Field({ optional: true, description: 'Optional authoring metadata; accepted but not currently persisted.' })
+  @Field({
+    optional: true,
+    description:
+      'One of the platform genres, matched case-insensitively and offered as the default genre when the novel is first published; any other value is ignored with a warning.',
+  })
   genre?: string;
 
   @Field(() => [String], { optional: true, description: 'Novel tags stored as project themes.' })
@@ -111,4 +120,7 @@ export class ImportNovelResponse {
 
   @Field()
   jobId: string;
+
+  @Field(() => [String], { description: 'Bundle content the import accepted but could not store.' })
+  warnings: string[];
 }

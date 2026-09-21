@@ -288,6 +288,13 @@
       "when": 1789913516803,
       "tag": "0040_bible_manifest_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789970581237,
+      "tag": "0041_chunky_bromley",
+      "breakpoints": true
     }
   ]
 }

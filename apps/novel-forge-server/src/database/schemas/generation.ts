@@ -94,6 +94,7 @@ export const briefs = pgTable(
     chapterPurpose: text('chapter_purpose'),
     readerValue: jsonb('reader_value'),
     repetitionRisks: jsonb('repetition_risks'),
+    guidance: text('guidance'),
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     staleReason: varchar('stale_reason'),

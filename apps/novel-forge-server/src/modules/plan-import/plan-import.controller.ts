@@ -1,5 +1,5 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
-import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, HttpController, Params, Post, RawBody, RespondFor } from '@shadow-library/fastify';
 
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
@@ -15,7 +15,8 @@ export class PlanImportController {
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/import')
   @RespondFor(200, ImportPlanResponse)
-  importPlan(@Params() params: PlanImportParams, @Body() body: ImportPlanBody): Promise<ImportPlanResponse> {
-    return this.planImportService.import(params.projectId, body);
+  importPlan(@Params() params: PlanImportParams, @Body() body: ImportPlanBody, @RawBody() rawBody?: Buffer): Promise<ImportPlanResponse> {
+    const sent: unknown = rawBody ? JSON.parse(rawBody.toString('utf8')) : undefined;
+    return this.planImportService.import(params.projectId, body, sent);
   }
 }

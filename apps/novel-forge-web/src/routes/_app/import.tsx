@@ -65,6 +65,7 @@ function ImportNovelScreen(): React.JSX.Element {
     importNovel.mutate(bundle, {
       onSuccess: response => {
         toast.success(`Import started — ${chapterCount(bundle)} chapters queued`);
+        for (const warning of response.warnings) toast.warning(warning);
         navigate({ to: '/novels/$novelId/overview', params: { novelId: response.projectId } });
       },
       onError: err => toast.danger(err.message),

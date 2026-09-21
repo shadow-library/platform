@@ -29,6 +29,12 @@ describe('briefContentHash', () => {
     expect(base).toBe(briefContentHash({ chapter: 1, body: 'b', updatedAt: new Date(0).toISOString() }));
     expect(base).not.toBe(briefContentHash({ chapter: 2, body: 'b' }));
   });
+
+  it('should change when only the pov or the guidance changes', () => {
+    const base = briefContentHash({ chapter: 1, body: 'b' });
+    expect(briefContentHash({ chapter: 1, body: 'b', pov: 'hero' })).not.toBe(base);
+    expect(briefContentHash({ chapter: 1, body: 'b', guidance: 'slow down' })).not.toBe(base);
+  });
 });
 
 describe('seedContentHash', () => {

@@ -350,6 +350,7 @@ export class GenerationService {
           chapterPurpose: c.chapterPurpose ?? null,
           readerValue: c.readerValue ?? null,
           repetitionRisks: c.repetitionRisks ?? null,
+          guidance: null,
           staleReason: null,
           handEdited: false,
         };
@@ -462,6 +463,7 @@ export class GenerationService {
           chapterPurpose: c.chapterPurpose ?? null,
           readerValue: c.readerValue ?? null,
           repetitionRisks: c.repetitionRisks ?? null,
+          guidance: null,
           staleReason: null,
           handEdited: false,
         };

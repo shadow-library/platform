@@ -1,3 +1,4 @@
+import { READER_VALUE_CHANGES } from '../ai/schemas';
 import { type PlanBundle, type PlanBundleArc } from './plan-import.dto';
 
 interface BundleIssue {
@@ -118,6 +119,16 @@ export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: Reado
   const knownEntities = new Set([...existingEntityKeys, ...(bundle.entities ?? []).map(e => e.entityKey)]);
   const knownFacts = new Set([...existingFactKeys, ...facts.map(f => f.factKey)]);
   const revealedFactKeys = new Set<string>();
+  for (const brief of briefs) {
+    if (brief.pov !== undefined && !knownEntities.has(brief.pov.trim())) {
+      warnings.push(`brief ${brief.chapter} pov names unknown entity '${brief.pov}' — it is stored, but no POV card reaches the drafter until that entity exists`);
+    }
+    for (const value of brief.readerValue ?? []) {
+      if (value.trim() && !(READER_VALUE_CHANGES as readonly string[]).includes(value.trim())) {
+        warnings.push(`brief ${brief.chapter} readerValue '${value}' is not one of ${READER_VALUE_CHANGES.join(', ')} — it is stored and rendered as written`);
+      }
+    }
+  }
   for (const [index, brief] of briefs.entries()) {
     const contract = brief.knowledgeContract;
     if (!contract) continue;
@@ -159,4 +170,35 @@ export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: Reado
   }
 
   return { issues, warnings, volumeRanges, arcVolumeKeys: [...arcsByVolume.keys()] };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function collectIgnoredPaths(raw: unknown, accepted: unknown, path: string, into: string[]): void {
+  if (Array.isArray(raw)) {
+    if (!Array.isArray(accepted)) return;
+    for (const [index, item] of raw.entries()) collectIgnoredPaths(item, accepted[index], `${path}[]`, into);
+    return;
+  }
+  if (!isRecord(raw) || !isRecord(accepted)) return;
+  for (const [key, value] of Object.entries(raw)) {
+    const childPath = path ? `${path}.${key}` : key;
+    if (Object.hasOwn(accepted, key)) collectIgnoredPaths(value, accepted[key], childPath, into);
+    else into.push(childPath);
+  }
+}
+
+/**
+ * The request schema strips unknown properties before the handler runs, so what the author sent has to
+ * be diffed against what survived validation. Array indexes collapse to `[]`, so a field repeated on
+ * every brief yields one warning rather than one per chapter.
+ */
+export function describeIgnoredFields(raw: unknown, accepted: unknown): string[] {
+  const paths: string[] = [];
+  collectIgnoredPaths(raw, accepted, '', paths);
+  const counts = new Map<string, number>();
+  for (const path of paths) counts.set(path, (counts.get(path) ?? 0) + 1);
+  return [...counts].map(([path, count]) => `field '${path}' is not part of the plan bundle format and was ignored${count > 1 ? ` (${count} occurrences)` : ''}`);
 }

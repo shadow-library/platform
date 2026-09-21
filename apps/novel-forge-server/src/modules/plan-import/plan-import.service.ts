@@ -10,13 +10,18 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, PLAN_BUNDLE_SECTIONS, type PlanBundle, type PlanBundleSectionValue } from './plan-import.dto';
-import { validatePlanBundle } from './plan-import.validator';
+import { describeIgnoredFields, validatePlanBundle } from './plan-import.validator';
 
 type CollectionName = 'bible' | 'entities' | 'facts' | 'volumes' | 'arcs' | 'briefs';
 
 const BUNDLE_FORMAT = 'novel-forge-plan';
 // v2 added the optional `facts` collection and brief `knowledgeContract`; v1 bundles remain valid.
 const BUNDLE_VERSIONS = [1, 2];
+
+function nonEmptyList(values: string[] | undefined): string[] | null {
+  const kept = (values ?? []).map(value => value.trim()).filter(Boolean);
+  return kept.length > 0 ? kept : null;
+}
 
 function emptyResult(): CollectionResult {
   return { created: 0, updated: 0, unchanged: 0, pruned: 0 };
@@ -31,7 +36,8 @@ export class PlanImportService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  async import(projectId: bigint, body: ImportPlanBody): Promise<ImportPlanResponse> {
+  /** `rawBody` is the request as sent, before schema validation stripped unrecognised fields; each one it held becomes a warning. */
+  async import(projectId: bigint, body: ImportPlanBody, rawBody?: unknown): Promise<ImportPlanResponse> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (project.kind !== 'new_novel') throw AppErrorCode.PRJ_003.create();
@@ -51,6 +57,7 @@ export class PlanImportService {
     }
 
     await this.assertGuards(projectId, bundle, body.overwrite === true);
+    const warnings = [...(rawBody === undefined ? [] : describeIgnoredFields(rawBody, body)), ...validation.warnings];
 
     const overwrite = body.overwrite === true;
     const response = await this.db.transaction(async rawTx => {
@@ -64,7 +71,7 @@ export class PlanImportService {
         briefs: await this.importBriefs(tx, projectId, bundle, overwrite),
       };
 
-      if (body.approve !== true) return { results, warnings: validation.warnings };
+      if (body.approve !== true) return { results, warnings };
 
       const { volumesApproved } = await approveVolumePlan(tx, projectId);
       let arcsApproved = 0;
@@ -76,7 +83,7 @@ export class PlanImportService {
           .returning({ id: schema.arcs.id });
         arcsApproved = approved.length;
       }
-      return { results, approval: { volumesApproved, arcsApproved }, warnings: validation.warnings };
+      return { results, approval: { volumesApproved, arcsApproved }, warnings };
     });
 
     this.logger.info('plan bundle imported', {
@@ -84,6 +91,7 @@ export class PlanImportService {
       overwrite,
       approved: body.approve === true,
       counts: Object.fromEntries(Object.entries(response.results).map(([k, v]) => [k, v.created + v.updated])),
+      warnings: response.warnings.length,
     });
     return response;
   }
@@ -154,8 +162,8 @@ export class PlanImportService {
     }
 
     if (overwrite) {
-      // Prune only authored docs in bundle-importable sections: app-managed sections (story_state, ai)
-      // and never-written placeholder rows are not the bundle's to delete.
+      // Prune only authored docs in bundle-importable sections: the app-managed `ai` section and
+      // never-written placeholder rows are not the bundle's to delete.
       const keep = docs.map(d => `${d.section}/${d.slug}`);
       const prunable = (d: (typeof existing)[number]): boolean =>
         PLAN_BUNDLE_SECTIONS.includes(d.section as PlanBundleSectionValue) && d.contentHash !== null && !keep.includes(`${d.section}/${d.slug}`);
@@ -395,6 +403,11 @@ export class PlanImportService {
         contextRefs: (item.requiredContext ?? []) as never,
         endingContract: { ...item.endingContract } as Record<string, unknown>,
         knowledgeContract: item.knowledgeContract ? ({ pov: item.knowledgeContract.pov, learns: item.knowledgeContract.learns ?? [] } as Record<string, unknown>) : null,
+        pov: item.pov?.trim() || null,
+        chapterPurpose: item.chapterPurpose?.trim() || null,
+        readerValue: nonEmptyList(item.readerValue) as never,
+        repetitionRisks: nonEmptyList(item.repetitionRisks) as never,
+        guidance: item.guidance?.trim() || null,
       };
       const contentHash = briefContentHash({ chapter: item.chapter, ...values });
       if (row && row.contentHash === contentHash) {

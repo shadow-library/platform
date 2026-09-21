@@ -12,10 +12,18 @@ interface FlattenedChapter {
   content: string;
 }
 
+interface FlattenedVolume {
+  ordinal: number;
+  title: string | null;
+  startChapter: number;
+  endChapter: number;
+}
+
 export interface BundleValidation {
   issues: BundleIssue[];
   /** Present (possibly empty) even when `issues` is non-empty, so callers can still inspect the shape. */
   chapters: FlattenedChapter[];
+  volumes: FlattenedVolume[];
 }
 
 // Sanity ceiling on chapter text + (estimated) decoded asset bytes, independent of the HTTP transport
@@ -66,8 +74,11 @@ export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
 
   // Flatten in ordinal order — the only place global chapter numbers are ever derived.
   const chapters: FlattenedChapter[] = [];
+  const volumes: FlattenedVolume[] = [];
   for (const volume of [...bundle.volumes].sort((a, b) => a.ordinal - b.ordinal)) {
+    const startChapter = chapters.length + 1;
     for (const chapter of volume.chapters) chapters.push({ number: chapters.length + 1, title: chapter.title, content: chapter.content });
+    volumes.push({ ordinal: volume.ordinal, title: volume.title?.trim() || null, startChapter, endChapter: chapters.length });
   }
 
   const textBytes = chapters.reduce((sum, c) => sum + Buffer.byteLength(c.content, 'utf8'), 0);
@@ -80,5 +91,5 @@ export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
     });
   }
 
-  return { issues, chapters };
+  return { issues, chapters, volumes };
 }

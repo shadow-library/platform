@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type PlanBundle, type PlanBundleArc, type PlanBundleBrief, type PlanBundleVolume } from '@modules/plan-import/plan-import.dto';
-import { validatePlanBundle } from '@modules/plan-import/plan-import.validator';
+import { describeIgnoredFields, validatePlanBundle } from '@modules/plan-import/plan-import.validator';
 
 const NO_ENTITIES: ReadonlySet<string> = new Set();
 
@@ -154,5 +154,61 @@ describe('validatePlanBundle — knowledge contracts (bundle v2)', () => {
     expect(result.warnings).toContain("fact 'fresh_secret' subjects unknown entity 'phantom'");
     expect(result.warnings).toContain("fact 'fresh_secret' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal");
     expect(result.warnings.some(w => w.includes("'hero'"))).toBe(false);
+  });
+
+  it('should warn when a brief pov names neither a bundle nor a project entity', () => {
+    const povBrief = (chapter: number, pov: string): PlanBundleBrief => ({ ...brief(chapter, 'v1'), pov });
+    const result = validatePlanBundle(
+      bundle({
+        volumes: [volume('v1', 1, 3)],
+        entities: [{ entityKey: 'hero', type: 'character', name: 'Hero' }],
+        briefs: [povBrief(1, 'hero'), povBrief(2, 'mentor'), povBrief(3, 'ghost')],
+      }),
+      new Set(['mentor']),
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(result.warnings).toEqual(["brief 3 pov names unknown entity 'ghost' — it is stored, but no POV card reaches the drafter until that entity exists"]);
+  });
+
+  it('should warn about reader values outside the outliner vocabulary without failing', () => {
+    const valued: PlanBundleBrief = { ...brief(1, 'v1'), readerValue: ['emotional_turn', 'a new ally'] };
+    const result = validatePlanBundle(bundle({ volumes: [volume('v1', 1, 1)], briefs: [valued] }), NO_ENTITIES);
+
+    expect(result.issues).toEqual([]);
+    expect(result.warnings).toEqual([expect.stringContaining("brief 1 readerValue 'a new ally' is not one of")]);
+  });
+});
+
+describe('describeIgnoredFields', () => {
+  it('should report nothing when the accepted body kept every field', () => {
+    const sent = { bundle: { bible: [{ section: 'world', slug: 'map', frontmatter: { anything: 1 }, body: 'b' }] } };
+    expect(describeIgnoredFields(sent, structuredClone(sent))).toEqual([]);
+  });
+
+  it('should name a stripped field once per path and count its repeats', () => {
+    const sent = {
+      bundle: {
+        briefs: [
+          { chapter: 1, mood: 'grim' },
+          { chapter: 2, mood: 'warm' },
+        ],
+        extra: { nested: true },
+      },
+    };
+    const accepted = { bundle: { briefs: [{ chapter: 1 }, { chapter: 2 }] } };
+
+    expect(describeIgnoredFields(sent, accepted)).toEqual([
+      "field 'bundle.briefs[].mood' is not part of the plan bundle format and was ignored (2 occurrences)",
+      "field 'bundle.extra' is not part of the plan bundle format and was ignored",
+    ]);
+  });
+
+  it('should treat an inherited property name as a stripped field', () => {
+    const sent: unknown = JSON.parse('{"bundle":{"__proto__":{"x":1},"toString":"y"}}');
+    expect(describeIgnoredFields(sent, { bundle: {} })).toEqual([
+      "field 'bundle.__proto__' is not part of the plan bundle format and was ignored",
+      "field 'bundle.toString' is not part of the plan bundle format and was ignored",
+    ]);
   });
 });

@@ -72,6 +72,18 @@ describe('renderChapterBrief', () => {
     );
   });
 
+  it('should render author guidance as its own final section', () => {
+    expect(renderChapterBrief({ body: BRIEF_BODY, pov: 'li-wei', guidance: '  Keep the bribe wordless.  ' })).toBe(
+      `${BRIEF_BODY}\n\nPOV: li-wei\n\nAuthor guidance:\nKeep the bribe wordless.`,
+    );
+    expect(renderChapterBrief({ body: BRIEF_BODY, guidance: 'Keep the bribe wordless.' })).toBe(`${BRIEF_BODY}\n\nAuthor guidance:\nKeep the bribe wordless.`);
+  });
+
+  it('should render the stored body byte-identically when guidance is null or blank', () => {
+    expect(renderChapterBrief({ body: BRIEF_BODY, guidance: null })).toBe(BRIEF_BODY);
+    expect(renderChapterBrief({ body: BRIEF_BODY, guidance: ' \n ' })).toBe(BRIEF_BODY);
+  });
+
   it('should include only the fields that carry a value', () => {
     expect(renderChapterBrief({ body: BRIEF_BODY, readerValue: ['emotional_turn'] })).toBe(`${BRIEF_BODY}\n\nThis chapter must deliver: emotional_turn`);
   });
