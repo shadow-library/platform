@@ -41,7 +41,10 @@ export class CreateProjectBody {
   @Field({ optional: true })
   title?: string;
 
-  @Field({ optional: true, description: 'Instructions for chapter voice, craft, and length; omission uses the application default.' })
+  @Field({
+    optional: true,
+    description: 'Project additions to the built-in chapter-writing style (point of view, tone, content limits); they take precedence where the two conflict.',
+  })
   instructions?: string;
 
   @Field(() => ContentMode, { optional: true })
@@ -186,7 +189,12 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   brief?: string | null;
 
-  @Field({ optional: true, nullable: true, description: 'Effective chapter-writing instructions, including the application default.' })
+  @Field({
+    optional: true,
+    nullable: true,
+    description:
+      'The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict.',
+  })
   instructions?: string | null;
 
   @Field(() => Integer, { optional: true, nullable: true })
@@ -202,6 +210,18 @@ export class ProjectResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema()
+export class ProjectDetailResponse extends ProjectResponse {
+  @Field({ description: 'The built-in chapter-writing style every project writes to; read-only.' })
+  defaultInstructions: string;
+
+  @Field({
+    description:
+      'True when the stored instructions repeated the built-in style, verbatim or as an edited copy, and those lines were dropped from `instructions`. Saving the instructions clears it.',
+  })
+  defaultCopyRemoved: boolean;
 }
 
 @Schema()
@@ -227,7 +247,12 @@ export class UpdateProjectBody {
   @Field({ optional: true })
   brief?: string;
 
-  @Field({ optional: true, nullable: true, description: 'Chapter-writing instructions; send an empty string to restore the application default.' })
+  @Field({
+    optional: true,
+    nullable: true,
+    description:
+      'Project additions to the built-in chapter-writing style; an empty string or null removes them. A copy of the current or an earlier built-in style inside the text, verbatim or lightly edited, is dropped.',
+  })
   instructions?: string | null;
 
   @Field({

@@ -9,6 +9,7 @@ import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { ActorService, projectOwnerColumns } from '@modules/actor';
 
+import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { assertUnderProjectCap } from '../project/project/project-limits';
 import { type ImportNovelBody, type ImportNovelResponse } from './novel-import.dto';
 import { validateNovelBundle } from './novel-import.validator';
@@ -75,7 +76,7 @@ export class NovelImportService {
           title: bundle.novel.title,
           brief: bundle.novel.synopsis,
           themes: bundle.novel.tags ?? null,
-          instructions: bundle.novel.instructions?.trim() || null,
+          instructions: writingInstructionAdditions(bundle.novel.instructions),
           importedMeta: genre ? { genres: [genre] } : null,
         })
         .returning()

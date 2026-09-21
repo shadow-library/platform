@@ -156,6 +156,18 @@ describe.if(pgAvailable)('knowledge-leak findings in the repair prompts', () => 
     }
   });
 
+  it('should scrub the secret out of a readability finding that quotes the draft', async () => {
+    const { writerPrompts } = await runRepair(WRITER_NOTE, '', {
+      readabilityCompliance: { compliant: false, issues: [`"Everyone would learn soon enough that ${SECRET_TEXT}" — say it plainly`] },
+    });
+
+    expect(writerPrompts.length).toBeGreaterThanOrEqual(2);
+    for (const prompt of writerPrompts) {
+      expect(prompt).toContain('readability: "Everyone would learn soon enough that [withheld]" — say it plainly');
+      expect(prompt).not.toContain(SECRET_TEXT);
+    }
+  });
+
   it('should scrub the secret out of author guidance before the writer sees it', async () => {
     const { writerPrompts } = await runRepair(WRITER_NOTE, `Play up the storm. Remember: ${SECRET_TEXT}`);
 

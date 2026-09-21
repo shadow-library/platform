@@ -37,6 +37,7 @@ import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
 import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics } from './mechanical-check';
+import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
 
 export interface GraphServices {
   db: PrimaryDatabase;
@@ -69,6 +70,9 @@ const ChapterGenAnnotation = Annotation.Root({
   knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   mechanicallyCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   briefCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  readabilityCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  readabilityEvidence: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  readabilityNote: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   mechanicalFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   knowledgeWriterFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
@@ -112,24 +116,36 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
   return false;
 }
 
-// Routing function after judge — exported for testing. Ending-contract, knowledge-leak, mechanical and
-// brief-fulfillment violations ride the same repair ladder as continuity findings but never harden the verdict.
+// Routing function after judge — exported for testing. Ending-contract, knowledge-leak, mechanical,
+// brief-fulfillment and readability violations ride the same repair ladder as continuity findings but never harden the verdict.
+// Readability alone is never a reason to hold a chapter: once repair is off or spent it is accepted for normal review, so
+// a stylistic miss cannot halt a batch or block the next chapter the way a contradiction does.
 export function routeAfterJudge(
   state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & {
     endingCompliant?: boolean;
     knowledgeCompliant?: boolean;
     mechanicallyCompliant?: boolean;
     briefCompliant?: boolean;
+    readabilityCompliant?: boolean;
   },
 ): string {
   const endingCompliant = state.endingCompliant !== false;
   const knowledgeCompliant = state.knowledgeCompliant !== false;
   const mechanicallyCompliant = state.mechanicallyCompliant !== false;
   const briefCompliant = state.briefCompliant !== false;
+  const readabilityCompliant = state.readabilityCompliant !== false;
   if (state.verdict === 'evaluation_failed') return 'awaitReview';
-  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant && briefCompliant) return 'accept';
+  const otherwiseCompliant = state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant && briefCompliant;
+  if (otherwiseCompliant && readabilityCompliant) return 'accept';
+  if (otherwiseCompliant) {
+    const readabilityBudgetSpent = state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings);
+    return state.autoFix && !readabilityBudgetSpent ? 'repairPatch' : 'accept';
+  }
+  // A readability quote the repair left alone must not end a repair loop that is still fixing a contradiction.
+  const withoutReadability = (findings: JudgeFinding[]): JudgeFinding[] => findings.filter(finding => !finding.text.startsWith(READABILITY_PREFIX));
+  const budgetSpent = state.attempt >= state.maxFixes || sameFinding(withoutReadability(state.findings), withoutReadability(state.previousFindings));
   if (!state.autoFix) return 'awaitReview';
-  if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
+  if (budgetSpent) return 'acceptAsIs';
   return 'repairPatch';
 }
 
@@ -352,6 +368,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const wordTarget = resolveWordTarget(projectRow);
     const mechanicalFindings = checkDraftMechanics(state.prose, priorChapters.map(c => c.content ?? '').filter(Boolean), wordTarget);
     const mechanicallyCompliant = !mechanicalFindings.some(f => f.severity === 'hard');
+    const readability = assessReadability(state.prose);
     logger.debug('generation mechanicalCheck', {
       runId: state.runId,
       chapter: state.chapter,
@@ -359,7 +376,13 @@ export function createChapterGenerationGraph(services: GraphServices) {
       findings: mechanicalFindings.length,
       mechanicallyCompliant,
     });
-    return { mechanicalFindings, mechanicallyCompliant, nodeTrace: ['mechanicalCheck'] };
+    return {
+      mechanicalFindings,
+      mechanicallyCompliant,
+      readabilityEvidence: readability ? renderReadabilityEvidence(readability) : null,
+      readabilityNote: readabilityNote(readability),
+      nodeTrace: ['mechanicalCheck'],
+    };
   }
 
   async function judge(state: ChapterGenState) {
@@ -416,11 +439,14 @@ export function createChapterGenerationGraph(services: GraphServices) {
         : '';
 
     const povLine = brief?.pov ? `POV: ${brief.pov}\n` : '';
+    const readabilityBlock = state.readabilityEvidence
+      ? `\n\n${state.readabilityEvidence}\n\nWeigh this evidence in readabilityCompliance; the project's writing-style additions win where they allow this prose.`
+      : '';
     const briefBlock = `\n\n## BRIEF\n${povLine}${brief?.body ?? ''}\n\nThis is the plan the chapter was written from — assess whether the draft delivers it and include briefCompliance in your JSON.`;
 
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
-      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${briefBlock}${contractBlock}${knowledgeBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${briefBlock}${contractBlock}${knowledgeBlock}${readabilityBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
     const judgeMessages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), systemMsg, humanMsg];
 
@@ -455,6 +481,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     if (briefCompliance && !briefCompliance.compliant) findings.push(...briefCompliance.issues.map(issue => ({ severity: 'soft' as const, text: `brief: ${issue}` })));
     else if (!briefCompliance) findings.push({ severity: 'soft' as const, text: 'brief: judge omitted briefCompliance — treated as non-compliant' });
 
+    const readabilityIssues = judgeResult?.readabilityCompliance?.compliant === false ? judgeResult.readabilityCompliance.issues : [];
+    findings.push(...readabilityIssues.map(issue => ({ severity: 'soft' as const, text: `${READABILITY_PREFIX}${issue}` })));
+    const readabilityCompliant = readabilityIssues.length === 0;
+
     const knowledge = mergeKnowledgeCompliance(
       forbidden.length > 0 ? judgeResult?.knowledgeCompliance : undefined,
       forbidden.length > 0 ? scanKnowledgeLeaks(state.prose, forbidden) : [],
@@ -471,11 +501,12 @@ export function createChapterGenerationGraph(services: GraphServices) {
       endingCompliant,
       knowledgeCompliant: knowledge.knowledgeCompliant,
       briefCompliant,
+      readabilityCompliant,
     });
 
     if (state.draftId) {
       const reviewStatus = verdict === 'consistent' ? 'needs_review' : 'contradiction';
-      const judgeNote = findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
+      const judgeNote = [...findings.map(f => `[${f.severity}] ${f.text}`), state.readabilityNote].filter(Boolean).join('\n');
       await db
         .update(schema.drafts)
         .set({ judge: verdict, judgeNote: judgeNote || null, reviewStatus, updatedAt: new Date() })
@@ -489,6 +520,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       knowledgeCompliant: knowledge.knowledgeCompliant,
       knowledgeWriterFindings: knowledge.writerFindings,
       briefCompliant,
+      readabilityCompliant,
       writerClassRaised: judgePolicy.raised,
       nodeTrace: ['judge'],
     };

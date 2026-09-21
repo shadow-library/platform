@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { ActionExecutorRegistry, type ChangeOp, ProposalApplyService, ProposalService } from '@modules/refinement';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -128,6 +129,15 @@ describe.if(pgAvailable)('proposal engine', () => {
     const untouched = await db.query.refinementProposals.findFirst({ where: eq(schema.refinementProposals.id, proposal.id) });
     expect(untouched?.status).toBe('pending');
     await proposals.discard(projectId, proposal.id);
+  });
+
+  it('should store only the author additions when a premise update carries a copy of the built-in writing style', async () => {
+    const proposal = await createProposal([{ op: 'premise.update', instructions: `${DEFAULT_WRITING_INSTRUCTIONS}\n\nWrite in first person.` }]);
+
+    await applier.apply(projectId, proposal.id);
+
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    expect(project?.instructions).toBe('Write in first person.');
   });
 
   it('should mark arcs stale on structural volume change and shift downstream ranges on count change', async () => {

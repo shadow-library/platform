@@ -66,6 +66,7 @@ export namespace Project {
   // serialiser is what keeps the ref off the wire. `wordTargetMin`/`wordTargetMax` collapse the same way
   // into a single optional `wordTarget` object, or an omitted field when either half is null.
   export type Presented = Omit<Row, 'config' | 'wordTargetMin' | 'wordTargetMax'> & { config?: ProjectConfigData; coverUrl?: string; wordTarget?: WordTarget };
+  export type PresentedDetail = Presented & { defaultInstructions: string; defaultCopyRemoved: boolean };
   export type Kind = InferEnum<typeof projectKind>;
   export type Status = InferEnum<typeof projectStatus>;
   export type ContentMode = InferEnum<typeof contentMode>;

@@ -25,6 +25,9 @@
 - **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
 - **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
+- **Writing style**: the built-in plain web-novel style always reaches the writer, and a project's `instructions` are additions after it (point of view, tone, content limits)
+  that win where the two conflict. The default is never trimmed to fit; additions give up their tail instead. A copy of the current or an earlier default inside stored
+  instructions, verbatim or lightly edited, is dropped on read so the default never reaches the writer twice.
 
 ## Capabilities
 
@@ -49,7 +52,11 @@
 - **Generation**: gates (volumes and arcs approved, briefs present and not stale, no unresolved contradiction; a second generate request returns the active job) -> brief -> context pack -> draft ->
   deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, arcs, briefs and drafts are
   chat-hub-only); a contradiction verdict must carry a hard finding, and deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to
-  human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an unfilled `external` slot.
+  human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an
+  unfilled `external` slot.
+- **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements (sentence and paragraph length,
+  reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
+  readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
 - **Approval** is author-initiated and never auto-applied from chat, may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction; hand edits reset it.
 - **Finalize** runs strictly in order; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.

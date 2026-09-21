@@ -136,3 +136,15 @@ export function reviewHotkey(event: ReviewHotkeyEvent): ReviewHotkey | null {
   if (event.ctrlKey || event.metaKey || event.altKey || event.editableTarget) return null;
   return HOTKEYS[event.key.toLowerCase()] ?? null;
 }
+
+// `[info]` lines are the measurements the author reads in the judge note, not findings for the reviser to act on.
+export function buildRepairNote(judgeNote: string | null | undefined): string {
+  const findings = (judgeNote ?? '')
+    .split('\n')
+    .filter(line => !line.trimStart().startsWith('[info]'))
+    .join('\n')
+    .trim();
+  return findings
+    ? `Resolve the following continuity findings without changing anything else:\n${findings}`
+    : 'Resolve the continuity contradiction the judge flagged for this chapter.';
+}

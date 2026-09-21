@@ -24,6 +24,10 @@
 //   name). Said-alternative rate = alternative-verb tags / all tags.
 // - Contraction rate in dialogue: restricted to text between double quotes; contracted vs. expanded forms
 //   from the fixed CONTRACTION_PAIRS list. Rate = contracted / (contracted + expanded).
+// - Readability: sentences split per paragraph (a closing quote after the terminator still ends one), the
+//   share over LONG_SENTENCE_WORDS, words per newline-separated paragraph, a Flesch–Kincaid grade over a
+//   heuristic syllable count, and ORNATE_PATTERNS hits (one per sentence) per 1,000 words. The generation graph
+//   hands these to the judge as evidence through `readability-check.ts`, where the house limits live.
 // - Ending-mode distribution: tallies `briefs.endingContract.hookType` (or a supplied hook type) across a
 //   chapter span; reports the counts and the distinct-type count.
 
@@ -246,6 +250,130 @@ export function computeSentenceLengthMetrics(body: string): SentenceLengthMetric
   };
 }
 
+export const LONG_SENTENCE_WORDS = 30;
+export const LONG_PARAGRAPH_WORDS = 120;
+
+export interface OrnatePattern {
+  label: string;
+  pattern: RegExp;
+}
+
+// Mirrors the "Avoid" list of DEFAULT_WRITING_INSTRUCTIONS, tested one sentence at a time. Only constructions plain
+// narration almost never needs belong here: this is evidence for the judge, and a noisy pattern teaches it to
+// ignore the evidence. Stacked similes, reframes, asides, hedges and wry labels read too much like plain speech
+// to match precisely and are left to the judge.
+export const ORNATE_PATTERNS: OrnatePattern[] = [
+  {
+    label: 'abstract noun doing concrete work',
+    pattern:
+      /\bthe\s+(?:architecture|choreography|cartography|topography)\s+of\s+(?:his|her|their|my|our|your)\s+(?:grief|fear|anger|love|hope|guilt|shame|doubt|memory|memories|thoughts|mind|moods?|longing|regret|patience|temper|loneliness|desire|sorrow|joy|pride|silence)\b/i,
+  },
+  { label: 'simile by manner', pattern: /\bthe\s+way\s+one\s+(?!of\b)\w+s\b/i },
+  { label: 'narrator cleverness', pattern: /\b(?:the\s+universe|fate)['’]s\s+idea\s+of\s+a\s+joke\b/i },
+  { label: 'metaphor for a voice', pattern: /\bvoice\s+like\s+(?:a|an)\s+\w+/i },
+  { label: 'metaphor for a silence', pattern: /\b(?:silence|stillness)\s+(?:had|held|carried)\s+(?:a|an)\s+(?:weight|texture|shape|taste|colou?r|temperature)\b/i },
+  { label: 'metaphor for a room', pattern: /\bthe\s+(?:room|office|hall|house|kitchen)\s+held\s+its\s+breath\b/i },
+];
+
+export interface OrnateHit {
+  label: string;
+  sentence: string;
+}
+
+export interface ReadabilityMetrics {
+  words: number;
+  sentenceCount: number;
+  paragraphCount: number;
+  averageSentenceWords: number;
+  /** Share of sentences longer than `LONG_SENTENCE_WORDS`. */
+  longSentenceShare: number;
+  /** Sentences longer than `LONG_SENTENCE_WORDS`, longest first. */
+  longSentences: string[];
+  averageParagraphWords: number;
+  /** Paragraphs longer than `LONG_PARAGRAPH_WORDS`, longest first. */
+  longParagraphs: string[];
+  /** Flesch–Kincaid grade level over a heuristic syllable count. */
+  readingGrade: number;
+  ornateHits: OrnateHit[];
+  ornateHitsPer1000Words: number;
+}
+
+// Words whose trailing full stop is not a sentence end. Kept small: a miss merges two sentences, which only
+// nudges an average.
+const ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'st', 'jr', 'sr', 'prof', 'capt', 'lt', 'sgt', 'col', 'gen', 'mt', 'vs', 'etc', 'no', 'e.g', 'i.e', 'a.m', 'p.m']);
+
+// Unlike `splitSentences`, a closing quote or bracket after the terminator still ends the sentence, so a line
+// of dialogue is not glued onto the narration that follows it. A terminator must be followed by whitespace,
+// so a decimal ("3.30") never ends a sentence.
+const SENTENCE_END = /[.!?]+["'”’)\]]*(?=\s|$)/g;
+
+function endsInAbbreviation(text: string): boolean {
+  const word = (text.trimEnd().split(/\s+/).pop() ?? '').replace(/^["'“‘(]+/, '');
+  return ABBREVIATIONS.has(word.toLowerCase()) || /^[A-Z]$/.test(word);
+}
+
+function proseSentences(paragraph: string): string[] {
+  const sentences: string[] = [];
+  let start = 0;
+  for (const match of paragraph.matchAll(SENTENCE_END)) {
+    if (match[0] === '.' && endsInAbbreviation(paragraph.slice(start, match.index))) continue;
+    const end = match.index + match[0].length;
+    sentences.push(paragraph.slice(start, end));
+    start = end;
+  }
+  sentences.push(paragraph.slice(start));
+  return sentences.map(sentence => sentence.trim()).filter(sentence => /[A-Za-z0-9]/.test(sentence));
+}
+
+export function splitProseParagraphs(body: string): string[] {
+  return body
+    .split(/\n+/)
+    .map(paragraph => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+// The common vowel-group heuristic: silent endings dropped, adjacent vowels counted once. It is wrong on
+// individual words and close enough over a chapter, which is all a grade estimate needs.
+export function countSyllables(word: string): number {
+  const letters = word.toLowerCase().replace(/[^a-z]/g, '');
+  if (!letters) return 0;
+  if (letters.length <= 3) return 1;
+  const stem = letters.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '');
+  return Math.max(1, stem.match(/[aeiouy]{1,2}/g)?.length ?? 0);
+}
+
+function byWordsDescending(a: string, b: string): number {
+  return countWords(b) - countWords(a);
+}
+
+export function computeReadabilityMetrics(body: string, patterns: OrnatePattern[] = ORNATE_PATTERNS): ReadabilityMetrics {
+  const paragraphs = splitProseParagraphs(body);
+  const sentences = paragraphs.flatMap(proseSentences);
+  const sentenceWords = sentences.map(sentence => countWords(sentence));
+  const words = sentenceWords.reduce((sum, count) => sum + count, 0);
+  const letterWords = sentences.flatMap(sentence => sentence.split(/\s+/)).filter(word => /[A-Za-z]/.test(word));
+  const syllables = letterWords.reduce((sum, word) => sum + countSyllables(word), 0);
+  const longSentences = sentences.filter((_, index) => (sentenceWords[index] ?? 0) > LONG_SENTENCE_WORDS);
+  const ornateHits = sentences.flatMap(sentence => {
+    const hit = patterns.find(({ pattern }) => pattern.test(sentence));
+    return hit ? [{ label: hit.label, sentence }] : [];
+  });
+
+  return {
+    words,
+    sentenceCount: sentences.length,
+    paragraphCount: paragraphs.length,
+    averageSentenceWords: sentences.length === 0 ? 0 : words / sentences.length,
+    longSentenceShare: sentences.length === 0 ? 0 : longSentences.length / sentences.length,
+    longSentences: longSentences.sort(byWordsDescending),
+    averageParagraphWords: paragraphs.length === 0 ? 0 : countWords(body) / paragraphs.length,
+    longParagraphs: paragraphs.filter(paragraph => countWords(paragraph) > LONG_PARAGRAPH_WORDS).sort(byWordsDescending),
+    readingGrade: sentences.length === 0 || letterWords.length === 0 ? 0 : 0.39 * (words / sentences.length) + 11.8 * (syllables / letterWords.length) - 15.59,
+    ornateHits,
+    ornateHitsPer1000Words: words === 0 ? 0 : (ornateHits.length / words) * 1000,
+  };
+}
+
 // Lowercases and strips a token down to alphanumerics/apostrophes; a token that becomes empty (i.e. was
 // pure punctuation) is dropped rather than kept as an empty string, per the module doc comment.
 export function tokenizeWords(text: string): string[] {
@@ -417,6 +545,7 @@ export interface ChapterMetricsReport {
   stockPhrases: StockPhraseReport;
   dialogueTags: DialogueTagMetrics;
   contractionRate: ContractionRateReport;
+  readability: ReadabilityMetrics;
   hookType: string | null;
 }
 
@@ -433,6 +562,7 @@ export function computeChapterMetrics(input: ChapterMetricsInput, priorBodies: s
     stockPhrases: computeStockPhraseCounts(input.body),
     dialogueTags: computeDialogueTagMetrics(input.body),
     contractionRate: computeDialogueContractionRate(input.body),
+    readability: computeReadabilityMetrics(input.body),
     hookType: input.hookType ?? null,
   };
 }

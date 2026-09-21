@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Alert, Button, ConfirmDialog, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
+import { Accordion, Alert, Button, ConfirmDialog, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
 import { PluginsTab } from '@/features/plugins/PluginsTab';
@@ -265,12 +265,26 @@ function SettingsScreen(): React.JSX.Element {
                   <FormField label="Premise / brief">
                     <Textarea value={brief} onValueChange={setBrief} minRows={3} autoGrow />
                   </FormField>
+                  {project?.defaultCopyRemoved && <Alert intent="warning">Some of your rules repeated the built-in style and were removed; review what remains.</Alert>}
                   <FormField
-                    label="Chapter writing instructions"
-                    helper="Always sent to the AI when it writes a chapter — voice, style, and length. Clear the field to restore the default."
+                    label="Your writing rules"
+                    helper="Added after the built-in writing style every time the AI writes or repairs a chapter — point of view, tone, content limits. Where the two conflict, your rules win. Leave blank to use the built-in style alone."
                   >
-                    <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
+                    <Textarea
+                      value={instructions}
+                      onValueChange={setInstructions}
+                      minRows={4}
+                      autoGrow
+                      placeholder="e.g. First person, present tense. End every chapter on a hook."
+                    />
                   </FormField>
+                  {project && (
+                    <Accordion type="single" collapsible variant="contained">
+                      <Accordion.Item value="default-style" title="Built-in writing style (read-only)">
+                        <pre className={styles.defaultStyle}>{project.defaultInstructions}</pre>
+                      </Accordion.Item>
+                    </Accordion>
+                  )}
                   <FormField
                     label="Chapter word-count target"
                     helper={`How long a generated chapter should run — length checks, the expansion pass, and the writer's prompt all read this. Leave both blank for the default (${DEFAULT_WORD_TARGET_MIN.toLocaleString('en-US')}–${DEFAULT_WORD_TARGET_MAX.toLocaleString('en-US')}).`}

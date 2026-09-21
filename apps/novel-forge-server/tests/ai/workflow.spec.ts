@@ -140,6 +140,40 @@ describe('routeAfterJudge', () => {
     expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [] })).toBe('accept');
   });
 
+  it('should repair a readability-only miss within the budget and accept it for normal review once the budget is spent or autoFix is off', () => {
+    const state = {
+      verdict: 'consistent' as const,
+      maxFixes: 2,
+      findings: [{ severity: 'soft' as const, text: 'readability: "The kitchen held its breath." — say it plainly' }],
+      previousFindings: [],
+      readabilityCompliant: false,
+    };
+    expect(routeAfterJudge({ ...state, attempt: 0, autoFix: true })).toBe('repairPatch');
+    expect(routeAfterJudge({ ...state, attempt: 2, autoFix: true })).toBe('accept');
+    expect(routeAfterJudge({ ...state, attempt: 1, autoFix: true, previousFindings: state.findings })).toBe('accept');
+    expect(routeAfterJudge({ ...state, attempt: 0, autoFix: false })).toBe('accept');
+  });
+
+  it('should keep repairing a contradiction when only the readability finding repeats', () => {
+    const readability = { severity: 'soft' as const, text: 'readability: "The kitchen held its breath." — say it plainly' };
+    const state = {
+      verdict: 'contradiction' as const,
+      attempt: 0,
+      maxFixes: 2,
+      autoFix: true,
+      findings: [{ severity: 'hard' as const, text: 'Pell uses a key the ferryman never gave her' }, readability],
+      previousFindings: [readability],
+      readabilityCompliant: false,
+    };
+    expect(routeAfterJudge(state)).toBe('repairPatch');
+  });
+
+  it('should keep the review routes when readability misses alongside another non-compliance', () => {
+    const state = { verdict: 'consistent' as const, maxFixes: 2, findings: [], previousFindings: [], readabilityCompliant: false, briefCompliant: false };
+    expect(routeAfterJudge({ ...state, attempt: 2, autoFix: true })).toBe('acceptAsIs');
+    expect(routeAfterJudge({ ...state, attempt: 0, autoFix: false })).toBe('awaitReview');
+  });
+
   it('routes to awaitReview when the judge output was unparseable, regardless of autoFix', () => {
     const state = {
       verdict: 'evaluation_failed' as const,

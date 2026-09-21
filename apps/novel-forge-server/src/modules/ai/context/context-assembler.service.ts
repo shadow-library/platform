@@ -28,7 +28,7 @@ import { matchPlaybooks } from '../../ideation/constraint-playbooks';
 import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
 import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
-import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
+import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { type BibleDocRow, renderBibleDigest } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
@@ -154,11 +154,6 @@ function makeSectionTail(key: string, content: string, maxTokens: number, tier: 
   return { key, tier, segment: 'volatile', tokens, truncated, sourceRefs, rendered };
 }
 
-function makeCappedSection(key: string, content: string, maxTokens: number, tier: ContextTier): ContextSection {
-  const { text, truncated } = truncateAtParagraph(content, maxTokens);
-  return { ...makeSection(key, text, tier), truncated };
-}
-
 function asStable(section: ContextSection): ContextSection {
   return { ...section, segment: 'stable' };
 }
@@ -167,6 +162,12 @@ export const ENTITY_CARD_BUDGET = 800;
 // Writing style is reserved ahead of every other section, so an oversized instructions text must not be
 // able to claim the budget the rest of the pack needs.
 export const WRITING_STYLE_BUDGET = 4_000;
+
+function writingStyleSection(stored: string | null | undefined, forbidden: FactLike[]): ContextSection {
+  const additions = writingInstructionAdditions(stored);
+  const { text, truncated } = effectiveWritingInstructions(additions && scrubForWriter(additions, forbidden), WRITING_STYLE_BUDGET);
+  return { ...makeSection('writing_style', text, 'canonical'), truncated };
+}
 
 type EntityCardRow = Pick<typeof schema.entities.$inferSelect, 'name' | 'type' | 'status' | 'body' | 'notes'> & { aliases: { alias: string }[] };
 
@@ -845,10 +846,7 @@ export class ContextAssembler {
 
     // Writing style is the generator's only source for voice, craft, and length, so it is required: the
     // budget reserves it before the refs listed ahead of it can crowd it out.
-    sections.push({
-      ...asStable(makeCappedSection('writing_style', scrubForWriter(project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, forbidden), WRITING_STYLE_BUDGET, 'canonical')),
-      required: true,
-    });
+    sections.push({ ...asStable(writingStyleSection(project?.instructions, forbidden)), required: true });
 
     for (const s of excessEntitySections) sections.push(s);
 
@@ -1073,7 +1071,7 @@ export class ContextAssembler {
         .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
       sections.push(makeSection('memory', scrubForWriter(lines.join('\n'), forbidden), 'canonical', []));
     }
-    sections.push(makeSection('writing_style', scrubForWriter(project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, forbidden), 'canonical', []));
+    sections.push(writingStyleSection(project?.instructions, forbidden));
 
     return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, opts);
   }
@@ -1655,9 +1653,8 @@ export class ContextAssembler {
 
   private renderPremise(project: { premise: string | null; brief: string | null; themes: unknown; instructions: string | null }): string {
     const themes = Array.isArray(project.themes) ? (project.themes as string[]).join(', ') : '';
-    return [project.premise ?? project.brief ?? '', themes ? `Themes: ${themes}` : '', project.instructions ? `Author instructions: ${project.instructions}` : '']
-      .filter(Boolean)
-      .join('\n\n');
+    const additions = writingInstructionAdditions(project.instructions);
+    return [project.premise ?? project.brief ?? '', themes ? `Themes: ${themes}` : '', additions ? `Author instructions: ${additions}` : ''].filter(Boolean).join('\n\n');
   }
 
   private renderVolumeLine(v: schema.Plan.Volume): string {

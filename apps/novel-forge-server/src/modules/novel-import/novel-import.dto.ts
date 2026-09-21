@@ -79,7 +79,7 @@ export class NovelImportMeta {
   @Field({ optional: true, description: 'Name of the bundle asset to use as the novel cover.' })
   cover?: string;
 
-  @Field({ optional: true, description: 'Chapter-writing instructions; omission uses the application default.' })
+  @Field({ optional: true, description: 'Additions to the built-in chapter-writing style; omission writes to the default alone.' })
   instructions?: string;
 }
 

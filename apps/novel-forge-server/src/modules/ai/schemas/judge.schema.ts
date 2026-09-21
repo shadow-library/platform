@@ -41,6 +41,15 @@ export class BriefComplianceSchema {
   issues: string[];
 }
 
+@Schema()
+export class ReadabilityComplianceSchema {
+  @Field({ description: 'true unless the draft reads as ornate or literary rather than plain contemporary web-novel English' })
+  compliant: boolean;
+
+  @Field(() => [String], { description: 'each problem, quoting the offending sentence verbatim and saying how to make it plain' })
+  issues: string[];
+}
+
 // A contradiction verdict must include at least one hard finding — expressed declaratively as a
 // JSON Schema if/then so AJV enforces the same cross-field rule zod's `.refine()` used to.
 @Schema({
@@ -65,6 +74,9 @@ export class JudgeSchema {
 
   @Field(() => BriefComplianceSchema, { optional: true, description: 'assessment of the draft against the chapter brief it was written from' })
   briefCompliance?: BriefComplianceSchema;
+
+  @Field(() => ReadabilityComplianceSchema, { optional: true, description: 'assessment of the draft against plain contemporary web-novel prose' })
+  readabilityCompliance?: ReadabilityComplianceSchema;
 }
 
 export type JudgeOutput = JudgeSchema;

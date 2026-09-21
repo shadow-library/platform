@@ -10,6 +10,7 @@ import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash,
 import { APP_NAME } from '@server/constants';
 import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
+import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
 import {
@@ -633,7 +634,7 @@ export class ProposalApplyService {
     if (op.premise !== undefined) update['premise'] = op.premise;
     if (op.brief !== undefined) update['brief'] = op.brief;
     if (op.themes !== undefined) update['themes'] = op.themes;
-    if (op.instructions !== undefined) update['instructions'] = op.instructions;
+    if (op.instructions !== undefined) update['instructions'] = writingInstructionAdditions(op.instructions);
 
     await ctx.tx.update(schema.projects).set(update).where(eq(schema.projects.id, ctx.projectId));
     ctx.applied.push({ artifactRef: 'premise', newRevision: null });

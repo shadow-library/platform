@@ -9,35 +9,42 @@ export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 - Every chapter must end on a note that compels turning the page. For serialized web-fiction this is often a cut, not a conclusion: ending mid-action, mid-line-of-dialogue, or mid-decision is a stronger hook than a wrapped-up scene followed by a bolted-on tease. Do not manufacture a resolution, summary, or scene break just because the chapter is ending — check the brief for whether this scene is meant to continue before you decide how to end it.
 - Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
 
+const VOICE_AND_CANON_RULES = `- Maintain established character voice and speech patterns exactly as recorded in their entity card.
+- Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
+
 // Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
 // but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any
-// prose exists. Used by the bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts,
-// and also by fix and revision — repairs and revisions must not fight DEFAULT_WRITING_INSTRUCTIONS (arriving
-// via the context pack) with the old, conflicting craft bullets in the full AUTHORING_STYLE. Only
-// reforge-write, reforge-transform-write, and rebrand-convert — separate re-authoring pipelines — still keep
+// prose exists. Used by the bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts.
+// Only reforge-write, reforge-transform-write, and rebrand-convert — separate re-authoring pipelines — keep
 // the full version. generation.prompt.ts uses neither constant; its craft rules come entirely from the
 // context pack's `writing_style` section.
 export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
-- Maintain established character voice and speech patterns exactly as recorded in their entity card.
-- Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
+${VOICE_AND_CANON_RULES}`;
 
-// The default, EDITABLE chapter-writing instructions. Unlike AUTHORING_STYLE (a fixed house style shared
-// by planning/bible/refinement prompts), this is the fallback for a project's `instructions` field — the
-// author can override it in project settings, and it is what the chapter generator is told about *how* to
-// write each chapter (voice, craft, and length). Keep it in sync with the web-side default copy.
+// For fix and revision, which rewrite prose under the pack's `writing_style`: point of view and tense are only
+// a default there, because a project's writing-style additions may set their own.
+export const AUTHORING_STYLE_REPAIR = `AUTHORING GUIDELINES:
+- Keep the point of view and tense the writing style asks for; when it sets none, write in third-person limited, past tense, from the POV character's perspective.
+${VOICE_AND_CANON_RULES}`;
+
+// The house chapter-writing style. It always reaches the writer; a project's `instructions` are additions layered
+// after it (see `writing-instructions.ts`). The "Avoid" list is mirrored by `ORNATE_PATTERNS` in the readability check.
 export const DEFAULT_WRITING_INSTRUCTIONS = `DEFAULT WEB-NOVEL ENGLISH
 
+Write plain, modern English that reads fast on a phone. A reader should never need to reread a sentence to see what happened.
+
 Clarity
-- Use common, modern vocabulary.
-- Prefer concrete nouns and direct verbs.
-- Keep most sentences between roughly 6 and 22 words.
+- Use common, everyday words: "said", not "offered" or "intoned".
+- One concrete thing per sentence: an action, a fact, or a line of speech.
+- Keep most sentences between roughly 6 and 22 words. Split anything longer than 30.
 - Put the important action or fact early in the sentence.
 - Use one clear image instead of several decorative comparisons.
 
 Paragraphs
-- Keep action and dialogue paragraphs short.
+- Keep most paragraphs to one to three sentences.
 - Start a new paragraph when the speaker, action focus, or thought changes.
+- Give each line of dialogue its own paragraph.
 - Avoid walls of exposition.
 - Avoid making every paragraph a one-line dramatic fragment.
 
@@ -51,7 +58,7 @@ Scenes
 Description
 - Select details that affect action, mood, judgment, or danger.
 - Do not inventory every sense.
-- Use figurative language only when it clarifies.
+- Use figurative language only when it clarifies. Never use a metaphor for a voice, a feeling, or an idea.
 - Do not describe ordinary actions as grand or mystical unless the moment earns it.
 
 Emotion
@@ -71,6 +78,7 @@ Dialogue
 
 Exposition
 - Deliver only what the current decision requires.
+- Give backstory in small doses: a line or two where it matters, never a page of memory.
 - Break explanations with questions, objections, consequences, or action.
 - Do not repeat lore merely because several chapters have passed.
 - Trust readers to remember major recent developments.
@@ -81,6 +89,29 @@ Pacing and endings
 - Valid endings include earned closure with a new direction, a decision,
   revelation, reversal, promise, danger, or continuing action.
 - Once the ending lands, stop. Do not add a summary or extra ominous line.
+
+Write like this
+- Not: The silence in the kitchen had a weight to it, the kind that settles over a house after an argument nobody won.
+  But: The kitchen was quiet. Nobody had won the argument.
+- Not: His voice was gravel dragged over old iron, every word a verdict.
+  But: His voice was rough. "Sit down," he said.
+- Not: She offered a smile that never reached the careful architecture of her eyes.
+  But: She smiled. Her eyes stayed cold.
+- Not: The envelope sat on the desk like an accusation, patient and unanswerable.
+  But: The envelope had no return address. She left it on the desk, unopened.
+- Not: The town had long ago sorted him into the drawer marked harmless.
+  But: People in town thought he was harmless.
+- Not: The rain turned the high street into a rumour of itself.
+  But: Rain blurred the high street. She could barely see the shops.
+
+Avoid
+- Asides that announce something matters instead of showing why.
+- Abstract nouns doing concrete work: "the architecture of her grief".
+- Two or more similes or metaphors stacked on one thing.
+- Reframes that correct themselves for effect: "It was not a door. It was a verdict."
+- Narrator cleverness: wry labels, "the universe's idea of a joke", knowing asides about the scene.
+- An elaborate metaphor for a voice, a room, or a silence.
+- Long passages of the POV character reflecting on the past or on their feelings.
 
 Originality
 - Do not imitate any named novel, author, character, terminology, or scene.

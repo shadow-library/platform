@@ -85,16 +85,23 @@ describe.if(pgAvailable)('Projects API', () => {
   });
 
   describe('chapter writing instructions', () => {
-    it('should pre-fill new projects with the default writing instructions', async () => {
+    it('should return no additions for a new project, and the read-only default only on the single-project read', async () => {
       const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-default', kind: 'new_novel' });
       expect(response.statusCode).toBe(201);
-      expect(response.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
+      expect(response.json().instructions).toBeNull();
+      expect(response.json()).not.toHaveProperty('defaultInstructions');
+
+      const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${response.json().id}`);
+      expect(fetched.json()).toMatchObject({ instructions: null, defaultInstructions: DEFAULT_WRITING_INSTRUCTIONS, defaultCopyRemoved: false });
+
+      const listed = await testEnv.getRouter().mockRequest().get('/api/v1/projects');
+      for (const item of listed.json().items) expect(item).not.toHaveProperty('defaultInstructions');
     });
 
-    it('should persist a custom instruction and echo it back', async () => {
+    it('should persist the project additions and echo them back', async () => {
       const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-custom', kind: 'new_novel' });
       const id = created.json().id;
-      const custom = 'Write terse, punchy chapters of about 1200 words.';
+      const custom = 'Write in first person. End every chapter on a hook.';
 
       const updated = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ instructions: custom });
       expect(updated.statusCode).toBe(200);
@@ -102,16 +109,45 @@ describe.if(pgAvailable)('Projects API', () => {
 
       const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${id}`);
       expect(fetched.json().instructions).toBe(custom);
+      expect(fetched.json().defaultInstructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
     });
 
-    it('should reset to the default when the instruction is cleared', async () => {
+    it('should remove the additions when the field is cleared', async () => {
       const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-reset', kind: 'new_novel', instructions: 'custom for now' });
       const id = created.json().id;
       expect(created.json().instructions).toBe('custom for now');
 
       const cleared = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ instructions: '' });
       expect(cleared.statusCode).toBe(200);
-      expect(cleared.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
+      expect(cleared.json().instructions).toBeNull();
+      const stored = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(id)) });
+      expect(stored?.instructions).toBeNull();
+    });
+
+    it('should drop a pasted copy of the default and keep only the additions', async () => {
+      const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-pasted', kind: 'new_novel' });
+      const id = created.json().id;
+
+      const updated = await testEnv
+        .getRouter()
+        .mockRequest()
+        .patch(`/api/v1/projects/${id}`)
+        .body({ instructions: `${DEFAULT_WRITING_INSTRUCTIONS}\n\nNo profanity.` });
+      expect(updated.json().instructions).toBe('No profanity.');
+      const stored = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, BigInt(id)) });
+      expect(stored?.instructions).toBe('No profanity.');
+    });
+
+    it('should present a stored copy of the default as no additions without rewriting the row', async () => {
+      const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-legacy', kind: 'new_novel' });
+      const id = BigInt(created.json().id);
+      await testEnv.getPostgresClient().update(schema.projects).set({ instructions: DEFAULT_WRITING_INSTRUCTIONS }).where(eq(schema.projects.id, id));
+
+      const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${id}`);
+      expect(fetched.json().instructions).toBeNull();
+      expect(fetched.json().defaultCopyRemoved).toBe(true);
+      const stored = await testEnv.getPostgresClient().query.projects.findFirst({ where: eq(schema.projects.id, id) });
+      expect(stored?.instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
     });
   });
 
@@ -368,6 +404,19 @@ describe.if(pgAvailable)('Projects API', () => {
     });
 
     describe('POST /api/v1/projects/:projectId/clone', () => {
+      it('should carry the source project’s writing-style additions onto the clone', async () => {
+        const source = await testEnv
+          .getRouter()
+          .mockRequest()
+          .post('/api/v1/projects')
+          .body({ name: 'wi-clone-source', kind: 'new_novel', instructions: 'Write in first person.' });
+
+        const cloned = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${source.json().id}/clone`).body({ name: 'wi-clone' });
+
+        expect(cloned.statusCode).toBe(201);
+        expect(cloned.json().instructions).toBe('Write in first person.');
+      });
+
       it('should carry the original language onto a cloned translation project', async () => {
         const id = await createProjectRow('tl-clone-source', 'translation', 'pt-BR');
 

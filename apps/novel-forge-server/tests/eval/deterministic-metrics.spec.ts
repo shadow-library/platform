@@ -7,11 +7,14 @@ import {
   computeDialogueContractionRate,
   computeDialogueTagMetrics,
   computeEndingModeDistribution,
+  computeReadabilityMetrics,
   computeSentenceLengthMetrics,
   computeStockPhraseCounts,
   computeWithinChapterRepeatedNgrams,
   computeWordCountDistribution,
+  countSyllables,
   countWords,
+  LONG_SENTENCE_WORDS,
   ngrams,
   resolveWordTarget,
   splitSentences,
@@ -256,5 +259,99 @@ describe('computeDeterministicMetricsReport', () => {
     expect(report.chapters).toHaveLength(2);
     expect(report.wordCountSummary.count).toBe(2);
     expect(report.endingModeDistribution.distinctCount).toBe(2);
+  });
+});
+
+describe('countSyllables', () => {
+  it('should count vowel groups and drop a silent ending', () => {
+    expect(countSyllables('cat')).toBe(1);
+    expect(countSyllables('harbor')).toBe(2);
+    expect(countSyllables('stone')).toBe(1);
+    expect(countSyllables('window')).toBe(2);
+  });
+
+  it('should count nothing for a token with no letters', () => {
+    expect(countSyllables('1,200')).toBe(0);
+  });
+});
+
+describe('computeReadabilityMetrics', () => {
+  it('should end a sentence at a closing quote so dialogue is not glued to the narration after it', () => {
+    const metrics = computeReadabilityMetrics('"Stop." She turned around.\n\n"Why?" he asked.');
+    expect(metrics.sentenceCount).toBe(4);
+    expect(metrics.paragraphCount).toBe(2);
+    expect(metrics.averageParagraphWords).toBe(3.5);
+  });
+
+  it('should measure long sentences against the long-sentence limit, longest first', () => {
+    const long = `${'word '.repeat(LONG_SENTENCE_WORDS + 5).trim()}.`;
+    const longer = `${'word '.repeat(LONG_SENTENCE_WORDS + 10).trim()}.`;
+    const metrics = computeReadabilityMetrics(`Short one. ${long} ${longer} Another short one.`);
+    expect(metrics.longSentenceShare).toBe(0.5);
+    expect(metrics.longSentences).toEqual([longer, long]);
+  });
+
+  it('should keep abbreviations, initials and decimals inside their sentence', () => {
+    const metrics = computeReadabilityMetrics('Dr. Hale met J. Ortiz at 3.30 p.m. on the pier. They talked for 2.5 hours. Mr. Vance left early.');
+    expect(metrics.sentenceCount).toBe(3);
+    expect(metrics.words).toBe(20);
+  });
+
+  it('should record one ornate hit per matching sentence with its label', () => {
+    const metrics = computeReadabilityMetrics('Pell had a voice like a hinge nobody oiled. She sat down.');
+    expect(metrics.ornateHits).toEqual([{ label: 'metaphor for a voice', sentence: 'Pell had a voice like a hinge nobody oiled.' }]);
+  });
+
+  it('should catch each ornate construction in invented sentences', () => {
+    const cases: [string, string][] = [
+      ['His plan had the architecture of his fear.', 'abstract noun doing concrete work'],
+      ['She folded the map the way one folds a flag.', 'simile by manner'],
+      ["It was the universe's idea of a joke.", 'narrator cleverness'],
+      ['The stillness carried a temperature.', 'metaphor for a silence'],
+      ['The kitchen held its breath.', 'metaphor for a room'],
+    ];
+    for (const [sentence, label] of cases) expect(computeReadabilityMetrics(sentence).ornateHits).toEqual([{ label, sentence }]);
+  });
+
+  it('should not flag plain sentences', () => {
+    const plain = [
+      'Her voice was a little hoarse.',
+      'Everyone in the room held their breath.',
+      'She did not look happy. She looked tired.',
+      'He did not feel well. He felt sick.',
+      'It was not a problem. It was a relief.',
+      'The room was thick with smoke.',
+      'The air was heavy with rain.',
+      'The house was alive with music.',
+      'He paid the fee, which was new this year.',
+      'She filed the report under the wrong case number.',
+      'The economy of the city was failing.',
+      'He looked like a cop, and she dressed like a nurse.',
+      'They turned the barn into a new room for the kids.',
+      'Something smaller and more useful would do.',
+      'It is not a car but a truck.',
+      'He made her a new coat.',
+      'The rope was frayed at the edges.',
+      'I like the way you work.',
+      'Her voice was a whisper. His voice was rough.',
+      'He played it like a pro, as if nothing happened.',
+      'I felt like a fool, as though everyone was watching.',
+      'Like a lot of people, he checked his phone as if expecting news.',
+      'The fog moved like a tide, as if the harbour were breathing.',
+      'The architecture of her house was plain.',
+      'The grammar of his letter was poor.',
+      'She checked the geometry of their design.',
+    ];
+    for (const sentence of plain) expect({ sentence, hits: computeReadabilityMetrics(sentence).ornateHits }).toEqual({ sentence, hits: [] });
+  });
+
+  it('should report ornate hits per 1,000 words', () => {
+    const metrics = computeReadabilityMetrics(`The kitchen held its breath. ${'She walked on. '.repeat(165)}`.trim());
+    expect(metrics.words).toBe(500);
+    expect(metrics.ornateHitsPer1000Words).toBeCloseTo(2, 5);
+  });
+
+  it('should return zeroed metrics for empty text', () => {
+    expect(computeReadabilityMetrics('')).toMatchObject({ words: 0, sentenceCount: 0, averageSentenceWords: 0, readingGrade: 0, ornateHits: [] });
   });
 });

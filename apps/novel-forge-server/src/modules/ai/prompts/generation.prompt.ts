@@ -12,8 +12,8 @@ export function generationWordTargetVars(target: ResolvedWordTarget): { wordTarg
 }
 
 // The chapter-writing craft rules (voice, pacing, length) are NOT hardcoded here — they arrive in the
-// context pack's `writing_style` section, sourced from the project's editable `instructions` (default:
-// DEFAULT_WRITING_INSTRUCTIONS). This keeps "how to write a chapter" author-configurable in settings.
+// context pack's `writing_style` section: DEFAULT_WRITING_INSTRUCTIONS followed by the project's own
+// `instructions` additions, which the author edits in settings.
 // The word-count band is a template variable, not a literal, so a project's overridden target renders in
 // the same position — see `generationWordTargetVars`.
 const system = `You are a skilled author writing a chapter of a serialized novel. You receive a context pack containing the author's writing instructions plus established canon (characters, world facts, active plot threads, open mysteries, recent chapter summaries, and — critically — the previous chapter's actual ending and continuation state) and a chapter brief specifying the chapter's objectives, required events, and handoff instructions. Follow the author's writing instructions for how to write the prose. Write the chapter's scene content that: fulfills the brief's objectives, maintains strict continuity with established canon, and advances at least one active plot thread. Length: write at least {wordTargetMin} words of scene prose and aim for about {wordTargetAim}, staying under {wordTargetMax}. Coming in short is the usual failure, so reach the length by dramatizing the brief's events fully on the page — let conversations run their course, give the POV character's perceptions, reactions, and decisions room, and stage the movement between beats — never by padding, recapping, or inventing events the brief did not plan. The brief decides where the chapter ends, not how long it is: when it continues into the next chapter, cut at the planned beat and build the length in the scenes leading up to it. Do not resolve mysteries or change power levels unless the brief specifies it.

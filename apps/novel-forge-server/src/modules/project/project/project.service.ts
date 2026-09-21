@@ -14,6 +14,7 @@ import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
+import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
 import { type CostWindow, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';
@@ -95,14 +96,13 @@ export class ProjectService {
 
   // The `ProjectResponse.config`/`wordTarget` schemas are non-nullable objects; a fresh project stores
   // `config = null` and both word-target columns null, so both collapse to `undefined` (an omitted
-  // field) before they reach the serialiser. `instructions` is surfaced as its effective value (stored
-  // override or the default) so the settings form always shows the writing instructions the AI will
-  // actually use.
+  // field) before they reach the serialiser.
   private present(project: Project.Row): Project.Presented {
     const { wordTargetMin, wordTargetMax, ...rest } = project;
-    const instructions = project.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS;
+    const instructions = writingInstructionAdditions(project.instructions);
     const wordTarget = wordTargetMin != null && wordTargetMax != null ? { min: wordTargetMin, max: wordTargetMax } : undefined;
-    return { ...rest, config: project.config ?? undefined, instructions, wordTarget, coverUrl: this.storage.getPublicUrl(project.coverImagePath) };
+    const coverUrl = this.storage.getPublicUrl(project.coverImagePath);
+    return { ...rest, config: project.config ?? undefined, instructions, wordTarget, coverUrl };
   }
 
   /**
@@ -126,8 +126,7 @@ export class ProjectService {
         kind: body.kind,
         status,
         title: body.title,
-        // Blank instructions stay null so the column means "use the default"; `present` fills it in.
-        instructions: body.instructions?.trim() || null,
+        instructions: writingInstructionAdditions(body.instructions),
         contentMode: body.contentMode,
         originalLanguage: body.originalLanguage,
         wordTargetMin: body.wordTarget?.min,
@@ -180,6 +179,13 @@ export class ProjectService {
 
   get(id: bigint): Promise<Project.Presented | null> {
     return this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) }).then(r => (r ? this.present(r) : null));
+  }
+
+  async getDetail(id: bigint): Promise<Project.PresentedDetail> {
+    const row = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
+    if (!row) throw AppErrorCode.PRJ_001.create();
+    const { removedDefaultCopy } = resolveWritingInstructions(row.instructions);
+    return { ...this.present(row), defaultInstructions: DEFAULT_WRITING_INSTRUCTIONS, defaultCopyRemoved: removedDefaultCopy };
   }
 
   async getOrThrow(id: bigint): Promise<Project.Presented> {
@@ -239,12 +245,7 @@ export class ProjectService {
     this.assertWordTargetValid(update.wordTarget);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
     if (update.title !== undefined) set.title = update.title.trim() || null;
-    // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
-    // column keeps meaning "use the default" and follows future changes to DEFAULT_WRITING_INSTRUCTIONS.
-    if (update.instructions !== undefined) {
-      const trimmed = update.instructions?.trim() ?? '';
-      set.instructions = trimmed && trimmed !== DEFAULT_WRITING_INSTRUCTIONS ? trimmed : null;
-    }
+    if (update.instructions !== undefined) set.instructions = writingInstructionAdditions(update.instructions);
     // `wordTarget` is wire shape only — the row stores it as two columns, and `null` clears both back
     // to "use the application default".
     if (update.wordTarget !== undefined) {
@@ -305,6 +306,7 @@ export class ProjectService {
           name: body.name,
           kind: source.kind,
           title: source.title,
+          instructions: writingInstructionAdditions(source.instructions),
           originalLanguage: source.originalLanguage,
           contentMode: body.contentMode ?? source.contentMode,
           config: body.config ?? source.config ?? null,

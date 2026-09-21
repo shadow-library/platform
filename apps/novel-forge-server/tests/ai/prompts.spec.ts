@@ -9,7 +9,7 @@ import {
   renderScopeInstructions,
   SCOPE_PLAYBOOKS,
 } from '@modules/ai/prompts';
-import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
+import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR } from '@modules/ai/prompts/authoring-preamble';
 import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import {
   AppearanceDescribeSchema,
@@ -53,7 +53,7 @@ describe('Prompt modules', () => {
       const authoring = Object.values(PROMPT_REGISTRY).filter(p => p.kind === 'authoring' && !CONTEXT_STYLED_KEYS.has(p.key));
       expect(authoring.length).toBeGreaterThan(0);
       for (const p of authoring) {
-        expect(p.system).toContain(AUTHORING_STYLE.slice(0, 40));
+        expect(p.system).toContain('AUTHORING GUIDELINES:');
       }
     });
 
@@ -69,7 +69,7 @@ describe('Prompt modules', () => {
       }
     });
 
-    it('fix and revision use the trimmed AUTHORING_STYLE_PLANNING, not the full house style', () => {
+    it('fix and revision use the trimmed repair style, not the full house style', () => {
       const oldStyleBullets = ['never state emotion directly', 'compels turning the page', 'Ground every scene with concrete sensory detail'];
       for (const p of [PROMPT_REGISTRY.fix, PROMPT_REGISTRY.revision]) {
         for (const bullet of oldStyleBullets) expect(p.system).not.toContain(bullet);
@@ -77,8 +77,16 @@ describe('Prompt modules', () => {
       }
     });
 
+    it('should let the writing style set point of view and tense for fix and revision, with third-person past only as the fallback', () => {
+      for (const p of [PROMPT_REGISTRY.fix, PROMPT_REGISTRY.revision]) {
+        expect(p.system).toContain(AUTHORING_STYLE_REPAIR);
+        expect(p.system).not.toContain('- Write in third-person limited, past tense');
+        expect(p.system).toContain('Keep the point of view and tense the writing style asks for; when it sets none, write in third-person limited, past tense');
+      }
+    });
+
     it('should make revision carry the established facts forward', () => {
-      expect(PROMPT_REGISTRY.revision.version).toBe('1.2.0');
+      expect(PROMPT_REGISTRY.revision.version).toBe('1.3.0');
       expect(PROMPT_REGISTRY.revision.system).toContain('carry forward the incoming "## CONTINUATION STATE" section\'s establishedFacts');
     });
   });
@@ -1134,7 +1142,6 @@ describe('Prompt modules', () => {
 
   describe('brief fulfillment (judge v2.3, harness §11 item 7)', () => {
     it('judge v2.3 asks for an unconditional brief-fulfillment assessment', () => {
-      expect(PROMPT_REGISTRY.judge.version).toBe('2.3.0');
       expect(PROMPT_REGISTRY.judge.system).toContain('## BRIEF');
       expect(PROMPT_REGISTRY.judge.system).toContain('briefCompliance');
       expect(PROMPT_REGISTRY.judge.system).toContain('"briefCompliance": {"compliant": true/false, "issues": ["..."]} (always)');
@@ -1146,6 +1153,38 @@ describe('Prompt modules', () => {
         true,
       );
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], briefCompliance: { compliant: false } }).success).toBe(false);
+    });
+  });
+
+  describe('readability (judge v2.4, fix v1.3)', () => {
+    it('should ask the judge for an unconditional readability assessment that quotes the offending sentences', () => {
+      expect(PROMPT_REGISTRY.judge.version).toBe('2.4.0');
+      expect(PROMPT_REGISTRY.judge.system).toContain('plain contemporary web-novel English');
+      expect(PROMPT_REGISTRY.judge.system).toContain('quotes one offending sentence verbatim');
+      expect(PROMPT_REGISTRY.judge.system).toContain('Short sentences can still be ornate: judge the diction, not the length.');
+      expect(PROMPT_REGISTRY.judge.system).toContain('or when narrator cleverness recurs');
+      expect(PROMPT_REGISTRY.judge.system).toContain('"## READABILITY EVIDENCE" block');
+      expect(PROMPT_REGISTRY.judge.system).toContain('Use it as evidence, not as a verdict');
+      expect(PROMPT_REGISTRY.judge.system).toContain('and those additions win');
+    });
+
+    it('should show readabilityCompliance in every judge few-shot answer', () => {
+      const answers = (PROMPT_REGISTRY.judge.fewShots ?? []).filter(message => message.getType() === 'ai');
+      expect(answers.length).toBeGreaterThan(0);
+      for (const answer of answers) expect(JSON.parse(String(answer.content))).toHaveProperty('readabilityCompliance');
+      expect(PROMPT_REGISTRY.judge.system).toContain('"readabilityCompliance": {"compliant": true/false, "issues": ["..."]} (always)');
+    });
+
+    it('should keep readabilityCompliance optional in the judge schema and require its issues when present', () => {
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false, issues: ['"x" — say it plainly'] } }).success).toBe(true);
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false } }).success).toBe(false);
+    });
+
+    it('should tell the fixer to rewrite quoted sentences plainly without dropping content', () => {
+      expect(PROMPT_REGISTRY.fix.version).toBe('1.3.0');
+      expect(PROMPT_REGISTRY.fix.system).toContain('Findings marked "readability:" quote the draft\'s own sentences');
+      expect(PROMPT_REGISTRY.fix.system).toContain('keeping every fact, action, and line of dialogue');
     });
   });
 

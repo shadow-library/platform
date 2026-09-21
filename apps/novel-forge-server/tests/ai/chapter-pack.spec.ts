@@ -3,6 +3,7 @@ import { describe, expect, it, mock, spyOn } from 'bun:test';
 import { type CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, ENTITY_CARD_BUDGET, WRITING_STYLE_BUDGET } from '@modules/ai/context/context-assembler.service';
 import { countTokens } from '@modules/ai/context/token-budget';
+import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 
 const filler = (subject: string, count: number): string =>
   Array.from({ length: count }, (_, i) => `Paragraph ${i}. ${`${subject} walks the quay past tar barrels, coiled rope and gull-picked nets. `.repeat(12)}`).join('\n\n');
@@ -266,13 +267,14 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     expect(pack.rendered).not.toContain('CURRENT_ARC_PAYOFF');
   });
 
-  it('should cap an oversized writing style so it cannot claim the whole budget', async () => {
+  it('should cap oversized project additions so they cannot claim the whole budget, keeping the default whole', async () => {
     const instructions = `WRITING_STYLE_MARKER\n\n${filler('The narrator', 60)}`;
     const pack = await makeAssembler(chapterOneDb({ instructions })).forChapter(1n, 1, { dryRun: true });
 
     const style = pack.sections.find(s => s.key === 'writing_style');
     expect(countTokens(instructions)).toBeGreaterThan(WRITING_STYLE_BUDGET);
     expect(style?.truncated).toBe(true);
+    expect(style?.rendered).toContain(DEFAULT_WRITING_INSTRUCTIONS);
     expect(style?.rendered).toContain('WRITING_STYLE_MARKER');
     expect(style?.tokens).toBeLessThanOrEqual(WRITING_STYLE_BUDGET + 10);
     expect(pack.sections.some(s => s.key === 'ref:entity:wren')).toBe(true);
@@ -291,7 +293,7 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     const assembler = makeAssembler(chapterOneDb({ contextRefs: refs, extraEntities: extras }));
     const warn = spyOn((assembler as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger, 'warn').mockImplementation(() => undefined);
 
-    const pack = await assembler.forChapter(1n, 1, { budgetTokens: 6_000 });
+    const pack = await assembler.forChapter(1n, 1, { budgetTokens: 7_000 });
     const calls = [...warn.mock.calls];
     warn.mockRestore();
 

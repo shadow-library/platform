@@ -9,6 +9,7 @@ import {
   CreateProjectBody,
   ListProjectResponse,
   ListProjectsQuery,
+  ProjectDetailResponse,
   ProjectParams,
   ProjectResponse,
   ProjectStatusResponse,
@@ -39,9 +40,9 @@ export class ProjectController {
   }
 
   @Get('/:projectId')
-  @RespondFor(200, ProjectResponse)
-  getProject(@Params() params: ProjectParams): Promise<ProjectResponse> {
-    return this.projectService.getOrThrow(params.projectId);
+  @RespondFor(200, ProjectDetailResponse)
+  getProject(@Params() params: ProjectParams): Promise<ProjectDetailResponse> {
+    return this.projectService.getDetail(params.projectId);
   }
 
   @Get('/:projectId/status')

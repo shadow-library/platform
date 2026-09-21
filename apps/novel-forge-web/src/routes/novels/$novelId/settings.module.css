@@ -8,6 +8,17 @@
   gap: 16px;
 }
 
+.defaultStyle {
+  margin: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  font-family: inherit;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+  white-space: pre-wrap;
+}
+
 .sectionSpacer {
   margin-bottom: 16px;
 }

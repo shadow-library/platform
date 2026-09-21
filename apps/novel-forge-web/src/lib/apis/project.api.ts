@@ -5,6 +5,7 @@ import {
   type CreateProjectBody,
   type ListProjectResponse,
   type ListProjectsQueryParams,
+  type ProjectDetailResponse,
   type ProjectResponse,
   type ProjectStatusResponse,
   type ResetBody,
@@ -36,8 +37,8 @@ export const listProjectsQueryOptions = (params?: ListProjectsQueryParams): UseQ
         .execute(),
   });
 
-export const projectQueryOptions = (projectId: string): UseQueryOptions<ProjectResponse, ApiError> =>
-  queryOptions<ProjectResponse, ApiError>({
+export const projectQueryOptions = (projectId: string): UseQueryOptions<ProjectDetailResponse, ApiError> =>
+  queryOptions<ProjectDetailResponse, ApiError>({
     queryKey: projectKeys.detail(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}`).execute(),
   });
@@ -52,7 +53,7 @@ export function useListProjectsQuery(params?: ListProjectsQueryParams): UseQuery
   return useQuery(listProjectsQueryOptions(params));
 }
 
-export function useProjectQuery(projectId: string, enabled = true): UseQueryResult<ProjectResponse, ApiError> {
+export function useProjectQuery(projectId: string, enabled = true): UseQueryResult<ProjectDetailResponse, ApiError> {
   return useQuery({ ...projectQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 

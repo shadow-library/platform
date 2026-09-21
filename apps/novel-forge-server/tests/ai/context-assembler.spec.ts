@@ -4,6 +4,7 @@ import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, FULL_CAST_MAX, type IdeationSeedInput, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
+import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
 import { nextQuestions, toRouterSeedState } from '@modules/ideation/question-router';
 
 describe('countTokens', () => {
@@ -722,6 +723,31 @@ describe('ContextAssembler.forChapter — no brief', () => {
     expect(writingStyle).toBeDefined();
     expect(writingStyle?.rendered).toContain(DEFAULT_WRITING_INSTRUCTIONS.slice(0, 40));
     expect(writingStyle?.rendered).toContain('Pacing and endings');
+  });
+
+  it('should send the default once, then the project additions, when the stored instructions embed a copy of the default', async () => {
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: `${DEFAULT_WRITING_INSTRUCTIONS}\n\nWRITING_STYLE_MARKER`, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => null) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const pack = await makeAssembler(dbOverrides).forChapter(1n, 1, { dryRun: true });
+    const rendered = pack.sections.find(s => s.key === 'writing_style')?.rendered ?? '';
+
+    expect(rendered.split(DEFAULT_WRITING_INSTRUCTIONS)).toHaveLength(2);
+    expect(rendered.indexOf(DEFAULT_WRITING_INSTRUCTIONS)).toBeLessThan(rendered.indexOf(PROJECT_ADDITIONS_HEADING));
+    expect(rendered.indexOf(PROJECT_ADDITIONS_HEADING)).toBeLessThan(rendered.indexOf('WRITING_STYLE_MARKER'));
   });
 });
 

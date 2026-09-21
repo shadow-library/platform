@@ -61,6 +61,7 @@ import {
   useUpdateDraftMutation,
 } from '@/lib/apis';
 import { buildChapterRows, type ChapterFilter, chapterSummary, countChapterRows, filterChapterRows } from '@/lib/chapter-list';
+import { buildRepairNote } from '@/lib/review-queue';
 
 import styles from './chapters.module.css';
 
@@ -118,13 +119,6 @@ function statusMeta(draft: DraftResponse): StatusMeta {
 
 // reviseDraft has no judge loop of its own — it rewrites from a feedback note, so the note carries the
 // judge's own findings back in as the instruction to fix.
-function buildRepairNote(draft: DraftResponse): string {
-  const findings = draft.judgeNote?.trim();
-  return findings
-    ? `Resolve the following continuity findings without changing anything else:\n${findings}`
-    : 'Resolve the continuity contradiction the judge flagged for this chapter.';
-}
-
 function wordCount(body?: string | null): number {
   if (!body) return 0;
   return body.trim().split(/\s+/).filter(Boolean).length;
@@ -812,7 +806,7 @@ function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: Rev
 
   const repair = (): void => {
     revise.mutate(
-      { note: buildRepairNote(draft) },
+      { note: buildRepairNote(draft.judgeNote) },
       { onSuccess: () => toast.success('Repair applied — run Verify to confirm it satisfies the judge'), onError: err => toast.danger(err.message) },
     );
   };

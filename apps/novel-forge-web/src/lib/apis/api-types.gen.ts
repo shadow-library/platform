@@ -3585,7 +3585,7 @@ export interface components {
       name: string;
       kind: components['schemas']['ProjectKind'];
       title?: string;
-      /** @description Instructions for chapter voice, craft, and length; omission uses the application default. */
+      /** @description Project additions to the built-in chapter-writing style (point of view, tone, content limits); they take precedence where the two conflict. */
       instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
       /** @description BCP 47 language tag of the original prose (for example `zh` or `pt-BR`); required for a `translation` project and rejected for any other kind. */
@@ -3622,7 +3622,7 @@ export interface components {
       originalLanguage?: null | string;
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
-      /** @description Effective chapter-writing instructions, including the application default. */
+      /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
       instructions?: null | string;
       storyCurrentChapter?: null | number;
       /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
@@ -3678,6 +3678,38 @@ export interface components {
       offset: number;
       items: components['schemas']['ProjectResponse'][];
     };
+    ProjectDetailResponse: {
+      id: string;
+      name: string;
+      kind: components['schemas']['ProjectKind'];
+      /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
+      status: components['schemas']['ProjectStatus'];
+      /** @description Whether the project was created by a signed-in person or an organisation bot. */
+      ownerKind: components['schemas']['OwnerKind'];
+      /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
+      sharedWithOrg: boolean;
+      title?: null | string;
+      /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
+      coverUrl?: null | string;
+      contentMode: components['schemas']['ContentMode'];
+      /** @description BCP 47 language tag of the original prose; set only on a `translation` project. */
+      originalLanguage?: null | string;
+      config?: components['schemas']['ProjectConfig'];
+      brief?: null | string;
+      /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
+      instructions?: null | string;
+      storyCurrentChapter?: null | number;
+      /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
+      wordTarget?: components['schemas']['ProjectWordTarget'];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** @description The built-in chapter-writing style every project writes to; read-only. */
+      defaultInstructions: string;
+      /** @description True when the stored instructions repeated the built-in style, verbatim or as an edited copy, and those lines were dropped from `instructions`. Saving the instructions clears it. */
+      defaultCopyRemoved: boolean;
+    };
     ProjectStatusResponse: {
       kind: components['schemas']['ProjectKind'];
       chaptersTotal?: number;
@@ -3693,7 +3725,7 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
-      /** @description Chapter-writing instructions; send an empty string to restore the application default. */
+      /** @description Project additions to the built-in chapter-writing style; an empty string or null removes them. A copy of the current or an earlier built-in style inside the text, verbatim or lightly edited, is dropped. */
       instructions?: string | null;
       /** @description BCP 47 language tag of the original prose; accepted only on a `translation` project, and only `null` on any other kind. */
       originalLanguage?: string | null;
@@ -5552,7 +5584,7 @@ export interface components {
       tags?: string[];
       /** @description Name of the bundle asset to use as the novel cover. */
       cover?: string;
-      /** @description Chapter-writing instructions; omission uses the application default. */
+      /** @description Additions to the built-in chapter-writing style; omission writes to the default alone. */
       instructions?: string;
     };
     NovelImportVolume: {
@@ -7653,7 +7685,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ProjectResponse'];
+          'application/json': components['schemas']['ProjectDetailResponse'];
         };
       };
       /** @description Default Response */
@@ -16149,6 +16181,7 @@ export type ProjectModelRef = components['schemas']['ProjectModelRef'];
 export type SortOrder = components['schemas']['SortOrder'];
 export type SortByTime = components['schemas']['SortByTime'];
 export type ListProjectResponse = components['schemas']['ListProjectResponse'];
+export type ProjectDetailResponse = components['schemas']['ProjectDetailResponse'];
 export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
 export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
 export type CloneProjectBody = components['schemas']['CloneProjectBody'];
