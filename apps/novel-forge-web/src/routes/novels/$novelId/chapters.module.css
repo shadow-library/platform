@@ -629,7 +629,7 @@
   padding: 14px 16px;
   font-size: 15px;
   line-height: 1.7;
-  font-family: var(--sh-font-mono);
+  font-family: var(--sh-font-sans);
   color: var(--sh-text-primary);
   caret-color: var(--sh-accent);
 }
@@ -638,14 +638,14 @@
   min-height: 62vh;
   font-size: 19px;
   line-height: 1.85;
-  font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sh-font-sans);
 }
 
 .reader {
   padding-block: 64px 120px;
   font-size: 19px;
   line-height: 1.85;
-  font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  font-family: var(--sh-font-sans);
 }
 
 .chapterEyebrow {
