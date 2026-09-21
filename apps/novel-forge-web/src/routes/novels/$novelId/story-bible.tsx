@@ -6,6 +6,7 @@ import { LockIcon, SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import {
   BibleDocumentList,
+  BibleHealth,
   BibleReadiness,
   CollectionPage,
   DetailPage,
@@ -47,6 +48,8 @@ import {
   useUploadEntityImageMutation,
   useUpsertFactMutation,
 } from '@/lib/apis';
+import { bibleHealth } from '@/lib/bible-documents';
+import { readinessDisplay } from '@/lib/bible-readiness';
 import {
   countByState,
   emptyFactForm,
@@ -75,6 +78,9 @@ import {
   type BibleView,
   countByType,
   entityCaption,
+  entityExcerpt,
+  factCountLabel,
+  factCountsBySubject,
   filterEntities,
   groupByType,
   orderTypesByCount,
@@ -132,9 +138,11 @@ interface EntityCardProps {
   novelId: string;
   entity: BibleEntity;
   type?: EntityType;
+  factCount: number | undefined;
 }
 
-function EntityCard({ novelId, entity, type }: EntityCardProps): React.JSX.Element {
+function EntityCard({ novelId, entity, type, factCount }: EntityCardProps): React.JSX.Element {
+  const excerpt = entityExcerpt(entity);
   return (
     <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type, entity: entity.entityKey }} className={styles.card}>
       <EntityAvatar entity={entity} size={36} />
@@ -143,6 +151,13 @@ function EntityCard({ novelId, entity, type }: EntityCardProps): React.JSX.Eleme
         <span className={styles.cardCaption} data-major={entity.significance === 'major' || undefined}>
           {entityCaption(entity)}
         </span>
+        {excerpt && <span className={styles.cardExcerpt}>{excerpt}</span>}
+        {(factCount !== undefined || entity.firstSeenChapter != null) && (
+          <span className={styles.cardMeta}>
+            {factCount !== undefined && <StatusChip intent="neutral">{factCountLabel(factCount)}</StatusChip>}
+            {entity.firstSeenChapter != null && <StatusChip intent="accent">First seen ch. {entity.firstSeenChapter}</StatusChip>}
+          </span>
+        )}
       </span>
     </Link>
   );
@@ -651,6 +666,15 @@ function StoryBibleScreen(): React.JSX.Element {
   const factsTotal = factsResolved ? facts.length : undefined;
 
   const factCounts = useMemo(() => countByState(facts), [facts]);
+  const factCountByEntity = useMemo(() => factCountsBySubject(facts), [facts]);
+  const readinessView = useMemo(() => readinessDisplay(readiness.data), [readiness.data]);
+  const health = useMemo(
+    () =>
+      resolved && factsResolved && bibleDocs.data
+        ? bibleHealth({ docs: bibleDocs.data.docs, entities: entities.length, facts: facts.length, roles: readinessView.alert ? undefined : readiness.data?.roles })
+        : undefined,
+    [resolved, factsResolved, bibleDocs.data, entities.length, facts.length, readiness.data, readinessView.alert],
+  );
   const visibleFacts = useMemo(() => filterFacts(facts, activeState, factQuery), [facts, activeState, factQuery]);
   const factsByKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
   const visibleFactIds = useMemo(() => (factsResolved ? visibleFacts.map(fact => fact.factKey) : undefined), [factsResolved, visibleFacts]);
@@ -811,18 +835,21 @@ function StoryBibleScreen(): React.JSX.Element {
             }
             filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
             notice={
-              <>
-                {readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
-                {resolved && entityParam && (
-                  <Alert
-                    intent="warning"
-                    title="That entity is no longer in the story bible."
-                    action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}
-                  >
-                    It was deleted, renamed, or the link was typed by hand.
-                  </Alert>
-                )}
-              </>
+              (health || readinessView.alert || (resolved && entityParam)) && (
+                <div className={styles.notices}>
+                  {health && <BibleHealth health={health} suggestions={readinessView.suggestions} />}
+                  {readinessView.alert && readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
+                  {resolved && entityParam && (
+                    <Alert
+                      intent="warning"
+                      title="That entity is no longer in the story bible."
+                      action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}
+                    >
+                      It was deleted, renamed, or the link was typed by hand.
+                    </Alert>
+                  )}
+                </div>
+              )
             }
             segments={{
               label: 'Entity type',
@@ -884,7 +911,13 @@ function StoryBibleScreen(): React.JSX.Element {
                     >
                       <div className={styles.grid}>
                         {section.items.map(entity => (
-                          <EntityCard key={entity.id} novelId={novelId} entity={entity} type={typeParam} />
+                          <EntityCard
+                            key={entity.id}
+                            novelId={novelId}
+                            entity={entity}
+                            type={typeParam}
+                            factCount={factsResolved ? (factCountByEntity.get(entity.entityKey) ?? 0) : undefined}
+                          />
                         ))}
                       </div>
                     </CollectionPage.Section>

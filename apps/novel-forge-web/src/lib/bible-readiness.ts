@@ -59,3 +59,19 @@ export function advisoryGaps(report: BibleReadinessResponse): string[] {
     .filter(dimension => !isBlocking(dimension.dimension))
     .flatMap(dimension => dimension.gaps);
 }
+
+export interface ReadinessDisplay {
+  alert: boolean;
+  suggestions: string[];
+}
+
+/** A ready bible says so through the health line alone; the full alert is kept for the gaps that block drafting. */
+export function readinessDisplay(report: BibleReadinessResponse | undefined): ReadinessDisplay {
+  if (!report) return { alert: false, suggestions: [] };
+  if (!report.readyToDraft) return { alert: true, suggestions: [] };
+  return { alert: false, suggestions: advisoryGaps(report) };
+}
+
+export function suggestionsLabel(count: number): string {
+  return count === 1 ? '1 suggestion' : `${count} suggestions`;
+}

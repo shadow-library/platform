@@ -8,6 +8,8 @@ export interface BibleEntity {
   significance?: 'major' | 'minor' | null;
   status?: string | null;
   imageUrl?: string | null;
+  body?: string | null;
+  firstSeenChapter?: number | null;
 }
 
 export interface BibleFact {
@@ -59,6 +61,7 @@ export const TYPE_SINGULAR: Record<EntityType, string> = {
 
 export const SECTION_PREVIEW = 8;
 export const ASIDE_FACT_LIMIT = 5;
+export const CARD_EXCERPT_CHARS = 140;
 
 export function parseEntityType(value: unknown): EntityType | undefined {
   return ALL_TYPES.find(type => type === value);
@@ -132,4 +135,43 @@ export function relatedEntities(facts: readonly BibleFact[], entityKey: string):
     }
   }
   return [...shared].map(([key, count]) => ({ entityKey: key, shared: count })).sort((a, b) => b.shared - a.shared || a.entityKey.localeCompare(b.entityKey));
+}
+
+export function factCountsBySubject(facts: readonly BibleFact[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const fact of facts) for (const subject of new Set(fact.subjects ?? [])) counts.set(subject, (counts.get(subject) ?? 0) + 1);
+  return counts;
+}
+
+export function factCountLabel(count: number): string {
+  if (count === 0) return 'No facts';
+  return count === 1 ? '1 fact' : `${count} facts`;
+}
+
+export function markdownPlainText(markdown: string): string {
+  return markdown
+    .split('\n')
+    .filter(line => !/^\s*#{1,6}\s/.test(line) && !/^\s*(?:[-*_]\s*){3,}$/.test(line))
+    .map(line => line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').replace(/^\s*>\s?/, ''))
+    .join('\n')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__|\*|`|~~)/g, '')
+    .trim();
+}
+
+/** Cut on a word boundary so a card never ends mid-word; the ellipsis says there is more to open. */
+export function clipText(text: string, maxChars: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= maxChars) return flat;
+  const cut = flat.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > maxChars / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.-]+$/, '')}…`;
+}
+
+export function entityExcerpt(entity: Pick<BibleEntity, 'name' | 'body'>, maxChars = CARD_EXCERPT_CHARS): string {
+  const body = entity.body?.trim();
+  if (!body) return '';
+  const firstParagraph = markdownPlainText(stripEntityHeading(body, entity.name)).split(/\n\s*\n/, 1)[0] ?? '';
+  return clipText(firstParagraph, maxChars);
 }

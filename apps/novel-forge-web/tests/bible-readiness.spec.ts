@@ -9,8 +9,10 @@ import {
   dimensionRatio,
   isBlocking,
   orderedDimensions,
+  readinessDisplay,
   readinessHeadline,
   readinessIntent,
+  suggestionsLabel,
   verdictIntent,
 } from '../src/lib/bible-readiness';
 
@@ -116,5 +118,32 @@ describe('dimension copy', () => {
 
   it('should tell the author that this screen reads records, which is what made the gap invisible', () => {
     expect(DIMENSION_HINT.records).toContain('records');
+  });
+});
+
+describe('readinessDisplay', () => {
+  it('should show nothing before the report has loaded', () => {
+    expect(readinessDisplay(undefined)).toEqual({ alert: false, suggestions: [] });
+  });
+
+  it('should show the full alert and no suggestions while drafting is blocked', () => {
+    const blocked = report([dimension('coverage', 'thin', ['Cast is missing']), dimension('substance', 'thin', ['Say more about the world'])], ['Cast is missing']);
+    expect(readinessDisplay(blocked)).toEqual({ alert: true, suggestions: [] });
+  });
+
+  it('should hide the alert once ready and offer the advisory notes as suggestions', () => {
+    const ready = report([dimension('coverage', 'strong'), dimension('records', 'strong'), dimension('reveal', 'thin', ['Give each withheld truth a reveal chapter'])]);
+    expect(readinessDisplay(ready)).toEqual({ alert: false, suggestions: ['Give each withheld truth a reveal chapter'] });
+  });
+
+  it('should offer no suggestions for a ready bible with nothing to tighten', () => {
+    expect(readinessDisplay(report([dimension('coverage', 'strong'), dimension('records', 'strong')]))).toEqual({ alert: false, suggestions: [] });
+  });
+});
+
+describe('suggestionsLabel', () => {
+  it('should use the singular for exactly one and the plural otherwise', () => {
+    expect(suggestionsLabel(1)).toBe('1 suggestion');
+    expect(suggestionsLabel(3)).toBe('3 suggestions');
   });
 });

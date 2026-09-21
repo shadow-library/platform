@@ -24,7 +24,7 @@
 
 .card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 11px;
   padding: 11px 12px;
   border: 1px solid var(--sh-border-subtle);
@@ -68,6 +68,30 @@
 .cardCaption[data-major] {
   color: var(--sh-text-secondary);
   font-weight: 600;
+}
+
+.cardExcerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: var(--sh-text-caption);
+  line-height: 1.45;
+  color: var(--sh-text-secondary);
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .avatar {

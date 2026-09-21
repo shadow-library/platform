@@ -33,6 +33,7 @@ export { RouteNotFound } from './NotFound';
 export { TurnStatus } from './TurnStatus';
 export { DefaultCatchBoundary } from './DefaultCatchBoundary';
 export { BibleDocumentList, type BibleDocumentListProps } from './BibleDocumentList';
+export { BibleHealth, type BibleHealthProps } from './BibleHealth';
 export { BibleReadiness, type BibleReadinessProps } from './BibleReadiness';
 export { type ChipIntent, StatusChip, type StatusChipProps } from './StatusChip';
 
