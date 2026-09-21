@@ -153,6 +153,29 @@ describe.if(pgAvailable)('proposal engine', () => {
     await proposals.discard(projectId, escaping.id);
   });
 
+  it('should drop arc cast entries that are not entity keys and correct a key that differs only in case', async () => {
+    await db.insert(schema.entities).values([
+      { projectId, entityKey: 'cast_ferrywoman', type: 'character', name: 'Ferrywoman' },
+      { projectId, entityKey: 'cast_lockkeeper', type: 'character', name: 'Lockkeeper' },
+      { projectId, entityKey: 'cast_Pilot', type: 'character', name: 'Pilot' },
+      { projectId, entityKey: 'cast_pilot', type: 'character', name: 'Second Pilot' },
+    ]);
+    await db.insert(schema.canonFacts).values({ projectId, factKey: 'cast_fact_sluice_debt', text: 'The sluice is mortgaged.' });
+
+    const proposal = await createProposal([
+      {
+        op: 'arc.upsert',
+        arcKey: 'vol_2_arc_cast',
+        volumeKey: 'vol_2',
+        cast: ['cast_ferrywoman', 'cast_fact_sluice_debt', 'CAST_LOCKKEEPER', 'Lockkeeper', 'cast_ferrywoman', 'CAST_PILOT', 'cast_pilot'],
+      },
+    ]);
+    await applier.apply(projectId, proposal.id);
+
+    const arc = await db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, 'vol_2_arc_cast')) });
+    expect(arc?.cast).toEqual(['cast_ferrywoman', 'cast_lockkeeper', 'cast_pilot']);
+  });
+
   it('should refuse removes on non-draft rows and allow them on drafts', async () => {
     const onApproved = await createProposal([{ op: 'arc.remove', arcKey: 'vol_1_arc_1' }]);
     await expect(applier.apply(projectId, onApproved.id)).rejects.toThrow(/not allowed for this scope/);

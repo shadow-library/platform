@@ -189,10 +189,10 @@ describe('Prompt modules', () => {
 
   describe('refinement prompt modules', () => {
     it('registers the five new prompt keys', () => {
-      for (const key of ['chat-compact', 'arc-plan'] as const) {
-        expect(PROMPT_REGISTRY[key]).toBeDefined();
-        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-      }
+      for (const key of ['chat-compact', 'arc-plan'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
+      expect(PROMPT_REGISTRY['chat-compact'].version).toBe('1.0.0');
+      // arc-plan v1.1 reads the governing bible documents and names the only valid cast entries.
+      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.1.0');
       // bible-audit v2 audits entity records alongside documents: a document-only audit could never
       // repair a bible whose canon exists as prose the Story Bible screen cannot read.
       expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.0.0');
@@ -1028,6 +1028,12 @@ describe('Prompt modules', () => {
       expect(PROMPT_REGISTRY.outline.system).toContain('"knowledgeContract": {"pov": ["entity-key"]');
     });
 
+    it('should tell the outliner to cite governing bible documents by their catalog ref and never a canon fact', () => {
+      expect(PROMPT_REGISTRY.outline.version).toBe('2.4.0');
+      expect(PROMPT_REGISTRY.outline.system).toContain('bible_doc:<section>/<slug> copied exactly as the BIBLE DOCUMENTS list writes it');
+      expect(PROMPT_REGISTRY.outline.system).toContain('Never cite a canon fact');
+    });
+
     it('outline schema accepts a brief with a knowledgeContract and keeps it optional', () => {
       const brief = {
         chapter: 1,
@@ -1060,7 +1066,6 @@ describe('Prompt modules', () => {
     };
 
     it('outline v2.3 instructs the outliner to name a falsifiable readerValue and forbids empty purpose', () => {
-      expect(PROMPT_REGISTRY.outline.version).toBe('2.3.0');
       expect(PROMPT_REGISTRY.outline.system).toContain('chapterPurpose');
       expect(PROMPT_REGISTRY.outline.system).toContain('readerValue');
       expect(PROMPT_REGISTRY.outline.system).toContain('repetitionRisks');

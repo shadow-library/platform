@@ -72,6 +72,7 @@ const SECTION_LABELS: Record<string, string> = {
   prose_retrieved: '## PROSE REFERENCES',
   premise: '## PREMISE',
   doc_inventory: '## BIBLE DOCUMENT INVENTORY',
+  bible_documents: '## BIBLE DOCUMENTS',
   document: '## DOCUMENT',
   volume_plan: '## VOLUME PLAN',
   volume: '## VOLUME',

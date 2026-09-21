@@ -761,7 +761,7 @@ export class ProposalApplyService {
       hook: op.hook ?? existing?.hook ?? null,
       chapterStart: op.chapterStart ?? existing?.chapterStart ?? null,
       chapterEnd: op.chapterEnd ?? existing?.chapterEnd ?? null,
-      cast: op.cast ?? existing?.cast ?? null,
+      cast: op.cast ? await this.entityKeyCast(ctx, op.arcKey, op.cast) : (existing?.cast ?? null),
       body: op.body ?? existing?.body ?? null,
     };
 
@@ -797,6 +797,37 @@ export class ProposalApplyService {
         .returning();
       ctx.staleMarked.push(...stale.map(brief => `chapter:${brief.chapter}`));
     }
+  }
+
+  /**
+   * An arc cast names entities, and the planner has filled it with fact keys and display names before. Entries that are not an entity
+   * key are dropped rather than failing the arc; a key differing only in case is corrected to the stored one, unless it could be several.
+   */
+  private async entityKeyCast(ctx: ApplyContext, arcKey: string, cast: string[]): Promise<string[]> {
+    if (cast.length === 0) return [];
+    const lowered = [...new Set(cast.map(entry => entry.trim().toLowerCase()))];
+    const rows = await ctx.tx.query.entities.findMany({
+      columns: { entityKey: true },
+      where: and(eq(schema.entities.projectId, ctx.projectId), inArray(sql<string>`lower(${schema.entities.entityKey})`, lowered)),
+    });
+    const keys = new Set(rows.map(row => row.entityKey));
+    const byLowered = new Map<string, string[]>();
+    for (const { entityKey } of rows) byLowered.set(entityKey.toLowerCase(), [...(byLowered.get(entityKey.toLowerCase()) ?? []), entityKey]);
+
+    const kept: string[] = [];
+    const dropped: string[] = [];
+    const ambiguous: string[] = [];
+    for (const entry of cast) {
+      const trimmed = entry.trim();
+      const candidates = keys.has(trimmed) ? [trimmed] : (byLowered.get(trimmed.toLowerCase()) ?? []);
+      if (candidates.length > 1) ambiguous.push(entry);
+      else if (candidates[0] === undefined) dropped.push(entry);
+      else if (!kept.includes(candidates[0])) kept.push(candidates[0]);
+    }
+    if (dropped.length > 0 || ambiguous.length > 0) {
+      this.logger.warn('apply: dropped arc cast entries that are not entity keys', { projectId: ctx.projectId, arcKey, dropped, ambiguous });
+    }
+    return kept;
   }
 
   private async applyVolumeRemove(ctx: ApplyContext, op: VolumeRemoveOp): Promise<void> {

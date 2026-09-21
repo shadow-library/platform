@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { noPluginProposals } from '@tests/fixtures/plugin-policy';
-import { GenerationService } from '@modules/generation/generation.service';
+import { countTokens } from '@modules/ai/context/token-budget';
+import { GenerationService, PLAN_BIBLE_BUDGET, PLAN_BIBLE_DOC_TOKENS } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -73,9 +74,9 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
 
     expect(structured).toHaveBeenCalledTimes(1);
     const [, vars] = structured.mock.calls[0] as unknown as [unknown, { bibleDocs: string }];
-    expect(vars.bibleDocs).toContain('world/foundation:');
+    expect(vars.bibleDocs).toContain('### bible_doc:world/foundation');
     expect(vars.bibleDocs).toContain('The city of Vane runs on forged paperwork.');
-    expect(vars.bibleDocs).toContain('plot/plot:');
+    expect(vars.bibleDocs).toContain('### bible_doc:plot/plot');
     expect(vars.bibleDocs).toContain('The ledger investigation escalates across three volumes.');
   });
 
@@ -104,6 +105,26 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
 
     const [, vars] = structured.mock.calls[0] as unknown as [unknown, { bibleDocs: string }];
     expect(vars.bibleDocs.length).toBeLessThan(oversized.length);
-    expect(vars.bibleDocs).toContain('world/foundation:');
+    expect(vars.bibleDocs).toContain('### bible_doc:world/foundation');
+    expect(countTokens(vars.bibleDocs)).toBeLessThanOrEqual(PLAN_BIBLE_DOC_TOKENS + 40);
+  });
+
+  it('should keep the whole bible within its budget and give the core documents priority over the rest', async () => {
+    const projectId = await createProject('A brief with a large bible.');
+    const pages = (subject: string): string => Array.from({ length: 300 }, (_, i) => `${subject} page ${i} describes the canal district in careful detail.`).join('\n\n');
+    await db
+      .insert(schema.bibleDocuments)
+      .values([
+        ...Array.from({ length: 8 }, (_, i) => ({ projectId, section: 'lore' as const, slug: `songs-${i}`, body: pages(`Song ${i}`) })),
+        ...Array.from({ length: 6 }, (_, i) => ({ projectId, section: 'plot' as const, slug: `line-${i}`, body: pages(`Line ${i}`) })),
+      ]);
+
+    const structured = mock(async () => [planVolume]);
+    await buildService(structured).plan(projectId, { volumeCount: 1, chaptersPerVolume: 8 });
+
+    const [, vars] = structured.mock.calls[0] as unknown as [unknown, { bibleDocs: string }];
+    expect(countTokens(vars.bibleDocs)).toBeLessThanOrEqual(PLAN_BIBLE_BUDGET);
+    for (let i = 0; i < 6; i++) expect(vars.bibleDocs).toContain(`### bible_doc:plot/line-${i}`);
+    expect(vars.bibleDocs.indexOf('bible_doc:plot/line-0')).toBeLessThan(vars.bibleDocs.indexOf('bible_doc:lore/'));
   });
 });

@@ -9,9 +9,9 @@ import { assertAuthoringProject, declaredDraftFields, isFinalizable, markDescend
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { ContextAssembler } from '../ai/context/context-assembler.service';
+import { renderBibleDigest } from '../ai/context/bible-docs';
+import { ContextAssembler, OUTLINE_BUDGET } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
-import { truncateAtParagraph } from '../ai/context/token-budget';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
@@ -113,7 +113,10 @@ export interface JobEnqueueResult {
   stoppedAtExternalChapter?: number;
 }
 
-const PLAN_BIBLE_DOC_TOKEN_CAP = 1_500;
+// The volume plan is one call whose only other inputs are the skeleton and the brief, so it can afford most of a bible: a
+// premise or plot document runs a few thousand tokens and stays whole, while no single document can starve the rest.
+export const PLAN_BIBLE_BUDGET = 24_000;
+export const PLAN_BIBLE_DOC_TOKENS = 4_000;
 
 /**
  * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
@@ -207,10 +210,9 @@ export class GenerationService {
 
     // Same fallback pattern as `skeleton` above — an explicit placeholder rather than a silently empty var, so a
     // weak model doesn't misread a blank "Bible:" section as "no canon exists" when it just hasn't been built yet.
-    const bibleDocsText =
-      bibleDocs.length > 0
-        ? bibleDocs.map(d => `${d.section}/${d.slug}:\n${truncateAtParagraph(d.body ?? '', PLAN_BIBLE_DOC_TOKEN_CAP).text}`).join('\n\n')
-        : '(no bible written yet)';
+    const digest = renderBibleDigest(bibleDocs, { totalTokens: PLAN_BIBLE_BUDGET, perDocTokens: PLAN_BIBLE_DOC_TOKENS });
+    if (digest.omitted.length > 0) this.logger.info('plan: bible documents left out for budget', { projectId, omitted: digest.omitted, truncated: digest.truncated });
+    const bibleDocsText = digest.text || '(no bible written yet)';
 
     this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
@@ -282,10 +284,10 @@ export class GenerationService {
 
   async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
     await this.assertActive(projectId);
-    const [catalog, volumes] = await Promise.all([
-      this.contextAssembler.catalog(projectId),
-      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')), orderBy: asc(schema.volumes.ordinal) }),
-    ]);
+    const volumes = await this.db.query.volumes.findMany({
+      where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')),
+      orderBy: asc(schema.volumes.ordinal),
+    });
 
     const start = body.start ?? 1;
     const requestedCount = body.count ?? volumes.reduce((acc, v) => acc + ((v.endChapter ?? 0) - (v.startChapter ?? 0) + 1), 0);
@@ -301,6 +303,8 @@ export class GenerationService {
       return { briefs: [] };
     }
     this.logger.info('outline: generating briefs', { projectId, start, end, volumes: relevantVolumes.length });
+    const focusEntityKeys = relevantVolumes.flatMap(v => (Array.isArray(v.cast) ? v.cast.filter((key): key is string => typeof key === 'string') : []));
+    const catalog = await this.contextAssembler.catalog(projectId, { focusEntityKeys, documents: true, maxTokens: OUTLINE_BUDGET });
 
     const volumePlan = relevantVolumes
       .map(

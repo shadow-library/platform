@@ -1,3 +1,4 @@
+export * from './bible-docs';
 export * from './catalog.service';
 export * from './context-assembler.service';
 export * from './plugin-sections';

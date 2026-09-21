@@ -83,7 +83,7 @@
 - Raw model output MUST be persisted before parsing; structured calls use the repair ladder; domain-invalid output NEVER enters the database as canon.
 - Context MUST be assembled once per run, token-budgeted, tier-labeled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay
   byte-identical while canon is unchanged; chapter or source prose travels as a template variable, NEVER inside the pack.
-- The drafter MUST see only the mandatory serial core plus refs its brief declared; broad canon access belongs to the outliner (titles-only catalog) and the judge. Retrieval
+- The drafter MUST see only the mandatory serial core plus refs its brief declared; broad canon access belongs to the outliner (a catalog of citable refs, each with a short description) and the judge. Retrieval
   runs only at outline time, in verification and chat-hub tools, and in search.
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. Plugin policy digest MUST be in any
   `llm_cache` key; only deterministic roles are cacheable, creative roles NEVER. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, between, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -17,7 +17,8 @@ import { type RouterResult, toRouterSeedState } from '../../ideation/question-ro
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
-import { CatalogService } from './catalog.service';
+import { type BibleDocRow, renderBibleDigest } from './bible-docs';
+import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { pluginContextSections } from './plugin-sections';
 import {
@@ -67,7 +68,19 @@ export const FULL_CAST_MAX = 5;
 export const CHAT_HUB_BUDGET = 20_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
-export const ARC_PLAN_BUDGET = 16_000;
+// Planning packs carry the whole catalog — every canon fact and a description per entity — plus, for arc planning, the governing
+// bible documents, which take what the rest leaves up to their own cap. Both calls run once per arc or volume, not per chapter.
+export const OUTLINE_BUDGET = 32_000;
+export const ARC_PLAN_BUDGET = 32_000;
+export const ARC_PLAN_BIBLE_BUDGET = 8_000;
+export const ARC_PLAN_BIBLE_DOC_TOKENS = 2_500;
+// The catalog's ceiling leaves the documents at least this much, so a long serial's catalog cannot squeeze them out entirely.
+export const ARC_PLAN_BIBLE_FLOOR = 4_000;
+// Held back for the uncached dormant-thread section, so the cached sections are sized from cached content alone and their cut
+// points — and with them the provider cache prefix — do not move when a thread goes dormant.
+export const ARC_PLAN_UNCACHED_RESERVE = 1_500;
+// Token counts of a section's parts and of the rendered whole differ by a few tokens; the margin keeps a sized section inside the budget.
+const SIZED_SECTION_MARGIN = 32;
 export const PREMISE_BUDGET = 8_000;
 export const AUDIT_BUDGET = 12_000;
 export const REBRAND_SEED_BUDGET = 10_000;
@@ -250,6 +263,19 @@ function entityCardTier(status: EntityCardRow['status']): ContextTier {
   return status === 'planned' ? 'approved_intent' : 'canonical';
 }
 
+function sumTokens(sections: ContextSection[]): number {
+  return sections.reduce((sum, section) => sum + section.tokens, 0);
+}
+
+/** The content a section may hold when the section itself, heading included, must fit in `available`. */
+function sizedSectionCeiling(key: string, available: number): number {
+  return Math.max(0, available - countTokens(renderSection(key, '')) - SIZED_SECTION_MARGIN);
+}
+
+function castKeys(cast: unknown): string[] {
+  return Array.isArray(cast) ? cast.filter((key): key is string => typeof key === 'string') : [];
+}
+
 function firstLine(text: string | null): string {
   return (text ?? '').split('\n', 1)[0] ?? '';
 }
@@ -365,8 +391,8 @@ export class ContextAssembler {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  catalog(projectId: bigint): Promise<string> {
-    return this.catalogService.render(projectId);
+  catalog(projectId: bigint, options?: CatalogOptions): Promise<string> {
+    return this.catalogService.render(projectId, options);
   }
 
   /** `chapter` is the chapter the refs are resolved for; it decides which arc payoffs are already on the page. */
@@ -758,9 +784,9 @@ export class ContextAssembler {
   }
 
   async forOutline(projectId: bigint, chapter: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
+    const budgetTokens = opts?.budgetTokens ?? OUTLINE_BUDGET;
 
-    const [currentVolume, recentChapters, prevVolumes] = await Promise.all([
+    const [currentVolume, recentChapters, prevVolumes, currentArc] = await Promise.all([
       this.db.query.volumes.findFirst({
         where: and(
           eq(schema.volumes.projectId, projectId),
@@ -778,13 +804,17 @@ export class ContextAssembler {
         where: and(eq(schema.volumes.projectId, projectId), sql`${schema.volumes.endChapter} < ${chapter}`),
         orderBy: schema.volumes.ordinal,
       }),
+      this.db.query.arcs.findFirst({
+        where: and(eq(schema.arcs.projectId, projectId), lte(schema.arcs.chapterStart, chapter), gte(schema.arcs.chapterEnd, chapter)),
+        orderBy: schema.arcs.ordinal,
+      }),
     ]);
 
     const sections: ContextSection[] = [];
 
     if (currentVolume) {
       const parts = [currentVolume.objective, currentVolume.conflict, currentVolume.payoff].filter(Boolean);
-      sections.push(makeSection('volume_objective', parts.join('\n'), 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
+      sections.push({ ...makeSection('volume_objective', parts.join('\n'), 'approved_intent', [`volume:${currentVolume.volumeKey}`]), required: true });
     }
 
     const memoryParts: string[] = [];
@@ -797,13 +827,15 @@ export class ContextAssembler {
       .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
     memoryParts.push(...recentLines);
     if (memoryParts.length > 0) {
-      sections.push(makeSection('memory', memoryParts.join('\n'), 'canonical', []));
+      sections.push({ ...makeSection('memory', memoryParts.join('\n'), 'canonical', []), required: true });
     }
 
-    const catalogText = await this.catalogService.render(projectId);
-    if (catalogText) {
-      sections.push(makeSection('catalog', catalogText, 'canonical', []));
-    }
+    // The outliner may only cite what the catalog lists, so retrieval gives way to it under budget pressure; the catalog's ceiling is
+    // what the other required sections leave, so none of them can be crowded out.
+    const focusEntityKeys = [...castKeys(currentArc?.cast), ...castKeys(currentVolume?.cast)];
+    const maxTokens = sizedSectionCeiling('catalog', budgetTokens - sumTokens(sections));
+    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys, documents: true, maxTokens });
+    if (catalogText) sections.push({ ...makeSection('catalog', catalogText, 'canonical', []), required: true });
 
     if (this.retrievalService) {
       const query = currentVolume?.objective?.split('\n')[0] ?? '';
@@ -988,7 +1020,7 @@ export class ContextAssembler {
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
       this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId), orderBy: [schema.arcs.volumeKey, schema.arcs.ordinal] }),
-      this.catalogService.render(projectId),
+      this.catalogService.render(projectId, { descriptors: 'compact' }),
     ]);
 
     const sections: ContextSection[] = [];
@@ -1074,12 +1106,15 @@ export class ContextAssembler {
   async forArcPlanning(projectId: bigint, volumeKey: string, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
 
-    const [project, volumes, catalogText, openThreads, openMysteries] = await Promise.all([
+    const [project, volumes, openThreads, openMysteries, documents] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-      this.catalogService.render(projectId),
       this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
       this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')) }),
+      this.db.query.bibleDocuments.findMany({
+        columns: { section: true, slug: true, frontmatter: true, body: true },
+        where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.section, ['project', 'plot', 'world', 'power'])),
+      }),
     ]);
     const volume = volumes.find(v => v.volumeKey === volumeKey);
     const prevVolume = volume ? volumes.filter(v => v.ordinal < volume.ordinal).at(-1) : undefined;
@@ -1099,12 +1134,30 @@ export class ContextAssembler {
       const skeleton = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
       sections.push(asStable(makeSection('skeleton', skeleton, 'canonical', [])));
     }
+
+    const cachedBudget = budgetTokens - ARC_PLAN_UNCACHED_RESERVE;
+    const catalogCeiling = sizedSectionCeiling('catalog', cachedBudget - sumTokens(sections) - ARC_PLAN_BIBLE_FLOOR);
+    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys: castKeys(volume?.cast), maxTokens: catalogCeiling });
     if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
+
+    const bibleSection = this.planningBibleSection(projectId, documents, cachedBudget - sumTokens(sections));
+    if (bibleSection) sections.push(bibleSection);
 
     const dormantText = renderDormantThreads(computeDormantThreads(openThreads, openMysteries, project?.storyCurrentChapter ?? 0));
     if (dormantText) sections.push(makeSection('dormant_threads', dormantText, 'working', []));
 
     return this.finalize(projectId, 'arc_plan', null, sections, [], budgetTokens, opts);
+  }
+
+  // Sized to what the rest of the pack leaves, so the documents are cut rather than the whole section dropped by the budget.
+  private planningBibleSection(projectId: bigint, documents: BibleDocRow[], available: number): ContextSection | null {
+    const totalTokens = Math.min(ARC_PLAN_BIBLE_BUDGET, sizedSectionCeiling('bible_documents', available));
+    if (totalTokens <= 0) return null;
+    const digest = renderBibleDigest(documents, { totalTokens, perDocTokens: ARC_PLAN_BIBLE_DOC_TOKENS, coreOnly: true });
+    if (!digest.text) return null;
+    if (digest.omitted.length > 0) this.logger.info('arc planning pack left out bible documents', { projectId, omitted: digest.omitted, truncated: digest.truncated });
+    const section = asStable(makeSection('bible_documents', digest.text, 'canonical', []));
+    return { ...section, truncated: digest.truncated.length > 0 || digest.omitted.length > 0 };
   }
 
   /** Pack for premise enhancement; the bible audit reuses it with a fuller document inventory. */

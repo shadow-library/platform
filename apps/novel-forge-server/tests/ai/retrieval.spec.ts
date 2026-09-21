@@ -82,6 +82,7 @@ function makeDbStubForOutline() {
       projects: { findFirst: mock(async () => null) },
       chapters: { findMany: mock(async () => []) },
       volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+      arcs: { findFirst: mock(async () => null) },
       contextPacks: { findFirst: mock(async () => null) },
     },
     insert: mock(() => ({
