@@ -72,25 +72,22 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 };
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
-// router (which resolves per role) and the settings UI (which picks per group) never drift. `chat`
-// mirrors `planning`. Production routes every hosted role through OpenRouter, per group, based on the
-// completed model evaluation: writing → moonshotai/kimi-k3 (top-2 measured long-form prose, near-zero
-// longform degradation), planning/chat → z-ai/glm-5.2 (strong structured output + instruction
-// following), review → anthropic/claude-sonnet-5 (best tool-calling reliability for the judge loop),
-// helper → openai/gpt-5.6-luna, image → x-ai/grok-imagine-image-2.0 (IllustrationService resolves it
-// through `resolveModel('image', project)`, so a project-level override is honoured), ideation →
-// anthropic/claude-opus-5 (the ideation studio has no settings screen, so this is the studio's fixed
-// default rather than a group an author configures), vision → openai/gpt-5.6-luna (the cheapest registered model OpenRouter lists
-// with image input; like ideation it is a fixed default, not an author-configured group).
+// router (which resolves per role) and the settings UI (which picks per group) never drift. Planning and
+// writing follow a cross-judged model comparison: Opus led planning with no outline-parse failures;
+// Sonnet was the reliable, low-cost prose pick.
 export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
-  writing: { provider: 'openrouter', model: 'moonshotai/kimi-k3' },
-  planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  writing: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
+  planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
   review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
+  // Its own group, independent of `planning` — resolveModel's project-override fallback is the one place it inherits `plan`.
   chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
+  // IllustrationService resolves through resolveModel('image', project), so a project-level override is honoured.
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
+  // Cheapest registered model OpenRouter lists with image input; fixed like `ideation`, not author-configured.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  // The ideation studio has no settings screen, so this is the studio's fixed default, not an author-configured group.
   ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
 };
 
@@ -137,11 +134,12 @@ function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<A
 export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
 
 // How hard each group is allowed to think. Hidden reasoning tokens bill as output, so the mechanical
-// helper roles (title, compact, epitome) ask for none at all; every authoring group buys the cheapest
-// tier its model offers rather than the provider default, which is typically medium or high.
+// helper roles (title, compact, epitome) ask for none at all; every other authoring group buys the
+// cheapest tier its model offers rather than the provider default — except `planning`, pinned to medium
+// for Opus.
 export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {
   writing: 'low',
-  planning: 'low',
+  planning: 'medium',
   review: 'low',
   chat: 'low',
   helper: 'none',

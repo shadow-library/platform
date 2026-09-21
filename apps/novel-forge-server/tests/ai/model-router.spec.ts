@@ -256,7 +256,12 @@ describe('resolveReasoningEffort', () => {
 
   it('should send the policy effort for an optional model that supports it', () => {
     expect(resolveReasoningEffort('anthropic/claude-sonnet-5', 'writing')).toBe('low');
-    expect(resolveReasoningEffort('openai/gpt-5.4', 'planning')).toBe('low');
+    expect(resolveReasoningEffort('openai/gpt-5.4', 'planning')).toBe('medium');
+  });
+
+  it('should send medium reasoning for the production planning model', () => {
+    expect(REASONING_POLICY.planning).toBe('medium');
+    expect(resolveReasoningEffort('anthropic/claude-opus-5', 'planning')).toBe('medium');
   });
 
   it('should omit reasoning for an optional model that declares no effort scale', () => {
@@ -350,7 +355,7 @@ describe('MODEL_REGISTRY', () => {
 describe('PRODUCTION_DEFAULTS', () => {
   it('production defaults route generation through openrouter', () => {
     expect(PRODUCTION_DEFAULTS.generation.provider).toBe('openrouter');
-    expect(PRODUCTION_DEFAULTS.generation.model).toBe('moonshotai/kimi-k3');
+    expect(PRODUCTION_DEFAULTS.generation.model).toBe('anthropic/claude-sonnet-5');
   });
 
   it('covers all required roles', () => {
