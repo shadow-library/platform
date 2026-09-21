@@ -42,6 +42,12 @@ export interface ProjectScreen {
    * the nav entry: the screen's own route must gate itself with `resolveIsAdmin`, the way `runs.tsx` does.
    */
   adminOnly?: boolean;
+  /**
+   * Stays reachable by URL and still counts toward `screenVisible` and `SCREEN_LABEL`, but is left out of
+   * the sidebar nav and the command palette by `screensForWorkflow` — for a screen kept alive as a direct
+   * link rather than a promoted destination.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -59,7 +65,7 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon />, workflows: AUTHORING },
   { segment: 'canon-facts', to: '/novels/$novelId/canon-facts', label: 'Canon Facts', icon: <LockIcon />, workflows: AUTHORING },
   { segment: 'volumes', to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon />, workflows: AUTHORING },
-  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan (deprecated)', icon: <UploadIcon />, workflows: ['new_novel'] },
+  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon />, workflows: ['new_novel'], hidden: true },
   { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon />, workflows: ['new_novel', 'source', 'curated'] },
   { segment: 'illustrations', to: '/novels/$novelId/illustrations', label: 'Illustrations', icon: <ImageIcon />, workflows: ALL_WORKFLOWS },
   { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon />, workflows: AUTHORING },
@@ -71,10 +77,10 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
 
 export const SCREEN_LABEL = new Map(PROJECT_SCREENS.map(screen => [screen.segment, screen.label]));
 
-/** All screens while the project's kind is still loading, otherwise the ones its workflow shows. */
+/** Every non-hidden screen while the project's kind is still loading, otherwise the ones its workflow shows. */
 export function screensForWorkflow(kind?: ProjectKind): ProjectScreen[] {
-  if (!kind) return PROJECT_SCREENS;
-  return PROJECT_SCREENS.filter(screen => screen.workflows.includes(kind));
+  const screens = kind ? PROJECT_SCREENS.filter(screen => screen.workflows.includes(kind)) : PROJECT_SCREENS;
+  return screens.filter(screen => !screen.hidden);
 }
 
 /** Whether `segment` is a screen shown for `kind` — an unlisted segment (not one of `PROJECT_SCREENS`) is never hidden by this check. */

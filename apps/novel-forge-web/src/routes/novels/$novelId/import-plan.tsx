@@ -145,9 +145,10 @@ function ImportPlanScreen(): React.JSX.Element {
           />
 
           <div className={styles.stack}>
-            <Alert intent="warning" title="Deprecated">
-              Plan import exists for novels authored with the external planning skill. New novels should be planned in-app via the project chat. This screen will be removed once
-              legacy plans are migrated.
+            <Alert intent="info" title="About plan import">
+              Plan import exists for novels authored offline with the external planning skill. New novels are usually planned in-app via the project chat, and a finished plan is
+              usually imported from the New novel dialog, which creates the project and lands here automatically. Reach this screen directly to import a bundle into an existing,
+              still-empty new-novel project.
             </Alert>
 
             {!isNewNovel ? (

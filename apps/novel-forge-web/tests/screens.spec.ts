@@ -1,31 +1,22 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PROJECT_SCREENS, screensForWorkflow, screenVisible } from '../src/components/Layout/screens';
+import { PROJECT_SCREENS, SCREEN_LABEL, screensForWorkflow, screenVisible } from '../src/components/Layout/screens';
 
 function segmentsFor(kind?: 'source' | 'new_novel' | 'translation' | 'curated'): string[] {
   return screensForWorkflow(kind).map(screen => screen.segment);
 }
 
 describe('screensForWorkflow', () => {
-  it('should return every screen while the project kind is still loading', () => {
-    expect(screensForWorkflow(undefined)).toEqual(PROJECT_SCREENS);
+  it('should return every non-hidden screen while the project kind is still loading', () => {
+    expect(screensForWorkflow(undefined)).toEqual(PROJECT_SCREENS.filter(screen => !screen.hidden));
   });
 
-  it('should show the full authoring sidebar for a new_novel project', () => {
-    expect(segmentsFor('new_novel')).toEqual([
-      'overview',
-      'story-bible',
-      'canon-facts',
-      'volumes',
-      'import-plan',
-      'chapters',
-      'illustrations',
-      'review',
-      'chat',
-      'runs',
-      'publish',
-      'settings',
-    ]);
+  it('should never include a hidden screen while the project kind is still loading', () => {
+    expect(screensForWorkflow(undefined).some(screen => screen.hidden)).toBe(false);
+  });
+
+  it('should show the full authoring sidebar for a new_novel project, without the hidden Import Plan entry', () => {
+    expect(segmentsFor('new_novel')).toEqual(['overview', 'story-bible', 'canon-facts', 'volumes', 'chapters', 'illustrations', 'review', 'chat', 'runs', 'publish', 'settings']);
   });
 
   it('should show the source pipeline screens and hide Import Plan for a source project', () => {
@@ -78,5 +69,21 @@ describe('screenVisible', () => {
 
   it('should never hide a segment that is not one of the declared project screens', () => {
     expect(screenVisible('not-a-real-screen', 'translation')).toBe(true);
+  });
+
+  it('should keep the hidden Import Plan screen reachable by URL for a new_novel project', () => {
+    expect(screenVisible('import-plan', 'new_novel')).toBe(true);
+  });
+
+  it('should still hide Import Plan by URL for workflows that never had it', () => {
+    expect(screenVisible('import-plan', 'source')).toBe(false);
+    expect(screenVisible('import-plan', 'translation')).toBe(false);
+    expect(screenVisible('import-plan', 'curated')).toBe(false);
+  });
+});
+
+describe('SCREEN_LABEL', () => {
+  it('should label the hidden Import Plan screen without a deprecated suffix', () => {
+    expect(SCREEN_LABEL.get('import-plan')).toBe('Import Plan');
   });
 });

@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Dialog, FormField, Input, SegmentedControl, Select, Textarea, toast } from '@shadow-library/ui';
 
@@ -8,8 +9,13 @@ import styles from './NewNovelModal.module.css';
 
 type Mode = NonNullable<CreateProjectBody['contentMode']>;
 
-/** The three ways into a novel: the studio interviews an idea into shape, the author already knows the book, or it's a translation of a novel written in another language. */
-type Door = 'idea' | 'direct' | 'translate';
+/**
+ * The four ways into a novel: the studio interviews an idea into shape, the author already knows the book,
+ * it's a translation of a novel written in another language, or a plan bundle authored offline is ready to
+ * load. The import door only creates the project — the bundle itself is uploaded on the Import Plan screen
+ * this door hands off to, since that screen already owns the upload/preview/overwrite/approve flow.
+ */
+type Door = 'idea' | 'direct' | 'translate' | 'import';
 
 const OTHER_LANGUAGE = 'other';
 
@@ -45,9 +51,11 @@ export interface NewNovelModalProps {
  * project only ever arrive through a novel-import bundle (see the "Import novel" screen), which creates its
  * own project, so there is nothing this manual dialog could usefully create for that kind. The idea door
  * creates a seed instead and hands the author to the Ideation Studio. The translate door creates a
- * `translation` project with a required original language.
+ * `translation` project with a required original language. The import door creates a `new_novel` project —
+ * plan import only ever applies to that kind — then routes to its Import Plan screen to upload the bundle.
  */
 export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, defaultDoor = 'direct' }: NewNovelModalProps): React.JSX.Element {
+  const navigate = useNavigate();
   const createProject = useCreateProjectMutation();
   const createSeed = useCreateSeedMutation();
   const [door, setDoor] = useState<Door>(defaultDoor);
@@ -115,6 +123,26 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
     });
   };
 
+  const submitImportPlan = (): void => {
+    setTouched(true);
+    if (!title.trim()) return;
+    const body: CreateProjectBody = {
+      name: title.trim(),
+      title: title.trim(),
+      kind: 'new_novel',
+      contentMode,
+    };
+    createProject.mutate(body, {
+      onSuccess: project => {
+        toast.success(`Created “${project.title || project.name}” — now import your plan bundle`);
+        onOpenChange(false);
+        reset();
+        void navigate({ to: '/novels/$novelId/import-plan', params: { novelId: project.id } });
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
   const submitIdea = (): void => {
     createSeed.mutate(
       { spark: spark.trim() || undefined, contentMode },
@@ -145,7 +173,9 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
               ? 'The studio asks the questions a developmental editor would, and keeps a story seed sheet as you answer.'
               : door === 'translate'
                 ? "Bring a novel written in another language. You add the chapters as written; translation drafts English beside them and nothing becomes the novel's text until you finalize it."
-                : 'Create an original novel from a premise. To adapt an existing manuscript, use Import novel instead.'
+                : door === 'import'
+                  ? 'Create the project, then upload a plan bundle authored offline — bible documents, entities, volumes, arcs and chapter briefs land in one transactional call.'
+                  : 'Create an original novel from a premise. To adapt an existing manuscript, use Import novel instead.'
           }
         />
         <Dialog.Body>
@@ -154,6 +184,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
               <SegmentedControl.Item value="idea">Start from an idea</SegmentedControl.Item>
               <SegmentedControl.Item value="direct">I know the novel</SegmentedControl.Item>
               <SegmentedControl.Item value="translate">Translate a novel</SegmentedControl.Item>
+              <SegmentedControl.Item value="import">Import a plan</SegmentedControl.Item>
             </SegmentedControl>
             {door === 'idea' ? (
               <>
@@ -225,6 +256,24 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
                   </div>
                 </div>
               </>
+            ) : door === 'import' ? (
+              <>
+                <FormField label="Working title" required error={titleError}>
+                  <Input placeholder="e.g. The Ashfall Chronicles" value={title} onValueChange={setTitle} invalid={Boolean(titleError)} autoFocus />
+                </FormField>
+                <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
+                  <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
+                    <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
+                    <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
+                  </SegmentedControl>
+                </FormField>
+                <div className={styles.hint}>
+                  <span className={styles.hintText}>
+                    Creates the project, then opens Import Plan so you can upload the bundle — bible documents, entities, volumes, arcs and chapter briefs land in one transactional
+                    call.
+                  </span>
+                </div>
+              </>
             ) : (
               <>
                 <FormField label="Working title" required error={titleError}>
@@ -259,6 +308,10 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
           ) : door === 'translate' ? (
             <Button variant="primary" loading={createProject.isPending} onClick={submitTranslate}>
               Create novel
+            </Button>
+          ) : door === 'import' ? (
+            <Button variant="primary" loading={createProject.isPending} onClick={submitImportPlan}>
+              Create &amp; import
             </Button>
           ) : (
             <Button variant="primary" loading={createProject.isPending} onClick={submitDirect}>
