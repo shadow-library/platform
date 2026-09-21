@@ -101,3 +101,43 @@
 .input {
   display: none;
 }
+
+.tile {
+  aspect-ratio: 1;
+  border-radius: var(--sh-radius-md);
+}
+
+.addTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px dashed var(--sh-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+
+.addTile:hover:not(:disabled) {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+}
+
+.addTile:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.addLabel {
+  font-size: 12px;
+  font-weight: 600;
+}

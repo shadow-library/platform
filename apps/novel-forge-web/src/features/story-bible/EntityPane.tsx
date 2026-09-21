@@ -23,7 +23,6 @@ import { guidesMentioning, leadSection } from '@/lib/bible-entries';
 import { type BibleSearch } from '@/lib/bible-search';
 import { knownFactsAbout, secretRevealLabel, secretsAbout, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, TOPIC_LABEL } from '@/lib/bible-topics';
-import { coverColor } from '@/lib/format';
 import { stripEntityHeading, TYPE_SINGULAR } from '@/lib/story-bible';
 
 import { SecretCard } from './SecretCard';
@@ -200,23 +199,29 @@ function EntityImages({ novelId, entity }: EntityImagesProps): ReactElement {
   const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
   const addGalleryImage = useAddEntityImageMutation(novelId, entityKey);
   const removeGalleryImage = useDeleteEntityImageByIdMutation(novelId, entityKey);
+  const hasPortrait = Boolean(entity.imageUrl);
 
   return (
     <section className={styles.imagesSection} aria-label="Portrait and gallery">
       <h3 className={styles.label}>Portrait &amp; gallery</h3>
-      <ImageUpload
-        className={styles.portrait}
-        src={entity.imageUrl ?? undefined}
-        alt={entity.name}
-        uploading={uploadImage.isPending || removeImage.isPending}
-        placeholder={<div className={styles.portraitPlaceholder} style={{ background: coverColor(entity.id) }} />}
-        onUpload={image => uploadImage.mutate(image, { onSuccess: () => toast.success(`Updated ${entity.name}’s image`), onError: e => toast.danger(e.message) })}
-        onRemove={() => removeImage.mutate(undefined, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
-      />
       <ImageGallery
+        leading={
+          <ImageUpload
+            variant="tile"
+            src={entity.imageUrl ?? undefined}
+            alt={entity.name}
+            label="Portrait"
+            emptyLabel="Add portrait"
+            uploading={uploadImage.isPending || removeImage.isPending}
+            onUpload={image => uploadImage.mutate(image, { onSuccess: () => toast.success(`Updated ${entity.name}’s image`), onError: e => toast.danger(e.message) })}
+            onRemove={() => removeImage.mutate(undefined, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
+          />
+        }
         images={(full?.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
         busy={addGalleryImage.isPending || removeGalleryImage.isPending || !full}
-        addLabel="Add image"
+        showAdd={hasPortrait}
+        addLabel="Add more"
+        addAriaLabel="Add another image"
         onAdd={image => addGalleryImage.mutate(image, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
         onRemove={id => removeGalleryImage.mutate(id, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
       />

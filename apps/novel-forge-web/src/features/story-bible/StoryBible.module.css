@@ -515,16 +515,6 @@
   border-top: var(--sh-border-width) solid var(--sh-border-subtle);
 }
 
-.portrait {
-  width: 160px;
-}
-
-.portraitPlaceholder {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  border-radius: var(--sh-radius-md);
-}
-
 .timeline {
   position: relative;
   height: 44px;
