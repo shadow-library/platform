@@ -1,0 +1,3 @@
+ALTER TABLE "projects" ADD COLUMN "word_target_min" integer;--> statement-breakpoint
+ALTER TABLE "projects" ADD COLUMN "word_target_max" integer;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_word_target_check" CHECK (("projects"."word_target_min" IS NULL AND "projects"."word_target_max" IS NULL) OR ("projects"."word_target_min" IS NOT NULL AND "projects"."word_target_max" IS NOT NULL AND "projects"."word_target_max" > "projects"."word_target_min"));

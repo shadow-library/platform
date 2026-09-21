@@ -21,7 +21,7 @@ import { asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import * as schema from '@server/database/schemas';
-import { type ChapterMetricsInput, computeDeterministicMetricsReport } from '@server/modules/eval/deterministic-metrics';
+import { type ChapterMetricsInput, computeDeterministicMetricsReport, resolveWordTarget } from '@server/modules/eval/deterministic-metrics';
 
 interface Args {
   projectId: bigint;
@@ -130,23 +130,25 @@ async function main(): Promise<void> {
     );
   }
 
-  const report = computeDeterministicMetricsReport(chapters, priorBodiesByChapter);
+  const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, args.projectId), columns: { wordTargetMin: true, wordTargetMax: true } });
+  const target = resolveWordTarget(projectRow);
+  const report = computeDeterministicMetricsReport(chapters, priorBodiesByChapter, target);
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    printTextReport(args, report);
+    printTextReport(args, target, report);
   }
 
   await db.$client.close();
 }
 
-function printTextReport(args: Args, report: ReturnType<typeof computeDeterministicMetricsReport>): void {
+function printTextReport(args: Args, target: { min: number; max: number }, report: ReturnType<typeof computeDeterministicMetricsReport>): void {
   console.log(`Track 2 — deterministic prose metrics — project ${args.projectId} (${args.source})`);
   console.log(`Chapters: ${report.chapters.map(c => c.chapter).join(', ')}`);
   console.log('');
 
-  console.log('Word count vs. target (1,800–2,600):');
+  console.log(`Word count vs. target (${target.min}–${target.max}):`);
   console.log(`  in-target: ${report.wordCountSummary.inTargetCount}/${report.wordCountSummary.count} (${(report.wordCountSummary.inTargetRate * 100).toFixed(1)}%)`);
   console.log(`  min=${report.wordCountSummary.min} max=${report.wordCountSummary.max} mean=${report.wordCountSummary.mean.toFixed(0)} median=${report.wordCountSummary.median}`);
   console.log('');

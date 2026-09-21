@@ -55,12 +55,17 @@ export interface ImportedNovelMetaData {
 
 export namespace Project {
   export type Row = InferSelectModel<typeof projects>;
+  export interface WordTarget {
+    min: number;
+    max: number;
+  }
   // The row as surfaced by `ProjectService.present`: the stored `config = null` is mapped to an omitted
   // (`undefined`) field so it satisfies the non-nullable `ProjectConfig` response schema, and the stored
   // `coverImagePath` ref gains its resolved `coverUrl`. The ref stays on the type for internal callers
   // (the export packer reads bytes by ref); only `coverUrl` is declared on the response DTO, so the
-  // serialiser is what keeps the ref off the wire.
-  export type Presented = Omit<Row, 'config'> & { config?: ProjectConfigData; coverUrl?: string };
+  // serialiser is what keeps the ref off the wire. `wordTargetMin`/`wordTargetMax` collapse the same way
+  // into a single optional `wordTarget` object, or an omitted field when either half is null.
+  export type Presented = Omit<Row, 'config' | 'wordTargetMin' | 'wordTargetMax'> & { config?: ProjectConfigData; coverUrl?: string; wordTarget?: WordTarget };
   export type Kind = InferEnum<typeof projectKind>;
   export type Status = InferEnum<typeof projectStatus>;
   export type ContentMode = InferEnum<typeof contentMode>;
@@ -94,6 +99,10 @@ export const projects = pgTable(
     /** BCP-47 tag of the prose in `chapters.original_content`; null means the project has no original-language side. */
     originalLanguage: varchar('original_language', { length: 16 }),
     config: jsonb('config').$type<ProjectConfigData>(),
+    /** Chapter scene-prose word-count floor; null means the generation pipeline's default band applies. Always set together with `wordTargetMax`. */
+    wordTargetMin: integer('word_target_min'),
+    /** Chapter scene-prose word-count ceiling; null means the generation pipeline's default band applies. Always set together with `wordTargetMin`. */
+    wordTargetMax: integer('word_target_max'),
     brief: text('brief'),
     premise: text('premise'),
     themes: jsonb('themes'),
@@ -118,6 +127,10 @@ export const projects = pgTable(
       .on(t.organisationId)
       .where(sql`${t.sharedWithOrg}`),
     check('projects_bot_owner_organisation_check', sql`${t.ownerKind} <> 'bot' OR ${t.organisationId} IS NOT NULL`),
+    check(
+      'projects_word_target_check',
+      sql`(${t.wordTargetMin} IS NULL AND ${t.wordTargetMax} IS NULL) OR (${t.wordTargetMin} IS NOT NULL AND ${t.wordTargetMax} IS NOT NULL AND ${t.wordTargetMax} > ${t.wordTargetMin})`,
+    ),
   ],
 );
 

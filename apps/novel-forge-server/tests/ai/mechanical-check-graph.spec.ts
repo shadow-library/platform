@@ -70,17 +70,26 @@ describe.if(pgAvailable)('mechanical check node', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
   });
 
-  async function seedProject(): Promise<bigint> {
+  async function seedProject(wordTarget?: { min: number; max: number }): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
-      .values({ name: `mechanical-check-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
+      .values({
+        name: `mechanical-check-${Date.now()}-${Math.random()}`,
+        kind: 'new_novel',
+        wordTargetMin: wordTarget?.min,
+        wordTargetMax: wordTarget?.max,
+      })
       .returning();
     if (!project) throw new Error('failed to seed project');
     return project.id;
   }
 
-  async function run(body: string, autoFix: boolean): Promise<{ outcome: string | null; mechanicallyCompliant: boolean; projectId: bigint }> {
-    const projectId = await seedProject();
+  async function run(
+    body: string,
+    autoFix: boolean,
+    wordTarget?: { min: number; max: number },
+  ): Promise<{ outcome: string | null; mechanicallyCompliant: boolean; projectId: bigint }> {
+    const projectId = await seedProject(wordTarget);
     const graph = createChapterGenerationGraph(buildServices(db, body));
     const runId = `mechanical-${projectId}-${autoFix}`;
     const input = { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix, maxFixes: 0, runId };
@@ -140,6 +149,18 @@ describe.if(pgAvailable)('mechanical check node', () => {
     const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
     expect(draft?.body).toBe(FULL_LENGTH_DRAFT_BODY);
     expect(draft?.judgeNote).toBeNull();
+  });
+
+  it('should check a soft-target-band finding against the project’s overridden word target, not the application default', async () => {
+    // ~1,900 words — inside the 1,800–2,600 default band (see the other "accept a clean draft" case
+    // above), but under the floor of a project overridden to 2,000–3,500.
+    const { outcome, mechanicallyCompliant, projectId } = await run(FULL_LENGTH_DRAFT_BODY, false, { min: 2000, max: 3500 });
+
+    expect(mechanicallyCompliant).toBe(true);
+    expect(outcome).toBe('accepted');
+
+    const draft = await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, 1)) });
+    expect(draft?.judgeNote).toContain('under the 2000–3500 target band');
   });
 
   it('should compare the draft against the last finished chapters', async () => {

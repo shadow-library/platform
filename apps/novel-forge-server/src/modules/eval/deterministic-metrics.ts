@@ -3,7 +3,8 @@
 // from prose alone, which is the point — mechanical properties need no model judgment.
 //
 // Definitions, so a future reader can trust the numbers without re-reading the code:
-// - Word count: whitespace-split tokens, matches the target band from `generation.prompt.ts` (1,800–2,600).
+// - Word count: whitespace-split tokens, matches the target band the generation prompt was given —
+//   the application default (1,800–2,600) unless the project overrides it (see `resolveWordTarget`).
 // - Sentence-length band: 6–22 words per sentence, the band named in `authoring-preamble.ts`'s
 //   `DEFAULT_WRITING_INSTRUCTIONS` ("Keep most sentences between roughly 6 and 22 words").
 // - "Longest-run monotony": the longest run of consecutive sentences that all fall OUTSIDE the 6–22
@@ -26,9 +27,31 @@
 // - Ending-mode distribution: tallies `briefs.endingContract.hookType` (or a supplied hook type) across a
 //   chapter span; reports the counts and the distinct-type count.
 
+// Application default target band — a project with no override uses these. `resolveWordTarget` is how
+// every caller (prompt, mechanical check, expansion pass, this module's own reports) reads the
+// effective band, so the default only needs to be correct here.
 export const WORD_TARGET_MIN = 1800;
 export const WORD_TARGET_MAX = 2600;
 export const WORD_TARGET_AIM = 2200;
+
+export interface ResolvedWordTarget {
+  min: number;
+  max: number;
+  /** Midpoint of the band — not a persisted value, always derived so it tracks a project's override. */
+  aim: number;
+}
+
+/** Structural rather than importing `Project.Row`/`ProjectConfig` — both already carry these two column names verbatim. */
+export interface WordTargetSource {
+  wordTargetMin?: number | null;
+  wordTargetMax?: number | null;
+}
+
+export function resolveWordTarget(project?: WordTargetSource | null): ResolvedWordTarget {
+  const min = project?.wordTargetMin ?? WORD_TARGET_MIN;
+  const max = project?.wordTargetMax ?? WORD_TARGET_MAX;
+  return { min, max, aim: Math.round((min + max) / 2) };
+}
 
 const SENTENCE_BAND_MIN = 6;
 const SENTENCE_BAND_MAX = 22;
@@ -159,10 +182,10 @@ export interface WordCountSummary {
   median: number;
 }
 
-export function computeWordCountDistribution(chapters: { chapter: number; body: string }[]): WordCountSummary {
+export function computeWordCountDistribution(chapters: { chapter: number; body: string }[], target: ResolvedWordTarget = resolveWordTarget()): WordCountSummary {
   const reports = chapters.map(c => {
     const words = countWords(c.body);
-    return { chapter: c.chapter, words, inTarget: words >= WORD_TARGET_MIN && words <= WORD_TARGET_MAX };
+    return { chapter: c.chapter, words, inTarget: words >= target.min && words <= target.max };
   });
   const counts = reports.map(r => r.words).sort((a, b) => a - b);
   const count = counts.length;
@@ -398,12 +421,12 @@ export interface ChapterMetricsReport {
 }
 
 /** Computes every per-chapter metric for one chapter, given the prior-chapters window for cross-chapter n-gram comparison. */
-export function computeChapterMetrics(input: ChapterMetricsInput, priorBodies: string[]): ChapterMetricsReport {
+export function computeChapterMetrics(input: ChapterMetricsInput, priorBodies: string[], target: ResolvedWordTarget = resolveWordTarget()): ChapterMetricsReport {
   const words = countWords(input.body);
   return {
     chapter: input.chapter,
     words,
-    inWordTarget: words >= WORD_TARGET_MIN && words <= WORD_TARGET_MAX,
+    inWordTarget: words >= target.min && words <= target.max,
     sentence: computeSentenceLengthMetrics(input.body),
     withinChapterNgrams: computeWithinChapterRepeatedNgrams(input.body),
     crossChapterNgrams: computeCrossChapterRepeatedNgrams(input.body, priorBodies),
@@ -425,11 +448,18 @@ export interface DeterministicMetricsReport {
  * immediately before the span (fetched by the caller and passed in `priorBodiesByChapter`) count toward
  * each chapter's cross-chapter n-gram comparison — the report recommends "prior ~10 chapters".
  */
-export function computeDeterministicMetricsReport(chapters: ChapterMetricsInput[], priorBodiesByChapter: Map<number, string[]>): DeterministicMetricsReport {
-  const chapterReports = chapters.map(c => computeChapterMetrics(c, priorBodiesByChapter.get(c.chapter) ?? []));
+export function computeDeterministicMetricsReport(
+  chapters: ChapterMetricsInput[],
+  priorBodiesByChapter: Map<number, string[]>,
+  target: ResolvedWordTarget = resolveWordTarget(),
+): DeterministicMetricsReport {
+  const chapterReports = chapters.map(c => computeChapterMetrics(c, priorBodiesByChapter.get(c.chapter) ?? [], target));
   return {
     chapters: chapterReports,
-    wordCountSummary: computeWordCountDistribution(chapters.map(c => ({ chapter: c.chapter, body: c.body }))),
+    wordCountSummary: computeWordCountDistribution(
+      chapters.map(c => ({ chapter: c.chapter, body: c.body })),
+      target,
+    ),
     endingModeDistribution: computeEndingModeDistribution(chapters.map(c => ({ chapter: c.chapter, hookType: c.hookType ?? null }))),
   };
 }

@@ -13,9 +13,25 @@ import {
   computeWordCountDistribution,
   countWords,
   ngrams,
+  resolveWordTarget,
   splitSentences,
   tokenizeWords,
+  WORD_TARGET_AIM,
+  WORD_TARGET_MAX,
+  WORD_TARGET_MIN,
 } from '@modules/eval/deterministic-metrics';
+
+describe('resolveWordTarget', () => {
+  it('should fall back to the application default when the project has no override', () => {
+    expect(resolveWordTarget()).toEqual({ min: WORD_TARGET_MIN, max: WORD_TARGET_MAX, aim: WORD_TARGET_AIM });
+    expect(resolveWordTarget(null)).toEqual({ min: WORD_TARGET_MIN, max: WORD_TARGET_MAX, aim: WORD_TARGET_AIM });
+    expect(resolveWordTarget({ wordTargetMin: null, wordTargetMax: null })).toEqual({ min: WORD_TARGET_MIN, max: WORD_TARGET_MAX, aim: WORD_TARGET_AIM });
+  });
+
+  it('should use the project’s overridden band and derive its midpoint as the aim', () => {
+    expect(resolveWordTarget({ wordTargetMin: 2000, wordTargetMax: 3500 })).toEqual({ min: 2000, max: 3500, aim: 2750 });
+  });
+});
 
 describe('countWords', () => {
   it('should count whitespace-separated words', () => {
@@ -61,6 +77,20 @@ describe('computeWordCountDistribution', () => {
   it('should return zeroed stats for an empty chapter list', () => {
     const summary = computeWordCountDistribution([]);
     expect(summary).toMatchObject({ count: 0, inTargetCount: 0, inTargetRate: 0, min: 0, max: 0, mean: 0, median: 0 });
+  });
+
+  it('should classify chapters against a passed-in target instead of the application default', () => {
+    const target = resolveWordTarget({ wordTargetMin: 2000, wordTargetMax: 3500 });
+    const summary = computeWordCountDistribution(
+      [
+        { chapter: 1, body: 'word '.repeat(1900) }, // inside the default band, outside this override
+        { chapter: 2, body: 'word '.repeat(2800) }, // inside the override
+      ],
+      target,
+    );
+    expect(summary.chapters[0]?.inTarget).toBe(false);
+    expect(summary.chapters[1]?.inTarget).toBe(true);
+    expect(summary.inTargetCount).toBe(1);
   });
 });
 

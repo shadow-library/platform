@@ -3555,11 +3555,20 @@ export interface components {
       contentMode?: components['schemas']['ContentMode'];
       /** @description BCP 47 language tag of the original prose (for example `zh` or `pt-BR`); required for a `translation` project and rejected for any other kind. */
       originalLanguage?: string;
+      /** @description Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words). */
+      wordTarget?: components['schemas']['ProjectWordTarget'];
     };
     /** @enum {string} */
     ProjectKind: 'source' | 'new_novel' | 'translation' | 'curated';
     /** @enum {string} */
     ContentMode: 'standard' | 'unrestricted';
+    /** @description Chapter scene-prose word-count target — the generation prompt, length checks, and the expansion pass all read this band. */
+    ProjectWordTarget: {
+      /** @description Minimum word count a generated chapter must reach. */
+      min: number;
+      /** @description Maximum word count a generated chapter should stay under; must be greater than `min`. */
+      max: number;
+    };
     ProjectResponse: {
       id: string;
       name: string;
@@ -3581,6 +3590,8 @@ export interface components {
       /** @description Effective chapter-writing instructions, including the application default. */
       instructions?: null | string;
       storyCurrentChapter?: null | number;
+      /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
+      wordTarget?: components['schemas']['ProjectWordTarget'];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -3651,6 +3662,8 @@ export interface components {
       instructions?: string | null;
       /** @description BCP 47 language tag of the original prose; accepted only on a `translation` project, and only `null` on any other kind. */
       originalLanguage?: string | null;
+      /** @description Chapter word-count target; send `null` to restore the application default (1,800–2,600 words). */
+      wordTarget?: components['schemas']['ProjectWordTarget'] | null;
       /** @description Switches the project workflow. Only `curated` to `new_novel` and `translation` to `curated` are accepted. */
       kind?: components['schemas']['ProjectKind'];
     };
@@ -3658,6 +3671,8 @@ export interface components {
       name: string;
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
+      /** @description Chapter word-count target; omitted inherits the source project’s target (or the application default). */
+      wordTarget?: components['schemas']['ProjectWordTarget'];
       resetDerived?: boolean;
     };
     ResetBody: {
@@ -15853,6 +15868,7 @@ export type ChapterTranslationStatus = components['schemas']['ChapterTranslation
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
+export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type ProjectStatus = components['schemas']['ProjectStatus'];
 export type OwnerKind = components['schemas']['OwnerKind'];

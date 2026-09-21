@@ -7,7 +7,8 @@ import { countTokens } from '@modules/ai/context/token-budget';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { applyAnthropicCacheControl, MIN_CACHEABLE_TOKENS } from '@modules/ai/prompt-caching';
 import { chatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
-import { generationPrompt } from '@modules/ai/prompts/generation.prompt';
+import { generationPrompt, generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
+import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 
 const bigText = 'the sect trials continue with rising stakes and sharper blades. '.repeat(150);
 const smallText = 'short volatile tail';
@@ -115,7 +116,14 @@ describe('cache_control wire shape through ChatOpenAI', () => {
 
 describe('generation path caching', () => {
   const ctx = { projectId: BigInt(1), promptKey: 'generation', promptVersion: generationPrompt.version, role: 'generation' };
-  const input = { stableContext: bigText, volatileContext: smallText, chapterBrief: 'reach the summit', endingContract: 'none', guidance: '' };
+  const input = {
+    stableContext: bigText,
+    volatileContext: smallText,
+    chapterBrief: 'reach the summit',
+    endingContract: 'none',
+    guidance: '',
+    ...generationWordTargetVars(resolveWordTarget()),
+  };
   const draft = { title: 'Ascent', body: 'the rope bit into his palms and the ledge came no closer. '.repeat(4), summary: 'they climbed' };
 
   it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {

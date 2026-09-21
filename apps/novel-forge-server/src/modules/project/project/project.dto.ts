@@ -5,11 +5,29 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { ContentMode, OwnerKind, ProjectKind, ProjectStatus, SortByTime } from '@server/common';
 import { type Owner, type Project } from '@server/database';
 
+// Floor keeps a chapter well above what the mechanical check would hard-reject on its own slack (see
+// `WORD_COUNT_HARD_SLACK` in `mechanical-check.ts`); ceiling is a sanity bound, not a model capability limit.
+export const WORD_TARGET_FLOOR = 500;
+export const WORD_TARGET_CEILING = 6000;
+
 @Schema()
 export class ProjectParams {
   @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
   projectId: bigint;
+}
+
+@Schema({ description: 'Chapter scene-prose word-count target — the generation prompt, length checks, and the expansion pass all read this band.' })
+export class ProjectWordTarget {
+  @Field(() => Integer, { minimum: WORD_TARGET_FLOOR, maximum: WORD_TARGET_CEILING, description: 'Minimum word count a generated chapter must reach.' })
+  min: number;
+
+  @Field(() => Integer, {
+    minimum: WORD_TARGET_FLOOR,
+    maximum: WORD_TARGET_CEILING,
+    description: 'Maximum word count a generated chapter should stay under; must be greater than `min`.',
+  })
+  max: number;
 }
 
 @Schema()
@@ -36,6 +54,9 @@ export class CreateProjectBody {
     description: 'BCP 47 language tag of the original prose (for example `zh` or `pt-BR`); required for a `translation` project and rejected for any other kind.',
   })
   originalLanguage?: string;
+
+  @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words).' })
+  wordTarget?: ProjectWordTarget;
 }
 
 @Schema({ description: 'Provider and model reference used for a project-level AI role override.' })
@@ -171,6 +192,11 @@ export class ProjectResponse {
   @Field(() => Integer, { optional: true, nullable: true })
   storyCurrentChapter?: number | null;
 
+  // Non-nullable for the same class-ref reason as `config` above: a fresh project stores both halves
+  // null, and `ProjectService.present` collapses that pair to an omitted field before serialisation.
+  @Field(() => ProjectWordTarget, { optional: true, description: 'Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words).' })
+  wordTarget?: ProjectWordTarget;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
@@ -213,6 +239,9 @@ export class UpdateProjectBody {
   })
   originalLanguage?: string | null;
 
+  @Field(() => ProjectWordTarget, { optional: true, nullable: true, description: 'Chapter word-count target; send `null` to restore the application default (1,800–2,600 words).' })
+  wordTarget?: ProjectWordTarget | null;
+
   @Field(() => ProjectKind, {
     optional: true,
     description: 'Switches the project workflow. Only `curated` to `new_novel` and `translation` to `curated` are accepted.',
@@ -230,6 +259,9 @@ export class CloneProjectBody {
 
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
+
+  @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter word-count target; omitted inherits the source project’s target (or the application default).' })
+  wordTarget?: ProjectWordTarget;
 
   @Field({ optional: true })
   resetDerived?: boolean;

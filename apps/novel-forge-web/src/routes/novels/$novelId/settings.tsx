@@ -10,6 +10,7 @@ import {
   type ProjectConfig,
   type ProjectKind,
   type ProjectModelOverrides,
+  type ProjectWordTarget,
   useAccountSettingsQuery,
   useAiModelsQuery,
   useDeleteProjectMutation,
@@ -74,6 +75,40 @@ const ROLE_GROUPS: RoleGroup[] = [
 
 const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
+// Mirrors the server's application default (`WORD_TARGET_MIN`/`MAX` in `deterministic-metrics.ts`) —
+// shown as the field placeholder so an unset project visibly states what it inherits.
+const DEFAULT_WORD_TARGET_MIN = 1800;
+const DEFAULT_WORD_TARGET_MAX = 2600;
+
+// Mirrors the server's `WORD_TARGET_FLOOR`/`WORD_TARGET_CEILING` in project.dto.ts — client-side
+// validation is a UX convenience, not a substitute for the server's own check, but it should reject
+// the same values rather than round-trip a 422 for something the field could have refused outright.
+const WORD_TARGET_FLOOR = 500;
+const WORD_TARGET_CEILING = 6000;
+
+type WordTargetInput = { value: ProjectWordTarget | null } | { error: string };
+
+function isInteger(value: number): boolean {
+  return Number.isFinite(value) && Number.isInteger(value);
+}
+
+// Both fields blank clears the override back to the application default; both filled sets it. One
+// filled and one blank is rejected client-side rather than silently coerced to the other's default.
+function parseWordTargetInput(minInput: string, maxInput: string): WordTargetInput {
+  const minTrimmed = minInput.trim();
+  const maxTrimmed = maxInput.trim();
+  if (!minTrimmed && !maxTrimmed) return { value: null };
+  if (!minTrimmed || !maxTrimmed) return { error: 'Enter both a minimum and a maximum word count, or leave both blank for the default.' };
+  const min = Number(minTrimmed);
+  const max = Number(maxTrimmed);
+  if (!isInteger(min) || !isInteger(max)) return { error: 'Word count target must be a whole number.' };
+  if (min < WORD_TARGET_FLOOR || min > WORD_TARGET_CEILING || max < WORD_TARGET_FLOOR || max > WORD_TARGET_CEILING) {
+    return { error: `Word count target must be between ${WORD_TARGET_FLOOR.toLocaleString('en-US')} and ${WORD_TARGET_CEILING.toLocaleString('en-US')}.` };
+  }
+  if (max <= min) return { error: 'Maximum word count must be greater than the minimum.' };
+  return { value: { min, max } };
+}
+
 function SettingsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
@@ -89,6 +124,8 @@ function SettingsScreen(): React.JSX.Element {
   const [brief, setBrief] = useState('');
   const [instructions, setInstructions] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
+  const [wordTargetMin, setWordTargetMin] = useState('');
+  const [wordTargetMax, setWordTargetMax] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [switchTarget, setSwitchTarget] = useState<Extract<ProjectKind, 'new_novel' | 'curated'> | null>(null);
@@ -101,6 +138,8 @@ function SettingsScreen(): React.JSX.Element {
     setBrief(project.brief ?? '');
     setInstructions(project.instructions ?? '');
     setContentMode(project.contentMode);
+    setWordTargetMin(project.wordTarget ? String(project.wordTarget.min) : '');
+    setWordTargetMax(project.wordTarget ? String(project.wordTarget.max) : '');
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
     const allowed = new Set(unrestrictedAllowlist ?? []);
@@ -116,8 +155,13 @@ function SettingsScreen(): React.JSX.Element {
   const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
   const saveGeneral = (): void => {
+    const wordTarget = parseWordTargetInput(wordTargetMin, wordTargetMax);
+    if ('error' in wordTarget) {
+      toast.danger(wordTarget.error);
+      return;
+    }
     updateProject.mutate(
-      { title: title.trim(), brief, instructions, contentMode },
+      { title: title.trim(), brief, instructions, contentMode, wordTarget: wordTarget.value },
       { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) },
     );
   };
@@ -226,6 +270,37 @@ function SettingsScreen(): React.JSX.Element {
                     helper="Always sent to the AI when it writes a chapter — voice, style, and length. Clear the field to restore the default."
                   >
                     <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
+                  </FormField>
+                  <FormField
+                    label="Chapter word-count target"
+                    helper={`How long a generated chapter should run — length checks, the expansion pass, and the writer's prompt all read this. Leave both blank for the default (${DEFAULT_WORD_TARGET_MIN.toLocaleString('en-US')}–${DEFAULT_WORD_TARGET_MAX.toLocaleString('en-US')}).`}
+                  >
+                    <div className={styles.fieldRow}>
+                      <div className={styles.fieldCol}>
+                        <Input
+                          type="number"
+                          min={WORD_TARGET_FLOOR}
+                          max={WORD_TARGET_CEILING}
+                          step={1}
+                          value={wordTargetMin}
+                          onValueChange={setWordTargetMin}
+                          placeholder={String(DEFAULT_WORD_TARGET_MIN)}
+                          aria-label="Minimum word count"
+                        />
+                      </div>
+                      <div className={styles.fieldCol}>
+                        <Input
+                          type="number"
+                          min={WORD_TARGET_FLOOR}
+                          max={WORD_TARGET_CEILING}
+                          step={1}
+                          value={wordTargetMax}
+                          onValueChange={setWordTargetMax}
+                          placeholder={String(DEFAULT_WORD_TARGET_MAX)}
+                          aria-label="Maximum word count"
+                        />
+                      </div>
+                    </div>
                   </FormField>
                   <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
                     <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>

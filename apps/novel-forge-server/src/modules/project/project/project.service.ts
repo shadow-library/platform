@@ -23,6 +23,7 @@ import {
   type ListProjectsQuery,
   type ProjectConfig,
   type ProjectStatusResponse,
+  type ProjectWordTarget,
   type ResetResponse,
   type UpdateProjectBody,
 } from './project.dto';
@@ -84,13 +85,23 @@ export class ProjectService {
     }
   }
 
-  // The `ProjectResponse.config` schema is a non-nullable object; a fresh project stores `config = null`,
-  // so map that to `undefined` (an omitted field) before it reaches the serialiser. `instructions` is
-  // surfaced as its effective value (stored override or the default) so the settings form always shows
-  // the writing instructions the AI will actually use.
+  // Field-level min/max bounds are declared on `ProjectWordTarget` itself; only the cross-field
+  // relationship (max strictly above min) needs a service-level check.
+  private assertWordTargetValid(target?: ProjectWordTarget | null): void {
+    if (!target) return;
+    if (target.max <= target.min) throw AppErrorCode.PRJ_010.create();
+  }
+
+  // The `ProjectResponse.config`/`wordTarget` schemas are non-nullable objects; a fresh project stores
+  // `config = null` and both word-target columns null, so both collapse to `undefined` (an omitted
+  // field) before they reach the serialiser. `instructions` is surfaced as its effective value (stored
+  // override or the default) so the settings form always shows the writing instructions the AI will
+  // actually use.
   private present(project: Project.Row): Project.Presented {
+    const { wordTargetMin, wordTargetMax, ...rest } = project;
     const instructions = project.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS;
-    return { ...project, config: project.config ?? undefined, instructions, coverUrl: this.storage.getPublicUrl(project.coverImagePath) };
+    const wordTarget = wordTargetMin != null && wordTargetMax != null ? { min: wordTargetMin, max: wordTargetMax } : undefined;
+    return { ...rest, config: project.config ?? undefined, instructions, wordTarget, coverUrl: this.storage.getPublicUrl(project.coverImagePath) };
   }
 
   /**
@@ -102,6 +113,7 @@ export class ProjectService {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
     if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
     assertLanguageMatchesKind(body.kind, body.originalLanguage);
+    this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
 
@@ -117,6 +129,8 @@ export class ProjectService {
         instructions: body.instructions?.trim() || null,
         contentMode: body.contentMode,
         originalLanguage: body.originalLanguage,
+        wordTargetMin: body.wordTarget?.min,
+        wordTargetMax: body.wordTarget?.max,
       })
       .returning()
       .catch(err => this.databaseService.translateError(err));
@@ -221,6 +235,7 @@ export class ProjectService {
 
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(update.config);
+    this.assertWordTargetValid(update.wordTarget);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
     if (update.title !== undefined) set.title = update.title.trim() || null;
     // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
@@ -229,6 +244,13 @@ export class ProjectService {
       const trimmed = update.instructions?.trim() ?? '';
       set.instructions = trimmed && trimmed !== DEFAULT_WRITING_INSTRUCTIONS ? trimmed : null;
     }
+    // `wordTarget` is wire shape only — the row stores it as two columns, and `null` clears both back
+    // to "use the application default".
+    if (update.wordTarget !== undefined) {
+      set.wordTargetMin = update.wordTarget?.min ?? null;
+      set.wordTargetMax = update.wordTarget?.max ?? null;
+    }
+    delete set.wordTarget;
 
     return this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;
@@ -263,6 +285,7 @@ export class ProjectService {
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(body.config);
+    this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
     return this.db.transaction(async tx => {
@@ -284,6 +307,8 @@ export class ProjectService {
           originalLanguage: source.originalLanguage,
           contentMode: body.contentMode ?? source.contentMode,
           config: body.config ?? source.config ?? null,
+          wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
+          wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
           skeletonCharacterArcs: source.skeletonCharacterArcs,
           skeletonPowerCurve: source.skeletonPowerCurve,
         })

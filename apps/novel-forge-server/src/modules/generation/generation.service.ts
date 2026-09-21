@@ -18,6 +18,7 @@ import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
+import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
@@ -31,6 +32,7 @@ import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { applyBriefReveals, loadFactWriterNotes, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
+import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -1127,6 +1129,7 @@ export class GenerationService {
       volatileContext: pack.renderedVolatile,
       chapterBrief: renderChapterBrief(brief),
       endingContract: renderEndingContract(brief?.endingContract, await loadFactWriterNotes(this.db, projectId, brief?.endingContract)),
+      ...generationWordTargetVars(resolveWordTarget(project)),
     };
     const routedProject = { ...project, contentMode: 'unrestricted' } as never;
 

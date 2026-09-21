@@ -10,6 +10,7 @@ import {
   SCOPE_PLAYBOOKS,
 } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
+import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import {
   AppearanceDescribeSchema,
   BibleStageSchema,
@@ -40,7 +41,7 @@ import {
   validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
-import { WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
+import { resolveWordTarget, WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
 import { reforgeFidelity } from '@server/database/schemas';
 
 describe('Prompt modules', () => {
@@ -916,6 +917,7 @@ describe('Prompt modules', () => {
         chapterBrief: 'BRIEF',
         endingContract: 'Hook type: cliffhanger',
         guidance: '',
+        ...generationWordTargetVars(resolveWordTarget()),
       });
       expect(String(messages[messages.length - 1]?.content)).toContain('## ENDING CONTRACT\nHook type: cliffhanger');
     });
@@ -928,6 +930,7 @@ describe('Prompt modules', () => {
         chapterBrief: 'BRIEF',
         endingContract: 'none',
         guidance: 'GUIDANCE',
+        ...generationWordTargetVars(resolveWordTarget()),
       });
       expect(messages).toHaveLength(3);
       expect(messages[0]?.getType()).toBe('system');
@@ -942,11 +945,39 @@ describe('Prompt modules', () => {
   describe('chapter length', () => {
     const words = (count: number): string => count.toLocaleString('en-US');
 
-    it('should state a concrete floor, aim and ceiling in the generation prompt, sourced from the mechanical-check band', () => {
-      expect(PROMPT_REGISTRY.generation.system).toContain(`at least ${words(WORD_TARGET_MIN)} words`);
-      expect(PROMPT_REGISTRY.generation.system).toContain(`about ${words(WORD_TARGET_AIM)}`);
-      expect(PROMPT_REGISTRY.generation.system).toContain(words(WORD_TARGET_MAX));
-      expect(PROMPT_REGISTRY.generation.system).not.toContain('not a hard wall');
+    it('should state a concrete floor, aim and ceiling in the rendered generation prompt, sourced from the resolved word target', async () => {
+      const messages = await PROMPT_REGISTRY.generation.template.formatMessages({
+        stableContext: '',
+        volatileContext: '',
+        chapterBrief: '',
+        endingContract: '',
+        guidance: '',
+        ...generationWordTargetVars(resolveWordTarget()),
+      });
+      const system = String(messages[0]?.content);
+      expect(system).toContain(`at least ${words(WORD_TARGET_MIN)} words`);
+      expect(system).toContain(`about ${words(WORD_TARGET_AIM)}`);
+      expect(system).toContain(words(WORD_TARGET_MAX));
+      expect(system).not.toContain('not a hard wall');
+    });
+
+    it('should render an overridden project word target in the same sentence position', async () => {
+      const target = resolveWordTarget({ wordTargetMin: 2000, wordTargetMax: 3500 });
+      expect(target.aim).toBe(2750);
+      const messages = await PROMPT_REGISTRY.generation.template.formatMessages({
+        stableContext: '',
+        volatileContext: '',
+        chapterBrief: '',
+        endingContract: '',
+        guidance: '',
+        ...generationWordTargetVars(target),
+      });
+      const system = String(messages[0]?.content);
+      expect(system).toContain(`at least ${words(2000)} words`);
+      expect(system).toContain(`about ${words(2750)}`);
+      expect(system).toContain(`staying under ${words(3500)}`);
+      expect(system).not.toContain(words(WORD_TARGET_MIN));
+      expect(system).not.toContain(words(WORD_TARGET_MAX));
     });
 
     it('should keep the continuation cut from licensing a short chapter', () => {
@@ -1005,7 +1036,7 @@ describe('Prompt modules', () => {
 
   describe('knowledge contract (generation/judge v2.2)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.5.0');
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.6.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');

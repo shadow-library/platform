@@ -12,6 +12,15 @@
   margin-bottom: 16px;
 }
 
+.fieldRow {
+  display: flex;
+  gap: 16px;
+}
+
+.fieldCol {
+  flex: 1;
+}
+
 .workflowActions {
   display: flex;
   gap: 8px;

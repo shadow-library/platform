@@ -4,15 +4,26 @@ import {
   computeStockPhraseCounts,
   countWords,
   ngrams,
+  type ResolvedWordTarget,
+  resolveWordTarget,
   tokenizeWords,
-  WORD_TARGET_MAX,
-  WORD_TARGET_MIN,
 } from '../../eval/deterministic-metrics';
 import { type JudgeFinding } from '../schemas';
 
-// ~600 words of slack either side of the target band: past these the draft is a truncation or a runaway, not a chapter that ran long or short.
-export const WORD_COUNT_HARD_MIN = 1200;
-export const WORD_COUNT_HARD_MAX = 3200;
+// Slack either side of the target band: past these the draft is a truncation or a runaway, not a
+// chapter that ran long or short. Applied to the *resolved* (possibly project-overridden) band, so a
+// project with a wider target also gets a wider hard wall.
+export const WORD_COUNT_HARD_SLACK = 600;
+
+/** Hard truncation/runaway bounds for a resolved word target — `target.min/max ± WORD_COUNT_HARD_SLACK`. */
+export function resolveWordCountHardBounds(target: ResolvedWordTarget): { min: number; max: number } {
+  return { min: target.min - WORD_COUNT_HARD_SLACK, max: target.max + WORD_COUNT_HARD_SLACK };
+}
+
+// Default-band hard bounds — kept as constants since tests and callers with no project in hand reach for
+// these directly; a project override goes through `resolveWordCountHardBounds(resolveWordTarget(project))`.
+export const WORD_COUNT_HARD_MIN = resolveWordCountHardBounds(resolveWordTarget()).min;
+export const WORD_COUNT_HARD_MAX = resolveWordCountHardBounds(resolveWordTarget()).max;
 
 // Short paragraphs repeat legitimately (a shouted name, a one-line refrain); at 20+ words a verbatim
 // repeat is a generation defect, not a stylistic echo.
@@ -82,16 +93,18 @@ function excerpt(text: string, length = 80): string {
  * Deterministic mechanical checks over a finished draft. Hard findings are structural defects that
  * must ride the repair ladder; soft findings are prose-quality signals that surface at review without
  * blocking. `priorBodies` is the raw text of the last ~10 finished chapters, newest first — an empty array
- * simply skips the cross-chapter comparison.
+ * simply skips the cross-chapter comparison. `target` defaults to the application band; pass the
+ * project's resolved target (`resolveWordTarget(projectRow)`) to check against its override instead.
  */
-export function checkDraftMechanics(body: string, priorBodies: string[] = []): JudgeFinding[] {
+export function checkDraftMechanics(body: string, priorBodies: string[] = [], target: ResolvedWordTarget = resolveWordTarget()): JudgeFinding[] {
   const findings: JudgeFinding[] = [];
   const words = countWords(body);
+  const { min: hardMin, max: hardMax } = resolveWordCountHardBounds(target);
 
-  if (words < WORD_COUNT_HARD_MIN) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, below the ${WORD_COUNT_HARD_MIN}-word floor` });
-  else if (words > WORD_COUNT_HARD_MAX) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, above the ${WORD_COUNT_HARD_MAX}-word ceiling` });
-  else if (words < WORD_TARGET_MIN) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, under the ${WORD_TARGET_MIN}–${WORD_TARGET_MAX} target band` });
-  else if (words > WORD_TARGET_MAX) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, over the ${WORD_TARGET_MIN}–${WORD_TARGET_MAX} target band` });
+  if (words < hardMin) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, below the ${hardMin}-word floor` });
+  else if (words > hardMax) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, above the ${hardMax}-word ceiling` });
+  else if (words < target.min) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, under the ${target.min}–${target.max} target band` });
+  else if (words > target.max) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, over the ${target.min}–${target.max} target band` });
 
   for (const paragraph of findDuplicatedParagraphs(body)) {
     findings.push({ severity: 'hard', text: `mechanical: a paragraph is repeated verbatim — "${excerpt(paragraph)}"` });

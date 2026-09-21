@@ -115,6 +115,99 @@ describe.if(pgAvailable)('Projects API', () => {
     });
   });
 
+  describe('chapter word-count target', () => {
+    it('should omit the field when a new project sets no override', async () => {
+      const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wt-default', kind: 'new_novel' });
+      expect(response.statusCode).toBe(201);
+      expect(response.json().wordTarget).toBeUndefined();
+    });
+
+    it('should persist a target set at creation and echo it back', async () => {
+      const response = await testEnv
+        .getRouter()
+        .mockRequest()
+        .post('/api/v1/projects')
+        .body({ name: 'wt-create', kind: 'new_novel', wordTarget: { min: 2000, max: 3500 } });
+      expect(response.statusCode).toBe(201);
+      expect(response.json().wordTarget).toEqual({ min: 2000, max: 3500 });
+    });
+
+    it('should persist a target set on update and carry it on a subsequent read', async () => {
+      const id = (await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wt-update', kind: 'new_novel' })).json().id;
+
+      const updated = await testEnv
+        .getRouter()
+        .mockRequest()
+        .patch(`/api/v1/projects/${id}`)
+        .body({ wordTarget: { min: 2000, max: 3500 } });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json().wordTarget).toEqual({ min: 2000, max: 3500 });
+
+      const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${id}`);
+      expect(fetched.json().wordTarget).toEqual({ min: 2000, max: 3500 });
+    });
+
+    it('should clear the override back to the application default when set to null', async () => {
+      const id = (
+        await testEnv
+          .getRouter()
+          .mockRequest()
+          .post('/api/v1/projects')
+          .body({ name: 'wt-clear', kind: 'new_novel', wordTarget: { min: 2000, max: 3500 } })
+      ).json().id;
+
+      const cleared = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ wordTarget: null });
+      expect(cleared.statusCode).toBe(200);
+      expect(cleared.json().wordTarget).toBeUndefined();
+    });
+
+    it('should refuse a maximum that does not exceed the minimum', async () => {
+      const response = await testEnv
+        .getRouter()
+        .mockRequest()
+        .post('/api/v1/projects')
+        .body({ name: 'wt-inverted', kind: 'new_novel', wordTarget: { min: 3000, max: 3000 } });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe('PRJ_010');
+    });
+
+    it('should reject a target below the floor or above the ceiling at the schema', async () => {
+      const tooLow = await testEnv
+        .getRouter()
+        .mockRequest()
+        .post('/api/v1/projects')
+        .body({ name: 'wt-floor', kind: 'new_novel', wordTarget: { min: 10, max: 3000 } });
+      expect(tooLow.statusCode).toBe(422);
+
+      const tooHigh = await testEnv
+        .getRouter()
+        .mockRequest()
+        .post('/api/v1/projects')
+        .body({ name: 'wt-ceiling', kind: 'new_novel', wordTarget: { min: 2000, max: 50000 } });
+      expect(tooHigh.statusCode).toBe(422);
+    });
+
+    it('should inherit the source project’s target on clone unless the clone overrides it', async () => {
+      const sourceId = (
+        await testEnv
+          .getRouter()
+          .mockRequest()
+          .post('/api/v1/projects')
+          .body({ name: 'wt-clone-src', kind: 'new_novel', wordTarget: { min: 2000, max: 3500 } })
+      ).json().id;
+
+      const inherited = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${sourceId}/clone`).body({ name: 'wt-clone-inherited' });
+      expect(inherited.json().wordTarget).toEqual({ min: 2000, max: 3500 });
+
+      const overridden = await testEnv
+        .getRouter()
+        .mockRequest()
+        .post(`/api/v1/projects/${sourceId}/clone`)
+        .body({ name: 'wt-clone-override', wordTarget: { min: 1500, max: 2500 } });
+      expect(overridden.json().wordTarget).toEqual({ min: 1500, max: 2500 });
+    });
+  });
+
   describe('GET /api/v1/projects', () => {
     it('should list the newest activity first when the caller asks for no particular order', async () => {
       const db = testEnv.getPostgresClient();

@@ -31,6 +31,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_007 = AppErrorCode.conflict('PRJ_007', 'Cannot switch to curated while {count} chapter(s) are not finalized — finalize every translated chapter first');
   static readonly PRJ_008 = AppErrorCode.badRequest('PRJ_008', 'Workflow switch not allowed — only curated to new_novel and translation to curated are supported');
   static readonly PRJ_009 = AppErrorCode.badRequest('PRJ_009', 'Only original-novel or source projects run the authoring pipeline');
+  static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
 
   /*!
    * Source Errors

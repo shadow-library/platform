@@ -11,8 +11,9 @@ import { ContextAssembler } from '@modules/ai/context/context-assembler.service'
 import { CORE_SECTION_KEYS } from '@modules/ai/context/sections';
 import { CHAPTER_PACK_CONSUMERS } from '@modules/ai/graphs/chapter-generation.graph';
 import { ModelRouterService } from '@modules/ai/model-router.service';
+import { generationPrompt, generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import { GenerationService } from '@modules/generation/generation.service';
-import { generationPrompt } from '@modules/ai/prompts/generation.prompt';
+import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 import { createPluginLogger, type ForgeCallPolicy, type ForgePlugin, loadPlugins, PluginHost, PluginPolicyService, ScopedPluginHostFactory } from '@modules/plugins';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -125,7 +126,14 @@ describe.if(pgAvailable)('plugin contributions', () => {
   }
 
   function buildMessages(policy?: ForgeCallPolicy): Promise<BaseMessage[]> {
-    const input = { stableContext: 'stable', volatileContext: 'volatile', chapterBrief: 'brief', endingContract: 'none', guidance: 'none' };
+    const input = {
+      stableContext: 'stable',
+      volatileContext: 'volatile',
+      chapterBrief: 'brief',
+      endingContract: 'none',
+      guidance: 'none',
+      ...generationWordTargetVars(resolveWordTarget()),
+    };
     return (router as unknown as RouterInternals).buildMessages(generationPrompt, input, RESOLVED, policy);
   }
 
@@ -459,9 +467,11 @@ describe.if(pgAvailable)('plugin contributions', () => {
       await enable(projectId, 'twin-track', twinTrack('1'));
 
       const messages = await buildMessages(await policyService.resolve(projectId, { role: 'generation', chapter: 1 }));
+      const baseline = await buildMessages();
 
       expect(messages.map(message => message.getType())).toEqual(['system', 'system', 'human', 'human', 'human']);
-      expect(messages[0]?.content).toBe(generationPrompt.system);
+      // The module's own rendered system message is unchanged by the plugin's contribution — only a second, contributed system message is inserted after it.
+      expect(messages[0]?.content).toBe(baseline[0]?.content);
       expect(messages[1]?.content).toBe(NOTE);
     });
 

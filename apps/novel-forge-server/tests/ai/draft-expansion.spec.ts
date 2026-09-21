@@ -84,6 +84,30 @@ describe('expandShortDraft', () => {
     expect(calls[0]?.ctx).toMatchObject({ runId: 'run-1', node: 'draftChapter:expand', promptKey: 'chapter-expand', role: 'generation' });
   });
 
+  it('should expand against a project’s overridden word target instead of the application default', async () => {
+    const { calls, modelRouter } = routerReturning({ body: bodyOfWords(2900) });
+    const short = bodyOfWords(1900); // above the default 1,800 floor, so a default-band project would not expand at all — but under this project's 2,000 floor
+    const words = countWords(short);
+    const project = { wordTargetMin: 2000, wordTargetMax: 3500 };
+
+    const result = await expandShortDraft(modelRouter, input(short), CTX, project);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.vars).toMatchObject({ minWords: 2000, aimWords: 2750, missingWords: 2750 - words });
+    expect(result.finalWords).toBe(countWords(bodyOfWords(2900)));
+  });
+
+  it('should not expand a draft that already reaches an overridden floor even though it is under the application default', async () => {
+    const { calls, modelRouter } = routerReturning({ body: bodyOfWords(2900) });
+    const short = bodyOfWords(1500); // under the default 1,800 floor
+    const project = { wordTargetMin: 1200, wordTargetMax: 3500 };
+
+    const result = await expandShortDraft(modelRouter, input(short), CTX, project);
+
+    expect(calls).toHaveLength(0);
+    expect(result.passes).toBe(0);
+  });
+
   it('should stop after the maximum number of passes when the draft stays short', async () => {
     const { calls, modelRouter } = routerReturning({ body: bodyOfWords(1500) }, { body: bodyOfWords(1600) }, { body: bodyOfWords(1700) });
 

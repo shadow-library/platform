@@ -8,7 +8,7 @@ import {
   WORD_COUNT_HARD_MAX,
   WORD_COUNT_HARD_MIN,
 } from '@modules/ai/graphs/mechanical-check';
-import { WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
+import { resolveWordTarget, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
 
 const SENTENCE = 'She climbed the ridge and did not look back. ';
 const SENTENCE_WORDS = 9;
@@ -57,6 +57,32 @@ describe('checkDraftMechanics', () => {
     expect(long).toHaveLength(1);
     expect(long[0]?.severity).toBe('soft');
     expect(long[0]?.text).toContain('over');
+  });
+
+  it('should check against a project’s overridden word target instead of the application default', () => {
+    const target = resolveWordTarget({ wordTargetMin: 2000, wordTargetMax: 3500 });
+
+    // 1,900 words: inside the default 1,800–2,600 band, but under the override's 2,000 floor.
+    const underOverride = checkDraftMechanics(bodyOfWords(1900), [], target);
+    expect(underOverride).toHaveLength(1);
+    expect(underOverride[0]?.severity).toBe('soft');
+    expect(underOverride[0]?.text).toContain('under the 2000–3500 target band');
+
+    // 3,000 words: over the default band, but inside the override — no finding at all.
+    expect(checkDraftMechanics(bodyOfWords(3000), [], target)).toEqual([]);
+
+    // 4,000 words: over the override's 3,500 ceiling but under its hard ceiling (3,500 + 600 slack = 4,100) — soft only.
+    const overSoftCeiling = checkDraftMechanics(bodyOfWords(4000), [], target);
+    expect(overSoftCeiling).toHaveLength(1);
+    expect(overSoftCeiling[0]?.severity).toBe('soft');
+    expect(overSoftCeiling[0]?.text).toContain('over the 2000–3500 target band');
+
+    // The hard ceiling moves with the override too: 4,200 is well inside the default hard ceiling
+    // (3,200) territory, but here it clears the override's own 4,100 hard ceiling.
+    const overHardCeiling = checkDraftMechanics(bodyOfWords(4200), [], target);
+    expect(overHardCeiling).toHaveLength(1);
+    expect(overHardCeiling[0]?.severity).toBe('hard');
+    expect(overHardCeiling[0]?.text).toContain('above');
   });
 
   it('should report a hard finding when a paragraph is repeated verbatim', () => {

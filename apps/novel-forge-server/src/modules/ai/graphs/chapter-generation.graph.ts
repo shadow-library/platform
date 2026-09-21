@@ -21,12 +21,14 @@ import {
   scrubForWriter,
   writerSafeLeakLines,
 } from '../../bible/fact/knowledge-view';
+import { resolveWordTarget } from '../../eval/deterministic-metrics';
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
 import { extractJsonCandidates, tryParseJson } from '../json-extract';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
+import { generationWordTargetVars } from '../prompts/generation.prompt';
 import { type IndexingService } from '../retrieval/indexing.service';
 import { type FixOutput, type JudgeOutput, JudgeSchema, renderEndingContract } from '../schemas';
 import { parseSchema } from '../schemas/validate';
@@ -228,9 +230,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const chapterBrief = renderChapterBrief(brief);
     const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
     const guidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
+    const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief, endingContract, guidance },
+      { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
@@ -337,14 +340,19 @@ export function createChapterGenerationGraph(services: GraphServices) {
   const MECHANICAL_PRIOR_WINDOW = 10;
 
   async function mechanicalCheck(state: ChapterGenState) {
-    const priorChapters = await db.query.chapters.findMany({
-      where: and(eq(schema.chapters.projectId, BigInt(state.projectId)), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, state.chapter)),
-      orderBy: [desc(schema.chapters.number)],
-      limit: MECHANICAL_PRIOR_WINDOW,
-      columns: { content: true },
-    });
+    const projectId = BigInt(state.projectId);
+    const [projectRow, priorChapters] = await Promise.all([
+      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      db.query.chapters.findMany({
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, state.chapter)),
+        orderBy: [desc(schema.chapters.number)],
+        limit: MECHANICAL_PRIOR_WINDOW,
+        columns: { content: true },
+      }),
+    ]);
 
-    const mechanicalFindings = checkDraftMechanics(state.prose, priorChapters.map(c => c.content ?? '').filter(Boolean));
+    const wordTarget = resolveWordTarget(projectRow);
+    const mechanicalFindings = checkDraftMechanics(state.prose, priorChapters.map(c => c.content ?? '').filter(Boolean), wordTarget);
     const mechanicallyCompliant = !mechanicalFindings.some(f => f.severity === 'hard');
     logger.debug('generation mechanicalCheck', {
       runId: state.runId,
@@ -573,9 +581,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
     const chapterBrief = renderChapterBrief(brief);
     const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
+    const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief, endingContract, guidance },
+      { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,

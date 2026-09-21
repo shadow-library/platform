@@ -20,7 +20,7 @@ export class GenerationSchema {
   @Field({ minLength: 1, maxLength: 200, description: 'chapter title' })
   title: string;
 
-  @Field({ minLength: 100, description: 'full chapter prose — target 1,800-2,600 words of scene content' })
+  @Field({ minLength: 100, description: 'full chapter prose — scene content at the length the system prompt specifies' })
   body: string;
 
   @Field({ minLength: 1, description: '2-3 sentence summary of what happened, past tense' })

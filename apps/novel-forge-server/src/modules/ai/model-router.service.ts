@@ -39,6 +39,8 @@ import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
+  wordTargetMin?: number | null;
+  wordTargetMax?: number | null;
 };
 
 export interface ImageRequest {
