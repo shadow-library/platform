@@ -10,6 +10,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
+import { estimateCallCostUsd } from './quota';
 
 export interface TelemetryContext {
   projectId: bigint;
@@ -87,6 +88,19 @@ export function extractTokenUsage(output: LLMResult, promptTokensEstimate: numbe
   };
 }
 
+// OpenRouter includes `usage.cost` (USD) in every completion response, but @langchain/openai's parser only
+// lifts the OpenAI-standard usage fields onto the message and discards the rest. `buildClient` sets
+// `__includeRawResponse` so the untouched provider payload survives on `additional_kwargs.__raw_response`,
+// which is the only place this reaches — `response_metadata.usage` is only populated when the provider also
+// echoed `system_fingerprint`, so it is checked as a fallback rather than the primary source.
+export function extractProviderCost(output: LLMResult): number | undefined {
+  const generation = output.generations?.[0]?.[0] as { message?: { additional_kwargs?: Record<string, unknown>; response_metadata?: Record<string, unknown> } } | undefined;
+  const rawResponseUsage = (generation?.message?.additional_kwargs?.['__raw_response'] as { usage?: UsageBag } | undefined)?.usage;
+  const responseMetadataUsage = generation?.message?.response_metadata?.['usage'] as UsageBag;
+  const cost = rawResponseUsage?.['cost'] ?? responseMetadataUsage?.['cost'];
+  return typeof cost === 'number' && Number.isFinite(cost) ? cost : undefined;
+}
+
 @Injectable()
 export class TelemetryHandler extends BaseCallbackHandler {
   name = 'novel-forge-telemetry';
@@ -158,8 +172,21 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const generation = output.generations?.[0]?.[0];
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
     const { inputTokens, cachedInputTokens, outputTokens } = extractTokenUsage(output, call.promptTokensEstimate, rawOutput);
+    // The provider figure is authoritative when it reported one; otherwise fall back to the same
+    // per-million-token price table the AI-quota spend guard already estimates from.
+    const costUsd = extractProviderCost(output) ?? estimateCallCostUsd(call.model, inputTokens, outputTokens);
 
-    this.logger.debug('LLM call completed', { runId, role: call.ctx.role, model: call.model, latencyMs, inputTokens, cachedInputTokens, outputTokens, attempt: call.attempt });
+    this.logger.debug('LLM call completed', {
+      runId,
+      role: call.ctx.role,
+      model: call.model,
+      latencyMs,
+      inputTokens,
+      cachedInputTokens,
+      outputTokens,
+      costUsd,
+      attempt: call.attempt,
+    });
 
     try {
       await this.db.insert(schema.modelCalls).values({
@@ -177,6 +204,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         inputTokens,
         cachedInputTokens,
         outputTokens,
+        costUsd: String(costUsd),
         latencyMs,
         attempt: call.attempt,
         rawOutput,

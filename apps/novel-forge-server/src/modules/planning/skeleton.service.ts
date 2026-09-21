@@ -52,7 +52,7 @@ export class SkeletonService {
       .join('\n\n');
     const themes = Array.isArray(projectRow?.themes) ? (projectRow.themes as string[]).join(', ') : projectRow?.themes ? String(projectRow.themes) : '';
 
-    const ctx: TelemetryContext = { projectId, runId: 'skeleton', node: 'skeleton', promptKey: 'skeleton', promptVersion: '1.0.0', role: 'skeleton' };
+    const ctx: TelemetryContext = { projectId, runId: 'skeleton', node: 'skeleton', promptKey: 'skeleton', promptVersion: PROMPT_REGISTRY.skeleton.version, role: 'skeleton' };
 
     const result = (await this.modelRouter.structured(PROMPT_REGISTRY.skeleton, { projectBrief, themes }, ctx, projectRow as ProjectConfig | undefined)) as SkeletonOutput;
 

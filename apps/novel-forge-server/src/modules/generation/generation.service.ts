@@ -215,25 +215,27 @@ export class GenerationService {
     const bibleDocsText = digest.text || '(no bible written yet)';
 
     this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
-    const planOutput = await this.modelRouter.structured(
-      PROMPT_REGISTRY.plan,
-      { skeleton, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume, projectBrief: project.brief ?? '', bibleDocs: bibleDocsText },
-      ctx,
-      project as never,
-    );
+    const { result: volumeSpecs } = await this.workflowRunService.runChain(projectId, 'plan', 'volumes', body, async runId => {
+      const ctx = { projectId, runId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
+      const planOutput = await this.modelRouter.structured(
+        PROMPT_REGISTRY.plan,
+        { skeleton, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume, projectBrief: project.brief ?? '', bibleDocs: bibleDocsText },
+        ctx,
+        project as never,
+      );
 
-    const volumeSpecs = planOutput as {
-      volumeKey: string;
-      ordinal: number;
-      title: string;
-      objective: string;
-      conflict: string;
-      payoff: string;
-      startChapter: number;
-      endChapter: number;
-      cast?: string[];
-    }[];
+      return planOutput as {
+        volumeKey: string;
+        ordinal: number;
+        title: string;
+        objective: string;
+        conflict: string;
+        payoff: string;
+        startChapter: number;
+        endChapter: number;
+        cast?: string[];
+      }[];
+    });
 
     const upserted = await Promise.all(
       volumeSpecs.map(v =>

@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { ModelRouterService } from '@modules/ai/model-router.service';
+import { estimateCallCostUsd } from '@modules/ai/quota';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { type PrimaryDatabase } from '@server/database';
@@ -204,5 +205,70 @@ describe.if(pgAvailable)('TelemetryHandler attribution via metadata', () => {
 
     const row = await db.query.modelCalls.findFirst({ where: eq(schema.modelCalls.projectId, project.id) });
     expect(row?.cachedInputTokens).toBe(48);
+  });
+
+  it("records the provider's own cost when OpenRouter's raw response carries one", async () => {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `telemetry-cost-provider-${Date.now()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+
+    const handler = new TelemetryHandler({ getPostgresClient: () => db } as never);
+    const runId = 'lc-run-cost-provider';
+    await handler.handleLLMStart({} as never, [], runId, undefined, undefined, undefined, {
+      nfTelemetry: {
+        projectId: String(project.id),
+        promptKey: 'judge',
+        promptVersion: '1.0.0',
+        role: 'judge',
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-5',
+        attempt: 0,
+      },
+    });
+    await handler.handleLLMEnd(
+      {
+        generations: [
+          [
+            {
+              text: '{}',
+              message: { additional_kwargs: { __raw_response: { usage: { prompt_tokens: 40, completion_tokens: 9, cost: 0.00033 } } } },
+            },
+          ],
+        ],
+        llmOutput: {},
+      } as never,
+      runId,
+    );
+
+    const row = await db.query.modelCalls.findFirst({ where: eq(schema.modelCalls.projectId, project.id) });
+    expect(Number(row?.costUsd)).toBeCloseTo(0.00033, 6);
+  });
+
+  it("falls back to the model registry's price-per-token estimate when the provider reports no cost", async () => {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `telemetry-cost-estimate-${Date.now()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+
+    const handler = new TelemetryHandler({ getPostgresClient: () => db } as never);
+    const runId = 'lc-run-cost-estimate';
+    await handler.handleLLMStart({} as never, [], runId, undefined, undefined, undefined, {
+      nfTelemetry: {
+        projectId: String(project.id),
+        promptKey: 'judge',
+        promptVersion: '1.0.0',
+        role: 'judge',
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-5',
+        attempt: 0,
+      },
+    });
+    await handler.handleLLMEnd({ generations: [[{ text: '{}', message: { usage_metadata: { input_tokens: 1000, output_tokens: 500 } } }]], llmOutput: {} } as never, runId);
+
+    const row = await db.query.modelCalls.findFirst({ where: eq(schema.modelCalls.projectId, project.id) });
+    expect(Number(row?.costUsd)).toBeCloseTo(estimateCallCostUsd('anthropic/claude-sonnet-5', 1000, 500), 6);
   });
 });

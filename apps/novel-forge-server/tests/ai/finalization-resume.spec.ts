@@ -5,6 +5,8 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterFinalizationGraph, type FinalizationServices } from '@modules/ai/graphs/chapter-finalization.graph';
+import { PROMPT_REGISTRY } from '@modules/ai/prompts';
+import { type TelemetryContext } from '@modules/ai/telemetry.handler';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
@@ -37,7 +39,7 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
   });
 
   function buildGraph(
-    options: { structured?: () => Promise<unknown>; failCursor?: boolean; beforeTransaction?: (index: number) => Promise<void> } = {},
+    options: { structured?: (...args: unknown[]) => Promise<unknown>; failCursor?: boolean; beforeTransaction?: (index: number) => Promise<void> } = {},
   ): ReturnType<typeof createChapterFinalizationGraph> {
     const modelRouter = { structured: options.structured ?? (async () => delta), resolveModel: () => ({ model: 'test-model' }), resolveFor: async () => ({ model: 'test-model' }) };
     const indexingService = { addProse: async () => undefined, addLore: async () => undefined };
@@ -337,5 +339,20 @@ describe.if(pgAvailable)('chapter finalization graph resume', () => {
     expect(chapter?.isolated).toBe(false);
     expect(chapter?.continuityApplied).toBe(true);
     expect(entities.map(e => e.entityKey)).toEqual(['char_hero']);
+  });
+
+  it("should log the continuity prompt's real version, not a hardcoded one", async () => {
+    const { projectId, draftId } = await seedPartiallyFinalizedChapter('final');
+    const seenCtx: TelemetryContext[] = [];
+    const structured = async (...args: unknown[]): Promise<unknown> => {
+      seenCtx.push(args[2] as TelemetryContext);
+      return delta;
+    };
+
+    await invoke(projectId, draftId, { structured, runId: 'run-continuity-version' });
+
+    expect(seenCtx).toHaveLength(1);
+    expect(seenCtx[0]?.promptVersion).toBe(PROMPT_REGISTRY.continuity.version);
+    expect(seenCtx[0]?.promptVersion).not.toBe('1.0.0');
   });
 });

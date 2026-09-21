@@ -281,13 +281,18 @@ export class ModelRouterService {
     if (!apiKey) throw AppErrorCode.AI_006.create();
     // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
     // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
-    return new ChatOpenAI({
+    const llm = new ChatOpenAI({
       model: resolved.model,
       apiKey,
       maxRetries: 0,
       configuration: { baseURL: Config.get('ai.openrouter.api.url') },
       ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
     });
+    // OpenRouter always includes `usage.cost` in the completion response, but @langchain/openai's parser
+    // only lifts known OpenAI usage fields onto the message and drops the rest — this is the escape hatch
+    // that keeps the whole raw response on `additional_kwargs.__raw_response` for TelemetryHandler to read.
+    llm.__includeRawResponse = true;
+    return llm;
   }
 
   // `projectId` is optional only so the smoke/local harnesses can build a raw client without a project;

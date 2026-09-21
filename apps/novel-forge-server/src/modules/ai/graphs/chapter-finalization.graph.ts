@@ -200,7 +200,14 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       '\n\n',
     );
 
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'extractContinuity', promptKey: 'continuity', promptVersion: '1.0.0', role: 'continuity' };
+    const ctx: TelemetryContext = {
+      projectId,
+      runId: state.runId,
+      node: 'extractContinuity',
+      promptKey: 'continuity',
+      promptVersion: PROMPT_REGISTRY.continuity.version,
+      role: 'continuity',
+    };
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     // A failure that surfaces fast releases the claim immediately, so the next retry starts at once instead of

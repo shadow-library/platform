@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { createBibleBuilderGraph } from '@modules/ai/graphs/bible-builder.graph';
 import { BIBLE_STAGE_OUTPUT_SHAPE } from '@modules/ai/prompts/authoring-preamble';
 import { type BibleStageOutput } from '@modules/ai/schemas';
+import { type TelemetryContext } from '@modules/ai/telemetry.handler';
 import { BIBLE_MANIFEST } from '@modules/bible/bible-manifest';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -26,9 +27,12 @@ const pgAvailable = await (async () => {
   }
 })();
 
-function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, stageOutput: BibleStageOutput, indexingService: object = {}) {
+function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, stageOutput: BibleStageOutput, indexingService: object = {}, seenCtx?: TelemetryContext[]) {
   const modelRouter = {
-    structured: async () => stageOutput,
+    structured: async (_prompt: unknown, _input: unknown, ctx?: TelemetryContext) => {
+      if (ctx) seenCtx?.push(ctx);
+      return stageOutput;
+    },
     resolveModel: () => ({ provider: 'test', model: 'test' }),
     resolveFor: async () => ({ provider: 'test', model: 'test' }),
   };
@@ -57,8 +61,8 @@ describe.if(pgAvailable)('bible-builder.graph characters stage persistence', () 
     return project.id;
   }
 
-  async function runCharactersStage(projectId: bigint, output: BibleStageOutput, force: boolean, threadSuffix: string): Promise<void> {
-    const graph = createBibleBuilderGraph(buildServices(db, checkpointer, output));
+  async function runCharactersStage(projectId: bigint, output: BibleStageOutput, force: boolean, threadSuffix: string, seenCtx?: TelemetryContext[]): Promise<void> {
+    const graph = createBibleBuilderGraph(buildServices(db, checkpointer, output, {}, seenCtx));
     const runId = `bible-builder-${projectId}-${threadSuffix}`;
     await graph.invoke({ projectId: String(projectId), brief: 'A test brief.', force, runId }, { configurable: { thread_id: runId } });
   }
@@ -172,6 +176,17 @@ describe.if(pgAvailable)('bible-builder.graph characters stage persistence', () 
 
     const original = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, 'amara')) });
     expect(original?.body).toBe('Original.');
+  });
+
+  it("should log every stage's declared role ('bible'), not its prompt key, as the telemetry role", async () => {
+    const projectId = await seedProject(`bible-role-${Date.now()}`);
+    const seenCtx: TelemetryContext[] = [];
+    await runCharactersStage(projectId, { body: 'Characters bible prose.' }, false, 'role', seenCtx);
+
+    const charactersCtx = seenCtx.find(ctx => ctx.promptKey === 'bible:characters');
+    expect(charactersCtx?.role).toBe('bible');
+    expect(seenCtx.length).toBeGreaterThan(1);
+    expect(seenCtx.every(ctx => ctx.role === 'bible')).toBe(true);
   });
 });
 

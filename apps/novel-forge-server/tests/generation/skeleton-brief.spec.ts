@@ -2,6 +2,7 @@ import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { SkeletonService } from '@modules/planning/skeleton.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -76,5 +77,21 @@ describe.if(pgAvailable)('skeleton generation reads the project brief and premis
     expect(structured).toHaveBeenCalledTimes(1);
     const vars = structured.mock.calls[0]?.[1] as { projectBrief: string };
     expect(vars.projectBrief).toBe('');
+  });
+
+  it("should log the skeleton prompt's real version, not a hardcoded one", async () => {
+    const [project] = await db
+      .insert(schema.projects)
+      .values({ name: `skeleton-version-${Date.now()}-${Math.random()}`, kind: 'new_novel' })
+      .returning();
+    if (!project) throw new Error('failed to seed project');
+
+    const { service, structured } = buildService();
+    await service.generateSkeleton(project.id);
+
+    // Reads the version from the prompt module rather than a hardcoded literal, so a version bump in
+    // skeleton.prompt.ts is reflected here automatically instead of silently going stale.
+    const ctx = structured.mock.calls[0]?.[2] as { promptVersion: string };
+    expect(ctx.promptVersion).toBe(PROMPT_REGISTRY.skeleton.version);
   });
 });

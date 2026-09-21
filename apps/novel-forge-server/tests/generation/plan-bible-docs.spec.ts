@@ -1,12 +1,16 @@
 import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { ProjectEventService } from '@modules/events';
+import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { noPluginProposals } from '@tests/fixtures/plugin-policy';
 import { countTokens } from '@modules/ai/context/token-budget';
 import { GenerationService, PLAN_BIBLE_BUDGET, PLAN_BIBLE_DOC_TOKENS } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { runCancellationStub } from '@tests/fixtures/model-router';
 import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 const baseConnectionString = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
@@ -57,7 +61,8 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const modelRouter = { structured } as never;
     const noop = {} as never;
-    return new GenerationService(databaseService, noop, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
+    const workflowRunService = new WorkflowRunService(databaseService, noop, runCancellationStub() as never, noop, noop, noop, noop, new ProjectEventService());
+    return new GenerationService(databaseService, workflowRunService, modelRouter, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
   }
 
   it('passes rendered bible-document content to the model call when bible docs exist', async () => {
@@ -126,5 +131,20 @@ describe.if(pgAvailable)('plan() reads bible documents', () => {
     expect(countTokens(vars.bibleDocs)).toBeLessThanOrEqual(PLAN_BIBLE_BUDGET);
     for (let i = 0; i < 6; i++) expect(vars.bibleDocs).toContain(`### bible_doc:plot/line-${i}`);
     expect(vars.bibleDocs.indexOf('bible_doc:plot/line-0')).toBeLessThan(vars.bibleDocs.indexOf('bible_doc:lore/'));
+  });
+
+  it('runs the volume-plan model call under a workflow run, so it shows up in Workflow Runs', async () => {
+    const projectId = await createProject('A brief for a run-tracked plan.');
+
+    const structured = mock(async () => [planVolume]);
+    const service = buildService(structured);
+
+    await service.plan(projectId, { volumeCount: 1, chaptersPerVolume: 8 });
+
+    const [, , ctx] = structured.mock.calls[0] as unknown as [unknown, unknown, { runId?: string }];
+    expect(ctx.runId).toBeTruthy();
+
+    const run = await db.query.workflowRuns.findFirst({ where: eq(schema.workflowRuns.id, ctx.runId as string) });
+    expect(run).toMatchObject({ projectId, graph: 'plan', status: 'completed' });
   });
 });

@@ -458,7 +458,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     }
 
     const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: '1.0.0', role: 'fix' };
+    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: PROMPT_REGISTRY.fix.version, role: 'fix' };
 
     const policy = await policyFor(projectId, { role: 'fix', chapter: state.chapter });
     const result = (await modelRouter.structured(
@@ -564,7 +564,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       continuationState: (result.state ?? {}) as Record<string, string>,
       attempt: state.attempt + 1,
       previousFindings: state.findings,
-      repairMode: 'patch' as const,
+      repairMode: 'rewrite' as const,
       writerClassRaised: policy.raised,
       nodeTrace: ['repairRewrite'],
     };

@@ -88,7 +88,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     if (!prompt) throw AppError.internal(`[bible-builder] No prompt for stage: ${stage}`);
 
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: stage, promptKey, promptVersion: prompt.version, role: promptKey };
+    const ctx: TelemetryContext = { projectId, runId: state.runId, node: stage, promptKey, promptVersion: prompt.version, role: prompt.role ?? promptKey };
     logger.debug('bible-builder runStage', { runId: state.runId, stage, section, slug, force: state.force });
 
     const result = (await modelRouter.structured(prompt, promptInput, ctx, projectRow as ProjectConfig | undefined)) as BibleStageOutput;

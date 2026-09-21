@@ -73,7 +73,14 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'extractKnowledge', promptKey: 'extraction', promptVersion: '1.0.0', role: 'extraction' };
+    const ctx: TelemetryContext = {
+      projectId,
+      runId: state.runId,
+      node: 'extractKnowledge',
+      promptKey: 'extraction',
+      promptVersion: PROMPT_REGISTRY.extraction.version,
+      role: 'extraction',
+    };
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.extraction,

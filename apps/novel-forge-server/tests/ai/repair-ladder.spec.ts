@@ -1,11 +1,13 @@
 import { SQL } from 'bun';
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { AIMessage, type BaseMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { createChapterGenerationGraph } from '@modules/ai/graphs/chapter-generation.graph';
+import { PROMPT_REGISTRY } from '@modules/ai/prompts';
+import { type TelemetryContext } from '@modules/ai/telemetry.handler';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 import { noPluginPolicy } from '@tests/fixtures/plugin-policy';
@@ -129,5 +131,71 @@ describe.if(pgAvailable)('repair ladder accounting', () => {
       'acceptAsIs',
       'finish',
     ]);
+  });
+
+  function buildRewriteServices(db: PrimaryDatabase, seenFixCtx: TelemetryContext[]) {
+    let judgeCall = 0;
+
+    const structured = mock(async (promptModule: { key: string }, _input: unknown, ctx: TelemetryContext) => {
+      if (promptModule.key === 'fix') {
+        seenFixCtx.push(ctx);
+        return { action: 'rewrite', body: FULL_LENGTH_DRAFT_BODY };
+      }
+      if (promptModule.key === 'generation') return { title: 'Chapter Title', body: FULL_LENGTH_DRAFT_BODY, summary: 'A summary.', state: {} };
+      return { title: 'Chapter Title' };
+    });
+
+    const modelRouter = {
+      structured,
+      chatFor: () => ({
+        bindTools: () => ({
+          invoke: async () => {
+            const call = judgeCall;
+            judgeCall++;
+            if (call === 0) {
+              return new AIMessage(
+                JSON.stringify({ verdict: 'contradiction', findings: [{ severity: 'hard', text: 'needs a rewrite' }], briefCompliance: { compliant: true, issues: [] } }),
+              );
+            }
+            return new AIMessage(JSON.stringify({ verdict: 'consistent', findings: [], briefCompliance: { compliant: true, issues: [] } }));
+          },
+        }),
+      }),
+      resolveModel: () => ({ provider: 'test', model: 'test' }),
+      resolveFor: async () => ({ provider: 'test', model: 'test' }),
+    };
+
+    const contextAssembler = { forChapter: async () => ({ id: null }) };
+    const toolRegistry = { forNode: () => [], getRaw: () => [] };
+
+    return {
+      db,
+      contextAssembler,
+      modelRouter,
+      telemetry: {},
+      toolRegistry,
+      indexingService: {},
+      pluginPolicy: noPluginPolicy(),
+      checkpointer: new MemorySaver(),
+    } as never;
+  }
+
+  it("should log the fix prompt's real version and record a rewrite repair as 'rewritten'", async () => {
+    const projectId = await seedProject();
+    const seenFixCtx: TelemetryContext[] = [];
+    const services = buildRewriteServices(db, seenFixCtx);
+    const graph = createChapterGenerationGraph(services);
+
+    const runId = `repair-ladder-rewrite-${projectId}`;
+    const input = { projectId: String(projectId), chapter: 1, volumeKey: '', guidance: '', autoFix: true, maxFixes: 2, runId };
+    const finalState = (await graph.invoke(input, { configurable: { thread_id: runId } })) as { outcome: string | null; nodeTrace: string[] };
+
+    expect(finalState.outcome).toBe('accepted');
+    expect(seenFixCtx).toHaveLength(1);
+    expect(seenFixCtx[0]?.promptVersion).toBe(PROMPT_REGISTRY.fix.version);
+    expect(seenFixCtx[0]?.promptVersion).not.toBe('1.0.0');
+
+    const revisions = await db.query.draftRevisions.findMany({ where: eq(schema.draftRevisions.projectId, projectId), orderBy: [schema.draftRevisions.revision] });
+    expect(revisions.map(r => r.source)).toEqual(['generated', 'rewritten']);
   });
 });

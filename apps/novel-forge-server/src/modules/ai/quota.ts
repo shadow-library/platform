@@ -21,11 +21,15 @@ export interface AiQuotaLimits {
 
 export type QuotaBreach = 'rate' | 'spend' | null;
 
-// Rows without a recorded `model_calls.cost_usd` (every chat/text call, and an image call whose
-// provider response omitted `usage.cost`) fall back to token counts times the registry's
-// per-million-token prices. Cached input tokens are billed at full input price here — an
-// over-estimate that makes the ceiling conservative, which is the safe direction for a spend guard.
-// A model the registry prices at nothing contributes nothing.
+// This same estimate serves two callers: `TelemetryHandler` calls it at write time to fill
+// `model_calls.cost_usd` for a text call whose provider reported no cost, and `computeWindowUsage`
+// below calls it at query time for whatever rows still carry no recorded cost at all (older rows
+// written before cost tracking existed, or an image call whose provider response omitted `usage.cost`).
+// A row's cost is frozen the moment it is written — a later change to these prices never re-prices a
+// row that already recorded one, deliberately, so historical spend stays comparable across price
+// changes. Cached input tokens are billed at full input price here — an over-estimate that makes the
+// ceiling conservative, which is the safe direction for a spend guard. A model the registry prices at
+// nothing contributes nothing.
 export function estimateCallCostUsd(model: string, inputTokens: number, outputTokens: number): number {
   const entry = MODEL_MAP[model];
   if (!entry) return 0;
@@ -34,8 +38,9 @@ export function estimateCallCostUsd(model: string, inputTokens: number, outputTo
   return (inputTokens / 1_000_000) * inputPrice + (outputTokens / 1_000_000) * outputPrice;
 }
 
-// Recorded cost is authoritative when the provider reported it (currently image calls only); the
-// token-based estimate only ever covers rows that lack one, so a call is never counted twice.
+// A row's `recordedCostUsd` (provider-reported or frozen-at-write-time estimate, for any call kind)
+// is authoritative over recomputing it here; the token-based estimate only ever covers rows that
+// still carry no recorded cost, so a call is never counted twice.
 export function computeWindowUsage(rows: WindowUsageRow[]): WindowUsage {
   let calls = 0;
   let costUsd = 0;
