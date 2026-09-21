@@ -71,6 +71,8 @@ function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
 interface ChaptersSearch {
   chapter?: number;
   job?: string;
+  /** A hand-off from elsewhere (e.g. Overview's Next step card) — opens straight into the review drawer instead of the read view. */
+  review?: boolean;
 }
 
 // Which chapter editor / generation-progress view is open lives in the URL, so a refresh returns to
@@ -81,6 +83,7 @@ export const Route = createFileRoute('/novels/$novelId/chapters')({
     return {
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
       job: typeof search.job === 'string' && search.job ? search.job : undefined,
+      review: search.review === true || search.review === 'true' ? true : undefined,
     };
   },
   loader: async ({ context, params }) => {
@@ -1141,7 +1144,10 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   const addSceneImage = useAddChapterImageMutation(novelId, chapter);
   const removeSceneImage = useDeleteChapterImageMutation(novelId, chapter);
 
-  const [reviewOpen, setReviewOpen] = useState(false);
+  // A `?review=1` hand-off (e.g. from Overview's Next step card) opens straight into the drawer; this
+  // is read once at mount, matching the drawer's own open state being otherwise locally controlled.
+  const { review: openReviewOnLoad } = Route.useSearch();
+  const [reviewOpen, setReviewOpen] = useState(openReviewOnLoad === true);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [summarizeOpen, setSummarizeOpen] = useState(false);
   const [amendOpen, setAmendOpen] = useState(false);

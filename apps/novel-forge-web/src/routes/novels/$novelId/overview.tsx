@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Skeleton, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
@@ -16,17 +16,23 @@ import {
   useCloneProjectMutation,
   useDeleteCoverMutation,
   useJobStop,
+  useListBriefsQuery,
+  useListDraftsQuery,
   useListJobsQuery,
+  useListProposalsQuery,
   useListRunsQuery,
+  useListVolumesQuery,
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
+  useReviewQueueQuery,
   useRunStop,
   useTranslationStatusQuery,
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { LIFECYCLE_PHASES, lifecyclePhase, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, translationLifecycle } from '@/lib/format';
+import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
 
 import styles from './overview.module.css';
 
@@ -36,11 +42,6 @@ export const Route = createFileRoute('/novels/$novelId/overview')({
   },
   component: OverviewScreen,
 });
-
-interface NextStep {
-  label: string;
-  to: '/novels/$novelId/story-bible' | '/novels/$novelId/volumes' | '/novels/$novelId/chapters';
-}
 
 interface LifecycleStepperProps {
   labels: readonly string[];
@@ -232,7 +233,18 @@ function OverviewScreen(): React.JSX.Element {
   const usageQuery = useAiUsageQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
   const isTranslation = projectQuery.data?.kind === 'translation';
+  // The Next step rule engine only covers the bible → plan → draft → arc → finalize pipeline, which is
+  // shared by these two kinds; translation and curated projects keep the simpler fallback below.
+  const isAuthoring = projectQuery.data?.kind === 'new_novel' || projectQuery.data?.kind === 'source';
   const translationQuery = useTranslationStatusQuery(novelId, isTranslation);
+  const reviewQueueQuery = useReviewQueueQuery(novelId, isAuthoring);
+  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 }, isAuthoring);
+  const briefsQuery = useListBriefsQuery(novelId, isAuthoring);
+  const volumesQuery = useListVolumesQuery(novelId, { limit: 50 }, isAuthoring);
+  // Full per-chapter draft rows, not just the `draftsTotal` count — the rule engine needs the actual
+  // drafted-chapter set (which briefs still lack a draft) and each draft's status (which aren't final
+  // yet), and no lighter endpoint reports either. The chapter list pays this same cost already.
+  const draftsQuery = useListDraftsQuery(novelId, isAuthoring);
   // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
   // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
   // overview visit.
@@ -264,19 +276,67 @@ function OverviewScreen(): React.JSX.Element {
   const draftsTotal = status?.draftsTotal ?? 0;
   const draftsFinal = status?.draftsFinal ?? 0;
   const allFinal = draftsTotal > 0 && draftsFinal === draftsTotal;
-  const next: NextStep =
-    volumesTotal === 0
-      ? { label: 'Open story bible →', to: '/novels/$novelId/story-bible' }
+
+  // Every input the rule engine reads has to have actually arrived — otherwise an empty brief/draft
+  // list reads as "nothing outlined" and briefly recommends the wrong action until the real data lands.
+  const nextStepReady = !briefsQuery.isLoading && !volumesQuery.isLoading && !reviewQueueQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
+  const nextStep =
+    isAuthoring && nextStepReady
+      ? computeNextStep(
+          deriveNextStepInput({
+            volumesTotal,
+            planApproved: status?.planApproved ?? false,
+            draftsTotal,
+            draftsFinal,
+            briefs: briefsQuery.data?.items ?? [],
+            volumes: volumesQuery.data?.items ?? [],
+            draftedChapters: draftsQuery.data?.items ?? [],
+            reviewDrafts: reviewQueueQuery.data?.drafts ?? [],
+            pendingContinuityCount: reviewQueueQuery.data?.proposals.length ?? 0,
+            pendingRefinementCount: proposalsQuery.data?.items.length ?? 0,
+          }),
+        )
+      : undefined;
+
+  // Translation and curated projects have no bible/plan/briefs to reason about, so they keep the
+  // original coarse "where in the lifecycle am I" fallback instead of the rule engine above.
+  const fallbackStep = !isAuthoring
+    ? volumesTotal === 0
+      ? { label: 'Open story bible →', to: '/novels/$novelId/story-bible' as const }
       : !status?.planApproved
-        ? { label: 'Review & approve plan →', to: '/novels/$novelId/volumes' }
+        ? { label: 'Review & approve plan →', to: '/novels/$novelId/volumes' as const }
         : draftsTotal === 0
-          ? { label: 'Start drafting →', to: '/novels/$novelId/chapters' }
+          ? { label: 'Start drafting →', to: '/novels/$novelId/chapters' as const }
           : allFinal
-            ? { label: 'Review chapters →', to: '/novels/$novelId/chapters' }
-            : { label: 'Continue drafting →', to: '/novels/$novelId/chapters' };
-  const continueLabel = next.label;
+            ? { label: 'Review chapters →', to: '/novels/$novelId/chapters' as const }
+            : { label: 'Continue drafting →', to: '/novels/$novelId/chapters' as const }
+    : undefined;
+
+  const goToNextStepTarget = (target: NextStepTarget): void => {
+    switch (target.screen) {
+      case 'story-bible':
+        navigate({ to: '/novels/$novelId/story-bible', params: { novelId } });
+        return;
+      case 'volumes':
+        navigate({ to: '/novels/$novelId/volumes', params: { novelId }, search: { volume: target.volumeKey } });
+        return;
+      case 'chapters':
+        navigate({ to: '/novels/$novelId/chapters', params: { novelId }, search: { chapter: target.chapter, review: target.review } });
+        return;
+      case 'review':
+        navigate({ to: '/novels/$novelId/review', params: { novelId } });
+        return;
+      case 'chat':
+        navigate({ to: '/novels/$novelId/chat', params: { novelId } });
+        return;
+    }
+  };
+
+  const nextStepAction = nextStep?.next;
+  const continueLabel = nextStepAction?.label ?? fallbackStep?.label;
   const onContinue = (): void => {
-    navigate({ to: next.to, params: { novelId } });
+    if (fallbackStep) navigate({ to: fallbackStep.to, params: { novelId } });
+    else if (nextStepAction) goToNextStepTarget(nextStepAction.target);
   };
 
   const importJob = latestJob(jobsQuery.data?.items ?? [], 'import');
@@ -383,15 +443,58 @@ function OverviewScreen(): React.JSX.Element {
               <Tooltip content="Reset derived state">
                 <IconButton variant="secondary" aria-label="Reset project" icon={<ResetIcon />} onClick={() => setResetOpen(true)} />
               </Tooltip>
-              <Button variant="primary" onClick={onContinue}>
-                {continueLabel}
-              </Button>
+              {continueLabel && (
+                <Button variant="primary" onClick={onContinue}>
+                  {continueLabel}
+                </Button>
+              )}
             </div>
           </div>
 
           {LIFECYCLE_PHASES[project.kind].length > 0 && (
             <SectionCard className={styles.sectionSpacer}>
               <LifecycleStepper labels={LIFECYCLE_PHASES[project.kind]} completed={phase.completed} />
+            </SectionCard>
+          )}
+
+          {isAuthoring && (
+            <SectionCard className={styles.sectionSpacer}>
+              {nextStepReady ? (
+                <>
+                  <div className={styles.nextStepRow}>
+                    <div className={styles.nextStepBody}>
+                      <h3 className={styles.usageTitle}>Next step</h3>
+                      <p className={styles.nextStepReason}>{nextStepAction?.reason ?? 'Nothing needs your attention right now.'}</p>
+                    </div>
+                    {nextStepAction && (
+                      <Button variant="primary" onClick={() => goToNextStepTarget(nextStepAction.target)}>
+                        {nextStepAction.label}
+                      </Button>
+                    )}
+                  </div>
+                  {nextStep && nextStep.comingUp.length > 0 && (
+                    <div className={styles.comingUp}>
+                      <div className={styles.comingUpLabel}>Coming up</div>
+                      <ul className={styles.comingUpList}>
+                        {nextStep.comingUp.map(item => (
+                          <li key={item.id} className={styles.comingUpItem}>
+                            <span className={styles.comingUpDot} />
+                            {item.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={styles.nextStepRow}>
+                  <div className={styles.nextStepBody}>
+                    <h3 className={styles.usageTitle}>Next step</h3>
+                    <Skeleton width={280} height={14} />
+                  </div>
+                  <Skeleton shape="rect" width={140} height={36} radius={8} />
+                </div>
+              )}
             </SectionCard>
           )}
 

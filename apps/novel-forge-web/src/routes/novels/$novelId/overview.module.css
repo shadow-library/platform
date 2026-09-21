@@ -181,6 +181,63 @@
   color: var(--sh-danger-text);
 }
 
+.nextStepRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.nextStepBody {
+  min-width: 0;
+}
+
+.nextStepReason {
+  margin: 3px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.comingUp {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.comingUpLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.comingUpList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.comingUpItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.comingUpDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sh-text-tertiary);
+  flex-shrink: 0;
+}
+
 .statGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
