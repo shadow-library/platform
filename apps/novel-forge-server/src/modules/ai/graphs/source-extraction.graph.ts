@@ -58,6 +58,11 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
   }
 
   async function extractKnowledge(state: ExtractionState) {
+    if (state.chapterIsolated) {
+      logger.debug('extraction extractKnowledge skipped: chapter is isolated', { runId: state.runId, chapter: state.chapter });
+      return { extracted: null, nodeTrace: ['extractKnowledge'] };
+    }
+
     const projectId = BigInt(state.projectId);
     const entityRows = await db.query.entities.findMany({
       where: eq(schema.entities.projectId, projectId),

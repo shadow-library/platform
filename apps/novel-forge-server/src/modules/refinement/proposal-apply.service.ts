@@ -117,6 +117,12 @@ const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note
     code: AppErrorCode.IDE_007,
     note: 'Graduation is never applied automatically — use “Start the novel” in the studio, or select the graduation step and apply it deliberately.',
   },
+  'action.approve_draft': { code: AppErrorCode.DRF_009, note: 'Draft approval is never applied automatically — select the approval step and apply it deliberately.' },
+  'action.approve_volume_plan': {
+    code: AppErrorCode.PLN_003,
+    note: 'Volume plan approval is never applied automatically — select the approval step and apply it deliberately.',
+  },
+  'action.approve_arcs': { code: AppErrorCode.ARC_005, note: 'Arc approval is never applied automatically — select the approval step and apply it deliberately.' },
 };
 
 /** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */

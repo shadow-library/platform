@@ -1230,6 +1230,7 @@ export class GenerationService {
 
   async proposeContinuity(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {
     const draft = await this.getDraft(projectId, chapter);
+    if (draft.isolated) throw AppErrorCode.DRF_008.create();
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'continuity', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
@@ -1263,6 +1264,7 @@ export class GenerationService {
    */
   async extractChapterToBible(projectId: bigint, chapter: number): Promise<Refinement.Proposal> {
     const draft = await this.getDraft(projectId, chapter);
+    if (draft.isolated) throw AppErrorCode.DRF_008.create();
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'extraction', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });

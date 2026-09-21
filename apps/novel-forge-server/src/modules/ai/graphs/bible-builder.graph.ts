@@ -33,6 +33,9 @@ const BibleBuilderAnnotation = Annotation.Root({
   runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   stagesDone: Annotation<string[]>({ reducer: (_, n) => n, default: () => [] }),
   counts: Annotation<Record<string, number>>({ reducer: (_, n) => n, default: () => ({}) }),
+  // Stages skipped because a non-force run found existing content — distinct from `counts`, whose 0
+  // already means "ran and produced zero entities" for a stage that emits none.
+  skippedStages: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   nodeTrace: Annotation<string[]>({ reducer: (a, n) => [...a, ...n], default: () => [] }),
 });
@@ -76,7 +79,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
       });
       if (existing?.body) {
         logger.debug(`[bible-builder] Skipping ${stage} — already has content`);
-        return { stagesDone: [...state.stagesDone, stage], counts: { ...state.counts, [stage]: 0 }, nodeTrace: [stage] };
+        return { stagesDone: [...state.stagesDone, stage], counts: { ...state.counts, [stage]: 0 }, skippedStages: [stage], nodeTrace: [stage] };
       }
     }
 

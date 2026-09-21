@@ -96,12 +96,15 @@ export interface WorkflowRunResult {
   runId: string;
   outcome: string;
   status: string;
+  /** Bible-builder only: stages a non-force run left untouched because a document already had content. */
+  skippedStages?: string[];
 }
 
 interface GraphOutcome {
   outcome: string;
   status: 'completed' | 'awaiting_review';
   nodeTrace: string[];
+  skippedStages?: string[];
 }
 
 // LangGraph's PostgresSaver opens its own raw connection pool and needs a plain connection string,
@@ -188,12 +191,15 @@ export class WorkflowRunService {
 
   // Every settle carries the `running` predicate: a run is written once, by whichever path reaches it
   // first, so a late finish cannot reopen a cancelled row and leave the audit trail lying about it.
-  private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[]): Promise<void> {
+  private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[], skippedStages?: string[]): Promise<void> {
     this.logger.info('workflow run finished', { runId, status, outcome });
-    this.logger.debug('workflow run node trace', { runId, nodeTrace });
+    // No dedicated column for a skipped stage, so it rides the already-persisted node trace as a
+    // `skipped:` marker rather than needing a migration this task does not own.
+    const persistedTrace = skippedStages?.length ? [...nodeTrace, ...skippedStages.map(stage => `skipped:${stage}`)] : nodeTrace;
+    this.logger.debug('workflow run node trace', { runId, nodeTrace: persistedTrace });
     const [run] = await this.db
       .update(schema.workflowRuns)
-      .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: nodeTrace as never })
+      .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: persistedTrace as never })
       .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
     if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status });
@@ -240,13 +246,13 @@ export class WorkflowRunService {
   private async runGraph(runId: string, graph: string, invoke: () => Promise<GraphOutcome>): Promise<WorkflowRunResult> {
     const signal = this.modelRouter.bindRunSignal(runId);
     try {
-      const { outcome, status, nodeTrace } = await invoke();
+      const { outcome, status, nodeTrace, skippedStages } = await invoke();
       if (signal.aborted) {
         await this.cancelRun(runId, nodeTrace);
         return { runId, outcome: 'cancelled', status: 'cancelled' };
       }
-      await this.completeRun(runId, outcome, status, nodeTrace);
-      return { runId, outcome, status };
+      await this.completeRun(runId, outcome, status, nodeTrace, skippedStages);
+      return { runId, outcome, status, ...(skippedStages ? { skippedStages } : {}) };
     } catch (err) {
       if (signal.aborted) {
         await this.cancelRun(runId);
@@ -350,8 +356,8 @@ export class WorkflowRunService {
       const graph = createBibleBuilderGraph(this.graphServices as BibleBuilderServices);
       const rawState = await graph.invoke({ projectId: String(input.projectId), brief: input.brief, force: input.force ?? false, runId }, { configurable: { thread_id: runId } });
 
-      const finalState = rawState as unknown as { nodeTrace?: string[] };
-      return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
+      const finalState = rawState as unknown as { nodeTrace?: string[]; skippedStages?: string[] };
+      return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [], skippedStages: finalState.skippedStages ?? [] };
     });
   }
 

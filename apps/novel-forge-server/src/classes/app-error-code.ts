@@ -55,12 +55,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHP_005 = AppErrorCode.badRequest('CHP_005', 'Isolated chapter has no summary or continuation state — summarize the chapter before finalizing');
   static readonly CHP_006 = AppErrorCode.badRequest('CHP_006', 'Chapter is not finalized canon — amend is only available once the chapter is finalized');
   static readonly CHP_007 = AppErrorCode.badRequest('CHP_007', 'Draft has no prose yet — import or generate the chapter before summarizing it');
+  static readonly CHP_008 = AppErrorCode.conflict('CHP_008', 'Chapter is locked — finalized prose changes only through amend');
 
   /*!
    * Planning Errors
    */
   static readonly PLN_001 = AppErrorCode.badRequest('PLN_001', 'Volume plan is not approved — approve all volumes before generating');
   static readonly PLN_002 = AppErrorCode.badRequest('PLN_002', 'Every volume needs a target chapter count (or an explicit chapter range) before the plan can be approved');
+  static readonly PLN_003 = AppErrorCode.badRequest('PLN_003', 'Volume plan approval is never applied automatically — select the approval step and apply it deliberately');
 
   /*!
    * Brief Errors
@@ -78,6 +80,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_005 = AppErrorCode.badRequest('DRF_005', 'Chapter adds no new canon to the bible');
   static readonly DRF_006 = AppErrorCode.notFound('DRF_006', 'Chapter scene image not found');
   static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — an ancestor chapter changed; regenerate before approving');
+  static readonly DRF_008 = AppErrorCode.badRequest('DRF_008', 'Chapter is isolated — continuity proposals and bible extraction are unavailable for isolated chapters');
+  static readonly DRF_009 = AppErrorCode.badRequest('DRF_009', 'Draft approval is never applied automatically — select the approval step and apply it deliberately');
 
   /*!
    * Finalize Errors
@@ -157,6 +161,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ARC_002 = AppErrorCode.badRequest('ARC_002', 'Arcs must be contiguous, non-overlapping, and exactly cover the volume chapter range');
   static readonly ARC_003 = AppErrorCode.badRequest('ARC_003', 'Volume plan is not approved or is missing target chapter counts — approve volumes before planning arcs');
   static readonly ARC_004 = AppErrorCode.badRequest('ARC_004', 'Arcs are not approved — approve all arcs of the volume before outlining');
+  static readonly ARC_005 = AppErrorCode.badRequest('ARC_005', 'Arc approval is never applied automatically — select the approval step and apply it deliberately');
 
   /*!
    * Chat Errors

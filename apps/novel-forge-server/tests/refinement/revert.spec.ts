@@ -239,7 +239,7 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
     registry.register('action.judge_draft', async () => {
       throw new Error('judge exploded');
     });
-    registry.register('action.approve_draft', async () => ({ summary: 'never reached' }));
+    registry.register('action.revise_draft', async () => ({ summary: 'never reached' }));
 
     const ok = await createProposal([
       { op: 'premise.update', premise: 'content plus action' },
@@ -253,7 +253,7 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
 
     const failing = await createProposal([
       { op: 'action.judge_draft', chapter: 1 },
-      { op: 'action.approve_draft', chapter: 1 },
+      { op: 'action.revise_draft', chapter: 1, note: 'tighten pacing' },
     ]);
     const failResult = await applier.apply(projectId, failing.id);
     expect(failResult.opResults[0]).toMatchObject({ status: 'failed', error: 'judge exploded' });

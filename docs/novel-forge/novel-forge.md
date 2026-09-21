@@ -24,7 +24,7 @@
 - **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
 - **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
-- **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated (but appliable from a chat action in auto mode); the judge only advises.
+- **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
 
 ## Capabilities
 
@@ -50,7 +50,7 @@
   deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, arcs, briefs and drafts are
   chat-hub-only); a contradiction verdict must carry a hard finding, and deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to
   human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an unfilled `external` slot.
-- **Approval** is author-initiated (chat auto mode can apply it), may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction; hand edits reset it.
+- **Approval** is author-initiated and never auto-applied from chat, may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction; hand edits reset it.
 - **Finalize** runs strictly in order; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
 - **Ideation**: studio turns stage seed proposals; graduation is deterministic (premise, reader-promise documents, one seed-source fact per promise; no volumes or entities).
@@ -91,11 +91,11 @@
 
 ### Canon, containment and knowledge
 
-- Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path skips continuity extraction for isolated chapters, but the manual continuity and
-  extract-to-bible endpoints do not (do not rely on them for containment). Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A
-  downstream chapter sees an isolated predecessor only as summary plus continuation state; finalizing an isolated draft requires both.
+- Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints, and the source-extraction graph all
+  skip isolated chapters. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A downstream chapter sees an isolated predecessor only as summary plus
+  continuation state; finalizing an isolated draft requires both.
 - A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run.
-- Finalized prose (`chapters.locked`) MUST NEVER change except through amend (the source-chapter PATCH/DELETE routes are unguarded), which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves.
+- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
   drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and POV-safe notes; only the judge sees the forbidden list (seed-source facts excluded).
@@ -109,7 +109,8 @@
 
 - Chat, audit, premise, arc-plan and plugin output MUST NEVER write domain tables directly (the studio's own readiness/concepts columns are the exception); only a proposal apply does, in a transaction with a baseline conflict check.
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
-- `action.finalize` and `action.graduate_seed` MUST NEVER be auto-applied. Action ops run after the content transaction commits and stop at first failure.
+- `action.finalize`, `action.graduate_seed`, `action.approve_draft`, `action.approve_volume_plan` and `action.approve_arcs` MUST NEVER be auto-applied. Action ops run after the
+  content transaction commits and stop at first failure.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
 - Plugins MUST NEVER register routes, hold the database client, write domain tables, move chapter ranges/ordinals/parentage, or issue `action.*` ops; durable changes are
   allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated context, NEVER core artifacts. A failing

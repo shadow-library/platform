@@ -50,20 +50,27 @@ export class ChapterService {
         ...(update.content !== undefined && { content: sanitizeMarkdown(update.content) }),
         updatedAt: new Date(),
       })
-      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)))
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number), eq(schema.chapters.locked, false)))
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!result) throw AppErrorCode.CHP_001.create();
+    if (!result) return this.notFoundOrLocked(projectId, number);
     return result;
   }
 
   async delete(projectId: bigint, number: number): Promise<void> {
     const result = await this.db
       .delete(schema.chapters)
-      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)))
+      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number), eq(schema.chapters.locked, false)))
       .returning();
 
-    if (result.length === 0) throw AppErrorCode.CHP_001.create();
+    if (result.length === 0) await this.notFoundOrLocked(projectId, number);
+  }
+
+  // Finalized prose (`chapters.locked`) never changes except through amend — the source-chapter PATCH/DELETE
+  // routes exist for pre-finalize manuscript editing, so a locked chapter here is a conflict, not a 404.
+  private async notFoundOrLocked(projectId: bigint, number: number): Promise<never> {
+    const existing = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)) });
+    throw existing?.locked ? AppErrorCode.CHP_008.create() : AppErrorCode.CHP_001.create();
   }
 }
