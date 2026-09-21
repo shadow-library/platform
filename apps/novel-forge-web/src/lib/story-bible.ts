@@ -14,8 +14,9 @@ export interface BibleFact {
   factKey: string;
   text: string;
   subjects?: string[] | null;
+  writerNote?: string | null;
   revealChapter?: number | null;
-  knowledge: { entityKey: string }[];
+  knowledge: { entityKey: string; learnedInChapter?: number }[];
 }
 
 export interface BibleRelation {
@@ -29,6 +30,12 @@ export interface BibleSection {
 }
 
 export type BibleCategory = EntityType | 'all';
+
+export type BibleView = 'entities' | 'facts';
+
+export function parseBibleView(value: unknown): BibleView | undefined {
+  return value === 'entities' || value === 'facts' ? value : undefined;
+}
 
 export const ALL_TYPES: EntityType[] = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 
@@ -108,12 +115,9 @@ export function stripEntityHeading(body: string, name: string): string {
   return body.slice(match[0].length).replace(/^\s+/, '');
 }
 
-function factMentions(fact: BibleFact, entityKey: string): boolean {
-  return (fact.subjects ?? []).includes(entityKey) || fact.knowledge.some(entry => entry.entityKey === entityKey);
-}
-
-export function entityFacts(facts: readonly BibleFact[], entityKey: string): BibleFact[] {
-  return facts.filter(fact => factMentions(fact, entityKey));
+/** The entity's own Facts panel, unlike `relatedEntities`, cares only about subjects — a fact an entity has merely been told about names no relationship of its own. */
+export function subjectFacts(facts: readonly BibleFact[], entityKey: string): BibleFact[] {
+  return facts.filter(fact => (fact.subjects ?? []).includes(entityKey));
 }
 
 /** The API models no relationship of its own, so the bible's one recorded link between two entities is a canon fact that names them both. */

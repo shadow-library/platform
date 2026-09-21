@@ -16,7 +16,7 @@ describe('screensForWorkflow', () => {
   });
 
   it('should show the full authoring sidebar for a new_novel project, without the hidden Import Plan entry', () => {
-    expect(segmentsFor('new_novel')).toEqual(['overview', 'story-bible', 'canon-facts', 'volumes', 'chapters', 'illustrations', 'review', 'chat', 'runs', 'publish', 'settings']);
+    expect(segmentsFor('new_novel')).toEqual(['overview', 'story-bible', 'volumes', 'chapters', 'illustrations', 'review', 'chat', 'runs', 'publish', 'settings']);
   });
 
   it('should show the source pipeline screens and hide Import Plan for a source project', () => {
@@ -28,7 +28,6 @@ describe('screensForWorkflow', () => {
       'reforge',
       'transform',
       'story-bible',
-      'canon-facts',
       'volumes',
       'chapters',
       'illustrations',

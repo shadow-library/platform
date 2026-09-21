@@ -7,14 +7,15 @@ import {
   type BibleFact,
   countByType,
   entityCaption,
-  entityFacts,
   filterEntities,
   groupByType,
   orderTypesByCount,
+  parseBibleView,
   parseEntityType,
   relatedEntities,
   sectionSlice,
   stripEntityHeading,
+  subjectFacts,
 } from '../src/lib/story-bible';
 
 function entity(overrides: Partial<BibleEntity> & Pick<BibleEntity, 'entityKey'>): BibleEntity {
@@ -150,19 +151,33 @@ describe('stripEntityHeading', () => {
   });
 });
 
-describe('entityFacts', () => {
+describe('subjectFacts', () => {
   const facts = [fact('oath', ['amara', 'boone']), fact('debt-owed', ['velan']), fact('tideglass-price', ['tideglass'], ['amara'])];
 
   it('should collect the facts the entity is a subject of', () => {
-    expect(entityFacts(facts, 'boone').map(f => f.factKey)).toEqual(['oath']);
+    expect(subjectFacts(facts, 'boone').map(f => f.factKey)).toEqual(['oath']);
   });
 
-  it('should collect the facts the entity has been told', () => {
-    expect(entityFacts(facts, 'amara').map(f => f.factKey)).toEqual(['oath', 'tideglass-price']);
+  it('should not count merely being told a fact as a subject', () => {
+    expect(subjectFacts(facts, 'amara').map(f => f.factKey)).toEqual(['oath']);
   });
 
-  it('should return nothing for an entity no fact names', () => {
-    expect(entityFacts(facts, 'ledger')).toEqual([]);
+  it('should return nothing for an entity no fact names as a subject', () => {
+    expect(subjectFacts(facts, 'ledger')).toEqual([]);
+    expect(subjectFacts(facts, 'tideglass').map(f => f.factKey)).toEqual(['tideglass-price']);
+  });
+});
+
+describe('parseBibleView', () => {
+  it('should accept the two views Story Bible offers', () => {
+    expect(parseBibleView('entities')).toBe('entities');
+    expect(parseBibleView('facts')).toBe('facts');
+  });
+
+  it('should reject anything else', () => {
+    expect(parseBibleView(undefined)).toBeUndefined();
+    expect(parseBibleView('all')).toBeUndefined();
+    expect(parseBibleView(3)).toBeUndefined();
   });
 });
 

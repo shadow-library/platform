@@ -1,3 +1,5 @@
+import { type FactResponse } from '@/lib/apis';
+
 export interface CanonFact {
   id: string;
   factKey: string;
@@ -6,7 +8,7 @@ export interface CanonFact {
   constraintNote?: string | null;
   writerNote?: string | null;
   revealChapter?: number | null;
-  knowledge: { entityKey: string }[];
+  knowledge: { entityKey: string; learnedInChapter?: number }[];
 }
 
 export type FactState = 'hidden' | 'revealed';
@@ -78,4 +80,65 @@ export function initialSpoilerState(state: FactState): SpoilerState {
 
 export function spoilerToggleLabel(state: SpoilerState, factKey: string): string {
   return state === 'shown' ? `Hide the judge-only truth of ${factKey}` : `Reveal the judge-only truth of ${factKey}`;
+}
+
+export type FactReveal = { kind: 'revealed'; chapter: number | undefined } | { kind: 'planned'; chapter: number } | { kind: 'unscheduled' };
+
+/** `revealChapter` is an authoring aid, never truth — a fact only counts as revealed once the ledger (`knowledge`) says so. */
+export function factReveal(fact: Pick<CanonFact, 'knowledge' | 'revealChapter'>): FactReveal {
+  if (fact.knowledge.length > 0) {
+    const chapters = fact.knowledge.map(entry => entry.learnedInChapter).filter((chapter): chapter is number => chapter != null);
+    return { kind: 'revealed', chapter: chapters.length > 0 ? Math.min(...chapters) : undefined };
+  }
+  if (fact.revealChapter != null) return { kind: 'planned', chapter: fact.revealChapter };
+  return { kind: 'unscheduled' };
+}
+
+export function factRevealLabel(reveal: FactReveal): string {
+  if (reveal.kind === 'revealed') return reveal.chapter != null ? `Reader learns: ch ${reveal.chapter}` : 'Reader learns';
+  if (reveal.kind === 'planned') return `Planned · ch ${reveal.chapter}`;
+  return 'Not scheduled';
+}
+
+/** The only trace of a hidden fact the chapter writer sees — an empty note withholds it from drafting context entirely. */
+export function factHiddenFromWriter(fact: Pick<CanonFact, 'knowledge' | 'writerNote'>): boolean {
+  return factState(fact) === 'hidden' && !(fact.writerNote ?? '').trim();
+}
+
+export function listToText(values?: string[] | null): string {
+  return (values ?? []).join(', ');
+}
+
+export function textToList(value: string): string[] | undefined {
+  const items = value
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+}
+
+export interface FactFormState {
+  factKey: string;
+  text: string;
+  subjects: string;
+  constraintNote: string;
+  writerNote: string;
+  terms: string;
+  revealChapter: string;
+}
+
+export function emptyFactForm(): FactFormState {
+  return { factKey: '', text: '', subjects: '', constraintNote: '', writerNote: '', terms: '', revealChapter: '' };
+}
+
+export function factFormFromFact(fact: FactResponse): FactFormState {
+  return {
+    factKey: fact.factKey,
+    text: fact.text,
+    subjects: listToText(fact.subjects),
+    constraintNote: fact.constraintNote ?? '',
+    writerNote: fact.writerNote ?? '',
+    terms: listToText(fact.terms),
+    revealChapter: fact.revealChapter != null ? String(fact.revealChapter) : '',
+  };
 }

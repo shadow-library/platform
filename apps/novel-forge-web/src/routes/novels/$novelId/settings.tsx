@@ -413,7 +413,7 @@ function SettingsScreen(): React.JSX.Element {
         title={switchTarget === 'new_novel' ? 'Convert to original novel?' : 'Mark as curated novel?'}
         description={
           switchTarget === 'new_novel'
-            ? 'Adds Story Bible, Canon Facts, Volumes & Arcs, and the rest of the authoring workflow. This cannot be undone.'
+            ? 'Adds Story Bible, Volumes & Arcs, and the rest of the authoring workflow. This cannot be undone.'
             : 'Hides Translation; Chapters stays for reading, amending, and inserting into the finalized canon. This cannot be undone.'
         }
         confirmLabel={switchTarget === 'new_novel' ? 'Convert' : 'Mark as curated'}

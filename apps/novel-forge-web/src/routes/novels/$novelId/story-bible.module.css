@@ -216,3 +216,36 @@
   font-size: var(--sh-text-caption);
   font-weight: 600;
 }
+
+.viewTabs {
+  margin-bottom: 20px;
+}
+
+.factRow {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.factRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.factText {
+  margin: 0 0 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.factMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.factEdit {
+  margin-left: auto;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+}

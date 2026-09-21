@@ -1,99 +1,44 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { EyeIcon, EyeOffIcon, LockIcon, SearchIcon, TrashIcon } from '@/components/icons';
-import { useCollectionJump } from '@/components/Layout';
-import { CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
-import {
-  type FactResponse,
-  type ListEntityResponse,
-  listFactsQueryOptions,
-  useDeleteFactMutation,
-  useListEntitiesQuery,
-  useListFactsQuery,
-  useRetractKnowledgeMutation,
-  useRevealFactMutation,
-  useUpsertFactMutation,
-} from '@/lib/apis';
+import { EyeIcon, EyeOffIcon, TrashIcon } from '@/components/icons';
+import { DetailPage, ItemPager, type ItemPagerJump, RowAction, StatusChip } from '@/components/nf';
+import { type FactResponse, type ListEntityResponse, useListEntitiesQuery, useRetractKnowledgeMutation, useRevealFactMutation } from '@/lib/apis';
 import {
   backLabel,
-  countByState,
   factAttachments,
-  factCaption,
-  type FactCategory,
-  type FactState,
+  type FactFormState,
   factState,
-  filterFacts,
+  type FactState,
   initialSpoilerState,
   parseFactState,
-  sortFactsByKey,
   type SpoilerState,
   spoilerToggleLabel,
-  STATE_LABEL,
 } from '@/lib/canon-facts';
 import { relativeTime } from '@/lib/format';
 
 import styles from './canon-facts.module.css';
 
-interface FactsSearch {
-  state?: FactState;
-  fact?: string;
-}
-
+// The Canon Facts directory merged into Story Bible's "All facts" tab (routes/novels/$novelId/story-bible.tsx)
+// — a fact's home is the same canon its subjects live in. This route survives only to bounce old links there;
+// `FactDialog`/`RevealDialog`/`FactDetail` below are what the merged tab reuses for the list, edit and detail UI.
 export const Route = createFileRoute('/novels/$novelId/canon-facts')({
-  validateSearch: (search: Record<string, unknown>): FactsSearch => ({
+  validateSearch: (search: Record<string, unknown>): { state?: FactState; fact?: string } => ({
     state: parseFactState(search.state),
     fact: typeof search.fact === 'string' && search.fact ? search.fact : undefined,
   }),
-  loader: ({ context, params }) => context.queryClient.prefetchQuery(listFactsQueryOptions(params.novelId)),
-  component: CanonFactsScreen,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({ to: '/novels/$novelId/story-bible', params, search: { view: 'facts', state: search.state, fact: search.fact }, replace: true });
+  },
 });
 
-function listToText(values?: string[] | null): string {
-  return (values ?? []).join(', ');
-}
-
-function textToList(value: string): string[] | undefined {
-  const items = value
-    .split(',')
-    .map(v => v.trim())
-    .filter(Boolean);
-  return items.length > 0 ? items : undefined;
-}
-
-interface FactFormState {
-  factKey: string;
-  text: string;
-  subjects: string;
-  constraintNote: string;
-  writerNote: string;
-  terms: string;
-  revealChapter: string;
-}
-
-function emptyForm(): FactFormState {
-  return { factKey: '', text: '', subjects: '', constraintNote: '', writerNote: '', terms: '', revealChapter: '' };
-}
-
-function formFromFact(fact: FactResponse): FactFormState {
-  return {
-    factKey: fact.factKey,
-    text: fact.text,
-    subjects: listToText(fact.subjects),
-    constraintNote: fact.constraintNote ?? '',
-    writerNote: fact.writerNote ?? '',
-    terms: listToText(fact.terms),
-    revealChapter: fact.revealChapter != null ? String(fact.revealChapter) : '',
-  };
-}
-
-interface FactDialogState {
+export interface FactDialogState {
   mode: 'create' | 'edit';
   initial: FactFormState;
 }
 
-interface FactDialogProps {
+export interface FactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'create' | 'edit';
@@ -102,7 +47,7 @@ interface FactDialogProps {
   pending: boolean;
 }
 
-function FactDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: FactDialogProps): React.JSX.Element {
+export function FactDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: FactDialogProps): React.JSX.Element {
   const [form, setForm] = useState(initial);
   const set = <K extends keyof FactFormState>(key: K, value: FactFormState[K]): void => setForm(prev => ({ ...prev, [key]: value }));
   const chapterValid = form.revealChapter.trim() === '' || (/^\d+$/.test(form.revealChapter.trim()) && Number(form.revealChapter) >= 1);
@@ -348,7 +293,7 @@ function FactAside({ novelId, fact, names, onReveal }: FactAsideProps): React.JS
   );
 }
 
-interface FactDetailProps {
+export interface FactDetailProps {
   novelId: string;
   fact: FactResponse;
   total: number | undefined;
@@ -360,7 +305,7 @@ interface FactDetailProps {
   onDelete: (fact: FactResponse) => void;
 }
 
-function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, onEdit, onDelete }: FactDetailProps): React.JSX.Element {
+export function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, onEdit, onDelete }: FactDetailProps): React.JSX.Element {
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
   const names = useMemo(() => new Map(entities.map(entity => [entity.entityKey, entity.name])), [entities]);
@@ -371,7 +316,7 @@ function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, on
     <>
       <DetailPage
         back={
-          <Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: filterState }}>
+          <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ view: 'facts', state: filterState }}>
             {backLabel(total)}
           </Link>
         }
@@ -425,207 +370,6 @@ function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, on
       </DetailPage>
 
       <RevealDialog novelId={novelId} factKey={fact.factKey} entities={entities} open={revealOpen} onOpenChange={setRevealOpen} />
-    </>
-  );
-}
-
-function CanonFactsScreen(): React.JSX.Element {
-  const { novelId } = Route.useParams();
-  const { state: stateParam, fact: factParam } = Route.useSearch();
-  const goSearch = Route.useNavigate();
-  const factsQuery = useListFactsQuery(novelId);
-  const facts = useMemo(() => sortFactsByKey(factsQuery.data?.facts ?? []), [factsQuery.data]);
-  const [query, setQuery] = useState('');
-  const [dialog, setDialog] = useState<FactDialogState | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FactResponse | undefined>();
-
-  const upsertFact = useUpsertFactMutation(novelId);
-  const deleteFact = useDeleteFactMutation(novelId);
-
-  const activeState: FactCategory = stateParam ?? 'all';
-  const resolved = !factsQuery.isLoading && !factsQuery.error;
-  const total = resolved ? facts.length : undefined;
-
-  const counts = useMemo(() => countByState(facts), [facts]);
-  const visible = useMemo(() => filterFacts(facts, activeState, query), [facts, activeState, query]);
-  const byKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
-  const visibleIds = useMemo(() => (resolved ? visible.map(fact => fact.factKey) : undefined), [resolved, visible]);
-
-  const selected = factParam ? byKey.get(factParam) : undefined;
-  const selectFact = (factKey?: string): Promise<void> => goSearch({ search: { state: stateParam, fact: factKey } });
-  const pickState = (value: string): Promise<void> => goSearch({ search: { state: parseFactState(value) } });
-  const clearFilters = (): void => {
-    setQuery('');
-    void goSearch({ search: {} });
-  };
-
-  const filtering = stateParam !== undefined || query.trim() !== '';
-  const jumpItems = useMemo(() => visible.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })), [visible]);
-  const allJumpItems = useMemo(() => (filtering ? facts.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })) : undefined), [filtering, facts]);
-  const jump = useCollectionJump(
-    resolved
-      ? {
-          collection: 'canon facts',
-          items: jumpItems,
-          filterLabel: stateParam ? STATE_LABEL[stateParam] : undefined,
-          allItems: allJumpItems,
-          currentId: factParam,
-          onSelect: key => void selectFact(key),
-        }
-      : null,
-  );
-
-  const submit = (form: FactFormState): void => {
-    const body = {
-      factKey: dialog?.mode === 'create' ? form.factKey.trim() : (dialog?.initial.factKey ?? ''),
-      text: form.text.trim(),
-      subjects: textToList(form.subjects),
-      constraintNote: form.constraintNote.trim() || undefined,
-      writerNote: form.writerNote.trim(),
-      terms: textToList(form.terms),
-      revealChapter: form.revealChapter.trim() ? Number(form.revealChapter) : undefined,
-    };
-    upsertFact.mutate(body, {
-      onSuccess: created => {
-        toast.success(dialog?.mode === 'create' ? `Created fact “${created.factKey}”` : 'Fact updated');
-        setDialog(null);
-        if (dialog?.mode === 'create') selectFact(created.factKey);
-      },
-      onError: err => toast.danger(err.message),
-    });
-  };
-
-  const doDelete = (): void => {
-    if (!deleteTarget) return;
-    deleteFact.mutate(deleteTarget.factKey, {
-      onSuccess: () => {
-        toast.success(`Deleted fact “${deleteTarget.factKey}”`);
-        setDeleteTarget(undefined);
-        if (deleteTarget.factKey === factParam) selectFact(undefined);
-      },
-      onError: err => toast.danger(err.message),
-    });
-  };
-
-  const dialogs = (
-    <>
-      {dialog && <FactDialog open onOpenChange={next => !next && setDialog(null)} mode={dialog.mode} initial={dialog.initial} pending={upsertFact.isPending} onSubmit={submit} />}
-
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
-        <Dialog.Content size="sm">
-          <Dialog.Header title={`Delete “${deleteTarget?.factKey ?? 'this fact'}”?`} description="This removes the fact and its entire reveal ledger. It cannot be undone." />
-          <Dialog.Footer>
-            <Dialog.Close asChild>
-              <Button variant="ghost">Cancel</Button>
-            </Dialog.Close>
-            <Button variant="danger" loading={deleteFact.isPending} onClick={doDelete}>
-              Delete fact
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog>
-    </>
-  );
-
-  if (selected)
-    return (
-      <>
-        <FactDetail
-          novelId={novelId}
-          fact={selected}
-          total={total}
-          filterState={stateParam}
-          ids={visibleIds}
-          jump={jump}
-          onSelect={key => void selectFact(key)}
-          onEdit={fact => setDialog({ mode: 'edit', initial: formFromFact(fact) })}
-          onDelete={setDeleteTarget}
-        />
-        {dialogs}
-      </>
-    );
-
-  return (
-    <>
-      <CollectionPage
-        title="Canon Facts"
-        subtitle="The spoiler ledger — truths only the judge sees until a character earns them on-page."
-        total={total}
-        actions={
-          <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm() })}>
-            New fact
-          </Button>
-        }
-        filter={{ label: 'Filter canon facts', placeholder: 'Filter by key, subject or term…', value: query, onValueChange: setQuery }}
-        notice={
-          resolved &&
-          factParam && (
-            <Alert intent="warning" title="That canon fact is no longer in the ledger." action={{ label: 'Back to the directory', onClick: () => void selectFact(undefined) }}>
-              It was deleted, its key was changed, or the link was typed by hand.
-            </Alert>
-          )
-        }
-        segments={{
-          label: 'Reveal state',
-          value: activeState,
-          onValueChange: pickState,
-          items: [
-            { value: 'all', label: STATE_LABEL.all, count: facts.length },
-            { value: 'hidden', label: STATE_LABEL.hidden, count: counts.hidden },
-            { value: 'revealed', label: STATE_LABEL.revealed, count: counts.revealed },
-          ],
-        }}
-        empty={
-          <EmptyState
-            icon={<LockIcon size={24} />}
-            title="No canon facts yet"
-            description="A canon fact is a truth the judge holds back — the drafting model never sees it until a character earns it on-page. Write the first one and the leak scan starts guarding it."
-            actions={
-              <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm() })}>
-                New fact
-              </Button>
-            }
-          />
-        }
-      >
-        {factsQuery.isLoading ? (
-          <PaneLoader />
-        ) : factsQuery.error ? (
-          <PaneError error={factsQuery.error} />
-        ) : visible.length === 0 ? (
-          <EmptyState
-            icon={<SearchIcon size={24} />}
-            title="Nothing matches"
-            description={`No ${activeState === 'all' ? '' : `${activeState} `}canon fact matches this filter.`}
-            actions={
-              <Button variant="secondary" onClick={clearFilters}>
-                Clear the filter
-              </Button>
-            }
-          />
-        ) : (
-          <CollectionPage.Rows>
-            {visible.map(fact => (
-              <CollectionPage.Row
-                key={fact.id}
-                link={<Link to="/novels/$novelId/canon-facts" params={{ novelId }} search={{ state: stateParam, fact: fact.factKey }} />}
-                title={<span className={styles.rowKey}>{fact.factKey}</span>}
-                trailing={
-                  <StatusChip intent={factState(fact) === 'revealed' ? 'success' : 'warning'} dot>
-                    {factCaption(fact)}
-                  </StatusChip>
-                }
-                actions={
-                  <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteTarget(fact)}>
-                    <TrashIcon size={13} />
-                  </RowAction>
-                }
-              />
-            ))}
-          </CollectionPage.Rows>
-        )}
-      </CollectionPage>
-      {dialogs}
     </>
   );
 }

@@ -347,7 +347,7 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 `{name, title, kind:'new_novel', contentMode}` (`:77-95`); "Translate" posts `kind:'translation'` (`:97-116`);
 "Idea" posts to `/api/v1/seeds` and creates a seed-status project (`:118-130`). Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
-project the visible labels are **Overview**, **Story Bible**, **Canon Facts**, **Volumes & Arcs**, **Import Plan
+project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Import Plan
 (deprecated)**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
 Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**. The `translation`, `source`,
 `rebrand`, `reforge` and `transform` screens never appear on a `new_novel` project (`AUTHORING` is
@@ -1132,8 +1132,8 @@ doc alone, seed it with:
 > the Salt Assize forecloses on the Quay itself.
 
 Entity/fact keys below (`amara_veil`, `rook_calder`, `salt_assize`, fact `amara_is_the_pledge`) are
-**illustrative** — the bible builder coins its own. Read the real keys off the **Story Bible** and
-**Canon Facts** screens and substitute them, because an unknown key is skipped in silence rather than
+**illustrative** — the bible builder coins its own. Read the real keys off the **Story Bible** screen's
+entity pages and **All facts** tab and substitute them, because an unknown key is skipped in silence rather than
 rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — skipped` and ledgers nothing
 (`bible/fact/knowledge-view.ts:195-203`), and an unresolvable `requiredContext` ref is dropped the same way.
 
@@ -1390,8 +1390,8 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
   adds none (unique `idempotency_key`, `onConflictDoNothing`). **In the same transaction** the brief's
   `knowledgeContract.learns` become `character_knowledge` rows with `learned_in_chapter = n`, `source='brief'`
   (`bible/fact/knowledge-view.ts:176`); log `brief reveals ledgered`. Unknown entity/fact keys are skipped with
-  the warn `brief reveals reference unknown keys — skipped` — check the **Canon Facts** screen for the fact's
-  knowledge list. No model call.
+  the warn `brief reveals reference unknown keys — skipped` — check the **Story Bible**'s **All facts** tab for
+  the fact's knowledge list. No model call.
 - **Fails when:** `DRF_007` (regenerate first), `DRF_002`, `DRF_001`.
 
 #### Finalize + continuity write-back
@@ -1572,7 +1572,7 @@ true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `
 #### Character-knowledge / canon-fact leak protection
 
 - **Entry:** `PUT /projects/:projectId/facts/:factKey` + a brief `knowledgeContract` + generation.
-  UI: **Canon Facts** screen.
+  UI: **Story Bible**'s **All facts** tab.
 - **Preconditions:** the POV entity exists in `entities`; a brief at the chapter under test.
 - **Input:** 1. fact —
   `PUT /facts/amara_is_the_pledge` `{"text":"Amara's own childhood is the collateral on the Veil debt.",

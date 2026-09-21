@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Tabs, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { LockIcon, SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import {
   BibleDocumentList,
@@ -10,12 +10,12 @@ import {
   CollectionPage,
   DetailPage,
   EmptyState,
-  FieldCard,
   ItemPager,
   type ItemPagerJump,
   Markdown,
   PaneError,
   PaneLoader,
+  RowAction,
   StatusChip,
 } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
@@ -25,7 +25,9 @@ import {
   type CreateEntityBody,
   type EntityResponse,
   type EntityType,
+  type FactResponse,
   listEntitiesQueryOptions,
+  listFactsQueryOptions,
   type UpdateEntityBody,
   useAddEntityImageMutation,
   useAuditBibleMutation,
@@ -34,6 +36,7 @@ import {
   useDeleteEntityImageByIdMutation,
   useDeleteEntityImageMutation,
   useDeleteEntityMutation,
+  useDeleteFactMutation,
   useEntityQuery,
   useListBibleDocsQuery,
   useListEntitiesQuery,
@@ -42,7 +45,26 @@ import {
   useSeedFromBriefMutation,
   useUpdateEntityMutation,
   useUploadEntityImageMutation,
+  useUpsertFactMutation,
 } from '@/lib/apis';
+import {
+  countByState,
+  emptyFactForm,
+  factCaption,
+  type FactCategory,
+  factFormFromFact,
+  type FactFormState,
+  factHiddenFromWriter,
+  factReveal,
+  factRevealLabel,
+  factState,
+  type FactState,
+  filterFacts,
+  parseFactState,
+  sortFactsByKey,
+  STATE_LABEL,
+  textToList,
+} from '@/lib/canon-facts';
 import { coverColor } from '@/lib/format';
 import {
   ALL_TYPES,
@@ -50,34 +72,48 @@ import {
   backLabel,
   type BibleCategory,
   type BibleEntity,
+  type BibleView,
   countByType,
   entityCaption,
-  entityFacts,
   filterEntities,
   groupByType,
   orderTypesByCount,
+  parseBibleView,
   parseEntityType,
   relatedEntities,
   sectionSlice,
   stripEntityHeading,
+  subjectFacts,
   TYPE_LABEL,
   TYPE_SINGULAR,
 } from '@/lib/story-bible';
 
+import { FactDetail, FactDialog, type FactDialogState } from './canon-facts';
+import factsStyles from './canon-facts.module.css';
 import styles from './story-bible.module.css';
 
 interface BibleSearch {
   type?: EntityType;
   entity?: string;
+  view?: BibleView;
+  state?: FactState;
+  fact?: string;
 }
 
-// The active type and the open entity live in the URL so a refresh reopens the same entry.
+// The active type/view and the open entity or fact live in the URL so a refresh reopens the same entry.
 export const Route = createFileRoute('/novels/$novelId/story-bible')({
   validateSearch: (search: Record<string, unknown>): BibleSearch => ({
     type: parseEntityType(search.type),
     entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
+    view: parseBibleView(search.view),
+    state: parseFactState(search.state),
+    fact: typeof search.fact === 'string' && search.fact ? search.fact : undefined,
   }),
-  loader: ({ context, params }) => context.queryClient.prefetchQuery(listEntitiesQueryOptions(params.novelId, { limit: 500 })),
+  loader: ({ context, params }) =>
+    Promise.all([
+      context.queryClient.prefetchQuery(listEntitiesQueryOptions(params.novelId, { limit: 500 })),
+      context.queryClient.prefetchQuery(listFactsQueryOptions(params.novelId)),
+    ]),
   component: StoryBibleScreen,
 });
 
@@ -246,7 +282,7 @@ function EntityAside({ novelId, entityKey, byKey, type }: EntityAsideProps): Rea
   const factsQuery = useListFactsQuery(novelId);
   const facts = useMemo(() => factsQuery.data?.facts ?? [], [factsQuery.data]);
   const related = useMemo(() => relatedEntities(facts, entityKey), [facts, entityKey]);
-  const mentions = useMemo(() => entityFacts(facts, entityKey), [facts, entityKey]);
+  const ownFacts = useMemo(() => subjectFacts(facts, entityKey), [facts, entityKey]);
 
   return (
     <>
@@ -274,22 +310,35 @@ function EntityAside({ novelId, entityKey, byKey, type }: EntityAsideProps): Rea
       </section>
 
       <section className={styles.asideBlock}>
-        <h2 className={styles.asideTitle}>Canon facts</h2>
-        {mentions.length === 0 ? (
-          <p className={styles.asideNote}>Nothing in the spoiler ledger mentions this entity.</p>
+        <h2 className={styles.asideTitle}>Facts</h2>
+        {ownFacts.length === 0 ? (
+          <p className={styles.asideNote}>Nothing in the spoiler ledger names this entity as a subject.</p>
         ) : (
           <div className={styles.factList}>
-            {mentions.slice(0, ASIDE_FACT_LIMIT).map(fact => (
-              <FieldCard
-                key={fact.factKey}
-                label={fact.factKey}
-                value={fact.text}
-                provenance={fact.revealChapter != null && <StatusChip intent="info">reveals ch. {fact.revealChapter}</StatusChip>}
-              />
-            ))}
-            {mentions.length > ASIDE_FACT_LIMIT && (
-              <Link to="/novels/$novelId/canon-facts" params={{ novelId }} className={styles.asideLink}>
-                See all {mentions.length} in Canon Facts
+            {ownFacts.slice(0, ASIDE_FACT_LIMIT).map(fact => {
+              const reveal = factReveal(fact);
+              return (
+                <div key={fact.factKey} className={styles.factRow}>
+                  <p className={styles.factText}>{fact.text}</p>
+                  <div className={styles.factMeta}>
+                    <StatusChip intent={reveal.kind === 'revealed' ? 'success' : 'neutral'}>{factRevealLabel(reveal)}</StatusChip>
+                    {factHiddenFromWriter(fact) && <StatusChip intent="warning">Hidden from writer</StatusChip>}
+                    <Link
+                      to="/novels/$novelId/story-bible"
+                      params={{ novelId }}
+                      search={{ view: 'facts', fact: fact.factKey }}
+                      className={styles.factEdit}
+                      aria-label={`Edit ${fact.factKey}`}
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+            {ownFacts.length > ASIDE_FACT_LIMIT && (
+              <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ view: 'facts' }} className={styles.asideLink}>
+                See all {ownFacts.length} in All facts
               </Link>
             )}
           </div>
@@ -426,8 +475,10 @@ function EntityDetail({ novelId, entity, total, type, ids, jump, byKey, onSelect
 function StoryBibleScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
-  const { type: typeParam, entity: entityParam } = Route.useSearch();
+  const { type: typeParam, entity: entityParam, view: viewParam, state: factStateParam, fact: factParam } = Route.useSearch();
   const goSearch = Route.useNavigate();
+  const view: BibleView = viewParam ?? 'entities';
+
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
   const projectQuery = useProjectQuery(novelId);
@@ -471,7 +522,7 @@ function StoryBibleScreen(): React.JSX.Element {
     [entities, typeParam],
   );
   const jump = useCollectionJump(
-    resolved
+    view === 'entities' && resolved
       ? {
           collection: 'entities',
           items: jumpItems,
@@ -585,6 +636,115 @@ function StoryBibleScreen(): React.JSX.Element {
     </>
   );
 
+  // Facts — the merged Canon Facts directory, reusing FactDialog/FactDetail from ./canon-facts.
+  const factsQuery = useListFactsQuery(novelId);
+  const facts = useMemo(() => sortFactsByKey(factsQuery.data?.facts ?? []), [factsQuery.data]);
+  const [factQuery, setFactQuery] = useState('');
+  const [factDialog, setFactDialog] = useState<FactDialogState | null>(null);
+  const [deleteFactTarget, setDeleteFactTarget] = useState<FactResponse | undefined>();
+
+  const upsertFact = useUpsertFactMutation(novelId);
+  const deleteFact = useDeleteFactMutation(novelId);
+
+  const activeState: FactCategory = factStateParam ?? 'all';
+  const factsResolved = !factsQuery.isLoading && !factsQuery.error;
+  const factsTotal = factsResolved ? facts.length : undefined;
+
+  const factCounts = useMemo(() => countByState(facts), [facts]);
+  const visibleFacts = useMemo(() => filterFacts(facts, activeState, factQuery), [facts, activeState, factQuery]);
+  const factsByKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
+  const visibleFactIds = useMemo(() => (factsResolved ? visibleFacts.map(fact => fact.factKey) : undefined), [factsResolved, visibleFacts]);
+
+  const selectedFact = factParam ? factsByKey.get(factParam) : undefined;
+  const selectFact = (factKey?: string): Promise<void> => goSearch({ search: { view: 'facts', state: factStateParam, fact: factKey } });
+  const pickFactState = (value: string): Promise<void> => goSearch({ search: { view: 'facts', state: parseFactState(value) } });
+  const clearFactFilters = (): void => {
+    setFactQuery('');
+    void goSearch({ search: { view: 'facts' } });
+  };
+
+  const factFiltering = factStateParam !== undefined || factQuery.trim() !== '';
+  const factJumpItems = useMemo(() => visibleFacts.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })), [visibleFacts]);
+  const factAllJumpItems = useMemo(
+    () => (factFiltering ? facts.map(fact => ({ id: fact.factKey, label: fact.factKey, caption: factCaption(fact) })) : undefined),
+    [factFiltering, facts],
+  );
+  const factJump = useCollectionJump(
+    view === 'facts' && factsResolved
+      ? {
+          collection: 'canon facts',
+          items: factJumpItems,
+          filterLabel: factStateParam ? STATE_LABEL[factStateParam] : undefined,
+          allItems: factAllJumpItems,
+          currentId: factParam,
+          onSelect: key => void selectFact(key),
+        }
+      : null,
+  );
+
+  const submitFact = (form: FactFormState): void => {
+    const body = {
+      factKey: factDialog?.mode === 'create' ? form.factKey.trim() : (factDialog?.initial.factKey ?? ''),
+      text: form.text.trim(),
+      subjects: textToList(form.subjects),
+      constraintNote: form.constraintNote.trim() || undefined,
+      writerNote: form.writerNote.trim(),
+      terms: textToList(form.terms),
+      revealChapter: form.revealChapter.trim() ? Number(form.revealChapter) : undefined,
+    };
+    upsertFact.mutate(body, {
+      onSuccess: created => {
+        toast.success(factDialog?.mode === 'create' ? `Created fact “${created.factKey}”` : 'Fact updated');
+        setFactDialog(null);
+        if (factDialog?.mode === 'create') selectFact(created.factKey);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  const doDeleteFact = (): void => {
+    if (!deleteFactTarget) return;
+    deleteFact.mutate(deleteFactTarget.factKey, {
+      onSuccess: () => {
+        toast.success(`Deleted fact “${deleteFactTarget.factKey}”`);
+        setDeleteFactTarget(undefined);
+        if (deleteFactTarget.factKey === factParam) selectFact(undefined);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  const pickView = (value: string): void => void goSearch({ search: { view: value === 'facts' ? 'facts' : undefined } });
+
+  const factDialogs = (
+    <>
+      {factDialog && (
+        <FactDialog
+          open
+          onOpenChange={next => !next && setFactDialog(null)}
+          mode={factDialog.mode}
+          initial={factDialog.initial}
+          pending={upsertFact.isPending}
+          onSubmit={submitFact}
+        />
+      )}
+
+      <Dialog open={Boolean(deleteFactTarget)} onOpenChange={o => !o && setDeleteFactTarget(undefined)}>
+        <Dialog.Content size="sm">
+          <Dialog.Header title={`Delete “${deleteFactTarget?.factKey ?? 'this fact'}”?`} description="This removes the fact and its entire reveal ledger. It cannot be undone." />
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={deleteFact.isPending} onClick={doDeleteFact}>
+              Delete fact
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
+    </>
+  );
+
   if (selected)
     return (
       <>
@@ -604,106 +764,223 @@ function StoryBibleScreen(): React.JSX.Element {
       </>
     );
 
+  if (selectedFact)
+    return (
+      <>
+        <FactDetail
+          novelId={novelId}
+          fact={selectedFact}
+          total={factsTotal}
+          filterState={factStateParam}
+          ids={visibleFactIds}
+          jump={factJump}
+          onSelect={key => void selectFact(key)}
+          onEdit={fact => setFactDialog({ mode: 'edit', initial: factFormFromFact(fact) })}
+          onDelete={setDeleteFactTarget}
+        />
+        {factDialogs}
+      </>
+    );
+
   return (
     <>
-      <CollectionPage
-        title="Story Bible"
-        subtitle="The canon every chapter is checked against — cast, factions, places, rules."
-        total={total}
-        actions={
-          <>
-            <Button variant="secondary" loading={audit.isPending} onClick={runAudit}>
-              Run bible audit
-            </Button>
-            <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm(typeParam ?? 'character') })}>
-              New entity
-            </Button>
-          </>
-        }
-        filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
-        notice={
-          <>
-            {readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
-            {resolved && entityParam && (
-              <Alert intent="warning" title="That entity is no longer in the story bible." action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}>
-                It was deleted, renamed, or the link was typed by hand.
-              </Alert>
-            )}
-          </>
-        }
-        segments={{
-          label: 'Entity type',
-          value: activeType,
-          onValueChange: pickType,
-          items: [{ value: 'all', label: 'All', count: entities.length }, ...order.map(type => ({ value: type, label: TYPE_LABEL[type], count: counts.get(type) ?? 0 }))],
-        }}
-        empty={
-          <>
-            <EmptyState
-              icon={<SparkIcon size={24} />}
-              title="Draft the story bible"
-              description="Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take a few minutes."
-              actions={
-                brief ? (
-                  <Button variant="primary" prefix={<SparkIcon />} loading={seed.isPending} onClick={runSeed}>
-                    Generate story bible
-                  </Button>
+      <Tabs value={view} onValueChange={pickView} className={styles.viewTabs}>
+        <Tabs.List>
+          <Tabs.Tab value="entities" count={resolved ? entities.length : undefined}>
+            Entities
+          </Tabs.Tab>
+          <Tabs.Tab value="facts" count={factsResolved ? facts.length : undefined}>
+            All facts
+          </Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="entities">
+          <CollectionPage
+            title="Story Bible"
+            subtitle="The canon every chapter is checked against — cast, factions, places, rules."
+            total={total}
+            actions={
+              <>
+                <Button variant="secondary" loading={audit.isPending} onClick={runAudit}>
+                  Run bible audit
+                </Button>
+                <Button variant="primary" onClick={() => setDialog({ mode: 'create', initial: emptyForm(typeParam ?? 'character') })}>
+                  New entity
+                </Button>
+              </>
+            }
+            filter={{ label: 'Filter entities', placeholder: 'Filter by name or key…', value: query, onValueChange: setQuery }}
+            notice={
+              <>
+                {readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
+                {resolved && entityParam && (
+                  <Alert
+                    intent="warning"
+                    title="That entity is no longer in the story bible."
+                    action={{ label: 'Back to the directory', onClick: () => void selectEntity(undefined) }}
+                  >
+                    It was deleted, renamed, or the link was typed by hand.
+                  </Alert>
+                )}
+              </>
+            }
+            segments={{
+              label: 'Entity type',
+              value: activeType,
+              onValueChange: pickType,
+              items: [{ value: 'all', label: 'All', count: entities.length }, ...order.map(type => ({ value: type, label: TYPE_LABEL[type], count: counts.get(type) ?? 0 }))],
+            }}
+            empty={
+              <>
+                <EmptyState
+                  icon={<SparkIcon size={24} />}
+                  title="Draft the story bible"
+                  description="Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take a few minutes."
+                  actions={
+                    brief ? (
+                      <Button variant="primary" prefix={<SparkIcon />} loading={seed.isPending} onClick={runSeed}>
+                        Generate story bible
+                      </Button>
+                    ) : (
+                      <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })}>
+                        Add a brief in Settings
+                      </Button>
+                    )
+                  }
+                />
+                <BibleDocumentList novelId={novelId} />
+              </>
+            }
+          >
+            {entitiesQuery.isLoading ? (
+              <PaneLoader />
+            ) : entitiesQuery.error ? (
+              <PaneError error={entitiesQuery.error} />
+            ) : (
+              <>
+                {visible.length === 0 ? (
+                  <EmptyState
+                    icon={<SearchIcon size={24} />}
+                    title="Nothing matches"
+                    description={`No ${activeType === 'all' ? 'entity' : TYPE_SINGULAR[activeType].toLowerCase()} matches this filter.`}
+                    actions={
+                      <Button variant="secondary" onClick={clearFilters}>
+                        Clear the filter
+                      </Button>
+                    }
+                  />
                 ) : (
-                  <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/settings', params: { novelId } })}>
-                    Add a brief in Settings
+                  sections.map(section => (
+                    <CollectionPage.Section
+                      key={section.type}
+                      label={TYPE_LABEL[section.type]}
+                      total={section.total}
+                      shown={section.items.length}
+                      seeAll={sectionTotal => (
+                        <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type: section.type }}>
+                          See all {sectionTotal}
+                        </Link>
+                      )}
+                    >
+                      <div className={styles.grid}>
+                        {section.items.map(entity => (
+                          <EntityCard key={entity.id} novelId={novelId} entity={entity} type={typeParam} />
+                        ))}
+                      </div>
+                    </CollectionPage.Section>
+                  ))
+                )}
+                <CollectionPage.Section label="Documents" total={bibleDocs.data?.docs.length ?? 0}>
+                  <BibleDocumentList novelId={novelId} />
+                </CollectionPage.Section>
+              </>
+            )}
+          </CollectionPage>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="facts">
+          <CollectionPage
+            title="All facts"
+            subtitle="The spoiler ledger — truths only the judge sees until a character earns them on-page."
+            total={factsTotal}
+            actions={
+              <Button variant="primary" onClick={() => setFactDialog({ mode: 'create', initial: emptyFactForm() })}>
+                New fact
+              </Button>
+            }
+            filter={{ label: 'Filter canon facts', placeholder: 'Filter by key, subject or term…', value: factQuery, onValueChange: setFactQuery }}
+            notice={
+              factsResolved &&
+              factParam && (
+                <Alert intent="warning" title="That canon fact is no longer in the ledger." action={{ label: 'Back to the directory', onClick: () => void selectFact(undefined) }}>
+                  It was deleted, its key was changed, or the link was typed by hand.
+                </Alert>
+              )
+            }
+            segments={{
+              label: 'Reveal state',
+              value: activeState,
+              onValueChange: pickFactState,
+              items: [
+                { value: 'all', label: STATE_LABEL.all, count: facts.length },
+                { value: 'hidden', label: STATE_LABEL.hidden, count: factCounts.hidden },
+                { value: 'revealed', label: STATE_LABEL.revealed, count: factCounts.revealed },
+              ],
+            }}
+            empty={
+              <EmptyState
+                icon={<LockIcon size={24} />}
+                title="No canon facts yet"
+                description="A canon fact is a truth the judge holds back — the drafting model never sees it until a character earns it on-page. Write the first one and the leak scan starts guarding it."
+                actions={
+                  <Button variant="primary" onClick={() => setFactDialog({ mode: 'create', initial: emptyFactForm() })}>
+                    New fact
                   </Button>
-                )
-              }
-            />
-            <BibleDocumentList novelId={novelId} />
-          </>
-        }
-      >
-        {entitiesQuery.isLoading ? (
-          <PaneLoader />
-        ) : entitiesQuery.error ? (
-          <PaneError error={entitiesQuery.error} />
-        ) : (
-          <>
-            {visible.length === 0 ? (
+                }
+              />
+            }
+          >
+            {factsQuery.isLoading ? (
+              <PaneLoader />
+            ) : factsQuery.error ? (
+              <PaneError error={factsQuery.error} />
+            ) : visibleFacts.length === 0 ? (
               <EmptyState
                 icon={<SearchIcon size={24} />}
                 title="Nothing matches"
-                description={`No ${activeType === 'all' ? 'entity' : TYPE_SINGULAR[activeType].toLowerCase()} matches this filter.`}
+                description={`No ${activeState === 'all' ? '' : `${activeState} `}canon fact matches this filter.`}
                 actions={
-                  <Button variant="secondary" onClick={clearFilters}>
+                  <Button variant="secondary" onClick={clearFactFilters}>
                     Clear the filter
                   </Button>
                 }
               />
             ) : (
-              sections.map(section => (
-                <CollectionPage.Section
-                  key={section.type}
-                  label={TYPE_LABEL[section.type]}
-                  total={section.total}
-                  shown={section.items.length}
-                  seeAll={sectionTotal => (
-                    <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ type: section.type }}>
-                      See all {sectionTotal}
-                    </Link>
-                  )}
-                >
-                  <div className={styles.grid}>
-                    {section.items.map(entity => (
-                      <EntityCard key={entity.id} novelId={novelId} entity={entity} type={typeParam} />
-                    ))}
-                  </div>
-                </CollectionPage.Section>
-              ))
+              <CollectionPage.Rows>
+                {visibleFacts.map(fact => (
+                  <CollectionPage.Row
+                    key={fact.id}
+                    link={<Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ view: 'facts', state: factStateParam, fact: fact.factKey }} />}
+                    title={<span className={factsStyles.rowKey}>{fact.factKey}</span>}
+                    trailing={
+                      <StatusChip intent={factState(fact) === 'revealed' ? 'success' : 'warning'} dot>
+                        {factCaption(fact)}
+                      </StatusChip>
+                    }
+                    actions={
+                      <RowAction label={`Delete ${fact.factKey}`} danger onClick={() => setDeleteFactTarget(fact)}>
+                        <TrashIcon size={13} />
+                      </RowAction>
+                    }
+                  />
+                ))}
+              </CollectionPage.Rows>
             )}
-            <CollectionPage.Section label="Documents" total={bibleDocs.data?.docs.length ?? 0}>
-              <BibleDocumentList novelId={novelId} />
-            </CollectionPage.Section>
-          </>
-        )}
-      </CollectionPage>
+          </CollectionPage>
+        </Tabs.Panel>
+      </Tabs>
       {dialogs}
+      {factDialogs}
     </>
   );
 }

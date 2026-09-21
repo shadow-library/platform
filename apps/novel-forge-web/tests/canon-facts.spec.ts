@@ -4,14 +4,21 @@ import {
   backLabel,
   type CanonFact,
   countByState,
+  emptyFactForm,
   factAttachments,
   factCaption,
+  factFormFromFact,
+  factHiddenFromWriter,
+  factReveal,
+  factRevealLabel,
   factState,
   filterFacts,
   initialSpoilerState,
+  listToText,
   parseFactState,
   sortFactsByKey,
   spoilerToggleLabel,
+  textToList,
 } from '../src/lib/canon-facts';
 
 function fact(overrides: Partial<CanonFact> & Pick<CanonFact, 'factKey'>): CanonFact {
@@ -140,5 +147,108 @@ describe('spoilerToggleLabel', () => {
   it('should name the fact the control acts on', () => {
     expect(spoilerToggleLabel('concealed', 'families_survived_me')).toBe('Reveal the judge-only truth of families_survived_me');
     expect(spoilerToggleLabel('shown', 'families_survived_me')).toBe('Hide the judge-only truth of families_survived_me');
+  });
+});
+
+describe('factReveal', () => {
+  it('should read a hidden fact with no planned chapter as unscheduled', () => {
+    expect(factReveal(fact({ factKey: 'a' }))).toEqual({ kind: 'unscheduled' });
+  });
+
+  it('should read a hidden fact with a planned chapter as planned — the field is an authoring aid, not truth', () => {
+    expect(factReveal(fact({ factKey: 'a', revealChapter: 12 }))).toEqual({ kind: 'planned', chapter: 12 });
+  });
+
+  it('should read a revealed fact by the earliest chapter it was actually learned in', () => {
+    const revealed = fact({
+      factKey: 'a',
+      revealChapter: 12,
+      knowledge: [
+        { entityKey: 'amara', learnedInChapter: 9 },
+        { entityKey: 'boone', learnedInChapter: 5 },
+      ],
+    });
+    expect(factReveal(revealed)).toEqual({ kind: 'revealed', chapter: 5 });
+  });
+});
+
+describe('factRevealLabel', () => {
+  it('should format each reveal kind', () => {
+    expect(factRevealLabel({ kind: 'revealed', chapter: 5 })).toBe('Reader learns: ch 5');
+    expect(factRevealLabel({ kind: 'revealed', chapter: undefined })).toBe('Reader learns');
+    expect(factRevealLabel({ kind: 'planned', chapter: 12 })).toBe('Planned · ch 12');
+    expect(factRevealLabel({ kind: 'unscheduled' })).toBe('Not scheduled');
+  });
+});
+
+describe('factHiddenFromWriter', () => {
+  it('should mark a hidden fact with no writer note', () => {
+    expect(factHiddenFromWriter(fact({ factKey: 'a', writerNote: null }))).toBe(true);
+    expect(factHiddenFromWriter(fact({ factKey: 'a', writerNote: '   ' }))).toBe(true);
+  });
+
+  it('should not mark a hidden fact that has a writer note', () => {
+    expect(factHiddenFromWriter(fact({ factKey: 'a', writerNote: 'Elias deflects questions about Tuesday night.' }))).toBe(false);
+  });
+
+  it('should never mark a revealed fact, even without a writer note', () => {
+    expect(factHiddenFromWriter(fact({ factKey: 'a', writerNote: null, knowledge: [{ entityKey: 'amara' }] }))).toBe(false);
+  });
+});
+
+describe('listToText', () => {
+  it('should join values with a comma and space', () => {
+    expect(listToText(['ledger', 'service corridor'])).toBe('ledger, service corridor');
+  });
+
+  it('should read a missing or empty list as an empty string', () => {
+    expect(listToText(null)).toBe('');
+    expect(listToText(undefined)).toBe('');
+    expect(listToText([])).toBe('');
+  });
+});
+
+describe('textToList', () => {
+  it('should split, trim and drop blanks', () => {
+    expect(textToList('ledger,  service corridor ,,')).toEqual(['ledger', 'service corridor']);
+  });
+
+  it('should read a blank string as unset rather than an empty list', () => {
+    expect(textToList('   ')).toBeUndefined();
+    expect(textToList('')).toBeUndefined();
+  });
+});
+
+describe('emptyFactForm', () => {
+  it('should start every field blank', () => {
+    expect(emptyFactForm()).toEqual({ factKey: '', text: '', subjects: '', constraintNote: '', writerNote: '', terms: '', revealChapter: '' });
+  });
+});
+
+describe('factFormFromFact', () => {
+  it('should flatten a fact into editable text fields', () => {
+    const response = {
+      id: 'f1',
+      projectId: 'p1',
+      factKey: 'ledger_forgery',
+      text: 'Boone forged the ledger.',
+      subjects: ['detective_amara', 'sergeant_boone'],
+      constraintNote: 'Never confirm before ch. 20',
+      writerNote: null,
+      terms: ['ledger', 'service corridor'],
+      revealChapter: 20,
+      knowledge: [],
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+    expect(factFormFromFact(response)).toEqual({
+      factKey: 'ledger_forgery',
+      text: 'Boone forged the ledger.',
+      subjects: 'detective_amara, sergeant_boone',
+      constraintNote: 'Never confirm before ch. 20',
+      writerNote: '',
+      terms: 'ledger, service corridor',
+      revealChapter: '20',
+    });
   });
 });
