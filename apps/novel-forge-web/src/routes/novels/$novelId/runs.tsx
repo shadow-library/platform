@@ -11,7 +11,6 @@ import {
   type RunContextPackResponse,
   type RunModelCallResponse,
   type RunToolCallResponse,
-  sessionQuery,
   useListRunsQuery,
   useRunCallQuery,
   useRunContextQuery,
@@ -21,7 +20,7 @@ import {
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 import { formatCost, formatMillis, formatSeconds, formatTokens, resolveRunView, runDuration, runIds, runsBackLabel, runTitle, runTotals, sectionShare } from '@/lib/runs';
-import { isAdminSession } from '@/lib/session';
+import { resolveIsAdmin } from '@/lib/session';
 
 import styles from './runs.module.css';
 
@@ -30,21 +29,21 @@ interface RunsSearch {
 }
 
 /**
- * `/novels/$novelId` already ensured the session in its own `beforeLoad`, so this reads the warm cache —
- * no extra round trip, and no flash of the admin-only screen before the check resolves, on the server or
- * the client. The detail endpoints (`getRun`, `getRunContext`, `getRunCall`) 403 for a non-admin, so the
- * loader skips prefetching the list too: a non-admin never issues a request this route can't show.
+ * The admin check resolves in `beforeLoad`, so the admin-only screen never flashes before it answers, on
+ * the server or the client. The detail endpoints (`getRun`, `getRunContext`, `getRunCall`) 403 for a
+ * non-admin, so the loader skips prefetching the list too: a non-admin never issues a request this route
+ * can't show.
  */
 export const Route = createFileRoute('/novels/$novelId/runs')({
   validateSearch: (search: Record<string, unknown>): RunsSearch => ({ run: typeof search.run === 'string' && search.run ? search.run : undefined }),
-  beforeLoad: async ({ context }) => ({ isAdmin: isAdminSession(await context.queryClient.ensureQueryData(sessionQuery)) }),
+  beforeLoad: async ({ context }) => ({ isAdmin: await resolveIsAdmin(context.queryClient) }),
   loader: ({ context, params }) => (context.isAdmin ? context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)) : undefined),
   component: RunsScreen,
 });
 
 /**
- * The person most likely to hit this is the product owner before granting themselves the scope — a silent
- * bounce to Overview would just look like the nav entry doesn't exist. This names the scope and stays on
+ * The person most likely to hit this is the product owner before granting themselves the role — a silent
+ * bounce to Overview would just look like the nav entry doesn't exist. This names the role and stays on
  * the URL they asked for, rather than redirecting or rendering a generic 404.
  */
 function AdminRequired(): React.JSX.Element {
@@ -55,8 +54,8 @@ function AdminRequired(): React.JSX.Element {
       <UiEmptyState
         size="page"
         illustration={<LockIcon size={28} />}
-        title="Workflow Runs needs the admin scope"
-        description="This screen exposes run internals — prompts, raw model output, cost. Grant yourself novel-forge:admin in the identity provider to see it."
+        title="Workflow Runs needs the admin role"
+        description="This screen exposes run internals — prompts, raw model output, cost. Assign yourself the NovelForgeAdmin role in Shadow Identity to see it."
         action={{ label: 'Back to Overview', onClick: () => navigate({ to: '/novels/$novelId/overview', params: { novelId } }) }}
       />
     </div>

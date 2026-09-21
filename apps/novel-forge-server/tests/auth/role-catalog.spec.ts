@@ -2,7 +2,14 @@ import { describe, expect, it } from 'bun:test';
 
 import { assertValidRoleCatalog, type RoleManifest } from '@shadow-library/auth';
 
-import { CURATE_PERMISSION, GENERATION_RUN_PERMISSION, ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
+import {
+  ADMIN_PERMISSION,
+  CURATE_PERMISSION,
+  GENERATION_RUN_PERMISSION,
+  ILLUSTRATIONS_WRITE_PERMISSION,
+  PROJECTS_READ_PERMISSION,
+  PROJECTS_WRITE_PERMISSION,
+} from '@server/constants';
 import { NOVEL_FORGE_ROLE_CATALOG } from '@modules/auth/role-catalog.constants';
 
 const roleNamed = (name: string): RoleManifest => NOVEL_FORGE_ROLE_CATALOG.roles.find(role => role.name === name) as RoleManifest;
@@ -30,7 +37,7 @@ describe('novel forge role catalog', () => {
 
   it('should carry every permission every route can demand', () => {
     const declared = NOVEL_FORGE_ROLE_CATALOG.permissions.map(permission => permission.name);
-    expect(declared).toEqual([PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION, ILLUSTRATIONS_WRITE_PERMISSION, GENERATION_RUN_PERMISSION, CURATE_PERMISSION]);
+    expect(declared).toEqual([PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION, ILLUSTRATIONS_WRITE_PERMISSION, GENERATION_RUN_PERMISSION, CURATE_PERMISSION, ADMIN_PERMISSION]);
   });
 
   it('should make exactly one role default and give it the everyday permissions', () => {
@@ -64,5 +71,12 @@ describe('novel forge role catalog', () => {
   it('should keep the curator role bot-grantable and outside the default role', () => {
     expect(roleNamed('NovelForgeCurator').bot).toEqual({ resource: 'curated-ingest', level: 'write' });
     expect(roleNamed('NovelForgeAuthor').permissions).not.toContain(CURATE_PERMISSION);
+  });
+
+  it('should grant the admin permission only through a role no bot and no default can reach', () => {
+    const holders = NOVEL_FORGE_ROLE_CATALOG.roles.filter(role => role.permissions.includes(ADMIN_PERMISSION));
+    expect(holders.map(role => role.name)).toEqual(['NovelForgeAdmin']);
+    expect(holders[0]?.bot).toBeUndefined();
+    expect(holders[0]?.default).toBeFalsy();
   });
 });

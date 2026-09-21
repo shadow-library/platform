@@ -211,18 +211,21 @@ describe('BootstrapService', () => {
     expect(pulse.roles.every(role => !role.isDefault)).toBe(true);
   });
 
-  it('should grant the bootstrap administrator NovelForgeCurator in the platform organisation', async () => {
+  it.each([
+    ['NovelForgeCurator', 'novel-forge:curate'],
+    ['NovelForgeAdmin', 'novel-forge:admin'],
+  ])('should grant the bootstrap administrator %s in the platform organisation', async (roleName, permission) => {
     const admin = await env.getService(UserService).getUser(ADMIN_EMAIL);
     const platform = await env.getService(OrganisationService).ensureTeamOrganisation(PLATFORM_ORG_NAME);
     const novelForge = env.getService(ApplicationService).getApplicationOrThrow('novel-forge');
-    const curatorRole = novelForge.roles.find(role => role.roleName === 'NovelForgeCurator');
-    expect(curatorRole).not.toBeUndefined();
+    const role = novelForge.roles.find(candidate => candidate.roleName === roleName);
+    expect(role).not.toBeUndefined();
 
-    const curatorPermissions = (await env.getService(PolicyDecisionService).listPermissionsForApplication(novelForge.id)).map(permission => permission.name);
-    expect(curatorPermissions).toContain('novel-forge:curate');
+    const permissions = (await env.getService(PolicyDecisionService).listPermissionsForApplication(novelForge.id)).map(candidate => candidate.name);
+    expect(permissions).toContain(permission);
 
     const assignments = await env.getPostgresClient().select().from(schema.roleAssignments);
-    const granted = assignments.find(assignment => assignment.principalType === 'USER' && assignment.principalId === admin?.id.toString() && assignment.roleId === curatorRole?.id);
+    const granted = assignments.find(assignment => assignment.principalType === 'USER' && assignment.principalId === admin?.id.toString() && assignment.roleId === role?.id);
     expect(granted?.organisationId).toBe(platform.id);
   });
 

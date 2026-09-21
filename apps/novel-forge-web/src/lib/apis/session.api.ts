@@ -1,8 +1,9 @@
-import { useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
 import { type AuthLogoutResult, createAuthApi } from '@shadow-library/web/auth';
 
-import { apiClient, type ApiError } from './transport';
+import { type AccessResponse } from './api-types.gen';
+import { apiClient, type ApiError, APIRequest } from './transport';
 
 /**
  * `/api/auth/*` is `@shadow-library/auth`'s surface, not Novel Forge's: the SDK owns `session`, `logout`,
@@ -23,6 +24,17 @@ const authApi = createAuthApi(apiClient.auth, { staleTime: 60_000 });
  * 401). `beforeLoad` gates ensure it; components read the warm cache.
  */
 export const sessionQuery = authApi.sessionQueryOptions();
+
+/**
+ * What this session may do in Novel Forge beyond the everyday author set. Permissions are evaluated by
+ * identity per organisation and never ride on the session, so this is the server's answer rather than
+ * anything read off `sessionQuery`; keyed under it so whatever refreshes the session refreshes this too.
+ */
+export const accessQuery = queryOptions<AccessResponse, ApiError>({
+  queryKey: [...authApi.keys.session, 'access'],
+  queryFn: () => APIRequest.get('/access').execute<AccessResponse>(),
+  staleTime: 60_000,
+});
 
 export const meQuery = userInfoQueryOptions(() => apiClient.auth.get('/userinfo').execute<UserInfo>());
 

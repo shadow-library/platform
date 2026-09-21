@@ -38,9 +38,9 @@ export interface ProjectScreen {
   /** Sits below the nav divider rather than in the main run. */
   trailing?: boolean;
   /**
-   * Requires the `novel-forge:admin` scope regardless of workflow — a session concern, not a project-kind
-   * one, so it is a field callers compose with `workflows` rather than a case folded into it. `screensForWorkflow` stays workflow-only; a caller that also cares about
-   * admin-gating filters this field itself, the way `AppShell` does.
+   * Requires the `novel-forge:admin` permission regardless of workflow — a session concern, not a project-kind
+   * one, so it is a field callers compose with `workflows` rather than a case folded into it. It only hides
+   * the nav entry: the screen's own route must gate itself with `resolveIsAdmin`, the way `runs.tsx` does.
    */
   adminOnly?: boolean;
 }

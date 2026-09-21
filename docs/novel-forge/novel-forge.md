@@ -40,8 +40,9 @@
 - Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. There is no local chat-model path
   (embeddings are local, via Ollama). AI quota is per owner and fails open on a database read error.
 - Retrieval: pgvector indexes of finalized prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
-- `novel-forge-web` navigation and guards derive from one screen list keyed by project kind. It never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` gates run inspection;
-  the `adminOnly` nav flag is not enforced by route guards. Bots reach almost every project route but cannot publish.
+- `novel-forge-web` navigation and guards derive from one screen list keyed by project kind. It never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`,
+  never default or bot-grantable) gates run inspection. It is an RBAC permission evaluated per organisation, not a scope, so the web reads it from `GET /api/v1/access`, never the
+  session; the `adminOnly` nav flag only hides the entry, and each admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.
 
 ## Flows
 

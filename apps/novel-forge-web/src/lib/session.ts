@@ -1,24 +1,20 @@
 import { type QueryClient, useQuery } from '@tanstack/react-query';
 import { requireAuth, type SessionGuardStatus, useSessionGuard as useSharedSessionGuard } from '@shadow-library/web/router';
 
-import { sessionQuery, type SessionResponse } from '@/lib/apis';
+import { accessQuery, sessionQuery, type SessionResponse } from '@/lib/apis';
 
-/**
- * Mirrors the server's `ADMIN_PERMISSION` (`apps/novel-forge-server/src/constants.ts`) — redeclared rather
- * than imported for the same reason `AuthPrincipal` is: the backend dependency chain isn't something a web
- * app's type-check should drag in for one string.
- */
-const ADMIN_SCOPE = 'novel-forge:admin';
-
-/** Whether a session holds the scope that gates admin-only runs UI — the one place that string is checked. */
-export function isAdminSession(session: Pick<SessionResponse, 'scopes'>): boolean {
-  return session.scopes.includes(ADMIN_SCOPE);
+/** The route gate for admin-only screens; a check that fails reads as "not an admin" rather than an error page. */
+export function resolveIsAdmin(queryClient: QueryClient): Promise<boolean> {
+  return queryClient.ensureQueryData(accessQuery).then(
+    access => access.admin,
+    () => false,
+  );
 }
 
-/** Reads the already-warmed session cache; `false` until it resolves, so callers never need a loading state. */
+/** Reads the access cache; `false` until it resolves, so callers never need a loading state. */
 export function useIsAdmin(): boolean {
-  const { data } = useQuery(sessionQuery);
-  return data != null && isAdminSession(data);
+  const { data } = useQuery(accessQuery);
+  return data?.admin === true;
 }
 
 /**
