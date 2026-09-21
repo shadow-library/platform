@@ -80,7 +80,7 @@ export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
   review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
   // Its own group, independent of `planning` — resolveModel's project-override fallback is the one place it inherits `plan`.
-  chat: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
+  chat: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   // IllustrationService resolves through resolveModel('image', project), so a project-level override is honoured.
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
