@@ -122,6 +122,11 @@ export function renderSection(key: string, content: string): string {
   return `${sectionLabel(key)}\n\n${content}`;
 }
 
+/** A resolved context ref is headed by what it is and its name (`## CHARACTER: Mira`), never by its raw `ref:` key. */
+export function renderLabeledSection(label: string, content: string): string {
+  return `## ${label}\n\n${content}`;
+}
+
 /** A plugin section is headed by its manifest-supplied title, never by a `SECTION_LABELS` lookup its namespaced key could never hit. */
 export function renderPluginSection(title: string, content: string): string {
   return `## ${title.toUpperCase()}\n\n${content}`;

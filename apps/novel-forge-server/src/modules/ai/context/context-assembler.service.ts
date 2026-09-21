@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 
 import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
@@ -18,7 +20,17 @@ import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { pluginContextSections } from './plugin-sections';
-import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection, splitSegments } from './sections';
+import {
+  type AssembledPack,
+  type ContextPurpose,
+  type ContextSection,
+  type ContextSegment,
+  type ContextTier,
+  joinSections,
+  renderLabeledSection,
+  renderSection,
+  splitSegments,
+} from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
 export interface PackPolicyOptions {
@@ -104,21 +116,134 @@ function makeSectionTail(key: string, content: string, maxTokens: number, tier: 
   return { key, tier, segment: 'volatile', tokens, truncated, sourceRefs, rendered };
 }
 
+function makeCappedSection(key: string, content: string, maxTokens: number, tier: ContextTier): ContextSection {
+  const { text, truncated } = truncateAtParagraph(content, maxTokens);
+  return { ...makeSection(key, text, tier), truncated };
+}
+
 function asStable(section: ContextSection): ContextSection {
   return { ...section, segment: 'stable' };
 }
 
-export const ENTITY_CARD_BUDGET = 350;
+export const ENTITY_CARD_BUDGET = 800;
+// Writing style is reserved ahead of every other section, so an oversized instructions text must not be
+// able to claim the budget the rest of the pack needs.
+export const WRITING_STYLE_BUDGET = 4_000;
 
 type EntityCardRow = Pick<typeof schema.entities.$inferSelect, 'name' | 'type' | 'status' | 'body' | 'notes'> & { aliases: { alias: string }[] };
 
-/** `maxTokens` omitted renders the entity's body in full — reserved for the POV character's card. */
-function renderEntityCard(entity: EntityCardRow, maxTokens?: number): string {
+interface RenderedCard {
+  text: string;
+  truncated: boolean;
+}
+
+const HEADING_LINE = /^(#{1,6}\s+(?<md>.+)|\*\*(?<bold>[^*\n]+)\*\*:?|__(?<under>[^_\n]+)__:?)\s*$/;
+const INLINE_LABEL = /^(?:\*\*|__)?(?<label>[^*_:\n]{1,40}?)(?:\*\*|__)?:/;
+const GUIDANCE_WORDS = /\b(drafter|drafting|cautions?|prohibit\w*|avoid|warnings?|guidance|off[- ]limits)\b/i;
+const PROHIBITION_OPENER = /^(?:\*\*|__)?(never|do not|don't|must not)\b/i;
+
+interface CardBlock {
+  paragraphs: string[];
+  guidance: boolean;
+  heading: boolean;
+}
+
+function headingText(paragraph: string): string | null {
+  const groups = HEADING_LINE.exec(paragraph.split('\n', 1)[0] ?? '')?.groups;
+  return groups ? (groups.md ?? groups.bold ?? groups.under ?? '') : null;
+}
+
+function isGuidanceParagraph(paragraph: string): boolean {
+  const label = INLINE_LABEL.exec(paragraph)?.groups?.label;
+  return (label !== undefined && GUIDANCE_WORDS.test(label)) || PROHIBITION_OPENER.test(paragraph.trimStart());
+}
+
+// Authored cards tend to end on the drafter guidance and the prohibitions, which a tail cut removes
+// first; an over-budget card therefore leads with those blocks, in their authored order.
+function guidanceFirst(body: string): string {
+  const blocks: CardBlock[] = [];
+  for (const paragraph of body.split(/\n\n+/)) {
+    const heading = headingText(paragraph);
+    const current = blocks.at(-1);
+    if (heading !== null) blocks.push({ paragraphs: [paragraph], guidance: GUIDANCE_WORDS.test(heading), heading: true });
+    else if (current?.heading) current.paragraphs.push(paragraph);
+    else blocks.push({ paragraphs: [paragraph], guidance: isGuidanceParagraph(paragraph), heading: false });
+  }
+  return [...blocks.filter(b => b.guidance), ...blocks.filter(b => !b.guidance)].flatMap(b => b.paragraphs).join('\n\n');
+}
+
+/** `maxTokens` omitted renders the entity's body in full and in its authored order — reserved for the POV character's card. */
+function renderEntityCard(entity: EntityCardRow, maxTokens?: number): RenderedCard {
   const aliasLine = entity.aliases.length > 0 ? `\nAliases: ${entity.aliases.map(a => a.alias).join(', ')}` : '';
   const statusLine = entity.status != null ? `\nStatus: ${entity.status}` : '';
   const bodyRaw = entity.body ?? entity.notes ?? '';
-  const body = maxTokens === undefined ? bodyRaw : truncateAtParagraph(bodyRaw, maxTokens).text;
-  return `**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})\n${body}${aliasLine}${statusLine}`;
+  const overBudget = maxTokens !== undefined && countTokens(bodyRaw) > maxTokens;
+  const { text: body, truncated } = overBudget ? truncateAtParagraph(guidanceFirst(bodyRaw), maxTokens) : { text: bodyRaw, truncated: false };
+  return { text: `**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})\n${body}${aliasLine}${statusLine}`, truncated };
+}
+
+function entityLabel(entity: Pick<EntityCardRow, 'name' | 'type'>, pov = false): string {
+  return `${pov ? 'POV ' : ''}${entity.type.toUpperCase().replace(/_/g, ' ')}: ${entity.name}`;
+}
+
+type WorldFactRow = typeof schema.worldFacts.$inferSelect;
+
+interface ResolvedRefRows {
+  entityMap: Map<string, EntityCardRow>;
+  worldFactRows: WorldFactRow[];
+  threadMap: Map<string, typeof schema.plotThreads.$inferSelect>;
+  mysteryMap: Map<string, typeof schema.mysteries.$inferSelect>;
+  chapterMap: Map<number, typeof schema.chapters.$inferSelect>;
+  volumeMap: Map<string, schema.Plan.Volume>;
+  arcMap: Map<string, ArcRow>;
+  bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
+  factMap: Map<string, typeof schema.canonFacts.$inferSelect>;
+}
+
+// The catalog lists world facts as `category: key | key`, so an outliner ref may name either. Category
+// wins because it was the only reading before keys resolved; `category/key` pins a single fact.
+function matchWorldFacts(rows: WorldFactRow[], value: string): { facts: WorldFactRow[]; byKey: boolean } | null {
+  const byCategory = rows.filter(f => f.category === value);
+  if (byCategory.length > 0) return { facts: byCategory, byKey: false };
+  const slash = value.indexOf('/');
+  const pinned = slash === -1 ? [] : rows.filter(f => f.category === value.slice(0, slash) && f.key === value.slice(slash + 1));
+  if (pinned.length > 0) return { facts: pinned, byKey: true };
+  const byKey = rows.filter(f => f.key === value);
+  return byKey.length > 0 ? { facts: byKey, byKey: true } : null;
+}
+
+type ArcRow = typeof schema.arcs.$inferSelect;
+type ArcTiming = 'written' | 'current' | 'upcoming';
+
+// Without a chapter to measure against, only a source arc is known to be on the page already; anything
+// else is treated as upcoming, the reading that can never hand the drafter an ending early.
+function arcTiming(arc: ArcRow, chapter?: number): ArcTiming {
+  if (arc.status === 'source') return 'written';
+  if (chapter === undefined || arc.chapterStart == null || arc.chapterEnd == null) return 'upcoming';
+  if (arc.chapterEnd < chapter) return 'written';
+  return arc.chapterStart <= chapter ? 'current' : 'upcoming';
+}
+
+// Payoff is the arc's ending: it reaches the drafter only once written. The current arc gets what the
+// arc-objective section gives it, and an upcoming arc only its objective and cast.
+function renderArcRef(arc: ArcRow, chapter?: number): string {
+  const timing = arcTiming(arc, chapter);
+  const cast = arc.cast && arc.cast.length > 0 ? `Cast: ${arc.cast.join(', ')}` : '';
+  return [
+    `**${arc.title ?? arc.arcKey}** (${arc.arcKey}, ${arc.status}, chs ${arc.chapterStart ?? '?'}–${arc.chapterEnd ?? '?'}, ${timing})`,
+    arc.objective ? `Objective: ${arc.objective}` : '',
+    timing !== 'upcoming' && arc.escalation ? `Escalation: ${arc.escalation}` : '',
+    timing === 'written' && arc.payoff ? `Payoff: ${arc.payoff}` : '',
+    timing !== 'upcoming' && arc.hook ? `Hook: ${arc.hook}` : '',
+    cast,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function makeRefSection(ref: string, label: string, content: string, tier: ContextTier, truncated = false): ContextSection {
+  const rendered = renderLabeledSection(label, content);
+  return { key: `ref:${ref}`, tier, segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [ref], rendered };
 }
 
 function entityCardTier(status: EntityCardRow['status']): ContextTier {
@@ -229,6 +354,7 @@ function renderConceptHistory(concepts: schema.Ideation.ConceptCard[]): string {
 
 @Injectable()
 export class ContextAssembler {
+  private readonly logger = Logger.getLogger(APP_NAME, ContextAssembler.name);
   private readonly db: PrimaryDatabase;
 
   constructor(
@@ -243,23 +369,22 @@ export class ContextAssembler {
     return this.catalogService.render(projectId);
   }
 
-  async resolveRefs(projectId: bigint, refs: string[]): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
+  /** `chapter` is the chapter the refs are resolved for; it decides which arc payoffs are already on the page. */
+  async resolveRefs(projectId: bigint, refs: string[], chapter?: number): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
+    const uniqueRefs = [...new Set(refs)];
     const entityKeys: string[] = [];
-    const worldFactCategories: string[] = [];
+    const worldFactValues: string[] = [];
     const threadKeys: string[] = [];
     const mysteryKeys: string[] = [];
     const chapterNumbers: number[] = [];
     const volumeKeys: string[] = [];
+    const arcKeys: string[] = [];
     const bibleDocRefs: { section: string; slug: string }[] = [];
     const factKeys: string[] = [];
-    const unknownRefs: string[] = [];
 
-    for (const ref of refs) {
+    for (const ref of uniqueRefs) {
       const colon = ref.indexOf(':');
-      if (colon === -1) {
-        unknownRefs.push(ref);
-        continue;
-      }
+      if (colon === -1) continue;
       const prefix = ref.slice(0, colon);
       const value = ref.slice(colon + 1);
       switch (prefix) {
@@ -267,7 +392,7 @@ export class ContextAssembler {
           entityKeys.push(value);
           break;
         case 'world_fact':
-          worldFactCategories.push(value);
+          worldFactValues.push(value, ...value.split('/'));
           break;
         case 'thread':
           threadKeys.push(value);
@@ -281,6 +406,9 @@ export class ContextAssembler {
         case 'volume':
           volumeKeys.push(value);
           break;
+        case 'arc':
+          arcKeys.push(value);
+          break;
         case 'bible_doc': {
           const slashIdx = value.indexOf('/');
           bibleDocRefs.push({ section: slashIdx === -1 ? value : value.slice(0, slashIdx), slug: slashIdx === -1 ? '' : value.slice(slashIdx + 1) });
@@ -289,17 +417,19 @@ export class ContextAssembler {
         case 'fact':
           factKeys.push(value);
           break;
-        default:
-          unknownRefs.push(ref);
       }
     }
 
-    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows, bibleDocRows, factRows] = await Promise.all([
+    const worldFactLookup = [...new Set(worldFactValues)];
+    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows, arcRows, bibleDocRows, factRows] = await Promise.all([
       entityKeys.length > 0
         ? this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)), with: { aliases: true } })
         : [],
-      worldFactCategories.length > 0
-        ? this.db.query.worldFacts.findMany({ where: and(eq(schema.worldFacts.projectId, projectId), inArray(schema.worldFacts.category, worldFactCategories)) })
+      worldFactLookup.length > 0
+        ? this.db.query.worldFacts.findMany({
+            where: and(eq(schema.worldFacts.projectId, projectId), or(inArray(schema.worldFacts.category, worldFactLookup), inArray(schema.worldFacts.key, worldFactLookup))),
+            orderBy: [schema.worldFacts.category, schema.worldFacts.key],
+          })
         : [],
       threadKeys.length > 0
         ? this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) })
@@ -307,6 +437,7 @@ export class ContextAssembler {
       mysteryKeys.length > 0 ? this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
       chapterNumbers.length > 0 ? this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapterNumbers)) }) : [],
       volumeKeys.length > 0 ? this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) }) : [],
+      arcKeys.length > 0 ? this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), inArray(schema.arcs.arcKey, arcKeys)) }) : [],
       bibleDocRefs.length > 0
         ? this.db.query.bibleDocuments.findMany({
             where: and(
@@ -320,133 +451,96 @@ export class ContextAssembler {
     ]);
 
     const entityMap = new Map(entitiesRows.map(e => [e.entityKey, e]));
-    const worldFactMap = new Map<string, (typeof worldFactRows)[number][]>();
-    for (const f of worldFactRows) {
-      if (!worldFactMap.has(f.category)) worldFactMap.set(f.category, []);
-      const catFacts = worldFactMap.get(f.category);
-      if (catFacts) catFacts.push(f);
-    }
     const threadMap = new Map(threadRows.map(t => [t.threadKey, t]));
     const mysteryMap = new Map(mysteryRows.map(m => [m.mysteryKey, m]));
     const chapterMap = new Map(chapterRows.map(c => [c.number, c]));
     const volumeMap = new Map(volumeRows.map(v => [v.volumeKey, v]));
+    const arcMap = new Map(arcRows.map(a => [a.arcKey, a]));
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
 
-    for (const ref of refs) {
+    for (const ref of uniqueRefs) {
       const colon = ref.indexOf(':');
-      if (colon === -1) {
-        unresolved.push(ref);
-        continue;
-      }
-      const prefix = ref.slice(0, colon);
+      const prefix = colon === -1 ? '' : ref.slice(0, colon);
       const value = ref.slice(colon + 1);
-
-      switch (prefix) {
-        case 'entity': {
-          const entity = entityMap.get(value);
-          if (!entity) {
-            unresolved.push(ref);
-            break;
-          }
-          resolved.push(makeSection(`ref:entity:${value}`, renderEntityCard(entity, ENTITY_CARD_BUDGET), entityCardTier(entity.status), [ref]));
-          break;
-        }
-        case 'world_fact': {
-          const facts = worldFactMap.get(value);
-          if (!facts || facts.length === 0) {
-            unresolved.push(ref);
-            break;
-          }
-          const lines = facts.map(f => {
-            const { text } = truncateAtParagraph(f.value, 150);
-            return `${f.key}: ${text}`;
-          });
-          resolved.push(makeSection(`ref:world_fact:${value}`, lines.join('\n'), 'canonical', [ref]));
-          break;
-        }
-        case 'thread': {
-          const thread = threadMap.get(value);
-          if (!thread) {
-            unresolved.push(ref);
-            break;
-          }
-          const content = `**${thread.threadKey}** (${thread.status}, ch ${thread.openedChapter ?? '?'}–${thread.closedChapter ?? '?'})\n${thread.summary ?? ''}`;
-          resolved.push(makeSection(`ref:thread:${value}`, content, 'canonical', [ref]));
-          break;
-        }
-        case 'mystery': {
-          const mystery = mysteryMap.get(value);
-          if (!mystery) {
-            unresolved.push(ref);
-            break;
-          }
-          const content = `**${mystery.mysteryKey}** (${mystery.status}, ch ${mystery.openedChapter ?? '?'})\n${mystery.question}`;
-          resolved.push(makeSection(`ref:mystery:${value}`, content, 'canonical', [ref]));
-          break;
-        }
-        case 'chapter': {
-          const n = parseInt(value, 10);
-          const chapter = chapterMap.get(n);
-          if (!chapter) {
-            unresolved.push(ref);
-            break;
-          }
-          const isDraft = chapter.status !== 'done';
-          const prefix2 = isDraft ? '[DRAFT — not yet canon] ' : '';
-          const content = `${prefix2}Ch ${n}: ${chapter.summary ?? ''}`;
-          const tier: ContextTier = isDraft ? 'working' : 'canonical';
-          resolved.push(makeSection(`ref:chapter:${value}`, content, tier, [ref]));
-          break;
-        }
-        case 'volume': {
-          const volume = volumeMap.get(value);
-          if (!volume) {
-            unresolved.push(ref);
-            break;
-          }
-          const tier: ContextTier = volume.status === 'source' ? 'canonical' : 'approved_intent';
-          const content = `**${volume.title ?? volume.volumeKey}** (${volume.status})\nObjective: ${volume.objective ?? ''}\nChs ${volume.startChapter ?? '?'}–${volume.endChapter ?? '?'}`;
-          resolved.push(makeSection(`ref:volume:${value}`, content, tier, [ref]));
-          break;
-        }
-        case 'bible_doc': {
-          const slashIdx = value.indexOf('/');
-          const section = slashIdx === -1 ? value : value.slice(0, slashIdx);
-          const slug = slashIdx === -1 ? '' : value.slice(slashIdx + 1);
-          const doc = bibleDocMap.get(`${section}/${slug}`);
-          if (!doc || !doc.body) {
-            unresolved.push(ref);
-            break;
-          }
-          const { text: body } = truncateAtParagraph(doc.body, 8_000);
-          resolved.push(makeSection(`ref:bible_doc:${value}`, `**${doc.section}/${doc.slug}**\n\n${body}`, 'canonical', [ref]));
-          break;
-        }
-        case 'fact': {
-          // Deliberately NOT surfaced via catalog.service.ts: canon_facts carries hidden-truth rows
-          // that must stay POV-filtered until ledgered. Only hand-authored
-          // refs — plan-import, manual brief edits, hand-authored chat-hub lookups — may name a fact:
-          // ref, since the automated outliner reading the catalog must never be able to request one and
-          // self-spoil a not-yet-revealed fact into a future chapter's context.
-          const fact = factMap.get(value);
-          if (!fact) {
-            unresolved.push(ref);
-            break;
-          }
-          const constraintLine = fact.constraintNote ? `\nConstraint: ${fact.constraintNote}` : '';
-          resolved.push(makeSection(`ref:fact:${value}`, `**${fact.factKey}**: ${fact.text}${constraintLine}`, 'canonical', [ref]));
-          break;
-        }
-        default:
-          unresolved.push(ref);
-      }
+      const section = this.resolveRef(ref, prefix, value, chapter, { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap });
+      if (section) resolved.push(section);
+      else unresolved.push(ref);
     }
 
     return { resolved, unresolved };
+  }
+
+  private resolveRef(ref: string, prefix: string, value: string, chapter: number | undefined, rows: ResolvedRefRows): ContextSection | null {
+    switch (prefix) {
+      case 'entity': {
+        const entity = rows.entityMap.get(value);
+        if (!entity) return null;
+        const card = renderEntityCard(entity, ENTITY_CARD_BUDGET);
+        return makeRefSection(ref, entityLabel(entity), card.text, entityCardTier(entity.status), card.truncated);
+      }
+      case 'world_fact': {
+        const match = matchWorldFacts(rows.worldFactRows, value);
+        if (!match) return null;
+        const lines = match.facts.map(f => `${match.byKey ? `${f.category}/` : ''}${f.key}: ${truncateAtParagraph(f.value, 150).text}`);
+        return makeRefSection(ref, `WORLD FACTS: ${value}`, lines.join('\n'), 'canonical');
+      }
+      case 'thread': {
+        const thread = rows.threadMap.get(value);
+        if (!thread) return null;
+        const content = `**${thread.threadKey}** (${thread.status}, ch ${thread.openedChapter ?? '?'}–${thread.closedChapter ?? '?'})\n${thread.summary ?? ''}`;
+        return makeRefSection(ref, `PLOT THREAD: ${thread.threadKey}`, content, 'canonical');
+      }
+      case 'mystery': {
+        const mystery = rows.mysteryMap.get(value);
+        if (!mystery) return null;
+        const content = `**${mystery.mysteryKey}** (${mystery.status}, ch ${mystery.openedChapter ?? '?'})\n${mystery.question}`;
+        return makeRefSection(ref, `MYSTERY: ${mystery.mysteryKey}`, content, 'canonical');
+      }
+      case 'chapter': {
+        const n = parseInt(value, 10);
+        const chapter = rows.chapterMap.get(n);
+        if (!chapter) return null;
+        const isDraft = chapter.status !== 'done';
+        const content = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${chapter.summary ?? ''}`;
+        return makeRefSection(ref, `EARLIER CHAPTER: ${n}${chapter.title ? ` — ${chapter.title}` : ''}`, content, isDraft ? 'working' : 'canonical');
+      }
+      case 'volume': {
+        const volume = rows.volumeMap.get(value);
+        if (!volume) return null;
+        const tier: ContextTier = volume.status === 'source' ? 'canonical' : 'approved_intent';
+        const content = `**${volume.title ?? volume.volumeKey}** (${volume.status})\nObjective: ${volume.objective ?? ''}\nChs ${volume.startChapter ?? '?'}–${volume.endChapter ?? '?'}`;
+        return makeRefSection(ref, `VOLUME: ${volume.title ?? volume.volumeKey}`, content, tier);
+      }
+      case 'arc': {
+        const arc = rows.arcMap.get(value);
+        if (!arc) return null;
+        const tier: ContextTier = arc.status === 'source' ? 'canonical' : 'approved_intent';
+        return makeRefSection(ref, `ARC: ${arc.title ?? arc.arcKey}`, renderArcRef(arc, chapter), tier);
+      }
+      case 'bible_doc': {
+        const doc = rows.bibleDocMap.get(value.includes('/') ? value : `${value}/`);
+        if (!doc?.body) return null;
+        const { text: body, truncated } = truncateAtParagraph(doc.body, 8_000);
+        return makeRefSection(ref, `BIBLE: ${doc.section}/${doc.slug}`, body, 'canonical', truncated);
+      }
+      case 'fact': {
+        // Deliberately NOT surfaced via catalog.service.ts: canon_facts carries hidden-truth rows
+        // that must stay POV-filtered until ledgered. Only hand-authored
+        // refs — plan-import, manual brief edits, hand-authored chat-hub lookups — may name a fact:
+        // ref, since the automated outliner reading the catalog must never be able to request one and
+        // self-spoil a not-yet-revealed fact into a future chapter's context.
+        const fact = rows.factMap.get(value);
+        if (!fact) return null;
+        const constraintLine = fact.constraintNote ? `\nConstraint: ${fact.constraintNote}` : '';
+        return makeRefSection(ref, `CANON FACT: ${fact.factKey}`, `**${fact.factKey}**: ${fact.text}${constraintLine}`, 'canonical');
+      }
+      default:
+        return null;
+    }
   }
 
   async forChapter(projectId: bigint, chapter: number, opts?: ChapterPackOptions): Promise<AssembledPack & { id: bigint | null }> {
@@ -514,20 +608,20 @@ export class ContextAssembler {
     }
 
     // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
-    // constraints, never as text. Absent a contract the feature is off and nothing changes.
+    // constraints, never as text. Absent a contract the feature is off and nothing changes. With a contract
+    // the known-facts section is always present, so a cast that knows nothing is told so rather than left
+    // to infer it from a missing heading.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     if (knowledgeContract) {
       const view = await loadKnowledgeView(this.db, projectId, chapter, knowledgeContract);
-      if (view.known.length > 0) {
-        sections.push(
-          makeSection(
-            'known_facts',
-            renderKnownFacts(view.known),
-            'canonical',
-            view.known.map(f => `fact:${f.factKey}`),
-          ),
-        );
-      }
+      sections.push(
+        makeSection(
+          'known_facts',
+          renderKnownFacts(view.known),
+          'canonical',
+          view.known.map(f => `fact:${f.factKey}`),
+        ),
+      );
       if (view.reveals.length > 0) {
         sections.push(
           makeSection(
@@ -556,7 +650,7 @@ export class ContextAssembler {
     let refSections: ContextSection[] = [];
 
     if (contextRefs.length > 0) {
-      const { resolved, unresolved } = await this.resolveRefs(projectId, contextRefs);
+      const { resolved, unresolved } = await this.resolveRefs(projectId, contextRefs, chapter);
       unresolvedRefs = unresolved;
       refSections = resolved;
     }
@@ -570,7 +664,8 @@ export class ContextAssembler {
     // and the outliner does not always remember to list it in contextRefs at all.
     const resolvedEntitySections = refSections.filter(s => s.key.startsWith('ref:entity:'));
     const entityRefSections = povSection ? [povSection, ...resolvedEntitySections.filter(s => s.key !== povSection.key)] : resolvedEntitySections;
-    const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
+    const hasArcObjective = sections.some(s => s.key === 'arc_objective');
+    const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:') && !(hasArcObjective && s.key === `ref:arc:${currentArc?.arcKey}`));
     const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX).map(asStable);
     const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX).map(asStable);
 
@@ -586,12 +681,21 @@ export class ContextAssembler {
       sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
     }
 
-    // Writing style is always present because this is the generator's only source for voice, craft, and length.
-    sections.push(asStable(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', [])));
+    // Writing style is the generator's only source for voice, craft, and length, so it is required: the
+    // budget reserves it before the refs listed ahead of it can crowd it out.
+    sections.push({
+      ...asStable(makeCappedSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, WRITING_STYLE_BUDGET, 'canonical')),
+      required: true,
+    });
 
     for (const s of excessEntitySections) sections.push(s);
 
-    return this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts);
+    const pack = await this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts);
+    const excessKeys = new Set(excessEntitySections.map(s => s.key));
+    const omitted = pack.omitted.filter(o => !excessKeys.has(o.key)).map(o => o.key);
+    if (!opts?.dryRun && (pack.unresolvedRefs.length > 0 || omitted.length > 0))
+      this.logger.warn('chapter pack dropped context', { projectId, chapter, unresolvedRefs: pack.unresolvedRefs, omitted });
+    return pack;
   }
 
   // The POV character's card is the one entity card that never pays the shared ENTITY_CARD_BUDGET cap: the
@@ -599,7 +703,7 @@ export class ContextAssembler {
   private async povEntitySection(projectId: bigint, pov: string): Promise<ContextSection | null> {
     const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, pov)), with: { aliases: true } });
     if (!entity) return null;
-    return makeSection(`ref:entity:${pov}`, renderEntityCard(entity), entityCardTier(entity.status), [`entity:${pov}`]);
+    return makeRefSection(`entity:${pov}`, entityLabel(entity, true), renderEntityCard(entity).text, entityCardTier(entity.status));
   }
 
   // Per-chapter dynamic state — never stable, and never project-wide: it is scoped to the cast the brief
@@ -781,7 +885,7 @@ export class ContextAssembler {
     const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
     let unresolvedRefs: string[] = [];
     if (contextRefs.length > 0) {
-      const { resolved, unresolved } = await this.resolveRefs(projectId, contextRefs);
+      const { resolved, unresolved } = await this.resolveRefs(projectId, contextRefs, chapter);
       unresolvedRefs = unresolved;
       for (const s of resolved) sections.push(s);
     }
