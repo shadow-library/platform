@@ -118,7 +118,9 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
   if (parsed.factKeys.length > 0) {
     const rows = await db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) });
     for (const row of rows) {
-      const contentHash = computeContentHash({ text: row.text, subjects: row.subjects, constraintNote: row.constraintNote, terms: row.terms, revealChapter: row.revealChapter });
+      const hashed = { text: row.text, subjects: row.subjects, constraintNote: row.constraintNote, terms: row.terms, revealChapter: row.revealChapter };
+      // Only a set writerNote joins the hash, so baselines recorded before the column existed stay current.
+      const contentHash = computeContentHash(row.writerNote === null ? hashed : { ...hashed, writerNote: row.writerNote });
       states[`fact:${row.factKey}`] = { exists: true, revision: null, contentHash };
     }
   }

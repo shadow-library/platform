@@ -5014,6 +5014,7 @@ export interface components {
       text: string;
       subjects?: null | string[];
       constraintNote?: null | string;
+      writerNote?: null | string;
       terms?: null | string[];
       revealChapter?: null | number;
       knowledge: components['schemas']['KnowledgeEntryResponse'][];
@@ -5036,7 +5037,10 @@ export interface components {
     UpsertFactBody: {
       text: string;
       subjects?: string[];
+      /** @description Author-only note on what the fact protects; never shown to the chapter writer */
       constraintNote?: string;
+      /** @description The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact */
+      writerNote?: string;
       terms?: string[];
       revealChapter?: number;
     };
@@ -6316,6 +6320,8 @@ export interface components {
       text: string;
       subjects?: string[];
       constraintNote?: string;
+      /** @description What the chapter writer sees while the fact is hidden; without it the hidden fact is withheld from the writer entirely */
+      writerNote?: string;
       terms?: string[];
       revealChapter?: number;
     };

@@ -29,7 +29,7 @@ import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
-import { applyBriefReveals } from '../bible/fact/knowledge-view';
+import { applyBriefReveals, loadFactWriterNotes, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
@@ -535,20 +535,15 @@ export class GenerationService {
     return { chapters, briefs: new Map(existing.filter(b => chapters.has(b.chapter)).map(b => [b.chapter, b])) };
   }
 
-  /**
-   * Strips requiredContext refs the model invented — ones that don't resolve against the actual
-   * catalog — so an unresolvable ref never reaches a persisted brief. Repairs in place; does not
-   * fail the outline call over one bad ref.
-   */
+  /** Repairs outliner briefs in place rather than failing the outline call over one bad ref. */
   private async dropUnresolvedContextRefs(projectId: bigint, briefs: { chapter: number; requiredContext: string[] }[]): Promise<void> {
     await Promise.all(
       briefs.map(async brief => {
         if (brief.requiredContext.length === 0) return;
-        const { unresolved } = await this.contextAssembler.resolveRefs(projectId, brief.requiredContext);
-        if (unresolved.length === 0) return;
-        const unresolvedSet = new Set(unresolved);
-        brief.requiredContext = brief.requiredContext.filter(ref => !unresolvedSet.has(ref));
-        this.logger.warn('outline: dropped unresolved context refs', { projectId, chapter: brief.chapter, unresolved });
+        const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, brief.requiredContext);
+        if (dropped.length === 0) return;
+        brief.requiredContext = kept;
+        this.logger.warn('outline: dropped context refs', { projectId, chapter: brief.chapter, dropped });
       }),
     );
   }
@@ -712,12 +707,12 @@ export class GenerationService {
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'revision', chapter }, project);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
+    const [pack, forbidden] = await Promise.all([this.contextAssembler.forChapter(projectId, chapter, { policy }), loadWriterForbiddenFacts(this.db, projectId, chapter)]);
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,
-      { contextPack: pack.rendered, chapterBrief: renderChapterBrief(brief), draftBody: draft.body, feedback: body.note },
+      { contextPack: pack.rendered, chapterBrief: renderChapterBrief(brief), draftBody: draft.body, feedback: scrubForWriter(body.note, forbidden) },
       ctx,
       project as never,
       policy,
@@ -1131,23 +1126,18 @@ export class GenerationService {
       stableContext: pack.renderedStable,
       volatileContext: pack.renderedVolatile,
       chapterBrief: renderChapterBrief(brief),
-      endingContract: renderEndingContract(brief?.endingContract),
+      endingContract: renderEndingContract(brief?.endingContract, await loadFactWriterNotes(this.db, projectId, brief?.endingContract)),
     };
     const routedProject = { ...project, contentMode: 'unrestricted' } as never;
 
-    const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance: body.guidance ?? '' }, ctx, routedProject, policy)) as {
+    const guidance = body.guidance ? scrubForWriter(body.guidance, await loadWriterForbiddenFacts(this.db, projectId, chapter)) : '';
+    const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, policy)) as {
       title: string;
       body: string;
       summary: string;
       state?: Record<string, string>;
     };
-    const expansion = await expandShortDraft(
-      this.modelRouter,
-      { ...promptVars, guidance: body.guidance ?? '', body: generated.body },
-      { ...ctx, node: 'generateUnrestricted' },
-      routedProject,
-      policy,
-    );
+    const expansion = await expandShortDraft(this.modelRouter, { ...promptVars, guidance, body: generated.body }, { ...ctx, node: 'generateUnrestricted' }, routedProject, policy);
     const result = { ...generated, body: expansion.body };
 
     // The replacement and the descendant invalidation it forces commit together: a crash between them

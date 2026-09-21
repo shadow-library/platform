@@ -345,6 +345,8 @@ export class ChapterInsertService {
 
     const chapter = outlined[0];
     if (!chapter) throw AppErrorCode.BRF_001.create();
-    return { ...chapter, contextRefs: chapter.requiredContext, body: renderBriefBody(chapter) };
+    const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, chapter.requiredContext ?? []);
+    if (dropped.length > 0) this.logger.warn('insert: dropped context refs', { projectId, chapter: newChapter, dropped });
+    return { ...chapter, contextRefs: kept, body: renderBriefBody(chapter) };
   }
 }

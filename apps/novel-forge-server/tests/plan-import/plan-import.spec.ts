@@ -104,7 +104,15 @@ function buildV2Bundle(): PlanBundle {
   const bundle = buildBundle();
   bundle.version = 2;
   bundle.facts = [
-    { factKey: 'ledger_forgery', text: 'The ledger is a forgery.', subjects: ['mara'], constraintNote: 'Mara avoids the study.', terms: ['forgery'], revealChapter: 2 },
+    {
+      factKey: 'ledger_forgery',
+      text: 'The ledger is a forgery.',
+      subjects: ['mara'],
+      constraintNote: 'Protects the forged-ledger reveal.',
+      writerNote: 'Mara avoids the study.',
+      terms: ['forgery'],
+      revealChapter: 2,
+    },
     { factKey: 'motive_debt', text: 'The covenant paymaster is broke.', terms: ['gambling debt'] },
   ];
   const brief = bundle.briefs?.find(b => b.chapter === 2);
@@ -357,7 +365,14 @@ describe.if(pgAvailable)('plan import', () => {
     expect(response.warnings).toEqual(["fact 'motive_debt' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal"]);
 
     const fact = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'ledger_forgery')) });
-    expect(fact).toMatchObject({ text: 'The ledger is a forgery.', constraintNote: 'Mara avoids the study.', terms: ['forgery'] });
+    expect(fact).toMatchObject({
+      text: 'The ledger is a forgery.',
+      constraintNote: 'Protects the forged-ledger reveal.',
+      writerNote: 'Mara avoids the study.',
+      terms: ['forgery'],
+    });
+    const withheld = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'motive_debt')) });
+    expect(withheld?.writerNote).toBeNull();
 
     const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 2)) });
     expect(brief?.knowledgeContract).toEqual({ pov: ['mara'], learns: [{ entityKey: 'mara', factKey: 'ledger_forgery' }] });
@@ -370,6 +385,22 @@ describe.if(pgAvailable)('plan import', () => {
     smaller.facts = smaller.facts?.filter(f => f.factKey === 'ledger_forgery');
     const pruning = await service.import(projectId, { bundle: smaller, overwrite: true });
     expect(pruning.results.facts).toEqual({ created: 0, updated: 0, unchanged: 1, pruned: 1 });
+  });
+
+  it('should accept writerNote on a fact without warning and update it on re-import', async () => {
+    const projectId = await createProject();
+    const bundle = buildV2Bundle();
+    const response = await service.import(projectId, { bundle }, structuredClone({ bundle }));
+    expect(response.warnings.filter(warning => warning.includes('writerNote'))).toEqual([]);
+
+    const revised = buildV2Bundle();
+    const fact = revised.facts?.find(f => f.factKey === 'ledger_forgery');
+    if (fact) fact.writerNote = 'Mara changes the subject when the study comes up.';
+    const again = await service.import(projectId, { bundle: revised, overwrite: true });
+    expect(again.results.facts).toEqual({ created: 0, updated: 1, unchanged: 1, pruned: 0 });
+
+    const stored = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'ledger_forgery')) });
+    expect(stored?.writerNote).toBe('Mara changes the subject when the study comes up.');
   });
 
   it('should reject a knowledge contract revealing an unknown fact and write nothing', async () => {

@@ -20,6 +20,7 @@ export interface FactLike {
   factKey: string;
   text: string;
   constraintNote?: string | null;
+  writerNote?: string | null;
   terms?: string[] | null;
   source?: Knowledge.FactSource;
 }
@@ -122,6 +123,69 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   return splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys);
 }
 
+function mustNotResolveKeys(endingContract: unknown): Set<string> {
+  const entries = (endingContract as { mustNotResolve?: unknown } | null)?.mustNotResolve;
+  if (!Array.isArray(entries)) return new Set();
+  return new Set(entries.filter((entry): entry is string => typeof entry === 'string').map(entry => (entry.startsWith('fact:') ? entry.slice('fact:'.length) : entry).trim()));
+}
+
+/**
+ * Facts the chapter writer must not read at `chapter`: under a knowledge contract, everything the POV cast neither
+ * knows nor learns this chapter; without one, everything whose planned reveal is still ahead or, when unscheduled,
+ * that no brief has revealed on the page yet — a manual ledger row can record a character's private knowledge, so it
+ * never unlocks the writer. A fact the brief's ending contract forbids resolving is hidden either way.
+ */
+export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[]): Promise<Set<string>> {
+  const brief = await db.query.briefs.findFirst({
+    columns: { knowledgeContract: true, endingContract: true },
+    where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)),
+  });
+  const forbidden = mustNotResolveKeys(brief?.endingContract);
+  const visible = await writerVisibleFactKeys(db, projectId, chapter, facts, parseKnowledgeContract(brief?.knowledgeContract));
+  return new Set(facts.filter(fact => forbidden.has(fact.factKey) || !visible.has(fact.factKey)).map(fact => fact.factKey));
+}
+
+async function writerVisibleFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[], contract: KnowledgeContract | null): Promise<Set<string>> {
+  if (contract) {
+    const view = await loadKnowledgeView(db, projectId, chapter, contract);
+    return new Set([...view.known, ...view.reveals].map(fact => fact.factKey));
+  }
+  const unscheduled = facts.filter(fact => fact.revealChapter === null);
+  const onPage =
+    unscheduled.length > 0
+      ? await db.query.characterKnowledge.findMany({
+          columns: { factId: true },
+          where: and(
+            eq(schema.characterKnowledge.projectId, projectId),
+            eq(schema.characterKnowledge.source, 'brief'),
+            inArray(
+              schema.characterKnowledge.factId,
+              unscheduled.map(fact => fact.id),
+            ),
+            lt(schema.characterKnowledge.learnedInChapter, chapter),
+          ),
+        })
+      : [];
+  const revealedOnPage = new Set(onPage.map(row => row.factId));
+  return new Set(facts.filter(fact => (fact.revealChapter === null ? revealedOnPage.has(fact.id) : fact.revealChapter <= chapter)).map(fact => fact.factKey));
+}
+
+/** The chapter's writer-hidden facts, minus seed reader promises (which the book obeys openly) — what writer-bound text must never carry. */
+export async function loadWriterForbiddenFacts(db: KnowledgeDb, projectId: bigint, chapter: number): Promise<FactLike[]> {
+  const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
+  if (facts.length === 0) return [];
+  const hidden = await loadWriterHiddenFactKeys(db, projectId, chapter, facts);
+  return facts.filter(fact => fact.source !== 'seed' && hidden.has(fact.factKey));
+}
+
+/** Every canon fact key of the project → its writer note, loaded only when the brief's ending contract has `mustNotResolve` entries that could name one. */
+export async function loadFactWriterNotes(db: KnowledgeDb, projectId: bigint, endingContract: unknown): Promise<Map<string, string | null>> {
+  const entries = (endingContract as { mustNotResolve?: unknown } | null)?.mustNotResolve;
+  if (!Array.isArray(entries) || entries.length === 0) return new Map();
+  const facts = await db.query.canonFacts.findMany({ columns: { factKey: true, writerNote: true }, where: eq(schema.canonFacts.projectId, projectId) });
+  return new Map(facts.map(fact => [fact.factKey, fact.writerNote]));
+}
+
 /** Renders the drafter-visible ledgered facts; explicit "(none established)" so the model knows the cast starts cold. */
 export function renderKnownFacts(facts: FactLike[]): string {
   if (facts.length === 0) return '(none established — the POV cast starts this chapter with no ledgered facts)';
@@ -134,19 +198,84 @@ export function renderChapterReveals(facts: FactLike[]): string {
 }
 
 /**
- * Renders POV-safe behavior compiled from still-hidden facts. Deliberately omits the fact key and
- * text — this is the only trace of a hidden fact the drafter is ever allowed to see.
+ * Renders the writer-safe notes of still-hidden facts. Deliberately omits the fact key, text and the author's
+ * `constraintNote` — a hidden fact without a `writerNote` is withheld from the drafter entirely.
  */
 export function renderHiddenConstraints(facts: FactLike[]): string {
-  return facts
-    .filter(fact => fact.constraintNote)
-    .map(fact => `- ${fact.constraintNote}`)
+  return withWriterNotes(facts)
+    .map(fact => `- ${fact.writerNote}`)
     .join('\n');
+}
+
+export function withWriterNotes(facts: FactLike[]): FactLike[] {
+  return facts.filter(fact => fact.writerNote?.trim());
 }
 
 /** Renders the judge-only forbidden list — full spoiler text, never enters the shared context pack. */
 export function renderForbiddenFacts(facts: FactLike[]): string {
   return facts.map(fact => `- [${fact.factKey}] ${fact.text}`).join('\n');
+}
+
+export const KNOWLEDGE_LEAK_PREFIX = 'knowledge leak: ';
+const UNKNOWABLE_REVEAL = 'cut anything that states or implies what the POV cast cannot know yet';
+const PRESCAN_LEAK = /^"(.+?)" exposes \[([^\]]+)\]/;
+const WITHHELD = '[withheld]';
+
+function withWriterNote(line: string, fact: FactLike | undefined): string {
+  const note = fact?.writerNote?.trim();
+  return note ? `${line} — ${note}` : line;
+}
+
+/**
+ * The judge's leak findings name the forbidden fact and quote it, so writer-facing text gets a reduced form
+ * instead: the give-away term to cut and the fact's writer note — never its key, text or author note.
+ */
+export function writerSafeLeakLines(prescan: Pick<KnowledgeLeakIssue, 'factKey' | 'term'>[], judgeIssues: string[], forbidden: FactLike[]): string[] {
+  const factByKey = new Map(forbidden.map(fact => [fact.factKey, fact]));
+  const lines = prescan.map(leak => withWriterNote(`remove or avoid "${leak.term}"`, factByKey.get(leak.factKey)));
+  for (const issue of judgeIssues) {
+    const cited = forbidden.filter(fact => issue.includes(fact.factKey));
+    if (cited.length === 0) lines.push(UNKNOWABLE_REVEAL);
+    for (const fact of cited) lines.push(withWriterNote(UNKNOWABLE_REVEAL, fact));
+  }
+  return [...new Set(lines)].map(line => `${KNOWLEDGE_LEAK_PREFIX}${line}`);
+}
+
+function wholeMention(value: string): RegExp {
+  return new RegExp(`(?<![\\w])${escapeRegExp(value)}(?![\\w])`, 'gi');
+}
+
+/**
+ * Makes author- or judge-written text (a revision note, regeneration guidance) safe for the writer: knowledge-leak
+ * finding lines are replaced by their writer-safe forms, and any remaining mention of a forbidden fact's text,
+ * author note or key is withheld.
+ */
+export function scrubForWriter(text: string, forbidden: FactLike[]): string {
+  if (!text || forbidden.length === 0) return text;
+  const prescan: Pick<KnowledgeLeakIssue, 'factKey' | 'term'>[] = [];
+  const judgeIssues: string[] = [];
+  const kept: string[] = [];
+  for (const line of text.split('\n')) {
+    const at = line.toLowerCase().indexOf(KNOWLEDGE_LEAK_PREFIX);
+    if (at === -1) {
+      kept.push(line);
+      continue;
+    }
+    const finding = line.slice(at + KNOWLEDGE_LEAK_PREFIX.length).trim();
+    const match = PRESCAN_LEAK.exec(finding);
+    if (match?.[1] && match[2]) prescan.push({ term: match[1], factKey: match[2] });
+    else judgeIssues.push(finding);
+  }
+
+  const secrets = forbidden
+    .flatMap(fact => [fact.text, fact.constraintNote, `fact:${fact.factKey}`, fact.factKey])
+    .filter((secret): secret is string => typeof secret === 'string' && secret.trim().length >= MIN_TERM_LENGTH)
+    .sort((a, b) => b.length - a.length);
+  let scrubbed = kept.join('\n');
+  for (const secret of secrets) scrubbed = scrubbed.replace(wholeMention(secret.trim()), WITHHELD);
+
+  const safe = writerSafeLeakLines(prescan, judgeIssues, forbidden).map(line => `- ${line.slice(KNOWLEDGE_LEAK_PREFIX.length)}`);
+  return [scrubbed.trim(), ...safe].filter(Boolean).join('\n');
 }
 
 /**

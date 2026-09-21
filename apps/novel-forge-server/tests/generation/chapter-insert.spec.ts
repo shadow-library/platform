@@ -5,6 +5,8 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 
 import { type AppError } from '@shadow-library/common';
 
+import { CatalogService } from '@modules/ai/context/catalog.service';
+import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { ChapterInsertService } from '@modules/generation/chapter-insert.service';
 import { parseBriefBody, renderBriefBody, shiftBriefBody, shiftChapterMentions, shiftChapterNumber, shiftChapterReferences } from '@server/common';
 import { type PrimaryDatabase } from '@server/database';
@@ -146,10 +148,16 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
 
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
+  function outlineAssembler(): ContextAssembler {
+    const databaseService = { getPostgresClient: () => db } as never;
+    const contextAssembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
+    contextAssembler.forOutline = mock(async () => ({ rendered: 'CATALOG' })) as never;
+    return contextAssembler;
+  }
+
   function buildService(outlined?: unknown[]): { service: ChapterInsertService; structured: ReturnType<typeof mock> } {
     const structured = mock(async () => outlined ?? []);
-    const contextAssembler = { forOutline: mock(async () => ({ rendered: 'CATALOG' })) } as never;
-    const service = new ChapterInsertService({ getPostgresClient: () => db } as never, { structured } as never, contextAssembler, noPluginPolicy());
+    const service = new ChapterInsertService({ getPostgresClient: () => db } as never, { structured } as never, outlineAssembler(), noPluginPolicy());
     return { service, structured };
   }
 
@@ -372,14 +380,7 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
         await db.insert(schema.jobs).values({ projectId, kind: 'generate', target: 'racing', status: 'in_progress' });
         return PLANNER_OUTPUT;
       });
-      const service = new ChapterInsertService(
-        { getPostgresClient: () => db } as never,
-        { structured } as never,
-        {
-          forOutline: mock(async () => ({ rendered: 'CATALOG' })),
-        } as never,
-        noPluginPolicy(),
-      );
+      const service = new ChapterInsertService({ getPostgresClient: () => db } as never, { structured } as never, outlineAssembler(), noPluginPolicy());
 
       await expectCode(service.insertAfter(projectId, 5, { briefOrigin: 'planner', intent: 'a dark interlude' }), 'CHP_004');
       expect(observed).toEqual(['model']);
@@ -672,6 +673,16 @@ describe.if(pgAvailable)('ChapterInsertService.insertAfter', () => {
       expect(brief.contextRefs).toEqual(['entity:li_wei']);
       expect(brief.writeMode).toBe('external');
       expect(brief.handEdited).toBe(true);
+    });
+
+    it('should strip fact refs and unresolved refs from a planner-authored brief', async () => {
+      const outline = [{ ...PLANNER_OUTPUT[0], requiredContext: ['entity:li_wei', 'fact:fact_late', 'entity:ghost'] }];
+      const { service } = buildService(outline);
+      const projectId = await seed({ chapters: 8 });
+
+      const { brief } = await service.insertAfter(projectId, 5, { briefOrigin: 'planner', intent: 'Li Wei burns the manifest.' });
+
+      expect(brief.contextRefs).toEqual(['entity:li_wei']);
     });
 
     it('should mark every descendant draft stale from the insert point', async () => {

@@ -248,6 +248,7 @@ export class PlanImportService {
         text: item.text,
         subjects: (item.subjects ?? null) as never,
         constraintNote: item.constraintNote ?? null,
+        writerNote: item.writerNote?.trim() || null,
         terms: (item.terms ?? null) as never,
         revealChapter: item.revealChapter ?? null,
         source: 'import' as const,

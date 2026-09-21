@@ -164,6 +164,25 @@ describe.if(pgAvailable)('apply engine v2: cherry-pick, actions, revert, rollbac
     expect(gone).toBeUndefined();
   });
 
+  it('should set, keep and revert a fact writer note through the op grammar', async () => {
+    const factOf = () => db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'vault_is_empty')) });
+    const create = await createProposal([{ op: 'fact.upsert', factKey: 'vault_is_empty', body: 'the vault holds nothing', terms: ['empty vault'] }]);
+    await applier.apply(projectId, create.id);
+    expect((await factOf())?.writerNote).toBeNull();
+
+    const addNote = await createProposal([{ op: 'fact.upsert', factKey: 'vault_is_empty', writerNote: 'the banker changes the subject when the vault comes up' }]);
+    await applier.apply(projectId, addNote.id);
+    expect((await factOf())?.writerNote).toBe('the banker changes the subject when the vault comes up');
+
+    const retext = await createProposal([{ op: 'fact.upsert', factKey: 'vault_is_empty', body: 'the vault was emptied years ago' }]);
+    await applier.apply(projectId, retext.id);
+    expect((await factOf())?.writerNote).toBe('the banker changes the subject when the vault comes up');
+
+    await applier.revert(projectId, retext.id);
+    await applier.revert(projectId, addNote.id);
+    expect((await factOf())?.writerNote).toBeNull();
+  });
+
   it('should restore a removed fact on revert and refuse to remove a ledgered one', async () => {
     const seed = await createProposal([{ op: 'fact.upsert', factKey: 'sword_is_cursed', body: 'the sword drinks its wielder', terms: ['curse'] }]);
     await applier.apply(projectId, seed.id);

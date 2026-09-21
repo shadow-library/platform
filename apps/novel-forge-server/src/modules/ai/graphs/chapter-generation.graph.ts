@@ -8,7 +8,19 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
-import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, renderForbiddenFacts, scanKnowledgeLeaks } from '../../bible/fact/knowledge-view';
+import {
+  type FactLike,
+  KNOWLEDGE_LEAK_PREFIX,
+  type KnowledgeLeakIssue,
+  loadFactWriterNotes,
+  loadKnowledgeView,
+  loadWriterForbiddenFacts,
+  parseKnowledgeContract,
+  renderForbiddenFacts,
+  scanKnowledgeLeaks,
+  scrubForWriter,
+  writerSafeLeakLines,
+} from '../../bible/fact/knowledge-view';
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
@@ -58,6 +70,7 @@ const ChapterGenAnnotation = Annotation.Root({
   briefCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   mechanicalFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
+  knowledgeWriterFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   repairMode: Annotation<'patch' | 'rewrite'>({ reducer: (_, n) => n, default: () => 'patch' }),
@@ -129,9 +142,26 @@ export function routeAfterPatch(state: Pick<ChapterGenState, 'patchApplied'>): s
 export function mergeKnowledgeCompliance(
   compliance: { compliant: boolean; issues: string[] } | undefined,
   prescan: KnowledgeLeakIssue[],
-): { knowledgeCompliant: boolean; findings: JudgeFinding[] } {
-  const issues = [...prescan.map(leak => `"${leak.term}" exposes [${leak.factKey}] — ${leak.excerpt}`), ...(compliance && !compliance.compliant ? compliance.issues : [])];
-  return { knowledgeCompliant: issues.length === 0, findings: issues.map(issue => ({ severity: 'soft' as const, text: `knowledge leak: ${issue}` })) };
+  forbidden: FactLike[] = [],
+): { knowledgeCompliant: boolean; findings: JudgeFinding[]; writerFindings: JudgeFinding[] } {
+  const judgeIssues = compliance && !compliance.compliant ? compliance.issues : [];
+  const issues = [...prescan.map(leak => `"${leak.term}" exposes [${leak.factKey}] — ${leak.excerpt}`), ...judgeIssues];
+  return {
+    knowledgeCompliant: issues.length === 0,
+    findings: issues.map(issue => ({ severity: 'soft' as const, text: `${KNOWLEDGE_LEAK_PREFIX}${issue}` })),
+    writerFindings: writerSafeLeakFindings(prescan, judgeIssues, forbidden),
+  };
+}
+
+export function writerSafeLeakFindings(prescan: KnowledgeLeakIssue[], judgeIssues: string[], forbidden: FactLike[]): JudgeFinding[] {
+  return writerSafeLeakLines(prescan, judgeIssues, forbidden).map(text => ({ severity: 'soft' as const, text }));
+}
+
+/** Other findings can still name or paraphrase a forbidden fact, so they are scrubbed; the leak findings are already in their writer-safe form. */
+function writerFacingFindings(state: Pick<ChapterGenState, 'findings' | 'knowledgeWriterFindings'>, forbidden: FactLike[]): string {
+  const render = (findings: JudgeFinding[]): string => findings.map(finding => `[${finding.severity}] ${finding.text}`).join('\n');
+  const others = scrubForWriter(render(state.findings.filter(finding => !finding.text.startsWith(KNOWLEDGE_LEAK_PREFIX))), forbidden);
+  return [others, render(state.knowledgeWriterFindings)].filter(Boolean).join('\n');
 }
 
 function parseJudgeOutput(raw: string): JudgeOutput | null {
@@ -196,17 +226,18 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
     const chapterBrief = renderChapterBrief(brief);
-    const endingContract = renderEndingContract(brief?.endingContract);
+    const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
+    const guidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { stableContext, volatileContext, chapterBrief, endingContract, guidance: state.guidance },
+      { stableContext, volatileContext, chapterBrief, endingContract, guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
     const expansion = await expandShortDraft(
       modelRouter,
-      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance: state.guidance },
+      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
       policy,
@@ -413,6 +444,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const knowledge = mergeKnowledgeCompliance(
       forbidden.length > 0 ? judgeResult?.knowledgeCompliance : undefined,
       forbidden.length > 0 ? scanKnowledgeLeaks(state.prose, forbidden) : [],
+      forbidden,
     );
     findings.push(...knowledge.findings);
     findings.push(...state.mechanicalFindings);
@@ -441,10 +473,16 @@ export function createChapterGenerationGraph(services: GraphServices) {
       findings,
       endingCompliant,
       knowledgeCompliant: knowledge.knowledgeCompliant,
+      knowledgeWriterFindings: knowledge.writerFindings,
       briefCompliant,
       writerClassRaised: judgePolicy.raised,
       nodeTrace: ['judge'],
     };
+  }
+
+  async function writerSafeGuidance(projectId: bigint, chapter: number, guidance: string): Promise<string> {
+    if (!guidance) return guidance;
+    return scrubForWriter(guidance, await loadWriterForbiddenFacts(db, projectId, chapter));
   }
 
   async function repairPatch(state: ChapterGenState) {
@@ -457,7 +495,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       renderedPack = pack?.rendered ?? '';
     }
 
-    const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
+    const findingsStr = writerFacingFindings(state, await loadWriterForbiddenFacts(db, projectId, state.chapter));
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: PROMPT_REGISTRY.fix.version, role: 'fix' };
 
     const policy = await policyFor(projectId, { role: 'fix', chapter: state.chapter });
@@ -519,8 +557,9 @@ export function createChapterGenerationGraph(services: GraphServices) {
       ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
     }
 
-    const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
-    const guidance = state.guidance ? `${state.guidance}\n\nPrevious judge findings to avoid:\n${findingsStr}` : `Avoid these issues from the previous draft:\n${findingsStr}`;
+    const findingsStr = writerFacingFindings(state, await loadWriterForbiddenFacts(db, projectId, state.chapter));
+    const authorGuidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
+    const guidance = authorGuidance ? `${authorGuidance}\n\nPrevious judge findings to avoid:\n${findingsStr}` : `Avoid these issues from the previous draft:\n${findingsStr}`;
 
     const ctx: TelemetryContext = {
       projectId,
@@ -533,7 +572,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
     const chapterBrief = renderChapterBrief(brief);
-    const endingContract = renderEndingContract(brief?.endingContract);
+    const endingContract = renderEndingContract(brief?.endingContract, await loadFactWriterNotes(db, projectId, brief?.endingContract));
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief, endingContract, guidance },

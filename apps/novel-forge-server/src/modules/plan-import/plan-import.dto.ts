@@ -81,6 +81,9 @@ export class PlanBundleFact {
   @Field({ optional: true })
   constraintNote?: string;
 
+  @Field({ optional: true, description: 'What the chapter writer sees while the fact is hidden; without it the hidden fact is withheld from the writer entirely' })
+  writerNote?: string;
+
   @Field(() => [String], { optional: true })
   terms?: string[];
 

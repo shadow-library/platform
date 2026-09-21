@@ -1141,7 +1141,8 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
       id: 2n,
       factKey: 'ledger_forgery',
       text: 'The ledger is a forgery planted by Elias.',
-      constraintNote: 'Elias steers conversation away from the study.',
+      constraintNote: 'Protects the forged-ledger reveal.',
+      writerNote: 'Elias steers conversation away from the study.',
       terms: ['forgery'],
       source: 'manual',
     },
@@ -1153,6 +1154,7 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     factKey: 'promise:no-harem',
     text: 'she never collects suitors',
     constraintNote: 'Reader promise locked at ideation — plan and write nothing that breaks it: she never collects suitors',
+    writerNote: 'Reader promise locked at ideation — plan and write nothing that breaks it: she never collects suitors',
     terms: [] as string[],
     source: 'seed',
   };
@@ -1210,6 +1212,7 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     const constraints = pack.sections.find(s => s.key === 'hidden_constraints');
     expect(constraints?.rendered).toContain('Elias steers conversation away from the study.');
     expect(constraints?.rendered).not.toContain('forgery');
+    expect(pack.rendered).not.toContain('Protects the forged-ledger reveal.');
     expect(pack.rendered).not.toContain('The killer used the service door.');
   });
 

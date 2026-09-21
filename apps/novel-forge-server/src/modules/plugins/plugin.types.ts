@@ -85,7 +85,7 @@ export type PluginChangeOp = (
       body?: string;
     }
   | { op: 'entity.remove'; entityKey: string }
-  | { op: 'fact.upsert'; factKey: string; body?: string; subjects?: string[]; constraintNote?: string; terms?: string[]; revealChapter?: number }
+  | { op: 'fact.upsert'; factKey: string; body?: string; subjects?: string[]; constraintNote?: string; writerNote?: string; terms?: string[]; revealChapter?: number }
   | { op: 'fact.remove'; factKey: string }
   | { op: 'bible_document.upsert'; section: string; slug: string; frontmatter?: Record<string, unknown>; body?: string }
   | { op: 'bible_document.remove'; section: string; slug: string }

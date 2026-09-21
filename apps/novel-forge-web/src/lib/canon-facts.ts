@@ -4,6 +4,7 @@ export interface CanonFact {
   subjects?: string[] | null;
   terms?: string[] | null;
   constraintNote?: string | null;
+  writerNote?: string | null;
   revealChapter?: number | null;
   knowledge: { entityKey: string }[];
 }

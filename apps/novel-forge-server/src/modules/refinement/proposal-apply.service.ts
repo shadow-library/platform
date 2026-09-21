@@ -566,6 +566,7 @@ export class ProposalApplyService {
       body: fact.text,
       subjects: (fact.subjects as string[] | null) ?? undefined,
       constraintNote: fact.constraintNote ?? undefined,
+      writerNote: fact.writerNote ?? '',
       terms: (fact.terms as string[] | null) ?? undefined,
       revealChapter: fact.revealChapter ?? undefined,
     };
@@ -993,6 +994,7 @@ export class ProposalApplyService {
       text: op.body ?? existing?.text ?? '',
       subjects: (op.subjects ?? existing?.subjects ?? null) as never,
       constraintNote: op.constraintNote ?? existing?.constraintNote ?? null,
+      writerNote: op.writerNote === undefined ? (existing?.writerNote ?? null) : op.writerNote.trim() || null,
       terms: (op.terms ?? existing?.terms ?? null) as never,
       revealChapter: op.revealChapter ?? existing?.revealChapter ?? null,
     };

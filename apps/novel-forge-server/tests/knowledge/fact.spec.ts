@@ -67,6 +67,18 @@ describe.if(pgAvailable)('Canon Fact API', () => {
       expect(list.statusCode).toBe(200);
       expect(list.json().facts).toHaveLength(1);
     });
+
+    it('should keep the writer note when omitted and clear it when sent blank', async () => {
+      const projectId = await createProject();
+      const created = await putFact(projectId, 'ledger_forgery', { text: 'The ledger is a forgery.', writerNote: '  Elias avoids the study.  ' });
+      expect(created.writerNote).toBe('Elias avoids the study.');
+
+      const kept = await putFact(projectId, 'ledger_forgery', { text: 'The ledger is a forgery.' });
+      expect(kept.writerNote).toBe('Elias avoids the study.');
+
+      const cleared = await putFact(projectId, 'ledger_forgery', { text: 'The ledger is a forgery.', writerNote: ' ' });
+      expect(cleared.writerNote).toBeNull();
+    });
   });
 
   describe('POST /api/v1/projects/:projectId/facts/:factKey/reveal', () => {

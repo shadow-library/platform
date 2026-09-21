@@ -132,8 +132,8 @@ export interface EntityRemoveOp {
 
 /**
  * Spoiler-grade canon. `body` is the truth itself and never reaches a drafter who has not ledgered
- * it; `constraintNote` is the POV-safe behaviour that stands in while the fact is hidden, and
- * `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
+ * it; `constraintNote` is author-only, `writerNote` is the writer-safe instruction shown while the fact
+ * is hidden (omitted keeps the current one, blank clears it), and `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
  * a fact enters the ledger through a brief's knowledgeContract and draft approval, nowhere else.
  */
 export interface FactUpsertOp {
@@ -142,6 +142,7 @@ export interface FactUpsertOp {
   body?: string;
   subjects?: string[];
   constraintNote?: string;
+  writerNote?: string;
   terms?: string[];
   revealChapter?: number;
 }
@@ -362,7 +363,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
   'fact.upsert': {
     required: { factKey: 'string' },
-    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', terms: 'string[]', revealChapter: 'number' },
+    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number' },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
   'seed.update': {
@@ -726,7 +727,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     ? `\nknowledgeContract, when present, must be exactly: {"pov": <non-empty array of entity keys>, "learns": <optional array of {"entityKey": <string>, "factKey": <string>}>} — pov bounds what the chapter may state; learns names the facts discovered on-page. A chapter that reveals nothing previously hidden omits the contract entirely; pass null to drop one the brief already carries.`
     : '';
   const factRules = ops.includes('fact.upsert')
-    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is the POV-safe behaviour that must hold while the fact is hidden; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off.'
+    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off.'
     : '';
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }

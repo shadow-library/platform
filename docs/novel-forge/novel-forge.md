@@ -98,7 +98,9 @@
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
-  drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and POV-safe notes; only the judge sees the forbidden list (seed-source facts excluded).
+  drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`, and a hidden
+  fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list (seed-source facts excluded). A chapter-scoped `fact:` ref obeys the same gate (plus
+  the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
   and never while a generate job is active. Recombine does not shift; it refuses once anything references chapter numbers.

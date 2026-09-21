@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
+import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { GenerationService, MAX_WHOLE_BOOK_OUTLINE_SPAN } from '@modules/generation/generation.service';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -67,6 +68,7 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
         resolved: refs.filter(r => !unresolvedRefs.has(r)).map(r => ({ key: r, tier: 'canonical', segment: 'stable', tokens: 1, sourceRefs: [r], rendered: r })),
         unresolved: refs.filter(r => unresolvedRefs.has(r)),
       }),
+      sanitizeOutlinedRefs: ContextAssembler.prototype.sanitizeOutlinedRefs,
     } as never;
     const noop = {} as never;
     return new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
@@ -78,15 +80,19 @@ describe.if(pgAvailable)('outline invariant enforcement', () => {
       Array.from({ length: vars.endChapter - vars.startChapter + 1 }, (_, i) => brief(vars.startChapter + i, [])),
     );
     const modelRouter = { structured } as never;
-    const contextAssembler = { catalog: async () => 'CATALOG', resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }) } as never;
+    const contextAssembler = {
+      catalog: async () => 'CATALOG',
+      resolveRefs: async (_projectId: bigint, refs: string[]) => ({ resolved: [], unresolved: refs }),
+      sanitizeOutlinedRefs: ContextAssembler.prototype.sanitizeOutlinedRefs,
+    } as never;
     const noop = {} as never;
     const service = new GenerationService(databaseService, noop, modelRouter, contextAssembler, noop, noop, noop, noop, noop, noop, noop, noop, noop, noPluginProposals());
     return { service, structured };
   }
 
-  it('drops refs missing from the catalog without failing the outline call', async () => {
+  it('drops refs missing from the catalog and every fact ref without failing the outline call', async () => {
     const projectId = await createApprovedVolume();
-    const output = [brief(1, ['entity:known', 'entity:phantom']), brief(2, ['entity:known']), brief(3, [])];
+    const output = [brief(1, ['entity:known', 'entity:phantom']), brief(2, ['entity:known', 'fact:known_secret']), brief(3, [])];
     const service = buildService(output, new Set(['entity:phantom']));
 
     const { briefs } = await service.outline(projectId, { start: 1, count: 3 });

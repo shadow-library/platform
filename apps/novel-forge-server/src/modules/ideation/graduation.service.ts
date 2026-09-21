@@ -147,7 +147,7 @@ export class GraduationService {
    * The named betrayals, and nothing else. These few rules are part of the core idea and must never be
    * paraphrased away by the planner, so they ride `canon_facts` — with `source: 'seed'` and a null
    * reveal. No POV cast ever learns them, so a chapter's knowledge view files them as hidden: they reach
-   * the drafter as behavioral constraints, and `source: 'seed'` is what keeps them out of the judge's
+   * the drafter through their writer note, and `source: 'seed'` is what keeps them out of the judge's
    * forbidden list, where a rule the book obeys would read as a spoiler the draft leaked. Every other
    * studio decision travels as prose in the reader-promise document.
    */
@@ -163,6 +163,7 @@ export class GraduationService {
       factKey,
       text: constraint.text,
       constraintNote: promiseConstraintNote(constraint.text),
+      writerNote: promiseConstraintNote(constraint.text),
       revealChapter: null,
       source: 'seed' as const,
     }));

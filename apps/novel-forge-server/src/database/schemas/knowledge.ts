@@ -137,7 +137,7 @@ export const relationshipObservations = pgTable(
 );
 
 // Spoiler-grade canon lives here, never in bible prose or entity sheets: the drafter only ever sees a fact's `text` once the POV cast has ledgered it.
-// While hidden, `constraintNote` supplies POV-safe behavior and `terms` feeds the deterministic leak scan.
+// While hidden, the drafter sees `writerNote` alone (nothing when it is null); `constraintNote` is author-only and `terms` feeds the deterministic leak scan.
 export const canonFacts = pgTable(
   'canon_facts',
   {
@@ -149,6 +149,7 @@ export const canonFacts = pgTable(
     text: text('text').notNull(),
     subjects: jsonb('subjects').$type<string[]>(),
     constraintNote: text('constraint_note'),
+    writerNote: text('writer_note'),
     terms: jsonb('terms').$type<string[]>(),
     revealChapter: integer('reveal_chapter'),
     source: factSource('source').notNull().default('manual'),

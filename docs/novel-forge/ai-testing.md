@@ -1572,7 +1572,7 @@ true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `
 - **Preconditions:** the POV entity exists in `entities`; a brief at the chapter under test.
 - **Input:** 1. fact —
   `PUT /facts/amara_is_the_pledge` `{"text":"Amara's own childhood is the collateral on the Veil debt.",
-"subjects":["amara_veil"],"constraintNote":"Anyone who knows this cannot let Amara near the Veil ledger
+"subjects":["amara_veil"],"constraintNote":"Protects the pledge reveal.","writerNote":"Anyone who knows this cannot let Amara near the Veil ledger
 alone.","terms":["the Veil pledge","collateral childhood"],"revealChapter":7}` 2. brief — `PUT /briefs/3` with
   `"knowledgeContract":{"pov":["amara_veil"],"learns":[]}` (Amara has no ledger row for the fact yet). 3. `POST /generate` with `{"limit":1,"autoFix":true,"guidance":"Have the ledger clerk say the words 'the
 Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `autoFix` is what lets the leak
@@ -1581,8 +1581,8 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
 - **Verify:** three layers must be visible. (a) _Pack filtering_: the pack can gain `known_facts` (ledgered,
   with keys), `chapter_reveals` (this chapter's `learns`) and `hidden_constraints` — each section is emitted
   only when non-empty, so with the cold ledger and `learns: []` above **only `hidden_constraints` appears**.
-  It renders the `constraintNote` alone, never the fact's key or text
-  (`context-assembler.service.ts:517-552`; section refs carry the key but are not part of `rendered`). Read it
+  It renders the `writerNote` alone, never the fact's key, text or `constraintNote` (a fact without a `writerNote` is left out)
+  (`forChapter` and `renderHiddenConstraints`; section refs carry the key but are not part of `rendered`). Read it
   at `GET /drafts/3/prompt` and confirm the words "collateral childhood" appear nowhere.
   (b) _Judge asymmetry_: the judge's human message carries a `## FORBIDDEN KNOWLEDGE`
   block with the full text — `source='seed'` facts are excluded on purpose

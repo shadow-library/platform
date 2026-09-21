@@ -42,8 +42,14 @@ export class UpsertFactBody {
   @Field(() => [String], { optional: true })
   subjects?: string[];
 
-  @Field({ optional: true })
+  @Field({ optional: true, description: 'Author-only note on what the fact protects; never shown to the chapter writer' })
   constraintNote?: string;
+
+  @Field({
+    optional: true,
+    description: 'The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact',
+  })
+  writerNote?: string;
 
   @Field(() => [String], { optional: true })
   terms?: string[];
@@ -104,6 +110,9 @@ export class FactResponse {
 
   @Field({ optional: true, nullable: true })
   constraintNote?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  writerNote?: string | null;
 
   @Field(() => [String], { optional: true, nullable: true })
   terms?: string[] | null;

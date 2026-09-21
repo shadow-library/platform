@@ -10,7 +10,17 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
-import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, renderHiddenConstraints, renderKnownFacts } from '../../bible/fact/knowledge-view';
+import {
+  loadKnowledgeView,
+  loadWriterForbiddenFacts,
+  loadWriterHiddenFactKeys,
+  parseKnowledgeContract,
+  renderChapterReveals,
+  renderHiddenConstraints,
+  renderKnownFacts,
+  scrubForWriter,
+  withWriterNotes,
+} from '../../bible/fact/knowledge-view';
 import { matchPlaybooks } from '../../ideation/constraint-playbooks';
 import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
 import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
@@ -210,8 +220,11 @@ interface ResolvedRefRows {
   volumeMap: Map<string, schema.Plan.Volume>;
   arcMap: Map<string, ArcRow>;
   bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
-  factMap: Map<string, typeof schema.canonFacts.$inferSelect>;
+  factMap: Map<string, CanonFactRow>;
+  hiddenFactKeys: ReadonlySet<string> | null;
 }
+
+type CanonFactRow = typeof schema.canonFacts.$inferSelect;
 
 // The catalog lists world facts as `category: key | key`, so an outliner ref may name either. Category
 // wins because it was the only reading before keys resolved; `category/key` pins a single fact.
@@ -484,6 +497,7 @@ export class ContextAssembler {
     const arcMap = new Map(arcRows.map(a => [a.arcKey, a]));
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
+    const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows) : null;
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
@@ -492,12 +506,27 @@ export class ContextAssembler {
       const colon = ref.indexOf(':');
       const prefix = colon === -1 ? '' : ref.slice(0, colon);
       const value = ref.slice(colon + 1);
-      const section = this.resolveRef(ref, prefix, value, chapter, { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap });
+      if (prefix === 'fact' && hiddenFactKeys?.has(value) && !factMap.get(value)?.writerNote?.trim()) continue;
+      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap, hiddenFactKeys };
+      const section = this.resolveRef(ref, prefix, value, chapter, rows);
       if (section) resolved.push(section);
       else unresolved.push(ref);
     }
 
     return { resolved, unresolved };
+  }
+
+  /**
+   * Sanitizes a model-written `requiredContext`: drops refs that resolve to nothing and every `fact:` ref, because an
+   * outliner reading the catalog sees hidden facts in full and must never pin one into a chapter's context.
+   */
+  async sanitizeOutlinedRefs(projectId: bigint, refs: string[]): Promise<{ kept: string[]; dropped: string[] }> {
+    const candidates = refs.filter(ref => !ref.startsWith('fact:'));
+    const { unresolved } = candidates.length > 0 ? await this.resolveRefs(projectId, candidates) : { unresolved: [] };
+    const unresolvedSet = new Set(unresolved);
+    const kept = candidates.filter(ref => !unresolvedSet.has(ref));
+    const keptSet = new Set(kept);
+    return { kept, dropped: refs.filter(ref => !keptSet.has(ref)) };
   }
 
   private resolveRef(ref: string, prefix: string, value: string, chapter: number | undefined, rows: ResolvedRefRows): ContextSection | null {
@@ -554,13 +583,10 @@ export class ContextAssembler {
         return makeRefSection(ref, `BIBLE: ${doc.section}/${doc.slug}`, body, 'canonical', truncated);
       }
       case 'fact': {
-        // Deliberately NOT surfaced via catalog.service.ts: canon_facts carries hidden-truth rows
-        // that must stay POV-filtered until ledgered. Only hand-authored
-        // refs — plan-import, manual brief edits, hand-authored chat-hub lookups — may name a fact:
-        // ref, since the automated outliner reading the catalog must never be able to request one and
-        // self-spoil a not-yet-revealed fact into a future chapter's context.
         const fact = rows.factMap.get(value);
         if (!fact) return null;
+        if (rows.hiddenFactKeys?.has(fact.factKey)) return makeRefSection(ref, 'WRITING CONSTRAINT', fact.writerNote?.trim() ?? '', 'approved_intent');
+        if (rows.hiddenFactKeys) return makeRefSection(ref, `CANON FACT: ${fact.factKey}`, `**${fact.factKey}**: ${fact.text}`, 'canonical');
         const constraintLine = fact.constraintNote ? `\nConstraint: ${fact.constraintNote}` : '';
         return makeRefSection(ref, `CANON FACT: ${fact.factKey}`, `**${fact.factKey}**: ${fact.text}${constraintLine}`, 'canonical');
       }
@@ -633,8 +659,8 @@ export class ContextAssembler {
       if (content) sections.push(asStable(makeSection('arc_objective', content, 'approved_intent', [`arc:${currentArc.arcKey}`])));
     }
 
-    // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
-    // constraints, never as text. Absent a contract the feature is off and nothing changes. With a contract
+    // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as their writer
+    // notes, never as text. Absent a contract the feature is off and nothing changes. With a contract
     // the known-facts section is always present, so a cast that knows nothing is told so rather than left
     // to infer it from a missing heading.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
@@ -665,7 +691,7 @@ export class ContextAssembler {
             'hidden_constraints',
             constraints,
             'approved_intent',
-            view.hidden.filter(f => f.constraintNote).map(f => `fact:${f.factKey}`),
+            withWriterNotes(view.hidden).map(f => `fact:${f.factKey}`),
           ),
         );
       }
@@ -677,8 +703,9 @@ export class ContextAssembler {
 
     if (contextRefs.length > 0) {
       const { resolved, unresolved } = await this.resolveRefs(projectId, contextRefs, chapter);
+      const constrained = new Set(sections.find(s => s.key === 'hidden_constraints')?.sourceRefs ?? []);
       unresolvedRefs = unresolved;
-      refSections = resolved;
+      refSections = resolved.filter(section => !section.sourceRefs.some(ref => constrained.has(ref)));
     }
 
     const pov = brief?.pov ?? null;
@@ -927,7 +954,8 @@ export class ContextAssembler {
     }
 
     if (feedbackRows.length > 0) {
-      const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ?? f.disposition}`).join('\n');
+      const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
+      const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ? scrubForWriter(f.note, forbidden) : f.disposition}`).join('\n');
       sections.push(makeSection('feedback', notes, 'working', []));
     }
 

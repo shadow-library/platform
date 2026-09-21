@@ -67,12 +67,13 @@ interface FactFormState {
   text: string;
   subjects: string;
   constraintNote: string;
+  writerNote: string;
   terms: string;
   revealChapter: string;
 }
 
 function emptyForm(): FactFormState {
-  return { factKey: '', text: '', subjects: '', constraintNote: '', terms: '', revealChapter: '' };
+  return { factKey: '', text: '', subjects: '', constraintNote: '', writerNote: '', terms: '', revealChapter: '' };
 }
 
 function formFromFact(fact: FactResponse): FactFormState {
@@ -81,6 +82,7 @@ function formFromFact(fact: FactResponse): FactFormState {
     text: fact.text,
     subjects: listToText(fact.subjects),
     constraintNote: fact.constraintNote ?? '',
+    writerNote: fact.writerNote ?? '',
     terms: listToText(fact.terms),
     revealChapter: fact.revealChapter != null ? String(fact.revealChapter) : '',
   };
@@ -123,7 +125,13 @@ function FactDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: Fa
             <FormField label="Truth" required helper="Judge-only — never shown to the chapter writer. State the full spoiler plainly.">
               <Textarea value={form.text} onValueChange={v => set('text', v)} minRows={3} autoGrow autoFocus={mode === 'edit'} />
             </FormField>
-            <FormField label="Behavioral constraint" helper="POV-safe behavior injected while the fact is still hidden, e.g. “Elias deflects questions about Tuesday night.”">
+            <FormField
+              label="Note for the writer"
+              helper="The only thing the chapter writer sees while the fact is hidden — say how to behave without naming the truth, e.g. “Elias deflects questions about Tuesday night.” Leave blank to withhold the fact entirely."
+            >
+              <Textarea value={form.writerNote} onValueChange={v => set('writerNote', v)} minRows={2} autoGrow />
+            </FormField>
+            <FormField label="Author note" helper="For you only — never shown to the chapter writer.">
               <Textarea value={form.constraintNote} onValueChange={v => set('constraintNote', v)} minRows={2} autoGrow />
             </FormField>
             <div className={styles.dialogGrid}>
@@ -390,9 +398,14 @@ function FactDetail({ novelId, fact, total, filterState, ids, jump, onSelect, on
       >
         <SpoilerBlock key={fact.factKey} factKey={fact.factKey} text={fact.text} state={state} />
 
+        <DetailPage.Prose className={styles.constraint}>
+          <div className={styles.sectionLabel}>Note for the writer while hidden</div>
+          <p className={styles.para}>{fact.writerNote ?? 'None — the chapter writer sees nothing of this fact until it is revealed.'}</p>
+        </DetailPage.Prose>
+
         {fact.constraintNote && (
           <DetailPage.Prose className={styles.constraint}>
-            <div className={styles.sectionLabel}>Behavioral constraint while hidden</div>
+            <div className={styles.sectionLabel}>Author note</div>
             <p className={styles.para}>{fact.constraintNote}</p>
           </DetailPage.Prose>
         )}
@@ -468,6 +481,7 @@ function CanonFactsScreen(): React.JSX.Element {
       text: form.text.trim(),
       subjects: textToList(form.subjects),
       constraintNote: form.constraintNote.trim() || undefined,
+      writerNote: form.writerNote.trim(),
       terms: textToList(form.terms),
       revealChapter: form.revealChapter.trim() ? Number(form.revealChapter) : undefined,
     };

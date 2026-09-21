@@ -167,8 +167,8 @@ describe('routeAfterJudge', () => {
 
 describe('mergeKnowledgeCompliance', () => {
   it('is compliant when neither the pre-scan nor the judge found leaks', () => {
-    expect(mergeKnowledgeCompliance({ compliant: true, issues: [] }, [])).toEqual({ knowledgeCompliant: true, findings: [] });
-    expect(mergeKnowledgeCompliance(undefined, [])).toEqual({ knowledgeCompliant: true, findings: [] });
+    expect(mergeKnowledgeCompliance({ compliant: true, issues: [] }, [])).toEqual({ knowledgeCompliant: true, findings: [], writerFindings: [] });
+    expect(mergeKnowledgeCompliance(undefined, [])).toEqual({ knowledgeCompliant: true, findings: [], writerFindings: [] });
   });
 
   it('lets a deterministic pre-scan hit force non-compliance over a compliant judge', () => {
@@ -184,6 +184,26 @@ describe('mergeKnowledgeCompliance', () => {
     expect(result.knowledgeCompliant).toBe(false);
     expect(result.findings.map(f => f.severity)).toEqual(['soft', 'soft']);
     expect(result.findings[1]?.text).toBe('knowledge leak: [motive_debt] Amara acts on the debt she cannot know about');
+  });
+
+  it('should reduce leak findings to a writer-safe form that never names the fact', () => {
+    const forbidden = [
+      { factKey: 'motive_debt', text: 'Marlow owed Elias a ruinous debt.', constraintNote: 'The debt is the motive.', writerNote: 'Elias flinches when money comes up.' },
+      { factKey: 'ledger_forgery', text: 'The ledger is forged.', constraintNote: 'Protects the forgery.', writerNote: null },
+    ];
+    const result = mergeKnowledgeCompliance(
+      { compliant: false, issues: ['[motive_debt] Amara acts on the debt: Marlow owed Elias a ruinous debt.', 'something is off'] },
+      [{ factKey: 'ledger_forgery', term: 'forgery', excerpt: 'a forgery, she realized' }],
+      forbidden,
+    );
+    expect(result.writerFindings.map(f => f.text)).toEqual([
+      'knowledge leak: remove or avoid "forgery"',
+      'knowledge leak: cut anything that states or implies what the POV cast cannot know yet — Elias flinches when money comes up.',
+      'knowledge leak: cut anything that states or implies what the POV cast cannot know yet',
+    ]);
+    const rendered = result.writerFindings.map(f => f.text).join('\n');
+    for (const secret of ['motive_debt', 'ledger_forgery', 'ruinous debt', 'The ledger is forged.', 'The debt is the motive.', 'Protects the forgery.'])
+      expect(rendered).not.toContain(secret);
   });
 });
 

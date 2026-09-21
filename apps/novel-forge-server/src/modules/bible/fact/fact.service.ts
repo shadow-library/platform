@@ -69,6 +69,7 @@ export class FactService {
       text: body.text,
       subjects: (body.subjects ?? existing?.subjects ?? null) as never,
       constraintNote: body.constraintNote ?? existing?.constraintNote ?? null,
+      writerNote: body.writerNote === undefined ? (existing?.writerNote ?? null) : body.writerNote.trim() || null,
       terms: (body.terms ?? existing?.terms ?? null) as never,
       revealChapter: body.revealChapter ?? existing?.revealChapter ?? null,
     };
