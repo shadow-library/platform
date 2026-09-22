@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { DatabaseService } from '@shadow-library/modules';
+import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import type { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
 import type { NotificationProviderService } from '@modules/notification/notification-provider.service';
@@ -9,7 +9,7 @@ import type { TemplateResolverService } from '@modules/template';
 
 function createService(): NotificationService {
   return new NotificationService(
-    { getPostgresClient: () => ({}) } as unknown as DatabaseService,
+    new FakeDatabaseService(),
     {} as NotificationProviderService,
     {} as TemplateResolverService,
     {} as SenderRoutingRuleService,
