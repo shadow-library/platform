@@ -18,7 +18,8 @@ export type ContextPurpose =
   | 'reforge_transform'
   | 'translate_seed'
   | 'translate'
-  | 'illustration';
+  | 'illustration'
+  | 'blueprint';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -113,6 +114,8 @@ const SECTION_LABELS: Record<string, string> = {
   cast_appearance: '## CAST APPEARANCE',
   ledger: '## DECISION LEDGER',
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
+  step_thread: '## THIS STEP SO FAR',
+  round_input: '## THE AUTHOR, THIS ROUND',
 };
 
 export const CORE_SECTION_KEYS: ReadonlySet<string> = new Set(Object.keys(SECTION_LABELS));

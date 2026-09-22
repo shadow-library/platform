@@ -27,6 +27,7 @@ function toRow(projectId: bigint, entry: NewLedgerEntry, supersedesId: bigint | 
     rejectedAlternatives: entry.rejectedAlternatives ?? [],
     writerLine: entry.writerLine?.trim() || null,
     decidedBy: entry.decidedBy,
+    stepKey: entry.stepKey ?? null,
     payload: entry.payload ?? null,
     links: entry.links ?? {},
     supersedesId,
@@ -48,6 +49,7 @@ export function authorSuccessor(previous: Ledger.Entry, input: AuthorSupersessio
     rejectedAlternatives: input.rejectedAlternatives ?? (inherits ? previous.rejectedAlternatives : []),
     payload: input.payload ?? (inherits ? previous.payload : null),
     links: inherits ? previous.links : {},
+    stepKey: inherits ? previous.stepKey : null,
   };
 }
 
@@ -124,24 +126,22 @@ export class LedgerService {
   }
 
   /** Deactivates the entry without a successor, so a dropped direction or a lifted rejection leaves nothing behind in the active ledger. */
-  async withdraw(projectId: bigint, entryId: bigint, reason: string): Promise<Ledger.Entry> {
+  async withdraw(projectId: bigint, entryId: bigint, reason: string, tx?: PrimaryTransaction): Promise<Ledger.Entry> {
     const table = schema.decisionLedgerEntries;
-    await this.assertLedgerProject(projectId, this.db);
-    const [withdrawn] = await this.db
+    const executor = tx ?? this.db;
+    await this.assertLedgerProject(projectId, executor);
+    const [withdrawn] = await executor
       .update(table)
       .set({ supersededAt: new Date(), withdrawnReason: reason.trim() })
       .where(and(eq(table.id, entryId), eq(table.projectId, projectId), isNull(table.supersededAt)))
       .returning();
-    if (!withdrawn) throw await this.unsupersedable(projectId, entryId, this.db);
+    if (!withdrawn) throw await this.unsupersedable(projectId, entryId, executor);
 
     this.logger.info('ledger entry withdrawn', { projectId, topic: withdrawn.topic, entryId: withdrawn.id, kind: withdrawn.kind });
     return withdrawn;
   }
 
-  /**
-   * The one in-place write besides retiring an entry (superseded marker, withdrawal reason): links are provenance of what an entry produced, which is materialised
-   * after the entry is appended and grows as later steps build on it, never part of what was decided.
-   */
+  /** Links record what an entry produced, which grows after it is appended, so they are the one in-place write besides retiring an entry. */
   linkEntry(projectId: bigint, entryId: bigint, links: Ledger.Links, tx?: PrimaryTransaction): Promise<Ledger.Entry> {
     const table = schema.decisionLedgerEntries;
     const run = async (executor: DbExecutor): Promise<Ledger.Entry> => {

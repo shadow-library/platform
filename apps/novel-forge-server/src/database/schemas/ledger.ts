@@ -55,6 +55,7 @@ export const decisionLedgerEntries = pgTable(
       .default(sql`'[]'::jsonb`),
     writerLine: text('writer_line'),
     decidedBy: ledgerDecidedBy('decided_by').notNull(),
+    stepKey: varchar('step_key', { length: 60 }),
     payload: jsonb('payload'),
     links: jsonb('links')
       .$type<Ledger.Links>()

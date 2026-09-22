@@ -178,6 +178,9 @@ export class LedgerEntryResponse {
   @Field(() => LedgerDecidedBy)
   decidedBy: Ledger.DecidedBy;
 
+  @Field({ nullable: true, description: 'The Blueprint step whose lock wrote the entry; null for what the author wrote directly or while steering.' })
+  stepKey: string | null;
+
   @Field(() => Object, { nullable: true, additionalProperties: true, description: 'Structured detail whose fields depend on the topic.' })
   payload: unknown;
 

@@ -299,8 +299,8 @@ export class WorkflowRunService {
    * gets a fresh runId that correlates its model_calls and context pack, and failures land in the
    * same audit trail as graph runs.
    */
-  async runChain<T>(projectId: bigint, graph: string, target: string, input: unknown, fn: (runId: string) => Promise<T>): Promise<{ runId: string; result: T }> {
-    const runId = await this.createRun(projectId, graph, target, input);
+  async runChain<T>(projectId: bigint, graph: string, target: string, input: unknown, fn: (runId: string) => Promise<T>, jobId?: string): Promise<{ runId: string; result: T }> {
+    const runId = await this.createRun(projectId, graph, target, input, jobId);
     const signal = this.modelRouter.bindRunSignal(runId);
     try {
       const result = await fn(runId);

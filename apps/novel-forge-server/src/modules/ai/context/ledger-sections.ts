@@ -105,13 +105,19 @@ function selectWithinBudget(lines: WriterLine[], budgetTokens: number): WriterLi
   return ranks.flatMap(rank => kept.get(rank) ?? []);
 }
 
-export function renderWriterLines(entries: LedgerContextEntry[], forbidden: FactLike[], budgetTokens = WRITER_LINES_BUDGET): string | null {
-  const lines = entries
+function scrubbedWriterLines(entries: LedgerContextEntry[], forbidden: FactLike[]): WriterLine[] {
+  return entries
     .filter(entry => DECIDED_KINDS.has(entry.kind) && entry.writerLine)
     .map(entry => ({ phase: entry.phase, line: scrubPlanForWriter(entry.writerLine ?? '', forbidden).trim() }))
     .filter(item => item.line);
-  const kept = selectWithinBudget(lines, budgetTokens);
+}
+
+function renderKept(kept: WriterLine[]): string | null {
   return kept.length === 0 ? null : kept.map(item => `- ${item.line}`).join('\n');
+}
+
+export function renderWriterLines(entries: LedgerContextEntry[], forbidden: FactLike[], budgetTokens = WRITER_LINES_BUDGET): string | null {
+  return renderKept(selectWithinBudget(scrubbedWriterLines(entries, forbidden), budgetTokens));
 }
 
 function requiredSection(key: string, content: string, segment: ContextSegment, sourceRefs: string[]): ContextSection {
@@ -129,9 +135,11 @@ export function ledgerSection(entries: LedgerContextEntry[], segment: ContextSeg
 }
 
 export function writerLinesSection(entries: LedgerContextEntry[], forbidden: FactLike[]): ContextSection | null {
-  const content = renderWriterLines(entries, forbidden);
+  const lines = scrubbedWriterLines(entries, forbidden);
+  const kept = selectWithinBudget(lines, WRITER_LINES_BUDGET);
+  const content = renderKept(kept);
   if (content === null) return null;
   const withLines = entries.filter(entry => DECIDED_KINDS.has(entry.kind) && entry.writerLine);
   const section = requiredSection('writer_lines', content, 'volatile', ledgerRefs(withLines));
-  return { ...section, truncated: content.split('\n').length < withLines.length };
+  return { ...section, truncated: kept.length < lines.length };
 }

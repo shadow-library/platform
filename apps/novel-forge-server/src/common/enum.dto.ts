@@ -58,6 +58,7 @@ export const RefinementKind = EnumType.create('RefinementKind', schema.refinemen
 export const LedgerEntryKind = EnumType.create('LedgerEntryKind', schema.ledgerEntryKind.enumValues);
 export const BlueprintPhase = EnumType.create('BlueprintPhase', schema.blueprintPhase.enumValues);
 export const LedgerDecidedBy = EnumType.create('LedgerDecidedBy', schema.ledgerDecidedBy.enumValues);
+export const BlueprintRoundStatus = EnumType.create('BlueprintRoundStatus', schema.blueprintRoundStatus.enumValues);
 export const PublicationStatus = EnumType.create('PublicationStatus', schema.publicationStatus.enumValues);
 export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatus', schema.chapterPublicationStatus.enumValues);
 export const PublicationVisibility = EnumType.create('PublicationVisibility', schema.publicationVisibility.enumValues);

@@ -1,4 +1,5 @@
 export * from './bible-docs';
+export * from './blueprint-sections';
 export * from './canon-guard';
 export * from './catalog.service';
 export * from './context-assembler.service';

@@ -30,5 +30,6 @@ export * from './chat-title.schema';
 export * from './arc-plan.schema';
 export * from './illustration.schema';
 export * from './appearance-describe.schema';
+export * from './blueprint-start.schema';
 export * from './chapter-summarize.schema';
 export * from './validate';

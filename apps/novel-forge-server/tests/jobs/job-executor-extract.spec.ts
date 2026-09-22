@@ -36,6 +36,7 @@ function makeExecutor(runSourceExtraction: (input: unknown) => Promise<WorkflowR
     storage,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { executor, progressCalls, runSourceExtraction: runSourceExtractionMock };
 }

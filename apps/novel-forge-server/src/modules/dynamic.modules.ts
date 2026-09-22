@@ -15,7 +15,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 import { AiModule } from '@modules/ai';
 import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
-import { BlueprintModule } from '@modules/blueprint';
+import { BlueprintHttpModule, BlueprintModule } from '@modules/blueprint';
 import { BotOwnershipModule } from '@modules/bot-ownership';
 import { CuratedIngestModule } from '@modules/curated-ingest';
 import { EventsModule } from '@modules/events';
@@ -74,6 +74,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     SourceModule,
     BibleModule,
     BlueprintModule,
+    BlueprintHttpModule,
   ],
   host: Config.get('server.host'),
   port: Config.get('server.port'),

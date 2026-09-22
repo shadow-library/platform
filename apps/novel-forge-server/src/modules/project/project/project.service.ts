@@ -13,9 +13,9 @@ import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDataba
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { isRegisteredModel } from '../../ai/defaults';
-import { clearLedgerBriefLinks } from '../../blueprint/ledger/ledger-entries';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
+import { clearLedgerBriefLinks } from '../../blueprint/ledger/ledger-entries';
 import { setProjectCover } from '../../illustration/uploaded-cover';
 import { type CostWindow, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';

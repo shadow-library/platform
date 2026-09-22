@@ -27,7 +27,9 @@ export type AiRole =
   | 'illustration'
   | 'image'
   | 'vision'
-  | 'ideation';
+  | 'ideation'
+  | 'blueprint'
+  | 'blueprint_pass';
 
 export interface ResolvedModel {
   provider: string;
@@ -69,6 +71,8 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   vision: 'vision',
   embedding: 'embedding',
   ideation: 'ideation',
+  blueprint: 'ideation',
+  blueprint_pass: 'planning',
 };
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the

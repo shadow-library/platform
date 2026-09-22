@@ -1,6 +1,7 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
+import { blueprintStartPrompt } from './blueprint-start.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
@@ -105,6 +106,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'translate-audit': translateAuditPrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
+  'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,
 };
 
 export * from './types';

@@ -19,4 +19,7 @@ export const constraintErrorMap: Record<string, AppError> = {
   chapters_project_id_source_ordinal_unique: AppErrorCode.ING_003.create(),
   // Two supersessions of one entry that both read it as active; the row lock makes the loser see it superseded, and this is the backstop.
   decision_ledger_entries_supersedes_id_unique: AppErrorCode.LDG_002.create(),
+  // Two round requests for one step that both found no active round; the loser is told a round is already running.
+  blueprint_rounds_one_active_per_step_idx: AppErrorCode.BPR_002.create(),
+  blueprint_rounds_project_id_step_key_round_unique: AppErrorCode.BPR_002.create(),
 };

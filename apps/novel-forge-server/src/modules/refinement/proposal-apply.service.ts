@@ -8,7 +8,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ideation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
@@ -55,6 +55,8 @@ export interface OpResult {
 export interface ApplyOptions {
   opIndexes?: number[];
   autoApplied?: boolean;
+  /** Applies inside the caller's transaction, so the change commits or rolls back with the caller's own writes. Content ops only: actions run after a commit. */
+  tx?: PrimaryTransaction;
 }
 
 export interface ApplyResult {
@@ -211,11 +213,13 @@ export class ProposalApplyService {
    * commit, sequentially, with their outcomes folded into opResults — except the one-way doors, which
    * an auto-mode turn declines with a note rather than failing over. A baseline mismatch commits
    * only the `conflicted` status flip and surfaces as HTTP 409; any other failure rolls the whole
-   * transaction back and leaves the proposal pending.
+   * transaction back and leaves the proposal pending. With `options.tx` everything runs inside the
+   * caller's transaction instead, so the caller's rollback also undoes the conflicted flip, and action
+   * ops are refused because nothing has committed for them to run after.
    */
   async apply(projectId: bigint, proposalId: bigint, options?: ApplyOptions): Promise<ApplyResult> {
     this.logger.debug('apply: starting', { projectId, proposalId, opIndexes: options?.opIndexes, autoApplied: options?.autoApplied });
-    const result = await this.db.transaction(async (tx): Promise<TxResult> => {
+    const applyInTransaction = async (tx: PrimaryTransaction): Promise<TxResult> => {
       const [proposal] = await tx
         .select()
         .from(schema.refinementProposals)
@@ -229,6 +233,8 @@ export class ProposalApplyService {
       const selectedOps = selected.map(index => ({ index, op: ops[index] as ChangeOp }));
       const contentOps = selectedOps.filter((s): s is { index: number; op: ContentOp } => !isActionOp(s.op));
       const selectedActions = selectedOps.filter((s): s is { index: number; op: ActionOp } => isActionOp(s.op));
+
+      if (options?.tx && selectedActions.length > 0) throw AppError.internal('action ops cannot run inside a caller transaction');
 
       const guarded = selectedActions.flatMap(action => {
         const door = NEVER_AUTO_APPLIED[action.op.op];
@@ -317,7 +323,8 @@ export class ProposalApplyService {
       }
 
       return { outcome: 'applied', proposal: applied, applied: ctx.applied, staleMarked: [...new Set(ctx.staleMarked)], opResults };
-    });
+    };
+    const result = options?.tx ? await applyInTransaction(options.tx) : await this.db.transaction(applyInTransaction);
 
     if (result.outcome === 'conflicted') throw AppErrorCode.RFN_003.create();
     if (result.outcome === 'declined') return { proposal: result.proposal, applied: [], staleMarked: [], opResults: result.opResults };

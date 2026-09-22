@@ -32,10 +32,11 @@ import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { type BibleDocRow, renderBibleDigest } from './bible-docs';
+import { BLUEPRINT_BUDGET, type BlueprintPackParts, blueprintSections } from './blueprint-sections';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
-import { ledgerSection, writerLinesSection } from './ledger-sections';
+import { type LedgerContextEntry, ledgerSection, writerLinesSection } from './ledger-sections';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -497,6 +498,10 @@ export class ContextAssembler {
 
   async activeLedgerSection(projectId: bigint, segment?: ContextSegment): Promise<ContextSection> {
     return ledgerSection(await loadActiveLedger(this.db, projectId), segment);
+  }
+
+  forBlueprint(projectId: bigint, ledger: LedgerContextEntry[], parts: BlueprintPackParts, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    return this.finalize(projectId, 'blueprint', null, blueprintSections(ledger, parts), [], opts?.budgetTokens ?? BLUEPRINT_BUDGET, opts);
   }
 
   catalog(projectId: bigint, options?: CatalogOptions): Promise<string> {

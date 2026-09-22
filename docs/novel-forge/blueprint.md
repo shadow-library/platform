@@ -126,6 +126,8 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   sees full conversation history or earlier rounds' options.
 - Rejected entries reach the model only as a do-not-propose list, never as material to build on.
 - Each round is stored so a reload shows the latest options; old rounds are history, not context.
+- A step runs one round at a time, and its round starts and locks are serialised. A round that stops without finishing (cancelled, crashed, never
+  queued) is settled from its job, so it never blocks the step.
 
 ## Identity and detail decisions
 
@@ -141,6 +143,8 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   check. Each pass sees everything decided so far, and the author still reviews, steers and locks every step it produced. The Blueprint deliberately does not decompose these
   phases into many narrow prompts: large passes plan as well at a fraction of the cost.
 - Every round is a background job; nothing in the Blueprint depends on a long-lived request.
+- A large pass feeds several screens that the author reviews and locks one by one. Steering one screen reruns the pass focused on it: that
+  screen's part is reworked and every other screen's part is kept exactly as it was. Screens of one pass share one round at a time.
 
 ## Materialisation
 
@@ -149,6 +153,12 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - Materialisation goes through the existing change-set operations, applied immediately as the author's own action, so change history and revert work exactly as for any other
   edit. There is no Blueprint-only storage for novel content.
 - Ledger entries link to what they produced, and what they produced is plain Workspace content, editable in the Workspace like anything else.
+- One lock writes the step's whole answer. Locking it again replaces what the step's earlier locks wrote on its topics (superseding entry for
+  entry, the same option first, and withdrawing the rest), so a revisit never leaves two answers to one question active; a step may narrow which
+  topics a lock replaces. Entries the author wrote directly, directions and rejections written while steering, and backlog entries are never
+  replaced by a lock.
+- The ledger entries and the materialised content of one lock commit together or not at all. Work that can only follow a commit (approving what
+  was materialised, queueing a job) runs after it; if it fails, the lock stands and the failure is reported beside it.
 
 ## Stage
 

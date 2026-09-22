@@ -395,6 +395,7 @@ const OP_SPECS = Object.fromEntries(
 
 const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
+export const CONTENT_OP_TYPES: readonly OpType[] = OP_TYPES.filter(op => !op.startsWith('action.'));
 // Graduation belongs to the studio alone: a hub project has already graduated, so offering it there is
 // an action the model can only fail with (IDE_001).
 export const HUB_ACTION_TYPES = ACTION_TYPES.filter(action => action !== 'action.graduate_seed');

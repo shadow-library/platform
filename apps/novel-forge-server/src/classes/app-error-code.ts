@@ -288,6 +288,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
 
   /*!
+   * Blueprint Errors
+   */
+  static readonly BPR_001 = AppErrorCode.notFound('BPR_001', 'Blueprint step "{step}" does not exist');
+  static readonly BPR_002 = AppErrorCode.conflict('BPR_002', 'A round is already running for this step — wait for it to finish or cancel it');
+  static readonly BPR_003 = AppErrorCode.badRequest('BPR_003', 'The Blueprint designs original novels only');
+  static readonly BPR_004 = AppErrorCode.badRequest('BPR_004', 'The {part} for this step is invalid: {issues}');
+  static readonly BPR_005 = AppErrorCode.badRequest('BPR_005', 'Option "{optionId}" is not one the latest round offered');
+  static readonly BPR_006 = AppErrorCode.notFound('BPR_006', 'This step has no running round to cancel');
+  static readonly BPR_007 = AppErrorCode.badRequest('BPR_007', 'Step "{step}" is a generation pass — lock the screens it feeds instead');
+
+  /*!
    * Publishing Errors
    */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');

@@ -15,6 +15,7 @@ function entry(overrides: Partial<Ledger.Entry> = {}): Ledger.Entry {
     rejectedAlternatives: ['Can a town forgive a flood?'],
     writerLine: 'Every chapter tests one promise.',
     decidedBy: 'author',
+    stepKey: null,
     payload: { drivers: ['slice_of_life'] },
     links: { bibleDocuments: [{ section: 'project', slug: 'theme' }] },
     supersedesId: null,

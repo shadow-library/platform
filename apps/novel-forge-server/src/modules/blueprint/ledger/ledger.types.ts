@@ -17,6 +17,8 @@ export interface NewLedgerEntry {
   rejectedAlternatives?: string[];
   writerLine?: string | null;
   decidedBy: Ledger.DecidedBy;
+  /** The Blueprint step whose lock wrote the entry; a re-lock of that step replaces only such entries. */
+  stepKey?: string | null;
   payload?: unknown;
   links?: Ledger.Links;
 }
