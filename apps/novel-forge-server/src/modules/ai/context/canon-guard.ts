@@ -46,11 +46,19 @@ interface LimitWorldFactRow {
   value: string;
 }
 
+interface PlannedScene {
+  goal?: string;
+  obstacle?: string;
+  turn?: string;
+  beats?: string[];
+}
+
 interface PlannedBrief {
   chapter: number;
   title?: string;
   objective?: string;
   events?: string[];
+  scenes?: PlannedScene[];
   chapterPurpose?: string;
   handoffBeat?: string;
   repetitionRisks?: string[];
@@ -186,6 +194,16 @@ export function renderRevealViolation({ subject, field, factKey, revealChapter }
   return `${subject} ${field} names a REVEAL SCHEDULE term of ${factKey}, ${schedule} — keep it out until then`;
 }
 
+function sceneFields(scene: PlannedScene, index: number): [string, string | undefined][] {
+  const path = `scenes[${index}]`;
+  return [
+    [`${path}.goal`, scene.goal],
+    [`${path}.obstacle`, scene.obstacle],
+    [`${path}.turn`, scene.turn],
+    ...(scene.beats ?? []).map((beat, beatIndex): [string, string] => [`${path}.beats[${beatIndex}]`, beat]),
+  ];
+}
+
 /** One violation per brief and fact, so a repair sees each leak once. */
 export function findBriefRevealViolations(briefs: readonly PlannedBrief[], reveals: readonly ScheduledReveal[]): RevealViolation[] {
   const violations: RevealViolation[] = [];
@@ -196,6 +214,7 @@ export function findBriefRevealViolations(briefs: readonly PlannedBrief[], revea
       ['title', brief.title],
       ['objective', brief.objective],
       ...(brief.events ?? []).map((event, index): [string, string] => [`events[${index}]`, event]),
+      ...(brief.scenes ?? []).flatMap(sceneFields),
       ['chapterPurpose', brief.chapterPurpose],
       ['handoffBeat', brief.handoffBeat],
       ['endingContract.emotionalBeat', brief.endingContract?.emotionalBeat],
@@ -290,10 +309,21 @@ function withKnownKeys<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
 }
 
+function sanitiseScene<T extends PlannedScene>(scene: T, path: string, state: Sanitiser, placeholder: string): T {
+  const beats = scene.beats === undefined ? undefined : sanitiseList(scene.beats, `${path}.beats`, state);
+  return withKnownKeys({
+    ...scene,
+    goal: sanitiseOptional(scene.goal, `${path}.goal`, state),
+    obstacle: sanitiseOptional(scene.obstacle, `${path}.obstacle`, state),
+    turn: sanitiseOptional(scene.turn, `${path}.turn`, state),
+    beats: beats !== undefined && beats.length === 0 ? [placeholder] : beats,
+  });
+}
+
 /**
  * The final guard behind the advisory repair: whatever still surfaces a reveal before its chapter is rewritten before it is
  * persisted, so a stored brief never carries a give-away term early. Chapter numbers, chaining flags, refs and reader value are
- * never touched, so the blocking outline rules still hold; `events` keeps at least one entry for its schema floor.
+ * never touched, so the blocking outline rules still hold; `events` and each scene's `beats` keep at least one entry.
  */
 export function sanitiseBriefReveals<T extends PlannedBrief>(briefs: readonly T[], reveals: readonly ScheduledReveal[]): { briefs: T[]; sanitised: RevealViolation[] } {
   const sanitised: RevealViolation[] = [];
@@ -314,6 +344,7 @@ export function sanitiseBriefReveals<T extends PlannedBrief>(briefs: readonly T[
       title: sanitiseOptional(brief.title, 'title', state),
       objective: sanitiseOptional(brief.objective, 'objective', state),
       events: events !== undefined && events.length === 0 ? [placeholderFor(firstReveal, state.reveals)] : events,
+      scenes: brief.scenes?.map((scene, index) => sanitiseScene(scene, `scenes[${index}]`, state, placeholderFor(firstReveal, state.reveals))),
       chapterPurpose: sanitiseOptional(brief.chapterPurpose, 'chapterPurpose', state),
       handoffBeat: sanitiseOptional(brief.handoffBeat, 'handoffBeat', state),
       repetitionRisks: brief.repetitionRisks === undefined ? undefined : sanitiseList(brief.repetitionRisks, 'repetitionRisks', state),

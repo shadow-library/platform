@@ -115,6 +115,6 @@ export { buildIdeationStressPrompt, renderReadinessPrecheck } from './ideation-s
 export { buildIdeationTurnPrompt } from './ideation-turn.prompt';
 export { CONCEPT_CARD_COUNT } from './ideation-concepts.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
-export { buildOutlinePrompt } from './outline.prompt';
+export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
 export { renderReforgeFidelityGuidance } from './reforge-write.prompt';
 export { renderReforgeFidelityRule } from './reforge-judge.prompt';

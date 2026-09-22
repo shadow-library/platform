@@ -3873,6 +3873,8 @@ export interface components {
       readerValue?: null | string[];
       /** @description Recent scene patterns the chapter should avoid repeating. */
       repetitionRisks?: null | string[];
+      /** @description The outliner's warning that the chapter's planned material cannot fill the word target without padding, and the suggested remedy; cleared by a hand edit. */
+      densityRisk?: null | string;
       /** @description How the chapter must end: hookType, emotionalBeat, openQuestion, handoffState and mustNotResolve. Older briefs may carry none. */
       endingContract?: null | {
         [key: string]: unknown;
@@ -3908,6 +3910,8 @@ export interface components {
       arcKey?: null | string;
       title?: null | string;
       staleReason?: null | string;
+      /** @description Set when the outliner judged the planned material too thin for the word target. */
+      densityRisk?: null | string;
       /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
       writeMode: components['schemas']['BriefWriteMode'];
       /**

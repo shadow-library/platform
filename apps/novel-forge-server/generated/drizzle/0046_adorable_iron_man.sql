@@ -1,0 +1,1 @@
+ALTER TABLE "briefs" ADD COLUMN "density_risk" text;

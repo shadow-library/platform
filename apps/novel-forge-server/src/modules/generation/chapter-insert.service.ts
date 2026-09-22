@@ -5,15 +5,16 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, shiftBriefBody, shiftChapterReferences } from '@server/common';
+import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type Plan, type PrimaryDatabase, schema } from '@server/database';
 
 import { loadRevealGuard, sanitiseBriefReveals } from '../ai/context/canon-guard';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
-import { buildOutlinePrompt } from '../ai/prompts';
+import { buildOutlinePrompt, outlineWordTargetVars } from '../ai/prompts';
 import { type OutlineOutput } from '../ai/schemas';
+import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 
 export interface InsertOptions {
@@ -32,6 +33,7 @@ interface PlannedSlotBrief {
   chapterPurpose?: string;
   readerValue?: string[];
   repetitionRisks?: string[];
+  densityRisk?: string;
 }
 
 export interface InsertResult {
@@ -181,6 +183,7 @@ export class ChapterInsertService {
           chapterPurpose: planned.chapterPurpose ?? null,
           readerValue: planned.readerValue ?? null,
           repetitionRisks: planned.repetitionRisks ?? null,
+          densityRisk: planned.densityRisk?.trim() || null,
           writeMode: 'external',
           handEdited: true,
           insertedAt: new Date(),
@@ -343,9 +346,11 @@ export class ChapterInsertService {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(newChapter, newChapter, guard.advised);
+    const wordTarget = resolveWordTarget(project);
+    const prompt = buildOutlinePrompt(newChapter, newChapter, wordTarget, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const vars = { catalog, volumePlan, startChapter: newChapter, endChapter: newChapter, extraContext: `Insert a single new chapter here. Author's intent: ${intent}` };
+    const extraContext = `Insert a single new chapter here. Author's intent: ${intent}`;
+    const vars = { catalog, volumePlan, startChapter: newChapter, endChapter: newChapter, extraContext, ...outlineWordTargetVars(wordTarget) };
     const raw = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
     const { briefs: outlined, sanitised } = sanitiseBriefReveals(raw, guard.all);
     if (sanitised.length > 0) this.logger.warn('insert: sanitised a brief that surfaced facts before their reveal chapter', { projectId, sanitised });
@@ -354,6 +359,6 @@ export class ChapterInsertService {
     if (!chapter) throw AppErrorCode.BRF_001.create();
     const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, chapter.requiredContext ?? []);
     if (dropped.length > 0) this.logger.warn('insert: dropped context refs', { projectId, chapter: newChapter, dropped });
-    return { ...chapter, contextRefs: kept, body: renderBriefBody(chapter) };
+    return { ...chapter, contextRefs: kept, body: renderBriefBody({ ...chapter, events: renderSceneEvents(chapter.scenes) }) };
   }
 }

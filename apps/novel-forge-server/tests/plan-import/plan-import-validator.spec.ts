@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 import { type PlanBundle, type PlanBundleArc, type PlanBundleBrief, type PlanBundleVolume } from '@modules/plan-import/plan-import.dto';
 import { describeIgnoredFields, validatePlanBundle } from '@modules/plan-import/plan-import.validator';
 
@@ -20,7 +21,7 @@ function brief(chapter: number, volumeKey: string, arcKey?: string): PlanBundleB
     arcKey,
     title: 't',
     objective: 'o',
-    events: ['e1'],
+    events: ['e1', 'e2', 'e3'],
     endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 's' },
   } as PlanBundleBrief;
 }
@@ -154,6 +155,20 @@ describe('validatePlanBundle — knowledge contracts (bundle v2)', () => {
     expect(result.warnings).toContain("fact 'fresh_secret' subjects unknown entity 'phantom'");
     expect(result.warnings).toContain("fact 'fresh_secret' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal");
     expect(result.warnings.some(w => w.includes("'hero'"))).toBe(false);
+  });
+
+  it('should warn, without failing, when a brief plans fewer events than its word target needs', () => {
+    const thin = { ...brief(1, 'v1'), events: ['the duel', ' '] };
+    const result = validatePlanBundle(
+      bundle({ volumes: [volume('v1', 1, 4)], briefs: [thin] }),
+      NO_ENTITIES,
+      new Set(),
+      resolveWordTarget({ wordTargetMin: 3500, wordTargetMax: 4500 }),
+    );
+    expect(result.issues).toEqual([]);
+    expect(result.warnings).toContain(
+      'brief 1 plans 1 event(s) for a 3500–4500 word chapter — the drafter cannot invent material, so thin briefs come back padded; plan about 5 scenes',
+    );
   });
 
   it('should warn when a brief pov names neither a bundle nor a project entity', () => {

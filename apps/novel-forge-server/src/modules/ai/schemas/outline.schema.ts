@@ -1,5 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
+import { type ResolvedWordTarget } from '../../eval/deterministic-metrics';
 import { EndingContractSchema } from './ending-contract.schema';
 import { KnowledgeContractSchema } from './knowledge-contract.schema';
 
@@ -9,6 +10,33 @@ import { KnowledgeContractSchema } from './knowledge-contract.schema';
 // invariants JSON Schema can't express.
 export const READER_VALUE_CHANGES = ['new_information', 'relationship_change', 'power_or_stakes_change', 'goal_or_plan_change', 'world_state_change', 'emotional_turn'] as const;
 export type ReaderValueChange = (typeof READER_VALUE_CHANGES)[number];
+
+// A dramatized web-novel scene with a goal, an obstacle and a turn rarely lands under ~700 words, so the
+// target band's aim fixes how many a chapter needs before the drafter has to invent material to reach it.
+export const WORDS_PER_SCENE = 750;
+const MIN_SCENES = 2;
+
+export function minScenesFor(target: ResolvedWordTarget): number {
+  return Math.max(MIN_SCENES, Math.round(target.aim / WORDS_PER_SCENE));
+}
+
+@Schema()
+export class ChapterSceneSchema {
+  @Field({ minLength: 1, description: 'what the POV character wants in this scene' })
+  goal: string;
+
+  @Field({ minLength: 1, description: 'who or what stands in the way — the scene has no length without resistance' })
+  obstacle: string;
+
+  @Field({ minLength: 1, description: 'how the situation has changed when the scene ends' })
+  turn: string;
+
+  @Field(() => [String], { minItems: 2, description: 'the on-page beats of the scene, in order' })
+  beats: string[];
+
+  @Field(() => Integer, { minimum: 1, description: 'the share of the chapter length this scene will fill when dramatized' })
+  estimatedWords: number;
+}
 
 @Schema()
 export class ChapterBriefSchema {
@@ -24,8 +52,8 @@ export class ChapterBriefSchema {
   @Field({ minLength: 1, description: 'what this chapter must accomplish in the story arc' })
   objective: string;
 
-  @Field(() => [String], { minItems: 1, description: 'key events in this chapter, in order' })
-  events: string[];
+  @Field(() => [ChapterSceneSchema], { minItems: 1, description: 'the scenes of this chapter, in order' })
+  scenes: ChapterSceneSchema[];
 
   @Field(() => [String], {
     description:
@@ -75,6 +103,14 @@ export class ChapterBriefSchema {
 
   @Field(() => [String], { optional: true, description: 'scene patterns or beats this chapter must avoid repeating from recent chapters (e.g. "another tavern negotiation")' })
   repetitionRisks?: string[];
+
+  @Field({
+    optional: true,
+    minLength: 1,
+    description:
+      'set only when the planned material cannot honestly fill the length target — what is missing and what the author could do (merge with a neighbour, add a named subplot)',
+  })
+  densityRisk?: string;
 }
 
 export const OutlineSchema = [ChapterBriefSchema] as [typeof ChapterBriefSchema];
@@ -86,9 +122,10 @@ export type ChapterBriefOutput = ChapterBriefSchema;
  * Cross-item rules JSON Schema can't express: the returned briefs must exactly, contiguously cover
  * the requested span with no gaps, no out-of-range chapters, and no duplicates, and the
  * continuesIntoNextChapter/startsFromPreviousChapter flags must chain across every adjacent pair the
- * prompt already promises will chain.
+ * prompt already promises will chain. Given a word target, every brief without a densityRisk must
+ * plan enough scenes to fill it.
  */
-export function validateOutlineCoverage(briefs: ChapterBriefOutput[], startChapter: number, endChapter: number): string[] {
+export function validateOutlineCoverage(briefs: ChapterBriefOutput[], startChapter: number, endChapter: number, target?: ResolvedWordTarget): string[] {
   const errors: string[] = [];
   const byChapter = new Map<number, ChapterBriefOutput>();
 
@@ -99,6 +136,7 @@ export function validateOutlineCoverage(briefs: ChapterBriefOutput[], startChapt
     for (const value of brief.readerValue ?? []) {
       if (!READER_VALUE_CHANGES.includes(value)) errors.push(`chapter ${brief.chapter} readerValue '${value}' is not one of: ${READER_VALUE_CHANGES.join(', ')}`);
     }
+    if (target) errors.push(...validateBriefDensity(brief, target));
   }
 
   for (let chapter = startChapter; chapter <= endChapter; chapter++) {
@@ -117,5 +155,20 @@ export function validateOutlineCoverage(briefs: ChapterBriefOutput[], startChapt
     }
   }
 
+  return errors;
+}
+
+function validateBriefDensity(brief: ChapterBriefOutput, target: ResolvedWordTarget): string[] {
+  if (brief.densityRisk?.trim()) return [];
+  const errors: string[] = [];
+  const scenes = brief.scenes ?? [];
+  const minScenes = minScenesFor(target);
+  const plannedWords = scenes.reduce((sum, scene) => sum + (scene.estimatedWords ?? 0), 0);
+  const remedy = 'plan more on-page material from the arc, or set densityRisk instead of padding';
+  if (scenes.length < minScenes)
+    errors.push(`chapter ${brief.chapter} plans ${scenes.length} scene(s); a ${target.min}–${target.max} word chapter needs at least ${minScenes} — ${remedy}`);
+  if (plannedWords < target.min) errors.push(`chapter ${brief.chapter} scenes are estimated at ${plannedWords} words, under the ${target.min}-word floor — ${remedy}`);
+  if (plannedWords > target.max)
+    errors.push(`chapter ${brief.chapter} scenes are estimated at ${plannedWords} words, over the ${target.max}-word ceiling — move a scene into a neighbouring chapter`);
   return errors;
 }

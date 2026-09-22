@@ -9,6 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { approveVolumePlan } from '../bible/volume/volume.approve';
+import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, PLAN_BUNDLE_SECTIONS, type PlanBundle, type PlanBundleSectionValue } from './plan-import.dto';
 import { describeIgnoredFields, validatePlanBundle } from './plan-import.validator';
 
@@ -49,7 +50,7 @@ export class PlanImportService {
       this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } }),
       this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), columns: { factKey: true } }),
     ]);
-    const validation = validatePlanBundle(bundle, new Set(existingEntities.map(e => e.entityKey)), new Set(existingFacts.map(f => f.factKey)));
+    const validation = validatePlanBundle(bundle, new Set(existingEntities.map(e => e.entityKey)), new Set(existingFacts.map(f => f.factKey)), resolveWordTarget(project));
     if (validation.issues.length > 0) {
       const error = new ValidationError();
       for (const issue of validation.issues) error.addFieldError(issue.field, issue.msg);

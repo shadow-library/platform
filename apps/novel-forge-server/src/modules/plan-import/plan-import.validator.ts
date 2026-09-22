@@ -1,4 +1,5 @@
-import { READER_VALUE_CHANGES } from '../ai/schemas';
+import { minScenesFor, READER_VALUE_CHANGES } from '../ai/schemas';
+import { type ResolvedWordTarget, resolveWordTarget } from '../eval/deterministic-metrics';
 import { type PlanBundle, type PlanBundleArc } from './plan-import.dto';
 
 interface BundleIssue {
@@ -33,7 +34,12 @@ function findDuplicates(keys: string[]): string[] {
  * reveal real facts. Issues abort the import; warnings (dangling entity refs,
  * pre-generation-impossible ref prefixes) are returned but never block.
  */
-export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: ReadonlySet<string>, existingFactKeys: ReadonlySet<string> = new Set()): BundleValidation {
+export function validatePlanBundle(
+  bundle: PlanBundle,
+  existingEntityKeys: ReadonlySet<string>,
+  existingFactKeys: ReadonlySet<string> = new Set(),
+  wordTarget: ResolvedWordTarget = resolveWordTarget(),
+): BundleValidation {
   const issues: BundleIssue[] = [];
   const warnings: string[] = [];
   const volumes = bundle.volumes ?? [];
@@ -119,7 +125,14 @@ export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: Reado
   const knownEntities = new Set([...existingEntityKeys, ...(bundle.entities ?? []).map(e => e.entityKey)]);
   const knownFacts = new Set([...existingFactKeys, ...facts.map(f => f.factKey)]);
   const revealedFactKeys = new Set<string>();
+  const minScenes = minScenesFor(wordTarget);
   for (const brief of briefs) {
+    const plannedEvents = brief.events.filter(event => event.trim()).length;
+    if (plannedEvents < minScenes) {
+      warnings.push(
+        `brief ${brief.chapter} plans ${plannedEvents} event(s) for a ${wordTarget.min}–${wordTarget.max} word chapter — the drafter cannot invent material, so thin briefs come back padded; plan about ${minScenes} scenes`,
+      );
+    }
     if (brief.pov !== undefined && !knownEntities.has(brief.pov.trim())) {
       warnings.push(`brief ${brief.chapter} pov names unknown entity '${brief.pov}' — it is stored, but no POV card reaches the drafter until that entity exists`);
     }

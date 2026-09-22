@@ -11,6 +11,29 @@ export const STARTS_LINE =
   "[STARTS FROM PREVIOUS CHAPTER] Continue forward in new sentences from the exact beat the previous chapter handed off — no time skip, no recap, and never repeat the previous chapter's closing line(s) verbatim; the reader already read them.";
 export const HANDOFF_PREFIX = 'Handoff beat: ';
 
+export interface BriefSceneInput {
+  goal: string;
+  obstacle: string;
+  turn: string;
+  beats: string[];
+  estimatedWords: number;
+}
+
+function asSentence(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return /[.!?…"'”’)]$/u.test(flat) ? flat : `${flat}.`;
+}
+
+// Each scene is one event line: `parseBriefBody` reads every line between the objective and the continuation markers as an event.
+export function renderSceneEvents(scenes: readonly BriefSceneInput[]): string[] {
+  return scenes.map((scene, index) => {
+    const beats = scene.beats.map(beat => beat.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const parts = [`Goal: ${asSentence(scene.goal)}`, `Obstacle: ${asSentence(scene.obstacle)}`, `Turn: ${asSentence(scene.turn)}`];
+    if (beats.length > 0) parts.push(`Beats: ${asSentence(beats.join('; '))}`);
+    return `Scene ${index + 1} (~${scene.estimatedWords} words). ${parts.join(' ')}`;
+  });
+}
+
 // Folds outline-time continuation decisions into the stored brief body so the drafter — which only
 // ever reads `chapterBrief` as plain text — actually sees them. Shared by the outline flow and the
 // plan-import endpoint so an authored brief renders byte-identically to an AI-outlined one.

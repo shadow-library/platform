@@ -486,6 +486,13 @@ export class BriefResponse {
   @Field(() => [String], { optional: true, nullable: true, description: 'Recent scene patterns the chapter should avoid repeating.' })
   repetitionRisks?: string[] | null;
 
+  @Field({
+    optional: true,
+    nullable: true,
+    description: "The outliner's warning that the chapter's planned material cannot fill the word target without padding, and the suggested remedy; cleared by a hand edit.",
+  })
+  densityRisk?: string | null;
+
   @Field(() => Object, {
     optional: true,
     nullable: true,
@@ -537,6 +544,9 @@ export class BriefSummaryResponse {
 
   @Field({ optional: true, nullable: true })
   staleReason?: string | null;
+
+  @Field({ optional: true, nullable: true, description: 'Set when the outliner judged the planned material too thin for the word target.' })
+  densityRisk?: string | null;
 
   @Field(() => BriefWriteMode, {
     description:

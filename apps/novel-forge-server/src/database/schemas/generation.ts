@@ -94,6 +94,8 @@ export const briefs = pgTable(
     chapterPurpose: text('chapter_purpose'),
     readerValue: jsonb('reader_value').$type<string[]>(),
     repetitionRisks: jsonb('repetition_risks').$type<string[]>(),
+    // The outliner's admission that the chapter's material cannot fill the length target; a hand edit clears it.
+    densityRisk: text('density_risk'),
     guidance: text('guidance'),
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, TokenInput } from '@shadow-library/ui';
+import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, TokenInput } from '@shadow-library/ui';
 
 import { ChevronRightIcon, CloseIcon, GripIcon, PlusIcon, SparkIcon } from '@/components/icons';
 import { PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip } from '@/components/nf';
@@ -431,8 +431,8 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
               <span className={styles.briefName}>{brief?.title ?? `Chapter ${n}`}</span>
               <span className={styles.statusCol}>
                 {brief ? (
-                  <StatusChip intent={brief.staleReason ? 'warning' : 'success'} dot>
-                    {brief.staleReason ? 'stale' : 'brief ready'}
+                  <StatusChip intent={brief.staleReason || brief.densityRisk ? 'warning' : 'success'} dot>
+                    {brief.staleReason ? 'stale' : brief.densityRisk ? 'too thin' : 'brief ready'}
                   </StatusChip>
                 ) : (
                   <StatusChip intent="neutral" dot>
@@ -461,6 +461,11 @@ function BriefSections({ brief }: { brief: BriefResponse }): React.JSX.Element {
 
   return (
     <div className={styles.briefSections}>
+      {brief.densityRisk && (
+        <Alert intent="warning" title="Too thin for a full chapter" className={styles.notice}>
+          {brief.densityRisk} — merge it with a neighbour or add material to the brief, or the drafter will pad it to length.
+        </Alert>
+      )}
       <Field label="Purpose" value={brief.chapterPurpose} />
       {sections.map((section, i) => (
         <section key={`${section.heading ?? 'body'}-${i}`} className={styles.briefSection}>

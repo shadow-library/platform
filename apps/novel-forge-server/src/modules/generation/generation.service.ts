@@ -5,7 +5,17 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertAuthoringProject, briefContentHash, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, selectGenerationBatch } from '@server/common';
+import {
+  assertAuthoringProject,
+  briefContentHash,
+  type BriefSceneInput,
+  declaredDraftFields,
+  isFinalizable,
+  markDescendantDraftsStale,
+  renderBriefBody,
+  renderSceneEvents,
+  selectGenerationBatch,
+} from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -19,7 +29,7 @@ import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
-import { buildOutlinePrompt, PROMPT_REGISTRY } from '../ai/prompts';
+import { buildOutlinePrompt, outlineWordTargetVars, PROMPT_REGISTRY } from '../ai/prompts';
 import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
@@ -340,10 +350,12 @@ export class GenerationService {
     }
     this.logger.info('outline: generating briefs', { projectId, start, end, volumes: relevantVolumes.length });
     const focusEntityKeys = relevantVolumes.flatMap(v => (Array.isArray(v.cast) ? v.cast.filter((key): key is string => typeof key === 'string') : []));
-    const [catalog, guard] = await Promise.all([
+    const [catalog, guard, project] = await Promise.all([
       this.contextAssembler.catalog(projectId, { focusEntityKeys, documents: true, maxTokens: OUTLINE_BUDGET, span: { start, end } }),
       loadRevealGuard(this.db, projectId, { start, end }),
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { wordTargetMin: true, wordTargetMax: true } }),
     ]);
+    const wordTarget = resolveWordTarget(project);
 
     const volumePlan = relevantVolumes
       .map(
@@ -352,9 +364,10 @@ export class GenerationService {
       )
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(start, end, guard.advised);
+    const prompt = buildOutlinePrompt(start, end, wordTarget, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const rawOutline = await this.modelRouter.structured(prompt, { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '' }, ctx);
+    const vars = { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '', ...outlineWordTargetVars(wordTarget) };
+    const rawOutline = await this.modelRouter.structured(prompt, vars, ctx);
     const outlineOutput = this.withheldEarlyReveals(projectId, rawOutline, guard.all);
 
     const chapters = outlineOutput as unknown as {
@@ -362,7 +375,7 @@ export class GenerationService {
       volumeKey: string;
       title: string;
       objective: string;
-      events: string[];
+      scenes: BriefSceneInput[];
       requiredContext: string[];
       pov?: string;
       continuesIntoNextChapter?: boolean;
@@ -373,6 +386,7 @@ export class GenerationService {
       chapterPurpose?: string;
       readerValue?: string[];
       repetitionRisks?: string[];
+      densityRisk?: string;
     }[];
 
     await this.dropUnresolvedContextRefs(projectId, chapters);
@@ -382,7 +396,7 @@ export class GenerationService {
       chapters.map(c => {
         if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
 
-        const briefBody = renderBriefBody(c);
+        const briefBody = renderBriefBody({ ...c, events: renderSceneEvents(c.scenes) });
         const values = {
           volumeKey: c.volumeKey,
           title: c.title,
@@ -394,6 +408,7 @@ export class GenerationService {
           chapterPurpose: c.chapterPurpose ?? null,
           readerValue: c.readerValue ?? null,
           repetitionRisks: c.repetitionRisks ?? null,
+          densityRisk: c.densityRisk?.trim() || null,
           guidance: null,
           staleReason: null,
           handEdited: false,
@@ -462,11 +477,12 @@ export class GenerationService {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd, guard.advised);
+    const wordTarget = resolveWordTarget(project);
+    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd, wordTarget, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
     const rawOutline = await this.modelRouter.structured(
       prompt,
-      { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '' },
+      { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '', ...outlineWordTargetVars(wordTarget) },
       ctx,
       project as never,
       policy,
@@ -479,7 +495,7 @@ export class GenerationService {
         volumeKey: string;
         title: string;
         objective: string;
-        events: string[];
+        scenes: BriefSceneInput[];
         requiredContext: string[];
         pov?: string;
         endingContract?: Record<string, unknown>;
@@ -487,6 +503,7 @@ export class GenerationService {
         chapterPurpose?: string;
         readerValue?: string[];
         repetitionRisks?: string[];
+        densityRisk?: string;
       }[]
     ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
 
@@ -497,7 +514,7 @@ export class GenerationService {
       chapters.map(c => {
         if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
 
-        const briefBody = renderBriefBody(c);
+        const briefBody = renderBriefBody({ ...c, events: renderSceneEvents(c.scenes) });
         const values = {
           volumeKey: arc.volumeKey,
           arcKey,
@@ -510,6 +527,7 @@ export class GenerationService {
           chapterPurpose: c.chapterPurpose ?? null,
           readerValue: c.readerValue ?? null,
           repetitionRisks: c.repetitionRisks ?? null,
+          densityRisk: c.densityRisk?.trim() || null,
           guidance: null,
           staleReason: null,
           handEdited: false,
@@ -595,10 +613,12 @@ export class GenerationService {
     );
   }
 
-  listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'writeMode' | 'insertedAt' | 'updatedAt'>[]> {
+  listBriefs(
+    projectId: bigint,
+  ): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'densityRisk' | 'writeMode' | 'insertedAt' | 'updatedAt'>[]> {
     return this.db.query.briefs.findMany({
       where: eq(schema.briefs.projectId, projectId),
-      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, writeMode: true, insertedAt: true, updatedAt: true },
+      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, densityRisk: true, writeMode: true, insertedAt: true, updatedAt: true },
       orderBy: asc(schema.briefs.chapter),
     });
   }
@@ -610,7 +630,7 @@ export class GenerationService {
   }
 
   async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
-    const edits: Partial<typeof schema.briefs.$inferInsert> = { body: body.body };
+    const edits: Partial<typeof schema.briefs.$inferInsert> = { body: body.body, densityRisk: null };
     const title = body.title?.trim();
     if (title) edits.title = title;
     if (body.knowledgeContract) edits.knowledgeContract = { pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] };

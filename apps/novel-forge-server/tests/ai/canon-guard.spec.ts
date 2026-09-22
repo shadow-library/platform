@@ -16,6 +16,7 @@ import {
 } from '@modules/ai/context/canon-guard';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { buildArcPlanPrompt, buildOutlinePrompt } from '@modules/ai/prompts';
+import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 
 const bellRinger: ScheduledReveal = {
   factKey: 'bell_ringer_is_heir',
@@ -25,6 +26,8 @@ const bellRinger: ScheduledReveal = {
 };
 const floodedCrypt: ScheduledReveal = { factKey: 'crypt_was_flooded', revealChapter: 5, terms: ['sunken crypt'], writerNote: null };
 
+const scene = (goal: string) => ({ goal, obstacle: 'the warden', turn: 'the toll doubles', beats: ['Wren argues', 'the warden relents'], estimatedWords: 700 });
+
 function brief(chapter: number, overrides: Record<string, unknown> = {}) {
   return {
     chapter,
@@ -32,6 +35,7 @@ function brief(chapter: number, overrides: Record<string, unknown> = {}) {
     title: `Chapter ${chapter}`,
     objective: 'Wren crosses the marsh road before the toll closes.',
     events: ['Wren bargains with the ferry warden', 'the lanterns go out on the causeway'],
+    scenes: [scene('Wren bargains with the ferry warden'), scene('Wren crosses the causeway'), scene('Wren relights the lanterns')],
     requiredContext: [],
     continuesIntoNextChapter: false,
     startsFromPreviousChapter: false,
@@ -155,6 +159,13 @@ describe('findBriefRevealViolations', () => {
     expect(violations).toEqual([{ subject: 'chapter 7', field: 'knowledgeContract.learns', factKey: 'bell_ringer_is_heir', revealChapter: 12 }]);
   });
 
+  it('should flag a scene beat that names a fact term before its reveal chapter', () => {
+    const leakyScene = { ...scene('Wren climbs the tower'), beats: ['Wren climbs', 'the cracked bell tolls'] };
+    const violations = findBriefRevealViolations([brief(4, { events: undefined, scenes: [leakyScene] })], [bellRinger]);
+
+    expect(violations).toEqual([{ subject: 'chapter 4', field: 'scenes[0].beats[1]', factKey: 'bell_ringer_is_heir', revealChapter: 12 }]);
+  });
+
   it('should allow a fact from its reveal chapter onward', () => {
     const overrides = { objective: 'Orrin Vale rings the cracked bell.', knowledgeContract: { learns: [{ factKey: 'bell_ringer_is_heir' }] } };
 
@@ -248,11 +259,26 @@ describe('sanitiseBriefReveals', () => {
     expect(twelve).toBe(leaky[2]);
   });
 
+  it('should rewrite a leaking scene field by field and keep its words and at least one beat', () => {
+    const leakyScene = { goal: 'Orrin Vale confesses.', obstacle: 'the warden', turn: 'Wren runs', beats: ['the cracked bell tolls'], estimatedWords: 800 };
+    const { briefs, sanitised } = sanitiseBriefReveals([brief(4, { events: undefined, scenes: [leakyScene] })], [bellRinger]);
+    const [sanitisedScene] = (briefs[0] as { scenes: Record<string, unknown>[] }).scenes;
+
+    expect(sanitisedScene).toEqual({
+      goal: 'The bell ringer is more than he seems.',
+      obstacle: 'the warden',
+      turn: 'Wren runs',
+      beats: ['(withheld until ch 12)'],
+      estimatedWords: 800,
+    });
+    expect(sanitised.map(({ field }) => field)).toEqual(['scenes[0].beats[0]', 'scenes[0].goal']);
+  });
+
   it('should leave a persisted outline with zero reveal violations and the blocking outline rules intact', () => {
     const outline = [3, 4].map(chapter =>
       brief(chapter, { title: 'Sunken crypt', objective: 'Into the sunken crypt.', events: ['The sunken crypt floods.'], chapterPurpose: 'The sunken crypt.' }),
     );
-    const prompt = buildOutlinePrompt(3, 4, [floodedCrypt]);
+    const prompt = buildOutlinePrompt(3, 4, resolveWordTarget(), [floodedCrypt]);
 
     const { briefs, sanitised } = sanitiseBriefReveals(outline, [floodedCrypt, bellRinger]);
 
@@ -315,7 +341,7 @@ describe('sanitiseArcReveals', () => {
 
 describe('planning prompt gates', () => {
   it('should keep coverage blocking and make an early reveal advisory in the outline prompt', () => {
-    const prompt = buildOutlinePrompt(4, 5, [bellRinger]);
+    const prompt = buildOutlinePrompt(4, 5, resolveWordTarget(), [bellRinger]);
     const briefs = [brief(4, { title: 'The Cracked Bell' })] as never;
 
     expect(prompt.postValidate?.(briefs)).toEqual(['chapter 5 is missing from the outline']);

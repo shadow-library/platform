@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   buildChatRefinePrompt,
   buildOutlinePrompt,
+  outlineWordTargetVars,
   PROMPT_REGISTRY,
   renderReforgeFidelityGuidance,
   renderReforgeFidelityRule,
@@ -43,6 +44,9 @@ import {
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
 import { resolveWordTarget, WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
+
+const SCENE = { goal: 'g', obstacle: 'o', turn: 't', beats: ['b1', 'b2'], estimatedWords: 700 };
+const SCENES = [SCENE, SCENE, SCENE];
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {
@@ -339,7 +343,7 @@ describe('Prompt modules', () => {
       volumeKey: 'vol_01',
       title: 't',
       objective: 'o',
-      events: ['e'],
+      scenes: SCENES,
       requiredContext: [],
       endingContract: { hookType: 'cliffhanger' as const, emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
       chapterPurpose: 'p',
@@ -381,10 +385,55 @@ describe('Prompt modules', () => {
     });
 
     it('buildOutlinePrompt closes over the requested span for postValidate', () => {
-      const prompt = buildOutlinePrompt(10, 12);
+      const prompt = buildOutlinePrompt(10, 12, resolveWordTarget());
       expect(prompt.key).toBe('outline');
       expect(prompt.postValidate?.([brief(10), brief(11), brief(12)])).toEqual([]);
       expect(prompt.postValidate?.([brief(10), brief(12)])[0]).toContain('chapter 11 is missing');
+    });
+
+    it('should skip the density rules when no word target is given', () => {
+      expect(validateOutlineCoverage([brief(5, { scenes: [SCENE] } as never)], 5, 5)).toEqual([]);
+    });
+
+    it('should reject a brief with fewer scenes than the target needs', () => {
+      const errors = validateOutlineCoverage(
+        [
+          brief(5, {
+            scenes: [
+              { ...SCENE, estimatedWords: 1000 },
+              { ...SCENE, estimatedWords: 1000 },
+            ],
+          } as never),
+        ],
+        5,
+        5,
+        resolveWordTarget(),
+      );
+      expect(errors).toEqual([expect.stringContaining('chapter 5 plans 2 scene(s); a 1800–2600 word chapter needs at least 3')]);
+    });
+
+    it('should reject scenes whose estimates fall outside the target band', () => {
+      const thin = validateOutlineCoverage([brief(5, { scenes: SCENES.map(scene => ({ ...scene, estimatedWords: 300 })) } as never)], 5, 5, resolveWordTarget());
+      const bloated = validateOutlineCoverage([brief(5, { scenes: SCENES.map(scene => ({ ...scene, estimatedWords: 1200 })) } as never)], 5, 5, resolveWordTarget());
+      expect(thin).toEqual([expect.stringContaining('estimated at 900 words, under the 1800-word floor')]);
+      expect(bloated).toEqual([expect.stringContaining('estimated at 3600 words, over the 2600-word ceiling')]);
+    });
+
+    it('should exempt a brief that declares a densityRisk from the density rules', () => {
+      const thin = brief(5, { scenes: [SCENE], densityRisk: 'only one confrontation is planned here; merge with chapter 6' } as never);
+      expect(validateOutlineCoverage([thin], 5, 5, resolveWordTarget())).toEqual([]);
+    });
+
+    it('should scale the scene floor with a project word target override', () => {
+      const target = resolveWordTarget({ wordTargetMin: 3500, wordTargetMax: 4500 });
+      expect(outlineWordTargetVars(target)).toEqual({ wordTargetMin: '3,500', wordTargetAim: '4,000', wordTargetMax: '4,500', minScenes: '5' });
+      expect(outlineWordTargetVars(resolveWordTarget()).minScenes).toBe('3');
+    });
+
+    it('should put the length target in the outline request', async () => {
+      const vars = { catalog: 'C', volumePlan: 'V', startChapter: 1, endChapter: 3, extraContext: '', ...outlineWordTargetVars(resolveWordTarget()) };
+      const messages = await PROMPT_REGISTRY.outline.template.formatMessages(vars);
+      expect(String(messages.at(-1)?.content)).toContain('Length target: 1,800–2,600 words of scene prose per chapter, aiming for about 2,200 — at least 3 scenes each.');
     });
 
     it('rejects a readerValue entry outside the fixed enum', () => {
@@ -809,7 +858,7 @@ describe('Prompt modules', () => {
 
   describe('ending contract (v2 bumps)', () => {
     it('outline v2 requires an ending contract per brief', () => {
-      const brief = { chapter: 1, volumeKey: 'v1', title: 'T', objective: 'obj', events: ['e1'], requiredContext: [] };
+      const brief = { chapter: 1, volumeKey: 'v1', title: 'T', objective: 'obj', scenes: SCENES, requiredContext: [] };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(false);
       const withContract = {
         ...brief,
@@ -946,7 +995,7 @@ describe('Prompt modules', () => {
         volumeKey: 'vol_01',
         title: 't',
         objective: 'o',
-        events: ['e'],
+        scenes: SCENES,
         requiredContext: [],
         pov: 'amara',
         endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
@@ -966,7 +1015,7 @@ describe('Prompt modules', () => {
       volumeKey: 'vol_01',
       title: 't',
       objective: 'o',
-      events: ['e'],
+      scenes: SCENES,
       requiredContext: [],
       endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
     };

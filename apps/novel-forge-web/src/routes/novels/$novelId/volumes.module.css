@@ -536,6 +536,10 @@
   flex-direction: column;
 }
 
+.notice {
+  margin-bottom: 20px;
+}
+
 .briefSection {
   margin-bottom: 26px;
 }

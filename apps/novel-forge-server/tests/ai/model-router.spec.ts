@@ -568,7 +568,7 @@ describe('ModelRouterService.structured (repair ladder)', () => {
         volumeKey: 'vol_01',
         title,
         objective: 'Cross the salt flats.',
-        events: ['The caravan stalls.'],
+        scenes: [{ goal: 'Reach the well.', obstacle: 'A broken axle.', turn: 'The caravan stalls.', beats: ['the axle snaps', 'the guide deserts'], estimatedWords: 700 }],
         requiredContext: [],
         endingContract: { hookType: 'turn', emotionalBeat: 'dread', openQuestion: 'who cut the rope?', handoffState: 'stranded', mustNotResolve: [] },
         chapterPurpose: 'Strands the caravan.',
