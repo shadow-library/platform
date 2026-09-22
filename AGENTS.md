@@ -64,7 +64,8 @@ Shell search remains the right tool where there are no symbols to resolve: the g
 
 Every command runs **from the repo root** — workspaces carry no build/verify/generate scripts of their own (a `test` script, and `build:app` referenced from the `"shadow"` key, are the exceptions).
 
-- Single workspace: `bun scripts/verify.ts <workspace>` (format + lint + type-check, plus tests where the workspace opts in). Add `--fix` to apply fixes, `--fast` to stop after lint.
+- Single workspace: `bun scripts/verify.ts <workspace>` (format + lint + type-check + test, where the workspace opts in). Add `--fix` to apply fixes, `--fast` to stop after lint, `--ci` to fail an `apps/*` workspace's test step on any test over the 50ms budget instead of only warning.
+- Fast dev loop: `bun scripts/verify.ts <app> --unit` — the test step alone (`bun test`, skipping format/lint/type-check), run only for the app you're changing. Every test under `apps/*` is a unit test: the unit under test is instantiated directly with fakes for its dependencies (`new Service(fakeA, fakeB)`) — never a booted `ShadowApplication`, Fastify, `mockRequest()`, a real Postgres/Redis, the network, or `mock.module` (process-global, leaks across files). Fakes live as `testing` subpath exports: `@shadow-library/{common,modules,auth}/testing`. Per-test budget: 10ms (a reporter lists anything over); `--ci` hard-fails anything over 50ms. Cross-app and integration behavior belongs in `e2e/`, not an app's own tests.
 - The root tooling itself: `bun scripts/verify.ts scripts` — covers `scripts/` and the root-level configs.
 - Everything: `bun scripts/verify.ts --all`, or `bun run verify`.
 - Building: `bun scripts/build.ts <workspace>`, `--deps` for its dependency closure, `--all` for the whole repo in dependency order.

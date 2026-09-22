@@ -3,8 +3,7 @@
   "compilerOptions": {
     "paths": {
       "@modules/*": ["./src/modules/*"],
-      "@server/*": ["./src/*"],
-      "@tests/*": ["./tests/*"]
+      "@server/*": ["./src/*"]
     }
   }
 }

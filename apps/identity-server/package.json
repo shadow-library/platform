@@ -18,8 +18,7 @@
       "public"
     ],
     "db": {
-      "schema": "src/modules/infrastructure/datastore/schemas/index.ts",
-      "templateSeed": "tests/fixtures/template-seed.ts"
+      "schema": "src/modules/infrastructure/datastore/schemas/index.ts"
     }
   },
   "repository": {

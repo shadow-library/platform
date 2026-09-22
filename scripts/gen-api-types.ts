@@ -57,14 +57,16 @@ const USAGE = `Usage: bun scripts/gen-api-types.ts <web-app>|--all [url] [--chec
   url       OpenAPI document to generate from (default ${DEFAULT_URL}); only meaningful for a single
             web-app target without --check — --all and --check always boot the paired server themselves
   --check   don't write api-types.gen.ts — render it to memory instead and diff against the committed
-            file, booting the paired server in-process and failing with a nonzero exit and an
+            file, booting the paired server without a port and failing with a nonzero exit and an
             actionable message on drift. The server↔web contract drift gate.
 
 --all and --check boot each paired server through its ${DUMP_ENTRY_RELATIVE_PATH}, over fakes: no dev
-server, Postgres, Redis or identity provider is needed, and nothing connects to one.
+server, Postgres, Redis or identity provider is needed, and nothing connects to one — a child process
+runs the entry, which captures the OpenAPI document via in-process request injection rather than a
+bound port.
 
 Without --check, writes the committed src/lib/apis/api-types.gen.ts (against a running server, or
-in-process for --all). With --check, nothing is ever written.`;
+without a port for --all). With --check, nothing is ever written.`;
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 

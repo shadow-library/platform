@@ -33,7 +33,7 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
 - Every server serves an OpenAPI document (in dev, at `/dev/api-docs/openapi.json`); every web app commits a generated `api-types.gen.ts` from its paired server (`apps/<x>-server` with `apps/<x>-web`). Never hand-write
   API shapes.
 - The contract is NOT atomic: a server DTO/route change requires regenerating the paired web app's types and fixing its callers in the same coordinated change.
-- CI's drift check (`bun scripts/gen-api-types.ts <web-app> --check`) does not catch a web-only hand edit of the generated file.
+- CI's drift check (`bun scripts/gen-api-types.ts <web-app> --check`) runs on both sides of a pair — a server-affecting change and a web-only hand edit of the committed file are both caught.
 
 ## Data stores
 

@@ -19,6 +19,8 @@
 - `modules` reusable modules (http-core, database, cache, storage, bootstrap); `auth` Identity consumer SDK, no business logic; `ui` React components and `--sh-*` tokens; `web`
   shared frontend wiring.
 - `sdk` novel vocabulary and the Novel Forge to Web Novel content-hash contract.
+- `common`, `modules` and `auth` each also publish a `testing` subpath (`@shadow-library/<pkg>/testing`) of fakes and stand-ins for `apps/*`'s unit tests — e.g. `FakeDatabaseService`,
+  `FakeStorageService`, `InMemoryRedis`, `withoutStartupHooks`, `createTestIdP`/`createOfflineAuth`. Apps reach for these instead of hand-rolling a fake or booting real infrastructure.
 
 ## Rules for package authors
 

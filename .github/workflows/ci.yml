@@ -128,39 +128,22 @@ jobs:
           echo "Affected workspaces: $SELECTED_JSON"
 
           # ---------------------------------------------------------------
-          # 4. Per-workspace CI metadata mined from the old imported
-          #    workflows — service needs and extra steps. Anything not
-          #    listed here (every other app, every package, e2e) is a plain
-          #    verify + build with no services.
-          #
-          #    Deliberately structural-only (workspace path + booleans) —
-          #    no env var *values* here. A first version put the mined env
-          #    map (including identity-server's dummy SECURITY_MASTER_
-          #    ENCRYPTION_KEY fixture) in this same JSON and GitHub Actions
-          #    silently dropped the whole `matrix` job output — "Skip output
-          #    'matrix' since it may contain secret" — which then made
-          #    `fromJSON(needs.changes.outputs.matrix)` fail matrix
-          #    expansion entirely (no `verify` job instances at all). That
-          #    guard applies to anything routed through $GITHUB_OUTPUT or
-          #    $GITHUB_ENV, regardless of whether the value is a real
-          #    secret. The per-workspace env values now live as static
-          #    job-level `env:` on `verify` below — literal YAML, not piped
-          #    through either file — exactly how the original per-workspace
-          #    workflows declared them.
+          # 4. The one piece of per-workspace CI metadata that isn't purely
+          #    structural: which backends have a migrations check at all.
+          #    Every apps/*-server has one except pulse-server, whose
+          #    migrations are hand-managed via src/migrate.ts rather than
+          #    `drizzle-kit generate` (check-migrations.ts requires a
+          #    "db:generate" script and errors without one).
           # ---------------------------------------------------------------
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
-            "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true },
-            "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true, "checkApiTypes": true },
-            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": false, "checkApiTypes": true },
-            "apps/memoir-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true, "checkApiTypes": true },
-            "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true }
+            "apps/identity-server": { "checkMigrations": true },
+            "apps/novel-forge-server": { "checkMigrations": true },
+            "apps/pulse-server": { "checkMigrations": false },
+            "apps/memoir-server": { "checkMigrations": true },
+            "apps/web-novel-server": { "checkMigrations": true }
           }
           JSON
-          # pulse-server has no "db:generate" script (its migrations are hand-managed via
-          # src/migrate.ts, not drizzle-kit generate) -- check-migrations requires one and
-          # errors without it. The old mined workflow never ran check-migrations for pulse-server
-          # either; standardizing it across every backend was over-reaching for this one.
 
           # ---------------------------------------------------------------
           # 5. Build matrix.include directly (one fully-specified object per
@@ -171,6 +154,14 @@ jobs:
           #    keyed by workspace name, every unaffected workspace would
           #    silently reappear as its own job. Emitting the complete,
           #    pre-filtered list here sidesteps that entirely.
+          #
+          #    checkApiTypes is structural, not mined metadata: every
+          #    apps/*-server and apps/*-web is paired one-to-one by naming
+          #    convention, and the check is infra-free and fast (~0.7s per
+          #    server), so both sides of every pair run it — a server leg
+          #    checks its own paired web app, a web leg checks itself. That
+          #    also covers a web-only hand edit of the committed
+          #    api-types.gen.ts, which a server-legs-only check would miss.
           # ---------------------------------------------------------------
           MATRIX="$(jq -cn --argjson meta "$(cat /tmp/workspace-metadata.json)" --argjson selected "$SELECTED_JSON" '
             $selected | map(
@@ -178,11 +169,8 @@ jobs:
               | ($meta[$w] // {}) as $m
               | {
                   workspace: $w,
-                  needsPostgres: ($m.needsPostgres // false),
-                  needsRedis: ($m.needsRedis // false),
-                  createTemplateDb: ($m.createTemplateDb // false),
                   checkMigrations: ($m.checkMigrations // false),
-                  checkApiTypes: ($m.checkApiTypes // false)
+                  checkApiTypes: ($w | test("^apps/.*-(server|web)$"))
                 }
             )
           ')"
@@ -191,9 +179,7 @@ jobs:
           echo "Resolved matrix:"
           echo "$MATRIX" | jq .
 
-  # One job per affected workspace. Postgres + Redis are declared unconditionally on the job
-  # (GitHub Actions services can't be made conditional per matrix leg) — a workspace that doesn't
-  # need them just never talks to those ports; the cost is two idle containers, not extra time.
+  # One job per affected workspace.
   verify:
     name: verify (${{ matrix.workspace }})
     needs: changes
@@ -205,81 +191,6 @@ jobs:
       # jobs than this matrix ever produces — the full 18-leg fan-out runs in a single wave.
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.matrix) }}
-
-    # Per-backend env, mined from the old imported workflows. Static YAML — not computed in the
-    # `changes` job and threaded through a matrix field — so none of it is subject to GitHub
-    # Actions' "may contain secret" job-output/env-file guard (see the note in the `changes` job).
-    # A ternary ladder keyed on `matrix.workspace`; every var is empty string for a workspace that
-    # doesn't need it, which is harmless (the apps read these with `??` fallbacks or don't read
-    # them at all).
-    env:
-      DATABASE_POSTGRES_URL: >-
-        ${{
-          matrix.workspace == 'apps/identity-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_identity' ||
-          matrix.workspace == 'apps/novel-forge-server' && 'postgresql://postgres:postgres@localhost:5432/novel_forge_test' ||
-          matrix.workspace == 'apps/pulse-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_pulse' ||
-          matrix.workspace == 'apps/memoir-server' && 'postgresql://postgres:postgres@localhost:5432/memoir' ||
-          matrix.workspace == 'apps/web-novel-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel' ||
-          ''
-        }}
-      DATABASE_REDIS_URL: ${{ matrix.workspace == 'apps/identity-server' && 'redis://localhost:6379' || '' }}
-      DATABASE_POSTGRES_LAZY_CONNECTION: >-
-        ${{
-          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/memoir-server' || matrix.workspace == 'apps/web-novel-server') && 'true' ||
-          ''
-        }}
-      # CI-only fixture key, never a real secret — matches what the old identity-server workflow
-      # hardcoded directly in YAML.
-      SECURITY_MASTER_ENCRYPTION_KEY: >-
-        ${{
-          matrix.workspace == 'apps/identity-server' && 'ci-master-key-0000000000000000000000000000000000000000000000000000000000' ||
-          ''
-        }}
-      LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
-      # pulse-server's notification-messages route is gated `@EnableIf(() => Config.get('app.stage')
-      # === 'dev')`, and `app.stage` is declared by @shadow-library/common with a deliberately
-      # fail-safe `prod` default -- so the suite has to opt in or the route is never registered and
-      # its specs 404. apps/pulse-server/tests/env.ts pins the same value for local runs; this is the
-      # CI-side half. Every other workspace resolves the safe default (an empty string is falsy, so
-      # `resolveConfigValue` falls through to it rather than failing the allowed-values check).
-      APP_STAGE: ${{ matrix.workspace == 'apps/pulse-server' && 'dev' || '' }}
-      # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
-      # one that already had this). `DatabaseService` does not close its postgres pool on shutdown
-      # (see the comment in each backend's tests/fixtures/template-db.ts) and `TestEnvironment` boots
-      # a fresh `ShadowApplication` per test, with `bun test`'s default --max-concurrency of 20 tests
-      # at once -- leaked pools stack up fast. Left unset (whatever the driver's own pool-size default
-      # is), that blew through Postgres's default max_connections=100 ("sorry, too many clients
-      # already") on identity-server, and drove a Bun bun:sql internal assertion ("connection must be
-      # a PostgresSQLConnection") under the same pool contention on web-novel-server. One connection
-      # per leaked pool instead of several buys enough headroom for a full test run.
-      DATABASE_POSTGRES_MAX_CONNECTIONS: >-
-        ${{
-          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/novel-forge-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/memoir-server' || matrix.workspace == 'apps/web-novel-server') && '1' ||
-          ''
-        }}
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -321,34 +232,26 @@ jobs:
         if: matrix.workspace != 'scripts' && matrix.workspace != 'e2e' && steps.pkgdist.outputs.cache-hit != 'true'
         run: bun scripts/build.ts 'packages/*'
 
-      # Standardized across every backend (the old identity-server workflow was the only one that
-      # ran this) — cheap, and it catches an uncommitted `drizzle-kit generate` output the same way
-      # everywhere.
+      # `check-migrations.ts` only diffs `drizzle-kit generate`'s output against the committed
+      # migrations directory — schema-to-file, no live database — so this needs no Postgres service.
       - name: Check migrations
         if: matrix.checkMigrations
         run: bun scripts/check-migrations.ts ${{ matrix.workspace }}
 
-      - name: Create template database
-        if: matrix.createTemplateDb
-        run: bun scripts/db.ts ${{ matrix.workspace }} create-template
-
-      # verify = format + lint + type-check + test. The test step runs only where the workspace opts in:
-      # off by convention for the web apps whose "test" is a Playwright e2e suite (and for e2e itself),
-      # re-enabled via `"shadow": { "verifyTest": true }` where that convention doesn't hold.
+      # verify = format + lint + type-check + test. The test step runs only where the workspace opts in
+      # via `"shadow": { "verifyTest": true }` in its own package.json — every apps/* and packages/*
+      # library does today; e2e (a Playwright suite needing a live deployment) does not. `--ci` fails an
+      # apps/* workspace's test step on any test over the 50ms hard cap instead of only warning.
       - name: Verify
-        run: bun scripts/verify.ts ${{ matrix.workspace }}
+        run: bun scripts/verify.ts ${{ matrix.workspace }} --ci
 
       # The server↔web API contract is not atomic (AGENTS.md) — a server DTO change with no matching
-      # `api-types.gen.ts` regeneration in its paired web app is a silent break nothing else here would
-      # catch. Scoped to the backend legs (matrix.checkApiTypes), each checking its own paired
-      # apps/*-web by naming convention (apps/<x>-server -> apps/<x>-web): that's exactly the affected
-      # pair a server change touches, it's already inside this leg's own job (deps built, DB/mock infra
-      # up, Verify just proved the server boots), and it needs no extra build step of its own — the
-      # check boots the server in-process (no port, no dev server) and only reads the web app's
-      # committed file, never its dependency closure. A web-app-only change (e.g. a hand-edited
-      # api-types.gen.ts) isn't covered here — that would mean booting a full backend on every web leg,
-      # which is not cheap enough to justify given the hard rule this exists for is specifically about
-      # server-originated drift.
+      # `api-types.gen.ts` regeneration in its paired web app, or a web-only hand edit of that
+      # committed file, is a silent break nothing else here would catch. `gen-api-types.ts --check`
+      # boots the relevant server through its `src/dump-openapi.ts` entry over fakes (no port, no dev
+      # server, no Postgres/Redis/IdP) and only reads the web app's committed file — infra-free and
+      # ~0.7s per server, so both a server leg (checking its own paired web app) and a web leg
+      # (checking itself) run it unconditionally rather than skipping web-only changes.
       - name: Check API types
         if: matrix.checkApiTypes
         run: bun scripts/gen-api-types.ts "$(echo '${{ matrix.workspace }}' | sed 's/-server$/-web/')" --check

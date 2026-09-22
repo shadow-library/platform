@@ -182,9 +182,9 @@ repo-relative directory (`packages/common`) or its package name (`@shadow-librar
 | `bun scripts/verify.ts <workspace> [--fix] [--fast]`                     | Prettier (run from the repo root, so the root `.prettierrc.json`/`.gitignore`/`.prettierignore` apply) → ESLint (no explicit config; flat config's upward lookup finds the single root `eslint.config.ts`) → `tsc` run directly against the workspace's own `tsconfig.json` → the workspace's own `test` script if it has one, else `bun test` directly (only for workspaces where `verifyTest` is true). Stops at first failure. `--fast` stops after lint — the pre-commit hook's speed budget. `--fix` applies format/lint fixes in place. No workspace needs a `type-check` package.json script, and only a workspace with a genuinely non-default test command needs a `test` one. |
 | `bun scripts/verify.ts scripts`                                          | Verifies the root tooling itself (`scripts/` + the root-level configs) — the thing that verifies everything else isn't the one unverified thing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `bun scripts/verify.ts --all`                                            | Verifies every workspace plus `scripts`, reporting a combined failure list instead of aborting on the first. Root `bun run verify`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `bun scripts/gen-api-types.ts <web-app>\|--all [url] [--check]`          | OpenAPI doc → typed `src/lib/apis/api-types.gen.ts` (unique operationIds `<method>_<path>`, GET query-param widening, `<Name>QueryParams`/`PathParams` aliases; formatted via the root Prettier config). Without `--check`, writes the file — a single target defaults to a locally running server (`url` overrides), `--all` boots each paired server hermetically in-process. With `--check`, nothing is written: it boots the paired server(s) in-process, diffs a fresh render against the committed file, and fails with a nonzero exit and an actionable message on drift — the server↔web contract drift gate CI runs.                                                                     |
-| `bun scripts/check-migrations.ts <workspace>`                            | Runs `scripts/db.ts <workspace> generate` directly (in-process, via `db.ts`'s exported `runDbCommand`); fails on uncommitted migrations in `generated/drizzle` (tracked AND untracked).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `bun scripts/db.ts <workspace> generate\|migrate\|create-template\|seed` | The 4 backends' Drizzle/Postgres CLI. No workspace carries its own `drizzle.config.ts` — `generate` shells `drizzle-kit generate` with `--schema`/`--out`/`--dialect` derived from convention (override the schema path via `shadow.db.schema`); `migrate` runs whichever `shadow.entries` item matches `/migrate/i`. `create-template` is a single generic driver here in `scripts/db.ts` — drop+create the template DB, run the migrate entry against it, run the optional template-seed hook (`shadow.db.templateSeed`, or the conventional `tests/fixtures/seed.ts` if present), mark it `IS_TEMPLATE` — no backend carries its own template-build script anymore. `seed` runs that same conventional `tests/fixtures/seed.ts` directly. Per-test-file DB cloning (`createDatabaseFromTemplate`/`dropDatabase`) lives in each backend's own `tests/fixtures/template-db.ts`, imported via `@tests/*`. No workspace carries its own `db:*` package.json scripts — this is the only entry point.                                                                                    |
+| `bun scripts/gen-api-types.ts <web-app>\|--all [url] [--check]`          | OpenAPI doc → typed `src/lib/apis/api-types.gen.ts` (unique operationIds `<method>_<path>`, GET query-param widening, `<Name>QueryParams`/`PathParams` aliases; formatted via the root Prettier config). Without `--check`, writes the file — a single target defaults to a locally running server (`url` overrides), `--all` boots each paired server hermetically, without a port. With `--check`, nothing is written: it boots the paired server(s) the same way, diffs a fresh render against the committed file, and fails with a nonzero exit and an actionable message on drift — the server↔web contract drift gate CI runs, on both a server's own leg and its paired web app's.                                                                     |
+| `bun scripts/check-migrations.ts <workspace>`                            | Runs `scripts/db.ts <workspace> generate` directly (in-process, via `db.ts`'s exported `runDbCommand`); fails on uncommitted migrations in `generated/drizzle` (tracked AND untracked). No live database: `drizzle-kit generate` only diffs schema against the migrations directory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `bun scripts/db.ts <workspace> generate\|migrate\|seed` | The backends' Drizzle/Postgres CLI. No workspace carries its own `drizzle.config.ts` — `generate` shells `drizzle-kit generate` with `--schema`/`--out`/`--dialect` derived from convention (override the schema path via `shadow.db.schema`); `migrate` runs whichever `shadow.entries` item matches `/migrate/i`; `seed` runs the workspace's conventional `tests/fixtures/seed.ts` — a real dev seed, present only on a workspace that has one (e.g. `pulse-server`) — failing with a clear error otherwise. No workspace carries its own `db:*` package.json scripts — this is the only entry point.                                                                                    |
 
 Commit messages are linted by `@commitlint/cli` against the root `commitlint.config.ts`, wired once at the
 repo root in `.husky/commit-msg` (`bunx --bun commitlint --edit "$1"`). There is no tooling command for it.
@@ -296,13 +296,16 @@ A single workflow (`.github/workflows/ci.yml`) replaces the old per-repo publish
    arm, is the simplest correct fix. Workspaces are enumerated from the filesystem, not a hardcoded list,
    so a new `apps/*`/`packages/*` needs no workflow edit. The list also includes the non-workspace
    `scripts` target, so the root tooling is itself verified.
-2. **One `verify` job per affected workspace** (matrix, `fail-fast: false`, capped parallelism), each:
-   builds that workspace's dependency closure first (`bun scripts/build.ts <workspace> --deps`),
-   optionally checks migrations / creates a template DB for backends that need Postgres, then runs
-   `bun scripts/verify.ts <workspace>` and `bun scripts/build.ts <workspace>` — all from the repo root.
-   (The `scripts` leg skips both build steps.) Postgres + Redis services run unconditionally on the job
-   (they can't be made conditional per matrix leg); a workspace that doesn't need them just never talks
-   to those ports.
+2. **One `verify` job per affected workspace** (matrix, `fail-fast: false`, no capped parallelism), each:
+   restores or builds every package's dist (one shared content-hashed cache key — a miss builds the FULL
+   package set, not just this leg's closure, so the cache stays complete for every other job), optionally
+   checks migrations (`drizzle-kit generate` diffed against the committed directory — no live database
+   needed), runs `bun scripts/verify.ts <workspace> --ci` (the `--ci` flag hard-fails an `apps/*`
+   workspace's test step on any test over the 50ms budget instead of only warning), checks API-contract
+   drift on an `apps/*-server` or `apps/*-web` leg (`bun scripts/gen-api-types.ts <its-paired-web-app>
+   --check` — infra-free, boots the server without a port, on both sides of the pair), then
+   `bun scripts/build.ts <workspace>`. No Postgres or Redis service container: every `apps/*` test is a
+   unit test that never connects to one (`references/testing.md`).
 3. **No separate publish/release workflow.** There is exactly one workflow file.
 
 ## GitHub Actions — the per-workspace step shape
@@ -310,16 +313,13 @@ A single workflow (`.github/workflows/ci.yml`) replaces the old per-repo publish
 If you're wiring a new workspace into the matrix, its steps are just:
 
 ```yaml
-- run: bun scripts/build.ts ${{ matrix.workspace }} --deps # its workspace:* dependency closure
-- run: bun scripts/verify.ts ${{ matrix.workspace }} # format + lint + type-check + test
+- run: bun scripts/build.ts 'packages/*' # every package's dist, shared across every leg
+- run: bun scripts/verify.ts ${{ matrix.workspace }} --ci # format + lint + type-check + test
 - run: bun scripts/build.ts ${{ matrix.workspace }}
 ```
 
-(`test` runs inside `verify` by convention for everything except the web apps and `e2e` —
-`identity-web`, `novel-forge-web`, and `pulse-web` carry **no `test` script at all**: their old per-app
-Playwright suites were removed, and browser e2e lives solely in the root `e2e/` workspace, which needs a
-live deployment and whose `verify` is therefore static-only. `web-novel-web`'s `test` is `vitest run` —
-a real jsdom unit suite — so it opts back in with `"shadow": { "verifyTest": true }`. `packages/ui`
-verifies its `test` script (`vitest run --project unit`) normally as a `component`; only its separate
-`test:stories` script — the Storybook interaction/a11y project — is never invoked by `verify` and stays
-out of CI.)
+(`test` runs inside `verify` for every workspace that opts in via `verifyTest` — every `apps/*` and
+`packages/*` library does today; check a workspace's own `package.json` `"shadow"` key if unsure.
+`packages/ui` verifies its `test` script (`vitest run --project unit`) normally as a `component`; only
+its separate `test:stories` script — the Storybook interaction/a11y project — is never invoked by
+`verify` and stays out of CI.)

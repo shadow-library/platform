@@ -48,5 +48,6 @@ export function withoutStartupHooks<T extends object>(token: Class<T>): ClassPro
       return undefined;
     }
   };
+  Object.defineProperty(Inert, 'name', { value: token.name });
   return { token, useClass: Inert as Class<T> };
 }
