@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { NOTIFICATION_CATEGORIES, type NotificationCategory, type NotificationClient } from '@modules/notifications';
+import { type NotificationClient } from '@modules/notifications/notification-client.service';
+import { NOTIFICATION_CATEGORIES, type NotificationCategory } from '@modules/notifications/notification.types';
 
 /** Compiles only if `NotificationClient.enqueue`'s category parameter is exactly the registry's closed union — a type-level proof that no other category can ever reach the call site, checked by `tsc` rather than at runtime. */
 type EnqueueCategoryParam = Parameters<NotificationClient['enqueue']>[1];

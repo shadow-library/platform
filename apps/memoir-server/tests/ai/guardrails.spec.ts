@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  ALLOWED_SUGGESTION_KINDS,
-  applyGuardrails,
-  CRISIS_RESPONSE_ANSWER,
-  findVerbatimQuote,
-  type GuardrailInput,
-  type GuardrailViolation,
-  type InferenceDraft,
-} from '@modules/ai-worker';
+import { ALLOWED_SUGGESTION_KINDS, applyGuardrails, CRISIS_RESPONSE_ANSWER, findVerbatimQuote, type GuardrailInput, type GuardrailViolation } from '@modules/ai-worker/guardrails';
+import { type InferenceDraft } from '@modules/ai-worker/ai-worker.types';
 
 const JOURNAL_ENTRY = 'I skipped the evening run again because my manager kept me on a call until nearly nine and I felt completely wrung out afterwards';
 const REASON_NOTE = 'too tired after the late standup meeting';

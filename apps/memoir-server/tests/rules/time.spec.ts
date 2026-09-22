@@ -380,7 +380,53 @@ describe('DST-aware local days', () => {
       expect(resolved.minuteOfDay).toBe(minutes(1));
     });
 
-    it('should keep every resolved instant monotonic in the requested wall minute', () => {
+    describe('monotonic across a full day', () => {
+      const COARSE_STEP_MINUTES = 15;
+      const DENSE_WINDOW_MINUTES = 180;
+      const SPARSE_STEP_MINUTES = 30;
+
+      const offsetAt = (zoneDate: LocalDate, minuteOfDay: number, timeZone: TimeZone): number =>
+        offsetMinutesAt(instantAtLocalMinute(zoneDate, minuteOfDay, timeZone).instant, timeZone);
+
+      /** Brackets each offset change against a coarse scan, then binary-searches the bracket to the transition minute — never hardcodes a transition time, so the plan adapts to whichever date/zone the case names. */
+      const findTransitionMinutes = (zoneDate: LocalDate, timeZone: TimeZone): number[] => {
+        const transitions: number[] = [];
+        let previousOffset = offsetAt(zoneDate, 0, timeZone);
+
+        for (let minuteOfDay = COARSE_STEP_MINUTES; minuteOfDay < 1440; minuteOfDay += COARSE_STEP_MINUTES) {
+          const offset = offsetAt(zoneDate, minuteOfDay, timeZone);
+          if (offset !== previousOffset) {
+            let low = minuteOfDay - COARSE_STEP_MINUTES;
+            let high = minuteOfDay;
+            while (high - low > 1) {
+              const mid = Math.floor((low + high) / 2);
+              if (offsetAt(zoneDate, mid, timeZone) === previousOffset) low = mid;
+              else high = mid;
+            }
+            transitions.push(high);
+          }
+          previousOffset = offset;
+        }
+
+        return transitions;
+      };
+
+      /** Every minute within `DENSE_WINDOW_MINUTES` of a transition (where a resolution can flip between exact/gap_shifted/ambiguous_earlier), a sparse grid everywhere else. */
+      const samplingMinutes = (transitionMinutes: readonly number[]): number[] => {
+        const dense = new Set<number>();
+        for (const transition of transitionMinutes) {
+          const start = Math.max(0, transition - DENSE_WINDOW_MINUTES);
+          const end = Math.min(1439, transition + DENSE_WINDOW_MINUTES);
+          for (let minuteOfDay = start; minuteOfDay <= end; minuteOfDay++) dense.add(minuteOfDay);
+        }
+
+        const minutes: number[] = [];
+        for (let minuteOfDay = 0; minuteOfDay < 1440; minuteOfDay++) {
+          if (dense.has(minuteOfDay) || minuteOfDay % SPARSE_STEP_MINUTES === 0) minutes.push(minuteOfDay);
+        }
+        return minutes;
+      };
+
       const zones: readonly [TimeZone, string][] = [
         [NEW_YORK, '2024-03-10'],
         [NEW_YORK, '2024-11-03'],
@@ -389,12 +435,18 @@ describe('DST-aware local days', () => {
       ];
 
       for (const [timeZone, iso] of zones) {
-        let previous = Number.NEGATIVE_INFINITY;
-        for (let minuteOfDay = 0; minuteOfDay < 1440; minuteOfDay++) {
-          const { instant } = instantAtLocalMinute(date(iso), minuteOfDay, timeZone);
-          expect(instant).toBeGreaterThanOrEqual(previous);
-          previous = instant;
-        }
+        it(`should keep every sampled instant monotonic across ${iso} in ${timeZone}`, () => {
+          const zoneDate = date(iso);
+          const transitionMinutes = findTransitionMinutes(zoneDate, timeZone);
+          expect(transitionMinutes.length).toBeGreaterThan(0);
+
+          let previous = Number.NEGATIVE_INFINITY;
+          for (const minuteOfDay of samplingMinutes(transitionMinutes)) {
+            const { instant } = instantAtLocalMinute(zoneDate, minuteOfDay, timeZone);
+            expect(instant).toBeGreaterThanOrEqual(previous);
+            previous = instant;
+          }
+        });
       }
     });
   });

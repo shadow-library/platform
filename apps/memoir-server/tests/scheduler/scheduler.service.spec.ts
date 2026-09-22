@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, setSystemTime } from 'bun:test';
 
 import { SchedulerService } from '@server/modules/scheduler';
 
@@ -8,11 +8,9 @@ function deferred<T = void>() {
   return { promise, resolve };
 }
 
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 describe('SchedulerService', () => {
+  afterEach(() => setSystemTime());
+
   it('should reject registering the same sweep name twice', () => {
     const scheduler = new SchedulerService();
     scheduler.registerSweep('dup', 1000, () => {});
@@ -22,7 +20,7 @@ describe('SchedulerService', () => {
   it('should not run a sweep again before its cadence elapses', async () => {
     let runs = 0;
     const scheduler = new SchedulerService();
-    scheduler.registerSweep('cadenced', 50, () => {
+    scheduler.registerSweep('cadenced', 1000, () => {
       runs++;
     });
 
@@ -32,7 +30,7 @@ describe('SchedulerService', () => {
     await (scheduler as any).tick();
     expect(runs).toBe(1);
 
-    await sleep(60);
+    setSystemTime(Date.now() + 1001);
     await (scheduler as any).tick();
     expect(runs).toBe(2);
   });
@@ -68,7 +66,6 @@ describe('SchedulerService', () => {
     await (scheduler as any).tick();
     expect(goodRuns).toBe(1);
 
-    await sleep(10);
     await (scheduler as any).tick();
     expect(goodRuns).toBe(2);
   });
