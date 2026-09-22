@@ -34,6 +34,15 @@ export interface OAuthTestClient extends OAuthClientCredentials {
   readonly redirectUri: string;
 }
 
+export type ApplicationVisibility = 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
+
+export interface OAuthApplicationOptions {
+  /** Default `PUBLIC`. */
+  visibility?: ApplicationVisibility;
+  /** Gives the application a browser origin, so its provisioned client redirects to `<origin>/api/auth/callback` like a real first-party app. */
+  withPublicUrl?: boolean;
+}
+
 export interface OAuthApplication {
   readonly applicationId: number;
   readonly name: string;
@@ -41,9 +50,15 @@ export interface OAuthApplication {
   readonly audience: string;
   /**
    * The confidential first-party client identity provisions alongside the application, named after it: `authorization_code`,
-   * `client_credentials` and token exchange, and no redirect URI.
+   * `client_credentials` and token exchange, redirecting only to `<publicUrl>/api/auth/callback` when the application has one.
    */
   readonly serviceClient: OAuthClientCredentials;
+  readonly publicUrl?: string;
+}
+
+export interface ApplicationPatch {
+  visibility?: ApplicationVisibility;
+  isActive?: boolean;
 }
 
 export type OAuthClientKind = 'SPA_PUBLIC' | 'WEB_CONFIDENTIAL';
@@ -147,6 +162,57 @@ export interface RotatedClientSecret {
   readonly previousSecretsExpireAt: string;
 }
 
+export interface CreateAppSessionRequest {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+}
+
+export interface MintAppTokenRequest {
+  sessionHandle: string;
+  resource?: string;
+  scope?: string;
+  elevated?: boolean;
+}
+
+export interface AppTokenBody {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  scope: string;
+  audience: string;
+  aal: 'AAL1' | 'AAL2';
+}
+
+export interface AppSessionOrganisation {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'PERSONAL' | 'TEAM';
+  active: boolean;
+}
+
+export interface OpenedAppSession {
+  readonly handle: string;
+  readonly userId: string;
+  readonly scope: string;
+}
+
+/**
+ * A first-party application's back end talking to identity's app-session API, authenticated by a client-credentials token
+ * carrying `app-session:manage`.
+ */
+export interface AppSessionApi {
+  readonly client: OAuthTestClient;
+  create(request: CreateAppSessionRequest): Promise<APIResponse>;
+  /** Authorizes as `sessionCtx`'s identity session and opens an app session from the code, throwing unless identity answers 201. */
+  open(sessionCtx: APIRequestContext, options?: AuthorizeOptions): Promise<OpenedAppSession>;
+  mint(request: MintAppTokenRequest): Promise<APIResponse>;
+  claimElevation(sessionHandle: string, resource?: string): Promise<APIResponse>;
+  organisations(sessionHandle: string): Promise<APIResponse>;
+  switchOrganisation(sessionHandle: string, organisationId: string): Promise<APIResponse>;
+}
+
 /**
  * Declaring the constants
  *
@@ -157,6 +223,9 @@ export interface RotatedClientSecret {
  */
 
 export const OAUTH_REDIRECT_URI = 'https://app.example.test/cb';
+export const PLATFORM_AUDIENCE = 'shadow-identity';
+export const APP_SESSION_SCOPE = 'app-session:manage';
+export const APP_CALLBACK_PATH = '/api/auth/callback';
 
 export class OAuthKitError extends Error {
   override readonly name = 'OAuthKitError';
@@ -185,16 +254,17 @@ export function pkcePair(): PkcePair {
   return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
 }
 
-/** A PUBLIC admin application named `e2e-<label>-<hex>`, with its own `api://` resource and provisioned confidential client. */
-export async function createOAuthApplication(admin: APIRequestContext, label = 'app'): Promise<OAuthApplication> {
+/** An admin application named `e2e-<label>-<hex>`, with its own `api://` resource and provisioned confidential client. */
+export async function createOAuthApplication(admin: APIRequestContext, label = 'app', options: OAuthApplicationOptions = {}): Promise<OAuthApplication> {
   const name = `e2e-${label}-${randomBytes(4).toString('hex')}`;
-  const created = await identityMutate(admin, 'post', '/api/v1/admin/applications', { name, subDomain: name });
+  const publicUrl = options.withPublicUrl ? `https://${name}.example.test` : undefined;
+  const created = await identityMutate(admin, 'post', '/api/v1/admin/applications', { name, subDomain: name, ...(publicUrl ? { publicUrls: [publicUrl] } : {}) });
   await expectStatus(created, 201, 'create application');
   const body = (await created.json()) as { id: number; clientId: string; audience: string; clientSecret?: string };
-  const application: OAuthApplication = { applicationId: body.id, name, audience: body.audience, serviceClient: { clientId: body.clientId, secret: body.clientSecret } };
+  const application: OAuthApplication = { applicationId: body.id, name, audience: body.audience, serviceClient: { clientId: body.clientId, secret: body.clientSecret }, publicUrl };
 
   try {
-    await expectStatus(await identityMutate(admin, 'patch', `/api/v1/admin/applications/${body.id}`, { visibility: 'PUBLIC' }), 200, 'publish application');
+    await updateApplication(admin, body.id, { visibility: options.visibility ?? 'PUBLIC' });
   } catch (error) {
     await deleteOAuthApplication(admin, application).catch(() => undefined);
     throw error;
@@ -204,6 +274,7 @@ export async function createOAuthApplication(admin: APIRequestContext, label = '
 
 /** Removes every client registered on the application, then the application with its provisioned client, resources and scopes. */
 export async function deleteOAuthApplication(admin: APIRequestContext, application: Pick<OAuthApplication, 'applicationId' | 'name'>): Promise<void> {
+  if ((await admin.get(`/api/v1/admin/applications/${application.applicationId}`)).status() === 404) return;
   const listed = await admin.get(`/api/v1/admin/clients?applicationId=${application.applicationId}`);
   await expectStatus(listed, 200, 'list clients');
   const { items } = (await listed.json()) as { items: { id: string }[] };
@@ -212,6 +283,26 @@ export async function deleteOAuthApplication(admin: APIRequestContext, applicati
     if (removed.status() !== 404) await expectStatus(removed, 200, `delete client ${client.id}`);
   }
   await expectStatus(await identityMutate(admin, 'delete', `/api/v1/admin/applications/${application.applicationId}`), 200, 'delete application');
+}
+
+export async function updateApplication(admin: APIRequestContext, applicationId: number, patch: ApplicationPatch): Promise<void> {
+  await expectStatus(await identityMutate(admin, 'patch', `/api/v1/admin/applications/${applicationId}`, patch), 200, `update application ${applicationId}`);
+}
+
+/** Releases a platform RESTRICTED application to a team organisation. */
+export async function releaseApplication(admin: APIRequestContext, applicationId: number, organisationId: string): Promise<void> {
+  await expectStatus(await identityMutate(admin, 'post', `/api/v1/admin/applications/${applicationId}/organisations`, { organisationId }), 200, `release ${applicationId}`);
+}
+
+export async function revokeApplicationRelease(admin: APIRequestContext, applicationId: number, organisationId: string): Promise<void> {
+  const response = await identityMutate(admin, 'delete', `/api/v1/admin/applications/${applicationId}/organisations/${organisationId}`);
+  await expectStatus(response, 200, `revoke release of ${applicationId}`);
+}
+
+/** The application's provisioned client as a relying party redirecting to its public origin's callback. */
+export function relyingPartyClient(application: OAuthApplication): OAuthTestClient {
+  if (!application.publicUrl) throw new OAuthKitError(`application ${application.name} has no public URL to redirect to`);
+  return { applicationId: application.applicationId, ...application.serviceClient, redirectUri: `${application.publicUrl}${APP_CALLBACK_PATH}` };
 }
 
 export async function registerOAuthClient(admin: APIRequestContext, application: OAuthApplication, options: RegisterOAuthClientOptions = {}): Promise<OAuthTestClient> {
@@ -260,6 +351,15 @@ export async function findApiResourceId(admin: APIRequestContext, identifier: st
   const resource = items.find(item => item.identifier === identifier);
   if (!resource) throw new OAuthKitError(`no API resource ${identifier}`);
   return resource.id;
+}
+
+export async function findResourceScopeId(admin: APIRequestContext, identifier: string, name: string): Promise<string> {
+  const listed = await admin.get('/api/v1/admin/resources');
+  await expectStatus(listed, 200, 'list resources');
+  const { items } = (await listed.json()) as { items: { identifier: string; scopes: { id: string; name: string }[] }[] };
+  const scope = items.find(item => item.identifier === identifier)?.scopes.find(item => item.name === name);
+  if (!scope) throw new OAuthKitError(`no scope ${name} on ${identifier}`);
+  return scope.id;
 }
 
 /** Declares `name` on the resource `identifier` and returns the scope id. Identity resolves scopes by name across resources, so keep names unique per test. */
@@ -366,4 +466,40 @@ export async function issueTokens(sessionCtx: APIRequestContext, tokenCtx: APIRe
 /** Authorizes as `sessionCtx`'s session and exchanges the code on `tokenCtx`, returning the refresh token bound to that session. */
 export async function mintRefreshToken(sessionCtx: APIRequestContext, tokenCtx: APIRequestContext, client: OAuthTestClient): Promise<string> {
   return (await issueTokens(sessionCtx, tokenCtx, client)).refreshToken;
+}
+
+/** A client-credentials access token for `client`, throwing unless identity issues one. */
+export async function serviceToken(ctx: APIRequestContext, client: OAuthClientCredentials, options: ClientCredentialsOptions = {}): Promise<string> {
+  const response = await clientCredentialsGrant(ctx, client, options);
+  const body = (await response.json()) as TokenResponseBody;
+  if (response.status() !== 200 || !body.access_token) throw new OAuthKitError(`client_credentials answered ${response.status()}: ${JSON.stringify(body)}`);
+  return body.access_token;
+}
+
+/**
+ * Grants the application's provisioned client `app-session:manage` and returns its app-session API on `ctx`, which should be
+ * cookie-less. The application must have a public URL, because an app session is opened from a code issued to that client.
+ */
+export async function createAppSessionApi(admin: APIRequestContext, ctx: APIRequestContext, application: OAuthApplication): Promise<AppSessionApi> {
+  const client = relyingPartyClient(application);
+  await grantClientScope(admin, client.clientId, await findResourceScopeId(admin, PLATFORM_AUDIENCE, APP_SESSION_SCOPE));
+  const headers = { authorization: `Bearer ${await serviceToken(ctx, client, { scope: APP_SESSION_SCOPE })}` };
+  const post = (path: string, data: object): Promise<APIResponse> => ctx.post(`/api/v1/app-sessions${path}`, { headers, data });
+  const create = (request: CreateAppSessionRequest): Promise<APIResponse> => post('', request);
+
+  return {
+    client,
+    create,
+    open: async (sessionCtx, options) => {
+      const { code, verifier } = await authorizeCode(sessionCtx, client, options);
+      const response = await create({ code, codeVerifier: verifier, redirectUri: client.redirectUri });
+      await expectStatus(response, 201, 'open app session');
+      const body = (await response.json()) as { sessionHandle: string; userId: string; scope: string };
+      return { handle: body.sessionHandle, userId: body.userId, scope: body.scope };
+    },
+    mint: request => post('/token', request),
+    claimElevation: (sessionHandle, resource) => post('/elevation', resource === undefined ? { sessionHandle } : { sessionHandle, resource }),
+    organisations: sessionHandle => post('/organisations', { sessionHandle }),
+    switchOrganisation: (sessionHandle, organisationId) => post('/organisation', { sessionHandle, organisationId }),
+  };
 }

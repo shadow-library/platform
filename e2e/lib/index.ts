@@ -4,6 +4,7 @@ export * from './db';
 export * from './env';
 export * from './identity-auth';
 export * from './identity-oauth';
+export * from './identity-orgs';
 export * from './identity-sessions';
 export * from './identity-users';
 export * from './jwt';

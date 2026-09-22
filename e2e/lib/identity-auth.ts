@@ -39,6 +39,15 @@ export interface FlowStepBody {
   metadata?: { maskedEmail?: string; maskedPhone?: string };
 }
 
+export interface StepUpRequest {
+  password?: string;
+  code?: string;
+  /** The application the step-up is for; with no client the elevation is usable only by identity's own console. */
+  clientId?: string;
+  /** Defaults to identity's own audience when a client is named. */
+  resource?: string;
+}
+
 export interface PasswordSignIn {
   readonly flowId: string;
   /** The `challenge/verify` answer to the password. */
@@ -111,4 +120,9 @@ export async function enrollTotp(ctx: APIRequestContext): Promise<string> {
   const activate = await identityMutate(ctx, 'post', '/api/v1/me/mfa/totp/activate', { code: totpCode(secret) });
   if (activate.status() !== 200) throw new IdentityAuthError(`totp/activate answered ${activate.status()}: ${await activate.text()}`);
   return secret;
+}
+
+/** `POST /api/v1/me/mfa/step-up` on `ctx`'s session; the caller asserts on the answer. */
+export function stepUp(ctx: APIRequestContext, request: StepUpRequest): Promise<APIResponse> {
+  return identityMutate(ctx, 'post', '/api/v1/me/mfa/step-up', request);
 }

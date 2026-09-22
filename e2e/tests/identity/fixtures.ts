@@ -7,6 +7,7 @@ import { type APIRequestContext, test as base } from '@playwright/test';
  * Importing user defined packages
  */
 import {
+  addOrganisationMember,
   type AdminApi,
   clearIpState,
   createAdminApi,
@@ -14,9 +15,12 @@ import {
   createIdentityUser,
   createOAuthApplication,
   createOAuthTestClient,
+  createTeamOrganisation,
   deleteIdentityUser,
   deleteOAuthApplication,
   deleteOAuthTestClient,
+  deleteOrganisation,
+  deleteOrgOAuthApp,
   freshClientIp,
   identityApi,
   type IdentitySession,
@@ -24,8 +28,14 @@ import {
   type IdentitySessionOptions,
   type IdentityUser,
   type IdentityUserOptions,
+  listOwnedApplicationIds,
   type OAuthApplication,
+  type OAuthApplicationOptions,
   type OAuthTestClient,
+  type TeamOrganisation,
+  type TeamOrganisationOptions,
+  updateIdentitySession,
+  updateOrganisation,
 } from '../../lib';
 
 /**
@@ -47,8 +57,18 @@ export interface IdentityHarness {
   admin(): Promise<AdminApi>;
   /** A throwaway PUBLIC application with a first-party public client, removed after the test. */
   createOAuthClient(label?: string): Promise<OAuthTestClient>;
-  /** A throwaway PUBLIC application; it and every client registered on it are removed after the test. */
-  createOAuthApp(label?: string): Promise<OAuthApplication>;
+  /** A throwaway application (PUBLIC unless told otherwise); it and every client registered on it are removed after the test. */
+  createOAuthApp(label?: string, options?: OAuthApplicationOptions): Promise<OAuthApplication>;
+  /** A database-created team organisation with a factory OWNER, removed after the test together with every app it owns. */
+  createTeam(options?: TeamOrganisationOptions): Promise<IdentityTeam>;
+  /** Removes an organisation the test created some other way (e.g. through the API) after the test, like `createTeam`'s. */
+  trackOrganisation(organisationId: string, ownerUserId: string): void;
+}
+
+export interface IdentityTeam extends TeamOrganisation {
+  readonly owner: IdentityUser;
+  /** The owner on a self-service-elevated session, as org-admin routes (assignment, org OAuth apps) require. */
+  readonly ownerCtx: APIRequestContext;
 }
 
 /**
@@ -75,6 +95,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const users: IdentityUser[] = [];
     const oauthClients: OAuthTestClient[] = [];
     const oauthApps: OAuthApplication[] = [];
+    const organisations: { organisationId: string; ownerUserId: string }[] = [];
     let adminApi: Promise<AdminApi> | undefined;
 
     const track = (ctx: APIRequestContext): APIRequestContext => {
@@ -83,19 +104,38 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     };
     const contextFor = async (session: IdentitySession): Promise<APIRequestContext> => track(await identitySessionContext(session, { clientIp }));
     const admin = (): Promise<AdminApi> => (adminApi ??= createAdminApi(clientIp));
+    const createUser = async (options?: IdentityUserOptions): Promise<IdentityUser> => {
+      const user = await createIdentityUser(options);
+      users.push(user);
+      return user;
+    };
+    const signIn = async (user: IdentityUser, options?: IdentitySessionOptions): Promise<{ session: IdentitySession; ctx: APIRequestContext }> => {
+      const session = await createIdentitySession(user.userId, options);
+      return { session, ctx: await contextFor(session) };
+    };
+
+    /** Org-owned apps can only be deleted through the org API, and their clients block the organisation's own deletion, so they go first on a fresh owner session. */
+    const removeOrganisation = async ({ organisationId, ownerUserId }: { organisationId: string; ownerUserId: string }): Promise<void> => {
+      const owned = await listOwnedApplicationIds(organisationId);
+      if (owned.length > 0) {
+        await updateOrganisation(organisationId, { status: 'ACTIVE' });
+        const session = await createIdentitySession(ownerUserId, { aal: 'AAL2' });
+        const ctx = await identitySessionContext(session, { clientIp });
+        try {
+          for (const applicationId of owned) await deleteOrgOAuthApp(ctx, organisationId, applicationId);
+        } finally {
+          await ctx.dispose();
+          await updateIdentitySession(session, { status: 'TERMINATED' });
+        }
+      }
+      await deleteOrganisation(organisationId);
+    };
 
     await use({
       clientIp,
       anonymous: async () => track(await identityApi(clientIp)),
-      createUser: async options => {
-        const user = await createIdentityUser(options);
-        users.push(user);
-        return user;
-      },
-      signIn: async (user, options) => {
-        const session = await createIdentitySession(user.userId, options);
-        return { session, ctx: await contextFor(session) };
-      },
+      createUser,
+      signIn,
       contextFor,
       admin,
       createOAuthClient: async label => {
@@ -103,10 +143,21 @@ export const test = base.extend<{ identity: IdentityHarness }>({
         oauthClients.push(client);
         return client;
       },
-      createOAuthApp: async label => {
-        const application = await createOAuthApplication((await admin()).ctx, label);
+      createOAuthApp: async (label, options) => {
+        const application = await createOAuthApplication((await admin()).ctx, label, options);
         oauthApps.push(application);
         return application;
+      },
+      createTeam: async options => {
+        const owner = await createUser({ label: `${options?.label ?? 'team'}-owner` });
+        const team = await createTeamOrganisation(options);
+        organisations.push({ organisationId: team.organisationId, ownerUserId: owner.userId });
+        await addOrganisationMember(team.organisationId, owner.userId, { role: 'OWNER' });
+        const { ctx } = await signIn(owner, { aal: 'AAL2' });
+        return { ...team, owner, ownerCtx: ctx };
+      },
+      trackOrganisation: (organisationId, ownerUserId) => {
+        organisations.push({ organisationId, ownerUserId });
       },
     });
 
@@ -114,6 +165,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     await runAll([
       ...oauthClients.map(client => async () => deleteOAuthTestClient((await admin()).ctx, client)),
       ...oauthApps.map(application => async () => deleteOAuthApplication((await admin()).ctx, application)),
+      ...organisations.map(organisation => () => removeOrganisation(organisation)),
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
       ...contexts.map(ctx => () => ctx.dispose()),
       ...users.map(user => () => deleteIdentityUser(user)),

@@ -56,8 +56,12 @@ export interface IdentityUser {
  * Creates identity users straight in the database, writing the same rows password registration does (user, profile, primary
  * email, PASSWORD identity + argon2id hash, personal organisation with an OWNER membership). Registration itself spends the
  * 5/hour `register-init` budget and needs an OTP round-trip; this costs a few inserts. Specs run under node, which has no argon2,
- * so the hash is copied from the seeded `user1` persona — every factory user therefore signs in with `PERSONAS.user1.password`.
+ * so the hash is copied from a seeded persona — every factory user therefore signs in with that persona's password. The source is
+ * the `locked` persona because no spec ever changes its password: `account.spec.ts` changes `user1`'s mid-run, and a hash copied
+ * inside that window would sign nobody in.
  */
+
+const HASH_SOURCE = PERSONAS.locked;
 
 let passwordHash: Promise<string> | undefined;
 
@@ -67,10 +71,10 @@ async function loadPersonaHash(): Promise<string> {
     FROM user_passwords up
     JOIN user_auth_identities uai ON uai.id = up.user_auth_identity_id
     JOIN user_emails ue ON ue.user_id = uai.user_id
-    WHERE uai.provider = 'PASSWORD' AND lower(ue.email_id) = ${PERSONAS.user1.email.toLowerCase()} AND up.algorithm = 'ARGON2ID'
+    WHERE uai.provider = 'PASSWORD' AND lower(ue.email_id) = ${HASH_SOURCE.email.toLowerCase()} AND up.algorithm = 'ARGON2ID'
   `;
   const hash = rows[0]?.hash;
-  if (!hash) throw new Error(`No ARGON2ID hash for ${PERSONAS.user1.email}; run the seed before creating factory users`);
+  if (!hash) throw new Error(`No ARGON2ID hash for ${HASH_SOURCE.email}; run the seed before creating factory users`);
   return hash;
 }
 
@@ -126,7 +130,7 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
     await tx`INSERT INTO organisation_members (organisation_id, user_id, role, is_default) VALUES (${org.id}, ${userId}, 'OWNER', true)`;
     await tx`UPDATE users SET personal_organisation_id = ${org.id} WHERE id = ${userId}`;
 
-    return { userId, sub: userId, email, password: PERSONAS.user1.password, personalOrgId: org.id };
+    return { userId, sub: userId, email, password: HASH_SOURCE.password, personalOrgId: org.id };
   });
 }
 
