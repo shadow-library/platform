@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test';
 
 import { formatShortDate } from '@/lib/data';
 import { type DeltaPage, SyncedAccountProvider, SyncedDataProvider, SyncedFinanceProvider, SyncedHeroProvider, SyncedQuickLogProvider, SyncedReflectProvider } from '@/lib/sync';
@@ -143,13 +143,15 @@ function fullPage(): DeltaPage {
 
 /** Money periods read the live clock, so the finance reads here run on the fixture day. */
 function onTheFixtureDay(): void {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+  setSystemTime(new Date(`${TODAY}T12:00:00`));
 }
 
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
 }
+
+/** `navigator` is a single process-wide object under bun, so a test that leaves it offline would otherwise bleed into every file that runs after this one. */
+afterAll(() => setOnline(true));
 
 async function started(page: DeltaPage = fullPage()): Promise<TestEngine> {
   const harness = createTestEngine({ pages: [page], today: TODAY });
@@ -162,7 +164,7 @@ describe('FE-5 domain projection', () => {
     setOnline(true);
     onTheFixtureDay();
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => setSystemTime());
 
   it('should ingest every new domain by the field names the server sends', async () => {
     const { engine } = await started();
@@ -233,7 +235,7 @@ describe('FE-5 optimistic apply', () => {
     setOnline(true);
     onTheFixtureDay();
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => setSystemTime());
 
   it('should show a created expense before the server has answered and post it as expense.create', async () => {
     const { engine, server } = await started();
@@ -323,14 +325,14 @@ describe('FE-5 optimistic apply', () => {
   it('should undo the optimistic apply when the engine cannot address a quick-log command', async () => {
     const { engine } = await started({ ...fullPage(), domains: { account: [ACCOUNT_ROW] } });
     const quickLogs = new SyncedQuickLogProvider(engine);
-    vi.spyOn(engine, 'enqueue').mockResolvedValue({ status: 'unaddressed' });
+    spyOn(engine, 'enqueue').mockResolvedValue({ status: 'unaddressed' });
 
     const result = await quickLogs.dispatchCommand({ type: 'sidequest.log', draft: { date: TODAY, name: 'Fixed the bike', statAffinity: 'body' } });
 
     expect(result).toMatchObject({ delivery: { status: 'unaddressed' } });
     expect((await quickLogs.sideQuests()).items).toEqual([]);
     expect(await engine.outbox.pending()).toEqual([]);
-    vi.restoreAllMocks();
+    mock.restore();
   });
 });
 
@@ -339,7 +341,7 @@ describe('FE-5 replay convergence', () => {
     setOnline(true);
     onTheFixtureDay();
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => setSystemTime());
 
   it('should replay a queued command over a fresh projection exactly once per domain', async () => {
     setOnline(false);

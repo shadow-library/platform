@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { type NovelSummary as ServerNovelSummary } from '@/lib/apis/api-types.gen';
 import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLibraryEntry, toReadingProgress, toSummary } from '@/lib/apis';

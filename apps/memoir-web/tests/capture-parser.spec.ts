@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   BUILT_IN_CATEGORIES,
@@ -58,7 +58,7 @@ describe('parseCapture', () => {
     ['thinking about the week ahead', 'journal'],
   ];
 
-  it.each(cases)('should read %s as a %s draft', (text, kind) => {
+  it.each(cases)('should read %s as a %s draft', (text: string, kind: CaptureKind) => {
     expect(draftOf(parseCapture(text, context)).kind).toBe(kind);
   });
 
@@ -177,7 +177,7 @@ describe('parseCapture', () => {
       ['taxi 18 €', '18', 'taxi'],
     ];
 
-    it.each(expenses)('should read %s as %s with the note kept intact', (text, amountText, note) => {
+    it.each(expenses)('should read %s as %s with the note kept intact', (text: string, amountText: string, note: string) => {
       expect(draftOf(parseCapture(text, context)).action.command).toMatchObject({ type: 'expense.create', draft: { amountText, currency: 'EUR', note } });
     });
 

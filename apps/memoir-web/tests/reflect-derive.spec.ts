@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   adherenceOf,
@@ -272,10 +272,14 @@ describe('deriveHistory', () => {
   });
 
   it('should format a large record count with digit grouping', () => {
-    const large = source({ expenses: Array.from({ length: 2912 }, (_, index) => expense('2026-08-22', 100 + index)) });
+    // Journal entries carry no per-row currency formatting, unlike `expense()`, so a count past the
+    // grouping threshold stays cheap to build — this test is about `formatCount`'s wiring, not volume.
+    const large = source({
+      journal: Array.from({ length: 1234 }, (_, index) => ({ ...journalEntry(`2026-08-${String(1 + (index % 28)).padStart(2, '0')}`, `entry ${index}`), id: `j-${index}` })),
+    });
 
-    expect(deriveHistory(large, 'all', '').countLabel).toBe('2,912 records');
-    expect(deriveHistory(large, 'expense', '').countLabel).toBe('2,912 matching records');
+    expect(deriveHistory(large, 'all', '').countLabel).toBe('1,234 records');
+    expect(deriveHistory(large, 'journal', '').countLabel).toBe('1,234 matching records');
   });
 });
 
@@ -317,7 +321,7 @@ describe('isoWeekOf', () => {
     ['2021-01-03', { year: 2020, week: 53 }],
     ['2020-12-31', { year: 2020, week: 53 }],
     ['2021-01-04', { year: 2021, week: 1 }],
-  ])('should number %s as ISO 8601 does', (date, expected) => {
+  ])('should number %s as ISO 8601 does', (date: string, expected: { year: number; week: number }) => {
     expect(isoWeekOf(date)).toEqual(expected);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { deriveNotifications } from '@/lib/apis/notifications.api';
 import { type LibraryEntry, type NovelSummary, type ReadingProgress } from '@/lib/apis/types';

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { clearProgressMirror, getProgress, readProgressMap, saveProgress } from '@/lib/apis';
 import { namespacedKey } from '@/lib/local-store';

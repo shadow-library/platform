@@ -28,9 +28,12 @@ export class SyncTransportError extends Error {
   }
 }
 
+/** A `fetch`-shaped function, described structurally rather than as `typeof fetch` so a plain stand-in (a test fake, a fetch wrapped mid-pipeline) satisfies it without also carrying `fetch`'s own static members. */
+export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
 export interface SyncClientOptions {
   basePath?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
 }
 
 export interface DeltaRequest {
@@ -71,7 +74,7 @@ export function toSyncFailureReason(error: unknown, online: boolean): SyncFailur
  */
 export class SyncClient {
   private readonly basePath: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
   private readonly csrf = resolveCsrfConfig();
 
   constructor(options: SyncClientOptions = {}) {

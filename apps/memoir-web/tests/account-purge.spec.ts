@@ -1,8 +1,7 @@
-import { render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { type Command } from '@/lib/data';
-import { type AccountMarker, type DeltaPage, type KeyValueBacking, MemoirStore, SYNC_META_KEYS, type SyncEngine, SyncEngineProvider } from '@/lib/sync';
+import { type AccountMarker, type DeltaPage, type FetchLike, type KeyValueBacking, MemoirStore, SYNC_META_KEYS, type SyncEngine } from '@/lib/sync';
 
 import { createSyncedTestData, createTestEngine, type FakeServer, sharedBacking, sharedMarker, type TestEngine, type TestEngineOptions } from './sync-harness';
 
@@ -61,16 +60,17 @@ function pause(): Pause & { wait: () => Promise<void>; reach: () => void } {
   return { reached, release, reach, wait: () => released };
 }
 
-function gateOn(path: string): Pause & { fetchImpl: (server: FakeServer) => typeof fetch } {
+function gateOn(path: string): Pause & { fetchImpl: (server: FakeServer) => FetchLike } {
   const gate = pause();
-  const fetchImpl = (server: FakeServer): typeof fetch =>
-    (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl =
+    (server: FakeServer): FetchLike =>
+    async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes(path)) {
         gate.reach();
         await gate.wait();
       }
       return server.fetchImpl(input, init);
-    }) as typeof fetch;
+    };
   return { ...gate, fetchImpl };
 }
 
@@ -151,10 +151,13 @@ describe('account-change isolation', () => {
     const a = await accountA(backing, marker);
     const b = engineFor('usr_B', backing, marker);
 
-    const { rerender } = render(<SyncEngineProvider data={createSyncedTestData(a.engine)}>{null}</SyncEngineProvider>);
-    rerender(<SyncEngineProvider data={createSyncedTestData(b.engine)}>{null}</SyncEngineProvider>);
+    // The original exercised this switch through `<SyncEngineProvider>`'s effect (mount on A's data,
+    // rerender onto B's), which cleans up A (`engine.stop()`) then starts B — exactly what it does
+    // directly, and the purge invariant lives in the engine/store, not the provider's effect wiring.
+    a.engine.stop();
+    await b.engine.start();
 
-    await waitFor(() => expect(b.engine.getSnapshot().state).toBe('online'));
+    expect(b.engine.getSnapshot().state).toBe('online');
     expect(b.server.batches).toEqual([]);
     expect(await b.store.readOutbox()).toEqual([]);
   });
@@ -167,7 +170,7 @@ describe('account-change isolation', () => {
     const b = engineFor('usr_B', spied(backing, reads), marker);
 
     createSyncedTestData(b.engine);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setImmediate(resolve));
     expect(reads).toEqual([]);
 
     await b.engine.start();
@@ -408,7 +411,7 @@ describe('pre-namespace layout', () => {
     return backing;
   }
 
-  it.each([['usr_B'], ['']])('should wipe it when the last-account marker is %j', async previous => {
+  it.each([['usr_B'], ['']])('should wipe it when the last-account marker is %j', async (previous: string) => {
     const backing = await legacyBacking();
     const store = new MemoirStore(backing, { accountId: 'usr_A', marker: sharedMarker(previous) });
     store.open();
@@ -419,7 +422,7 @@ describe('pre-namespace layout', () => {
     expect(await backing.keys()).toEqual([]);
   });
 
-  it.each([['usr_A'], [null]])('should adopt it into the account namespace when the marker is %j', async previous => {
+  it.each([['usr_A'], [null]])('should adopt it into the account namespace when the marker is %j', async (previous: string | null) => {
     const backing = await legacyBacking();
     const marker = sharedMarker(previous);
     const store = new MemoirStore(backing, { accountId: 'usr_A', marker });

@@ -1,5 +1,3 @@
-import { vi } from 'vitest';
-
 export interface HttpCall {
   method: string;
   path: string;
@@ -16,11 +14,18 @@ export interface HttpFake {
   count: (method: string, path: string) => number;
 }
 
-/** Stubs the global `fetch` the app transport sends through; unstub it with `vi.unstubAllGlobals()`. */
+const originalFetch = globalThis.fetch;
+
+/** Restores the real `fetch` a prior `httpFake` replaced; call from `afterEach`. */
+export function restoreFetch(): void {
+  globalThis.fetch = originalFetch;
+}
+
+/** Stubs the global `fetch` the app transport sends through; call `restoreFetch()` in `afterEach`. */
 export function httpFake(handlers: Record<string, (call: HttpCall, attempt: number) => HttpReply | Promise<HttpReply>>): HttpFake {
   const fake: HttpFake = { calls: [], count: (method, path) => fake.calls.filter(call => call.method === method && call.path === path).length };
 
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input), 'http://memoir.test').pathname;
     const method = init?.method ?? 'GET';
     const call: HttpCall = { method, path, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null };
@@ -33,7 +38,7 @@ export function httpFake(handlers: Record<string, (call: HttpCall, attempt: numb
 
     const reply = await handler(call, attempt);
     return new Response(JSON.stringify(reply.body ?? {}), { status: reply.status ?? 200, headers: { 'content-type': 'application/json' } });
-  });
+  }) as unknown as typeof fetch;
 
   return fake;
 }

@@ -4,7 +4,7 @@ import { type DeadLetter, type DeltaRow, type OutboxEntry, SYNC_META_KEYS, type 
 
 /**
  * The narrow slice of a key/value store the sync layer needs, so the same `MemoirStore` runs over
- * IndexedDB in the browser and over a Map wherever IndexedDB is absent — SSR, and the jsdom suite, which
+ * IndexedDB in the browser and over a Map wherever IndexedDB is absent — SSR, and the test suite, which
  * deliberately leaves `indexedDB` undefined so the offline layer has to degrade rather than throw.
  */
 export interface KeyValueBacking {

@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { purgeIfAccountChanged } from '@shadow-library/web/offline';
 
 import { getProgress, purgeOnLogout, saveProgress } from '@/lib/apis';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { breakCostNote, breakStreakNote, lockBreakNote, questMeta, rescheduleSummary, scheduleSummary } from '@/features/quests';
 import { formatShortDate, type Quest, type QuestOccurrence, type QuestProgress, type QuestSummary, type Recurrence } from '@/lib/data';

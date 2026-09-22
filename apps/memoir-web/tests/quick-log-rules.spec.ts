@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   applyMarkdownTool,
   CAP_ADVISORY_THRESHOLD,
   capAdvisoryForTier,
+  createMemoirData,
   deriveCapAdvisory,
   deriveThresholdOffer,
   firstOfDayReward,
@@ -21,6 +22,7 @@ import {
   sameDayWeight,
   SIDE_QUEST_DAILY_REWARD_LIMIT,
   snapshotPresetToMeal,
+  todayISODate,
   type WeightEntry,
   weightError,
 } from '@/lib/data';
@@ -232,5 +234,17 @@ describe('markdown-lite', () => {
 
   it('should strip markers from an excerpt', () => {
     expect(journalExcerpt('- **Five kilometres** felt short')).toBe('Five kilometres felt short');
+  });
+});
+
+describe('FixtureQuickLogProvider health.save message', () => {
+  it('should name the metric and its value when a health save is the day’s first', async () => {
+    const data = createMemoirData();
+    const yesterday = new Date(`${todayISODate()}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    const result = await data.quickLogs.dispatchCommand({ type: 'health.save', key: 'water', date: yesterday.toISOString().slice(0, 10), value: 250 });
+
+    expect(result.message).toBe('Water logged: 250 ml.');
   });
 });

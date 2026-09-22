@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { nextOccurrenceAfter, occursOn, type Recurrence } from '@/lib/data';
 

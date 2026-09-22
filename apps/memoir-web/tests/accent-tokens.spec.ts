@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { type AccentKey } from '@/lib/data';
 
@@ -152,7 +152,7 @@ function surfaces(vars: Vars): Surfaces {
 describe('equipped accent tokens', () => {
   const cases = (Object.keys(ACCENTS) as AccentKey[]).flatMap(key => THEMES.map(theme => [key, theme] as const));
 
-  it.each(cases)('should give %s a visibly different accent from the default in the %s theme', (key, theme) => {
+  it.each(cases)('should give %s a visibly different accent from the default in the %s theme', (key: AccentKey, theme: Theme) => {
     const base = platformVars(theme);
     const equipped = accentVars(key, theme);
 
@@ -160,7 +160,7 @@ describe('equipped accent tokens', () => {
     expect(deltaE2000(resolve(equipped, 'sh-accent-text'), resolve(base, 'sh-accent-text'))).toBeGreaterThanOrEqual(MIN_VISIBLE_DISTANCE);
   });
 
-  it.each(cases)('should keep %s accent text at 4.5:1 and the accent at 3:1 against %s surfaces', (key, theme) => {
+  it.each(cases)('should keep %s accent text at 4.5:1 and the accent at 3:1 against %s surfaces', (key: AccentKey, theme: Theme) => {
     const vars = accentVars(key, theme);
     const accent = toRgba(resolve(vars, 'sh-accent'));
     const accentText = toRgba(resolve(vars, 'sh-accent-text'));

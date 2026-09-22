@@ -1,8 +1,11 @@
+import { type QueryClient } from '@tanstack/react-query';
+
 import { memoirQueryClient } from '@/lib/data';
 import {
   type AccountMarker,
   coverageKey,
   type DeltaPage,
+  type FetchLike,
   type KeyValueBacking,
   MemoirStore,
   SNAPSHOT_DOMAINS,
@@ -17,6 +20,7 @@ import {
   SyncedQuickLogProvider,
   SyncedReflectProvider,
   SyncEngine,
+  type SyncSnapshot,
   type UnloadBacking,
   type WireCommandOutcome,
 } from '@/lib/sync';
@@ -24,6 +28,69 @@ import {
 export interface RecordedBatch {
   commandIds: string[];
   types: string[];
+}
+
+/**
+ * Polls `predicate` until it is true, for assertions that settle after a promise-chain hop rather than
+ * synchronously. Most callers settle within a handful of microtask turns (fake HTTP responses resolve
+ * without real I/O), so this drains a few of those — free, no real timer — before falling back to a
+ * bounded `setImmediate` loop (the task queue, cheaper than `setTimeout`'s timer overhead) for the rarer
+ * case of a macrotask-scheduled continuation. Kept short: a condition that needs the task queue should
+ * reach it quickly rather than spend the budget re-checking a microtask queue it will never settle on.
+ */
+export async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 1_000): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (await predicate()) return;
+    await Promise.resolve();
+  }
+  const deadline = Date.now() + timeoutMs;
+  while (!(await predicate())) {
+    if (Date.now() > deadline) throw new Error('waitFor: condition was not met before the timeout');
+    await new Promise(resolve => setImmediate(resolve));
+  }
+}
+
+/**
+ * The same event-driven trade as {@link waitForState}, for a value that only changes through a React Query
+ * cache write (a `useQuery` result observed via `renderHook`, not an engine snapshot): the cache's own
+ * `subscribe` fires on every query-cache event, so this settles in one hop rather than a poll loop's budget.
+ */
+export function waitForQuery(queryClient: QueryClient, predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
+  if (predicate()) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(new Error('waitForQuery: condition was not met before the timeout'));
+    }, timeoutMs);
+    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
+      if (!predicate()) return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
+/**
+ * Waits for an engine snapshot the same way a subscriber would, rather than polling for one: `engine.subscribe`
+ * already notifies synchronously on every state change, so this settles in exactly one hop instead of
+ * however many polling attempts it takes to next observe the queue — the difference that matters when the
+ * process is under load and a poll loop's fixed attempt budget stops being "a few free microtask turns".
+ */
+export function waitForState(engine: SyncEngine, predicate: (snapshot: SyncSnapshot) => boolean, timeoutMs = 1_000): Promise<void> {
+  if (predicate(engine.getSnapshot())) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(new Error('waitForState: condition was not met before the timeout'));
+    }, timeoutMs);
+    const unsubscribe = engine.subscribe(() => {
+      if (!predicate(engine.getSnapshot())) return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    });
+  });
 }
 
 export interface FakeServerOptions {
@@ -38,7 +105,7 @@ export interface FakeServerOptions {
 }
 
 export interface FakeServer {
-  fetchImpl: typeof fetch;
+  fetchImpl: FetchLike;
   batches: RecordedBatch[];
   deltaRequests: string[];
   deviceRegistrations: string[];
@@ -112,7 +179,7 @@ export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
     const page = options.pages?.[server.pageIndex] ?? EMPTY_PAGE;
     if (options.pages && server.pageIndex < options.pages.length - 1) server.pageIndex += 1;
     return deltaResponse(url, page, server.epoch, options.serves);
-  }) as typeof fetch;
+  }) as FetchLike;
 
   return server;
 }
@@ -143,7 +210,7 @@ export interface TestEngineOptions extends FakeServerOptions {
   onAccountChanged?: () => void;
   marker?: AccountMarker;
   unload?: UnloadBacking;
-  fetchImpl?: (server: FakeServer) => typeof fetch;
+  fetchImpl?: (server: FakeServer) => FetchLike;
   outcomeTimeoutMs?: number;
   maxPages?: number;
 }

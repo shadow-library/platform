@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, setSystemTime, spyOn } from 'bun:test';
 import { toast } from '@shadow-library/ui';
 
 import { accountApi, type AccountResponseDto } from '@/lib/apis';
@@ -14,7 +14,7 @@ import {
 } from '@/lib/data';
 import { type DeltaPage, type KeyValueBacking, MissingSessionProbeError, projectFinanceRows, SYNC_META_KEYS, SyncedAccountProvider } from '@/lib/sync';
 
-import { httpFake } from './http-fake';
+import { httpFake, restoreFetch } from './http-fake';
 import { withTimeZone } from './setup';
 import { createLiveTestEngine, createTestEngine, sharedBacking, sharedMarker } from './sync-harness';
 
@@ -66,8 +66,8 @@ async function provider(domains: DeltaPage['domains'] = {}): Promise<SyncedAccou
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
+  restoreFetch();
+  mock.restore();
 });
 
 describe('Account settings over the wire', () => {
@@ -145,11 +145,16 @@ describe('Account settings over the wire', () => {
       },
     });
 
+    // `patchDay` fires its confirming re-sync as `void this.sync.sync({ fresh: true })` — spying on it
+    // from before the dispatch, rather than polling the projection afterwards, lets the test await that
+    // exact pass instead of guessing how many ticks its background start takes to land.
+    const sync = spyOn(live.engine, 'sync');
     const result = await new SyncedAccountProvider(live.engine).dispatchCommand({ type: 'day.set', patch: { monthlyBudgetMinor: 160000 } });
     await release();
+    await sync.mock.results.at(-1)?.value;
 
     expect(result.status).toBe('applied');
-    await vi.waitFor(() => expect(projectFinanceRows(live.engine.domains()).settings.monthlyBudgetMinor).toBe(160000));
+    expect(projectFinanceRows(live.engine.domains()).settings.monthlyBudgetMinor).toBe(160000);
   });
 
   it('should patch one notification category without touching the others', async () => {
@@ -388,7 +393,7 @@ describe('Account deletion over the wire', () => {
 
       expect(await subject.dispatchCommand({ type: 'deletion.begin' })).toMatchObject({ status: 'rejected', error: { code: DELETION_START_UNCONFIRMED_CODE } });
       expect(fake.count('POST', '/api/v1/account/deletion')).toBe(1);
-      vi.unstubAllGlobals();
+      restoreFetch();
     }
   });
 
@@ -437,8 +442,7 @@ describe('Account deletion over the wire', () => {
   });
 
   it('should drop acknowledgements that are more than an hour old', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-08-24T09:00:00.000Z'));
+    setSystemTime(new Date('2026-08-24T09:00:00.000Z'));
     try {
       httpFake({ 'GET /api/v1/account/deletion': () => ({ body: { deletionState: 'none' } }) });
       const subject = await provider();
@@ -446,15 +450,15 @@ describe('Account deletion over the wire', () => {
       await subject.dispatchCommand({ type: 'deletion.continue' });
       expect((await subject.getDeletion()).stage).toEqual({ kind: 'confirm' });
 
-      vi.setSystemTime(new Date('2026-08-24T09:59:00.000Z'));
+      setSystemTime(new Date('2026-08-24T09:59:00.000Z'));
       expect((await subject.getDeletion()).acknowledged).toHaveLength(2);
 
-      vi.setSystemTime(new Date('2026-08-24T10:01:00.000Z'));
+      setSystemTime(new Date('2026-08-24T10:01:00.000Z'));
       const stale = await subject.getDeletion();
       expect(stale).toMatchObject({ stage: { kind: 'idle' }, acknowledged: [] });
       expect(await subject.dispatchCommand({ type: 'deletion.begin' })).toMatchObject({ status: 'rejected', message: DELETION_UNACKNOWLEDGED });
     } finally {
-      vi.useRealTimers();
+      setSystemTime();
     }
   });
 
@@ -489,7 +493,6 @@ describe('Account deletion over the wire', () => {
 
 describe('Billing over the wire', () => {
   it('should open a checkout session for the chosen period', async () => {
-    Object.defineProperty(window, 'location', { value: { pathname: '/settings/billing', assign: vi.fn() }, writable: true, configurable: true });
     const fake = httpFake({ 'POST /api/v1/billing/checkout': () => ({ body: { url: 'https://pay.test/session', expiresAt: '2026-08-24T10:00:00.000Z' } }) });
 
     const result = await (await provider()).dispatchCommand({ type: 'billing.checkout', plan: 'yearly' });
@@ -573,11 +576,15 @@ describe('Devices over the wire', () => {
       },
     });
 
+    // Same confirming-resync shape as the monthly-budget pass above: spy on the fire-and-forget
+    // `sync.sync({ fresh: true })` and await exactly that call instead of polling for its effect.
+    const sync = spyOn(live.engine, 'sync');
     const result = await subject.dispatchCommand({ type: 'device.remove', deviceId: 'device-b' });
     await release();
+    await sync.mock.results.at(-1)?.value;
 
     expect(result.status).toBe('applied');
-    await vi.waitFor(async () => expect((await subject.getAppSync()).devices).toEqual([]));
+    expect((await subject.getAppSync()).devices).toHaveLength(0);
   });
 });
 
@@ -635,7 +642,7 @@ describe('Account deletion against the signed-in session', () => {
   });
 
   it('should refuse to start the erasure when the session belongs to another account', async () => {
-    const warning = vi.spyOn(toast, 'warning');
+    const warning = spyOn(toast, 'warning');
     const fake = httpFake(ELEVATED);
     const subject = await confirmedProvider(() => Promise.resolve('account-b'));
 

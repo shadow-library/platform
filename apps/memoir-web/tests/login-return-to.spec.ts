@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { safeReturnTo } from '@/lib/return-to';
 import { signInUrl } from '@/lib/session';
@@ -13,7 +13,7 @@ describe('safeReturnTo', () => {
     ['/quests/q1?tab=log#history', '/quests/q1?tab=log#history'],
     ['/log/meals/', '/log/meals/'],
     ['/finance?note=a%2F%2Fb', '/finance?note=a%2F%2Fb'],
-  ])('should keep the same-origin path %s', (candidate, expected) => {
+  ])('should keep the same-origin path %s', (candidate: string, expected: string) => {
     expect(safeReturnTo(candidate)).toBe(expected);
   });
 
@@ -44,19 +44,22 @@ describe('safeReturnTo', () => {
     '/.//evil.example/plan?x=1',
     '/a/../%2F/evil.example',
     '/%2e%2e/%2F/evil.example',
-  ])('should reject protocol-relative return paths with embedded control characters (%j)', candidate => {
+  ])('should reject protocol-relative return paths with embedded control characters (%j)', (candidate: string) => {
     expect(safeReturnTo(candidate)).toBe('/');
   });
 
-  it.each(['//evil.example', 'https://evil.example/plan', 'http:/evil.example', 'javascript:alert(1)', 'evil.example', '', '/%E0%A4%A'])('should reject %j', candidate => {
+  it.each(['//evil.example', 'https://evil.example/plan', 'http:/evil.example', 'javascript:alert(1)', 'evil.example', '', '/%E0%A4%A'])(
+    'should reject %j',
+    (candidate: string) => {
+      expect(safeReturnTo(candidate)).toBe('/');
+    },
+  );
+
+  it.each([undefined, null, 42, { path: '/plan' }])('should reject a non-string return path %j', (candidate: unknown) => {
     expect(safeReturnTo(candidate)).toBe('/');
   });
 
-  it.each([undefined, null, 42, { path: '/plan' }])('should reject a non-string return path %j', candidate => {
-    expect(safeReturnTo(candidate)).toBe('/');
-  });
-
-  it.each(LOGIN_PATHS)('should not return to the sign-in redirect itself (%j)', candidate => {
+  it.each(LOGIN_PATHS)('should not return to the sign-in redirect itself (%j)', (candidate: string) => {
     expect(safeReturnTo(candidate)).toBe('/');
   });
 

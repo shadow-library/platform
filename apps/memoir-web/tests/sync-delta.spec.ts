@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { type Command } from '@/lib/data';
-import { type DeltaPage, NEWER_DOMAINS, SYNC_DOMAINS, SYNC_META_KEYS, SyncedDataProvider } from '@/lib/sync';
+import { type DeltaPage, type FetchLike, NEWER_DOMAINS, SYNC_DOMAINS, SYNC_META_KEYS, SyncedDataProvider } from '@/lib/sync';
 
 import { coverageFor, createTestEngine, deltaResponse, domainsExcept, type FakeServer, sharedBacking, type TestEngine } from './sync-harness';
 
@@ -46,6 +46,9 @@ function page(overrides: Partial<DeltaPage>): DeltaPage {
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
 }
+
+/** `navigator` is a single process-wide object under bun, so a test that leaves it offline would otherwise bleed into every file that runs after this one. */
+afterAll(() => setOnline(true));
 
 describe('delta ingestion', () => {
   beforeEach(() => setOnline(true));
@@ -177,16 +180,15 @@ describe('delta ingestion', () => {
 });
 
 /** Stands in for a server released before a domain existed: it refuses the first unknown domain it reads, as `SYN_001`. */
-function refusingDomains(unknown: string[], named = true, refusing: (server: FakeServer) => boolean = () => true): (server: FakeServer) => typeof fetch {
-  return server =>
-    (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = decodeURIComponent(String(input));
-      const requested = url.includes('/sync/delta') ? (new URL(url, 'http://memoir.test').searchParams.get('domains')?.split(',') ?? []) : [];
-      const refused = refusing(server) ? requested.find(domain => unknown.includes(domain)) : undefined;
-      if (!refused) return server.fetchImpl(input, init);
-      const message = named ? `Unknown sync domain '${refused}'` : 'Validation failed';
-      return new Response(JSON.stringify({ code: 'SYN_001', message }), { status: 400, headers: { 'content-type': 'application/json' } });
-    }) as typeof fetch;
+function refusingDomains(unknown: string[], named = true, refusing: (server: FakeServer) => boolean = () => true): (server: FakeServer) => FetchLike {
+  return server => async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = decodeURIComponent(String(input));
+    const requested = url.includes('/sync/delta') ? (new URL(url, 'http://memoir.test').searchParams.get('domains')?.split(',') ?? []) : [];
+    const refused = refusing(server) ? requested.find(domain => unknown.includes(domain)) : undefined;
+    if (!refused) return server.fetchImpl(input, init);
+    const message = named ? `Unknown sync domain '${refused}'` : 'Validation failed';
+    return new Response(JSON.stringify({ code: 'SYN_001', message }), { status: 400, headers: { 'content-type': 'application/json' } });
+  };
 }
 
 function requestedDomains(url: string): string[] {
@@ -256,11 +258,12 @@ describe('domain coverage', () => {
     const heroEvent = (id: string): Record<string, unknown> => ({ id, type: 'quest_complete', date: TODAY, syncSeq: id });
     const olderTab = createTestEngine({ backing, fetchImpl: refusingDomains(['hero_events']), pages: [page({ cursor: '43' })] });
     let backfillPages = 0;
-    const withdrawingDuringBackfill = (server: FakeServer): typeof fetch =>
-      (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const withdrawingDuringBackfill =
+      (server: FakeServer): FetchLike =>
+      async (input: RequestInfo | URL, init?: RequestInit) => {
         if (requestedDomains(String(input)).join(',') === 'hero_events' && ++backfillPages === withdrawOnPage) await olderTab.engine.start();
         return server.fetchImpl(input, init);
-      }) as typeof fetch;
+      };
     const backfilling = createTestEngine({
       backing,
       fetchImpl: withdrawingDuringBackfill,
@@ -440,8 +443,9 @@ describe('domain coverage', () => {
     await first.store.writeMeta(SYNC_META_KEYS.coveredDomains, coverageFor(domainsExcept('hero_events')));
 
     const heroEvent = (id: string): Record<string, unknown> => ({ id, type: 'quest_complete', date: TODAY, syncSeq: id });
-    const routed = (server: FakeServer): typeof fetch =>
-      (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const routed =
+      (server: FakeServer): FetchLike =>
+      async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = decodeURIComponent(String(input));
         if (!url.includes('/sync/delta')) return server.fetchImpl(input, init);
         server.deltaRequests.push(url);
@@ -453,7 +457,7 @@ describe('domain coverage', () => {
             ? page({ cursor: '10', hasMore: true, domains: { hero_events: [heroEvent('10')] } })
             : page({ cursor: '20', domains: { hero_events: [heroEvent('20')] } });
         return deltaResponse(input, body, server.epoch);
-      }) as typeof fetch;
+      };
 
     const second = createTestEngine({ backing, maxPages: 1, fetchImpl: routed });
     await second.engine.start();

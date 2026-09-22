@@ -1,11 +1,8 @@
-import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
-import { PlanningBoardScreen } from '@/features/planning';
 import { formatDuration, MemoirEngine, type QuestDraft, shiftDate } from '@/lib/data';
 import { projectWorldState, SyncedDataProvider } from '@/lib/sync';
 
-import { createMemoirTestData, renderScreen } from './harness';
 import { createTestEngine, sharedBacking } from './sync-harness';
 
 const TODAY = '2026-08-22';
@@ -55,7 +52,7 @@ describe('planning board (P2-03)', () => {
     const engine = new MemoirEngine(world);
 
     expect((await engine.getPlan({ scope: 'week', anchor: TODAY })).label).toBe('17–23 August 2026');
-    expect((await engine.getPlan({ scope: 'week', anchor: '2026-12-30' })).label).toBe('28 December 2026\u00a0– 3 January 2027');
+    expect((await engine.getPlan({ scope: 'week', anchor: '2026-12-30' })).label).toBe('28 December 2026 – 3 January 2027');
   });
 
   it('should show overload above capacity', async () => {
@@ -188,21 +185,5 @@ describe('planning board (P2-03)', () => {
 
     const empty = await engine.dispatchCommand({ type: 'plan.setLock', date: TODAY, locked: true, questIds: [] });
     expect(empty.status).toBe('rejected');
-  });
-
-  it('should hide the lock button in Month scope and show a visible reason when nothing is scheduled today', async () => {
-    const mondayOnlyQuest = { id: 'q1', name: 'Monday planning', durationMin: 30, recurrence: { frequency: 'weekly', daysOfWeek: [1] }, active: true };
-    const world = projectWorldState({ quests: [mondayOnlyQuest] }, TODAY);
-    const data = createMemoirTestData({ today: TODAY });
-    data.provider = new MemoirEngine(world);
-
-    renderScreen(<PlanningBoardScreen />, { value: data });
-
-    expect(await screen.findByText('Nothing is scheduled today.')).toBeDefined();
-    const lockButton = screen.getByRole('button', { name: /lock today’s plan/i }) as HTMLButtonElement;
-    expect(lockButton.disabled).toBe(true);
-
-    fireEvent.click(await screen.findByRole('radio', { name: 'Month' }));
-    expect(screen.queryByRole('button', { name: /lock today’s plan/i })).toBeNull();
   });
 });

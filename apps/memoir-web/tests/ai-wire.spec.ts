@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 
 import { type DeltaPage, SyncedReflectProvider, type SyncEngine } from '@/lib/sync';
 
-import { httpFake } from './http-fake';
+import { httpFake, restoreFetch } from './http-fake';
 import { withTimeZone } from './setup';
-import { createLiveTestEngine, createTestEngine } from './sync-harness';
+import { createLiveTestEngine, createTestEngine, waitFor } from './sync-harness';
 
 const TODAY = '2026-08-24';
 
@@ -44,7 +44,7 @@ const DECLINED = (dataClass: string): Record<string, unknown> => ({ dataClass, g
 
 const DECIDED_ELSEWHERE = { code: 'AI_011', type: 'Conflict', message: 'AI consent has already been decided for this account' };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(restoreFetch);
 
 describe('Coaching consent', () => {
   it('should hold an owner who has never decided at the gate', async () => {
@@ -127,10 +127,10 @@ describe('Coaching consent', () => {
     const release = await live.holdPass();
     live.rows = { ai_consents: [DECLINED('journal_reflection_reason'), DECLINED('health')] };
     httpFake({ 'PUT /api/v1/ai/consents': () => ({ status: 409, body: DECIDED_ELSEWHERE }) });
-    const sync = vi.spyOn(live.engine, 'sync');
+    const sync = spyOn(live.engine, 'sync');
 
     const pending = reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
-    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await waitFor(() => sync.mock.calls.length > 0);
     await release();
 
     expect((await pending).status).toBe('applied');
@@ -167,10 +167,10 @@ describe('Coaching consent', () => {
         return { body: { consents: [] } };
       },
     });
-    const sync = vi.spyOn(live.engine, 'sync');
+    const sync = spyOn(live.engine, 'sync');
 
     const pending = reflect.dispatchCommand({ type: 'ai.setConsent', consent: { journal: false, health: false } });
-    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await waitFor(() => sync.mock.calls.length > 0);
     await release();
 
     expect((await pending).status).toBe('applied');
@@ -215,10 +215,10 @@ describe('Coaching requests', () => {
         return { status: 201, body: { ...TASK, status: 'pending' } };
       },
     });
-    const sync = vi.spyOn(live.engine, 'sync');
+    const sync = spyOn(live.engine, 'sync');
 
     const pending = reflect.dispatchCommand({ type: 'ai.submit', question: TASK.queryText });
-    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await waitFor(() => sync.mock.calls.length > 0);
     await release();
 
     expect((await pending).status).toBe('applied');
@@ -366,10 +366,10 @@ describe('Coaching requests', () => {
         return { status: 409, body: { code: 'AI_004', type: 'Conflict', message: 'This task is no longer pending and cannot be cancelled' } };
       },
     });
-    const sync = vi.spyOn(live.engine, 'sync');
+    const sync = spyOn(live.engine, 'sync');
 
     const pending = reflect.dispatchCommand({ type: 'ai.cancel', requestId: 'task-1' });
-    await vi.waitFor(() => expect(sync).toHaveBeenCalled());
+    await waitFor(() => sync.mock.calls.length > 0);
     await release();
 
     expect(await pending).toMatchObject({
@@ -411,7 +411,7 @@ describe('Coaching requests', () => {
   });
 
   it('should count the quota month and its reset in the account’s time zone', async () => {
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-08-31T12:00:00.000Z') });
+    setSystemTime(new Date('2026-08-31T12:00:00.000Z'));
     try {
       httpFake({});
       const coach = await (
@@ -426,7 +426,7 @@ describe('Coaching requests', () => {
 
       expect(coach.quota).toMatchObject({ used: 1, resetsOn: '1 October' });
     } finally {
-      vi.useRealTimers();
+      setSystemTime();
     }
   });
 

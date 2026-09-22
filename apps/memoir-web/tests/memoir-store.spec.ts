@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { type AccountMarker, type KeyValueBacking, MemoirStore, SYNC_META_KEYS } from '@/lib/sync';
 

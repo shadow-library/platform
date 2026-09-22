@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { type Command, type OutcomeTicket } from '@/lib/data';
 import { type DeadLetter, type KeyValueBacking, MemoirStore, Outbox, type OutboxEntry, SYNC_META_KEYS, type SyncEngine } from '@/lib/sync';
@@ -26,6 +26,9 @@ async function claimed(engine: SyncEngine, command: Command): Promise<OutcomeTic
 function setOnline(online: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: online });
 }
+
+/** `navigator` is a single process-wide object under bun, so a test that leaves it offline would otherwise bleed into every file that runs after this one. */
+afterAll(() => setOnline(true));
 
 describe('Outbox', () => {
   beforeEach(() => setOnline(true));

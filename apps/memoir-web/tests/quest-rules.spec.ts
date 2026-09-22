@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:test';
 
 import { type Command, MemoirEngine, type QuestDraft } from '@/lib/data';
 import { type DeltaPage, projectWorldState, resolveThresholdMetric, SyncedDataProvider, toWireCommand } from '@/lib/sync';
@@ -168,10 +168,9 @@ describe('quest threshold wire', () => {
 
   describe('SyncedDataProvider', () => {
     beforeEach(() => {
-      vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
+      setSystemTime(new Date(`${TODAY}T12:00:00`));
     });
-    afterEach(() => vi.useRealTimers());
+    afterEach(() => setSystemTime());
 
     it('should refuse a threshold the metrics catalogue cannot address yet instead of queueing it', async () => {
       const page: DeltaPage = { cursor: '1', hasMore: false, tombstones: [], domains: { quests: [] } };

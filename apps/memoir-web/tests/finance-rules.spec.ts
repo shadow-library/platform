@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   BUILT_IN_CATEGORIES,
   convertToHomeMinor,
   deriveDueState,
+  describeAuditEntry,
+  type ExpenseAuditEntry,
   type ExpenseDetail,
   financeExpensePage,
   type FinanceSettings,
@@ -13,6 +15,7 @@ import {
   formatMinor,
   monthlyEquivalentMinor,
   parseAmountToMinor,
+  sortAuditNewestFirst,
   type Subscription,
   type SubscriptionFrequency,
 } from '@/lib/data';
@@ -101,7 +104,7 @@ describe('monthlyEquivalentMinor', () => {
     ['yearly', 16300, 1358],
   ];
 
-  it.each(cases)('should amortise a %s charge', (frequency, amountMinor, expected) => {
+  it.each(cases)('should amortise a %s charge', (frequency: SubscriptionFrequency, amountMinor: number, expected: number) => {
     expect(monthlyEquivalentMinor(amountMinor, frequency)).toBe(expected);
   });
 
@@ -322,5 +325,53 @@ describe('financeSubscriptionsView', () => {
     const summary = financeSummary(state);
     expect(summary.subscriptionsMonthlyMinor).toBe(1099);
     expect(summary.unconvertedSubscriptions).toEqual({ count: 1, currencies: ['NOK'] });
+  });
+});
+
+function auditEntry(id: string, action: ExpenseAuditEntry['action'], at: string, changes: ExpenseAuditEntry['changes'] = []): ExpenseAuditEntry {
+  return { id, action, changes, at };
+}
+
+describe('sortAuditNewestFirst', () => {
+  it('should sort newest server time first, then by row id for a tie', () => {
+    const created = auditEntry('10', 'created', '2026-08-20T09:00:00.000Z');
+    const amount = auditEntry('11', 'updated', '2026-08-21T11:02:00.000Z', [{ field: 'amountMinor', from: '420', to: '520' }]);
+    const category = auditEntry('12', 'updated', '2026-08-22T08:30:00.000Z', [{ field: 'categoryId', from: 'shopping', to: 'health' }]);
+
+    expect(sortAuditNewestFirst([created, amount, category]).map(entry => entry.id)).toEqual(['12', '11', '10']);
+  });
+
+  it('should sort a local entry with no server sequence above its peers', () => {
+    const synced = auditEntry('10', 'created', '2026-08-20T09:00:00.000Z');
+    const local = auditEntry('local-1', 'updated', '2026-08-20T09:00:00.000Z');
+
+    expect(sortAuditNewestFirst([synced, local]).map(entry => entry.id)).toEqual(['local-1', '10']);
+  });
+});
+
+describe('describeAuditEntry', () => {
+  it('should describe created, receipt-confirmed and deleted actions by name alone', () => {
+    expect(describeAuditEntry(auditEntry('1', 'created', '2026-08-20T09:00:00.000Z'), 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Created']);
+    expect(describeAuditEntry(auditEntry('1', 'receipt_confirmed', '2026-08-20T09:00:00.000Z'), 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Receipt attached']);
+    expect(describeAuditEntry(auditEntry('1', 'deleted', '2026-08-20T09:00:00.000Z'), 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Deleted']);
+  });
+
+  it('should fall back to Edited for an update with no recorded field changes', () => {
+    expect(describeAuditEntry(auditEntry('1', 'updated', '2026-08-20T09:00:00.000Z'), 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Edited']);
+  });
+
+  it('should describe one line per changed field, formatted for its type', () => {
+    const entry = auditEntry('1', 'updated', '2026-08-22T08:30:00.000Z', [
+      { field: 'categoryId', from: 'shopping', to: 'health' },
+      { field: 'note', from: null, to: 'Knee support' },
+      { field: 'amountMinor', from: '420', to: '520' },
+    ]);
+
+    expect(describeAuditEntry(entry, 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Category Shopping → Health', 'Note added: “Knee support”', 'Amount €4.20 → €5.20']);
+  });
+
+  it('should say a field was removed rather than added when the new value is null', () => {
+    const entry = auditEntry('1', 'updated', '2026-08-22T08:30:00.000Z', [{ field: 'note', from: 'Knee support', to: null }]);
+    expect(describeAuditEntry(entry, 'EUR', BUILT_IN_CATEGORIES)).toEqual(['Note removed (was “Knee support”)']);
   });
 });
