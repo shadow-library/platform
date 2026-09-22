@@ -102,6 +102,17 @@ export async function issueBotKey(orgAdmin: APIRequestContext, bot: Organisation
   return { keyId: body.id, key: body.key };
 }
 
+/** Suspends the bot, the state its key exchange and every policy decision for it are refused in. */
+export async function suspendOrganisationBot(orgAdmin: APIRequestContext, bot: OrganisationBot): Promise<void> {
+  const response = await identityMutate(orgAdmin, 'post', `/api/v1/organisations/${bot.organisationId}/bots/${bot.botId}/suspend`);
+  await expectStatus(response, 200, `suspend ${bot.handle}`);
+}
+
+export async function resumeOrganisationBot(orgAdmin: APIRequestContext, bot: OrganisationBot): Promise<void> {
+  const response = await identityMutate(orgAdmin, 'post', `/api/v1/organisations/${bot.organisationId}/bots/${bot.botId}/resume`);
+  await expectStatus(response, 200, `resume ${bot.handle}`);
+}
+
 export interface BotApiOptions {
   /** A user session carried alongside the bot key, to prove the guard admits the bot on its own and attaches no session. */
   session?: IdentitySession;

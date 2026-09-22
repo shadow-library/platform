@@ -77,15 +77,21 @@ async function readCsrfToken(ctx: APIRequestContext, host: string): Promise<stri
 }
 
 /**
- * Performs a mutating request with the double-submit CSRF token attached. It first GETs `csrfSeedPath` so the
- * server can set the `csrf-token` cookie — the CSRF middleware only issues (and only enforces) a token once the
- * request already carries a cookie, so this step is a no-op for an unauthenticated context, where CSRF is not
- * enforced anyway. The token half of the resulting cookie is then echoed in the `x-csrf-token` header.
+ * The double-submit header for `ctx`'s `csrf-token` cookie, minting one by GETting `seedPath` first — the CSRF
+ * middleware only issues (and only enforces) a token once the request already carries a session cookie, so this is a
+ * no-op on an unauthenticated context, where CSRF is not enforced anyway. Take the header once and reuse it when
+ * firing concurrent mutations: each seeding GET reissues the cookie, so a request racing another's reissue would echo
+ * a token the jar no longer holds and be refused.
  */
-export async function mutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MutateOptions = {}): Promise<APIResponse> {
-  const seed = await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
+export async function csrfHeaders(ctx: APIRequestContext, seedPath = '/api/auth/session'): Promise<Record<string, string>> {
+  const seed = await ctx.get(seedPath);
   const token = await readCsrfToken(ctx, new URL(seed.url()).hostname);
-  const headers = { ...(token ? { 'x-csrf-token': token } : {}), ...options.headers };
+  return token ? { 'x-csrf-token': token } : {};
+}
+
+/** Performs a mutating request with the double-submit CSRF token attached. */
+export async function mutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MutateOptions = {}): Promise<APIResponse> {
+  const headers = { ...(await csrfHeaders(ctx, options.csrfSeedPath)), ...options.headers };
   return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
 }
 

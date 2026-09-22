@@ -67,6 +67,12 @@ export interface OrgOAuthApp extends OAuthTestClient {
   readonly organisationId: string;
 }
 
+export interface ScimGroup {
+  readonly groupId: string;
+  readonly displayName: string;
+  readonly organisationId: string;
+}
+
 /**
  * Declaring the constants
  *
@@ -150,13 +156,32 @@ export async function updateOrganisationMember(organisationId: string, userId: s
   await sql`UPDATE organisation_members SET ${sql(Object.fromEntries(columns))} WHERE organisation_id = ${organisationId} AND user_id = ${userId}`;
 }
 
-/** Records the user in the organisation's SCIM directory; `managed` fences the account to that organisation's grants. */
-export async function setScimDirectoryEntry(organisationId: string, userId: string, managed: boolean): Promise<void> {
-  await identityDb()`
+/** Records the user in the organisation's SCIM directory, returning the directory entry id; `managed` fences the account to that organisation's grants. */
+export async function setScimDirectoryEntry(organisationId: string, userId: string, managed: boolean): Promise<string> {
+  const [row] = await identityDb()<{ id: string }[]>`
     INSERT INTO scim_directory (organisation_id, user_id, user_name, managed)
     VALUES (${organisationId}, ${userId}, ${`e2e-scim-${userId}`}, ${managed})
     ON CONFLICT (organisation_id, user_id) DO UPDATE SET managed = EXCLUDED.managed, updated_at = now()
+    RETURNING id::text
   `;
+  if (!row) throw new IdentityOrgError(`scim directory upsert for user ${userId} returned no row`);
+  return row.id;
+}
+
+/** A SCIM group of the organisation, which an admin may map to an application role. Groups and their members cascade with the organisation. */
+export async function createScimGroup(organisationId: string, label = 'group'): Promise<ScimGroup> {
+  const displayName = `E2E ${label} ${randomBytes(4).toString('hex')}`;
+  const [row] = await identityDb()<{ id: string }[]>`
+    INSERT INTO scim_groups (organisation_id, display_name) VALUES (${organisationId}, ${displayName}) RETURNING id::text
+  `;
+  if (!row) throw new IdentityOrgError(`scim group insert for organisation ${organisationId} returned no row`);
+  return { groupId: row.id, displayName, organisationId };
+}
+
+/** Adds an unmanaged directory entry for `userId` and puts it in `group`, the membership a SCIM push would write. */
+export async function addScimGroupMember(group: ScimGroup, userId: string): Promise<void> {
+  const directoryId = await setScimDirectoryEntry(group.organisationId, userId, false);
+  await identityDb()`INSERT INTO scim_group_members (group_id, directory_id) VALUES (${group.groupId}, ${directoryId}) ON CONFLICT DO NOTHING`;
 }
 
 export async function listOwnedApplicationIds(organisationId: string): Promise<number[]> {
