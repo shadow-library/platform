@@ -5,7 +5,7 @@ import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round'
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
 import { type PremiseInput, type PremiseOptions, type PremiseSelection, premiseStep } from '@modules/blueprint/steps/premise.step';
 
-import { ledgerEntry } from './blueprint-fixtures';
+import { ledgerEntry, pageTx } from './blueprint-fixtures';
 
 function output(overrides: Partial<BlueprintPremiseOutput> = {}): BlueprintPremiseOutput {
   return {
@@ -30,8 +30,8 @@ function options(input: PremiseInput | null = null, previous: PremiseOptions | n
   return premiseStep.toRound(output(), { previous, input, focus: null }).options;
 }
 
-function materialise(selection: PremiseSelection, round: PremiseOptions | null = options()): ReturnType<typeof premiseStep.materialise> {
-  const ctx = { round: round ? { round: 1, options: round } : null, ledger: [], project: {}, tx: {} } as unknown as MaterialiseContext<PremiseOptions>;
+function materialise(selection: PremiseSelection, round: PremiseOptions | null = options(), page: string | null = null): ReturnType<typeof premiseStep.materialise> {
+  const ctx = { round: round ? { round: 1, options: round } : null, ledger: [], project: { id: 7n }, tx: pageTx(page) } as unknown as MaterialiseContext<PremiseOptions>;
   return premiseStep.materialise(selection, ctx);
 }
 

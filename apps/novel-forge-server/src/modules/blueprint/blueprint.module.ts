@@ -1,6 +1,7 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
+import { ActorModule } from '../actor/actor.module';
 import { AiModule } from '../ai/ai.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { RefinementModule } from '../refinement/refinement.module';
@@ -13,9 +14,10 @@ import { LedgerService } from './ledger/ledger.service';
 import { BlueprintStageService } from './stage/blueprint-stage.service';
 import { BLUEPRINT_STEP_REGISTRY } from './steps/blueprint-steps';
 import { PremisePreviewService } from './steps/premise-preview.service';
+import { TitleChecksService } from './steps/title-checks.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, PluginsModule, RefinementModule],
+  imports: [ActorModule, DatabaseModule, AiModule, PluginsModule, RefinementModule],
   controllers: [LedgerController],
   providers: [
     { token: BlueprintStepRegistry, useFactory: () => BLUEPRINT_STEP_REGISTRY },
@@ -25,7 +27,17 @@ import { PremisePreviewService } from './steps/premise-preview.service';
     BlueprintRoundRunner,
     BlueprintStageService,
     PremisePreviewService,
+    TitleChecksService,
   ],
-  exports: [LedgerService, BlueprintRoundService, BlueprintStepService, BlueprintRoundRunner, BlueprintStepRegistry, BlueprintStageService, PremisePreviewService],
+  exports: [
+    LedgerService,
+    BlueprintRoundService,
+    BlueprintStepService,
+    BlueprintRoundRunner,
+    BlueprintStepRegistry,
+    BlueprintStageService,
+    PremisePreviewService,
+    TitleChecksService,
+  ],
 })
 export class BlueprintModule {}

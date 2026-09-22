@@ -5,12 +5,11 @@ import { type AnyBlueprintStep, type AnyLockingStep, isLocking } from '../engine
 import { filterLedgerEntries } from '../ledger/ledger-entries';
 
 export const GATE_TOPIC = 'gate';
-export const READER_PROMISE_TOPIC = 'promise';
 
 export type BlueprintStage = 'blueprint' | 'workspace';
 export type BlueprintPhaseStatus = 'done' | 'current' | 'locked' | 'open';
 
-type StageLedgerEntry = Pick<Ledger.Entry, 'kind' | 'phase' | 'topic' | 'payload' | 'stepKey'>;
+export type StageLedgerEntry = Pick<Ledger.Entry, 'kind' | 'phase' | 'topic' | 'payload' | 'stepKey'>;
 
 export interface BlueprintStepProgress {
   key: string;
@@ -77,15 +76,8 @@ export interface ImportCoverage {
 
 const DECIDED_KINDS: Ledger.Kind[] = ['decision', 'system'];
 
-function isDecided(entry: StageLedgerEntry): boolean {
+export function isDecided(entry: StageLedgerEntry): boolean {
   return DECIDED_KINDS.includes(entry.kind);
-}
-
-/** The reader promise's drivers (T7 writes them as `payload.drivers`); none until the promise is decided. */
-export function promiseDrivers(ledger: StageLedgerEntry[]): string[] {
-  const promise = [...ledger].reverse().find(entry => entry.topic === READER_PROMISE_TOPIC && isDecided(entry));
-  const drivers = (promise?.payload as { drivers?: unknown } | null | undefined)?.drivers;
-  return Array.isArray(drivers) ? drivers.filter((driver): driver is string => typeof driver === 'string') : [];
 }
 
 export function hasGate(ledger: StageLedgerEntry[]): boolean {

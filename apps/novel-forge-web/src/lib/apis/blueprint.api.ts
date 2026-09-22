@@ -9,6 +9,8 @@ import {
   type PremisePreviewBody,
   type PremisePreviewResponse,
   type StartBlueprintRoundBody,
+  type TitleChecksBody,
+  type TitleChecksListResponse,
 } from './api-types.gen';
 import { invalidateSoon } from './batched-invalidation';
 import { invalidateLedger } from './ledger.api';
@@ -79,6 +81,13 @@ export function useLockBlueprintStepMutation(projectId: string, stepKey: string)
 export function usePremisePreviewMutation(projectId: string): UseMutationResult<PremisePreviewResponse, ApiError, PremisePreviewBody> {
   return useMutation<PremisePreviewResponse, ApiError, PremisePreviewBody>({
     mutationFn: body => APIRequest.post(`/projects/${projectId}/blueprint/premise/preview`).body(body).execute(),
+  });
+}
+
+/** The title checks: the author's own library and the shape of a catalog card. No model call, so nothing is invalidated. */
+export function useTitleChecksMutation(projectId: string): UseMutationResult<TitleChecksListResponse, ApiError, TitleChecksBody> {
+  return useMutation<TitleChecksListResponse, ApiError, TitleChecksBody>({
+    mutationFn: body => APIRequest.post(`/projects/${projectId}/blueprint/title/checks`).body(body).execute(),
   });
 }
 

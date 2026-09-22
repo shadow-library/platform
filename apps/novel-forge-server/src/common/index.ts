@@ -13,6 +13,7 @@ export * from './finalize-gate';
 export * from './owner';
 export * from './project-status';
 export * from './publish-token';
+export * from './reader-promise';
 export * from './reveal-term';
 export * from './sanitize-content';
 export * from './seed-sample';

@@ -2,9 +2,12 @@ import { type ReactElement } from 'react';
 
 import { type StepScreenProps } from './blueprint-steps';
 import { ConceptsStep } from './ConceptsStep';
+import { HeartStep } from './HeartStep';
 import { PremiseStep } from './PremiseStep';
+import { PromiseStep } from './PromiseStep';
 import { StartStep } from './StartStep';
 import { TasteStep } from './TasteStep';
+import { TitleStep } from './TitleStep';
 
 export type StepScreenRenderer = (props: StepScreenProps) => ReactElement;
 
@@ -14,6 +17,9 @@ export const BLUEPRINT_STEP_SCREENS: Record<string, StepScreenRenderer> = {
   taste: props => <TasteStep {...props} />,
   concepts: props => <ConceptsStep {...props} />,
   premise: props => <PremiseStep {...props} />,
+  heart: props => <HeartStep {...props} />,
+  promise: props => <PromiseStep {...props} />,
+  title: props => <TitleStep {...props} />,
 };
 
 export function blueprintStepScreen(key: string): StepScreenRenderer | null {

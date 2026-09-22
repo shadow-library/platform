@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { type PassStep, type SourcedScreenStep, type StepOption } from '@modules/blueprint/engine/blueprint-step.types';
 import { startStep } from '@modules/blueprint/steps/start.step';
-import { type Blueprint, type Ledger } from '@server/database';
+import { type Blueprint, type Ledger, type PrimaryTransaction } from '@server/database';
 
 export function round(overrides: Partial<Blueprint.Round> = {}): Blueprint.Round {
   return {
@@ -113,3 +113,9 @@ export const engineOptions: EngineOptions = {
   core: [{ id: 'p1', label: 'A ferryman who lies to the dead' }],
   world: [{ id: 'w1', label: 'Every crossing costs a memory' }],
 };
+
+/** A transaction that answers `loadPageBody` with one stored page body and nothing else. */
+export function pageTx(body: string | null = null): PrimaryTransaction {
+  const rows = body === null ? [] : [{ body }];
+  return { select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }) }) } as unknown as PrimaryTransaction;
+}

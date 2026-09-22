@@ -2,8 +2,9 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { blueprintStep, BlueprintStepRegistry } from '@modules/blueprint/engine/blueprint-step.registry';
 import { type AnyBlueprintStep } from '@modules/blueprint/engine/blueprint-step.types';
-import { deriveBlueprintStage, type ImportContent, importCoverage, isStepDone, promiseDrivers } from '@modules/blueprint/stage/blueprint-stage';
+import { deriveBlueprintStage, type ImportContent, importCoverage, isStepDone } from '@modules/blueprint/stage/blueprint-stage';
 import { BlueprintStageService } from '@modules/blueprint/stage/blueprint-stage.service';
+import { promiseDrivers } from '@modules/blueprint/stage/promise-tailoring';
 import { startStep } from '@modules/blueprint/steps/start.step';
 import { type Ledger } from '@server/database';
 

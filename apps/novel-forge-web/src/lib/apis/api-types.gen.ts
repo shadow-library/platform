@@ -3310,6 +3310,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/blueprint/title/checks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Check Titles */
+    post: operations['post_api_v1_projects_projectId_blueprint_title_checks'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/blueprint/steps/{step}/lock': {
     parameters: {
       query?: never;
@@ -7129,6 +7146,29 @@ export interface components {
     PremisePreviewResponse: {
       /** @description A sample opening paragraph. It is never stored, never a decision and never the novel’s voice. */
       paragraph: string;
+    };
+    TitleChecksBody: {
+      /** @description The titles to check, at most one batch of 8. Each is trimmed, blanks and repeats are dropped, and one longer than 120 characters is refused. */
+      titles: string[];
+    };
+    TitleChecksListResponse: {
+      results: components['schemas']['TitleChecksResponse'][];
+    };
+    TitleChecksResponse: {
+      /** @description The title as it was checked, trimmed. */
+      title: string;
+      catalogFit: components['schemas']['TitleCheckResponse'];
+      library: components['schemas']['TitleCheckResponse'];
+      published: components['schemas']['TitleCheckResponse'];
+    };
+    TitleCheckResponse: {
+      /**
+       * @description `unknown` means the check did not run; it is never reported as a pass.
+       * @enum {string}
+       */
+      status: 'ok' | 'warn' | 'unknown';
+      /** @description What the check found, or why it could not be made. */
+      detail: string;
     };
     LockBlueprintStepBody: {
       /** @description The chosen option ids and the author’s edits, in the shape the step defines. */
@@ -17144,6 +17184,50 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_blueprint_title_checks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TitleChecksBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TitleChecksListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_blueprint_steps_step_lock: {
     parameters: {
       query?: never;
@@ -17660,6 +17744,10 @@ export type CancelBlueprintRoundResponse = components['schemas']['CancelBlueprin
 export type BlueprintCancelOutcome = components['schemas']['BlueprintCancelOutcome'];
 export type PremisePreviewBody = components['schemas']['PremisePreviewBody'];
 export type PremisePreviewResponse = components['schemas']['PremisePreviewResponse'];
+export type TitleChecksBody = components['schemas']['TitleChecksBody'];
+export type TitleChecksListResponse = components['schemas']['TitleChecksListResponse'];
+export type TitleChecksResponse = components['schemas']['TitleChecksResponse'];
+export type TitleCheckResponse = components['schemas']['TitleCheckResponse'];
 export type LockBlueprintStepBody = components['schemas']['LockBlueprintStepBody'];
 export type LockBlueprintStepResponse = components['schemas']['LockBlueprintStepResponse'];
 export type BlueprintLockFollowUpResponse = components['schemas']['BlueprintLockFollowUpResponse'];

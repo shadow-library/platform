@@ -49,9 +49,10 @@ Seven phases in a fixed order, grouped by altitude:
   weak option is weak (for example a mystery that gets solved rather than a question that ends a novel) instead of hiding it.
 - **Reader promise.** Up to two drivers (mystery, progression, romance, slice of life, war and adventure, political intrigue, found family), length, tone and editable
   promises to the reader. It is the last whole-novel decision and the one that tailors every later phase (see below).
-- **Title workshop.** Titles in several styles, each tied to the decision it came from; star, reject, steer with rules. It checks catalog fit, the author's own library and,
-  through web search, similar published titles, and says plainly what it could not check. The result is a working title, asked again after the first chapters and before
-  first publish.
+- **Title workshop.** Titles in several styles, each tied to the decision it came from; star, reject, steer with rules. It checks that a title fits a catalog card and that no
+  other novel in the author's own library already has it. A similar-published-titles check needs a model gateway that can search the web; where there is none, that check is
+  reported as not run, never as a pass, because a check the author believes was made is worse than one they know was not. The result is a working title, asked again after the
+  first chapters and before first publish.
 
 ### Core
 
@@ -153,6 +154,10 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - Materialisation goes through the existing change-set operations, applied immediately as the author's own action, so change history and revert work exactly as for any other
   edit. There is no Blueprint-only storage for novel content.
 - Ledger entries link to what they produced, and what they produced is plain Workspace content, editable in the Workspace like anything else.
+- A Story Bible page more than one step writes to is merged section by section: one step owns the page's title and opening, every other step owns its own headed section, and
+  a lock never rewrites a section it did not ask about. The premise page carries the premise, the theme and the ending question this way.
+- The novel's working title is an effect of the title decision, so only a Blueprint lock may set it. No other scope is offered the field, and one that sends it anyway is
+  refused — a title that moved without a decision superseding the one that named the novel would leave the book and the Notebook disagreeing with no record of why.
 - One lock writes the step's whole answer. Locking it again replaces what the step's earlier locks wrote on its topics (superseding entry for
   entry, the same option first, and withdrawing the rest), so a revisit never leaves two answers to one question active; a step may narrow which
   topics a lock replaces. Entries the author wrote directly, directions and rejections written while steering, and backlog entries are never

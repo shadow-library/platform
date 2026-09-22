@@ -60,6 +60,30 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     costToChange: 'expensive',
     lockLabel: 'Lock premise',
   },
+  heart: {
+    key: 'heart',
+    label: 'Theme and ending',
+    title: 'What this book is about underneath',
+    lede: 'The question under the plot, and what the reader waits the whole novel to learn. Both are yours: rewriting one in your own words beats picking it.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock theme and ending',
+  },
+  promise: {
+    key: 'promise',
+    label: 'Reader promise',
+    title: 'What kind of story is this?',
+    lede: 'The last whole-novel decision, and the one that tailors every later phase. A slice-of-life answer here means you are never asked for a villain.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock reader promise',
+  },
+  title: {
+    key: 'title',
+    label: 'Title',
+    title: 'Naming it, from what you have decided',
+    lede: 'Titles in several styles, each tied to the decision it came from. Star, reject with a reason, or steer with rules.',
+    costToChange: 'cheap',
+    lockLabel: 'Use this title for now',
+  },
 };
 
 const WORD_BREAK = /[._-]+/;

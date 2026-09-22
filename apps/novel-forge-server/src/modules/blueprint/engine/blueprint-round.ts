@@ -158,10 +158,18 @@ function optionIdOf(entry: Pick<NewLedgerEntry, 'payload'>): string | undefined 
   return typeof optionId === 'string' ? optionId : undefined;
 }
 
+/** The option an entry answers, and the side of it when one answer is split across two entries (a taste pair answered "neither"). */
+function optionKeyOf(entry: Pick<NewLedgerEntry, 'payload'>): string | undefined {
+  const optionId = optionIdOf(entry);
+  if (optionId === undefined) return undefined;
+  const side = (entry.payload as { side?: unknown } | null | undefined)?.side;
+  return typeof side === 'string' ? `${optionId}#${side}` : optionId;
+}
+
 type Matcher = (previous: Ledger.Entry, next: NewLedgerEntry) => boolean;
 
 const PAIRING: Matcher[] = [
-  (previous, next) => optionIdOf(next) !== undefined && optionIdOf(previous) === optionIdOf(next),
+  (previous, next) => optionKeyOf(next) !== undefined && optionKeyOf(previous) === optionKeyOf(next),
   (previous, next) => previous.statement.trim() === next.statement.trim(),
   (previous, next) => optionIdOf(previous) === undefined && optionIdOf(next) === undefined,
 ];
@@ -172,8 +180,8 @@ const PAIRING: Matcher[] = [
  * beyond position, is restricted to entries that name no option at all.
  */
 function crossesOptions(previous: Ledger.Entry, next: NewLedgerEntry): boolean {
-  const before = optionIdOf(previous);
-  const after = optionIdOf(next);
+  const before = optionKeyOf(previous);
+  const after = optionKeyOf(next);
   return before !== undefined && after !== undefined && before !== after;
 }
 

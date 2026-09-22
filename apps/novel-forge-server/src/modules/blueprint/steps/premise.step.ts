@@ -17,6 +17,7 @@ import {
 } from '../../ai/schemas/blueprint-premise.schema';
 import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type ScreenStep } from '../engine/blueprint-step.types';
+import { loadPageBody, upsertPageSections } from './bible-page';
 
 export const PREMISE_TOPIC = 'premise';
 export const PREMISE_PAGE: { section: Bible.Section; slug: string } = { section: 'project', slug: 'premise' };
@@ -121,11 +122,12 @@ function currentTextOf(part: PremisePartOption, input: PremiseInput | null): str
   return input?.current?.find(candidate => candidate.id === part.id)?.text.trim() || part.text;
 }
 
-function premiseBody(sentence: string, why: string | null, writerLine: string | null): string {
-  const blocks = ['# Premise', sentence];
-  if (why) blocks.push('## Why', why);
-  if (writerLine) blocks.push('## What it means for the writer', writerLine);
-  return blocks.join('\n\n');
+/** The Heart phase writes its own sections onto this page, so a re-lock merges its sections in rather than rewriting the body. */
+function premiseBody(current: string | null, sentence: string, why: string | null, writerLine: string): string {
+  return upsertPageSections(current, 'Premise', sentence, [
+    { heading: 'Why', body: why ?? '' },
+    { heading: 'What it means for the writer', body: writerLine },
+  ]);
 }
 
 function rejectedAlternatives(offered: PremiseOptions | null, chosen: Set<string>): string[] {
@@ -181,7 +183,7 @@ export const premiseStep: ScreenStep<BlueprintPremiseOutput, PremiseOptions, Pre
     return selection.parts.flatMap(part => (part.optionId ? [part.optionId] : []));
   },
 
-  async materialise(selection, { round }) {
+  async materialise(selection, { round, project, tx }) {
     const sentence = selection.sentence.trim();
     if (!sentence) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: 'the premise sentence is empty' });
 
@@ -193,7 +195,7 @@ export const premiseStep: ScreenStep<BlueprintPremiseOutput, PremiseOptions, Pre
 
     const changeSet: ContentOp[] = [
       { op: 'premise.update', premise: sentence },
-      { op: 'bible_document.upsert', ...PREMISE_PAGE, body: premiseBody(sentence, why, writerLine) },
+      { op: 'bible_document.upsert', ...PREMISE_PAGE, body: premiseBody(await loadPageBody(tx, project.id, PREMISE_PAGE), sentence, why, writerLine) },
     ];
     const plan: LockPlan = {
       entries: [

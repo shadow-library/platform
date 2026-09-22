@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { type BlueprintStartOutput, BlueprintStartSchema } from '@modules/ai/schemas/blueprint-start.schema';
 import { parseSchema } from '@modules/ai/schemas/validate';
+import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
 import { StartOptions, StartSelection, startStep } from '@modules/blueprint/steps/start.step';
 import { type Project } from '@server/database';
 
@@ -70,6 +71,32 @@ describe('start step', () => {
       { kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } },
     ]);
     expect(plan.replaces).toEqual(['start']);
+    expect(plan.retires).toEqual(['c1', 'c3']);
+  });
+
+  it('should retire every chip the round offered, so one the author deleted outright goes too', async () => {
+    const offered = startStep.toRound(modelOutput, { previous: null, input: null, focus: null }).options;
+    const selection = { chips: [{ optionId: 'c1', label: 'A ferry that only runs at night', kind: 'element' as const }] };
+    const plan = await startStep.materialise(selection, { round: { round: 1, options: offered }, ledger: [], project: {} as Project.Row, tx: {} as never });
+    expect(plan.retires).toEqual(['c1', 'c2', 'c3']);
+
+    const stale = ledgerEntry({ id: 33n, kind: 'direction', topic: 'start', stepKey: 'start', statement: 'Quiet dread, not gore', payload: { kind: 'want', optionId: 'c2' } });
+    expect(reconcileLockEntries(startStep, plan, [stale]).withdraw.map(entry => entry.id)).toEqual([33n]);
+  });
+
+  it('should retire the direction an earlier lock wrote for a chip the author has now ruled out', async () => {
+    const selection = { chips: [{ optionId: 'c1', label: 'No ferries at all', kind: 'not' as const }] };
+    const earlier = ledgerEntry({
+      id: 32n,
+      kind: 'direction',
+      topic: 'start',
+      stepKey: 'start',
+      statement: 'A ferry that only runs at night',
+      payload: { kind: 'element', optionId: 'c1' },
+    });
+    const plan = await startStep.materialise(selection, { round: null, ledger: [earlier], project: {} as Project.Row, tx: {} as never });
+    const reconciled = reconcileLockEntries(startStep, plan, [earlier]);
+    expect(reconciled.withdraw.map(entry => entry.id)).toEqual([32n]);
   });
 
   it('should not write a rejection the ledger already carries', async () => {

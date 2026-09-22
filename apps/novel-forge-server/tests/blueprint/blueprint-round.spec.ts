@@ -159,6 +159,23 @@ describe('reconcileLockEntries', () => {
     expect(result.append).toEqual([{ kind: 'direction', topic: 'start', statement: 'A ferry town', phase: 'idea', decidedBy: 'author', stepKey: 'start' }]);
   });
 
+  it('should keep the two halves of one answer on their own history chains', () => {
+    const before = [
+      ledgerEntry({ id: 10n, kind: 'rejected', statement: 'slow-burn rise', payload: { optionId: 'p1', verdict: 'neither', side: 'a' } }),
+      ledgerEntry({ id: 11n, kind: 'rejected', statement: 'early triumph', payload: { optionId: 'p1', verdict: 'neither', side: 'b' } }),
+    ];
+    const next = plan([
+      { kind: 'rejected', statement: 'a slower rise', payload: { optionId: 'p1', verdict: 'neither', side: 'a' } },
+      { kind: 'rejected', statement: 'a faster win', payload: { optionId: 'p1', verdict: 'neither', side: 'b' } },
+    ]);
+    const result = reconcileLockEntries(step, next, before);
+    expect(result.supersede.map(pair => [pair.previous.id, pair.next.statement])).toEqual([
+      [10n, 'a slower rise'],
+      [11n, 'a faster win'],
+    ]);
+    expect(result.withdraw).toEqual([]);
+  });
+
   it('should let an entry name its own phase', () => {
     const result = reconcileLockEntries(step, { entries: [{ kind: 'decision', topic: 'world.rules', statement: 'Crossings cost memories', phase: 'world' }] }, []);
     expect(result.append[0]?.phase).toBe('world');

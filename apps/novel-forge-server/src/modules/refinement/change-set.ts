@@ -13,6 +13,7 @@ interface EndingContract {
 
 export interface PremiseUpdateOp {
   op: 'premise.update';
+  title?: string;
   premise?: string;
   brief?: string;
   themes?: string[];
@@ -315,7 +316,7 @@ const SEED_CONSTRAINT_LOCKED_BY = ['author', 'inferred'];
 const SEED_CONCEPT_FATES = ['offered', 'kept', 'killed', 'crossed'];
 
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
-  'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
+  'premise.update': { required: {}, optional: { title: 'string', premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
   'volume.upsert': {
@@ -615,7 +616,16 @@ function validateEntityMaterialization(ops: readonly unknown[], allowedOps?: rea
 export interface ChangeSetValidationOptions {
   /** `false` only for a change-set that rearranges prose the bible already holds, and so cannot be the one that leaves canon unrecorded. */
   entityMaterialization?: boolean;
+  /** True only for a Blueprint lock, the one caller allowed to write the fields in `BLUEPRINT_ONLY_FIELDS`. */
+  blueprintLock?: boolean;
 }
+
+/**
+ * Fields only a Blueprint lock may set. The working title is an effect of the `title` decision: any other scope writing it would move
+ * `projects.title` away from the ledger entry that named the novel with nothing superseded, so the title and the Notebook would
+ * disagree with no record of why. `renderOpVocabulary` hides these fields, so no scope is ever shown a field it would be refused.
+ */
+export const BLUEPRINT_ONLY_FIELDS: Partial<Record<OpType, readonly string[]>> = { 'premise.update': ['title'] };
 
 /**
  * Validates an untrusted change-set structurally, optionally against a scope's allowed-op vocabulary.
@@ -664,6 +674,11 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     }
     if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
       errors.push(`${path}: draft.update must set at least one of title, body, summary`);
+    }
+    if (options?.blueprintLock !== true) {
+      for (const field of BLUEPRINT_ONLY_FIELDS[op as OpType] ?? []) {
+        if (record[field] !== undefined) errors.push(`${path}: field '${field}' is not allowed for this scope`);
+      }
     }
     if (op === 'seed.update') validateSeedUpdate(record, path, errors);
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
@@ -722,8 +737,11 @@ const RATIONALE_NOTE =
 export function renderOpVocabulary(ops: readonly OpType[]): string {
   const lines = ops.map(op => {
     const spec = OP_SPECS[op];
+    const hidden = BLUEPRINT_ONLY_FIELDS[op] ?? [];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
-    const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
+    const optional = Object.entries(spec.optional)
+      .filter(([key]) => !hidden.includes(key))
+      .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}${spec.description ? ` — ${spec.description}` : ''}`;
   });
   const contractShape = ops.includes('brief.update')

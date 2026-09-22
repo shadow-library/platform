@@ -105,7 +105,17 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
     return selection.chips.flatMap(chip => (chip.optionId ? [chip.optionId] : []));
   },
 
-  materialise(selection, { ledger }) {
-    return Promise.resolve({ entries: withoutKnownRejections(selection.chips.map(toEntry), ledger), replaces: [START_TOPIC] });
+  /**
+   * Every chip the round offered is retired, not only the ones the lock answers: a reading turned into "not" takes its old direction
+   * down with it, and so does one the author simply deleted.
+   */
+  materialise(selection, { round, ledger }) {
+    const offered = round?.options.understood.map(chip => chip.id) ?? [];
+    const answered = selection.chips.flatMap(chip => (chip.optionId ? [chip.optionId] : []));
+    return Promise.resolve({
+      entries: withoutKnownRejections(selection.chips.map(toEntry), ledger),
+      replaces: [START_TOPIC],
+      retires: [...new Set([...offered, ...answered])],
+    });
   },
 };

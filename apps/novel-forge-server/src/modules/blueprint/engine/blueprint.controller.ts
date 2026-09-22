@@ -8,6 +8,8 @@ import { type LedgerEntryResponse } from '../ledger/ledger.dto';
 import { ledgerEntryStatus } from '../ledger/ledger.service';
 import { PremisePreviewBody, PremisePreviewResponse } from '../steps/premise-preview.dto';
 import { PremisePreviewService } from '../steps/premise-preview.service';
+import { TitleChecksBody, TitleChecksListResponse } from '../steps/title-checks.dto';
+import { TitleChecksService } from '../steps/title-checks.service';
 import { BlueprintRoundQueue } from './blueprint-round-queue.service';
 import { BlueprintStepService } from './blueprint-step.service';
 import { isLocking, isSourced } from './blueprint-step.types';
@@ -34,6 +36,7 @@ export class BlueprintController {
     private readonly steps: BlueprintStepService,
     private readonly queue: BlueprintRoundQueue,
     private readonly premisePreview: PremisePreviewService,
+    private readonly titleChecks: TitleChecksService,
   ) {}
 
   @Get()
@@ -73,6 +76,12 @@ export class BlueprintController {
   @RespondFor(200, PremisePreviewResponse)
   async previewPremise(@Params() params: BlueprintProjectParams, @Body() body: PremisePreviewBody): Promise<PremisePreviewResponse> {
     return { paragraph: await this.premisePreview.preview(params.projectId, body.premise) };
+  }
+
+  @Post('/title/checks')
+  @RespondFor(200, TitleChecksListResponse)
+  async checkTitles(@Params() params: BlueprintProjectParams, @Body() body: TitleChecksBody): Promise<TitleChecksListResponse> {
+    return { results: await this.titleChecks.check(params.projectId, body.titles) };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

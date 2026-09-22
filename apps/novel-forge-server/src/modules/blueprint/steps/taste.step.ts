@@ -221,7 +221,8 @@ export const tasteStep: ScreenStep<BlueprintTasteOutput, TasteOptions, never, Ta
     // by its own retirement, and skipping it because the ledger already holds it would retire the answer and put nothing back.
     const entries = [...answered, ...withoutKnownRejections(reasonEntries(selection, round.options.giveUpReasons), ledger)];
     if (entries.length === 0) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: 'answer at least one pair or name one reason you gave up on a book' });
-    // Every pair the lock answers is retired first, so re-answering one that was "neither" takes both its bans down with it.
-    return { entries, replaces: [TASTE_TOPIC], retires: selection.verdicts.filter(verdict => pairs.has(verdict.optionId)).map(verdict => verdict.optionId) };
+    // Every pair on screen is retired, not only the answered ones: re-answering a "neither" pair takes both its bans down with it,
+    // and taking a verdict back takes its direction down rather than stranding an answer the author no longer gives.
+    return { entries, replaces: [TASTE_TOPIC], retires: round.options.pairs.map(pair => pair.id) };
   },
 };

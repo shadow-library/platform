@@ -2,10 +2,13 @@ import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
 import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
+import { blueprintHeartPrompt } from './blueprint-heart.prompt';
 import { blueprintPremisePrompt } from './blueprint-premise.prompt';
 import { blueprintPremisePreviewPrompt } from './blueprint-premise-preview.prompt';
+import { blueprintPromisePrompt } from './blueprint-promise.prompt';
 import { blueprintStartPrompt } from './blueprint-start.prompt';
 import { blueprintTastePrompt } from './blueprint-taste.prompt';
+import { blueprintTitlePrompt } from './blueprint-title.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
@@ -115,6 +118,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'blueprint-concepts': blueprintConceptsPrompt as PromptModule<unknown>,
   'blueprint-premise': blueprintPremisePrompt as PromptModule<unknown>,
   'blueprint-premise-preview': blueprintPremisePreviewPrompt as PromptModule<unknown>,
+  'blueprint-heart': blueprintHeartPrompt as PromptModule<unknown>,
+  'blueprint-promise': blueprintPromisePrompt as PromptModule<unknown>,
+  'blueprint-title': blueprintTitlePrompt as PromptModule<unknown>,
 };
 
 export * from './types';

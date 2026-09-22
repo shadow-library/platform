@@ -467,6 +467,7 @@ export class ProposalApplyService {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
     if (!project) return null;
     const inverse: PremiseUpdateOp = { op: 'premise.update' };
+    if (op.title !== undefined) inverse.title = project.title ?? '';
     if (op.premise !== undefined) inverse.premise = project.premise ?? '';
     if (op.brief !== undefined) inverse.brief = project.brief ?? '';
     if (op.themes !== undefined) inverse.themes = (project.themes as string[] | null) ?? [];
@@ -639,6 +640,7 @@ export class ProposalApplyService {
 
   private async applyPremiseUpdate(ctx: ApplyContext, op: PremiseUpdateOp): Promise<void> {
     const update: Record<string, unknown> = { updatedAt: new Date() };
+    if (op.title !== undefined) update['title'] = op.title.trim() || null;
     if (op.premise !== undefined) update['premise'] = op.premise;
     if (op.brief !== undefined) update['brief'] = op.brief;
     if (op.themes !== undefined) update['themes'] = op.themes;

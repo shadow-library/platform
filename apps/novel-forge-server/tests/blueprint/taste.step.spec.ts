@@ -123,6 +123,23 @@ describe('tasteStep.materialise', () => {
     expect(plan.retires).toEqual(['p1']);
   });
 
+  it('should retire every pair on screen, so taking a verdict back takes its direction with it', async () => {
+    const twoPairs = tasteStep.toRound(
+      output({
+        pairs: [
+          ...output().pairs,
+          { a: { text: 'The mentor is wrong about everything', label: 'flawed mentor' }, b: { text: 'The mentor is right and unbearable', label: 'hard mentor' } },
+        ],
+      }),
+      context,
+    ).options;
+    const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'a' }] }), twoPairs);
+    expect(plan.retires).toEqual(['p1', 'p2']);
+
+    const unanswered = ledgerEntry({ id: 40n, kind: 'direction', topic: 'taste', stepKey: 'taste', statement: 'hard mentor', payload: { optionId: 'p2', verdict: 'b' } });
+    expect(reconcileLockEntries(tasteStep, plan, [unanswered]).withdraw.map(entry => entry.id)).toEqual([40n]);
+  });
+
   it('should save the author’s own words when the answer depends', async () => {
     const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'depends', note: '  Depends on who is watching  ' }] }), options());
     expect(plan.entries[0]).toMatchObject({ kind: 'direction', statement: 'Depends on who is watching', why: 'On “slow-burn rise or early triumph”.' });
