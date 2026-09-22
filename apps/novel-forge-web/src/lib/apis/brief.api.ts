@@ -33,6 +33,7 @@ export function useUpdateBriefMutation(projectId: string, n: number): UseMutatio
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: briefKeys.detail(projectId, n) });
       queryClient.invalidateQueries({ queryKey: briefKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts', 'rows'] });
     },
   });
 }

@@ -15,6 +15,8 @@ export interface JobProgress {
   current: string;
   phase: string;
   skipped?: number[];
+  /** When work on `current` began, so a client can time the chapter without inferring it from the row's `updatedAt`. */
+  startedAt?: string;
 }
 
 export interface JobCancelResult {

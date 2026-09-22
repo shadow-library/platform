@@ -2,6 +2,7 @@ export * from './amend-republish';
 export * from './batch-selection';
 export * from './bible-doc-title';
 export * from './brief-body';
+export * from './chapter-rows';
 export * from './chapter-shift';
 export * from './content-hash';
 export * from './data-transformers';

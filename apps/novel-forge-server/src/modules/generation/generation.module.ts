@@ -12,13 +12,15 @@ import { ChapterImageController } from './chapter-image.controller';
 import { ChapterImageService } from './chapter-image.service';
 import { ChapterInsertController } from './chapter-insert.controller';
 import { ChapterInsertService } from './chapter-insert.service';
+import { ChapterRowsController } from './chapter-rows.controller';
+import { ChapterRowsService } from './chapter-rows.service';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 
 @Module({
   imports: [DatabaseModule, AiModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
-  controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController],
-  providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
+  controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController, ChapterRowsController],
+  providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
 })
 export class GenerationModule {}

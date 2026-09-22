@@ -1,59 +1,53 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChapterRows, type ChapterListBrief, type ChapterListDraft, chapterSummary, countChapterRows, filterChapterRows } from '../src/lib/chapter-list';
+import { CHAPTER_PAGE_SIZE, chapterSummary, isChapterFilter, listedChapters, nextBriefChapter, pageOfChapter } from '../src/lib/chapter-list';
 
-const drafts: ChapterListDraft[] = [
-  { chapter: 3, title: 'Three', status: 'final', reviewStatus: 'final' },
-  { chapter: 1, title: 'One', status: 'draft', reviewStatus: 'needs_review' },
-  { chapter: 5, title: 'Unplanned', status: 'draft', reviewStatus: 'generating' },
-];
+describe('pageOfChapter', () => {
+  const chapters = Array.from({ length: 60 }, (_, i) => i + 1);
 
-const briefs: ChapterListBrief[] = [
-  { chapter: 1, title: 'Brief one', writeMode: 'standard' },
-  { chapter: 2, title: 'Brief two', writeMode: 'external' },
-  { chapter: 3, title: 'Brief three', writeMode: 'standard' },
-  { chapter: 4, title: null, writeMode: 'standard' },
-];
-
-describe('buildChapterRows', () => {
-  it('should interleave written chapters and unwritten brief slots in chapter order', () => {
-    const rows = buildChapterRows(drafts, briefs);
-    expect(rows.map(r => [r.chapter, r.kind])).toEqual([
-      [1, 'written'],
-      [2, 'planned'],
-      [3, 'written'],
-      [4, 'planned'],
-      [5, 'written'],
-    ]);
+  it('should place the first page-worth of chapters on page 1', () => {
+    expect(pageOfChapter(chapters, 1)).toBe(1);
+    expect(pageOfChapter(chapters, CHAPTER_PAGE_SIZE)).toBe(1);
   });
 
-  it('should prefer the draft title over the brief title when a slot is written', () => {
-    expect(buildChapterRows(drafts, briefs)[0]?.title).toBe('One');
+  it('should move to the next page one chapter past a full page', () => {
+    expect(pageOfChapter(chapters, CHAPTER_PAGE_SIZE + 1)).toBe(2);
   });
 
-  it('should carry the brief write mode onto a planned slot', () => {
-    const slot = buildChapterRows(drafts, briefs).find(r => r.chapter === 2);
-    expect(slot).toEqual({ kind: 'planned', chapter: 2, title: 'Brief two', writeMode: 'external' });
+  it('should count positions rather than chapter numbers when the plan has gaps', () => {
+    const gapped = [1, 2, 100, ...Array.from({ length: 30 }, (_, i) => 200 + i)];
+    expect(pageOfChapter(gapped, 222)).toBe(2);
+  });
+
+  it('should fall back to page 1 for a chapter not in the list', () => {
+    expect(pageOfChapter(chapters, 999)).toBe(1);
   });
 });
 
-describe('countChapterRows', () => {
-  it('should count every listed row under all, so all equals written plus not written', () => {
-    const counts = countChapterRows(buildChapterRows(drafts, briefs));
-    expect(counts).toEqual({ all: 5, not_written: 2, needs_review: 1, draft: 2, final: 1 });
+describe('listedChapters', () => {
+  it('should merge brief and draft chapters once each in ascending order', () => {
+    expect(listedChapters([{ chapter: 3 }, { chapter: 1 }, { chapter: 2 }], [{ chapter: 5 }, { chapter: 1 }])).toEqual([1, 2, 3, 5]);
+  });
+});
+
+describe('nextBriefChapter', () => {
+  it('should pick the lowest brief without a draft', () => {
+    expect(nextBriefChapter([{ chapter: 3 }, { chapter: 1 }, { chapter: 2 }], [{ chapter: 1 }])).toBe(2);
   });
 
-  it('should agree with the rows each filter shows', () => {
-    const rows = buildChapterRows(drafts, briefs);
-    const counts = countChapterRows(rows);
-    for (const filter of ['all', 'not_written', 'needs_review', 'draft', 'final'] as const) {
-      expect(filterChapterRows(rows, filter)).toHaveLength(counts[filter]);
-    }
+  it('should ignore drafts that have no brief', () => {
+    expect(nextBriefChapter([{ chapter: 1 }], [{ chapter: 1 }, { chapter: 2 }])).toBeUndefined();
+  });
+});
+
+describe('isChapterFilter', () => {
+  it('should accept every list filter', () => {
+    for (const filter of ['all', 'not_written', 'needs_review', 'draft', 'final']) expect(isChapterFilter(filter)).toBe(true);
   });
 
-  it('should count a contradiction as needing review', () => {
-    const counts = countChapterRows(buildChapterRows([{ chapter: 1, status: 'draft', reviewStatus: 'contradiction' }], []));
-    expect(counts.needs_review).toBe(1);
+  it('should reject anything else from the URL', () => {
+    expect(isChapterFilter('drafts')).toBe(false);
+    expect(isChapterFilter(undefined)).toBe(false);
   });
 });
 

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Button } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
 import { type FailedTurnResponse, type TurnState } from '@/lib/apis';
+import { formatElapsed } from '@/lib/format';
+import { useElapsed } from '@/lib/use-elapsed';
 
 import styles from './TurnStatus.module.css';
 
@@ -47,22 +48,6 @@ const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reaso
 const SLOW_AFTER_MS = 45_000;
 // Elapsed time before this reads as a stopwatch on a request that was always going to be quick.
 const SHOW_ELAPSED_AFTER_MS = 5_000;
-
-function useElapsed(since: string | undefined): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!since) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [since]);
-  return since ? Math.max(0, now - new Date(since).getTime()) : 0;
-}
-
-function formatElapsed(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
-}
 
 interface TurnStatusProps {
   state: TurnState;

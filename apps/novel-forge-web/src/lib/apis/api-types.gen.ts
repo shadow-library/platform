@@ -1319,6 +1319,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chapter-rows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Chapter Rows */
+    get: operations['get_api_v1_projects_projectId_chapter_rows'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/jobs/{jobId}': {
     parameters: {
       query?: never;
@@ -4480,6 +4497,64 @@ export interface components {
       publicationRevision?: number;
       /** @description Always true. Amend replaces prose only, so anything this chapter already contributed to the bible stays there and keeps propagating — offer POST /chapters/:n/extract-to-bible so the author can re-derive canon deliberately. */
       suggestExtractToBible: boolean;
+    };
+    /** @enum {string} */
+    ChapterRowFilter: 'all' | 'not_written' | 'needs_review' | 'draft' | 'final';
+    /** @description One page of chapter rows, plus whole-novel figures the list needs regardless of the page shown. */
+    ListChapterRowsResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChapterRowResponse'][];
+      /** @description Rows matching each filter across the whole novel. */
+      counts: components['schemas']['ChapterRowCountsResponse'];
+      totalWords: number;
+      /** @description The lowest brief with no draft — the chapter `generate` targets next. */
+      nextBriefChapter?: null | number;
+      /** @description The highest planned or written chapter number, 0 when there are none. */
+      lastChapter: number;
+      /** @description The highest finalized chapter, 0 when none is; no chapter can be inserted below it. */
+      frontier: number;
+      /** @description Every planned or written chapter number, ascending. */
+      chapters: number[];
+      contradiction?: components['schemas']['ChapterContradictionResponse'] | null;
+    };
+    /** @description One chapter of the plan: a written draft, or a brief with no draft yet. Rows are always in chapter order. */
+    ChapterRowResponse: {
+      kind: components['schemas']['ChapterRowKind'];
+      chapter: number;
+      /** @description The draft's title for a written row, the brief's for a planned one. */
+      title?: null | string;
+      /** @description Null for a written chapter that has no brief. */
+      writeMode?: components['schemas']['BriefWriteMode'] | null;
+      /** @description Written rows only. */
+      status?: components['schemas']['DraftStatus'];
+      /** @description Written rows only. */
+      reviewStatus?: components['schemas']['DraftReviewStatus'];
+      /** @description Written rows only. */
+      generator?: string;
+      /** @description Written rows only. */
+      isolated?: boolean;
+      /** @description Written rows only: finalize is refused until this isolated chapter has a summary and continuation state. */
+      finalizeBlocked?: boolean;
+      /** @description Written rows only. */
+      wordCount?: number;
+    };
+    /** @enum {string} */
+    ChapterRowKind: 'written' | 'planned';
+    ChapterRowCountsResponse: {
+      all: number;
+      not_written: number;
+      needs_review: number;
+      draft: number;
+      final: number;
+    };
+    /** @description The first chapter the judge flagged, which blocks further generation until it is resolved. */
+    ChapterContradictionResponse: {
+      chapter: number;
+      judgeNote?: string | null;
+      /** @description How many chapters are flagged in total. */
+      count: number;
     };
     JobResponse: {
       id: string;
@@ -10230,6 +10305,50 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AmendChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapter_rows: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        filter?: components['schemas']['ChapterRowFilter'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChapterRowsResponse'];
         };
       };
       /** @description Default Response */
@@ -16368,6 +16487,12 @@ export type InsertChapterBody = components['schemas']['InsertChapterBody'];
 export type InsertChapterResponse = components['schemas']['InsertChapterResponse'];
 export type AmendChapterBody = components['schemas']['AmendChapterBody'];
 export type AmendChapterResponse = components['schemas']['AmendChapterResponse'];
+export type ChapterRowFilter = components['schemas']['ChapterRowFilter'];
+export type ListChapterRowsResponse = components['schemas']['ListChapterRowsResponse'];
+export type ChapterRowResponse = components['schemas']['ChapterRowResponse'];
+export type ChapterRowKind = components['schemas']['ChapterRowKind'];
+export type ChapterRowCountsResponse = components['schemas']['ChapterRowCountsResponse'];
+export type ChapterContradictionResponse = components['schemas']['ChapterContradictionResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
 export type ChapterStatus = components['schemas']['ChapterStatus'];
 export type ListChapterResponse = components['schemas']['ListChapterResponse'];
@@ -16685,6 +16810,8 @@ export type SearchProseQueryParams = Exclude<paths['/api/v1/projects/{projectId}
 export type SearchProsePathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
 export type ApiV1ProjectsProjectIdManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
 export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
+export type ListChapterRowsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['query'], undefined>;
+export type ListChapterRowsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
 export type ApiV1ProjectsProjectIdSourceChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
 export type ApiV1ProjectsProjectIdSourceChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;

@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
   type ContinuityProposalResponse,
@@ -8,6 +8,8 @@ import {
   type GenerateBody,
   type JobEnqueueResponse,
   type JudgeResponse,
+  type ListChapterRowsQueryParams,
+  type ListChapterRowsResponse,
   type ListDraftResponse,
   type PlanBody,
   type PlanResponse,
@@ -24,6 +26,7 @@ const draftKeys = {
   all: (projectId: string) => ['projects', projectId, 'drafts'] as const,
   list: (projectId: string) => [...draftKeys.all(projectId), 'list'] as const,
   summary: (projectId: string) => [...draftKeys.all(projectId), 'summary'] as const,
+  rows: (projectId: string, params?: ListChapterRowsQueryParams) => [...draftKeys.all(projectId), 'rows', params] as const,
   detail: (projectId: string, n: number) => [...draftKeys.all(projectId), n] as const,
   revisions: (projectId: string, n: number) => [...draftKeys.all(projectId), n, 'revisions'] as const,
   reviewQueue: (projectId: string) => ['projects', projectId, 'review-queue'] as const,
@@ -37,6 +40,18 @@ export const listDraftsQueryOptions = (projectId: string): UseQueryOptions<ListD
 
 export function useListDraftsQuery(projectId: string, enabled = true): UseQueryResult<ListDraftResponse, ApiError> {
   return useQuery({ ...listDraftsQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+// Keyed under drafts so every draft mutation refreshes the list; the previous page stays on screen while the next one loads.
+export const chapterRowsQueryOptions = (projectId: string, params: ListChapterRowsQueryParams): UseQueryOptions<ListChapterRowsResponse, ApiError> =>
+  queryOptions<ListChapterRowsResponse, ApiError>({
+    queryKey: draftKeys.rows(projectId, params),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/chapter-rows`).query(params).execute(),
+    placeholderData: keepPreviousData,
+  });
+
+export function useChapterRowsQuery(projectId: string, params: ListChapterRowsQueryParams, enabled = true): UseQueryResult<ListChapterRowsResponse, ApiError> {
+  return useQuery({ ...chapterRowsQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
 export function useDraftSummaryQuery(projectId: string, enabled = true): UseQueryResult<DraftSummaryResponse, ApiError> {

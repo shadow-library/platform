@@ -3,6 +3,8 @@ import { CONTENT_RATING_LEVELS, NOVEL_GENRES, NOVEL_TAGS } from '@shadow-library
 
 import { schema } from '@server/database';
 
+import { CHAPTER_FILTERS } from './chapter-rows';
+
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
 export const OwnerKind = EnumType.create('OwnerKind', schema.ownerKind.enumValues);
 export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
@@ -23,6 +25,8 @@ export const JobStatus = EnumType.create('JobStatus', schema.jobStatus.enumValue
 export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
 export const DraftReviewStatus = EnumType.create('DraftReviewStatus', schema.draftReviewStatus.enumValues);
 export const BriefWriteMode = EnumType.create('BriefWriteMode', schema.briefWriteMode.enumValues);
+export const ChapterRowFilter = EnumType.create('ChapterRowFilter', [...CHAPTER_FILTERS]);
+export const ChapterRowKind = EnumType.create('ChapterRowKind', ['written', 'planned']);
 export const WorkflowRunStatus = EnumType.create('WorkflowRunStatus', schema.workflowRunStatus.enumValues);
 export const DraftRevisionSource = EnumType.create('DraftRevisionSource', schema.draftRevisionSource.enumValues);
 export const UserFeedbackDisposition = EnumType.create('UserFeedbackDisposition', schema.userFeedbackDisposition.enumValues);

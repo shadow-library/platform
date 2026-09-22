@@ -1,0 +1,27 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  color: var(--sh-info-text);
+  white-space: nowrap;
+}
+
+.status[data-phase='queued'] {
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+
+.queuedDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}

@@ -229,7 +229,7 @@ export class JobExecutor {
 
     for (const [i, chapter] of chapters.entries()) {
       if (await this.cancelRequested(job.id)) return;
-      await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating' });
+      await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating', startedAt: new Date().toISOString() });
       this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
       this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, outcome: result.outcome, runId: result.runId });

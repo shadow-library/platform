@@ -45,13 +45,6 @@
 
 /* Field prose spans the full record width so it lines up with the arc / brief list below it, and is
    justified so both edges meet the table's edges. */
-.fieldText {
-  margin: 0 0 30px;
-  font-size: var(--sh-text-body);
-  line-height: 1.7;
-  text-align: justify;
-}
-
 /* Docked below the scroll area rather than floating over it, so an open Forge card pushes the record up instead of hiding it. */
 .forgeDock {
   flex-shrink: 0;
@@ -293,8 +286,21 @@
 
 .briefActions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-bottom: 34px;
+}
+
+.briefGeneration {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actionReason {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
 }
 
 .titleInput {
@@ -536,45 +542,8 @@
   flex-direction: column;
 }
 
-.notice {
-  margin-bottom: 20px;
-}
-
 .briefSection {
   margin-bottom: 26px;
-}
-
-.briefParagraph {
-  margin: 0 0 10px;
-  font-size: var(--sh-text-body);
-  line-height: 1.7;
-}
-
-.briefList {
-  margin: 0;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--sh-text-body);
-  line-height: 1.6;
-}
-
-.endingGrid {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 8px 18px;
-  margin: 0;
-  font-size: var(--sh-text-body);
-  line-height: 1.6;
-}
-
-.endingGrid dt {
-  color: var(--sh-text-tertiary);
-}
-
-.endingGrid dd {
-  margin: 0;
 }
 
 .regenerateCallout {

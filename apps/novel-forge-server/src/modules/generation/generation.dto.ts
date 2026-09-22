@@ -1,9 +1,14 @@
-import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
+import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { type ContentRating, type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
 import {
   BriefWriteMode,
+  type ChapterFilter,
+  type ChapterRow,
+  ChapterRowFilter,
+  ChapterRowKind,
   DarkContentRating,
   DraftReviewStatus,
   DraftRevisionSource,
@@ -12,6 +17,7 @@ import {
   JobStatus,
   PlanStatus,
   SexualContentRating,
+  SortByTime,
   UserFeedbackDisposition,
   ViolenceRating,
   WorkflowRunStatus,
@@ -960,6 +966,99 @@ export class DraftSummaryItem {
 export class DraftSummaryResponse {
   @Field(() => [DraftSummaryItem])
   items: DraftSummaryItem[];
+}
+
+@Schema()
+export class ListChapterRowsQuery extends OmitType(PaginationQuery(SortByTime, { limit: 25 }), ['sortBy', 'sortOrder'] as const) {
+  @Field(() => ChapterRowFilter, { default: 'all' })
+  filter: ChapterFilter;
+}
+
+@Schema({ description: 'One chapter of the plan: a written draft, or a brief with no draft yet. Rows are always in chapter order.' })
+export class ChapterRowResponse {
+  @Field(() => ChapterRowKind)
+  kind: ChapterRow['kind'];
+
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field({ optional: true, nullable: true, description: "The draft's title for a written row, the brief's for a planned one." })
+  title?: string | null;
+
+  @Field(() => BriefWriteMode, { optional: true, nullable: true, description: 'Null for a written chapter that has no brief.' })
+  writeMode?: Generation.BriefWriteMode | null;
+
+  @Field(() => DraftStatus, { optional: true, description: 'Written rows only.' })
+  status?: Generation.DraftStatus;
+
+  @Field(() => DraftReviewStatus, { optional: true, description: 'Written rows only.' })
+  reviewStatus?: Generation.DraftReviewStatus;
+
+  @Field(() => String, { optional: true, description: 'Written rows only.' })
+  generator?: Generation.Draft['generator'];
+
+  @Field({ optional: true, description: 'Written rows only.' })
+  isolated?: boolean;
+
+  @Field({ optional: true, description: 'Written rows only: finalize is refused until this isolated chapter has a summary and continuation state.' })
+  finalizeBlocked?: boolean;
+
+  @Field(() => Integer, { optional: true, description: 'Written rows only.' })
+  wordCount?: number;
+}
+
+@Schema({ description: 'The first chapter the judge flagged, which blocks further generation until it is resolved.' })
+export class ChapterContradictionResponse {
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field({ optional: true, nullable: true })
+  judgeNote?: string | null;
+
+  @Field(() => Integer, { description: 'How many chapters are flagged in total.' })
+  count: number;
+}
+
+@Schema()
+export class ChapterRowCountsResponse {
+  @Field(() => Integer)
+  all: number;
+
+  @Field(() => Integer)
+  not_written: number;
+
+  @Field(() => Integer)
+  needs_review: number;
+
+  @Field(() => Integer)
+  draft: number;
+
+  @Field(() => Integer)
+  final: number;
+}
+
+@Schema({ description: 'One page of chapter rows, plus whole-novel figures the list needs regardless of the page shown.' })
+export class ListChapterRowsResponse extends Paginated(ChapterRowResponse) {
+  @Field(() => ChapterRowCountsResponse, { description: 'Rows matching each filter across the whole novel.' })
+  counts: ChapterRowCountsResponse;
+
+  @Field(() => Integer)
+  totalWords: number;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'The lowest brief with no draft — the chapter `generate` targets next.' })
+  nextBriefChapter?: number | null;
+
+  @Field(() => Integer, { description: 'The highest planned or written chapter number, 0 when there are none.' })
+  lastChapter: number;
+
+  @Field(() => Integer, { description: 'The highest finalized chapter, 0 when none is; no chapter can be inserted below it.' })
+  frontier: number;
+
+  @Field(() => [Integer], { description: 'Every planned or written chapter number, ascending.' })
+  chapters: number[];
+
+  @Field(() => ChapterContradictionResponse, { optional: true, nullable: true })
+  contradiction?: ChapterContradictionResponse | null;
 }
 
 @Schema()

@@ -72,7 +72,10 @@ export function useOutlineArcMutation(projectId: string, arcKey: string): UseMut
       APIRequest.post(`/projects/${projectId}/arcs/${arcKey}/outline`)
         .body(body ?? {})
         .execute(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'briefs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'briefs'] });
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts', 'rows'] });
+    },
   });
 }
 

@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, TokenInput } from '@shadow-library/ui';
+import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, TokenInput } from '@shadow-library/ui';
 
 import { ChevronRightIcon, CloseIcon, GripIcon, PlusIcon, SparkIcon } from '@/components/icons';
-import { PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip } from '@/components/nf';
+import { GenerationStatus, PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip, StopButton } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
+import { BriefSections, DetailField } from '@/features/briefs';
 import {
   type ArcResponse,
   type BriefResponse,
@@ -13,6 +14,7 @@ import {
   useApproveVolumesMutation,
   useBriefQuery,
   useDraftSummaryQuery,
+  useGenerateMutation,
   useListArcsQuery,
   useListBriefsQuery,
   useListEntitiesQuery,
@@ -21,6 +23,7 @@ import {
   useOutlineArcMutation,
   usePlanArcsMutation,
   usePlanMutation,
+  useProjectStatusQuery,
   useUpdateBriefMutation,
   useVolumeQuery,
   type VolumeResponse,
@@ -35,15 +38,16 @@ import {
   type BriefListItem,
   briefListItem,
   briefSaveOf,
-  endingContractOf,
   type EndingDraft,
   HOOK_TYPE_LABELS,
   HOOK_TYPES,
   outlineObjectiveProblem,
-  parseBriefBody,
   toEditModel,
 } from '@/lib/chapter-brief';
+import { listedChapters, nextBriefChapter, pageOfChapter } from '@/lib/chapter-list';
+import { chapterGeneration } from '@/lib/generation-activity';
 import { proposalTitle } from '@/lib/proposals';
+import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './volumes.module.css';
 
@@ -92,21 +96,6 @@ function Crumb({ label, onClick, current }: CrumbProps): React.JSX.Element {
     <button onClick={onClick} className={styles.crumbBtn}>
       {label}
     </button>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  value?: string | null;
-}
-
-function Field({ label, value }: FieldProps): React.JSX.Element | null {
-  if (!value) return null;
-  return (
-    <>
-      <h2 className={styles.sectionLabel}>{label}</h2>
-      <p className={styles.fieldText}>{value}</p>
-    </>
   );
 }
 
@@ -296,10 +285,10 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
         </StatusChip>
       </div>
 
-      <Field label="Objective" value={v.objective} />
-      <Field label="Central conflict" value={v.conflict} />
-      <Field label="Payoff" value={v.payoff} />
-      {v.body && <Field label="Notes" value={v.body} />}
+      <DetailField label="Objective" value={v.objective} />
+      <DetailField label="Central conflict" value={v.conflict} />
+      <DetailField label="Payoff" value={v.payoff} />
+      {v.body && <DetailField label="Notes" value={v.body} />}
 
       <div className={styles.sectionHeadRow}>
         <h2 className={styles.sectionH2}>Arcs</h2>
@@ -405,11 +394,11 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
         {arc.staleReason && <StatusChip intent="warning">stale · {arc.staleReason}</StatusChip>}
       </div>
 
-      <Field label="Objective" value={arc.objective} />
-      <Field label="Escalation" value={arc.escalation} />
-      <Field label="Payoff" value={arc.payoff} />
-      <Field label="Hook (handoff to next arc)" value={arc.hook} />
-      {arc.body && <Field label="Notes" value={arc.body} />}
+      <DetailField label="Objective" value={arc.objective} />
+      <DetailField label="Escalation" value={arc.escalation} />
+      <DetailField label="Payoff" value={arc.payoff} />
+      <DetailField label="Hook (handoff to next arc)" value={arc.hook} />
+      {arc.body && <DetailField label="Notes" value={arc.body} />}
 
       <div className={styles.sectionHeadRow}>
         <h2 className={styles.sectionH2}>Chapter briefs</h2>
@@ -452,81 +441,6 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
 interface BriefDetailProps {
   novelId: string;
   chapter: number;
-}
-
-function BriefSections({ brief }: { brief: BriefResponse }): React.JSX.Element {
-  const sections = parseBriefBody(brief.body);
-  const ending = endingContractOf(brief.endingContract);
-  const readerValue = (brief.readerValue ?? []).map(value => value.replace(/_/g, ' '));
-
-  return (
-    <div className={styles.briefSections}>
-      {brief.densityRisk && (
-        <Alert intent="warning" title="Too thin for a full chapter" className={styles.notice}>
-          {brief.densityRisk} — merge it with a neighbour or add material to the brief, or the drafter will pad it to length.
-        </Alert>
-      )}
-      <Field label="Purpose" value={brief.chapterPurpose} />
-      {sections.map((section, i) => (
-        <section key={`${section.heading ?? 'body'}-${i}`} className={styles.briefSection}>
-          {section.heading && <h2 className={styles.sectionLabel}>{section.heading}</h2>}
-          {section.paragraphs.map((paragraph, j) => (
-            <p key={j} className={styles.briefParagraph}>
-              {paragraph}
-            </p>
-          ))}
-          {section.items.length > 0 && (
-            <ul className={styles.briefList}>
-              {section.items.map((item, j) => (
-                <li key={j}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
-      <Field label="POV" value={brief.pov} />
-      {ending && (
-        <section className={styles.briefSection}>
-          <h2 className={styles.sectionLabel}>Ending</h2>
-          <dl className={styles.endingGrid}>
-            {ending.hookType && (
-              <>
-                <dt>Hook</dt>
-                <dd>{ending.hookType}</dd>
-              </>
-            )}
-            {ending.emotionalBeat && (
-              <>
-                <dt>Feeling</dt>
-                <dd>{ending.emotionalBeat}</dd>
-              </>
-            )}
-            {ending.openQuestion && (
-              <>
-                <dt>Open question</dt>
-                <dd>{ending.openQuestion}</dd>
-              </>
-            )}
-            {ending.handoffState && (
-              <>
-                <dt>Hands off</dt>
-                <dd>{ending.handoffState}</dd>
-              </>
-            )}
-            {ending.mustNotResolve.length > 0 && (
-              <>
-                <dt>Leave open</dt>
-                <dd>{ending.mustNotResolve.join(', ')}</dd>
-              </>
-            )}
-          </dl>
-        </section>
-      )}
-      <Field label="Delivers" value={readerValue.join(', ')} />
-      <Field label="Avoid repeating" value={(brief.repetitionRisks ?? []).join('; ')} />
-      <Field label="Author guidance" value={brief.guidance} />
-    </div>
-  );
 }
 
 function ChapterProposals({ novelId, chapter }: BriefDetailProps): React.JSX.Element | null {
@@ -935,7 +849,11 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   const navigate = useNavigate();
   const briefQuery = useBriefQuery(novelId, chapter);
   const draftsQuery = useDraftSummaryQuery(novelId);
+  const briefsQuery = useListBriefsQuery(novelId);
+  const statusQuery = useProjectStatusQuery(novelId);
   const updateBrief = useUpdateBriefMutation(novelId, chapter);
+  const generate = useGenerateMutation(novelId);
+  const { activity, stop, stopping } = useGenerationActivity(novelId);
   const [edit, setEdit] = useState<BriefEdit | null>(null);
   const [showErrors, setShowErrors] = useState(false);
 
@@ -946,10 +864,37 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   const invalid = saveState?.kind === 'invalid' && showErrors ? saveState : null;
   const changedElsewhere = Boolean(edit && brief && brief.updatedAt !== edit.base.updatedAt);
 
-  const chapterDraft = draftsQuery.data?.items.find(item => item.chapter === chapter);
+  const summaries = draftsQuery.data?.items ?? [];
+  const briefs = briefsQuery.data?.items ?? [];
+  const chapterDraft = summaries.find(item => item.chapter === chapter);
+  const generation = chapterGeneration(activity, chapter);
+  const busyReason = activity && !generation ? `Chapter ${activity.current} is being written — wait for it to finish` : undefined;
   const regenerable = Boolean(brief && chapterDraft && chapterDraft.status !== 'final');
   const staleReason = brief?.staleReason ? `The brief is stale (${brief.staleReason}) — refresh the outline before regenerating.` : undefined;
-  const regenerateBlocked = editing ? EDITING_REASON : staleReason;
+  const regenerateBlocked = editing ? EDITING_REASON : (staleReason ?? busyReason);
+
+  // Generation gates mirror the backend (PLN_001 / DRF_003 / BRF_002); `generate` only ever writes the lowest unwritten brief.
+  const generatable = Boolean(brief && !chapterDraft && nextBriefChapter(briefs, summaries) === chapter);
+  const contradicted = summaries.find(item => item.reviewStatus === 'contradiction');
+  const generateBlocked = editing
+    ? EDITING_REASON
+    : brief?.staleReason
+      ? `The brief is stale (${brief.staleReason}) — refresh the outline first.`
+      : !statusQuery.data?.planApproved
+        ? 'Approve the volume plan first'
+        : contradicted
+          ? `Resolve chapter ${contradicted.chapter}’s flagged contradiction first`
+          : busyReason;
+
+  const runGenerate = (): void => {
+    generate.mutate({ limit: 1, autoFix: true }, { onError: err => toast.danger(err.message) });
+  };
+
+  const openInChapters = (): Promise<void> => {
+    if (chapterDraft) return navigate({ to: '/novels/$novelId/chapters', params: { novelId }, search: { chapter } });
+    const page = pageOfChapter(listedChapters(briefs, summaries), chapter);
+    return navigate({ to: '/novels/$novelId/chapters', params: { novelId }, search: { page: page > 1 ? page : undefined } });
+  };
   const briefIsNewer = Boolean(brief && chapterDraft && !staleReason && new Date(brief.updatedAt) > new Date(chapterDraft.writtenAt));
 
   const setDraft = (draft: BriefDraft): void => setEdit(current => (current ? { ...current, draft } : current));
@@ -1009,21 +954,36 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
       </div>
 
       <div className={styles.briefActions}>
-        <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/chapters', params: { novelId } })}>
-          Open in chapters →
+        <Button variant="secondary" onClick={openInChapters}>
+          {chapterDraft ? 'Open chapter →' : 'Show in chapter list →'}
         </Button>
         {brief && !editing && (
           <Button variant="ghost" onClick={startEditing}>
             Edit brief
           </Button>
         )}
-        {regenerable && !briefIsNewer && <RegenerateChapterButton novelId={novelId} chapter={chapter} label="Regenerate chapter" disabledReason={regenerateBlocked} />}
+        {generation ? (
+          <span className={styles.briefGeneration}>
+            <GenerationStatus generation={generation} label={chapterDraft ? 'Regenerating' : 'Writing'} />
+            {generation.phase === 'writing' && <StopButton onStop={stop} stopping={stopping} />}
+          </span>
+        ) : (
+          <>
+            {generatable && (
+              <Button variant="primary" prefix={<SparkIcon />} loading={generate.isPending} disabled={Boolean(generateBlocked)} onClick={runGenerate}>
+                Generate chapter
+              </Button>
+            )}
+            {generatable && generateBlocked && <span className={styles.actionReason}>{generateBlocked}</span>}
+            {regenerable && !briefIsNewer && <RegenerateChapterButton novelId={novelId} chapter={chapter} label="Regenerate chapter" disabledReason={regenerateBlocked} />}
+          </>
+        )}
       </div>
 
-      {regenerable && briefIsNewer && (
+      {!generation && regenerable && briefIsNewer && (
         <div className={styles.regenerateCallout}>
           <p className={styles.regenerateNote}>The brief changed after chapter {chapter} was drafted. Regenerate it to write the chapter from the updated plan.</p>
-          <RegenerateChapterButton novelId={novelId} chapter={chapter} variant="primary" disabledReason={editing ? EDITING_REASON : undefined} />
+          <RegenerateChapterButton novelId={novelId} chapter={chapter} variant="primary" disabledReason={editing ? EDITING_REASON : busyReason} />
         </div>
       )}
 

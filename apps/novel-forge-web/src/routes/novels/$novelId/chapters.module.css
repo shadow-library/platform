@@ -7,97 +7,6 @@
   inset: 0;
 }
 
-.progressScreen {
-  position: absolute;
-  inset: 0;
-  background: var(--sh-surface-app);
-}
-
-.progressInner {
-  max-width: 640px;
-  margin: 0 auto;
-  padding-block: 60px 90px;
-}
-
-.progressHead {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 8px;
-}
-
-.progressTitle {
-  margin: 0;
-  font-size: var(--sh-text-h1);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.progressSub {
-  margin: 0 0 28px;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-secondary);
-}
-
-.jobCard {
-  background: var(--sh-surface-card);
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-lg);
-  padding: 18px 20px;
-  margin-bottom: 16px;
-}
-
-.jobHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.jobLabel {
-  font-size: var(--sh-text-body-sm);
-  font-weight: 700;
-}
-
-.jobTarget {
-  font-size: 11px;
-  color: var(--sh-text-tertiary);
-}
-
-.jobError {
-  margin: 12px 0 0;
-  white-space: pre-wrap;
-  font-family: var(--sh-font-mono);
-  font-size: 12px;
-  color: var(--sh-danger-text-on-subtle);
-}
-
-.runList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 28px;
-}
-
-.runWaiting {
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-}
-
-.runCard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--sh-surface-card);
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-md);
-  padding: 11px 14px;
-}
-
-.runLabel {
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-}
-
 .screenScroll {
   position: absolute;
   inset: 0;
@@ -753,4 +662,12 @@
 
 .notice {
   margin-bottom: 20px;
+}
+
+.pagination {
+  margin-top: 14px;
+}
+
+.drawerStatus {
+  margin-bottom: 16px;
 }
