@@ -1,4 +1,5 @@
 import { AppErrorCode } from '@server/classes';
+import { type Ledger } from '@server/database';
 
 import { type PromptKey, type PromptModule } from '../../ai/prompts/types';
 import { BLUEPRINT_PHASES } from '../blueprint-phase';
@@ -66,6 +67,7 @@ export function validateBlueprintSteps(steps: readonly AnyBlueprintStep[], promp
     if (isGenerating(step)) issues.push(...generatorIssues(step, prompts));
     issues.push(...sourceIssues(step, byKey));
     if (step.kind === 'pass' && !steps.some(screen => isSourced(screen) && screen.source.step === step.key)) issues.push(`pass "${step.key}" feeds no screen`);
+    if (isLocking(step) && step.required && step.completionTopics.length === 0) issues.push(`required step "${step.key}" names no completion topic`);
     const topics = [steerTopic(step), rejectedTopic(step), ...(isLocking(step) ? step.completionTopics : [])];
     for (const topic of topics) {
       if (!TOPIC_KEY_PATTERN.test(topic)) issues.push(`step "${step.key}" writes topic "${topic}", which is not a ledger topic key`);
@@ -96,6 +98,13 @@ export class BlueprintStepRegistry {
     const step = this.get(key);
     if (!isSourced(step)) return { generator: step, focus: null };
     return { generator: this.get(step.source.step) as AnyGeneratingStep, focus: step.key };
+  }
+
+  /** A screen applies unless its `appliesWhen` says otherwise; a pass applies when any screen it feeds does. */
+  applies(key: string, ledger: Ledger.Entry[]): boolean {
+    const step = this.get(key);
+    if (isLocking(step)) return step.appliesWhen?.(ledger) ?? true;
+    return this.all.some(screen => isSourced(screen) && screen.source.step === step.key && (screen.appliesWhen?.(ledger) ?? true));
   }
 
   lockable(key: string): AnyLockingStep {

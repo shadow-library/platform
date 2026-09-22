@@ -6,12 +6,13 @@ import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 import { ActorModule } from '@modules/actor';
 
+import { BlueprintModule } from '../blueprint/blueprint.module';
 import { ProjectOwnershipGuard } from './project-ownership.middleware';
 import { ProjectController } from './project/project.controller';
 import { ProjectService } from './project/project.service';
 
 @Module({
-  imports: [ActorModule, DatabaseModule, StorageModule, FastifyModule],
+  imports: [ActorModule, BlueprintModule, DatabaseModule, StorageModule, FastifyModule],
   controllers: [ProjectController, ProjectOwnershipGuard],
   providers: [{ token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) }, ProjectService],
   exports: [ProjectService],

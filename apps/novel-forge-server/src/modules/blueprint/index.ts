@@ -12,4 +12,5 @@ export * from './engine/blueprint.dto';
 export * from './ledger/ledger-entries';
 export * from './ledger/ledger.service';
 export * from './ledger/ledger.types';
+export * from './stage';
 export * from './steps';

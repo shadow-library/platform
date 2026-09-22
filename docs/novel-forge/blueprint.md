@@ -165,6 +165,9 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - A project's stage (Blueprint or Workspace) and each phase's state (done, current, locked, with a lock reason) are computed from data, never stored.
 - Phase completion is derived from active ledger topics. A project is in the Workspace once the gate entry exists, or when it has chapter briefs and no Blueprint ledger (an
   import).
+- A phase is done when every required step that applies to the novel is done; a step the reader promise rules out (a power ladder without progression) never holds its phase
+  back. The first unfinished phase is current and the rest wait behind the nearest unfinished phase above them; a phase finished before a revisit stays done. In the
+  Workspace nothing is locked: an unfinished phase is open to reopen.
 - An import reports per-phase coverage derived from its content (bible pages, entities, volumes, arcs, briefs); gaps are recommendations, not blockers. Only a missing chapter
   brief blocks generation.
 

@@ -56,9 +56,13 @@ function authorMessage(round: Pick<Blueprint.Round, 'steer' | 'nudges'>): string
   return parts.length > 0 ? parts.join(' ') : null;
 }
 
-/** The step's conversation: each earlier round's steer and the coach's reply. Options never enter it, so an old round's cards cannot resurface. */
-export function stepMessages(rounds: Pick<Blueprint.Round, 'round' | 'steer' | 'nudges' | 'coachMessage'>[]): BlueprintStepMessage[] {
-  return [...rounds]
+/**
+ * The step's conversation: each earlier round's steer and the coach's reply. Options never enter it, so an old round's cards cannot resurface.
+ * A round focused on one screen of a pass hears only that screen's rounds and whole-pass rounds, never a sibling screen's.
+ */
+export function stepMessages(rounds: Pick<Blueprint.Round, 'round' | 'steer' | 'nudges' | 'coachMessage' | 'focus'>[], focus: string | null = null): BlueprintStepMessage[] {
+  return rounds
+    .filter(round => focus === null || round.focus === null || round.focus === focus)
     .sort((a, b) => a.round - b.round)
     .flatMap(round => {
       const author = authorMessage(round);

@@ -1,4 +1,4 @@
-import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
+import { type BlueprintPhaseProgressResponse, type BlueprintStage, type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
 
 // A role's model override is a `{ provider, model }` pair, but a `Select` needs a single string value,
 // so the two are joined on '::'. A model id never contains '::', so the split back is unambiguous.
@@ -191,6 +191,16 @@ export function lifecyclePhase(status?: ProjectStatusResponse, kind: ProjectResp
     completed++;
   }
   return { completed, total, label: phases[Math.min(completed, total - 1)] ?? phases[0] ?? '' };
+}
+
+/** Null until the status loads, and always for a kind that has no Blueprint (only an original novel does). */
+export function blueprintStage(status?: Pick<ProjectStatusResponse, 'blueprint'>): BlueprintStage | null {
+  return status?.blueprint?.stage ?? null;
+}
+
+/** The phase the author is working on; null in the Workspace, where no phase is current, and once every phase is done. */
+export function currentBlueprintPhase(status?: Pick<ProjectStatusResponse, 'blueprint'>): BlueprintPhaseProgressResponse | null {
+  return status?.blueprint?.phases.find(phase => phase.status === 'current') ?? null;
 }
 
 export interface TranslationLifecycleInput {

@@ -24,8 +24,18 @@ function fakeService(state: FakeState = {}, steps: AnyBlueprintStep[] = ALL_STEP
   const calls: string[] = [];
   const tx = {
     query: {
-      projects: { findFirst: mock(async () => ({ id: 7n, kind: state.projectKind ?? 'new_novel' })) },
-      decisionLedgerEntries: { findMany: mock(async () => state.active ?? []) },
+      projects: {
+        findFirst: mock(async () => {
+          calls.push('read:project');
+          return { id: 7n, kind: state.projectKind ?? 'new_novel' };
+        }),
+      },
+      decisionLedgerEntries: {
+        findMany: mock(async () => {
+          calls.push('read:ledger');
+          return state.active ?? [];
+        }),
+      },
     },
   };
   const db = {
@@ -36,8 +46,14 @@ function fakeService(state: FakeState = {}, steps: AnyBlueprintStep[] = ALL_STEP
     lockStep: mock<(projectId: bigint, stepKey: string, tx: unknown) => Promise<void>>(async (_projectId, stepKey) => {
       calls.push(`lock:${stepKey}`);
     }),
-    latestForStep: mock(async () => state.latest),
-    latestReady: mock(async () => state.ready),
+    latestForStep: mock(async () => {
+      calls.push('read:latest');
+      return state.latest;
+    }),
+    latestReady: mock(async () => {
+      calls.push('read:ready');
+      return state.ready;
+    }),
     latestPerStep: mock(async () => state.perStep ?? []),
     settle: mock(async () => {
       calls.push('settle');
@@ -90,7 +106,7 @@ describe('BlueprintStepService.openRound', () => {
       input: { text: 'A ferry town.' },
     });
 
-    expect(calls).toEqual(['lock:start', 'ledger.append', 'create']);
+    expect(calls).toEqual(['lock:start', 'read:project', 'read:latest', 'read:ready', 'ledger.append', 'create']);
     expect(rounds.lockStep.mock.calls[0]?.[2]).toBe(tx as never);
     expect(ledger.append.mock.calls[0]?.[1]).toEqual([
       { kind: 'direction', phase: 'idea', topic: 'start.steer', statement: 'Quieter', decidedBy: 'author' },
@@ -120,7 +136,7 @@ describe('BlueprintStepService.openRound', () => {
   it('should settle a round whose job was cancelled underneath it before opening the next', async () => {
     const { service, calls } = fakeService({ latest: { round: round({ status: 'pending' }), jobStatus: 'cancelled' } });
     await service.openRound(7n, 'start', {});
-    expect(calls).toEqual(['lock:start', 'settle', 'create']);
+    expect(calls).toEqual(['lock:start', 'read:project', 'read:latest', 'settle', 'read:ready', 'create']);
   });
 
   it('should refuse malformed input, a nudge the step does not offer and a project that is not an original novel', async () => {
@@ -138,7 +154,7 @@ describe('BlueprintStepService.lock', () => {
 
     const result = await service.lock(7n, 'start', selection);
 
-    expect(calls[0]).toBe('lock:start');
+    expect(calls).toEqual(['lock:start', 'read:project', 'read:latest', 'read:ready', 'read:ledger', 'ledger.append']);
     expect(ledger.append.mock.calls[0]?.[1]).toEqual([
       {
         kind: 'direction',

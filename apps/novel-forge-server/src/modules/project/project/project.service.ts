@@ -16,6 +16,7 @@ import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { clearLedgerBriefLinks } from '../../blueprint/ledger/ledger-entries';
+import { BlueprintStageService } from '../../blueprint/stage/blueprint-stage.service';
 import { setProjectCover } from '../../illustration/uploaded-cover';
 import { type CostWindow, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';
@@ -55,6 +56,7 @@ export class ProjectService {
     private readonly storage: StorageService,
     private readonly authClient: AuthClient,
     private readonly context: ContextService,
+    private readonly blueprintStage: BlueprintStageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -425,7 +427,7 @@ export class ProjectService {
     // Three single-row aggregate queries with conditional counts, rather than six concurrent `$count`
     // calls: fewer connections under load (drizzle's `$count` intermittently crashed on `res[0].count`
     // when the pool was contended by in-flight generation writes), and each `?? 0` is crash-proof.
-    const [chapterRow, draftRow, volumeRow] = await Promise.all([
+    const [chapterRow, draftRow, volumeRow, blueprint] = await Promise.all([
       this.db
         .select({
           total: sql<number>`count(*)::int`,
@@ -447,6 +449,7 @@ export class ProjectService {
         })
         .from(schema.volumes)
         .where(eq(schema.volumes.projectId, id)),
+      this.blueprintStage.progress(project),
     ]);
 
     const chaptersTotal = chapterRow[0]?.total ?? 0;
@@ -458,7 +461,7 @@ export class ProjectService {
 
     const planApproved = volumesTotal > 0 && unapprovedVolumes === 0;
 
-    return { kind: project.kind, chaptersTotal, chaptersExtracted, draftsTotal, draftsFinal, planApproved, volumesTotal };
+    return { kind: project.kind, chaptersTotal, chaptersExtracted, draftsTotal, draftsFinal, planApproved, volumesTotal, blueprint };
   }
 
   async cost(projectId: bigint): Promise<CostResponse> {

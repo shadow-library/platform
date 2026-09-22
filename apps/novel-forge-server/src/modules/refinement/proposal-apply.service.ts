@@ -211,10 +211,11 @@ export class ProposalApplyService {
    * baseline conflict check over the selected refs, guarded op dispatch with inverse capture,
    * staleness propagation, audit. Content ops are transactional; selected actions execute after
    * commit, sequentially, with their outcomes folded into opResults — except the one-way doors, which
-   * an auto-mode turn declines with a note rather than failing over. A baseline mismatch commits
-   * only the `conflicted` status flip and surfaces as HTTP 409; any other failure rolls the whole
-   * transaction back and leaves the proposal pending. With `options.tx` everything runs inside the
-   * caller's transaction instead, so the caller's rollback also undoes the conflicted flip, and action
+   * an auto-mode turn declines with a note rather than failing over. On its own transaction, a
+   * baseline mismatch commits only the `conflicted` status flip and surfaces as HTTP 409; any other
+   * failure rolls the whole transaction back and leaves the proposal pending. With `options.tx`
+   * everything runs inside the caller's transaction instead: the 409 is thrown with the flip still
+   * uncommitted, so it persists only if the caller catches the error and commits anyway, and action
    * ops are refused because nothing has committed for them to run after.
    */
   async apply(projectId: bigint, proposalId: bigint, options?: ApplyOptions): Promise<ApplyResult> {

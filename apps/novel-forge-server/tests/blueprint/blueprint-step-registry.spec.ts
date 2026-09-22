@@ -44,6 +44,14 @@ describe('validateBlueprintSteps', () => {
   });
 });
 
+describe('validateBlueprintSteps completion', () => {
+  it('should flag a required step with no completion topic, which would count as done from the start', () => {
+    expect(validateBlueprintSteps([blueprintStep({ ...startStep, required: true, completionTopics: [] })], PROMPT_REGISTRY)).toEqual([
+      'required step "start" names no completion topic',
+    ]);
+  });
+});
+
 describe('validateBlueprintSteps with a pass', () => {
   it('should accept a pass feeding its screens', () => {
     expect(validateBlueprintSteps(ENGINE, PROMPT_REGISTRY)).toEqual([]);

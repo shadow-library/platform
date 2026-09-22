@@ -133,6 +133,17 @@ describe('Blueprint context recipe', () => {
   it('should keep the step’s messages in round order whatever order the rounds arrive in', () => {
     expect(stepMessages([...rounds].reverse()).map(message => message.text)).toEqual(rounds.flatMap(r => [`steer ${r.round}`, `coach ${r.round}`]));
   });
+
+  it('should give a focused pass round only its own screen’s and whole-pass rounds, never a sibling screen’s', () => {
+    const passRounds = [
+      round({ round: 1, steer: 'whole pass', focus: null }),
+      round({ round: 2, steer: 'about the world', focus: 'engine_world' }),
+      round({ round: 3, steer: 'about the hero', focus: 'engine_core' }),
+    ];
+
+    expect(stepMessages(passRounds, 'engine_core').map(message => message.text)).toEqual(['whole pass', 'about the hero']);
+    expect(stepMessages(passRounds).map(message => message.text)).toEqual(['whole pass', 'about the world', 'about the hero']);
+  });
 });
 
 describe('reconcileLockEntries', () => {

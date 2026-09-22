@@ -101,6 +101,8 @@ export interface LockingStep<TView, TSelection> {
   required: boolean;
   /** Topics whose active decisions mean this step is done. */
   completionTopics: readonly string[];
+  /** Whether the novel's active decisions call for this step (a power ladder only when progression drives it); omitted means always. */
+  appliesWhen?(ledger: Ledger.Entry[]): boolean;
   selectionSchema: SchemaClass;
   chosenOptionIds(selection: TSelection): string[];
   materialise(selection: TSelection, context: MaterialiseContext<TView>): Promise<LockPlan>;

@@ -111,7 +111,7 @@ export class BlueprintRoundRunner {
     const pack = await this.contextAssembler.forBlueprint(
       projectId,
       ledger,
-      { inputs, thread: stepMessages(earlier), roundInput: renderRoundInput(step, roundInput(round), offered) },
+      { inputs, thread: stepMessages(earlier, round.focus), roundInput: renderRoundInput(step, roundInput(round), offered) },
       { policy, budgetTokens: step.budgetTokens },
     );
 
