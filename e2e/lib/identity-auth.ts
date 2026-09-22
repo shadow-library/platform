@@ -10,6 +10,7 @@ import { mutate } from './api';
 import { clientIpHeaders } from './client-ip';
 import { requireProductUrl } from './env';
 import { TotpAuthenticator, totpCode } from './totp';
+import { type AssertionBody, type RegistrationOptionsLike, type SoftAuthenticator } from './webauthn';
 
 /**
  * Defining types
@@ -27,6 +28,7 @@ export interface ChallengeVerifyRequest {
   password?: string;
   code?: string;
   recoveryCode?: string;
+  webauthn?: AssertionBody;
 }
 
 export interface FlowStepBody {
@@ -52,6 +54,12 @@ export interface TotpEnrolment {
   readonly authenticator: TotpAuthenticator;
   /** The first batch, which identity returns only from the activation that creates it. */
   readonly recoveryCodes: string[];
+}
+
+export interface PasskeyEnrolment {
+  readonly credentialId: string;
+  /** The first batch, which identity returns only from the ceremony that creates it. */
+  readonly recoveryCodes?: string[];
 }
 
 export interface PasswordSignIn {
@@ -128,6 +136,17 @@ export async function enrollTotp(ctx: APIRequestContext): Promise<TotpEnrolment>
   if (activate.status() !== 200) throw new IdentityAuthError(`totp/activate answered ${activate.status()}: ${await activate.text()}`);
   const { recoveryCodes = [] } = (await activate.json()) as { recoveryCodes?: string[] };
   return { authenticator: new TotpAuthenticator(secret, activatedAt), recoveryCodes };
+}
+
+/** Registers `authenticator` as a passkey for the signed-in user of `ctx`, which — like TOTP enrolment — must hold a self-service elevation. */
+export async function enrollPasskey(ctx: APIRequestContext, authenticator: SoftAuthenticator, label?: string): Promise<PasskeyEnrolment> {
+  const options = await identityMutate(ctx, 'post', '/api/v1/me/webauthn/register/options');
+  if (options.status() !== 200) throw new IdentityAuthError(`webauthn/register/options answered ${options.status()}: ${await options.text()}`);
+  const attestation = authenticator.attest((await options.json()) as RegistrationOptionsLike, label ? { label } : {});
+  const verify = await identityMutate(ctx, 'post', '/api/v1/me/webauthn/register/verify', attestation);
+  if (verify.status() !== 200) throw new IdentityAuthError(`webauthn/register/verify answered ${verify.status()}: ${await verify.text()}`);
+  const { recoveryCodes } = (await verify.json()) as { recoveryCodes?: string[] };
+  return { credentialId: authenticator.credentialId, recoveryCodes };
 }
 
 /** `POST /api/v1/me/mfa/step-up` on `ctx`'s session; the caller asserts on the answer. */

@@ -15,3 +15,4 @@ export * from './redis';
 export * from './set-cookie';
 export * from './totp';
 export * from './wait';
+export * from './webauthn';
