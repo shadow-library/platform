@@ -6,6 +6,7 @@ export * from './identity-auth';
 export * from './identity-oauth';
 export * from './identity-sessions';
 export * from './identity-users';
+export * from './jwt';
 export * from './load-env';
 export * from './personas';
 export * from './redis';

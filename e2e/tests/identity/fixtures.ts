@@ -12,8 +12,10 @@ import {
   createAdminApi,
   createIdentitySession,
   createIdentityUser,
+  createOAuthApplication,
   createOAuthTestClient,
   deleteIdentityUser,
+  deleteOAuthApplication,
   deleteOAuthTestClient,
   freshClientIp,
   identityApi,
@@ -22,6 +24,7 @@ import {
   type IdentitySessionOptions,
   type IdentityUser,
   type IdentityUserOptions,
+  type OAuthApplication,
   type OAuthTestClient,
 } from '../../lib';
 
@@ -44,6 +47,8 @@ export interface IdentityHarness {
   admin(): Promise<AdminApi>;
   /** A throwaway PUBLIC application with a first-party public client, removed after the test. */
   createOAuthClient(label?: string): Promise<OAuthTestClient>;
+  /** A throwaway PUBLIC application; it and every client registered on it are removed after the test. */
+  createOAuthApp(label?: string): Promise<OAuthApplication>;
 }
 
 /**
@@ -69,6 +74,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const contexts: APIRequestContext[] = [];
     const users: IdentityUser[] = [];
     const oauthClients: OAuthTestClient[] = [];
+    const oauthApps: OAuthApplication[] = [];
     let adminApi: Promise<AdminApi> | undefined;
 
     const track = (ctx: APIRequestContext): APIRequestContext => {
@@ -97,11 +103,17 @@ export const test = base.extend<{ identity: IdentityHarness }>({
         oauthClients.push(client);
         return client;
       },
+      createOAuthApp: async label => {
+        const application = await createOAuthApplication((await admin()).ctx, label);
+        oauthApps.push(application);
+        return application;
+      },
     });
 
     const pendingAdmin = adminApi;
     await runAll([
       ...oauthClients.map(client => async () => deleteOAuthTestClient((await admin()).ctx, client)),
+      ...oauthApps.map(application => async () => deleteOAuthApplication((await admin()).ctx, application)),
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
       ...contexts.map(ctx => () => ctx.dispose()),
       ...users.map(user => () => deleteIdentityUser(user)),
