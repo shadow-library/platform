@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from '@server/modules/auth/oauth';
+import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from '@server/modules/auth/oauth/workload-subject.util';
 
 const SERVER = 'system:serviceaccount:novel-forge:novel-forge-server';
 const WEB = 'system:serviceaccount:novel-forge:novel-forge-web';

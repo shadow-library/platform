@@ -1,12 +1,14 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { afterAll, describe, expect, it, mock } from 'bun:test';
 
-import '@server/bootstrap';
-import { BackChannelLogoutService } from '@server/modules/auth/token';
-import { BotOwnershipService } from '@server/modules/identity/bot-ownership';
-import { NotificationService } from '@server/modules/infrastructure/notification';
-import { WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
-import { BotKeyExpiryService, MAINTENANCE_EVERY_TICKS, WorkerService } from '@server/modules/worker';
-import { MaintenanceService } from '@server/modules/worker/maintenance.service';
+import { setConfig } from '@shadow-library/common/testing';
+
+import { type BackChannelLogoutService } from '@server/modules/auth/token';
+import { type BotOwnershipService } from '@server/modules/identity/bot-ownership';
+import { type NotificationService } from '@server/modules/infrastructure/notification';
+import { type WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
+import { type BotKeyExpiryService } from '@server/modules/worker/bot-key-expiry.service';
+import { type MaintenanceService } from '@server/modules/worker/maintenance.service';
+import { MAINTENANCE_EVERY_TICKS, WorkerService } from '@server/modules/worker/worker.service';
 
 interface Tickable {
   tick(): Promise<void>;
@@ -43,6 +45,9 @@ function buildWorker() {
 }
 
 describe('WorkerService', () => {
+  const restoreConfig = setConfig({ 'worker.poll-interval': 60_000 });
+  afterAll(restoreConfig);
+
   it('should run the bot key expiry reminder and sweep on the same cadence as the other maintenance jobs', async () => {
     const { worker, remindExpiringKeys, sweepExpiredKeys, purgeStaleContactClaims, purgeStaleAppSessions } = buildWorker();
 

@@ -1,22 +1,31 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { randomBytes } from 'node:crypto';
 
-import { BotKeyExchangeService, formatBotKey } from '@server/modules/identity/bot';
-import { LogSamplerService } from '@server/modules/infrastructure/security';
+import { FakeDatabaseService, InMemoryRedis } from '@shadow-library/modules/testing';
+
+import { BotKeyExchangeService } from '@server/modules/identity/bot/bot-key-exchange.service';
+import { formatBotKey } from '@server/modules/identity/bot/bot-key.util';
+import { LogSamplerService } from '@server/modules/infrastructure/security/log-sampler.service';
 
 interface KeyRecordStub {
   secretHash: string;
 }
 
-const serviceWith = (redis: { set: (slot: string) => Promise<unknown> }, records: KeyRecordStub[] = []): BotKeyExchangeService => {
+class UnreachableRedis extends InMemoryRedis {
+  override set(): Promise<'OK' | null> {
+    return Promise.reject(new Error('redis down'));
+  }
+}
+
+const serviceWith = (redis: InMemoryRedis, records: KeyRecordStub[] = []): BotKeyExchangeService => {
   const query = { from: () => query, innerJoin: () => query, where: () => query, limit: () => Promise.resolve(records) };
-  const databaseService = { getPostgresClient: () => ({ select: () => query }), getRedisClient: () => redis };
-  return new BotKeyExchangeService(databaseService as never, {} as never, {} as never, new LogSamplerService(databaseService as never));
+  const databaseService = new FakeDatabaseService({ postgres: { select: () => query }, redis });
+  return new BotKeyExchangeService(databaseService, {} as never, {} as never, new LogSamplerService(databaseService));
 };
 
 describe('BotKeyExchangeService log sampling', () => {
   it('should keep refusing and still log when Redis is unavailable', async () => {
-    const service = serviceWith({ set: () => Promise.reject(new Error('redis down')) }, [{ secretHash: '0'.repeat(64) }]);
+    const service = serviceWith(new UnreachableRedis(), [{ secretHash: '0'.repeat(64) }]);
     const warn = spyOn(service['logger'], 'warn');
 
     expect(await service.authenticate('sl_bot_malformed', '198.51.100.7', 'exchange')).toEqual({ status: 'denied' });
@@ -24,18 +33,11 @@ describe('BotKeyExchangeService log sampling', () => {
 
     const reasons = warn.mock.calls.map(([, meta]) => (meta as { reason: string }).reason);
     expect(reasons).toEqual(['malformed', 'secret_mismatch']);
+    warn.mockRestore();
   });
 
   it('should sample each refusal reason separately per caller address', async () => {
-    const claimed = new Set<string>();
-    const redis = {
-      set: async (slot: string) => {
-        if (claimed.has(slot)) return null;
-        claimed.add(slot);
-        return 'OK';
-      },
-    };
-    const service = serviceWith(redis, []);
+    const service = serviceWith(new InMemoryRedis());
     const warn = spyOn(service['logger'], 'warn');
     const unknownKey = () => formatBotKey(Bun.randomUUIDv7(), randomBytes(32));
 
@@ -44,5 +46,6 @@ describe('BotKeyExchangeService log sampling', () => {
 
     const logged = warn.mock.calls.map(([, meta]) => `${(meta as { ip: string }).ip}:${(meta as { reason: string }).reason}`);
     expect(logged).toEqual(['198.51.100.7:malformed', '198.51.100.7:not_found', '198.51.100.8:malformed']);
+    warn.mockRestore();
   });
 });

@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterAll, afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { AppError } from '@shadow-library/common';
 
-import { announceSecretOnce, resolveBootstrapAdminPassword } from '@server/modules/bootstrap';
+import { announceSecretOnce, resolveBootstrapAdminPassword } from '@server/modules/bootstrap/bootstrap-secrets.util';
 
 describe('bootstrap secrets', () => {
   describe('resolveBootstrapAdminPassword', () => {
@@ -29,6 +29,7 @@ describe('bootstrap secrets', () => {
     const writeSpy = spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     afterEach(() => writeSpy.mockClear());
+    afterAll(() => writeSpy.mockRestore());
 
     it('should never write a secret anywhere in a production deployment', () => {
       announceSecretOnce('heading', 'top-s3cret-value', true);
