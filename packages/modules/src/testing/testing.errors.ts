@@ -33,4 +33,7 @@ export class TestingErrorCode extends ErrorCode {
   static readonly REDIS_SYNTAX = TestingErrorCode.internal('TESTING_REDIS_SYNTAX', 'ERR syntax error');
   static readonly REDIS_WRONG_ARITY = TestingErrorCode.internal('TESTING_REDIS_WRONG_ARITY', "ERR wrong number of arguments for '{command}' command");
   static readonly REDIS_UNKNOWN_COMMAND = TestingErrorCode.internal('TESTING_REDIS_UNKNOWN_COMMAND', "InMemoryRedis does not implement '{command}'");
+
+  static readonly OPENAPI_OUTPUT_MISSING = TestingErrorCode.internal('TESTING_OPENAPI_OUTPUT_MISSING', 'No output path was given for the OpenAPI document');
+  static readonly OPENAPI_UNAVAILABLE = TestingErrorCode.internal('TESTING_OPENAPI_UNAVAILABLE', "'{route}' answered http {status} instead of the OpenAPI document");
 }

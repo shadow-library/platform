@@ -11,7 +11,7 @@ import prettier from 'prettier';
 /**
  * Importing user defined packages
  */
-import { log, reportError, run, ShadowError } from './utils/index.ts';
+import { log, reportError, ShadowError, stripGitEnv } from './utils/index.ts';
 import { API_TYPES_PATH, findWorkspace, findWorkspaces, type Workspace } from './workspaces.ts';
 
 /**
@@ -40,6 +40,16 @@ export interface OpenApiDocument {
 /** The running server every web app generates against during development, in non-`--check` single-target mode. */
 const DEFAULT_URL = 'http://localhost:8080/dev/api-docs/openapi.json';
 
+/**
+ * Each backend's own entry for writing its OpenAPI document: it boots `AppModule` in-process over fakes
+ * for Postgres, Redis, storage and identity, which only that server knows how to assemble. It lives in
+ * the server so Bun resolves the workspace's own path aliases and `@shadow-library/*` copies.
+ */
+const DUMP_ENTRY_RELATIVE_PATH = 'src/dump-openapi.ts';
+
+/** Booting takes about a second; anything near this long means a provider is waiting on a connection it should never open. */
+const DUMP_TIMEOUT_MS = 60_000;
+
 const USAGE = `Usage: bun scripts/gen-api-types.ts <web-app>|--all [url] [--check]
 
   web-app   repo-relative directory (apps/pulse-web) or package name — must have a paired apps/*-server
@@ -47,37 +57,16 @@ const USAGE = `Usage: bun scripts/gen-api-types.ts <web-app>|--all [url] [--chec
   url       OpenAPI document to generate from (default ${DEFAULT_URL}); only meaningful for a single
             web-app target without --check — --all and --check always boot the paired server themselves
   --check   don't write api-types.gen.ts — render it to memory instead and diff against the committed
-            file, booting the paired server hermetically in-process (no dev server needed) and failing
-            with a nonzero exit and an actionable message on drift. The server↔web contract drift gate.
+            file, booting the paired server in-process and failing with a nonzero exit and an
+            actionable message on drift. The server↔web contract drift gate.
+
+--all and --check boot each paired server through its ${DUMP_ENTRY_RELATIVE_PATH}, over fakes: no dev
+server, Postgres, Redis or identity provider is needed, and nothing connects to one.
 
 Without --check, writes the committed src/lib/apis/api-types.gen.ts (against a running server, or
 in-process for --all). With --check, nothing is ever written.`;
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
-
-/** The route HttpCoreModule serves the OpenAPI document on in development. */
-const OPENAPI_ROUTE = '/dev/api-docs/openapi.json';
-
-/**
- * A throwaway spec file dropped into the paired server's own `tests/` directory and removed again once
- * the document is captured. It has to live there (not under `scripts/`) so Bun resolves the server's own
- * `tsconfig.json` path aliases (`@server/*`, `@scripts/*`, …) and `bunfig.toml` `[test].preload` exactly
- * as every other spec in that workspace does — there is no in-process way to boot a workspace's app
- * module graph from outside its own directory that doesn't go through `bun test`.
- */
-const BOOT_SPEC_RELATIVE_PATH = 'tests/__gen-api-types.spec.ts';
-
-/**
- * A throwaway `--preload` script, run before the boot spec (and before every `bunfig.toml` preload it
- * doesn't replace). It has to be a *preload*, not inline code in the spec file: static `import`s resolve
- * — and the modules they name fully evaluate — before the importing module's own top-level statements
- * run, no matter where in the file they're textually placed. The boot spec imports `./test-environment`,
- * which statically (or, for two backends, lazily inside `beforeAll` — either way, before the spec's `it`
- * runs) imports the real `AppModule`; setting `Config`'s `app.env` from inside the spec file would run
- * too late for anything the module graph decides at import/decoration time. A separate `--preload` file
- * that touches nothing but `Config` is guaranteed to finish before any file that imports `AppModule` does.
- */
-const BOOT_PRELOAD_RELATIVE_PATH = 'tests/__gen-api-types.preload.ts';
 
 /** Narrows an unknown parsed JSON value to an OpenAPI document, rejecting anything without a `paths` object. */
 export function validateOpenApiDocument(value: unknown, sourceUrl: string): OpenApiDocument {
@@ -239,41 +228,6 @@ export async function generateApiTypesContents(document: OpenApiDocument, output
   }
 }
 
-function bootPreloadContents(): string {
-  return `import { Config } from '@shadow-library/common';
-
-Config['cache'].set('app.env', 'development');
-`;
-}
-
-/**
- * Every server's `tests/test-environment.ts` exports a `TestEnvironment` with the exact same shape
- * (`new TestEnvironment(suffix)`, `.init()`, `.getRouter()` → `FastifyRouter`) — this spec is generic
- * across all four backends. It boots the real app in-process (`ShadowApplication.init()`, never
- * `.start()`, so nothing binds a network port) and drives the OpenAPI route through `mockRequest()`
- * (fastify's `light-my-request` injection).
- */
-function bootSpecContents(): string {
-  return `import { describe, expect, it } from 'bun:test';
-import fs from 'node:fs';
-
-import { TestEnvironment } from './test-environment';
-
-describe('__gen-api-types', () => {
-  const env = new TestEnvironment('gen_api_types');
-  env.init();
-
-  it('should dump the OpenAPI document', async () => {
-    const response = await env.getRouter().mockRequest().get('${OPENAPI_ROUTE}');
-    expect(response.statusCode).toBe(200);
-    const outputPath = process.env['OPENAPI_DUMP_PATH'];
-    if (!outputPath) throw new Error('OPENAPI_DUMP_PATH is not set');
-    fs.writeFileSync(outputPath, response.payload);
-  });
-});
-`;
-}
-
 /**
  * The `apps/*-server` workspace paired with `webApp` by naming convention — the same convention the
  * server↔web contract and AGENTS.md already assume.
@@ -295,37 +249,46 @@ function webAppTargets(workspaces: Workspace[]): Workspace[] {
 }
 
 /**
- * Boots `server` hermetically (via its own `TestEnvironment`, the exact env recipe its own test suite
- * uses — template DB clone, mock IdP where the backend needs one, `bunfig.toml` preload) and returns its
- * OpenAPI document. Always cleans up the throwaway spec file and dump, even on failure.
+ * Runs `server`'s dump entry and returns the OpenAPI document it wrote. `--no-env-file` keeps a
+ * developer's local `.env` from changing the contract, so a local run and CI capture the same document.
+ * Always removes the dump, even on failure.
  */
 export async function captureOpenApiDocument(server: Workspace): Promise<unknown> {
-  const specPath = path.join(server.path, BOOT_SPEC_RELATIVE_PATH);
-  const preloadPath = path.join(server.path, BOOT_PRELOAD_RELATIVE_PATH);
-  const dumpPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-api-types-')), 'openapi.json');
+  const entryPath = path.join(server.path, DUMP_ENTRY_RELATIVE_PATH);
+  if (!fs.existsSync(entryPath)) throw new ShadowError(`${server.dir} has no ${DUMP_ENTRY_RELATIVE_PATH} — every paired server needs one to capture its OpenAPI document`);
 
-  fs.mkdirSync(path.dirname(specPath), { recursive: true });
-  fs.writeFileSync(specPath, bootSpecContents());
-  fs.writeFileSync(preloadPath, bootPreloadContents());
+  const dumpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-api-types-'));
+  const dumpPath = path.join(dumpDir, 'openapi.json');
 
   try {
-    log.info(`boot   ${server.dir} (bun test ${BOOT_SPEC_RELATIVE_PATH})`);
-    const result = run('bun', ['test', '--preload', `./${BOOT_PRELOAD_RELATIVE_PATH}`, BOOT_SPEC_RELATIVE_PATH], {
+    log.info(`boot   ${server.dir} (bun ${DUMP_ENTRY_RELATIVE_PATH})`);
+    /** `@shadow-library/common` reads `NODE_ENV` on import, before the entry can set anything, and a production value makes deployment-only config mandatory */
+    const child = Bun.spawn(['bun', '--no-env-file', DUMP_ENTRY_RELATIVE_PATH, dumpPath], {
       cwd: server.path,
-      env: { ...process.env, NODE_ENV: 'test', OPENAPI_DUMP_PATH: dumpPath },
-      stream: false,
+      env: { ...stripGitEnv(process.env), NODE_ENV: 'development' },
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: DUMP_TIMEOUT_MS,
     });
-    if (result.status !== 0) {
-      log.error(result.stdout);
-      log.error(result.stderr);
-      throw new ShadowError(`Booting ${server.dir} to capture its OpenAPI document failed (exit code ${result.status})`);
+
+    const [stdout, stderr, status] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    if (child.signalCode) {
+      log.error(stderr);
+      throw new ShadowError(`Booting ${server.dir} was killed by ${child.signalCode} — past ${DUMP_TIMEOUT_MS / 1000}s, a provider is probably waiting on a connection`);
+    }
+    if (status !== 0) {
+      log.error(stdout);
+      log.error(stderr);
+      throw new ShadowError(`Booting ${server.dir} to capture its OpenAPI document failed (exit code ${status})`);
     }
 
-    return JSON.parse(fs.readFileSync(dumpPath, 'utf-8'));
+    try {
+      return JSON.parse(fs.readFileSync(dumpPath, 'utf-8'));
+    } catch (cause) {
+      throw new ShadowError(`${server.dir}'s ${DUMP_ENTRY_RELATIVE_PATH} exited cleanly without writing a JSON document to ${dumpPath}`, { cause });
+    }
   } finally {
-    fs.rmSync(specPath, { force: true });
-    fs.rmSync(preloadPath, { force: true });
-    fs.rmSync(path.dirname(dumpPath), { recursive: true, force: true });
+    fs.rmSync(dumpDir, { recursive: true, force: true });
   }
 }
 

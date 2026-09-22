@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { type FactoryProvider } from '@shadow-library/app';
+import { type ClassProvider, type FactoryProvider } from '@shadow-library/app';
+import { type Class } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -30,4 +31,22 @@ export function fakeDatabaseProvider(database: DatabaseService = new FakeDatabas
 
 export function fakeStorageProvider(storage: StorageService = new FakeStorageService()): FactoryProvider<StorageService> {
   return { token: StorageService, useFactory: () => storage };
+}
+
+/**
+ * The provider itself, except that `onModuleInit` and `onApplicationReady` do nothing — for a service that
+ * loads, seeds or starts polling a store when the application boots. Shutdown hooks stay real, since they
+ * only release what startup would have acquired.
+ */
+export function withoutStartupHooks<T extends object>(token: Class<T>): ClassProvider<T> {
+  const Inert = class extends (token as Class<object>) {
+    onModuleInit(): void {
+      return undefined;
+    }
+
+    onApplicationReady(): void {
+      return undefined;
+    }
+  };
+  return { token, useClass: Inert as Class<T> };
 }

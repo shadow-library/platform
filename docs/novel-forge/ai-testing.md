@@ -99,7 +99,7 @@ port you chose.
 
 OpenAPI is served **only when `NODE_ENV=development`** at `/dev/api-docs/openapi.json`
 (`packages/modules/src/http-core/http-core.module.ts:62,101`; the gate is `Config.isDev()`,
-`packages/common/src/services/config.service.ts:318-319`; the path is also `scripts/gen-api-types.ts:41,59`).
+`packages/common/src/services/config.service.ts:318-319`; the path is also `scripts/gen-api-types.ts:41` and `packages/modules/src/testing/openapi-dump.ts:31`).
 `NODE_ENV` itself defaults to `development` (`config.service.ts:96`), so this surface is on unless you set the
 variable to `production`. It is your route reference and the source for `bun scripts/gen-api-types.ts`.
 

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { Module, ShadowFactory } from '@shadow-library/app';
+import { Injectable, Module, ShadowFactory } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
 /**
@@ -11,7 +11,7 @@ import { AppError } from '@shadow-library/common';
  */
 import { DatabaseModule, DatabaseService } from '@shadow-library/modules/database';
 import { StorageModule, StorageService } from '@shadow-library/modules/storage';
-import { fakeDatabaseProvider, FakeDatabaseService, fakeStorageProvider, FakeStorageService } from '@shadow-library/modules/testing';
+import { fakeDatabaseProvider, FakeDatabaseService, fakeStorageProvider, FakeStorageService, withoutStartupHooks } from '@shadow-library/modules/testing';
 
 /**
  * Defining types
@@ -42,5 +42,40 @@ describe('testing providers', () => {
   it('should default to fresh fakes', () => {
     expect(fakeDatabaseProvider().useFactory()).toBeInstanceOf(FakeDatabaseService);
     expect(fakeStorageProvider().useFactory()).toBeInstanceOf(FakeStorageService);
+  });
+
+  it('should keep a provider injected but skip its startup hooks', async () => {
+    const calls: string[] = [];
+
+    @Injectable()
+    class Store {}
+
+    @Injectable()
+    class Loader {
+      constructor(readonly store: Store) {}
+
+      onModuleInit(): void {
+        calls.push('init');
+      }
+
+      onApplicationReady(): void {
+        calls.push('ready');
+      }
+
+      onModuleDestroy(): void {
+        calls.push('destroy');
+      }
+    }
+
+    @Module({ providers: [Store, Loader], exports: [Loader] })
+    class AppModule {}
+
+    const app = await ShadowFactory.create(AppModule, { enableShutdownHooks: false, overrides: [withoutStartupHooks(Loader)] });
+    const loader = app.get(Loader);
+
+    expect(loader).toBeInstanceOf(Loader);
+    expect(loader.store).toBeInstanceOf(Store);
+    await app.stop();
+    expect(calls).toEqual(['destroy']);
   });
 });
