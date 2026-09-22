@@ -6,11 +6,13 @@ import { type APIResponse, expect, type Page } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { identityDb } from '../../lib';
+import { findSetCookie, type FlowStepBody, identityDb } from '../../lib';
 
 /**
  * Defining types
  */
+
+type OutboxRecipient = 'email' | 'phone';
 
 /** Options shared by the two pollers below — how long to keep looking and how often. */
 interface PollOptions {
@@ -61,28 +63,46 @@ export async function fillOtp(page: Page, code: string): Promise<void> {
   await page.keyboard.type(code, { delay: 40 });
 }
 
-/**
- * Polls the identity outbox until `email` has an OTP under `templateKey`, returning it — or throws when none
- * lands in time. Identity stores `recipients`/`payload` as double-encoded jsonb string scalars (the values come
- * back as JSON *text*, not objects — see the report), so we unwrap with `#>> '{}'` and re-parse rather than the
- * plain `->> 'email'` the shared `fetchLatestOtp` uses, which returns NULL against this shape.
- */
-export async function pollOtp(email: string, templateKey: string, options: PollOptions = {}): Promise<string> {
+async function pollRecipientOtp(field: OutboxRecipient, recipient: string, templateKey: string, options: PollOptions): Promise<string> {
   const { timeoutMs, intervalMs } = { ...DEFAULT_POLL, ...options };
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const rows = await identityDb()<{ code: string | null }[]>`
       SELECT ((payload #>> '{}')::jsonb) ->> 'code' AS code
       FROM notification_outbox
-      WHERE ((recipients #>> '{}')::jsonb) ->> 'email' = ${email} AND template_key = ${templateKey}
+      WHERE ((recipients #>> '{}')::jsonb) ->> ${field} = ${recipient} AND template_key = ${templateKey}
       ORDER BY id DESC
       LIMIT 1
     `;
     const code = rows[0]?.code ?? undefined;
     if (code) return code;
-    if (Date.now() >= deadline) throw new Error(`No ${templateKey} OTP for ${email} within ${timeoutMs}ms`);
+    if (Date.now() >= deadline) throw new Error(`No ${templateKey} OTP for ${recipient} within ${timeoutMs}ms`);
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
+}
+
+/**
+ * Polls the identity outbox until `email` has an OTP under `templateKey`, returning it — or throws when none
+ * lands in time. Identity stores `recipients`/`payload` as double-encoded jsonb string scalars (the values come
+ * back as JSON *text*, not objects — see the report), so we unwrap with `#>> '{}'` and re-parse rather than the
+ * plain `->> 'email'` the shared `fetchLatestOtp` uses, which returns NULL against this shape.
+ */
+export function pollOtp(email: string, templateKey: string, options: PollOptions = {}): Promise<string> {
+  return pollRecipientOtp('email', email, templateKey, options);
+}
+
+/** `pollOtp` for a code texted to `phone`. */
+export function pollSmsOtp(phone: string, templateKey: string, options: PollOptions = {}): Promise<string> {
+  return pollRecipientOtp('phone', phone, templateKey, options);
+}
+
+/** How many outbox rows identity has enqueued for `recipient`, optionally under one template. */
+export async function countOutboxRows(field: OutboxRecipient, recipient: string, templateKey?: string): Promise<number> {
+  const [row] = await identityDb()<{ count: number }[]>`
+    SELECT count(*)::int AS count FROM notification_outbox
+    WHERE ((recipients #>> '{}')::jsonb) ->> ${field} = ${recipient} AND (${templateKey ?? null}::text IS NULL OR template_key = ${templateKey ?? null})
+  `;
+  return row?.count ?? 0;
 }
 
 /** The current highest `notification_outbox` id for `email`+`templateKey` (0 when none) — a baseline to prove a later action enqueued a *new* row. */
@@ -145,4 +165,26 @@ export async function restorePasswordCredential(userId: string, snapshot: Passwo
     WHERE up.user_auth_identity_id = uai.id AND uai.user_id = ${userId} AND uai.provider = 'PASSWORD'
   `;
   await identityDb()`DELETE FROM password_history WHERE user_id = ${userId} AND id > ${snapshot.historyHighWater}`;
+}
+
+export const SESSION_COOKIE = '__Host-sid';
+
+export async function flowStepOf(response: APIResponse): Promise<FlowStepBody> {
+  return (await response.json()) as FlowStepBody;
+}
+
+/** The `__Host-sid` a completed flow set, failing the test when it set none. */
+export function expectSessionCookie(response: APIResponse): string {
+  const secret = findSetCookie(response, SESSION_COOKIE)?.value;
+  expect(secret, 'a completed flow sets __Host-sid').toBeTruthy();
+  return secret ?? '';
+}
+
+export function expectNoSessionCookie(response: APIResponse): void {
+  expect(findSetCookie(response, SESSION_COOKIE), 'no session cookie may be issued').toBeUndefined();
+}
+
+/** The verification challenges identity issued for one auth flow, oldest first. */
+export async function flowChallenges(flowId: string): Promise<{ type: string; target: string }[]> {
+  return identityDb()<{ type: string; target: string }[]>`SELECT type, target FROM verification_challenges WHERE flow_id = ${flowId} ORDER BY created_at`;
 }

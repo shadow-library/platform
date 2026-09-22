@@ -29,6 +29,9 @@ loadDotEnv(path.join(import.meta.dirname, '.env'));
 
 const isCI = !!process.env.CI;
 
+/** Identity specs that must never overlap with a copy of themselves — they flip state the whole deployment shares. */
+const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](sms-otp|rate-limit)\.spec\.ts$/;
+
 export default defineConfig({
   testDir: './tests',
   // Seed the dev cluster's Postgres before anything runs, and drain DB clients after. `globalSetup` spawns the
@@ -62,8 +65,13 @@ export default defineConfig({
   // so those files exist before an authenticated spec reads one. `chromium` carries no `storageState` of its own —
   // the existing specs assert the unauthenticated experience, and authenticated specs opt in per-test (via
   // `test.use({ storageState })` or `apiContext(product, persona)`).
+  //
+  // `identity-serial` holds the specs that drive identity-wide state no other spec may observe mid-flight — a global
+  // auth mode, a per-IP rate-limit budget. One worker and no in-file parallelism means even `--repeat-each` copies of
+  // the same test run one after another, which `test.describe.configure({ mode: 'serial' })` alone does not guarantee.
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: /.*\.setup\.ts/ },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS] },
+    { name: 'identity-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_IDENTITY_SPECS, workers: 1, fullyParallel: false },
   ],
 });

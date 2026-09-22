@@ -21,6 +21,7 @@ import {
   deleteOAuthTestClient,
   deleteOrganisation,
   deleteOrgOAuthApp,
+  findIdentityUserByEmail,
   freshClientIp,
   identityApi,
   type IdentitySession,
@@ -63,6 +64,8 @@ export interface IdentityHarness {
   createTeam(options?: TeamOrganisationOptions): Promise<IdentityTeam>;
   /** Removes an organisation the test created some other way (e.g. through the API) after the test, like `createTeam`'s. */
   trackOrganisation(organisationId: string, ownerUserId: string): void;
+  /** Removes the user holding `email` after the test, if one exists by then — for accounts a spec registers through the API or UI. */
+  trackUserByEmail(email: string): void;
 }
 
 export interface IdentityTeam extends TeamOrganisation {
@@ -96,6 +99,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const oauthClients: OAuthTestClient[] = [];
     const oauthApps: OAuthApplication[] = [];
     const organisations: { organisationId: string; ownerUserId: string }[] = [];
+    const registeredEmails: string[] = [];
     let adminApi: Promise<AdminApi> | undefined;
 
     const track = (ctx: APIRequestContext): APIRequestContext => {
@@ -159,6 +163,9 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       trackOrganisation: (organisationId, ownerUserId) => {
         organisations.push({ organisationId, ownerUserId });
       },
+      trackUserByEmail: email => {
+        registeredEmails.push(email);
+      },
     });
 
     const pendingAdmin = adminApi;
@@ -169,6 +176,10 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
       ...contexts.map(ctx => () => ctx.dispose()),
       ...users.map(user => () => deleteIdentityUser(user)),
+      ...registeredEmails.map(email => async () => {
+        const user = await findIdentityUserByEmail(email);
+        if (user) await deleteIdentityUser(user);
+      }),
       () => clearIpState(clientIp),
     ]);
   },

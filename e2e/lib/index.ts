@@ -3,6 +3,7 @@ export * from './client-ip';
 export * from './db';
 export * from './env';
 export * from './identity-auth';
+export * from './identity-auth-modes';
 export * from './identity-oauth';
 export * from './identity-orgs';
 export * from './identity-sessions';

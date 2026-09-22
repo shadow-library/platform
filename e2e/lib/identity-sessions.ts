@@ -105,13 +105,15 @@ export interface IdentitySessionRow {
   readonly status: SessionStatus;
   readonly aal: SessionAal;
   readonly deviceId: string | null;
+  readonly elevatedUntil: Date | null;
 }
 
 /** The `user_sessions` row behind a `__Host-sid` value, e.g. one a real login set. */
 export async function findSessionBySecret(secret: string): Promise<IdentitySessionRow | undefined> {
   const sessionHash = createHash('sha256').update(secret).digest('hex');
   const [row] = await identityDb()<IdentitySessionRow[]>`
-    SELECT id::text, user_id::text AS "userId", status, aal, device_id::text AS "deviceId" FROM user_sessions WHERE session_hash = ${sessionHash}
+    SELECT id::text, user_id::text AS "userId", status, aal, device_id::text AS "deviceId", elevated_until AS "elevatedUntil"
+    FROM user_sessions WHERE session_hash = ${sessionHash}
   `;
   return row;
 }

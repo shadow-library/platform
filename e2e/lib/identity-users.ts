@@ -48,13 +48,21 @@ export interface IdentityUser {
   /** The plaintext behind the copied hash; meaningless when the user was created without a password. */
   readonly password: string;
   readonly personalOrgId: string;
+  readonly phone?: string;
+}
+
+export type IdentityUserRef = Pick<IdentityUser, 'userId' | 'email' | 'phone'> & { readonly personalOrgId: string | null };
+
+export interface FederatedLink {
+  readonly identityProviderId: string;
+  readonly subject: string;
 }
 
 /**
  * Declaring the constants
  *
  * Creates identity users straight in the database, writing the same rows password registration does (user, profile, primary
- * email, PASSWORD identity + argon2id hash, personal organisation with an OWNER membership). Registration itself spends the
+ * email, PASSWORD identity + argon2id hash + its `password_history` row, personal organisation with an OWNER membership). Registration itself spends the
  * 5/hour `register-init` budget and needs an OTP round-trip; this costs a few inserts. Specs run under node, which has no argon2,
  * so the hash is copied from a seeded persona — every factory user therefore signs in with that persona's password. The source is
  * the `locked` persona because no spec ever changes its password: `account.spec.ts` changes `user1`'s mid-run, and a hash copied
@@ -121,6 +129,7 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
       const [identity] = await tx<{ id: string }[]>`INSERT INTO user_auth_identities (user_id, provider, provider_key) VALUES (${userId}, 'PASSWORD', ${email}) RETURNING id`;
       if (!identity) throw new Error('auth identity insert returned no row');
       await tx`INSERT INTO user_passwords (user_auth_identity_id, hash, algorithm, version) VALUES (${identity.id}, ${hash}, 'ARGON2ID', 1)`;
+      await tx`INSERT INTO password_history (user_id, hash) VALUES (${userId}, ${hash})`;
     }
 
     const [org] = await tx<{ id: string }[]>`
@@ -130,18 +139,58 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
     await tx`INSERT INTO organisation_members (organisation_id, user_id, role, is_default) VALUES (${org.id}, ${userId}, 'OWNER', true)`;
     await tx`UPDATE users SET personal_organisation_id = ${org.id} WHERE id = ${userId}`;
 
-    return { userId, sub: userId, email, password: HASH_SOURCE.password, personalOrgId: org.id };
+    return { userId, sub: userId, email, password: HASH_SOURCE.password, personalOrgId: org.id, ...(options.phone ? { phone: options.phone } : {}) };
   });
 }
 
 /**
- * Removes a factory user: the user row (its sessions, credentials, emails, memberships and the rest cascade), its personal
- * organisation, identity's Redis set of its session hashes and its per-identifier OTP counter. Idempotent, so it is safe in an `afterEach` that may run after a
- * failed create or a spec that already deleted the user through the API.
+ * Removes a factory or API-registered user: the user row (its sessions, credentials, emails, memberships and the rest cascade), the
+ * sign-in events and verification challenges that outlive it, its personal organisation, identity's Redis set of its session
+ * hashes and its per-identifier OTP counters. Idempotent, so it is safe in a teardown that may run after a failed create or a spec
+ * that already deleted the user through the API.
  */
-export async function deleteIdentityUser(user: Pick<IdentityUser, 'userId' | 'personalOrgId' | 'email'>): Promise<void> {
+export async function deleteIdentityUser(user: IdentityUserRef): Promise<void> {
   const sql = identityDb();
+  const targets = [user.email.toLowerCase(), ...(user.phone ? [user.phone] : [])];
+  await sql`DELETE FROM user_sign_in_events WHERE user_id = ${user.userId}`;
+  await sql`DELETE FROM verification_challenges WHERE user_id = ${user.userId} OR lower(target) IN ${sql(targets)}`;
   await sql`DELETE FROM users WHERE id = ${user.userId}`;
-  await sql`DELETE FROM organisations WHERE id = ${user.personalOrgId} AND type = 'PERSONAL'`;
-  await redisDel(`user_sessions:${user.userId}`, `rl:otp-ident:${user.email.toLowerCase()}`);
+  if (user.personalOrgId) await sql`DELETE FROM organisations WHERE id = ${user.personalOrgId} AND type = 'PERSONAL'`;
+  await redisDel(`user_sessions:${user.userId}`, ...targets.map(target => `rl:otp-ident:${target}`));
+}
+
+/** The user whose primary email is `email`, e.g. one a spec registered through the API. */
+export async function findIdentityUserByEmail(email: string): Promise<IdentityUserRef | undefined> {
+  const [row] = await identityDb()<{ userId: string; personalOrgId: string | null }[]>`
+    SELECT u.id::text AS "userId", u.personal_organisation_id::text AS "personalOrgId"
+    FROM users u JOIN user_emails ue ON ue.user_id = u.id
+    WHERE lower(ue.email_id) = ${email.toLowerCase()} AND ue.is_primary
+  `;
+  return row ? { ...row, email } : undefined;
+}
+
+/**
+ * Links `user` to an upstream subject on an inactive OIDC provider owned by the user's personal organisation, the state a federated
+ * sign-in leaves behind. The provider never routes or signs anyone in, and it goes with the personal organisation.
+ */
+export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 'personalOrgId'>): Promise<FederatedLink> {
+  const sql = identityDb();
+  const issuer = `https://idp-${randomBytes(4).toString('hex')}.example.test`;
+  const subject = `e2e-${randomBytes(8).toString('hex')}`;
+  return sql.begin(async tx => {
+    const [provider] = await tx<{ id: string }[]>`
+      INSERT INTO identity_providers (
+        organisation_id, kind, name, issuer, client_id, client_secret_ciphertext, client_secret_iv, client_secret_auth_tag,
+        authorization_endpoint, token_endpoint, jwks_uri, is_active
+      )
+      VALUES (
+        ${user.personalOrgId}, 'OIDC', 'E2E Upstream', ${issuer}, 'e2e-client', 'unused', 'unused', 'unused',
+        ${`${issuer}/authorize`}, ${`${issuer}/token`}, ${`${issuer}/jwks`}, false
+      )
+      RETURNING id
+    `;
+    if (!provider) throw new Error('identity provider insert returned no row');
+    await tx`INSERT INTO federated_identities (identity_provider_id, user_id, subject) VALUES (${provider.id}, ${user.userId}, ${subject})`;
+    return { identityProviderId: provider.id, subject };
+  });
 }

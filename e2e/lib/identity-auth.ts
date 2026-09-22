@@ -9,7 +9,7 @@ import { type APIRequestContext, type APIResponse, request } from '@playwright/t
 import { mutate } from './api';
 import { clientIpHeaders } from './client-ip';
 import { requireProductUrl } from './env';
-import { totpCode } from './totp';
+import { TotpAuthenticator, totpCode } from './totp';
 
 /**
  * Defining types
@@ -46,6 +46,12 @@ export interface StepUpRequest {
   clientId?: string;
   /** Defaults to identity's own audience when a client is named. */
   resource?: string;
+}
+
+export interface TotpEnrolment {
+  readonly authenticator: TotpAuthenticator;
+  /** The first batch, which identity returns only from the activation that creates it. */
+  readonly recoveryCodes: string[];
 }
 
 export interface PasswordSignIn {
@@ -109,20 +115,34 @@ export async function signInWithPassword(ctx: APIRequestContext, identifier: str
 }
 
 /**
- * Enrols and activates TOTP for the signed-in user of `ctx`, returning the base32 secret. Identity allows factor changes only
- * on a self-service-elevated session, so `ctx` must hold an AAL2 session with a live `elevated_until` and no elevation intent.
- * The activation spends the current 30 s step, so a code for that step is refused as a replay until the next one.
+ * Enrols and activates TOTP for the signed-in user of `ctx`. Identity allows factor changes only on a self-service-elevated session,
+ * so `ctx` must hold an AAL2 session with a live `elevated_until` and no elevation intent. The activation spends the current 30 s
+ * step; the returned authenticator knows that and never hands the step out again.
  */
-export async function enrollTotp(ctx: APIRequestContext): Promise<string> {
+export async function enrollTotp(ctx: APIRequestContext): Promise<TotpEnrolment> {
   const enroll = await identityMutate(ctx, 'post', '/api/v1/me/mfa/totp/enroll');
   if (enroll.status() !== 200) throw new IdentityAuthError(`totp/enroll answered ${enroll.status()}: ${await enroll.text()}`);
   const { secret } = (await enroll.json()) as { secret: string };
-  const activate = await identityMutate(ctx, 'post', '/api/v1/me/mfa/totp/activate', { code: totpCode(secret) });
+  const activatedAt = Date.now();
+  const activate = await identityMutate(ctx, 'post', '/api/v1/me/mfa/totp/activate', { code: totpCode(secret, activatedAt) });
   if (activate.status() !== 200) throw new IdentityAuthError(`totp/activate answered ${activate.status()}: ${await activate.text()}`);
-  return secret;
+  const { recoveryCodes = [] } = (await activate.json()) as { recoveryCodes?: string[] };
+  return { authenticator: new TotpAuthenticator(secret, activatedAt), recoveryCodes };
 }
 
 /** `POST /api/v1/me/mfa/step-up` on `ctx`'s session; the caller asserts on the answer. */
 export function stepUp(ctx: APIRequestContext, request: StepUpRequest): Promise<APIResponse> {
   return identityMutate(ctx, 'post', '/api/v1/me/mfa/step-up', request);
+}
+
+export function registerInit(ctx: APIRequestContext, email: string): Promise<APIResponse> {
+  return ctx.post('/api/v1/auth/register/init', { data: { email } });
+}
+
+export function recoverInit(ctx: APIRequestContext, identifier: string): Promise<APIResponse> {
+  return ctx.post('/api/v1/auth/recover/init', { data: { identifier } });
+}
+
+export function recoverReset(ctx: APIRequestContext, flowId: string, newPassword: string): Promise<APIResponse> {
+  return ctx.post('/api/v1/auth/recover/reset', { data: { flowId, newPassword } });
 }
