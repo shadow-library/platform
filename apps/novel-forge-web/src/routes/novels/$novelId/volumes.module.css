@@ -297,16 +297,231 @@
   margin-bottom: 34px;
 }
 
-.editWrap {
+.titleInput {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% + 14px);
+  margin-inline: -7px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: var(--sh-text-primary);
+  font-family: inherit;
+  line-height: 1.25;
+}
+
+.titleInput:hover {
+  border-color: var(--sh-border-subtle);
+}
+
+.titleInput:focus {
+  outline: none;
+  border-color: var(--sh-border-focus);
+}
+
+.titleInput::placeholder {
+  color: var(--sh-text-placeholder);
+}
+
+.titleInput[aria-invalid] {
+  border-color: var(--sh-danger-border);
+}
+
+.editLabelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.editLabel {
+  margin-bottom: 0;
+}
+
+.editHint {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.editStack {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 30px;
 }
 
-.editActions {
+.editError {
+  margin: 8px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.listEditor {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.listRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border-top: 2px solid transparent;
+  border-radius: var(--sh-radius-md);
+}
+
+.listRowOver {
+  border-top-color: var(--sh-accent);
+}
+
+.listRowDragging {
+  opacity: 0.45;
+}
+
+.dragHandle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  cursor: grab;
+}
+
+.dragHandle:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-secondary);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: 1px;
+}
+
+.listDropEnd {
+  height: 14px;
+  border-top: 2px solid transparent;
+}
+
+.listDropEndOver {
+  border-top-color: var(--sh-accent);
+}
+
+.listField {
+  flex: 1;
+  min-width: 0;
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px dashed var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addRow:hover {
+  border-color: var(--sh-border-strong);
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+
+.addRow:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: 1px;
+}
+
+.povSelect {
+  max-width: 320px;
+}
+
+.endingEditGrid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.endingEditLabel {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.plannerNotes {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+}
+
+.toggleError {
+  margin: -16px 0 24px;
+}
+
+.editNotice {
+  margin: 0 0 24px;
+  padding: 10px 14px;
+  border: 1px solid var(--sh-warning-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+  font-size: var(--sh-text-body-sm);
+}
+
+.plainToggle {
+  align-self: flex-start;
+  margin-bottom: 24px;
+  font-size: var(--sh-text-body-sm);
+}
+
+/* Sticky inside the scroll area, so it rests on top of the docked Forge bar instead of overlapping it. */
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-app);
+}
+
+.unsaved {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-warning-text);
+}
+
+.saveError {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
 }
 
 .briefBody {

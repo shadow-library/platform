@@ -178,6 +178,12 @@ export const CloseIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const GripIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />
+  </SvgIcon>
+);
+
 export const CopyIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <rect x="9" y="9" width="11" height="11" rx="2" />

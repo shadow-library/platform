@@ -3921,9 +3921,31 @@ export interface components {
     UpdateBriefBody: {
       title?: string;
       body: string;
+      /** @description Why this chapter exists in the arc. Omit to leave unchanged. */
+      chapterPurpose?: string;
+      /** @description Entity key of the point-of-view character. Omit to leave unchanged. */
+      pov?: string;
+      /** @description Author guidance for the writer. Omit to leave unchanged. */
+      guidance?: string;
+      /** @description Replacement ending contract; null removes it. Omit to leave unchanged. */
+      endingContract?: components['schemas']['EndingContractSchema'] | null;
       /** @description Replacement knowledge contract. Omit to leave the existing contract unchanged. */
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
     };
+    EndingContractSchema: {
+      /** @description the kind of hook the closing scene must land on */
+      hookType: components['schemas']['HookType'];
+      /** @description what the reader should feel on the last line */
+      emotionalBeat: string;
+      /** @description the question the ending must leave open */
+      openQuestion: string;
+      /** @description the situation the next chapter picks up from — specific enough for a different author to continue */
+      handoffState: string;
+      /** @description refs (e.g. "thread:heir_mystery") the ending must NOT resolve */
+      mustNotResolve?: string[];
+    };
+    /** @enum {string} */
+    HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
     KnowledgeContractSchema: {
       /** @description entity keys whose ledgered knowledge bounds what the chapter may state */
       pov: string[];
@@ -6613,20 +6635,6 @@ export interface components {
       /** @description Free-form authorial direction for the drafter, rendered as its own section of the chapter brief. */
       guidance?: string;
     };
-    EndingContractSchema: {
-      /** @description the kind of hook the closing scene must land on */
-      hookType: components['schemas']['HookType'];
-      /** @description what the reader should feel on the last line */
-      emotionalBeat: string;
-      /** @description the question the ending must leave open */
-      openQuestion: string;
-      /** @description the situation the next chapter picks up from — specific enough for a different author to continue */
-      handoffState: string;
-      /** @description refs (e.g. "thread:heir_mystery") the ending must NOT resolve */
-      mustNotResolve?: string[];
-    };
-    /** @enum {string} */
-    HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
     ImportPlanResponse: {
       results: components['schemas']['ImportResults'];
       approval?: components['schemas']['ApprovalResult'];
@@ -16290,6 +16298,8 @@ export type OutlineArcBody = components['schemas']['OutlineArcBody'];
 export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
+export type EndingContractSchema = components['schemas']['EndingContractSchema'];
+export type HookType = components['schemas']['HookType'];
 export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
 export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
 export type GenerateBody = components['schemas']['GenerateBody'];
@@ -16634,8 +16644,6 @@ export type PlanBundleFact = components['schemas']['PlanBundleFact'];
 export type PlanBundleVolume = components['schemas']['PlanBundleVolume'];
 export type PlanBundleArc = components['schemas']['PlanBundleArc'];
 export type PlanBundleBrief = components['schemas']['PlanBundleBrief'];
-export type EndingContractSchema = components['schemas']['EndingContractSchema'];
-export type HookType = components['schemas']['HookType'];
 export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
 export type ImportResults = components['schemas']['ImportResults'];
 export type CollectionResult = components['schemas']['CollectionResult'];

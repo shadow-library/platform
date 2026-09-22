@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
-import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, TokenInput, toast } from '@shadow-library/ui';
 
-import { ChevronRightIcon, SparkIcon } from '@/components/icons';
+import { ChevronRightIcon, CloseIcon, GripIcon, PlusIcon, SparkIcon } from '@/components/icons';
 import { PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
@@ -15,6 +15,7 @@ import {
   useDraftSummaryQuery,
   useListArcsQuery,
   useListBriefsQuery,
+  useListEntitiesQuery,
   useListProposalsQuery,
   useListVolumesQuery,
   useOutlineArcMutation,
@@ -25,7 +26,23 @@ import {
   type VolumeResponse,
 } from '@/lib/apis';
 
-import { endingContractOf, parseBriefBody } from '@/lib/chapter-brief';
+import {
+  type BriefDraft,
+  type BriefEditModel,
+  type BriefEditSection,
+  briefBodyText,
+  briefDraftOf,
+  type BriefListItem,
+  briefListItem,
+  briefSaveOf,
+  type EndingDraft,
+  endingContractOf,
+  HOOK_TYPE_LABELS,
+  HOOK_TYPES,
+  outlineObjectiveProblem,
+  parseBriefBody,
+  toEditModel,
+} from '@/lib/chapter-brief';
 import { proposalTitle } from '@/lib/proposals';
 
 import styles from './volumes.module.css';
@@ -52,6 +69,10 @@ export const Route = createFileRoute('/novels/$novelId/volumes')({
 });
 
 const PENDING_PROPOSALS_SHOWN = 5;
+const NO_POV = '__no_pov__';
+const LIST_ITEM_DRAG_TYPE = 'application/x-brief-list-item';
+const LIST_END_DROP_ID = '__list_end__';
+const EDITING_REASON = 'Save or cancel your edits first';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
@@ -528,45 +549,439 @@ function ChapterProposals({ novelId, chapter }: BriefDetailProps): React.JSX.Ele
   );
 }
 
+function moved<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  if (item === undefined) return next;
+  next.splice(to, 0, item);
+  return next;
+}
+
+interface EditFieldProps {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}
+
+function EditField({ label, hint, children }: EditFieldProps): React.JSX.Element {
+  return (
+    <section className={styles.briefSection}>
+      <div className={styles.editLabelRow}>
+        <h2 className={`${styles.sectionLabel} ${styles.editLabel}`}>{label}</h2>
+        {hint && <span className={styles.editHint}>{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+type PendingFocus = { target: 'field' | 'handle'; id: string } | { target: 'add' };
+
+interface ListEditorProps {
+  items: BriefListItem[];
+  onChange: (items: BriefListItem[]) => void;
+  noun: string;
+  addLabel: string;
+}
+
+function ListEditor({ items, onChange, noun, addLabel }: ListEditorProps): React.JSX.Element {
+  const fields = useRef(new Map<string, HTMLTextAreaElement>());
+  const handles = useRef(new Map<string, HTMLElement>());
+  const addButton = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<PendingFocus | null>(null);
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending) return;
+    pendingFocus.current = null;
+    if (pending.target === 'add') return addButton.current?.focus();
+    (pending.target === 'field' ? fields : handles).current.get(pending.id)?.focus();
+  });
+
+  useEffect(() => {
+    if (!armedId) return;
+    const disarm = (): void => setArmedId(null);
+    window.addEventListener('pointerup', disarm);
+    window.addEventListener('pointercancel', disarm);
+    return () => {
+      window.removeEventListener('pointerup', disarm);
+      window.removeEventListener('pointercancel', disarm);
+    };
+  }, [armedId]);
+
+  const insertAt = (index: number): void => {
+    const item = briefListItem();
+    pendingFocus.current = { target: 'field', id: item.id };
+    onChange([...items.slice(0, index), item, ...items.slice(index)]);
+  };
+
+  const removeAt = (index: number, towards: 'previous' | 'next'): void => {
+    const neighbour = towards === 'previous' ? (items[index - 1] ?? items[index + 1]) : (items[index + 1] ?? items[index - 1]);
+    pendingFocus.current = neighbour ? { target: 'field', id: neighbour.id } : { target: 'add' };
+    onChange(items.filter((_, position) => position !== index));
+  };
+
+  const move = (from: number, to: number): void => {
+    const item = items[from];
+    if (!item || to < 0 || to >= items.length || from === to) return;
+    pendingFocus.current = { target: 'handle', id: item.id };
+    onChange(moved(items, from, to));
+  };
+
+  const dropBefore = (index: number): void => {
+    const from = items.findIndex(entry => entry.id === dragId);
+    if (from >= 0) move(from, from < index ? index - 1 : index);
+  };
+
+  const endDrag = (): void => {
+    setArmedId(null);
+    setDragId(null);
+    setOverId(null);
+  };
+
+  const dropTarget = (id: string, index: number): React.HTMLAttributes<HTMLElement> => ({
+    onDragOver: event => {
+      if (!dragId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      setOverId(id);
+    },
+    onDragLeave: event => {
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setOverId(current => (current === id ? null : current));
+    },
+    onDrop: event => {
+      if (!dragId) return;
+      event.preventDefault();
+      dropBefore(index);
+      endDrag();
+    },
+  });
+
+  const onHandleKeyDown = (event: React.KeyboardEvent, index: number): void => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    move(index, event.key === 'ArrowUp' ? index - 1 : index + 1);
+  };
+
+  const onFieldKeyDown = (event: React.KeyboardEvent, item: BriefListItem, index: number): void => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      insertAt(index + 1);
+    } else if (event.key === 'Backspace' && item.text === '') {
+      event.preventDefault();
+      removeAt(index, 'previous');
+    }
+  };
+
+  return (
+    <div className={styles.listEditor}>
+      {items.length > 0 && (
+        <ol className={styles.listRows}>
+          {items.map((item, index) => (
+            <li
+              key={item.id}
+              draggable={armedId === item.id}
+              className={`${styles.listRow} ${overId === item.id && dragId !== item.id ? styles.listRowOver : ''} ${dragId === item.id ? styles.listRowDragging : ''}`}
+              onDragStart={event => {
+                if (event.target !== event.currentTarget) return;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData(LIST_ITEM_DRAG_TYPE, item.id);
+                setDragId(item.id);
+              }}
+              onDragEnd={endDrag}
+              {...dropTarget(item.id, index)}
+            >
+              {/* A span, not a button: Firefox never starts a drag from inside a <button>. */}
+              <span
+                role="button"
+                tabIndex={0}
+                ref={node => {
+                  if (node) handles.current.set(item.id, node);
+                  else handles.current.delete(item.id);
+                }}
+                className={styles.dragHandle}
+                aria-label={`Reorder ${noun} ${index + 1} — drag, or press the up and down arrow keys`}
+                title="Drag to reorder"
+                onPointerDown={() => setArmedId(item.id)}
+                onKeyDown={event => onHandleKeyDown(event, index)}
+              >
+                <GripIcon size={14} />
+              </span>
+              <Textarea
+                ref={node => {
+                  if (node) fields.current.set(item.id, node);
+                  else fields.current.delete(item.id);
+                }}
+                className={styles.listField}
+                value={item.text}
+                onValueChange={text => onChange(items.map(entry => (entry.id === item.id ? { ...entry, text } : entry)))}
+                onKeyDown={event => onFieldKeyDown(event, item, index)}
+                minRows={1}
+                autoGrow
+                aria-label={`${noun} ${index + 1}`}
+              />
+              <IconButton size="sm" icon={<CloseIcon />} aria-label={`Remove ${noun} ${index + 1}`} onClick={() => removeAt(index, 'next')} />
+            </li>
+          ))}
+        </ol>
+      )}
+      {dragId && <div className={`${styles.listDropEnd} ${overId === LIST_END_DROP_ID ? styles.listDropEndOver : ''}`} {...dropTarget(LIST_END_DROP_ID, items.length)} />}
+      <button ref={addButton} type="button" className={styles.addRow} onClick={() => insertAt(items.length)}>
+        <PlusIcon size={14} />
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
+interface BodyFieldsProps {
+  model: BriefEditModel;
+  onChange: (model: BriefEditModel) => void;
+}
+
+function LabelledSectionFields({ section, onChange }: { section: BriefEditSection; onChange: (section: BriefEditSection) => void }): React.JSX.Element {
+  const label = section.heading ?? 'Notes';
+  return (
+    <EditField label={label}>
+      <div className={styles.editStack}>
+        {section.layout !== 'list' && <Textarea value={section.text} onValueChange={text => onChange({ ...section, text })} minRows={2} autoGrow aria-label={label} />}
+        {section.layout !== 'text' && <ListEditor items={section.items} onChange={items => onChange({ ...section, items })} noun="item" addLabel="Add item" />}
+      </div>
+    </EditField>
+  );
+}
+
+function BodyFields({ model, onChange }: BodyFieldsProps): React.JSX.Element {
+  if (model.shape === 'labelled') {
+    return (
+      <>
+        {model.sections.map(section => (
+          <LabelledSectionFields
+            key={section.id}
+            section={section}
+            onChange={next => onChange({ ...model, sections: model.sections.map(entry => (entry.id === next.id ? next : entry)) })}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <EditField label="Objective" hint="What the chapter must accomplish">
+        <Textarea value={model.objective} onValueChange={objective => onChange({ ...model, objective })} minRows={2} autoGrow aria-label="Objective" />
+      </EditField>
+      <EditField label="Beats">
+        <ListEditor items={model.beats} onChange={beats => onChange({ ...model, beats })} noun="beat" addLabel="Add beat" />
+      </EditField>
+      <EditField label="Continuity" hint="Carries into the next chapter">
+        <ListEditor items={model.continuity} onChange={continuity => onChange({ ...model, continuity })} noun="note" addLabel="Add note" />
+      </EditField>
+    </>
+  );
+}
+
+interface PovSelectProps {
+  novelId: string;
+  value: string;
+  onChange: (pov: string) => void;
+}
+
+function PovSelect({ novelId, value, onChange }: PovSelectProps): React.JSX.Element {
+  const charactersQuery = useListEntitiesQuery(novelId, { type: 'character', limit: 500 });
+  const characters = [...(charactersQuery.data?.items ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const unlisted = value !== '' && !characters.some(character => character.entityKey === value);
+
+  return (
+    <Select value={value || NO_POV} onValueChange={next => onChange(next === NO_POV ? '' : next)} loading={charactersQuery.isLoading} aria-label="POV" className={styles.povSelect}>
+      <Select.Item value={NO_POV}>No POV</Select.Item>
+      {unlisted && <Select.Item value={value}>{value}</Select.Item>}
+      {characters.map(character => (
+        <Select.Item key={character.entityKey} value={character.entityKey}>
+          {character.name}
+        </Select.Item>
+      ))}
+    </Select>
+  );
+}
+
+interface EndingEditorProps {
+  ending: EndingDraft;
+  missing: string[];
+  onChange: (ending: EndingDraft) => void;
+}
+
+function EndingEditor({ ending, missing, onChange }: EndingEditorProps): React.JSX.Element {
+  const set = <K extends keyof EndingDraft>(key: K, value: EndingDraft[K]): void => onChange({ ...ending, [key]: value });
+  const invalid = (label: string): boolean => missing.includes(label);
+
+  return (
+    <EditField label="Ending">
+      <div className={styles.endingEditGrid}>
+        <span className={styles.endingEditLabel}>Hook</span>
+        <Select
+          value={ending.hookType}
+          onValueChange={value => set('hookType', HOOK_TYPES.find(hook => hook === value) ?? '')}
+          placeholder="Choose a hook"
+          invalid={invalid('Hook')}
+          aria-label="Hook"
+        >
+          {HOOK_TYPES.map(hook => (
+            <Select.Item key={hook} value={hook}>
+              {HOOK_TYPE_LABELS[hook]}
+            </Select.Item>
+          ))}
+        </Select>
+        <span className={styles.endingEditLabel}>Feeling</span>
+        <Input value={ending.emotionalBeat} onValueChange={value => set('emotionalBeat', value)} invalid={invalid('Feeling')} aria-label="Feeling" />
+        <span className={styles.endingEditLabel}>Open question</span>
+        <Input value={ending.openQuestion} onValueChange={value => set('openQuestion', value)} invalid={invalid('Open question')} aria-label="Open question" />
+        <span className={styles.endingEditLabel}>Hands off</span>
+        <Input value={ending.handoffState} onValueChange={value => set('handoffState', value)} invalid={invalid('Hands off')} aria-label="Hands off" />
+        <span className={styles.endingEditLabel}>Leave open</span>
+        <TokenInput
+          value={ending.mustNotResolve.map(entry => ({ value: entry, valid: true }))}
+          onValueChange={tokens => set('mustNotResolve', tokens.map(token => token.value.trim()).filter(Boolean))}
+          separators={['Enter']}
+          placeholder="Add and press Enter"
+          aria-label="Leave open"
+        />
+      </div>
+      {missing.length > 0 && <p className={styles.editError}>An ending needs {missing.join(', ')} — fill them in, or empty every ending field to remove it.</p>}
+    </EditField>
+  );
+}
+
+interface BriefEditorProps {
+  novelId: string;
+  brief: BriefResponse;
+  draft: BriefDraft;
+  endingMissing: string[];
+  onChange: (draft: BriefDraft) => void;
+}
+
+function BriefEditor({ novelId, brief, draft, endingMissing, onChange }: BriefEditorProps): React.JSX.Element {
+  const [toggleRefused, setToggleRefused] = useState(false);
+  const readerValue = (brief.readerValue ?? []).map(value => value.replace(/_/g, ' ')).join(', ');
+  const repetitionRisks = (brief.repetitionRisks ?? []).join('; ');
+  const plannerNotes = [readerValue && `Delivers: ${readerValue}`, repetitionRisks && `Avoid repeating: ${repetitionRisks}`].filter(Boolean).join(' · ');
+  const plainText = draft.plainBody !== null;
+  const toggleProblem = toggleRefused && !plainText ? outlineObjectiveProblem(draft.body) : null;
+
+  const togglePlainText = (): void => {
+    if (draft.plainBody !== null) return onChange({ ...draft, body: toEditModel(draft.plainBody), plainBody: null });
+    if (outlineObjectiveProblem(draft.body)) return setToggleRefused(true);
+    setToggleRefused(false);
+    onChange({ ...draft, plainBody: briefBodyText(draft) });
+  };
+
+  return (
+    <div className={styles.briefSections}>
+      <EditField label="Purpose" hint="Why this chapter exists in the arc">
+        <Textarea value={draft.chapterPurpose} onValueChange={chapterPurpose => onChange({ ...draft, chapterPurpose })} minRows={2} autoGrow aria-label="Purpose" />
+      </EditField>
+      {plainText ? (
+        <EditField label="Brief" hint="One entry per line">
+          <Textarea value={draft.plainBody ?? ''} onValueChange={plainBody => onChange({ ...draft, plainBody })} minRows={8} autoGrow aria-label="Brief as plain text" />
+        </EditField>
+      ) : (
+        <BodyFields model={draft.body} onChange={body => onChange({ ...draft, body })} />
+      )}
+      <EditField label="POV">
+        <PovSelect novelId={novelId} value={draft.pov} onChange={pov => onChange({ ...draft, pov })} />
+      </EditField>
+      <EndingEditor ending={draft.ending} missing={endingMissing} onChange={ending => onChange({ ...draft, ending })} />
+      <EditField label="Author guidance">
+        <Textarea value={draft.guidance} onValueChange={guidance => onChange({ ...draft, guidance })} minRows={2} autoGrow aria-label="Author guidance" />
+      </EditField>
+      {plannerNotes && (
+        <EditField label="Planner notes" hint="Set by the planner · read-only">
+          <p className={styles.plannerNotes}>{plannerNotes}</p>
+        </EditField>
+      )}
+      <button type="button" className={`${styles.inlineLink} ${styles.plainToggle}`} onClick={togglePlainText}>
+        {plainText ? 'Edit as separate fields' : draft.body.shape === 'outline' ? 'Edit objective, beats and continuity as plain text' : 'Edit these sections as plain text'}
+      </button>
+      {toggleProblem && <p className={`${styles.editError} ${styles.toggleError}`}>{toggleProblem}</p>}
+    </div>
+  );
+}
+
+interface BriefEdit {
+  base: BriefResponse;
+  draft: BriefDraft;
+}
+
 function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element {
   const navigate = useNavigate();
   const briefQuery = useBriefQuery(novelId, chapter);
   const draftsQuery = useDraftSummaryQuery(novelId);
   const updateBrief = useUpdateBriefMutation(novelId, chapter);
-  const [editing, setEditing] = useState(false);
-  const [bodyDraft, setBodyDraft] = useState('');
+  const [edit, setEdit] = useState<BriefEdit | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
 
   const brief = briefQuery.data;
-  const [seededBrief, setSeededBrief] = useState<typeof brief>(undefined);
-  if (brief && seededBrief !== brief) {
-    setSeededBrief(brief);
-    setBodyDraft(brief.body);
-  }
+  const editing = edit !== null;
+  const saveState = edit ? briefSaveOf(edit.base, edit.draft, brief?.body ?? edit.base.body) : null;
+  const dirty = saveState !== null && saveState.kind !== 'unchanged';
+  const invalid = saveState?.kind === 'invalid' && showErrors ? saveState : null;
+  const changedElsewhere = Boolean(edit && brief && brief.updatedAt !== edit.base.updatedAt);
 
   const chapterDraft = draftsQuery.data?.items.find(item => item.chapter === chapter);
   const regenerable = Boolean(brief && chapterDraft && chapterDraft.status !== 'final');
   const staleReason = brief?.staleReason ? `The brief is stale (${brief.staleReason}) — refresh the outline before regenerating.` : undefined;
+  const regenerateBlocked = editing ? EDITING_REASON : staleReason;
   const briefIsNewer = Boolean(brief && chapterDraft && !staleReason && new Date(brief.updatedAt) > new Date(chapterDraft.writtenAt));
 
+  const setDraft = (draft: BriefDraft): void => setEdit(current => (current ? { ...current, draft } : current));
+
+  const startEditing = (): void => {
+    if (!brief) return;
+    setEdit({ base: brief, draft: briefDraftOf(brief) });
+    setShowErrors(false);
+  };
+
+  const cancel = (): void => {
+    setEdit(null);
+    setShowErrors(false);
+  };
+
   const save = (): void => {
-    updateBrief.mutate(
-      { body: bodyDraft, title: brief?.title ?? undefined },
-      {
-        onSuccess: () => {
-          toast.success('Brief saved');
-          setEditing(false);
-        },
-        onError: err => toast.danger(err.message),
+    if (!saveState || saveState.kind === 'unchanged') return cancel();
+    if (saveState.kind === 'invalid') return setShowErrors(true);
+    updateBrief.mutate(saveState.update, {
+      onSuccess: () => {
+        toast.success('Brief saved');
+        cancel();
       },
-    );
+      onError: err => toast.danger(err.message),
+    });
   };
 
   if (briefQuery.isLoading) return <PaneLoader />;
 
   return (
     <div className={`nf-page ${styles.pageDetail}`}>
-      <div className={styles.recordKind}>CHAPTER {chapter} · BRIEF</div>
-      <h1 className={`${styles.title} ${styles.titleBrief}`}>{brief?.title ?? `Chapter ${chapter}`}</h1>
+      <div className={styles.recordKind}>
+        CHAPTER {chapter} · BRIEF{editing ? ' · EDITING' : ''}
+      </div>
+      {edit ? (
+        <input
+          className={`${styles.title} ${styles.titleBrief} ${styles.titleInput}`}
+          value={edit.draft.title}
+          onChange={event => setDraft({ ...edit.draft, title: event.target.value })}
+          placeholder={`Chapter ${chapter}`}
+          aria-label="Title"
+          aria-invalid={invalid?.missing.includes('Title') || undefined}
+        />
+      ) : (
+        <h1 className={`${styles.title} ${styles.titleBrief}`}>{brief?.title ?? `Chapter ${chapter}`}</h1>
+      )}
       <div className={styles.briefMeta}>
         {brief ? (
           <StatusChip intent={brief.staleReason ? 'warning' : 'success'} dot>
@@ -584,34 +999,37 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
           Open in chapters →
         </Button>
         {brief && !editing && (
-          <Button variant="ghost" onClick={() => setEditing(true)}>
+          <Button variant="ghost" onClick={startEditing}>
             Edit brief
           </Button>
         )}
-        {regenerable && !briefIsNewer && <RegenerateChapterButton novelId={novelId} chapter={chapter} label="Regenerate chapter" disabledReason={staleReason} />}
+        {regenerable && !briefIsNewer && <RegenerateChapterButton novelId={novelId} chapter={chapter} label="Regenerate chapter" disabledReason={regenerateBlocked} />}
       </div>
 
       {regenerable && briefIsNewer && (
         <div className={styles.regenerateCallout}>
           <p className={styles.regenerateNote}>The brief changed after chapter {chapter} was drafted. Regenerate it to write the chapter from the updated plan.</p>
-          <RegenerateChapterButton novelId={novelId} chapter={chapter} variant="primary" />
+          <RegenerateChapterButton novelId={novelId} chapter={chapter} variant="primary" disabledReason={editing ? EDITING_REASON : undefined} />
         </div>
       )}
 
       <ChapterProposals novelId={novelId} chapter={chapter} />
 
-      {editing ? (
-        <div className={styles.editWrap}>
-          <Textarea value={bodyDraft} onValueChange={setBodyDraft} minRows={8} autoGrow />
-          <div className={styles.editActions}>
-            <Button variant="primary" loading={updateBrief.isPending} onClick={save}>
-              Save
-            </Button>
-            <Button variant="ghost" onClick={() => setEditing(false)}>
+      {edit ? (
+        <>
+          {changedElsewhere && <p className={styles.editNotice}>This brief was changed elsewhere while you were editing. Saving overwrites only the fields you changed here.</p>}
+          <BriefEditor novelId={novelId} brief={edit.base} draft={edit.draft} endingMissing={invalid?.endingMissing ?? []} onChange={setDraft} />
+          <div className={styles.saveBar}>
+            {invalid ? <span className={styles.saveError}>{invalid.problems.join(' ')}</span> : dirty && <span className={styles.unsaved}>● Unsaved changes</span>}
+            <div className={styles.spacer} />
+            <Button variant="ghost" onClick={cancel} disabled={updateBrief.isPending}>
               Cancel
             </Button>
+            <Button variant="primary" loading={updateBrief.isPending} onClick={save}>
+              Save brief
+            </Button>
           </div>
-        </div>
+        </>
       ) : brief ? (
         <BriefSections brief={brief} />
       ) : (
@@ -674,7 +1092,7 @@ function VolumesScreen(): React.JSX.Element {
           {level === 'volumes' && <VolumesList novelId={novelId} onOpen={volume => goVolume(volume.volumeKey)} />}
           {level === 'volume' && volumeKey != null && <VolumeDetail novelId={novelId} volumeKey={volumeKey} onOpenArc={arc => goArc(arc.arcKey)} />}
           {level === 'arc' && volumeKey != null && arcKey != null && <ArcDetail novelId={novelId} volumeKey={volumeKey} arcKey={arcKey} onOpenBrief={goBrief} />}
-          {level === 'brief' && chapter != null && <BriefDetail novelId={novelId} chapter={chapter} />}
+          {level === 'brief' && chapter != null && <BriefDetail key={chapter} novelId={novelId} chapter={chapter} />}
         </div>
         <ForgeDockArea novelId={novelId} scope={forgeScope} />
       </div>

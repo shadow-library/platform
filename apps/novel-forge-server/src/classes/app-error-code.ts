@@ -70,6 +70,7 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly BRF_001 = AppErrorCode.badRequest('BRF_001', 'No brief exists for the requested chapter(s) — outline the plan before generating');
   static readonly BRF_002 = AppErrorCode.badRequest('BRF_002', 'Brief is stale for chapter(s) {chapters} — refresh the outline or clear staleness before generating');
+  static readonly BRF_003 = AppErrorCode.badRequest('BRF_003', 'Ending contract is incomplete — {fields} must not be empty');
 
   /*!
    * Draft Errors

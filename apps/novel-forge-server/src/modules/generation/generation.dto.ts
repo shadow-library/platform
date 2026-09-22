@@ -18,7 +18,7 @@ import {
 } from '@server/common';
 import { type Ai, type Generation, type Job } from '@server/database';
 
-import { KnowledgeContractSchema } from '../ai/schemas';
+import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
 
 const RATING_DESCRIPTION = 'Content rating level; an omitted dimension is unrated — never send "none" to say it.';
 
@@ -142,6 +142,18 @@ export class UpdateBriefBody {
 
   @Field()
   body: string;
+
+  @Field({ optional: true, description: 'Why this chapter exists in the arc. Omit to leave unchanged.' })
+  chapterPurpose?: string;
+
+  @Field({ optional: true, description: 'Entity key of the point-of-view character. Omit to leave unchanged.' })
+  pov?: string;
+
+  @Field({ optional: true, description: 'Author guidance for the writer. Omit to leave unchanged.' })
+  guidance?: string;
+
+  @Field(() => EndingContractSchema, { optional: true, nullable: true, description: 'Replacement ending contract; null removes it. Omit to leave unchanged.' })
+  endingContract?: EndingContractSchema | null;
 
   @Field(() => KnowledgeContractSchema, { optional: true, description: 'Replacement knowledge contract. Omit to leave the existing contract unchanged.' })
   knowledgeContract?: KnowledgeContractSchema;

@@ -5,7 +5,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertAuthoringProject, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, selectGenerationBatch } from '@server/common';
+import { assertAuthoringProject, briefContentHash, declaredDraftFields, isFinalizable, markDescendantDraftsStale, renderBriefBody, selectGenerationBatch } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -25,6 +25,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
+import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
@@ -109,6 +110,16 @@ export type PresentedRun = Omit<Ai.WorkflowRun, 'nodeTrace'> & RunTrace;
 
 function presentRun(run: Ai.WorkflowRun): PresentedRun {
   return { ...run, ...splitRunTrace(run.nodeTrace) };
+}
+
+function handEditedEndingContract(contract: EndingContractSchema): EndingContractSchema {
+  const emotionalBeat = contract.emotionalBeat.trim();
+  const openQuestion = contract.openQuestion.trim();
+  const handoffState = contract.handoffState.trim();
+  const missing = Object.entries({ emotionalBeat, openQuestion, handoffState }).flatMap(([key, value]) => (value ? [] : [key]));
+  if (missing.length > 0) throw AppErrorCode.BRF_003.create({ fields: missing.join(', ') });
+  const mustNotResolve = (contract.mustNotResolve ?? []).map(entry => entry.trim()).filter(Boolean);
+  return { hookType: contract.hookType, emotionalBeat, openQuestion, handoffState, mustNotResolve };
 }
 
 export interface DraftSummary {
@@ -599,15 +610,33 @@ export class GenerationService {
   }
 
   async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
-    const contract = body.knowledgeContract ? ({ pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] } as Record<string, unknown>) : undefined;
-    const [result] = await this.db
-      .insert(schema.briefs)
-      .values({ projectId, chapter, title: body.title, body: body.body, knowledgeContract: contract ?? null, handEdited: true })
-      .onConflictDoUpdate({
-        target: [schema.briefs.projectId, schema.briefs.chapter],
-        set: { title: body.title, body: body.body, ...(contract !== undefined ? { knowledgeContract: contract } : {}), handEdited: true, updatedAt: new Date() },
-      })
-      .returning();
+    const edits: Partial<typeof schema.briefs.$inferInsert> = { body: body.body };
+    const title = body.title?.trim();
+    if (title) edits.title = title;
+    if (body.knowledgeContract) edits.knowledgeContract = { pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] };
+    if (body.endingContract !== undefined) edits.endingContract = body.endingContract && handEditedEndingContract(body.endingContract);
+    if (body.chapterPurpose !== undefined) edits.chapterPurpose = body.chapterPurpose.trim() || null;
+    if (body.pov !== undefined) edits.pov = body.pov.trim() || null;
+    if (body.guidance !== undefined) edits.guidance = body.guidance.trim() || null;
+
+    const result = await this.db.transaction(async tx => {
+      const [existing] = await tx
+        .select()
+        .from(schema.briefs)
+        .where(and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)))
+        .for('update');
+      const revision = (existing?.revision ?? 0) + 1;
+      const contentHash = briefContentHash({ ...existing, chapter, ...edits });
+      const [upserted] = await tx
+        .insert(schema.briefs)
+        .values({ knowledgeContract: null, ...edits, projectId, chapter, body: body.body, revision, contentHash, handEdited: true })
+        .onConflictDoUpdate({
+          target: [schema.briefs.projectId, schema.briefs.chapter],
+          set: { ...edits, revision, contentHash, handEdited: true, updatedAt: new Date() },
+        })
+        .returning();
+      return upserted;
+    });
     if (!result) throw AppErrorCode.DRF_001.create();
     return result;
   }
