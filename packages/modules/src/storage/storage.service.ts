@@ -41,9 +41,9 @@ import { extFromContentType, sha256Hex } from './storage.utils';
 export class StorageService implements OnModuleInit {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'StorageService');
 
-  private driver!: StorageDriver;
-  private provider!: StorageProvider;
-  private publicOrigin!: string;
+  protected driver!: StorageDriver;
+  protected provider!: StorageProvider;
+  protected publicOrigin!: string;
 
   constructor(@Inject(STORAGE_MODULE_OPTIONS) private readonly options: StorageModuleOptions) {}
 

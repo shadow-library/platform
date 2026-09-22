@@ -8,7 +8,8 @@
   "compilerOptions": {
     "paths": {
       "@lib/*": ["./src/*"],
-      "@shadow-library/common": ["./src/index.ts"]
+      "@shadow-library/common": ["./src/index.ts"],
+      "@shadow-library/common/testing": ["./src/testing/index.ts"]
     }
   }
 }

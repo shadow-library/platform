@@ -46,6 +46,10 @@
     "./reflect": {
       "types": "./dist/services/reflector.service.d.ts",
       "default": "./dist/services/reflector.service.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
   "scripts": {},

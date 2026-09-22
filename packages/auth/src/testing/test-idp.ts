@@ -15,8 +15,14 @@ import { createTestSigner, TestSigner } from './signer';
  */
 
 export interface TestIdPOptions {
-  /** Overrides the issuer advertised in discovery; defaults to the bound server url */
+  /** Overrides the issuer advertised in discovery; defaults to the bound server url, or `https://identity.test` when not serving */
   issuer?: string;
+
+  /**
+   * Binds an HTTP server on a random port; on by default. Turned off, the mock is reachable only through
+   * `transport`, which answers in-process — no socket, so a unit test does no I/O at all.
+   */
+  serve?: boolean;
 
   /** When set, the token endpoint enforces these client credentials */
   clientId?: string;
@@ -131,6 +137,12 @@ export interface TestIdP {
    * document is only reachable here.
    */
   url: string;
+
+  /**
+   * Answers any request from this mock in-process, whatever host the URL names. Hand it to the SDK as
+   * `fetch`; it is the only way in when `serve` is off.
+   */
+  transport: FetchLike;
 
   /** Mints a signed token with sensible claim defaults */
   issueToken(input: TestTokenInput): Promise<string>;
@@ -253,6 +265,7 @@ export interface TestIdP {
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 600;
 const DEFAULT_APP_SESSION_TTL_SECONDS = 3600;
 const DEFAULT_AUDIENCE = 'shadow-identity';
+const UNSERVED_ISSUER = 'https://identity.test';
 
 /** How long a claimed step-up grant stays live, mirroring identity's short elevation window */
 const ELEVATION_WINDOW_SECONDS = 600;
@@ -289,8 +302,8 @@ const intentMismatch = (): Response => json({ code: 'AUTH_007', message: 'the st
 
 /**
  * Spins an in-process mock identity provider: an ephemeral Ed25519 key, discovery + JWKS + token +
- * PDP endpoints on a random port. Consuming services integration-test their guards against it
- * without a running identity service.
+ * PDP endpoints on a random port, or reachable only in-process when `serve` is off. Consuming services
+ * test their guards against it without a running identity service.
  */
 export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestIdP> {
   let signer: TestSigner = await createTestSigner();
@@ -679,8 +692,10 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     }
   };
 
-  const server = Bun.serve({ port: 0, fetch: handle });
-  const url = `http://127.0.0.1:${server.port}`;
+  const transport: FetchLike = async (target, init) => handle(new Request(target, init));
+  const server = options.serve === false ? undefined : Bun.serve({ port: 0, fetch: handle });
+  const url = server ? `http://127.0.0.1:${server.port}` : (options.issuer ?? UNSERVED_ISSUER);
+  const send: FetchLike = server ? (target, init) => fetch(target, init) : transport;
   issuer = options.issuer ?? url;
 
   /** A bot reaches the PDP as a SERVICE_ACCOUNT, so its grants are filed exactly where a service's would be */
@@ -690,6 +705,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   return {
     issuer,
     url,
+    transport,
     issueToken,
     mintBotToken,
     issueBotKey: input => {
@@ -723,13 +739,13 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     handleOnlyTransport:
       () =>
       (url, init = {}) => {
-        if (!new URL(url).pathname.startsWith(SESSIONS_PATH)) return fetch(url, init);
+        if (!new URL(url).pathname.startsWith(SESSIONS_PATH)) return send(url, init);
 
         /** Only the app-session bearer goes; the client still authenticates to /oauth2/token normally,
          * so what arrives at the route really is a handle and nothing else. */
         const headers = new Headers(init.headers);
         headers.delete('authorization');
-        return fetch(url, { ...init, headers });
+        return send(url, { ...init, headers });
       },
     getLastCatalog: () => lastCatalog,
     setCatalogGuardrail: refuse => void (catalogGuardrail = refuse),
@@ -769,6 +785,6 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     getAppSessionCount: () => appSessions.size,
     getLastMintRequest: () => lastMintRequest,
     getLastElevationRequest: () => lastElevationRequest,
-    stop: () => void server.stop(true),
+    stop: () => void server?.stop(true),
   };
 }
