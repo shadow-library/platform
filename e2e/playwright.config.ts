@@ -30,7 +30,7 @@ loadDotEnv(path.join(import.meta.dirname, '.env'));
 const isCI = !!process.env.CI;
 
 /** Identity specs that must never overlap with a copy of themselves — they flip state the whole deployment shares. */
-const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](sms-otp|rate-limit)\.spec\.ts$/;
+const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](sms-otp|rate-limit|workload-identity)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: './tests',
@@ -67,8 +67,9 @@ export default defineConfig({
   // `test.use({ storageState })` or `apiContext(product, persona)`).
   //
   // `identity-serial` holds the specs that drive identity-wide state no other spec may observe mid-flight — a global
-  // auth mode, a per-IP rate-limit budget. One worker and no in-file parallelism means even `--repeat-each` copies of
-  // the same test run one after another, which `test.describe.configure({ mode: 'serial' })` alone does not guarantee.
+  // auth mode, a per-IP rate-limit budget, the deployment-wide namespace of Kubernetes workload-subject bindings. One
+  // worker and no in-file parallelism means even `--repeat-each` copies of the same test run one after another, which
+  // `test.describe.configure({ mode: 'serial' })` alone does not guarantee.
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
     { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS] },

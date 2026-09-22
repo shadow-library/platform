@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { createPublicKey, type JsonWebKey, verify } from 'node:crypto';
+import { createHmac, createPublicKey, generateKeyPairSync, type JsonWebKey, randomBytes, sign, verify } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
@@ -93,4 +93,17 @@ export function swapJwtPayload(token: string, patch: JwtClaims): string {
 export function unsignedJwt(token: string): string {
   const { payload } = decodeJwt(token);
   return `${encodeJwtSegment({ alg: 'none', typ: 'JWT' })}.${encodeJwtSegment(payload)}.`;
+}
+
+/** A well-formed RS256 token signed by a keypair generated here, so its `kid` resolves to nothing a verifier holds. */
+export function selfSignedJwt(claims: JwtClaims, kid = randomBytes(8).toString('hex')): string {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const signed = `${encodeJwtSegment({ alg: 'RS256', typ: 'JWT', kid })}.${encodeJwtSegment(claims)}`;
+  return `${signed}.${sign('sha256', Buffer.from(signed, 'utf8'), privateKey).toString('base64url')}`;
+}
+
+/** A token whose header claims `HS256` and whose signature is an HMAC over `secret` — the algorithm-confusion probe against an asymmetric verifier. */
+export function hmacJwt(claims: JwtClaims, secret: string, kid?: string): string {
+  const signed = `${encodeJwtSegment({ alg: 'HS256', typ: 'JWT', ...(kid ? { kid } : {}) })}.${encodeJwtSegment(claims)}`;
+  return `${signed}.${createHmac('sha256', secret).update(signed).digest('base64url')}`;
 }

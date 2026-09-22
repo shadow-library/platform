@@ -61,19 +61,56 @@ export interface ApplicationPatch {
   isActive?: boolean;
 }
 
-export type OAuthClientKind = 'SPA_PUBLIC' | 'WEB_CONFIDENTIAL';
+export type OAuthClientKind = 'SPA_PUBLIC' | 'WEB_CONFIDENTIAL' | 'SERVICE';
 
 export type OAuthGrantType = 'authorization_code' | 'refresh_token' | 'client_credentials';
 
+export type OAuthClientAuthMethod = 'client_secret' | 'workload_identity';
+
 export interface RegisterOAuthClientOptions {
-  /** Default `SPA_PUBLIC`; `WEB_CONFIDENTIAL` gets a client secret. */
+  /** Default `SPA_PUBLIC`; the confidential kinds get a client secret unless they are bound to workload subjects. */
   kind?: OAuthClientKind;
   /** Default true. A third-party client needs the user's consent before authorize issues a code. */
   isFirstParty?: boolean;
   /** Default `authorization_code refresh_token`. */
   grantTypes?: OAuthGrantType[];
-  /** Appended to the application name to form the client id. Default `spa` or `web` by kind. */
+  /** Appended to the application name to form the client id. Default `spa`, `web` or `svc` by kind. */
   suffix?: string;
+  /** Seconds, 60–86400. Caps the lifetime of every access token this client is issued. */
+  accessTokenTtl?: number;
+  /** Where identity POSTs a logout token when a session holding this client's refresh token ends. */
+  backchannelLogoutUri?: string;
+  /** Kubernetes subjects (`system:serviceaccount:<ns>:<name>`, or a namespace-scoped `*` pattern) allowed to authenticate this client. */
+  workloadSubjects?: string[];
+  /** Defaults to `workload_identity` when subjects are bound, `client_secret` for a confidential kind, and nothing for a public one. */
+  authMethod?: OAuthClientAuthMethod;
+}
+
+export interface OAuthClientPatch {
+  isActive?: boolean;
+  backchannelLogoutUri?: string;
+  /** Replaces the whole set; an empty array removes every binding. */
+  workloadSubjects?: string[];
+}
+
+export interface TokenExchangeRequest {
+  subjectToken?: string;
+  /** Default the RFC 8693 access-token type; `null` omits the parameter altogether. */
+  subjectTokenType?: string | null;
+  resource?: string;
+  scope?: string;
+  requestedTokenType?: string;
+  actorToken?: string;
+}
+
+export interface WorkloadGrantOptions {
+  /** Sent as `client_id`; a pattern binding is only honoured when the caller names its client. */
+  clientId?: string;
+  /** Default the JWT-bearer client-assertion type. */
+  assertionType?: string;
+  resource?: string;
+  scope?: string;
+  headers?: Record<string, string>;
 }
 
 export type ScopePrincipalType = 'USER' | 'SERVICE' | 'BOTH';
@@ -131,6 +168,8 @@ export interface TokenResponseBody {
   id_token?: string;
   expires_in?: number;
   scope?: string;
+  /** Present only on a token-exchange response. */
+  issued_token_type?: string;
   error?: string;
   code?: string;
 }
@@ -227,6 +266,11 @@ export const PLATFORM_AUDIENCE = 'shadow-identity';
 export const APP_SESSION_SCOPE = 'app-session:manage';
 export const APP_CALLBACK_PATH = '/api/auth/callback';
 
+export const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
+export const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+export const ID_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:id_token';
+export const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+
 export class OAuthKitError extends Error {
   override readonly name = 'OAuthKitError';
 }
@@ -305,9 +349,18 @@ export function relyingPartyClient(application: OAuthApplication): OAuthTestClie
   return { applicationId: application.applicationId, ...application.serviceClient, redirectUri: `${application.publicUrl}${APP_CALLBACK_PATH}` };
 }
 
+const DEFAULT_CLIENT_SUFFIX: Record<OAuthClientKind, string> = { SPA_PUBLIC: 'spa', WEB_CONFIDENTIAL: 'web', SERVICE: 'svc' };
+
+function resolveAuthMethod(kind: OAuthClientKind, options: RegisterOAuthClientOptions): OAuthClientAuthMethod | undefined {
+  if (options.authMethod) return options.authMethod;
+  if (options.workloadSubjects) return 'workload_identity';
+  return kind === 'SPA_PUBLIC' ? undefined : 'client_secret';
+}
+
 export async function registerOAuthClient(admin: APIRequestContext, application: OAuthApplication, options: RegisterOAuthClientOptions = {}): Promise<OAuthTestClient> {
   const kind = options.kind ?? 'SPA_PUBLIC';
-  const clientId = `${application.name}-${options.suffix ?? (kind === 'SPA_PUBLIC' ? 'spa' : 'web')}`;
+  const clientId = `${application.name}-${options.suffix ?? DEFAULT_CLIENT_SUFFIX[kind]}`;
+  const authMethod = resolveAuthMethod(kind, options);
   const registered = await identityMutate(admin, 'post', '/api/v1/admin/clients', {
     clientId,
     applicationId: application.applicationId,
@@ -316,11 +369,18 @@ export async function registerOAuthClient(admin: APIRequestContext, application:
     isFirstParty: options.isFirstParty ?? true,
     redirectUris: [OAUTH_REDIRECT_URI],
     grantTypes: options.grantTypes ?? ['authorization_code', 'refresh_token'],
-    ...(kind === 'WEB_CONFIDENTIAL' ? { authMethod: 'client_secret' } : {}),
+    ...(options.accessTokenTtl ? { accessTokenTtl: options.accessTokenTtl } : {}),
+    ...(options.backchannelLogoutUri ? { backchannelLogoutUri: options.backchannelLogoutUri } : {}),
+    ...(options.workloadSubjects ? { workloadSubjects: options.workloadSubjects } : {}),
+    ...(authMethod ? { authMethod } : {}),
   });
   await expectStatus(registered, 201, `register client ${clientId}`);
   const { secret } = (await registered.json()) as { secret?: string };
   return { applicationId: application.applicationId, clientId, redirectUri: OAUTH_REDIRECT_URI, secret };
+}
+
+export async function updateOAuthClient(admin: APIRequestContext, clientId: string, patch: OAuthClientPatch): Promise<void> {
+  await expectStatus(await identityMutate(admin, 'patch', `/api/v1/admin/clients/${clientId}`, patch), 200, `update client ${clientId}`);
 }
 
 /** A throwaway PUBLIC application with a first-party public (PKCE) client that may hold refresh tokens. */
@@ -438,6 +498,36 @@ export function clientCredentialsGrant(ctx: APIRequestContext, client: OAuthClie
   if (options.scope !== undefined) form.scope = options.scope;
   if (options.resource !== undefined) form.resource = options.resource;
   return ctx.post('/oauth2/token', { form });
+}
+
+/** An RFC 8693 exchange by `client`, which authenticates itself as on any other token-endpoint call. */
+export function tokenExchangeGrant(ctx: APIRequestContext, client: OAuthClientCredentials, request: TokenExchangeRequest): Promise<APIResponse> {
+  const subjectTokenType = request.subjectTokenType === undefined ? ACCESS_TOKEN_TYPE : request.subjectTokenType;
+  const form: Record<string, string> = { grant_type: TOKEN_EXCHANGE_GRANT, ...clientForm(client) };
+  if (request.subjectToken !== undefined) form.subject_token = request.subjectToken;
+  if (subjectTokenType !== null) form.subject_token_type = subjectTokenType;
+  if (request.resource !== undefined) form.resource = request.resource;
+  if (request.scope !== undefined) form.scope = request.scope;
+  if (request.requestedTokenType !== undefined) form.requested_token_type = request.requestedTokenType;
+  if (request.actorToken !== undefined) form.actor_token = request.actorToken;
+  return ctx.post('/oauth2/token', { form });
+}
+
+/** `tokenExchangeGrant`, throwing unless identity issues a token. */
+export async function exchangeToken(ctx: APIRequestContext, client: OAuthClientCredentials, request: TokenExchangeRequest): Promise<TokenResponseBody> {
+  const response = await tokenExchangeGrant(ctx, client, request);
+  const body = (await response.json()) as TokenResponseBody;
+  if (response.status() !== 200 || !body.access_token) throw new OAuthKitError(`token exchange answered ${response.status()}: ${JSON.stringify(body)}`);
+  return body;
+}
+
+/** A secretless `client_credentials` call authenticated by a Kubernetes service-account token. */
+export function workloadGrant(ctx: APIRequestContext, assertion: string, options: WorkloadGrantOptions = {}): Promise<APIResponse> {
+  const form: Record<string, string> = { grant_type: 'client_credentials', client_assertion_type: options.assertionType ?? JWT_BEARER_ASSERTION_TYPE, client_assertion: assertion };
+  if (options.clientId !== undefined) form.client_id = options.clientId;
+  if (options.resource !== undefined) form.resource = options.resource;
+  if (options.scope !== undefined) form.scope = options.scope;
+  return ctx.post('/oauth2/token', { form, ...(options.headers ? { headers: options.headers } : {}) });
 }
 
 export function introspectToken(ctx: APIRequestContext, client: OAuthClientCredentials, token: string): Promise<APIResponse> {
