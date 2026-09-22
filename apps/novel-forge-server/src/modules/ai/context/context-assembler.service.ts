@@ -24,6 +24,7 @@ import {
   scrubPlanForWriter,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
+import { loadActiveLedger } from '../../blueprint/ledger/ledger-entries';
 import { matchPlaybooks } from '../../ideation/constraint-playbooks';
 import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
 import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
@@ -34,6 +35,7 @@ import { type BibleDocRow, renderBibleDigest } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
+import { ledgerSection, writerLinesSection } from './ledger-sections';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -493,6 +495,10 @@ export class ContextAssembler {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
+  async activeLedgerSection(projectId: bigint, segment?: ContextSegment): Promise<ContextSection> {
+    return ledgerSection(await loadActiveLedger(this.db, projectId), segment);
+  }
+
   catalog(projectId: bigint, options?: CatalogOptions): Promise<string> {
     return this.catalogService.render(projectId, options);
   }
@@ -725,7 +731,7 @@ export class ContextAssembler {
       }),
     ]);
 
-    const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
+    const [forbidden, ledger] = await Promise.all([loadWriterForbiddenFacts(this.db, projectId, chapter), loadActiveLedger(this.db, projectId)]);
     const prevStale = staleDraftPrefix(prevDraft);
 
     const currentArc = brief?.arcKey ? await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, brief.arcKey)) }) : undefined;
@@ -849,6 +855,10 @@ export class ContextAssembler {
     sections.push({ ...asStable(writingStyleSection(project?.instructions, forbidden)), required: true });
 
     for (const s of excessEntitySections) sections.push(s);
+
+    // Pushed after every other core section so the author's decisions render next to the brief, which the template appends after the pack.
+    const writerLines = writerLinesSection(ledger, forbidden);
+    if (writerLines) sections.push(writerLines);
 
     const pack = await this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts);
     const excessKeys = new Set(excessEntitySections.map(s => s.key));

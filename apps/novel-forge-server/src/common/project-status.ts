@@ -17,5 +17,9 @@ export function assertActiveProject(project: Pick<Project.Row, 'status'>): void 
  */
 export function assertAuthoringProject(project: Pick<Project.Row, 'status' | 'kind'>): void {
   assertActiveProject(project);
+  assertAuthoringKind(project);
+}
+
+export function assertAuthoringKind(project: Pick<Project.Row, 'kind'>): void {
   if (project.kind === 'translation' || project.kind === 'curated') throw AppErrorCode.PRJ_009.create();
 }

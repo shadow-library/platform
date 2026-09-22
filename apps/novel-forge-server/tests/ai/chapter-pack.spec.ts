@@ -107,10 +107,11 @@ interface FixtureOptions {
   instructions?: string;
   currentArc?: ArcFixture;
   extraEntities?: (typeof guild)[];
+  ledger?: Record<string, unknown>[];
 }
 
 function chapterOneDb(options: FixtureOptions = {}) {
-  const { contextRefs = baseRefs, instructions = 'WRITING_STYLE_MARKER Write close third person.', currentArc = arcs[0], extraEntities = [] } = options;
+  const { contextRefs = baseRefs, instructions = 'WRITING_STYLE_MARKER Write close third person.', currentArc = arcs[0], extraEntities = [], ledger = [] } = options;
   const brief = { chapter: 1, body: 'Wren counts crates.', contextRefs, pov: 'wren', arcKey: 'arc_opening', knowledgeContract: { pov: ['wren'], learns: [] } };
   const entities = [wren, tobin, guild, ...extraEntities];
   return {
@@ -132,6 +133,7 @@ function chapterOneDb(options: FixtureOptions = {}) {
       characterStates: { findMany: mock(async () => []) },
       entityRelationships: { findMany: mock(async () => []) },
       contextPacks: { findFirst: mock(async () => null) },
+      decisionLedgerEntries: { findMany: mock(async () => ledger) },
     },
   };
 }
@@ -322,5 +324,43 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     warn.mockRestore();
 
     expect(calls).toEqual([]);
+  });
+
+  const decisions = [
+    {
+      kind: 'decision',
+      phase: 'core',
+      topic: 'protagonist',
+      statement: 'Wren trusts ledgers over people.',
+      writerLine: 'WRITER_LINE_MARKER Wren checks the numbers before she answers anyone.',
+    },
+    { kind: 'direction', phase: 'idea', topic: 'taste', statement: 'DIRECTION_MARKER keep it quiet', writerLine: null },
+    { kind: 'system', phase: 'volume_one', topic: 'cast', statement: 'Tobin is thirty.', writerLine: 'Tobin jokes when the crew is scared.' },
+  ].map(decision => ({ why: null, rejectedAlternatives: [], decidedBy: 'author', ...decision }));
+
+  it('should carry the writer lines of active decisions directly ahead of the brief', async () => {
+    const pack = await makeAssembler(chapterOneDb({ ledger: decisions })).forChapter(1n, 1, { dryRun: true });
+
+    const section = pack.sections.find(s => s.key === 'writer_lines');
+    expect(section?.rendered).toBe(
+      '## AUTHOR DECISIONS FOR THE WRITER\n\n- WRITER_LINE_MARKER Wren checks the numbers before she answers anyone.\n- Tobin jokes when the crew is scared.',
+    );
+    expect(section?.segment).toBe('volatile');
+    expect(pack.renderedVolatile.endsWith(section?.rendered ?? '')).toBe(true);
+    expect(pack.rendered).not.toContain('DIRECTION_MARKER');
+  });
+
+  it('should keep the writer lines when the refs exceed the budget', async () => {
+    const refs = [...baseRefs, 'bible_doc:world/ledger'];
+    const pack = await makeAssembler(chapterOneDb({ contextRefs: refs, ledger: decisions })).forChapter(1n, 1, { dryRun: true, budgetTokens: 3_000 });
+
+    expect(pack.omitted.map(o => o.key)).toContain('ref:bible_doc:world/ledger');
+    expect(pack.sections.find(s => s.key === 'writer_lines')?.rendered).toContain('WRITER_LINE_MARKER');
+  });
+
+  it('should add no writer-lines section without a decision that carries one', async () => {
+    const pack = await makeAssembler(chapterOneDb()).forChapter(1n, 1, { dryRun: true });
+
+    expect(pack.sections.some(s => s.key === 'writer_lines')).toBe(false);
   });
 });

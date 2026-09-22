@@ -3173,6 +3173,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Active */
+    get: operations['get_api_v1_projects_projectId_ledger'];
+    put?: never;
+    /** Create */
+    post: operations['post_api_v1_projects_projectId_ledger'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/topics/{topic}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** History */
+    get: operations['get_api_v1_projects_projectId_ledger_topics_topic'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/supersede': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Supersede */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_supersede'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_withdraw'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6737,6 +6806,97 @@ export interface components {
     ApprovalResult: {
       volumesApproved: number;
       arcsApproved: number;
+    };
+    ListLedgerEntriesResponse: {
+      entries: components['schemas']['LedgerEntryResponse'][];
+    };
+    LedgerEntryResponse: {
+      id: string;
+      projectId: string;
+      kind: components['schemas']['LedgerEntryKind'];
+      phase: components['schemas']['BlueprintPhase'] | null;
+      topic: string;
+      statement: string;
+      why: null | string;
+      rejectedAlternatives: string[];
+      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
+      writerLine: null | string;
+      decidedBy: components['schemas']['LedgerDecidedBy'];
+      /** @description Structured detail whose fields depend on the topic. */
+      payload: null | {
+        [key: string]: unknown;
+      };
+      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
+      links: components['schemas']['LedgerLinksResponse'];
+      supersedesId: null | string;
+      /**
+       * Format: date-time
+       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
+       */
+      supersededAt: null | string;
+      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
+      withdrawnReason: null | string;
+      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
+      status: components['schemas']['LedgerEntryStatus'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
+    /** @enum {string} */
+    BlueprintPhase: 'idea' | 'heart' | 'core' | 'world' | 'spine' | 'volume_one' | 'opening';
+    /** @enum {string} */
+    LedgerDecidedBy: 'author' | 'system';
+    LedgerLinksResponse: {
+      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
+      entityKeys?: string[];
+      factKeys?: string[];
+      volumeKeys?: string[];
+      arcKeys?: string[];
+      briefChapters?: number[];
+    };
+    LedgerBibleDocumentLinkResponse: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+    };
+    /** @enum {string} */
+    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
+    CreateLedgerEntryBody: {
+      /** @description Decisions come from locking a Blueprint step; the author writes directions, rejected ideas and backlog entries directly. */
+      kind: components['schemas']['AuthorLedgerKind'];
+      phase?: components['schemas']['BlueprintPhase'] | null;
+      /** @description Stable topic key, e.g. `premise`, `world.rules`, `check.<id>`. */
+      topic: string;
+      statement: string;
+      /** @description For a rejected entry, the reason the author gave for killing it. */
+      why?: string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorLedgerKind: 'direction' | 'rejected' | 'backlog';
+    SupersedeLedgerEntryBody: {
+      /** @description Kind of the successor; defaults to the superseded entry’s kind (a system detail becomes a decision). Only a decision or a system detail can become a decision. */
+      kind?: components['schemas']['AuthorSupersedeLedgerKind'];
+      statement: string;
+      /** @description Omit to keep the superseded entry’s value when the kind is kept; send an empty string to clear it. */
+      why?: string;
+      /** @description What the decision means for the chapter writer. Omit to keep, empty string to clear. */
+      writerLine?: string;
+      /** @description Omit to keep the superseded entry’s alternatives when the kind is kept. */
+      rejectedAlternatives?: string[];
+      /** @description Omit to keep the superseded entry’s payload when the kind is kept. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorSupersedeLedgerKind: 'decision' | 'direction' | 'rejected' | 'backlog';
+    WithdrawLedgerEntryBody: {
+      /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
+      reason: string;
     };
   };
   responses: never;
@@ -16340,6 +16500,228 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated entry kinds to keep. */
+        kinds?: string;
+        /** @description Comma-separated Blueprint phases to keep. */
+        phases?: string;
+        /** @description Comma-separated topic keys to keep; a key ending in `.*` keeps every topic under that prefix. */
+        topics?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_ledger_topics_topic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        topic: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_supersede: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SupersedeLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_withdraw: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WithdrawLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
 }
 export type AccessResponse = components['schemas']['AccessResponse'];
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
@@ -16777,6 +17159,19 @@ export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
 export type ImportResults = components['schemas']['ImportResults'];
 export type CollectionResult = components['schemas']['CollectionResult'];
 export type ApprovalResult = components['schemas']['ApprovalResult'];
+export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
+export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
+export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
+export type BlueprintPhase = components['schemas']['BlueprintPhase'];
+export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
+export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
+export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
+export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
+export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
+export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
+export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
+export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
+export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
@@ -16882,3 +17277,6 @@ export type ListGlossaryPathParams = Exclude<paths['/api/v1/projects/{projectId}
 export type ApiV1ProjectsProjectIdTranslationManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/translation/manuscript']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
+export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
+export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
+export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;

@@ -111,6 +111,8 @@ const SECTION_LABELS: Record<string, string> = {
   art_style: '## ART STYLE BIBLE',
   subject_card: '## SUBJECT',
   cast_appearance: '## CAST APPEARANCE',
+  ledger: '## DECISION LEDGER',
+  writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
 };
 
 export const CORE_SECTION_KEYS: ReadonlySet<string> = new Set(Object.keys(SECTION_LABELS));

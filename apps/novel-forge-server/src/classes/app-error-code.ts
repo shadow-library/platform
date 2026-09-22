@@ -277,6 +277,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IDE_008 = AppErrorCode.badRequest('IDE_008', 'Graduation requires a premise on the sheet');
 
   /*!
+   * Decision Ledger Errors
+   */
+  static readonly LDG_001 = AppErrorCode.notFound('LDG_001', 'Ledger entry not found');
+  static readonly LDG_002 = AppErrorCode.conflict('LDG_002', 'Ledger entry is already superseded or withdrawn — change the active entry on its topic instead');
+  static readonly LDG_003 = AppErrorCode.badRequest(
+    'LDG_003',
+    'Only a decision or a system detail can be rewritten as a decision — other decisions come from locking a Blueprint step',
+  );
+  static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
+
+  /*!
    * Publishing Errors
    */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');

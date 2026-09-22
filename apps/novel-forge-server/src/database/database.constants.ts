@@ -17,4 +17,6 @@ export const constraintErrorMap: Record<string, AppError> = {
   // Two ingest pushes of the same source ordinal that both read "absent" before either wrote; the row
   // that lands wins, and the loser is told what a serialized retry would have told it.
   chapters_project_id_source_ordinal_unique: AppErrorCode.ING_003.create(),
+  // Two supersessions of one entry that both read it as active; the row lock makes the loser see it superseded, and this is the backstop.
+  decision_ledger_entries_supersedes_id_unique: AppErrorCode.LDG_002.create(),
 };

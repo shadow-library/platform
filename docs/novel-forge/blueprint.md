@@ -106,10 +106,17 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   until later in the novel) and **system** (a detail the system decided on the author's behalf, including the gate).
 - A decision records its statement, why, the alternatives rejected, who decided, and a **writer line**: what the decision means for the chapter writer. It links to the pages,
   entities, facts, volumes, arcs and briefs it produced.
-- The ledger is append-only. Changing a decision appends a new entry that supersedes the old one; nothing is edited in place except the superseded marker. Active means not
-  superseded.
+- The ledger is append-only. Changing a decision appends a new entry that supersedes the old one; nothing is edited in place except the marker that retires an entry
+  (superseded or withdrawn) and the links to what an entry produced, which grow as later steps build on it. Active means not retired, and an entry is superseded at most
+  once, so a topic's history is one chain.
+- Nothing is deleted. Withdrawing an entry deactivates it with the author's reason and no successor, so a dropped direction does not turn into a ban and a withdrawn
+  rejection lifts it; the topic's history still shows it. The author writes directions, rejected ideas and backlog entries directly and may reword a decision or overrule a
+  system detail; every other decision comes from locking a step.
+- Links address produced content by the keys change-set operations use (a page's section and slug, entity and fact keys, volume and arc keys, brief chapters), so a revert and
+  re-apply keeps them, and inserting a chapter renumbers linked briefs with everything else.
 - Every Blueprint step's context includes the active ledger, and it is never evicted to fit a budget.
-- Chapter packs carry the writer lines of active decisions as their own section, so a decision made in the Blueprint reaches the prose.
+- Chapter packs carry the writer lines of active decisions as their own section, so a decision made in the Blueprint reaches the prose. The section is never evicted and has
+  its own cap, which keeps every phase's newest lines first.
 
 ## Steering and memory
 

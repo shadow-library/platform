@@ -14,6 +14,7 @@ import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, outlineWordTargetVars } from '../ai/prompts';
 import { type OutlineOutput } from '../ai/schemas';
+import { shiftLedgerBriefLinks } from '../blueprint/ledger/ledger-entries';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 
@@ -66,6 +67,8 @@ interface ShiftTarget {
  * - `chapter_conversions`, `chapter_reforges`, `rebrand_glossary`, `reforge_*` — keyed to source projects, outside this path.
  * - `chapter_translations` — keyed to translation projects, which have no brief/draft pipeline to insert into.
  * - every `ordinal`, `*_count` and `chapters_analyzed` column — positions and counts, not chapter numbers.
+ *
+ * `decision_ledger_entries.links.briefChapters` is jsonb, not a column, and is shifted by `shiftLedgerBriefLinks` in the same transaction.
  */
 const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.briefs, projectId: schema.briefs.projectId, column: schema.briefs.chapter, field: 'chapter', updatedAt: 'updatedAt' },
@@ -162,6 +165,7 @@ export class ChapterInsertService {
       // takes this path whether or not a unique constraint covers it — uniformity over per-column analysis.
       for (const target of SHIFT_TARGETS) await this.parkAbove(tx, projectId, afterChapter, target);
       for (const target of SHIFT_TARGETS) await this.landParked(tx, projectId, target);
+      await shiftLedgerBriefLinks(tx, projectId, afterChapter);
 
       for (const brief of shifted) await this.rewriteShiftedBrief(tx, projectId, afterChapter, brief);
 

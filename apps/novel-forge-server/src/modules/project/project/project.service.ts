@@ -13,6 +13,7 @@ import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDataba
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { isRegisteredModel } from '../../ai/defaults';
+import { clearLedgerBriefLinks } from '../../blueprint/ledger/ledger-entries';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
@@ -406,6 +407,7 @@ export class ProjectService {
       tablesCleared.push('drafts');
       await this.db.delete(schema.briefs).where(eq(schema.briefs.projectId, id));
       tablesCleared.push('briefs');
+      await clearLedgerBriefLinks(this.db, id);
       await this.db.delete(schema.continuityProposals).where(eq(schema.continuityProposals.projectId, id));
       tablesCleared.push('continuityProposals');
       await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), inArray(schema.jobs.kind, ['generate', 'finalize', 'backfill'])));
