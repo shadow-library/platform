@@ -33,14 +33,11 @@ export interface IdentityUserOptions {
   emailVerified?: boolean;
   /** Default true. False creates a passwordless account (no PASSWORD identity or hash). */
   withPassword?: boolean;
+  /** Sign-in username (3–32 of letters, digits, `.`, `_`, `-`); unique across users. */
+  username?: string;
   /** E.164 number stored as the primary phone. */
   phone?: string;
   phoneVerified?: boolean;
-  /**
-   * Enrols a verified EMAIL_OTP second factor. TOTP cannot be arranged here: its secret is stored encrypted under the server's KEK,
-   * so a TOTP factor has to be enrolled through the API.
-   */
-  emailOtpMfa?: boolean;
 }
 
 export interface IdentityUser {
@@ -100,8 +97,11 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
 
   return sql.begin(async tx => {
     const [user] = await tx<{ id: string }[]>`
-      INSERT INTO users (status, status_until, lock_mode, locked_until, password_reset_required)
-      VALUES (${options.status ?? 'ACTIVE'}::user_status, ${options.statusUntil ?? null}, ${lockMode}::user_lock_mode, ${lockedUntil}, ${options.passwordResetRequired ?? false})
+      INSERT INTO users (status, status_until, lock_mode, locked_until, password_reset_required, username)
+      VALUES (
+        ${options.status ?? 'ACTIVE'}::user_status, ${options.statusUntil ?? null}, ${lockMode}::user_lock_mode, ${lockedUntil}, ${options.passwordResetRequired ?? false},
+        ${options.username ?? null}
+      )
       RETURNING id
     `;
     if (!user) throw new Error('user insert returned no row');
@@ -119,8 +119,6 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
       await tx`INSERT INTO user_passwords (user_auth_identity_id, hash, algorithm, version) VALUES (${identity.id}, ${hash}, 'ARGON2ID', 1)`;
     }
 
-    if (options.emailOtpMfa) await tx`INSERT INTO mfa_enrollments (user_id, type, verified_at) VALUES (${userId}, 'EMAIL_OTP', now())`;
-
     const [org] = await tx<{ id: string }[]>`
       INSERT INTO organisations (slug, name, type, status) VALUES (${`e2e-personal-${userId}`}, ${'E2E Factory Workspace'}, 'PERSONAL', 'ACTIVE') RETURNING id
     `;
@@ -134,12 +132,12 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
 
 /**
  * Removes a factory user: the user row (its sessions, credentials, emails, memberships and the rest cascade), its personal
- * organisation, and identity's Redis set of its session hashes. Idempotent, so it is safe in an `afterEach` that may run after a
+ * organisation, identity's Redis set of its session hashes and its per-identifier OTP counter. Idempotent, so it is safe in an `afterEach` that may run after a
  * failed create or a spec that already deleted the user through the API.
  */
-export async function deleteIdentityUser(user: Pick<IdentityUser, 'userId' | 'personalOrgId'>): Promise<void> {
+export async function deleteIdentityUser(user: Pick<IdentityUser, 'userId' | 'personalOrgId' | 'email'>): Promise<void> {
   const sql = identityDb();
   await sql`DELETE FROM users WHERE id = ${user.userId}`;
   await sql`DELETE FROM organisations WHERE id = ${user.personalOrgId} AND type = 'PERSONAL'`;
-  await redisDel(`user_sessions:${user.userId}`);
+  await redisDel(`user_sessions:${user.userId}`, `rl:otp-ident:${user.email.toLowerCase()}`);
 }

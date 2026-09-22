@@ -99,6 +99,28 @@ export async function createIdentitySession(userId: string, options: IdentitySes
   return { sessionId: row.id, userId, secret };
 }
 
+export interface IdentitySessionRow {
+  readonly id: string;
+  readonly userId: string;
+  readonly status: SessionStatus;
+  readonly aal: SessionAal;
+  readonly deviceId: string | null;
+}
+
+/** The `user_sessions` row behind a `__Host-sid` value, e.g. one a real login set. */
+export async function findSessionBySecret(secret: string): Promise<IdentitySessionRow | undefined> {
+  const sessionHash = createHash('sha256').update(secret).digest('hex');
+  const [row] = await identityDb()<IdentitySessionRow[]>`
+    SELECT id::text, user_id::text AS "userId", status, aal, device_id::text AS "deviceId" FROM user_sessions WHERE session_hash = ${sessionHash}
+  `;
+  return row;
+}
+
+export async function readSessionStatus(sessionId: string): Promise<SessionStatus | undefined> {
+  const [row] = await identityDb()<{ status: SessionStatus }[]>`SELECT status FROM user_sessions WHERE id = ${sessionId}`;
+  return row?.status;
+}
+
 /** Rewrites a live session row and drops its cache entry, so the change is what identity sees on the next request. */
 export async function updateIdentitySession(
   session: IdentitySession,
