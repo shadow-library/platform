@@ -44,7 +44,7 @@ export class BlueprintController {
   async state(@Params() params: BlueprintProjectParams): Promise<BlueprintStateResponse> {
     const states = await this.steps.state(params.projectId);
     return {
-      steps: states.map(({ step, latestRound }) => ({
+      steps: states.map(({ step, latestRound, sliceMoved }) => ({
         key: step.key,
         kind: step.kind,
         source: isSourced(step) ? step.source.step : null,
@@ -53,6 +53,7 @@ export class BlueprintController {
         completionTopics: isLocking(step) ? [...step.completionTopics] : [],
         nudges: [...step.nudges],
         latestRound,
+        sliceMoved,
       })),
     };
   }

@@ -136,6 +136,46 @@ export function roundLedgerEffects(step: Pick<AnyBlueprintStep, 'key' | 'phase'>
   return entries;
 }
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => (left < right ? -1 : 1))
+      .map(([key, item]) => [key, canonical(item)]),
+  );
+}
+
+/** A fingerprint of the options a screen locked from, so a later whole-pass rerun that moved them can be shown as having moved them. */
+export function sliceDigest(view: unknown): string {
+  return Bun.hash(JSON.stringify(canonical(view) ?? null)).toString(16);
+}
+
+/** Stamps the fingerprint onto the decisions a lock writes; nothing else reads `lockedSlice`, and it never takes part in pairing. */
+export function stampLockedSlice(entries: PlannedLedgerEntry[], digest: string): PlannedLedgerEntry[] {
+  return entries.map(entry => (entry.kind === 'decision' ? { ...entry, payload: { ...(entry.payload as object | null), lockedSlice: digest } } : entry));
+}
+
+export function lockedSliceOf(entry: Pick<Ledger.Entry, 'payload'>): string | null {
+  const digest = (entry.payload as { lockedSlice?: unknown } | null | undefined)?.lockedSlice;
+  return typeof digest === 'string' ? digest : null;
+}
+
+/**
+ * A locked screen whose part of the pass is no longer the one it was locked from. Steering a sibling screen keeps this screen's part
+ * byte for byte, but rerunning the whole pass reworks it, and an answer that no longer matches what produced it is said out loud
+ * rather than quietly replaced.
+ */
+export function lockedSliceMoved(step: AnyBlueprintStep, view: unknown, ledger: Ledger.Entry[]): boolean {
+  if (!isSourced(step) || view === null || view === undefined) return false;
+  const locked = ledger
+    .filter(entry => entry.stepKey === step.key && entry.kind === 'decision')
+    .map(lockedSliceOf)
+    .filter((digest): digest is string => digest !== null);
+  return locked.length > 0 && !locked.includes(sliceDigest(view));
+}
+
 /**
  * What a lock has not already said. A rejection lives outside the topics a lock replaces, because the author's refusal survives every
  * later answer — which also means a re-lock that repeats it must not write it a second time. Every step that kills options uses this.

@@ -3,17 +3,21 @@ import { describe, expect, it } from 'bun:test';
 import { blueprintSections, joinSections } from '@modules/ai/context';
 import {
   effectiveRoundStatus,
+  lockedSliceMoved,
   reconcileLockEntries,
   renderRoundInput,
   resolveNudges,
   roundLedgerEffects,
+  sliceDigest,
+  stampLockedSlice,
   stepMessages,
   UNQUEUED_ROUND_GRACE_MS,
 } from '@modules/blueprint/engine/blueprint-round';
+import { blueprintStep } from '@modules/blueprint/engine/blueprint-step.registry';
 import { type RoundAuthorInput, type ScreenStep } from '@modules/blueprint/engine/blueprint-step.types';
 import { startStep } from '@modules/blueprint/steps/start.step';
 
-import { ledgerEntry, round } from './blueprint-fixtures';
+import { engineOptions, engineWorldScreen, ledgerEntry, round } from './blueprint-fixtures';
 
 const step = startStep as unknown as ScreenStep<unknown, unknown, unknown, unknown>;
 const offered = [
@@ -237,5 +241,44 @@ describe('reconcileLockEntries', () => {
     const other = ledgerEntry({ id: 9n, topic: 'start.extra' });
     const result = reconcileLockEntries({ ...step, completionTopics: ['start', 'start.extra'] }, plan([{ kind: 'direction', statement: 'A ferry town' }], ['start']), [other]);
     expect(result.withdraw).toEqual([]);
+  });
+});
+
+describe('sliceDigest', () => {
+  it('should read the same slice the same way whatever order its keys arrive in', () => {
+    expect(sliceDigest({ a: 1, b: [{ x: 1, y: 2 }] })).toBe(sliceDigest({ b: [{ y: 2, x: 1 }], a: 1 }));
+    expect(sliceDigest({ a: 1 })).not.toBe(sliceDigest({ a: 2 }));
+    expect(sliceDigest(null)).toBe(sliceDigest(undefined));
+  });
+});
+
+describe('lockedSliceMoved', () => {
+  const screen = blueprintStep(engineWorldScreen);
+  const locked = (digest: string) => ledgerEntry({ kind: 'decision', topic: 'world.rules', stepKey: 'engine_world', payload: { lockedSlice: digest } });
+
+  it('should flag a locked screen whose part of the pass has been reworked since', () => {
+    expect(lockedSliceMoved(screen, engineOptions.world, [locked(sliceDigest(engineOptions.world))])).toBe(false);
+    expect(lockedSliceMoved(screen, engineOptions.world, [locked('0')])).toBe(true);
+  });
+
+  it('should flag nothing for a screen that was never locked, or while its round has no options yet', () => {
+    expect(lockedSliceMoved(screen, engineOptions.world, [])).toBe(false);
+    expect(lockedSliceMoved(screen, null, [locked('0')])).toBe(false);
+    expect(lockedSliceMoved(blueprintStep(startStep), { understood: [] }, [locked('0')])).toBe(false);
+  });
+});
+
+describe('stampLockedSlice', () => {
+  it('should stamp the decisions of a lock and leave every other entry alone', () => {
+    const stamped = stampLockedSlice(
+      [
+        { kind: 'decision', topic: 'world.rules', statement: 'a', payload: { optionId: 'wr1' } },
+        { kind: 'rejected', topic: 'world.ruled_out', statement: 'b' },
+      ],
+      'abc',
+    );
+
+    expect(stamped[0]?.payload).toEqual({ optionId: 'wr1', lockedSlice: 'abc' });
+    expect(stamped[1]?.payload).toBeUndefined();
   });
 });

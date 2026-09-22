@@ -84,6 +84,38 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     costToChange: 'cheap',
     lockLabel: 'Use this title for now',
   },
+  protagonist: {
+    key: 'protagonist',
+    label: 'Protagonist',
+    title: 'Same person, three lies',
+    lede: 'One generation writes the whole engine of this novel. Here it is the protagonist: the same character three times over, differing only in the lie they believe and what it makes them do in chapter one.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock protagonist',
+  },
+  opposition: {
+    key: 'opposition',
+    label: 'Opposition',
+    title: 'What stands in the way? Not every story has a villain',
+    lede: 'Five kinds, each already answered for this novel and pre-selected from your reader promise. “Nothing: slice of life” replaces opposition with small goals, a rhythm and gentle stakes.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock opposition',
+  },
+  world: {
+    key: 'world',
+    label: 'How the world works',
+    title: 'Rules first, detail later',
+    lede: 'What power costs, stated so a chapter can pay it on the page, and the hard rules under it. Each rule becomes a canon fact. Places and factions wait for Volume one.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock world rules',
+  },
+  power: {
+    key: 'power',
+    label: 'The ladder',
+    title: 'The ladder of ranks',
+    lede: 'Asked for because progression is part of what you promised the reader: every rung with what it buys and what it costs.',
+    costToChange: 'medium',
+    lockLabel: 'Lock the ladder',
+  },
 };
 
 const WORD_BREAK = /[._-]+/;

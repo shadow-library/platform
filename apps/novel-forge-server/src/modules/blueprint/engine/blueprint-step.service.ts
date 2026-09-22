@@ -18,15 +18,18 @@ import {
   describeView,
   generatorKeyOf,
   isActiveRound,
+  lockedSliceMoved,
   reconcileLockEntries,
   resolveNudges,
   roundLedgerEffects,
+  sliceDigest,
+  stampLockedSlice,
   validateStepPart,
   viewOf,
 } from './blueprint-round';
 import { BlueprintRoundService, presentRound, type RoundWithJob } from './blueprint-round.service';
 import { BlueprintStepRegistry } from './blueprint-step.registry';
-import { type AnyBlueprintStep, type AnyGeneratingStep, type AnyLockingStep, type LockPlan, type RoundAuthorInput, type StepOption } from './blueprint-step.types';
+import { type AnyBlueprintStep, type AnyGeneratingStep, type AnyLockingStep, isSourced, type LockPlan, type RoundAuthorInput, type StepOption } from './blueprint-step.types';
 
 export const RELOCK_WITHDRAW_REASON = 'Replaced when the step was locked again.';
 
@@ -45,6 +48,8 @@ export interface StepState {
   step: AnyBlueprintStep;
   /** The latest round of the step's generator, with its options narrowed to what this step shows. */
   latestRound: Blueprint.Round | null;
+  /** The screen is locked, and a later whole-pass rerun has moved the part it was locked from. */
+  sliceMoved: boolean;
 }
 
 export type LockFollowUp = { ok: true } | { ok: false; error: string };
@@ -88,6 +93,11 @@ function viewRound(step: AnyBlueprintStep, round: Blueprint.Round): Blueprint.Ro
   return round.options === null ? round : { ...round, options: viewOf(step, round.options) };
 }
 
+/** A pass round focused on another screen reworks that screen's part alone, so this screen's answer cannot move under it while it locks. */
+function runsBeside(step: AnyLockingStep, round: Blueprint.Round): boolean {
+  return round.focus !== null && round.focus !== step.key;
+}
+
 @Injectable()
 export class BlueprintStepService {
   private readonly logger = Logger.getLogger(APP_NAME, BlueprintStepService.name);
@@ -106,11 +116,13 @@ export class BlueprintStepService {
 
   async state(projectId: bigint): Promise<StepState[]> {
     await loadBlueprintProject(this.db, projectId);
-    const latest = new Map((await this.rounds.latestPerStep(projectId)).map(row => [row.round.stepKey, row]));
+    const [rounds, ledger] = await Promise.all([this.rounds.latestPerStep(projectId), loadActiveLedger(this.db, projectId)]);
+    const latest = new Map(rounds.map(row => [row.round.stepKey, row]));
     const now = new Date();
     return this.registry.all.map(step => {
       const row = latest.get(generatorKeyOf(step));
-      return { step, latestRound: row ? viewRound(step, presentRound(row, now)) : null };
+      const latestRound = row ? viewRound(step, presentRound(row, now)) : null;
+      return { step, latestRound, sliceMoved: lockedSliceMoved(step, latestRound?.options ?? null, ledger) };
     });
   }
 
@@ -173,13 +185,15 @@ export class BlueprintStepService {
     await this.rounds.lockStep(projectId, generatorKey, tx);
     const project = await loadBlueprintProject(tx, projectId);
     const latest = await this.rounds.latestForStep(projectId, generatorKey, tx);
-    if (latest && isActiveRound(presentRound(latest).status)) throw AppErrorCode.BPR_002.create();
+    if (latest && isActiveRound(presentRound(latest).status) && !runsBeside(step, latest.round)) throw AppErrorCode.BPR_002.create();
 
     const ready = await this.rounds.latestReady(projectId, generatorKey, tx);
     const view = ready ? viewOf(step, ready.options) : null;
     assertOfferedOptions(step.chosenOptionIds(selection), ready ? describeView(step, view) : []);
     const active = await loadActiveLedger(tx, projectId);
-    const plan = await step.materialise(selection, { round: ready ? { round: ready.round, options: view } : null, ledger: active, project, tx });
+    const materialised = await step.materialise(selection, { round: ready ? { round: ready.round, options: view } : null, ledger: active, project, tx });
+    // A lock with no ready round was answered from nothing, so there is no slice it could later be said to have moved away from.
+    const plan = isSourced(step) && ready ? { ...materialised, entries: stampLockedSlice(materialised.entries, sliceDigest(view)) } : materialised;
 
     const proposal = await this.applyAsAuthor(projectId, step, plan, tx);
     return { ...(await this.writeLockEntries(projectId, step, plan, active, tx)), proposal, plan };

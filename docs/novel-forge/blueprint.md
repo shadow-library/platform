@@ -63,8 +63,10 @@ Seven phases in a fixed order, grouped by altitude:
 
 ### World
 
-- Rules first, detail later. The cost rule for power is an identity decision. A power ladder is asked for only when progression is a driver; otherwise the step is about
-  society and economy. Places and factions wait for Volume one.
+- Rules first, detail later. The cost rule for power is an identity decision, and each hard rule becomes a canon fact, because a fact is what the chapter writer is held to
+  and a page is only what they are told. These facts are open from chapter one rather than scheduled reveals: a rule the writer may not read is a rule they cannot keep. A
+  power ladder is its own step, asked for only when progression is a driver; without it the rules step covers society and economy instead. Places and factions wait for
+  Volume one.
 
 ### Spine
 
@@ -145,7 +147,10 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   phases into many narrow prompts: large passes plan as well at a fraction of the cost.
 - Every round is a background job; nothing in the Blueprint depends on a long-lived request.
 - A large pass feeds several screens that the author reviews and locks one by one. Steering one screen reruns the pass focused on it: that
-  screen's part is reworked and every other screen's part is kept exactly as it was. Screens of one pass share one round at a time.
+  screen's part is reworked and every other screen's part is kept exactly as it was, so a screen locked already can be locked again while a
+  sibling's round runs. Rerunning the whole pass does move every part: a screen whose answer no longer matches the options it was locked from
+  says so and offers to take the new version, rather than either hiding the change or replacing the answer without being asked. On any rerun,
+  what the author wrote or locked survives and what they had only been shown is replaced. Screens of one pass share one round at a time.
 
 ## Materialisation
 

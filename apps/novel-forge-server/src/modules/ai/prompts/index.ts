@@ -2,6 +2,7 @@ import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
 import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
+import { blueprintEnginePrompt } from './blueprint-engine.prompt';
 import { blueprintHeartPrompt } from './blueprint-heart.prompt';
 import { blueprintPremisePrompt } from './blueprint-premise.prompt';
 import { blueprintPremisePreviewPrompt } from './blueprint-premise-preview.prompt';
@@ -121,6 +122,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'blueprint-heart': blueprintHeartPrompt as PromptModule<unknown>,
   'blueprint-promise': blueprintPromisePrompt as PromptModule<unknown>,
   'blueprint-title': blueprintTitlePrompt as PromptModule<unknown>,
+  'blueprint-engine': blueprintEnginePrompt as PromptModule<unknown>,
 };
 
 export * from './types';

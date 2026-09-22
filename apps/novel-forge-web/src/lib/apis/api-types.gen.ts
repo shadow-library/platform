@@ -7072,6 +7072,8 @@ export interface components {
       nudges: string[];
       /** @description The latest round of the step (of its pass, for a sourced screen, with options narrowed to this screen). Earlier rounds are history. */
       latestRound: components['schemas']['BlueprintRoundResponse'] | null;
+      /** @description The screen is locked and a later whole-pass rerun moved the options it was locked from, so its answer no longer matches what is on screen. */
+      sliceMoved: boolean;
     };
     /** @enum {string} */
     BlueprintStepKind: 'screen' | 'pass';

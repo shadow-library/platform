@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 
+import { sliceDigest } from '@modules/blueprint/engine/blueprint-round';
 import { type RoundWithJob } from '@modules/blueprint/engine/blueprint-round.service';
 import { blueprintStep, BlueprintStepRegistry } from '@modules/blueprint/engine/blueprint-step.registry';
 import { BLUEPRINT_CHANGE_OPS, BlueprintStepService } from '@modules/blueprint/engine/blueprint-step.service';
@@ -191,7 +192,15 @@ describe('BlueprintStepService.lock', () => {
 
     expect(calls[0]).toBe('lock:engine');
     expect(ledger.append.mock.calls[0]?.[1]).toEqual([
-      { kind: 'decision', topic: 'world.rules', statement: 'Every crossing costs a memory', phase: 'world', decidedBy: 'author', stepKey: 'engine_world' },
+      {
+        kind: 'decision',
+        topic: 'world.rules',
+        statement: 'Every crossing costs a memory',
+        phase: 'world',
+        decidedBy: 'author',
+        stepKey: 'engine_world',
+        payload: { lockedSlice: sliceDigest(engineOptions.world) },
+      },
     ]);
     await expect(service.lock(7n, 'engine_world', { optionId: 'p1' })).rejects.toMatchObject({ code: 'BPR_005' });
   });

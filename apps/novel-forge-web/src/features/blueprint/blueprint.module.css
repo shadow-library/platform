@@ -809,3 +809,29 @@
   outline-offset: 2px;
   border-radius: var(--sh-radius-sm);
 }
+
+/* Core and World: the pass's screens */
+.versionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1000px) {
+  .versionGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ladderRow {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .ladderRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
