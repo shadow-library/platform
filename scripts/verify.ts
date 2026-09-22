@@ -1,7 +1,9 @@
 /**
  * Importing npm packages
  */
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { ESLint } from 'eslint';
@@ -9,7 +11,7 @@ import { ESLint } from 'eslint';
 /**
  * Importing user defined packages
  */
-import { findScript, log, reportError, resolveBin, run, ShadowError } from './utils/index.ts';
+import { findScript, log, reportError, reportTestBudget, resolveBin, run, ShadowError } from './utils/index.ts';
 import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
 /**
@@ -20,6 +22,10 @@ interface VerifyOptions {
   fix: boolean;
   /** Stop after format + lint, skipping type-check/test — the pre-commit hook's speed budget. */
   fast: boolean;
+  /** Run only the test step, always as `bun test` directly — the fast unit-test dev loop. */
+  unit: boolean;
+  /** For an `apps/*` workspace, fail the test step on any test over the 50ms hard cap instead of only warning. */
+  ci: boolean;
 }
 
 /**
@@ -41,18 +47,26 @@ interface VerifyTarget {
   /** The package.json `test` script, when the workspace defines one — preferred over the `bun test` fallback. */
   scripts: Record<string, string> | undefined;
   verifyTest: boolean;
+  /** Whether `--ci` may fail this target's test step on the 50ms budget — `apps/*` only; everything else stays warn-only. */
+  ciScoped: boolean;
 }
 
 /**
  * Declaring the constants
  */
-const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast]
+const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--ci]
 
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)
   scripts     the root tooling itself — scripts/ and the root-level configs
   --all       verify the root tooling and every workspace, and report a combined result
   --fix       apply prettier and eslint fixes in place instead of only reporting
-  --fast      stop after format + lint, skipping type-check and test`;
+  --fast      stop after format + lint, skipping type-check and test
+  --unit      run only the test step, always as "bun test" (ignores any package.json "test" script) —
+              skips format/lint/type-check; combine with --all to run every opted-in workspace;
+              incompatible with --fix and --fast
+  --ci        for an apps/* workspace, fail the test step when a test exceeds the 50ms hard cap, listing
+              offenders — without it, a test over budget only warns; applies to --unit and to the normal
+              test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
 
 /**
  * Ignore files prettier is pointed at, repo-relative. Passed explicitly (rather than relying on prettier's
@@ -73,6 +87,7 @@ const TOOLING_TARGET: VerifyTarget = {
   tsconfigPath: path.join(REPO_ROOT, 'tsconfig.json'),
   scripts: undefined,
   verifyTest: false,
+  ciScoped: false,
 };
 
 /** Adapts a workspace to a verify target: prettier gets the whole directory, ESLint runs inside it. */
@@ -85,6 +100,7 @@ function toTarget(workspace: Workspace): VerifyTarget {
     tsconfigPath: path.join(workspace.path, 'tsconfig.json'),
     scripts: workspace.packageJson.scripts,
     verifyTest: workspace.verifyTest,
+    ciScoped: workspace.dir.startsWith('apps/'),
   };
 }
 
@@ -150,27 +166,68 @@ function runTypeCheck(target: VerifyTarget): boolean {
 }
 
 /**
- * Runs the workspace's own `test` package.json script when it declares one (a Playwright/vitest suite,
- * or a composed sequence like `packages/app`'s `test:unit && test:integration` — none of these are
- * restatements of a default, so they stay workspace-owned scripts). Otherwise falls back to running
- * `bun test` directly, the exact behavior every deleted `"test": "bun test"` pass-through had.
+ * Runs `bun test` directly against `target`, with the junit reporter feeding the 10ms budget report.
+ * `--timeout 1000` is a hang safety net only — genuinely stuck tests still get killed rather than hanging
+ * for the default 5s — and is deliberately well above the 50ms `--ci` cap, so the budget's warn-vs-fail
+ * split is enforced solely by {@link reportTestBudget} rather than by bun's own timeout pre-empting it.
+ * `--ci` can only fail a `ciScoped` (apps/*) target; elsewhere the report stays a warning. A workspace
+ * with zero matching test files exits non-zero without writing the report, so the budget is only read
+ * when it exists.
  */
-function runTest(target: VerifyTarget): boolean {
-  const script = findScript(target.scripts, ['test']);
-  // A workspace with its own "test" script owns its invocation (including whether it collects coverage,
-  // like `packages/app`'s `test:unit --coverage`); the `bun test` fallback is the one path verify fully
-  // controls, so it runs with `--coverage` there — `bunfig.toml`'s `coverageThreshold` (where a workspace
-  // sets one) then gates it for free, with no separate coverage step to keep in sync.
-  const result = script ? run('bun', ['run', script.name], { cwd: target.path }) : run('bun', ['test', '--coverage'], { cwd: target.path });
-  const label = script ? `bun run ${script.name}` : 'bun test --coverage';
+function runBunTestWithBudget(target: VerifyTarget, ci: boolean): boolean {
+  const ciGate = ci && target.ciScoped;
+  const outfile = path.join(os.tmpdir(), `shadow-verify-junit-${randomUUID()}.xml`);
+  const result = run('bun', ['test', '--timeout', '1000', '--reporter=junit', `--reporter-outfile=${outfile}`], { cwd: target.path });
+  const withinBudget = fs.existsSync(outfile) ? reportTestBudget(outfile, { ci: ciGate }) : true;
+  fs.rmSync(outfile, { force: true });
 
   if (result.status !== 0) {
-    log.error(`failed test — "${label}" exited with code ${result.status}`);
+    log.error(`failed test — "bun test" exited with code ${result.status}`);
+    return false;
+  }
+  if (ciGate && !withinBudget) {
+    log.error('failed test — one or more tests exceeded the 50ms ci budget');
     return false;
   }
 
   log.success('test ok');
   return true;
+}
+
+/**
+ * Runs the workspace's own `test` package.json script when it declares one (a Playwright/vitest suite,
+ * or a composed sequence like `packages/app`'s `test:unit && test:integration` — none of these are
+ * restatements of a default, so they stay workspace-owned scripts). Otherwise falls back to `bun test`
+ * directly, the one path the junit budget reporter and `--ci` gate can apply to.
+ */
+function runTest(target: VerifyTarget, ci: boolean): boolean {
+  const script = findScript(target.scripts, ['test']);
+  if (!script) return runBunTestWithBudget(target, ci);
+
+  const result = run('bun', ['run', script.name], { cwd: target.path });
+  if (result.status !== 0) {
+    log.error(`failed test — "bun run ${script.name}" exited with code ${result.status}`);
+    return false;
+  }
+
+  log.success('test ok');
+  return true;
+}
+
+/**
+ * The `--unit` dev loop: only the test step, always as `bun test` directly — a workspace's own `test`
+ * script (e.g. a composed `test:unit && test:integration`) is bypassed on purpose, since those aren't
+ * the fast, DB-free unit run this flag exists for.
+ */
+function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
+  log.info(`\nverifying ${target.dir} (unit)`);
+
+  if (!target.verifyTest) {
+    log.info('tests skipped — workspace has not opted into verify running tests');
+    return true;
+  }
+
+  return runBunTestWithBudget(target, ci);
 }
 
 /**
@@ -192,7 +249,7 @@ export async function verifyTarget(target: VerifyTarget, options: VerifyOptions)
   }
 
   if (!runTypeCheck(target)) return false;
-  if (target.verifyTest && !runTest(target)) return false;
+  if (target.verifyTest && !runTest(target, options.ci)) return false;
 
   log.success('verify passed');
   return true;
@@ -218,6 +275,29 @@ async function verifyAll(options: VerifyOptions): Promise<number> {
   return 0;
 }
 
+/** `--unit --all`: the test step alone for every target, skipping any that hasn't opted into `verifyTest`. */
+function verifyUnitAll(ci: boolean): number {
+  const failures: string[] = [];
+  for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
+    if (!runUnitTarget(target, ci)) failures.push(target.dir);
+  }
+
+  if (failures.length > 0) {
+    log.error(`\nunit verify failed for ${failures.length} workspace(s):\n${failures.map(dir => `  ${dir}`).join('\n')}`);
+    return 1;
+  }
+
+  log.success('\nAll opted-in workspaces passed unit tests');
+  return 0;
+}
+
+/** Resolves the workspace, or `scripts`, an identifier on the command line names — the shared lookup behind every mode. */
+function resolveTarget(args: string[]): VerifyTarget {
+  const identifier = args.find(arg => !arg.startsWith('-'));
+  if (!identifier) throw new ShadowError(`A workspace, "scripts", or --all is required.\n\n${USAGE}`);
+  return identifier === TOOLING_TARGET.dir ? TOOLING_TARGET : toTarget(findWorkspace(identifier));
+}
+
 /** Parses argv, verifies either one workspace or all of them, and returns the process exit code. */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
@@ -226,14 +306,17 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const options: VerifyOptions = { fix: args.includes('--fix'), fast: args.includes('--fast') };
+  const options: VerifyOptions = { fix: args.includes('--fix'), fast: args.includes('--fast'), unit: args.includes('--unit'), ci: args.includes('--ci') };
+  if (options.unit && options.fix) throw new ShadowError(`--unit cannot be combined with --fix — a tests-only run has nothing to fix.\n\n${USAGE}`);
+  if (options.unit && options.fast) throw new ShadowError(`--unit cannot be combined with --fast — --unit already skips format/lint/type-check.\n\n${USAGE}`);
+
+  if (options.unit) {
+    if (args.includes('--all')) return verifyUnitAll(options.ci);
+    return runUnitTarget(resolveTarget(args), options.ci) ? 0 : 1;
+  }
+
   if (args.includes('--all')) return verifyAll(options);
-
-  const identifier = args.find(arg => !arg.startsWith('-'));
-  if (!identifier) throw new ShadowError(`A workspace, "scripts", or --all is required.\n\n${USAGE}`);
-
-  const target = identifier === TOOLING_TARGET.dir ? TOOLING_TARGET : toTarget(findWorkspace(identifier));
-  return (await verifyTarget(target, options)) ? 0 : 1;
+  return (await verifyTarget(resolveTarget(args), options)) ? 0 : 1;
 }
 
 process.exitCode = await main().catch(reportError);
