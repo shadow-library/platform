@@ -2,10 +2,16 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { blueprintStartPrompt } from '../../ai/prompts/blueprint-start.prompt';
 import { type BlueprintStartOutput, START_CHIP_KINDS, START_CHIP_LABEL_MAX, START_CHIP_MAX, type StartChipKind } from '../../ai/schemas/blueprint-start.schema';
+import { withoutKnownRejections } from '../engine/blueprint-round';
 import { type PlannedLedgerEntry, type ScreenStep } from '../engine/blueprint-step.types';
 
 export const STARTING_TYPES = ['book', 'character', 'world', 'scene', 'nothing'] as const;
 export const START_TOPIC = 'start';
+/**
+ * What the author ruled out lives apart from what they meant, so a later reading of the same starting point can never retire it.
+ * The name is deliberately one `rejectedTopic(step)` cannot produce: a lock's rejections never share a topic with steering ones.
+ */
+export const START_RULED_OUT_TOPIC = 'start.ruled_out';
 
 export type StartingType = (typeof STARTING_TYPES)[number];
 
@@ -64,7 +70,8 @@ export class StartSelection {
 
 function toEntry(chip: StartSelectionChip): PlannedLedgerEntry {
   const payload = { kind: chip.kind, ...(chip.optionId ? { optionId: chip.optionId } : {}) };
-  return { kind: chip.kind === 'not' ? 'rejected' : 'direction', topic: START_TOPIC, statement: chip.label.trim(), payload };
+  const ruledOut = chip.kind === 'not';
+  return { kind: ruledOut ? 'rejected' : 'direction', topic: ruledOut ? START_RULED_OUT_TOPIC : START_TOPIC, statement: chip.label.trim(), payload };
 }
 
 export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInput, StartSelection> = {
@@ -72,7 +79,7 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
   key: 'start',
   phase: 'idea',
   required: false,
-  completionTopics: [START_TOPIC],
+  completionTopics: [START_TOPIC, START_RULED_OUT_TOPIC],
   nudges: ['Read it more literally', 'Look for the feeling', 'Fewer chips'],
   prompt: blueprintStartPrompt,
   optionsSchema: StartOptions,
@@ -98,7 +105,7 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
     return selection.chips.flatMap(chip => (chip.optionId ? [chip.optionId] : []));
   },
 
-  materialise(selection) {
-    return Promise.resolve({ entries: selection.chips.map(toEntry) });
+  materialise(selection, { ledger }) {
+    return Promise.resolve({ entries: withoutKnownRejections(selection.chips.map(toEntry), ledger), replaces: [START_TOPIC] });
   },
 };

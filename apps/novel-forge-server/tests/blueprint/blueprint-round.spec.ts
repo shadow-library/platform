@@ -180,7 +180,7 @@ describe('reconcileLockEntries', () => {
 
   it('should pair a re-locked entry with the one for the same option, then the same statement, then in order', () => {
     const first = ledgerEntry({ id: 1n, statement: 'A ferry town', payload: { optionId: 'c1' } });
-    const second = ledgerEntry({ id: 2n, statement: 'Quiet dread', payload: { optionId: 'c2' } });
+    const second = ledgerEntry({ id: 2n, statement: 'Quiet dread', payload: {} });
     const third = ledgerEntry({ id: 3n, statement: 'Found family', payload: {} });
 
     const result = reconcileLockEntries(
@@ -198,6 +198,22 @@ describe('reconcileLockEntries', () => {
       ['Found family', 3n],
       ['A ferry town at dusk', 1n],
     ]);
+  });
+
+  it('should never pair two entries that answer different offered options', () => {
+    const answered = ledgerEntry({ id: 1n, statement: 'A ferry town', payload: { optionId: 'p1' } });
+    const result = reconcileLockEntries(step, plan([{ kind: 'direction', statement: 'A river town', payload: { optionId: 'p2' } }]), [answered]);
+
+    expect(result.supersede).toEqual([]);
+    expect(result.append.map(entry => entry.statement)).toEqual(['A river town']);
+    expect(result.withdraw.map(entry => entry.id)).toEqual([1n]);
+  });
+
+  it('should leave an answered option alone when the new lock says nothing about its kind', () => {
+    const rejection = ledgerEntry({ id: 1n, kind: 'rejected', statement: 'No sea monsters', payload: { optionId: 'p1' } });
+    const result = reconcileLockEntries(step, plan([{ kind: 'direction', statement: 'A river town' }]), [rejection]);
+
+    expect(result.withdraw).toEqual([]);
   });
 
   it('should retire only the topics a plan says it replaces', () => {

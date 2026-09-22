@@ -3293,6 +3293,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/blueprint/premise/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Preview Premise */
+    post: operations['post_api_v1_projects_projectId_blueprint_premise_preview'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/blueprint/steps/{step}/lock': {
     parameters: {
       query?: never;
@@ -7105,6 +7122,14 @@ export interface components {
     };
     /** @enum {string} */
     BlueprintCancelOutcome: 'cancelled' | 'stopping' | 'already_settled';
+    PremisePreviewBody: {
+      /** @description The premise sentence as it stands on screen; it need not be locked. */
+      premise: string;
+    };
+    PremisePreviewResponse: {
+      /** @description A sample opening paragraph. It is never stored, never a decision and never the novel’s voice. */
+      paragraph: string;
+    };
     LockBlueprintStepBody: {
       /** @description The chosen option ids and the author’s edits, in the shape the step defines. */
       selection: {
@@ -17075,6 +17100,50 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_blueprint_premise_preview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PremisePreviewBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PremisePreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_blueprint_steps_step_lock: {
     parameters: {
       query?: never;
@@ -17589,6 +17658,8 @@ export type StartBlueprintRoundBody = components['schemas']['StartBlueprintRound
 export type BlueprintOptionFeedbackBody = components['schemas']['BlueprintOptionFeedbackBody'];
 export type CancelBlueprintRoundResponse = components['schemas']['CancelBlueprintRoundResponse'];
 export type BlueprintCancelOutcome = components['schemas']['BlueprintCancelOutcome'];
+export type PremisePreviewBody = components['schemas']['PremisePreviewBody'];
+export type PremisePreviewResponse = components['schemas']['PremisePreviewResponse'];
 export type LockBlueprintStepBody = components['schemas']['LockBlueprintStepBody'];
 export type LockBlueprintStepResponse = components['schemas']['LockBlueprintStepResponse'];
 export type BlueprintLockFollowUpResponse = components['schemas']['BlueprintLockFollowUpResponse'];

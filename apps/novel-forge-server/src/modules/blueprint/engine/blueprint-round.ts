@@ -7,7 +7,16 @@ import { type BlueprintStepMessage } from '../../ai/context/blueprint-sections';
 import { parseSchema, renderSchemaIssues } from '../../ai/schemas/validate';
 import { type NewLedgerEntry } from '../ledger/ledger.types';
 import { rejectedTopic, steerTopic } from './blueprint-step.registry';
-import { type AnyBlueprintStep, type AnyGeneratingStep, type AnyLockingStep, isSourced, type LockPlan, type RoundAuthorInput, type StepOption } from './blueprint-step.types';
+import {
+  type AnyBlueprintStep,
+  type AnyGeneratingStep,
+  type AnyLockingStep,
+  isSourced,
+  type LockPlan,
+  type PlannedLedgerEntry,
+  type RoundAuthorInput,
+  type StepOption,
+} from './blueprint-step.types';
 
 export const ACTIVE_ROUND_STATUSES: readonly Blueprint.RoundStatus[] = ['pending', 'running'];
 export const UNQUEUED_ROUND_GRACE_MS = 60_000;
@@ -127,6 +136,15 @@ export function roundLedgerEffects(step: Pick<AnyBlueprintStep, 'key' | 'phase'>
   return entries;
 }
 
+/**
+ * What a lock has not already said. A rejection lives outside the topics a lock replaces, because the author's refusal survives every
+ * later answer — which also means a re-lock that repeats it must not write it a second time. Every step that kills options uses this.
+ */
+export function withoutKnownRejections(entries: PlannedLedgerEntry[], ledger: Ledger.Entry[]): PlannedLedgerEntry[] {
+  const known = new Set(ledger.filter(entry => entry.kind === 'rejected').map(entry => `${entry.topic}|${entry.statement.trim().toLowerCase()}`));
+  return entries.filter(entry => entry.kind !== 'rejected' || !known.has(`${entry.topic}|${entry.statement.trim().toLowerCase()}`));
+}
+
 export interface LedgerReconciliation {
   supersede: { previous: Ledger.Entry; next: NewLedgerEntry }[];
   append: NewLedgerEntry[];
@@ -145,18 +163,31 @@ type Matcher = (previous: Ledger.Entry, next: NewLedgerEntry) => boolean;
 const PAIRING: Matcher[] = [
   (previous, next) => optionIdOf(next) !== undefined && optionIdOf(previous) === optionIdOf(next),
   (previous, next) => previous.statement.trim() === next.statement.trim(),
-  () => true,
+  (previous, next) => optionIdOf(previous) === undefined && optionIdOf(next) === undefined,
 ];
 
 /**
+ * Two entries that name different offered options are answers to different questions, so pairing them would rewrite one as the
+ * other. Only the same option, or no option on either side, may ever be paired — and the order-based fallback, which knows nothing
+ * beyond position, is restricted to entries that name no option at all.
+ */
+function crossesOptions(previous: Ledger.Entry, next: NewLedgerEntry): boolean {
+  const before = optionIdOf(previous);
+  const after = optionIdOf(next);
+  return before !== undefined && after !== undefined && before !== after;
+}
+
+/**
  * One lock writes the step's whole answer: locking again retires what the step's earlier locks wrote on the topics it replaces (its
- * completion topics and every topic it writes, unless the plan narrows them). Each new entry supersedes an earlier one of the same topic and
- * kind (the same option first, then the same statement, then in order), so every topic keeps one history chain; leftovers are appended or
- * withdrawn. What the author wrote directly, steering entries and backlog entries are never touched.
+ * completion topics and every topic it writes, unless the plan narrows them). Each new entry supersedes an earlier one of the same topic,
+ * kind and offered option (the same option first, then the same statement, then in order), so every topic keeps one history chain; leftovers
+ * are appended or withdrawn. An entry that names an option is only withdrawn when the new answer speaks to its topic and kind at all, so a
+ * lock that says nothing about a kind cannot silently retire it. What the author wrote directly, steering entries and backlog entries are
+ * never touched.
  */
 export function reconcileLockEntries(
   step: Pick<AnyLockingStep, 'key' | 'phase' | 'completionTopics'>,
-  plan: Pick<LockPlan, 'entries' | 'replaces'>,
+  plan: Pick<LockPlan, 'entries' | 'replaces' | 'retires'>,
   active: Ledger.Entry[],
 ): LedgerReconciliation {
   const next = plan.entries.map((entry): NewLedgerEntry => ({ ...entry, phase: entry.phase ?? step.phase, decidedBy: entry.decidedBy ?? 'author', stepKey: step.key }));
@@ -168,12 +199,19 @@ export function reconcileLockEntries(
   for (const matches of PAIRING) {
     for (const entry of next) {
       if (pairs.has(entry)) continue;
-      const previous = replaceable.find(old => !taken.has(old) && old.topic === entry.topic && old.kind === entry.kind && matches(old, entry));
+      const previous = replaceable.find(old => !taken.has(old) && old.topic === entry.topic && old.kind === entry.kind && !crossesOptions(old, entry) && matches(old, entry));
       if (!previous) continue;
       pairs.set(entry, previous);
       taken.add(previous);
     }
   }
+
+  const answered = new Set(next.map(entry => `${entry.topic}|${entry.kind}`));
+  const retired = new Set(plan.retires ?? []);
+  const stranded = (entry: Ledger.Entry): boolean => {
+    const optionId = optionIdOf(entry);
+    return optionId === undefined || retired.has(optionId) || answered.has(`${entry.topic}|${entry.kind}`);
+  };
 
   return {
     supersede: next.flatMap(entry => {
@@ -181,6 +219,6 @@ export function reconcileLockEntries(
       return previous ? [{ previous, next: entry }] : [];
     }),
     append: next.filter(entry => !pairs.has(entry)),
-    withdraw: replaceable.filter(entry => !taken.has(entry)),
+    withdraw: replaceable.filter(entry => !taken.has(entry) && stranded(entry)),
   };
 }

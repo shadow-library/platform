@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Alert } from '@shadow-library/ui';
 
 import { PaneLoader } from '@/components/nf';
-import { blueprintAltitude, blueprintStepMeta, findPhaseOfStep, PhaseHeader, phasePosition, StartStep, StepPlaceholder } from '@/features/blueprint';
+import { blueprintAltitude, blueprintStepMeta, blueprintStepScreen, findPhaseOfStep, PhaseHeader, phasePosition, StepPlaceholder } from '@/features/blueprint';
 import { type BlueprintPhaseProgressResponse, useBlueprintStateQuery, useProjectStatusQuery } from '@/lib/apis';
 
 export const Route = createFileRoute('/novels/$novelId/blueprint/$step')({
@@ -39,6 +39,7 @@ function BlueprintStepScreen(): React.JSX.Element {
 
   const progress = phase.steps.find(candidate => candidate.key === stepKey);
   const stepState = stateQuery.data?.steps.find(candidate => candidate.key === stepKey);
+  const renderScreen = blueprintStepScreen(stepKey);
 
   if (phase.status === 'locked')
     return (
@@ -56,11 +57,11 @@ function BlueprintStepScreen(): React.JSX.Element {
       </>
     );
 
-  if (stepKey === 'start' && stepState != null)
+  if (renderScreen != null && stepState != null)
     return (
       <>
         {header}
-        <StartStep projectId={novelId} step={stepState} onLocked={() => void navigate({ to: '/novels/$novelId/blueprint', params: { novelId } })} />
+        {renderScreen({ projectId: novelId, step: stepState, onLocked: () => void navigate({ to: '/novels/$novelId/blueprint', params: { novelId } }) })}
       </>
     );
 

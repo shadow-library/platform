@@ -6,6 +6,8 @@ import { type Ledger } from '@server/database';
 
 import { type LedgerEntryResponse } from '../ledger/ledger.dto';
 import { ledgerEntryStatus } from '../ledger/ledger.service';
+import { PremisePreviewBody, PremisePreviewResponse } from '../steps/premise-preview.dto';
+import { PremisePreviewService } from '../steps/premise-preview.service';
 import { BlueprintRoundQueue } from './blueprint-round-queue.service';
 import { BlueprintStepService } from './blueprint-step.service';
 import { isLocking, isSourced } from './blueprint-step.types';
@@ -31,6 +33,7 @@ export class BlueprintController {
   constructor(
     private readonly steps: BlueprintStepService,
     private readonly queue: BlueprintRoundQueue,
+    private readonly premisePreview: PremisePreviewService,
   ) {}
 
   @Get()
@@ -63,6 +66,13 @@ export class BlueprintController {
   @RespondFor(200, CancelBlueprintRoundResponse)
   cancelRound(@Params() params: BlueprintStepParams): Promise<CancelBlueprintRoundResponse> {
     return this.queue.cancel(params.projectId, params.step);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/premise/preview')
+  @RespondFor(200, PremisePreviewResponse)
+  async previewPremise(@Params() params: BlueprintProjectParams, @Body() body: PremisePreviewBody): Promise<PremisePreviewResponse> {
+    return { paragraph: await this.premisePreview.preview(params.projectId, body.premise) };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

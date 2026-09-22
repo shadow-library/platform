@@ -68,6 +68,11 @@ export interface LockPlan {
   summary?: string;
   /** Topics whose earlier lock entries this lock retires; defaults to the step's completion topics plus every topic it writes. */
   replaces?: string[];
+  /**
+   * Offered options this lock has answered, for answers that write nothing under the kind an earlier lock used — answering a taste
+   * pair with "neither" writes rejections, and the direction the last lock wrote for that pair has to go with it.
+   */
+  retires?: string[];
   /** Work that must follow the commit, such as approving what was materialised or queueing a job; its failure never undoes the lock. */
   afterCommit?(context: AfterCommitContext): Promise<void>;
 }

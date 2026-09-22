@@ -6,6 +6,8 @@ import { parseSchema } from '@modules/ai/schemas/validate';
 import { StartOptions, StartSelection, startStep } from '@modules/blueprint/steps/start.step';
 import { type Project } from '@server/database';
 
+import { ledgerEntry } from './blueprint-fixtures';
+
 const modelOutput: BlueprintStartOutput = {
   understood: [
     { label: ' A ferry that only runs at night ', kind: 'element' },
@@ -49,7 +51,7 @@ describe('start step', () => {
     expect(startStep.renderInput?.({ startingType: 'nothing' })).toBe('Starting from nothing yet.\n\nThe author wrote nothing.');
   });
 
-  it('should lock kept chips as directions and ruled-out chips as rejected entries on the start topic', async () => {
+  it('should lock kept chips as directions and ruled-out chips as rejections that a later lock cannot retire', async () => {
     const selection = {
       chips: [
         { optionId: 'c1', label: 'A ferry that only runs at dusk', kind: 'element' as const },
@@ -65,8 +67,16 @@ describe('start step', () => {
     expect(plan.entries).toEqual([
       { kind: 'direction', topic: 'start', statement: 'A ferry that only runs at dusk', payload: { kind: 'element', optionId: 'c1' } },
       { kind: 'direction', topic: 'start', statement: 'Found family', payload: { kind: 'want' } },
-      { kind: 'rejected', topic: 'start', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } },
+      { kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } },
     ]);
+    expect(plan.replaces).toEqual(['start']);
+  });
+
+  it('should not write a rejection the ledger already carries', async () => {
+    const selection = { chips: [{ label: 'No chosen-one prophecy', kind: 'not' as const }] };
+    const already = ledgerEntry({ id: 31n, kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy' });
+    const plan = await startStep.materialise(selection, { round: null, ledger: [already], project: {} as Project.Row, tx: {} as never });
+    expect(plan.entries).toEqual([]);
   });
 
   it('should refuse a lock with no chips', () => {

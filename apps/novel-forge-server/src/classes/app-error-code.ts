@@ -297,6 +297,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BPR_005 = AppErrorCode.badRequest('BPR_005', 'Option "{optionId}" is not one the latest round offered');
   static readonly BPR_006 = AppErrorCode.notFound('BPR_006', 'This step has no running round to cancel');
   static readonly BPR_007 = AppErrorCode.badRequest('BPR_007', 'Step "{step}" is a generation pass — lock the screens it feeds instead');
+  static readonly BPR_008 = AppErrorCode.badRequest('BPR_008', 'A preview paragraph was written moments ago — wait {seconds}s before asking for another', 429);
 
   /*!
    * Publishing Errors

@@ -1,4 +1,13 @@
+import { type BlueprintStepStateResponse } from '@/lib/apis';
+
 export type CostToChange = 'cheap' | 'medium' | 'expensive';
+
+/** Every step screen takes the same three things; the layout owns the frame, the Notebook and the event stream. */
+export interface StepScreenProps {
+  projectId: string;
+  step: BlueprintStepStateResponse;
+  onLocked: () => void;
+}
 
 export interface BlueprintStepMeta {
   key: string;
@@ -26,6 +35,30 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     lede: 'A scene, a feeling, “like X but Y”, a character, a single image. Leave it empty if there’s nothing yet.',
     costToChange: 'cheap',
     lockLabel: 'Save the starting point',
+  },
+  taste: {
+    key: 'taste',
+    label: 'Taste',
+    title: 'Which would you rather read next?',
+    lede: 'Either-or pairs for when you can’t put it into words, and a steer box for when you can. Pairs are shaped by your starting point.',
+    costToChange: 'cheap',
+    lockLabel: 'Show me story ideas',
+  },
+  concepts: {
+    key: 'concepts',
+    label: 'Concepts',
+    title: 'Four directions this could go',
+    lede: 'Your own idea is one of the cards. Keep one, kill the rest with a reason, or steer the whole round and see four more.',
+    costToChange: 'medium',
+    lockLabel: 'Build a premise from what I kept',
+  },
+  premise: {
+    key: 'premise',
+    label: 'Premise',
+    title: 'One sentence, steered part by part',
+    lede: 'Open a highlighted part to see alternatives for that part alone, or write your own. Locking the premise completes the Idea phase.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock premise',
   },
 };
 

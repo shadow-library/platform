@@ -126,10 +126,20 @@ describe('promiseDrivers', () => {
 
 describe('isStepDone', () => {
   it('should need every completion topic of a required step, and accept a topic prefix', () => {
-    const step = { required: true, completionTopics: ['spine', 'spine.reveals'] };
+    const step = { key: 'spine', required: true, completionTopics: ['spine', 'spine.reveals'] };
     expect(isStepDone(step, [decision('spine')])).toBe(false);
     expect(isStepDone(step, [decision('spine'), decision('spine.reveals')])).toBe(true);
-    expect(isStepDone({ required: true, completionTopics: ['check.*'] }, [decision('check.timeline')])).toBe(true);
+    expect(isStepDone({ key: 'check', required: true, completionTopics: ['check.*'] }, [decision('check.timeline')])).toBe(true);
+  });
+
+  it('should count an optional step done only by what its own lock wrote', () => {
+    const step = { key: 'taste', required: false, completionTopics: ['taste', 'taste.gave_up'] };
+    const steering = ledgerEntry({ kind: 'rejected', topic: 'taste', stepKey: null });
+    const locked = ledgerEntry({ kind: 'direction', topic: 'taste.gave_up', stepKey: 'taste' });
+
+    expect(isStepDone(step, [steering])).toBe(false);
+    expect(isStepDone(step, [ledgerEntry({ kind: 'direction', topic: 'taste', stepKey: 'concepts' })])).toBe(false);
+    expect(isStepDone(step, [steering, locked])).toBe(true);
   });
 });
 

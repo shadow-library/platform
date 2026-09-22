@@ -6,6 +6,8 @@ import {
   type CancelBlueprintRoundResponse,
   type LockBlueprintStepBody,
   type LockBlueprintStepResponse,
+  type PremisePreviewBody,
+  type PremisePreviewResponse,
   type StartBlueprintRoundBody,
 } from './api-types.gen';
 import { invalidateSoon } from './batched-invalidation';
@@ -70,6 +72,13 @@ export function useLockBlueprintStepMutation(projectId: string, stepKey: string)
   return useMutation<LockBlueprintStepResponse, ApiError, LockBlueprintStepBody>({
     mutationFn: body => APIRequest.post(`/projects/${projectId}/blueprint/steps/${stepKey}/lock`).body(body).execute(),
     onSuccess: () => invalidateBlueprintProgress(queryClient, projectId),
+  });
+}
+
+/** The throwaway opening paragraph: one model call, nothing saved, so nothing is invalidated when it returns. */
+export function usePremisePreviewMutation(projectId: string): UseMutationResult<PremisePreviewResponse, ApiError, PremisePreviewBody> {
+  return useMutation<PremisePreviewResponse, ApiError, PremisePreviewBody>({
+    mutationFn: body => APIRequest.post(`/projects/${projectId}/blueprint/premise/preview`).body(body).execute(),
   });
 }
 

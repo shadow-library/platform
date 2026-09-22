@@ -12,6 +12,7 @@ import { LedgerController } from './ledger/ledger.controller';
 import { LedgerService } from './ledger/ledger.service';
 import { BlueprintStageService } from './stage/blueprint-stage.service';
 import { BLUEPRINT_STEP_REGISTRY } from './steps/blueprint-steps';
+import { PremisePreviewService } from './steps/premise-preview.service';
 
 @Module({
   imports: [DatabaseModule, AiModule, PluginsModule, RefinementModule],
@@ -23,7 +24,8 @@ import { BLUEPRINT_STEP_REGISTRY } from './steps/blueprint-steps';
     BlueprintStepService,
     BlueprintRoundRunner,
     BlueprintStageService,
+    PremisePreviewService,
   ],
-  exports: [LedgerService, BlueprintRoundService, BlueprintStepService, BlueprintRoundRunner, BlueprintStepRegistry, BlueprintStageService],
+  exports: [LedgerService, BlueprintRoundService, BlueprintStepService, BlueprintRoundRunner, BlueprintStepRegistry, BlueprintStageService, PremisePreviewService],
 })
 export class BlueprintModule {}

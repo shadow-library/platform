@@ -1,7 +1,11 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
+import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
+import { blueprintPremisePrompt } from './blueprint-premise.prompt';
+import { blueprintPremisePreviewPrompt } from './blueprint-premise-preview.prompt';
 import { blueprintStartPrompt } from './blueprint-start.prompt';
+import { blueprintTastePrompt } from './blueprint-taste.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
@@ -107,6 +111,10 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,
+  'blueprint-taste': blueprintTastePrompt as PromptModule<unknown>,
+  'blueprint-concepts': blueprintConceptsPrompt as PromptModule<unknown>,
+  'blueprint-premise': blueprintPremisePrompt as PromptModule<unknown>,
+  'blueprint-premise-preview': blueprintPremisePreviewPrompt as PromptModule<unknown>,
 };
 
 export * from './types';

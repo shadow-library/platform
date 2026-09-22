@@ -77,7 +77,7 @@ describe('BlueprintStepRegistry', () => {
   it('should find a registered step and refuse an unknown one', () => {
     const registry = new BlueprintStepRegistry(BLUEPRINT_STEPS);
     expect(registry.get('start').phase).toBe('idea');
-    expect(registry.find('concepts')).toBeUndefined();
-    expect(() => registry.get('concepts')).toThrow(expect.objectContaining({ code: 'BPR_001' }));
+    expect(registry.find('nowhere_step')).toBeUndefined();
+    expect(() => registry.get('nowhere_step')).toThrow(expect.objectContaining({ code: 'BPR_001' }));
   });
 });

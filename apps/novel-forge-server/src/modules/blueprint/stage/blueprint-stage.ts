@@ -10,7 +10,7 @@ export const READER_PROMISE_TOPIC = 'promise';
 export type BlueprintStage = 'blueprint' | 'workspace';
 export type BlueprintPhaseStatus = 'done' | 'current' | 'locked' | 'open';
 
-type StageLedgerEntry = Pick<Ledger.Entry, 'kind' | 'phase' | 'topic' | 'payload'>;
+type StageLedgerEntry = Pick<Ledger.Entry, 'kind' | 'phase' | 'topic' | 'payload' | 'stepKey'>;
 
 export interface BlueprintStepProgress {
   key: string;
@@ -92,8 +92,12 @@ export function hasGate(ledger: StageLedgerEntry[]): boolean {
   return ledger.some(entry => entry.kind === 'system' && entry.topic === GATE_TOPIC);
 }
 
-export function isStepDone(step: Pick<AnyLockingStep, 'required' | 'completionTopics'>, ledger: StageLedgerEntry[]): boolean {
-  if (!step.required) return filterLedgerEntries(ledger, { topics: [...step.completionTopics] }).length > 0;
+/**
+ * A required step is done when every completion topic holds a decision; an optional one when its own lock wrote anything at all.
+ * The `stepKey` test is what keeps a rejection written while steering from marking the step the author never locked as done.
+ */
+export function isStepDone(step: Pick<AnyLockingStep, 'key' | 'required' | 'completionTopics'>, ledger: StageLedgerEntry[]): boolean {
+  if (!step.required) return filterLedgerEntries(ledger, { topics: [...step.completionTopics] }).some(entry => entry.stepKey === step.key);
   const decided = ledger.filter(isDecided);
   return step.completionTopics.every(topic => filterLedgerEntries(decided, { topics: [topic] }).length > 0);
 }

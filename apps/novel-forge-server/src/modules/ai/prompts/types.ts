@@ -56,7 +56,11 @@ export type PromptKey =
   | 'translate-audit'
   | 'illustration-compose'
   | 'appearance-describe'
-  | 'blueprint-start';
+  | 'blueprint-start'
+  | 'blueprint-taste'
+  | 'blueprint-concepts'
+  | 'blueprint-premise'
+  | 'blueprint-premise-preview';
 
 /** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
 export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';

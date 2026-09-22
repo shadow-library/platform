@@ -1,24 +1,28 @@
 import { type ReactElement, useState } from 'react';
-import { Button, IconButton, Input, Select, Textarea, toast } from '@shadow-library/ui';
+import { Alert, Button, IconButton, Input, Select, Textarea, toast } from '@shadow-library/ui';
 
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { StatusChip } from '@/components/nf';
-import { type BlueprintStepStateResponse, isRoundLive, useCancelBlueprintRoundMutation, useLockBlueprintStepMutation, useStartBlueprintRoundMutation } from '@/lib/apis';
+import { isRoundLive, useCancelBlueprintRoundMutation, useLedgerEntriesQuery, useLockBlueprintStepMutation, useStartBlueprintRoundMutation } from '@/lib/apis';
 
-import { blueprintStepMeta } from './blueprint-steps';
+import { blueprintStepMeta, type StepScreenProps } from './blueprint-steps';
 import { LockBar } from './LockBar';
 import { buildRoundBody, EMPTY_STEER, roundThread, type SteerDraft, stepPayload } from './round';
 import { RoundStatus } from './RoundStatus';
 import {
   buildStartSelection,
+  mergeStartChips,
   parseStartChips,
   parseStartInput,
   resolveStartInput,
+  restoreStartChips,
   START_CHIP_KIND_LABELS,
   START_CHIP_KINDS,
   START_CHIP_LABEL_MAX,
   START_CHIP_MAX,
+  START_RULED_OUT_TOPIC,
   START_TEXT_MAX,
+  START_TOPIC,
   type StartChip,
   type StartChipKind,
   startChipsKey,
@@ -30,18 +34,13 @@ import { SteerBox } from './SteerBox';
 import styles from './blueprint.module.css';
 
 const RUNNING_LABEL = 'Reading your starting point…';
-
-export interface StartStepProps {
-  projectId: string;
-  step: BlueprintStepStateResponse;
-  onLocked: () => void;
-}
+const LEDGER_QUERY = { topics: `${START_TOPIC},${START_RULED_OUT_TOPIC}` };
 
 /**
  * The starting point, read back as chips the author corrects. It is the one step whose lock writes only
  * directions and rejections — nothing here is a decision, so a misunderstanding costs a re-run, not a revisit.
  */
-export function StartStep({ projectId, step, onLocked }: StartStepProps): ReactElement {
+export function StartStep({ projectId, step, onLocked }: StepScreenProps): ReactElement {
   const round = step.latestRound;
   const meta = blueprintStepMeta(step.key);
 
@@ -50,17 +49,26 @@ export function StartStep({ projectId, step, onLocked }: StartStepProps): ReactE
   const [draft, setDraft] = useState<SteerDraft>(EMPTY_STEER);
   const [chips, setChips] = useState<StartChip[]>(() => parseStartChips(round));
   const [chipsKey, setChipsKey] = useState(() => startChipsKey(round));
+  const [saved, setSaved] = useState<StartChip[] | null>(null);
 
   const startRound = useStartBlueprintRoundMutation(projectId, step.key);
   const cancelRound = useCancelBlueprintRoundMutation(projectId, step.key);
   const lockStep = useLockBlueprintStepMutation(projectId, step.key);
+  const savedChips = useLedgerEntriesQuery(projectId, LEDGER_QUERY);
+
+  // Chips the author typed themselves are in no round's options, so a revisit has to read them back or the next lock retires them.
+  if (saved == null && savedChips.data != null) {
+    const restored = restoreStartChips(savedChips.data.entries);
+    setSaved(restored);
+    setChips(current => mergeStartChips(current, restored, true));
+  }
 
   // Options arriving on the round already on screen is the same id with a different key, so the chips have
   // to follow the key, not the id. Adjusted during render rather than in an effect: a round that has just
   // become ready must never paint once with the old chips.
   if (startChipsKey(round) !== chipsKey) {
     setChipsKey(startChipsKey(round));
-    setChips(parseStartChips(round));
+    setChips(mergeStartChips(parseStartChips(round), saved ?? [], false));
     setDraft(EMPTY_STEER);
   }
 
@@ -125,6 +133,16 @@ export function StartStep({ projectId, step, onLocked }: StartStepProps): ReactE
         </div>
       </section>
 
+      {savedChips.isError && (
+        <Alert
+          intent="danger"
+          title="Couldn’t read back the chips you saved"
+          action={{ label: savedChips.isFetching ? 'Retrying…' : 'Try again', onClick: () => void savedChips.refetch() }}
+        >
+          Saving now would retire the chips this screen cannot see, so it stays disabled until the Notebook loads. {savedChips.error?.message}
+        </Alert>
+      )}
+
       <RoundStatus
         round={round}
         runningLabel={RUNNING_LABEL}
@@ -183,10 +201,10 @@ export function StartStep({ projectId, step, onLocked }: StartStepProps): ReactE
       {chips.length > 0 && (
         <LockBar
           label={meta.lockLabel ?? 'Save the starting point'}
-          hint="Saved as directions and rejections every later step reads. Nothing here is a decision yet."
+          hint={saved == null ? 'Reading back the chips you saved…' : 'Saved as directions and rejections every later step reads. Nothing here is a decision yet.'}
           onLock={lock}
           loading={lockStep.isPending}
-          disabled={!hasChips || busy || lockStep.isPending}
+          disabled={saved == null || !hasChips || busy || lockStep.isPending}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-import { type BlueprintRoundResponse } from '@/lib/apis';
+import { type BlueprintRoundResponse, type LedgerEntryResponse } from '@/lib/apis';
 
 export const START_CHIP_KINDS = ['element', 'want', 'not'] as const;
 export type StartChipKind = (typeof START_CHIP_KINDS)[number];
@@ -9,6 +9,8 @@ export type StartingType = (typeof STARTING_TYPES)[number];
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
 export const START_TEXT_MAX = 4000;
+export const START_TOPIC = 'start';
+export const START_RULED_OUT_TOPIC = 'start.ruled_out';
 
 export const STARTING_TYPE_LABELS: Record<StartingType, string> = {
   book: 'A book I love',
@@ -48,6 +50,31 @@ export function parseStartChips(round: BlueprintRoundResponse | null): StartChip
     if (typeof chip.id !== 'string' || typeof chip.label !== 'string' || !isChipKind(chip.kind)) return [];
     return [{ optionId: chip.id, label: chip.label, kind: chip.kind }];
   });
+}
+
+/**
+ * The chips already in the Notebook. One lock writes the step's whole answer, so a revisit that shows only the round's reading would
+ * retire everything the author typed themselves — their chips are in no round's options and can come back from nowhere else.
+ */
+export function restoreStartChips(entries: LedgerEntryResponse[]): StartChip[] {
+  return entries.flatMap(entry => {
+    if (entry.topic !== START_TOPIC && entry.topic !== START_RULED_OUT_TOPIC) return [];
+    const payload = entry.payload as { kind?: unknown; optionId?: unknown } | null;
+    const kind = isChipKind(payload?.kind) ? payload.kind : entry.topic === START_RULED_OUT_TOPIC ? 'not' : 'element';
+    return [{ ...(typeof payload?.optionId === 'string' ? { optionId: payload.optionId } : {}), label: entry.statement, kind }];
+  });
+}
+
+/**
+ * The reading on screen, with what the author saved last put back. `keepEdits` is for the round those chips were saved against: a
+ * fresh reading numbers its chips from one again, so carrying an edited label across to it would rename a different chip.
+ */
+export function mergeStartChips(fromRound: StartChip[], restored: StartChip[], keepEdits: boolean): StartChip[] {
+  const saved = new Map(restored.flatMap(chip => (chip.optionId ? [[chip.optionId, chip] as const] : [])));
+  const shown = keepEdits ? fromRound.map(chip => (chip.optionId && saved.has(chip.optionId) ? { ...chip, ...saved.get(chip.optionId) } : chip)) : fromRound;
+  const present = new Set(shown.map(chip => chip.label.trim().toLowerCase()));
+  const authored = restored.filter(chip => !chip.optionId && !present.has(chip.label.trim().toLowerCase()));
+  return [...shown, ...authored].slice(0, START_CHIP_MAX);
 }
 
 export interface StartRoundInput {
