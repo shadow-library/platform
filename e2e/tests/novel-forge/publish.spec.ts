@@ -18,9 +18,8 @@ import { buildFinalBundle, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix }
  *
  * The fast, AI-free content path: hand-author a valid `final`-mode novel-import bundle, land it in one call,
  * publish metadata + chapters, exercise the forge-side gates (PUB_002/PUB_003) and access management, then
- * attempt to verify the one-way push actually reached web-novel. Serial, because every step builds on the last
- * project's state. NOTE: the reader push is broken in this dev cluster (see the fixmes), so the cross-app
- * arrival checks are recorded as fixmes with server-log evidence rather than asserted.
+ * verify the one-way push reached web-novel, including a RESTRICTED grant. Serial, because every step builds on
+ * the last project's state.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -78,7 +77,7 @@ test.describe('novel-forge import and publish pipeline', () => {
 
   test('should publish novel metadata under the chosen slug', async () => {
     const response = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/publish`, {
-      data: { novelSlug: slug, title: novelTitle, genres: ['fantasy', 'slow-burn'] },
+      data: { novelSlug: slug, title: novelTitle, genres: ['Fantasy'] },
     });
     expect(response.status(), await response.text()).toBe(200);
     const body = (await response.json()) as { novelSlug: string; title: string };
@@ -88,8 +87,7 @@ test.describe('novel-forge import and publish pipeline', () => {
 
   test('should enforce contiguous chapter publishing (PUB_003) on the forge ledger', async () => {
     // These are pure forge-side gates on the publication ledger — they hold regardless of whether the
-    // downstream reader push succeeds (it does not in this environment; see the fixmes below). Chapter 1 is
-    // accepted (202, enqueued)...
+    // downstream reader push succeeds. Chapter 1 is accepted (202, enqueued)...
     const ch1 = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/chapters/1/publish`, { data: {} });
     expect(ch1.status(), await ch1.text()).toBe(202);
 
@@ -113,7 +111,7 @@ test.describe('novel-forge import and publish pipeline', () => {
   test('should resolve a RESTRICTED share grant for user2 by email, then reopen to public', async () => {
     // Forge-side access management, independent of the reader push. Proves the identity M2M path
     // (resolveUsersByEmail) works: user2's address resolves to a subject, so the grant is `resolved`, not
-    // `pending`. The reader-side effect of this grant is covered by the fixme below.
+    // `pending`. The reader-side effect of a grant is asserted after reconcile below.
     const access = await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/publications/access`, {
       data: { visibility: 'RESTRICTED', grants: [{ email: PERSONAS.user2.email }] },
     });
@@ -129,20 +127,32 @@ test.describe('novel-forge import and publish pipeline', () => {
     expect((await reopen.json()).visibility).toBe('PUBLIC');
   });
 
-  test('should run reconcile and report a coherent (reader-outage) result', async () => {
-    // With the reader unreachable, reconcile surfaces the outage as PUB_004 (its controller documents this).
-    // In a healthy environment the same call returns 200 with an applied/noop + pushed/failed breakdown. Accept
-    // either, but assert the shape of whichever lands so a regression in the response contract still fails.
+  test('should run reconcile and report the pushed chapters', async () => {
     const response = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/publications/reconcile`);
-    expect([200, 500]).toContain(response.status());
-    const body = (await response.json()) as Record<string, unknown> & { code?: string };
-    if (response.status() === 200) {
-      expect(['applied', 'noop']).toContain(body.novel);
-      expect(Array.isArray(body.pushed)).toBe(true);
-      expect(Array.isArray(body.failed)).toBe(true);
-    } else {
-      expect(body.code).toBe('PUB_004');
-    }
+    expect(response.status(), await response.text()).toBe(200);
+    const body = (await response.json()) as { novel: string; pushed: number[]; failed: number[] };
+    expect(['applied', 'noop']).toContain(body.novel);
+    expect(Array.isArray(body.pushed)).toBe(true);
+    expect(body.failed).toEqual([]);
+  });
+
+  test('should surface the published novel and its chapters on web-novel', async () => {
+    const detail = await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 200);
+    expect(detail.status()).toBe(200);
+    const detailBody = (await detail.json()) as { title: string; chapterCount: number };
+    expect(detailBody.title).toBe(novelTitle);
+    expect(detailBody.chapterCount).toBeGreaterThanOrEqual(2);
+    const chapters = await webGuestCtx.get(`/api/novels/${slug}/chapters`);
+    expect((await chapters.json()).items.map((c: { ordinal: number }) => c.ordinal)).toEqual(expect.arrayContaining([1, 2]));
+  });
+
+  test('should restrict web-novel reads to the granted user and hide from guests', async () => {
+    const access = await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/publications/access`, {
+      data: { visibility: 'RESTRICTED', grants: [{ email: PERSONAS.user2.email }] },
+    });
+    expect(access.status(), await access.text()).toBe(200);
+    expect((await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 404)).status()).toBe(404);
+    expect((await pollWebNovel(webUser2Ctx, `/api/novels/${slug}`, 200)).status()).toBe(200);
   });
 
   test('should reject a garbage bundle with a 422 validation error', async () => {
@@ -157,34 +167,5 @@ test.describe('novel-forge import and publish pipeline', () => {
     const del = await mutate(forgeCtx, 'delete', `/api/v1/projects/${projectId}`);
     expect(del.status()).toBe(204);
     projectId = '';
-  });
-
-  // SUSPECTED ENVIRONMENT/INTERCONNECT BUG — the one-way reader push from novel-forge to web-novel is broken in
-  // this dev cluster, so nothing published on the forge ever reaches the web-novel reader. The forge mints a
-  // valid M2M token (aud api://web-novel, scope web-novel:publish) but the push target resolves to a bare
-  // `http://web-novel-server` host that does not connect:
-  //   APIRequest: "PUT http://web-novel-server/internal/novels/<slug> - failed" reason
-  //     "Unable to connect. Is the computer able to access the url?" / "Was there a typo in the url or port?"
-  //   ReaderPushClient: "reader push transport failure" → PublishRunner aborts → job fails PUB_004.
-  // (novel-forge-server logs, PublishRunner/ReaderPushClient; chapter ledger status settles to `failed`.)
-  // Root cause is a service-endpoint/DNS misconfiguration (missing namespace/port on the discovered web-novel
-  // internal base URL), not a test issue — so the two cross-app verifications below cannot pass here. Recorded,
-  // not "fixed". They also carry the intended orphan-vs-retire observation for a healthy environment.
-  test.fixme('should surface the published novel and its chapters on web-novel', async () => {
-    const detail = await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 200);
-    expect(detail.status()).toBe(200);
-    const detailBody = (await detail.json()) as { title: string; chapterCount: number };
-    expect(detailBody.title).toBe(novelTitle);
-    expect(detailBody.chapterCount).toBeGreaterThanOrEqual(2);
-    const chapters = await webGuestCtx.get(`/api/novels/${slug}/chapters`);
-    expect((await chapters.json()).items.map((c: { ordinal: number }) => c.ordinal)).toEqual(expect.arrayContaining([1, 2]));
-  });
-
-  test.fixme('should restrict web-novel reads to the granted user and hide from guests', async () => {
-    await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/publications/access`, {
-      data: { visibility: 'RESTRICTED', grants: [{ email: PERSONAS.user2.email }] },
-    });
-    expect((await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 404)).status()).toBe(404);
-    expect((await pollWebNovel(webUser2Ctx, `/api/novels/${slug}`, 200)).status()).toBe(200);
   });
 });

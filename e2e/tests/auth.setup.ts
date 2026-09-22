@@ -3,12 +3,23 @@
  */
 import { existsSync, mkdirSync } from 'node:fs';
 
-import { type APIRequestContext, expect, type Page, request, test as setup } from '@playwright/test';
+import { expect, type Page, request, test as setup } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { AUTH_DIR, getProductUrl, type LoginPersona, type PersonaAccount, PERSONAS, type ProductKey, requireProductUrl, storageStateFor } from '../lib';
+import {
+  addIdentitySessionCookies,
+  AUTH_DIR,
+  createIdentitySession,
+  getProductUrl,
+  type LoginPersona,
+  PERSONAS,
+  type ProductKey,
+  readSeedManifest,
+  type SessionAal,
+  storageStateFor,
+} from '../lib';
 
 /**
  * Defining types
@@ -18,15 +29,14 @@ import { AUTH_DIR, getProductUrl, type LoginPersona, type PersonaAccount, PERSON
  * Declaring the constants
  *
  * A Playwright `setup` project (the `chromium` project depends on it) that produces one `storageState` file per
- * login persona, so the real specs never drive the login UI. Authentication is entirely programmatic: the
- * identity flow (`login/init` → `challenge/verify`) is scripted over the page's own request context so the
- * resulting `__Host-sid` lands in the browser context, then a headless `GET <app>/api/auth/login` per app rides
- * that central session through the OIDC hop and mints each app's `__Host-shadow-session` cookie.
+ * login persona, so the real specs never drive the login UI. The identity session is minted in the database
+ * (`createIdentitySession`) rather than through `login/init` → `challenge/verify`: that flow spends the 20/hour
+ * per-IP `login/init` budget and cannot finish for an account with a passkey enrolled (the dev bootstrap admin has
+ * one). A headless `GET <app>/api/auth/login` per app then rides that central session through the OIDC hop and
+ * mints each app's `__Host-shadow-session` cookie. Interactive login itself is covered by `identity/login.spec.ts`.
  *
- * It is deliberately resumable. `login/init` is rate-limited to 20/hour per identifier/IP, so before spending a
- * login this checks whether the saved storage state still answers `GET /api/auth/session` with 200 for every app
- * the persona needs — if so, it skips untouched. That makes re-running the suite cheap and keeps a flapping test
- * run from exhausting the rate limit.
+ * It is resumable: a saved storage state that still answers `GET /api/auth/session` with 200 for every app the
+ * persona needs is kept untouched, so a re-run does not pile up sessions.
  *
  * Which apps each persona needs a session on: the two ordinary users get the consumer apps (Novel Forge, Web
  * Novel, and Memoir); Pulse is an INTERNAL ops console, so identity denies a non-privileged user a Pulse
@@ -65,18 +75,11 @@ async function existingStateIsValid(persona: LoginPersona, apps: { url: string }
   }
 }
 
-/** Runs identity's password flow, leaving `__Host-sid` + `isLoggedIn` in the caller's cookie jar. */
-async function establishIdentitySession(api: APIRequestContext, identityUrl: string, account: PersonaAccount): Promise<void> {
-  const init = await api.post(`${identityUrl}/api/v1/auth/login/init`, { data: { identifier: account.email } });
-  expect(init.ok(), `login/init failed for ${account.email}: ${init.status()}`).toBeTruthy();
-  const initBody = (await init.json()) as { flowId: string; status: string };
-  expect(initBody.status, `expected a password prompt for ${account.email}`).toBe('AWAITING_PASSWORD');
-
-  const verify = await api.post(`${identityUrl}/api/v1/auth/challenge/verify`, { data: { flowId: initBody.flowId, password: account.password } });
-  expect(verify.ok(), `challenge/verify failed for ${account.email}: ${verify.status()}`).toBeTruthy();
-  const verifyBody = (await verify.json()) as { status: string };
-  expect(verifyBody.status, `expected COMPLETED for ${account.email}`).toBe('COMPLETED');
-}
+/**
+ * The assurance level a real sign-in would leave: the admin completes a passkey factor (AAL2), the users sign in with a password
+ * alone (AAL1). No elevation window — a reused storage state is long past the ten minutes a fresh MFA login grants.
+ */
+const PERSONA_AAL: Record<LoginPersona, SessionAal> = { user1: 'AAL1', user2: 'AAL1', admin: 'AAL2' };
 
 /**
  * Establishes every app session `persona` needs and saves the storage state, unless a valid one already exists.
@@ -90,8 +93,8 @@ async function authenticate(page: Page, persona: LoginPersona): Promise<void> {
 
   if (await existingStateIsValid(persona, apps)) return;
 
-  const identityUrl = requireProductUrl('identity');
-  await establishIdentitySession(page.request, identityUrl, account);
+  const session = await createIdentitySession(readSeedManifest().users[persona].userId, { aal: PERSONA_AAL[persona], elevatedUntil: null });
+  await addIdentitySessionCookies(page.context(), session);
 
   for (const { product, url } of apps) {
     await page.goto(`${url}/api/auth/login?return_to=/`);

@@ -37,7 +37,8 @@ test.describe('memoir offline outbox', () => {
     await expect(completeButton).toBeVisible();
 
     await context.setOffline(true);
-    const netStrip = page.getByRole('status');
+    // Toasts are `role="status"` too; `data-state` is carried only by the shell's connection strip.
+    const netStrip = page.getByRole('status').and(page.locator('[data-state]'));
     await expect(netStrip).toContainText(/offline/i);
 
     await completeButton.click();

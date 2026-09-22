@@ -31,8 +31,8 @@ test.describe('console UI', () => {
     await page.goto(url);
 
     await expect(page.getByRole('heading', { name: 'Delivery health', level: 1 })).toBeVisible();
-    // `GET /api/v1/dashboard/stats` is hardcoded mock data (dashboard.controller.ts:20-46) — assert the four
-    // KPI cards render with *a* value, never a specific seeded number.
+    // `GET /api/v1/dashboard/stats` aggregates every notification job on the shared dev cluster, so the numbers
+    // move with whatever else ran — assert the four KPI cards render, never a specific value.
     // `.first()`: each label also appears inside the per-channel breakdown cards and the trend legend further
     // down the page — the KPI `Statistic` is the first occurrence in DOM order for all four labels.
     for (const label of ['Total sent', 'Succeeded', 'Failed', 'Pending']) {

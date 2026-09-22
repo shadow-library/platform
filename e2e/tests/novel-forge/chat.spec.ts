@@ -7,7 +7,7 @@ import { type APIRequestContext, type APIResponse, expect, test } from '@playwri
  * Importing user defined packages
  */
 import { apiContext, mutate } from '../../lib';
-import { AI_SKIP_REASON, aiAvailable, createProject, deleteProjectQuietly, jsonOrUndefined, pinHaiku, uniqueSuffix } from './forge-helpers';
+import { aiAvailable, aiSkipReason, createProject, deleteProjectQuietly, jsonOrUndefined, pinHaiku, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -53,7 +53,7 @@ test.describe('novel-forge refinement chat', () => {
   });
 
   test.beforeEach(() => {
-    test.skip(!available, AI_SKIP_REASON);
+    test.skip(!available, aiSkipReason());
     test.setTimeout(600_000);
   });
 

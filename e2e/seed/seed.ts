@@ -50,6 +50,12 @@ const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
 const PUBLIC_NOVEL_SLUG = 'e2e-public-novel';
 const RESTRICTED_NOVEL_SLUG = 'e2e-restricted-novel';
 
+/**
+ * The publisher web-novel records as owning the seeded novels. Deliberately not a real client id, so no publishing client
+ * (novel-forge included) gains authority to overwrite them through the internal publish surface.
+ */
+const SEED_SOURCE_CLIENT_ID = 'e2e-seed';
+
 /** A far-future lock expiry for the `locked` persona, so `locked_until` stays in the future across many runs. */
 const LOCK_UNTIL = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
@@ -232,8 +238,8 @@ interface NovelSeed {
 
 async function upsertNovel(sql: Sql, novel: NovelSeed): Promise<string> {
   const rows = await sql<{ id: string }[]>`
-    INSERT INTO novels (slug, title, blurb, genres, status, visibility, revision)
-    VALUES (${novel.slug}, ${novel.title}, ${novel.blurb}, ${novel.genres}, 'live', ${novel.visibility}::novel_visibility, 1)
+    INSERT INTO novels (slug, source_client_id, source_ref, title, blurb, genres, status, visibility, revision)
+    VALUES (${novel.slug}, ${SEED_SOURCE_CLIENT_ID}, ${novel.slug}, ${novel.title}, ${novel.blurb}, ${novel.genres}, 'live', ${novel.visibility}::novel_visibility, 1)
     ON CONFLICT (slug) DO UPDATE SET title = excluded.title, blurb = excluded.blurb, genres = excluded.genres, visibility = excluded.visibility, revision = excluded.revision, updated_at = now()
     RETURNING id
   `;
@@ -330,23 +336,6 @@ async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
   }
 }
 
-/**
- * Deletes `user2Sub`'s memoir account (cascade), so the onboarding e2e flow always finds an
- * unprovisioned, never-onboarded account to walk through — the account row is otherwise created lazily on
- * first authenticated request and would persist "onboarded" across every later run against this dev cluster.
- * `user1` is left alone: the core-loop/quick-capture/settings specs want a persistent, already-onboarded
- * account so they don't re-pay the onboarding wizard every run.
- */
-async function cleanMemoir(url: string, user2Sub: string): Promise<void> {
-  const sql = connect(url);
-  try {
-    const deleted = await sql`DELETE FROM accounts WHERE identity_sub = ${user2Sub} RETURNING id`;
-    summary.push(`memoir: deleted ${deleted.count} account(s) for e2e user2 (keeps onboarding fresh)`);
-  } finally {
-    await sql.end();
-  }
-}
-
 /** Writes the computed ids/subs to the gitignored manifest the specs read. */
 function writeManifest(users: Record<Persona, SeedManifestUser>): void {
   const manifest: SeedManifest = { generatedAt: new Date().toISOString(), users, webNovel: { publicSlug: PUBLIC_NOVEL_SLUG, restrictedSlug: RESTRICTED_NOVEL_SLUG } };
@@ -373,10 +362,6 @@ async function main(): Promise<void> {
   const webNovelUrl = resolveUrl('webNovel');
   if (webNovelUrl && users) await seedWebNovel(webNovelUrl, users.user1.sub);
   else summary.push(`web_novel: skipped (${webNovelUrl ? 'no identity subs' : 'E2E_PG_URL_WEB_NOVEL blank'})`);
-
-  const memoirUrl = resolveUrl('memoir');
-  if (memoirUrl && users) await cleanMemoir(memoirUrl, users.user2.sub);
-  else summary.push(`memoir: skipped (${memoirUrl ? 'no identity subs' : 'E2E_PG_URL_MEMOIR blank'})`);
 
   const pulseUrl = resolveUrl('pulse');
   if (pulseUrl) await seedPulse(pulseUrl);

@@ -7,7 +7,7 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, mutate, pollJob, requireProductUrl, storageStateFor } from '../../lib';
-import { buildFinalBundle, createProject, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
+import { buildFinalBundle, createProject, deleteProjectQuietly, HAIKU_MODEL, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -18,8 +18,8 @@ import { buildFinalBundle, createProject, deleteProjectQuietly, jsonOrUndefined,
  *
  * Workspace odds-and-ends that do not need AI: the export endpoint's two outcomes (bytes for a project with
  * chapters, EXP_001 for an empty one), and the authenticated web surface — overview CTA, the settings General
- * tab persisting a brief, and the Models tab's role rows. The Models test also RECORDS which Haiku id the
- * dropdown would submit, documenting (never "fixing") the dated-id-vs-gateway mismatch.
+ * tab persisting a brief, and the Models tab's role rows. The Models test also checks the Haiku id the dropdown
+ * submits is the one the API model pin uses.
  */
 
 test.describe('novel-forge export endpoint (API)', () => {
@@ -80,23 +80,22 @@ test.describe('novel-forge workspace UI', () => {
     const base = requireProductUrl('novelForge');
     await page.goto(`${base}/novels/${projectId}/overview`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('main')).toBeVisible();
-    // The lifecycle stepper's primary CTA is always an arrow-suffixed action ("Open story bible →", etc.).
-    await expect(
-      page
-        .getByRole('link', { name: /→/ })
-        .or(page.getByRole('button', { name: /→/ }))
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
+    // A project with a brief but no plan yet offers building the plan, both as the header's primary action and in the
+    // "Next step" card.
+    await expect(page.getByRole('heading', { name: 'Next step' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Build your plan' })).toHaveCount(2);
   });
 
   test('should persist a brief edited on the settings General tab', async ({ page }) => {
     const base = requireProductUrl('novelForge');
     const nextBrief = `Edited via the settings General tab ${uniqueSuffix()}.`;
-    await page.goto(`${base}/novels/${projectId}/settings`, { waitUntil: 'networkidle' });
+    await page.goto(`${base}/novels/${projectId}/settings`);
 
     // The brief textarea is pre-filled from the project, and a plain fill() appends rather than replaces on
-    // this controlled field — clear it with the keyboard first, then type the new value.
+    // this controlled field — clear it with the keyboard first, then type the new value. The workspace keeps a
+    // live connection open, so the page never reaches `networkidle`; the pre-filled value marks it ready instead.
     const field = page.getByLabel('Premise / brief');
+    await expect(field).toHaveValue(/seed brief/);
     await field.click();
     await field.press('ControlOrMeta+A');
     await field.press('Delete');
@@ -110,13 +109,14 @@ test.describe('novel-forge workspace UI', () => {
     }).toPass({ timeout: 15_000 });
   });
 
-  test('should render Models-tab role rows and record the Haiku id the dropdown submits', async ({ page }) => {
+  test('should render Models-tab role rows and offer the same Haiku id the API pin uses', async ({ page }) => {
     const base = requireProductUrl('novelForge');
-    await page.goto(`${base}/novels/${projectId}/settings`, { waitUntil: 'networkidle' });
+    await page.goto(`${base}/novels/${projectId}/settings`);
+    await expect(page.getByLabel('Premise / brief')).toHaveValue(/seed brief|Edited via/);
     await page.getByRole('tab', { name: 'Models' }).click();
 
     // The role rows are custom @shadow-library/ui Selects (role=combobox, aria-label "Model"), one per model
-    // group. Assert they render, then open the first and confirm the Anthropic group lists a Haiku option.
+    // group. Assert they render, then open the first and confirm it lists a Haiku option.
     const modelCombos = page.getByRole('combobox', { name: 'Model' });
     await expect(modelCombos.first()).toBeVisible({ timeout: 15_000 });
     expect(await modelCombos.count()).toBeGreaterThanOrEqual(5);
@@ -125,12 +125,9 @@ test.describe('novel-forge workspace UI', () => {
     await expect(page.getByRole('option', { name: /haiku/i }).first()).toBeVisible({ timeout: 10_000 });
     await page.keyboard.press('Escape');
 
-    // RECORD (do not "fix") the id the dropdown actually submits. The Select is built from GET /ai/models, whose
-    // Anthropic Haiku entry carries the DATED id — the exact one the dev AI gateway rejects,
-    // while the API model-pin uses the undated `claude-haiku-4-5`. Surfacing the mismatch is the point.
+    // The Select is built from GET /ai/models, so its Haiku entry is the id the dropdown submits.
     const registry = (await (await ctx.get('/api/v1/ai/models')).json()) as { models: { id: string; provider: string }[] };
-    const haiku = registry.models.filter(m => m.provider === 'anthropic' && /haiku/i.test(m.id)).map(m => m.id);
-    console.log('[novel-forge Models tab] Anthropic Haiku id(s) the dropdown submits:', haiku);
-    expect(haiku.length, 'the /ai/models registry backing the dropdown should list an Anthropic Haiku model').toBeGreaterThan(0);
+    const haiku = registry.models.filter(m => /haiku/i.test(m.id)).map(m => ({ provider: m.provider, model: m.id }));
+    expect(haiku, 'the /ai/models registry backing the dropdown should offer the pinned Haiku model').toContainEqual(HAIKU_MODEL);
   });
 });

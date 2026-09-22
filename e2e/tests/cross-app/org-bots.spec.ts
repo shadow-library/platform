@@ -6,7 +6,18 @@ import { type APIRequestContext, type APIResponse, type BrowserContext, expect, 
 /**
  * Importing user defined packages
  */
-import { apiContext, identityDb, novelForgeDb, PERSONAS, pollUntil, readSeedManifest, requireProductUrl } from '../../lib';
+import {
+  apiContext,
+  createIdentitySession,
+  identityDb,
+  type IdentitySession,
+  identitySessionContext,
+  novelForgeDb,
+  PERSONAS,
+  pollUntil,
+  readSeedManifest,
+  requireProductUrl,
+} from '../../lib';
 import { organisationBoundContext, scopedMutate } from './helpers';
 
 /**
@@ -131,6 +142,7 @@ test.describe('organisation bots across identity and Novel Forge', () => {
 
   // Shared, built up across the serial steps.
   let ownerIdentity: APIRequestContext;
+  let adminSession: IdentitySession;
   let adminIdentity: APIRequestContext;
   let botContext: APIRequestContext;
   let curatorContext: BrowserContext;
@@ -143,7 +155,10 @@ test.describe('organisation bots across identity and Novel Forge', () => {
 
   test.beforeAll(async () => {
     ownerIdentity = await apiContext('identity', 'user1');
-    adminIdentity = await apiContext('identity', 'admin');
+    // An already-elevated admin session, arranged in the database: the dev bootstrap admin has a passkey enrolled, so identity
+    // refuses a password step-up for it (MFA_001), and step-up is not what this spec is about.
+    adminSession = await createIdentitySession(users.admin.userId, { aal: 'AAL2' });
+    adminIdentity = await identitySessionContext(adminSession);
   });
 
   test.afterAll(async () => {
@@ -160,6 +175,7 @@ test.describe('organisation bots across identity and Novel Forge', () => {
     // whole risk this teardown exists to close.
     const settled = await Promise.allSettled([
       botId ? identityDb()`UPDATE bot_keys SET revoked_at = now() WHERE bot_id = ${botId} AND revoked_at IS NULL` : undefined,
+      adminSession ? identityDb()`UPDATE user_sessions SET status = 'REVOKED', terminated_at = now() WHERE id = ${adminSession.sessionId}` : undefined,
       projectId ? novelForgeDb()`DELETE FROM projects WHERE id = ${projectId}` : undefined,
       botContext?.dispose(),
       curatorContext?.close(),
@@ -216,7 +232,6 @@ test.describe('organisation bots across identity and Novel Forge', () => {
 
     // `novel-forge:curate` is not part of the default authoring role, and no self-service surface grants an
     // application role to a person — identity's platform admin is the only one who can make the owner a curator.
-    await stepUp(adminIdentity, identityUrl, PERSONAS.admin.password);
     const assigned = await scopedMutate(adminIdentity, identityUrl, 'post', '/api/v1/admin/role-assignments', {
       data: { principalType: 'USER', principalId: users.user1.userId, roleId: curate!.roleId, organisationId },
       seedPath: '/api/v1/me',

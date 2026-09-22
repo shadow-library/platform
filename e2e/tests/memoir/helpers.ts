@@ -122,9 +122,7 @@ export async function getAccount(ctx: APIRequestContext): Promise<AccountView> {
 
 /**
  * Completes onboarding for the caller if it has not already run — the account is provisioned lazily on first
- * touch, and the onboarding e2e flow deliberately wipes only `user2`'s account (see `seed/seed.ts`), so a spec
- * driving `user1` (persistent across runs) needs this to guarantee an onboarded account without depending on
- * run order.
+ * touch, so a spec driving a persona needs this to guarantee an onboarded account without depending on run order.
  */
 export async function ensureOnboarded(ctx: APIRequestContext): Promise<AccountView> {
   const account = await getAccount(ctx);

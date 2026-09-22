@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { expect, test } from '@playwright/test';
+import { expect, request, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
+import { addIdentitySessionCookies, createIdentitySession, createIdentityUser, deleteIdentityUser, type IdentityUser, memoirDb, requireProductUrl } from '../../lib';
 import { getAccount } from './helpers';
 
 /**
@@ -16,19 +16,28 @@ import { getAccount } from './helpers';
 /**
  * Declaring the constants
  *
- * Drives the real five-step onboarding wizard (`features/onboarding`) as `user2` — the one persona
- * `seed/seed.ts` wipes from the memoir database on every run (`cleanMemoir`), so this always finds an
- * unprovisioned, never-onboarded account regardless of how many times the suite has run against this
- * cluster before. `user1` is deliberately left alone for the other specs, which want a persistent,
- * already-onboarded account.
+ * Drives the real five-step onboarding wizard (`features/onboarding`) as a throwaway identity user, so memoir provisions a
+ * never-onboarded account on first contact. Wiping a persona's memoir account instead does not work: memoir-server caches
+ * sub → account id for `account.context-ttl` (60 s) and answers a vanished row with ACC_002 ("being deleted") until it expires.
  */
 test.describe('memoir onboarding', () => {
-  test.use({ storageState: storageStateFor('user2') });
+  let user: IdentityUser | undefined;
 
-  test('should walk a fresh account through onboarding, lock the currency, and land a first quest on Today', async ({ page }) => {
+  test.afterEach(async () => {
+    if (!user) return;
+    await memoirDb()`DELETE FROM accounts WHERE identity_sub = ${user.sub}`;
+    await deleteIdentityUser(user);
+    user = undefined;
+  });
+
+  test('should walk a fresh account through onboarding, lock the currency, and land a first quest on Today', async ({ page, context }) => {
     const url = requireProductUrl('memoir');
+    user = await createIdentityUser({ label: 'memoir-onboarding' });
+    await addIdentitySessionCookies(context, await createIdentitySession(user.userId));
 
-    await page.goto(`${url}/onboarding`);
+    // Memoir's login route rides the identity session through the OIDC hop and mints a memoir session.
+    await page.goto(`${url}/api/auth/login?return_to=/onboarding`);
+    await expect(page).toHaveURL(/\/onboarding/);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     // Step 1 — essentials: wake/sleep window, timezone, home currency.
@@ -51,7 +60,10 @@ test.describe('memoir onboarding', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
 
     // Step 4 — strictness.
-    await page.getByRole('group', { name: 'Strictness' }).getByRole('button', { name: 'Routine' }).click();
+    // Each option's label (the name + cost line) is the click target; its inner spans fail Playwright's hit test.
+    const strictness = page.getByRole('radiogroup', { name: 'Strictness' });
+    await strictness.locator('label', { hasText: 'Routine' }).click();
+    await expect(strictness.getByRole('radio', { name: /^Routine/ })).toBeChecked();
     await page.getByRole('button', { name: 'Review' }).click();
 
     // Step 5 — review, then commit.
@@ -61,8 +73,9 @@ test.describe('memoir onboarding', () => {
     await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
     await expect(page.getByRole('button', { name: `Mark complete: ${questName}` })).toBeVisible();
 
-    const ctx = await apiContext('memoir', 'user2');
+    const ctx = await request.newContext({ baseURL: url, ignoreHTTPSErrors: true, storageState: await context.storageState() });
     const account = await getAccount(ctx);
+    await ctx.dispose();
     expect(account.onboardingCompletedAt).not.toBeNull();
     expect(account.defaultCurrency).toBe('USD');
   });

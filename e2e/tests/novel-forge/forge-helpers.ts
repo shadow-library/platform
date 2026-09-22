@@ -35,13 +35,13 @@ export interface NovelBundle {
  * Declaring the constants
  *
  * Shared building blocks for the Novel Forge specs: the Haiku model pin every AI test must apply, an
- * `aiAvailable()` gateway probe that caches its verdict so a whole run skips cleanly when the dev AI key is
- * absent, and a hand-authored `novel-import` bundle builder that lands a publishable novel without any AI.
+ * `aiAvailable()` gate that keeps live AI calls opt-in and caches its gateway probe so a whole run skips cleanly,
+ * and a hand-authored `novel-import` bundle builder that lands a publishable novel without any AI.
  */
 
 /**
- * Every text-generating AI role the settings UI exposes. An AI test must pin ALL of them
- * to Haiku: leaving one on the profile default routes that stage to grok-3 (xAI) and defeats the pin. `image`
+ * Every text role a project's `config.models` accepts an override for (`ProjectModelOverrides`). An AI test must pin
+ * ALL of them to Haiku: a role left on its group default routes that stage to Sonnet/Opus and defeats the pin. `image`
  * and `embedding` are deliberately excluded — they are not text roles and their providers are left untouched.
  */
 export const HAIKU_TEXT_ROLES = [
@@ -63,16 +63,11 @@ export const HAIKU_TEXT_ROLES = [
   'chat',
   'title',
   'compact',
+  'translate',
 ] as const;
 
-/**
- * The undated id, on purpose. The deployed dev stack routes Anthropic through the host AI-CLI gateway whose
- * allowlist accepts exactly `claude-haiku-4-5`; the app's own MODEL_REGISTRY/settings dropdown offers the dated
- * `claude-haiku-4-5-20251001`, which that gateway rejects with a 400 (surfaced as AI_001). Sending the dated id
- * here would make every AI call fail — see the `workspace-ui` spec, which records that mismatch rather than
- * "fixing" it.
- */
-export const HAIKU_MODEL: ModelRef = { provider: 'anthropic', model: 'claude-haiku-4-5' };
+/** Every LLM goes through OpenRouter, so a model is its OpenRouter `vendor/model` slug; anything off `MODEL_REGISTRY` is refused with AI_002. */
+export const HAIKU_MODEL: ModelRef = { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' };
 
 /** The `config.models` map that pins every text role to Haiku, for a `PATCH /api/v1/projects/:id` body. */
 export function haikuModelConfig(): { models: Record<string, ModelRef> } {
@@ -154,16 +149,20 @@ export function buildFinalBundle(title: string): NovelBundle {
 }
 
 /**
- * Probes whether the dev AI gateway can actually service an Anthropic call. Creates a throwaway Haiku-pinned
- * project, fires the cheapest AI endpoint (`POST /premise/enhance` with a tiny brief), and caches the verdict
- * to `.auth/ai-probe.json` so every worker and spec in a run reuses one probe. A gateway/auth failure (AI_001
- * etc., or any non-2xx) caches a negative result — AI specs then `test.skip` with a clear reason rather than
- * failing on missing credentials.
+ * Whether live-AI specs may run. Live calls are metered, so they are opt-in: without `E2E_LIVE_AI=1` this answers false
+ * without touching the gateway. With it, a throwaway Haiku-pinned project fires the cheapest AI endpoint
+ * (`POST /premise/enhance` with a tiny brief) and the verdict is cached to `.auth/ai-probe.json` so every worker and spec
+ * in a run reuses one probe. Any non-2xx caches a negative result — AI specs then `test.skip` rather than fail.
  */
 const AI_PROBE_CACHE = path.join(AUTH_DIR, 'ai-probe.json');
 const AI_PROBE_TTL_MS = 20 * 60 * 1000;
 
+export function liveAiEnabled(): boolean {
+  return process.env.E2E_LIVE_AI?.trim() === '1';
+}
+
 export async function aiAvailable(persona: LoginPersona = 'user1'): Promise<boolean> {
+  if (!liveAiEnabled()) return false;
   const cached = readProbeCache();
   if (cached !== undefined) return cached;
 
@@ -182,7 +181,8 @@ async function probeGateway(ctx: APIRequestContext): Promise<boolean> {
     const created = await createProject(ctx, { name: `e2e-forge-aiprobe-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'standard' });
     projectId = created.id;
     if (!projectId) return false;
-    await pinHaiku(ctx, projectId);
+    const pin = await pinHaiku(ctx, projectId);
+    if (!pin.ok()) throw new Error(`Haiku pin refused (${pin.status()}): ${await pin.text()}`);
     // A short, self-contained overview satisfies the endpoint's 10-char minimum. A missing gateway key fails
     // fast (auth 400/500), it does not hang — so no special timeout is needed here.
     const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, {
@@ -212,5 +212,9 @@ function writeProbeCache(available: boolean): boolean {
   return available;
 }
 
-/** The shared skip reason for every AI spec when the gateway probe comes back negative. */
-export const AI_SKIP_REASON = 'AI gateway key not configured (AI_ANTHROPIC_API_KEY missing in dev secret)';
+/** The shared skip reason for every AI spec when live AI is not enabled or the gateway probe comes back negative. */
+export function aiSkipReason(): string {
+  return liveAiEnabled()
+    ? 'AI gateway probe failed (premise/enhance on a Haiku-pinned project did not return 2xx)'
+    : 'live AI calls are opt-in and metered: set E2E_LIVE_AI=1 to run them';
+}

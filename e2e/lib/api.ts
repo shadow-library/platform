@@ -65,13 +65,14 @@ export async function apiContext(product: ProductKey, persona?: LoginPersona): P
 }
 
 /**
- * Reads the `csrf-token` cookie's token half out of `ctx`'s jar. The cookie value is `expiry(radix36):hex`; the
- * server compares the `x-csrf-token` header against the `hex` half alone (`CSRFTokenService.validateToken`), so
- * that is what we echo back. Returns `undefined` when no session cookie has caused a token to be issued yet.
+ * Reads the `csrf-token` cookie's token half for `host` out of `ctx`'s jar. The cookie value is `expiry(radix36):hex`; the
+ * server compares the `x-csrf-token` header against the `hex` half alone (`CSRFTokenService.validateToken`), so that is what
+ * we echo back. A persona's storage state holds one `csrf-token` per app, so the lookup must be scoped to the target host.
+ * Returns `undefined` when no session cookie has caused a token to be issued yet.
  */
-async function readCsrfToken(ctx: APIRequestContext): Promise<string | undefined> {
+async function readCsrfToken(ctx: APIRequestContext, host: string): Promise<string | undefined> {
   const { cookies } = await ctx.storageState();
-  const cookie = cookies.find(c => c.name === 'csrf-token');
+  const cookie = cookies.find(c => c.name === 'csrf-token' && c.domain.replace(/^\./, '') === host);
   return cookie?.value.split(':')[1];
 }
 
@@ -82,8 +83,8 @@ async function readCsrfToken(ctx: APIRequestContext): Promise<string | undefined
  * enforced anyway. The token half of the resulting cookie is then echoed in the `x-csrf-token` header.
  */
 export async function mutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MutateOptions = {}): Promise<APIResponse> {
-  await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
-  const token = await readCsrfToken(ctx);
+  const seed = await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
+  const token = await readCsrfToken(ctx, new URL(seed.url()).hostname);
   const headers = { ...(token ? { 'x-csrf-token': token } : {}), ...options.headers };
   return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
 }

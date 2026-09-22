@@ -174,7 +174,7 @@ test.describe('novel-forge wiki publish → reader', () => {
 
   test('should publish novel metadata (PUBLIC by default) under the chosen slug', async () => {
     const response = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/publish`, {
-      data: { novelSlug: slug, title: novelTitle, genres: ['fantasy', 'slow-burn'] },
+      data: { novelSlug: slug, title: novelTitle, genres: ['Fantasy'] },
     });
     expect(response.status(), await response.text()).toBe(200);
     expect((await response.json()).novelSlug).toBe(slug);

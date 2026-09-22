@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
+import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
 
 /**
  * Defining types
@@ -67,7 +67,7 @@ test.describe('security', () => {
    */
   test('should 403 IAM_002 for admin (a user session can never hold the service-only notifications:send scope) POST /api/v1/notifications', async () => {
     const ctx = await apiContext('pulse', 'admin');
-    const response = await ctx.post('/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: { email: 'e2e.pulse.probe@shadow-apps.test' } } });
+    const response = await mutate(ctx, 'post', '/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: { email: 'e2e.pulse.probe@shadow-apps.test' } } });
     expect(response.status()).toBe(403);
     const body = (await response.json()) as { code?: string };
     expect(body.code).toBe('IAM_002');
@@ -75,10 +75,12 @@ test.describe('security', () => {
 
   /**
    * `GET /api/v1/notifications/messages` is gated by `@EnableIf(() => Config.get('app.stage') === 'dev')` in
-   * addition to `pulse:logs:read` — confirmed live against the deployed API (`APP_STAGE` on this cluster is
-   * `dev`): a 200 with the paginated shape, not a 404. `PulseAdmin` (admin's role) carries `logsRead`.
+   * addition to `pulse:messages:read`, which only `PulseAdmin` (admin's role) carries.
+   *
+   * App bug: identity's `EcosystemSeedService.reconcileApplication` never adds a permission declared after its application
+   * exists, so `pulse:messages:read` (added in da30f903) is missing from the dev identity DB and admin gets 403 IAM_002.
    */
-  test('should allow admin GET /api/v1/notifications/messages in this (dev-stage) deployment', async () => {
+  test.fixme('should allow admin GET /api/v1/notifications/messages in this (dev-stage) deployment', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const response = await ctx.get('/api/v1/notifications/messages?limit=3');
     expect(response.status()).toBe(200);

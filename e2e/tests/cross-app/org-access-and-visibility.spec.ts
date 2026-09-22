@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type BrowserContext, expect, test } from '@playwright/test';
 
@@ -90,11 +90,13 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
   let ownerContext: BrowserContext;
   let ownerEmail: string;
   let orgId: string;
-  const orgNovelSlug = `e2e-org-novel-${Date.now()}`;
+  // Parallel workers can load this file in the same millisecond under `--repeat-each`, so a timestamp alone collides.
+  const runId = `${Date.now()}-${randomBytes(3).toString('hex')}`;
+  const orgNovelSlug = `e2e-org-novel-${runId}`;
 
   test.beforeAll(async ({ browser }) => {
     ownerContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    ownerEmail = `e2e.orgcheck.${Date.now()}@shadow-apps.test`;
+    ownerEmail = `e2e.orgcheck.${runId}@shadow-apps.test`;
   });
 
   test.afterAll(async () => {
@@ -138,7 +140,7 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
   });
 
   test('should create an organisation as the new user, who becomes its OWNER', async () => {
-    const slug = `e2e-org-${Date.now()}`;
+    const slug = `e2e-org-${runId}`;
     const response = await scopedMutate(ownerContext.request, identityUrl, 'post', '/api/v1/organisations', {
       data: { name: 'E2E Org Access Check', slug },
       seedPath: '/api/v1/me',
@@ -214,8 +216,8 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
   // published chapter. Runs first so the member-read fixme below can rely on the row existing once its bug is fixed.
   test('should hide the ORGANISATION novel from non-members, guests, and the public catalog', async () => {
     const [novel] = await webNovelDb()<{ id: string }[]>`
-      INSERT INTO novels (slug, title, genres, status, visibility, organisation_id, revision)
-      VALUES (${orgNovelSlug}, ${'E2E Org Novel'}, ${['Fantasy']}, 'live', 'ORGANISATION'::novel_visibility, ${orgId}, 1)
+      INSERT INTO novels (slug, source_client_id, source_ref, title, genres, status, visibility, organisation_id, revision)
+      VALUES (${orgNovelSlug}, ${'e2e-seed'}, ${orgNovelSlug}, ${'E2E Org Novel'}, ${['Fantasy']}, 'live', 'ORGANISATION'::novel_visibility, ${orgId}, 1)
       RETURNING id::text AS id
     `;
     expect(novel, 'the org novel insert should return its id').toBeTruthy();

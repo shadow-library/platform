@@ -26,8 +26,9 @@ import { loginIdentity, scopedMutate } from './helpers';
  * `__Host-sid`, so identity's own portal must bounce to login again. Each consumer app's session is a separate
  * opaque handle in that app's own store (`__Host-shadow-session`), with no back-channel logout wired to identity
  * signout (identity's `terminateAllForUser` only touches its own session table + Redis) — so those app sessions
- * are expected to *survive* an identity signout. This spec records that behaviour precisely rather than assuming
- * it: whichever way the deployed platform behaves, the assertions below are the observed truth.
+ * survive an identity signout, but not indefinitely: Novel Forge's lasts only until its cached identity access token
+ * needs refreshing (~59 min after login), when the refresh fails against the ended central session. The assertions
+ * below run seconds after signout, well inside that window.
  */
 const IDENTITY_LOGIN_PATTERN = /identity\.shadow-apps\.test\/login/i;
 
@@ -76,7 +77,7 @@ test.describe('single sign-on across apps', () => {
       await expect(page, 'after signout identity must bounce back to its login').toHaveURL(/\/login/i, { timeout: 30_000 });
 
       // Observed logout semantics: the consumer app sessions are independent opaque handles with no back-channel
-      // logout from identity signout, so they SURVIVE. Recorded here as the platform's real behaviour.
+      // logout from identity signout, so they survive it — until their cached access token next needs a refresh.
       const webNovelAfter = await page.request.get(`${webNovelUrl}/api/auth/session`);
       expect(webNovelAfter.status(), "identity signout must NOT revoke Web Novel's independent app session").toBe(200);
       const forgeAfter = await page.request.get(`${novelForgeUrl}/api/auth/session`);

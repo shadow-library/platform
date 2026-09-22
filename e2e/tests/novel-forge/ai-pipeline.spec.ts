@@ -7,7 +7,7 @@ import { type APIRequestContext, type APIResponse, expect, test } from '@playwri
  * Importing user defined packages
  */
 import { apiContext, mutate, novelForgeDb, pollJob } from '../../lib';
-import { AI_SKIP_REASON, aiAvailable, createProject, deleteProjectQuietly, pinHaiku, uniqueSuffix } from './forge-helpers';
+import { aiAvailable, aiSkipReason, createProject, deleteProjectQuietly, HAIKU_MODEL, pinHaiku, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -19,8 +19,8 @@ import { AI_SKIP_REASON, aiAvailable, createProject, deleteProjectQuietly, pinHa
  * One compact end-to-end authoring arc on a fresh Haiku-pinned project: seed → plan → approve → outline →
  * generate → judge → approve → finalize, keeping the total AI calls small (~8). Serial and generously
  * timed, because the dev gateway serialises AI work at concurrency 1 with a 5-minute per-call ceiling. The
- * whole describe skips when the gateway probe reports no usable Anthropic key. A closing check reads the
- * `model_calls` ledger straight from the DB to prove every call actually used anthropic/claude-haiku-4-5.
+ * whole describe skips unless live AI is opted into and the gateway probe succeeds. A closing check reads the
+ * `model_calls` ledger straight from the DB to prove every call actually used the pinned Haiku model.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -56,7 +56,7 @@ test.describe('novel-forge Haiku authoring pipeline', () => {
   });
 
   test.beforeEach(() => {
-    test.skip(!available, AI_SKIP_REASON);
+    test.skip(!available, aiSkipReason());
     test.setTimeout(600_000);
   });
 
@@ -112,14 +112,13 @@ test.describe('novel-forge Haiku authoring pipeline', () => {
     expect(finalize.status(), await finalize.text()).toBe(200);
   });
 
-  test('should have used only anthropic/claude-haiku-4-5 for every model call', async () => {
+  test('should have used only the pinned Haiku model for every model call', async () => {
     const rows = await novelForgeDb()<{ provider: string; model: string }[]>`
       SELECT DISTINCT provider, model FROM model_calls WHERE project_id = ${projectId}
     `;
     expect(rows.length, 'expected at least one recorded model call').toBeGreaterThan(0);
     for (const row of rows) {
-      expect(row.provider).toBe('anthropic');
-      expect(row.model).toBe('claude-haiku-4-5');
+      expect(row).toEqual(HAIKU_MODEL);
     }
   });
 });

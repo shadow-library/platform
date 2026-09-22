@@ -77,7 +77,7 @@ test.describe('novel-forge project CRUD and settings (API)', () => {
 
     const fetched = await ctx.get(`/api/v1/projects/${id}`);
     const body = (await fetched.json()) as { config?: { models?: Record<string, { provider: string; model: string }> } };
-    // The pin persisted across every text role, and it is the undated id (the only one the dev gateway accepts).
+    // The pin persisted across every text role as the registry's OpenRouter slug.
     expect(body.config?.models?.generation).toEqual(HAIKU_MODEL);
     expect(body.config?.models?.judge).toEqual(HAIKU_MODEL);
     expect(body.config?.models?.chat).toEqual(HAIKU_MODEL);

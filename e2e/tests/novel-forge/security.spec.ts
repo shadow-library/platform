@@ -100,22 +100,22 @@ test.describe('novel-forge unrestricted enforcement', () => {
     await ctx.dispose();
   });
 
-  test('should accept (but not honour) an anthropic override on an Unrestricted project', async () => {
-    // The PATCH is NOT the enforcement point: the server stores whatever override is sent. Enforcement is at
-    // resolve time, where Unrestricted coerces disallowed models to the group default. So the
-    // contract here is: 200, and the override round-trips in config.models — inert, not rejected.
+  test('should accept (but not honour) a non-allowlisted override on an Unrestricted project', async () => {
+    // Haiku is registered but not on the unrestricted allowlist. The PATCH only checks the registry, not the
+    // allowlist; enforcement is at resolve time, where Unrestricted coerces disallowed models to the group default.
+    // So the contract here is: 200, and the override round-trips in config.models — inert, not rejected.
     const patch = await mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { config: { models: { generation: HAIKU_MODEL } } } });
     expect(patch.status(), await patch.text()).toBe(200);
 
     const fetched = await ctx.get(`/api/v1/projects/${projectId}`);
-    const body = (await fetched.json()) as { contentMode: string; config?: { models?: Record<string, { provider: string }> } };
+    const body = (await fetched.json()) as { contentMode: string; config?: { models?: Record<string, { provider: string; model: string }> } };
     expect(body.contentMode).toBe('unrestricted');
-    expect(body.config?.models?.generation?.provider).toBe('anthropic');
+    expect(body.config?.models?.generation).toEqual(HAIKU_MODEL);
   });
 
   // AI_003 is defined but thrown nowhere — Unrestricted silently coerces at resolve time. Recorded, not "fixed".
-  test.fixme('should reject an anthropic AI dispatch on an Unrestricted project with AI_003', async () => {
-    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'An Unrestricted project that should refuse anthropic.' } });
+  test.fixme('should reject a non-allowlisted AI dispatch on an Unrestricted project with AI_003', async () => {
+    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'An Unrestricted project that should refuse Haiku.' } });
     expect(response.status()).toBe(400);
     expect((await jsonOrUndefined<{ code: string }>(response))?.code).toBe('AI_003');
   });

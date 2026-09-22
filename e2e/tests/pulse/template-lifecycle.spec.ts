@@ -47,15 +47,6 @@ test.describe('template lifecycle', () => {
     expect(body.code).toBe('TPL_002');
   });
 
-  /**
-   * `openDraft` (template-version.service.ts:101-126) is unconditionally idempotent: a second `POST /draft`
-   * finds the existing draft and returns it rather than throwing. `AppErrorCode.TPL_PUB_004` ("A draft version
-   * already exists for this template", `app-error-code.ts:68`) is declared but has no live throw site anywhere
-   * in `template-version.service.ts` — grepped the whole file. This is a real discrepancy between the error
-   * catalog (which promises a conflict) and the actual behaviour (silently idempotent), so the "second draft ⇒
-   * TPL_PUB_004" case this suite was asked to cover is `test.fixme`'d below with the evidence, and this test
-   * instead documents the real, current contract: two `POST /draft` calls both 201 with the same version number.
-   */
   test('should open a draft version (201), then reject a second open with 409 TPL_PUB_004', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const created = await createTemplate(ctx, { templateKey: uniqueKey('tpl-draft'), messageType: 'TRANSACTIONAL' });

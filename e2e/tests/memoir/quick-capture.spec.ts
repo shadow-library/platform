@@ -21,14 +21,14 @@ test.describe('memoir quick capture', () => {
     await ensureOnboarded(await apiContext('memoir', 'user1'));
 
     await page.goto(url);
-    // The ⌘K listener is registered by a shell effect after hydration; `page.goto` only waits for `load`, so
-    // sending the shortcut immediately can fire before anything is listening. Wait for the banner's own quick
-    // capture trigger (same component tree, same mount) to confirm the shell has hydrated before sending it.
-    await expect(page.getByRole('button', { name: 'Quick capture' })).toBeVisible();
-    await page.keyboard.press('ControlOrMeta+KeyK');
-
+    // The ⌘K listener is registered by a shell effect after hydration, and `page.goto` only waits for `load`, so an early
+    // shortcut can land before anything listens. The SSR markup is no hydration signal, so re-send the shortcut until the
+    // palette opens — and only while it is still closed, since a second press would toggle it shut.
     const captureInput = page.getByLabel('Log something, or jump to a screen');
-    await expect(captureInput).toBeVisible();
+    await expect(async () => {
+      if (!(await captureInput.isVisible())) await page.keyboard.press('ControlOrMeta+KeyK');
+      await expect(captureInput).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
 
     const note = `e2e coffee ${Date.now()}`;
     await captureInput.fill(`${note} 3.50`);

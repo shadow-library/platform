@@ -71,6 +71,11 @@ export function identityDb(): Sql {
   return db('identity');
 }
 
+/** The memoir database — accounts and every per-account domain table. */
+export function memoirDb(): Sql {
+  return db('memoir');
+}
+
 /** The pulse database — sender profiles/endpoints/routing, notification jobs and messages. */
 export function pulseDb(): Sql {
   return db('pulse');
