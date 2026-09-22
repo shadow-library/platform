@@ -49,9 +49,15 @@ export interface IdentityUser {
   readonly password: string;
   readonly personalOrgId: string;
   readonly phone?: string;
+  readonly username?: string;
 }
 
 export type IdentityUserRef = Pick<IdentityUser, 'userId' | 'email' | 'phone'> & { readonly personalOrgId: string | null };
+
+export interface FederatedLinkOptions {
+  /** Default false. Identity ignores a link whose provider is inactive. */
+  isActive?: boolean;
+}
 
 export interface FederatedLink {
   readonly identityProviderId: string;
@@ -139,7 +145,15 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
     await tx`INSERT INTO organisation_members (organisation_id, user_id, role, is_default) VALUES (${org.id}, ${userId}, 'OWNER', true)`;
     await tx`UPDATE users SET personal_organisation_id = ${org.id} WHERE id = ${userId}`;
 
-    return { userId, sub: userId, email, password: HASH_SOURCE.password, personalOrgId: org.id, ...(options.phone ? { phone: options.phone } : {}) };
+    return {
+      userId,
+      sub: userId,
+      email,
+      password: HASH_SOURCE.password,
+      personalOrgId: org.id,
+      ...(options.phone ? { phone: options.phone } : {}),
+      ...(options.username ? { username: options.username } : {}),
+    };
   });
 }
 
@@ -170,10 +184,11 @@ export async function findIdentityUserByEmail(email: string): Promise<IdentityUs
 }
 
 /**
- * Links `user` to an upstream subject on an inactive OIDC provider owned by the user's personal organisation, the state a federated
- * sign-in leaves behind. The provider never routes or signs anyone in, and it goes with the personal organisation.
+ * Links `user` to an upstream subject on an OIDC provider owned by the user's personal organisation, the state a federated
+ * sign-in leaves behind. The provider never routes or signs anyone in, and it goes with the personal organisation. It is
+ * inactive unless `isActive` says otherwise — an active one is what identity requires before it will start a federated step-up.
  */
-export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 'personalOrgId'>): Promise<FederatedLink> {
+export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 'personalOrgId'>, options: FederatedLinkOptions = {}): Promise<FederatedLink> {
   const sql = identityDb();
   const issuer = `https://idp-${randomBytes(4).toString('hex')}.example.test`;
   const subject = `e2e-${randomBytes(8).toString('hex')}`;
@@ -185,7 +200,7 @@ export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 
       )
       VALUES (
         ${user.personalOrgId}, 'OIDC', 'E2E Upstream', ${issuer}, 'e2e-client', 'unused', 'unused', 'unused',
-        ${`${issuer}/authorize`}, ${`${issuer}/token`}, ${`${issuer}/jwks`}, false
+        ${`${issuer}/authorize`}, ${`${issuer}/token`}, ${`${issuer}/jwks`}, ${options.isActive ?? false}
       )
       RETURNING id
     `;

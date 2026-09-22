@@ -9,7 +9,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  * Importing user defined packages
  */
 import { identityMutate } from './identity-auth';
-import { createIdentitySession, type IdentitySession, identitySessionContext, updateIdentitySession } from './identity-sessions';
+import { createIdentitySession, type IdentitySession, identitySessionContext, type IdentitySessionOptions, updateIdentitySession } from './identity-sessions';
 import { readSeedManifest } from './personas';
 
 /**
@@ -279,9 +279,9 @@ async function expectStatus(response: APIResponse, status: number, action: strin
   if (response.status() !== status) throw new OAuthKitError(`${action} answered ${response.status()}: ${await response.text()}`);
 }
 
-/** The bootstrap admin at AAL2 (so elevated admin routes pass), charged to `clientIp`. */
-export async function createAdminApi(clientIp: string): Promise<AdminApi> {
-  const session = await createIdentitySession(readSeedManifest().users.admin.userId, { aal: 'AAL2' });
+/** The bootstrap admin, at AAL2 by default so elevated admin routes pass, charged to `clientIp`. */
+export async function createAdminApi(clientIp: string, options: IdentitySessionOptions = { aal: 'AAL2' }): Promise<AdminApi> {
+  const session = await createIdentitySession(readSeedManifest().users.admin.userId, options);
   const ctx = await identitySessionContext(session, { clientIp });
   const dispose = async (): Promise<void> => {
     try {

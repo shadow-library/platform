@@ -30,7 +30,7 @@ loadDotEnv(path.join(import.meta.dirname, '.env'));
 const isCI = !!process.env.CI;
 
 /** Identity specs that must never overlap with a copy of themselves — they flip state the whole deployment shares. */
-const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](sms-otp|rate-limit|workload-identity)\.spec\.ts$/;
+const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](federation|sms-otp|rate-limit|workload-identity)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: './tests',

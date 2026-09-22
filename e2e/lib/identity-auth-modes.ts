@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext } from '@playwright/test';
+import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
  * Importing user defined packages
@@ -15,6 +15,11 @@ import { redisDel } from './redis';
  */
 
 export type BuiltInAuthMode = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
+
+/** Every method `GET /api/v1/admin/auth-modes` lists, in the order it lists them. */
+export const AUTH_MODES = ['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP', 'GOOGLE', 'MICROSOFT', 'APPLE'] as const;
+
+export type AuthModeName = (typeof AUTH_MODES)[number];
 
 export interface AuthModeSnapshot {
   readonly method: BuiltInAuthMode;
@@ -58,7 +63,26 @@ export async function restoreAuthMode(snapshot: AuthModeSnapshot): Promise<void>
 }
 
 /** `PUT /api/v1/admin/auth-modes/:method` on an elevated admin context. */
-export async function setAuthMode(admin: APIRequestContext, method: BuiltInAuthMode, enabled: boolean): Promise<void> {
-  const response = await identityMutate(admin, 'put', `/api/v1/admin/auth-modes/${method}`, { enabled });
+export function putAuthMode(admin: APIRequestContext, method: string, enabled: boolean): Promise<APIResponse> {
+  return identityMutate(admin, 'put', `/api/v1/admin/auth-modes/${method}`, { enabled });
+}
+
+/** `putAuthMode`, throwing unless identity answers 200. */
+export async function setAuthMode(admin: APIRequestContext, method: AuthModeName, enabled: boolean): Promise<void> {
+  const response = await putAuthMode(admin, method, enabled);
   if (response.status() !== 200) throw new AuthModeError(`set ${method}=${enabled} answered ${response.status()}: ${await response.text()}`);
+}
+
+export interface AuthModeItem {
+  method: AuthModeName;
+  kind: 'BUILT_IN' | 'SOCIAL';
+  enabled: boolean;
+  configured: boolean;
+  provider?: { id: string; kind: string; clientId: string; isActive: boolean };
+}
+
+export async function listAuthModes(admin: APIRequestContext): Promise<AuthModeItem[]> {
+  const response = await admin.get('/api/v1/admin/auth-modes');
+  if (response.status() !== 200) throw new AuthModeError(`list auth modes answered ${response.status()}: ${await response.text()}`);
+  return ((await response.json()) as { items: AuthModeItem[] }).items;
 }

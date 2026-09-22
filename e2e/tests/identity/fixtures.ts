@@ -33,6 +33,11 @@ import {
   type OAuthApplication,
   type OAuthApplicationOptions,
   type OAuthTestClient,
+  type OrgOAuthApp,
+  registerOAuthClient,
+  type RegisterOAuthClientOptions,
+  registerOrgOAuthApp,
+  type RegisterOrgOAuthAppOptions,
   type TeamOrganisation,
   type TeamOrganisationOptions,
   updateIdentitySession,
@@ -56,10 +61,18 @@ export interface IdentityHarness {
   contextFor(session: IdentitySession): Promise<APIRequestContext>;
   /** The elevated bootstrap admin, minted once per test and terminated after it. */
   admin(): Promise<AdminApi>;
+  /** A further bootstrap-admin caller at a chosen assurance level, terminated after the test — for the routes that separate reads from mutations. */
+  adminAt(options: IdentitySessionOptions): Promise<AdminApi>;
   /** A throwaway PUBLIC application with a first-party public client, removed after the test. */
   createOAuthClient(label?: string): Promise<OAuthTestClient>;
   /** A throwaway application (PUBLIC unless told otherwise); it and every client registered on it are removed after the test. */
   createOAuthApp(label?: string, options?: OAuthApplicationOptions): Promise<OAuthApplication>;
+  /** A further client on a tracked application, removed with it. */
+  createOAuthClientOn(application: OAuthApplication, options?: RegisterOAuthClientOptions): Promise<OAuthTestClient>;
+  /** An organisation-owned (RESTRICTED, third-party) OAuth app, removed with its organisation. */
+  createOrgOAuthApp(team: IdentityTeam, options?: RegisterOrgOAuthAppOptions): Promise<OrgOAuthApp>;
+  /** Removes an application the test created through the API after the test, like `createOAuthApp`'s. */
+  trackApplication(applicationId: number, name: string): void;
   /** A database-created team organisation with a factory OWNER, removed after the test together with every app it owns. */
   createTeam(options?: TeamOrganisationOptions): Promise<IdentityTeam>;
   /** Removes an organisation the test created some other way (e.g. through the API) after the test, like `createTeam`'s. */
@@ -100,6 +113,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const oauthApps: OAuthApplication[] = [];
     const organisations: { organisationId: string; ownerUserId: string }[] = [];
     const registeredEmails: string[] = [];
+    const extraAdmins: AdminApi[] = [];
     let adminApi: Promise<AdminApi> | undefined;
 
     const track = (ctx: APIRequestContext): APIRequestContext => {
@@ -142,6 +156,11 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       signIn,
       contextFor,
       admin,
+      adminAt: async options => {
+        const api = await createAdminApi(clientIp, options);
+        extraAdmins.push(api);
+        return api;
+      },
       createOAuthClient: async label => {
         const client = await createOAuthTestClient((await admin()).ctx, label);
         oauthClients.push(client);
@@ -151,6 +170,11 @@ export const test = base.extend<{ identity: IdentityHarness }>({
         const application = await createOAuthApplication((await admin()).ctx, label, options);
         oauthApps.push(application);
         return application;
+      },
+      createOAuthClientOn: async (application, options) => registerOAuthClient((await admin()).ctx, application, options),
+      createOrgOAuthApp: (team, options) => registerOrgOAuthApp(team.ownerCtx, team.organisationId, options),
+      trackApplication: (applicationId, name) => {
+        oauthApps.push({ applicationId, name, audience: `api://${name}`, serviceClient: { clientId: name } });
       },
       createTeam: async options => {
         const owner = await createUser({ label: `${options?.label ?? 'team'}-owner` });
@@ -174,6 +198,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       ...oauthApps.map(application => async () => deleteOAuthApplication((await admin()).ctx, application)),
       ...organisations.map(organisation => () => removeOrganisation(organisation)),
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
+      ...extraAdmins.map(api => () => api.dispose()),
       ...contexts.map(ctx => () => ctx.dispose()),
       ...users.map(user => () => deleteIdentityUser(user)),
       ...registeredEmails.map(email => async () => {
