@@ -41,7 +41,7 @@ function output(overrides: Partial<BlueprintConceptsOutput> = {}): BlueprintConc
 }
 
 function options(): ConceptsOptions {
-  return conceptsStep.toRound(output(), { previous: null, input: null, focus: null }).options;
+  return conceptsStep.toRound(output(), { previous: null, input: null, focus: null, ledger: [] }).options;
 }
 
 function materialise(selection: ConceptsSelection, round: ConceptsOptions | null = options(), ledger: unknown[] = []): ReturnType<typeof conceptsStep.materialise> {

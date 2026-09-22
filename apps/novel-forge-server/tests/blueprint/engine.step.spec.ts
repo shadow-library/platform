@@ -82,7 +82,7 @@ function output(overrides: Partial<BlueprintEngineOutput> = {}): BlueprintEngine
 }
 
 const round = (out: BlueprintEngineOutput, previous: EngineOptions | null = null, focus: string | null = null): EngineOptions =>
-  enginePass.toRound(out, { previous, input: null, focus }).options;
+  enginePass.toRound(out, { previous, input: null, focus, ledger: [] }).options;
 
 function promise(drivers: string[]): Ledger.Entry[] {
   return [ledgerEntry({ kind: 'decision', phase: 'heart', topic: 'promise', stepKey: 'promise', payload: { drivers } })];

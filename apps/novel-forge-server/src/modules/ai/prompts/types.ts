@@ -64,7 +64,9 @@ export type PromptKey =
   | 'blueprint-heart'
   | 'blueprint-promise'
   | 'blueprint-title'
-  | 'blueprint-engine';
+  | 'blueprint-engine'
+  | 'blueprint-spine'
+  | 'blueprint-volume-one';
 
 /** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
 export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';

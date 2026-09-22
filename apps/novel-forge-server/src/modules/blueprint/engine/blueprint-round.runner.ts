@@ -7,6 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Blueprint, type PrimaryDatabase, schema } from '@server/database';
 
+import { type CatalogOptions } from '../../ai/context/catalog.service';
 import { ContextAssembler } from '../../ai/context/context-assembler.service';
 import { WorkflowRunService } from '../../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../../ai/model-router.service';
@@ -107,7 +108,8 @@ export class BlueprintRoundRunner {
     const offered = previous === null ? [] : step.describeOptions(previous);
     const role = step.prompt.role ?? 'blueprint';
     const policy = await this.pluginPolicy.resolve(projectId, { role, promptKey: step.prompt.key }, project);
-    const inputs = (await step.inputs?.({ projectId, project, ledger, db: this.db, previous, focus: round.focus })) ?? [];
+    const catalog = (options?: CatalogOptions): Promise<string> => this.contextAssembler.catalog(projectId, options);
+    const inputs = (await step.inputs?.({ projectId, project, ledger, db: this.db, previous, focus: round.focus, catalog })) ?? [];
     const pack = await this.contextAssembler.forBlueprint(
       projectId,
       ledger,
@@ -131,7 +133,7 @@ export class BlueprintRoundRunner {
           project as ProjectConfig,
           policy,
         );
-        const { options, coachMessage } = step.toRound(output, { previous, input: round.input, focus: round.focus });
+        const { options, coachMessage } = step.toRound(output, { previous, input: round.input, focus: round.focus, ledger });
         if (!parseSchema(step.optionsSchema, options).success) throw AppErrorCode.AI_001.create();
         this.assertUnfocusedSlicesKept(step, round.focus, previous, options);
         return { options, coachMessage };

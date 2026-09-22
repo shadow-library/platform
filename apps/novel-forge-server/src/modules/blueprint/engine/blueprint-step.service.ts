@@ -7,7 +7,8 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Blueprint, type DbExecutor, type Ledger, type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
-import { CONTENT_OP_TYPES, type OpType } from '../../refinement/change-set';
+import { ActionExecutorRegistry } from '../../refinement/action-registry';
+import { type ActionOp, type ActionType, CONTENT_OP_TYPES, type OpType } from '../../refinement/change-set';
 import { ProposalService } from '../../refinement/proposal.service';
 import { ProposalApplyService } from '../../refinement/proposal-apply.service';
 import { loadActiveLedger } from '../ledger/ledger-entries';
@@ -35,6 +36,14 @@ export const RELOCK_WITHDRAW_REASON = 'Replaced when the step was locked again.'
 
 /** A lock materialises plan content; drafts and the retired seed sheet are never Blueprint output, and actions belong after the commit. */
 export const BLUEPRINT_CHANGE_OPS: readonly OpType[] = CONTENT_OP_TYPES.filter(op => !op.startsWith('draft.') && op !== 'seed.update');
+
+/**
+ * The only actions a lock may run after its commit — the counterpart of `BLUEPRINT_CHANGE_OPS`, and deliberately short. Both approvals
+ * are on the pipeline's never-auto-applied list precisely because they must be somebody's decision; a Blueprint lock IS that decision,
+ * made on content the same lock just wrote. Nothing that generates, writes or spends a model call belongs here: a lock is not a job,
+ * and re-locking is the only retry, so every op listed has to be safe to run again.
+ */
+export const BLUEPRINT_ACTION_OPS: readonly ActionType[] = ['action.approve_volume_plan', 'action.approve_arcs'];
 
 export interface OpenRoundInput {
   steer?: string;
@@ -110,6 +119,7 @@ export class BlueprintStepService {
     private readonly ledger: LedgerService,
     private readonly proposals: ProposalService,
     private readonly proposalApply: ProposalApplyService,
+    private readonly actions: ActionExecutorRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -203,11 +213,22 @@ export class BlueprintStepService {
   private async followUp(projectId: bigint, step: AnyLockingStep, plan: LockPlan, result: Omit<LockResult, 'followUp'>): Promise<LockFollowUp | null> {
     if (!plan.afterCommit) return null;
     try {
-      await plan.afterCommit({ projectId, entries: result.entries, proposal: result.proposal });
+      await plan.afterCommit({ projectId, entries: result.entries, proposal: result.proposal, runActions: ops => this.runActions(projectId, ops) });
       return { ok: true };
     } catch (err) {
       this.logger.error('blueprint lock follow-up failed', { projectId, stepKey: step.key, err });
       return { ok: false, error: AppError.is(err) && !err.isInternal ? err.message : 'The follow-up work failed; the lock itself is saved.' };
+    }
+  }
+
+  /** Approving what a lock materialised is an action, and an action runs its own transactions — so it waits for the lock's to commit. */
+  private async runActions(projectId: bigint, ops: ActionOp[]): Promise<void> {
+    for (const op of ops) {
+      if (!BLUEPRINT_ACTION_OPS.includes(op.op)) throw AppError.internal(`"${op.op}" is not a Blueprint follow-up action`);
+      const executor = this.actions.get(op.op);
+      if (!executor) throw AppError.internal(`no executor is registered for "${op.op}"`);
+      const result = await executor(projectId, op, { autoApplied: false, blueprintLock: true });
+      this.logger.info('blueprint lock follow-up action ran', { projectId, op: op.op, summary: result.summary });
     }
   }
 

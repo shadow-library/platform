@@ -21,7 +21,7 @@ function output(overrides: Partial<BlueprintTasteOutput> = {}): BlueprintTasteOu
   };
 }
 
-const context = { previous: null, input: null, focus: null };
+const context = { previous: null, input: null, focus: null, ledger: [] };
 
 function options(): TasteOptions {
   return tasteStep.toRound(output(), context).options;
@@ -82,14 +82,14 @@ describe('tasteStep.describeOptions', () => {
 
 describe('tasteStep.inputs', () => {
   it('should tell the model which pairs it has already asked', async () => {
-    const sections = await tasteStep.inputs?.({ previous: options() } as never);
+    const sections = await tasteStep.inputs?.({ previous: options(), ledger: [] } as never);
     expect(sections?.[0]?.key).toBe('taste_asked');
     expect(sections?.[0]?.content).toContain('never ask any of these again');
     expect(sections?.[0]?.content).toContain('She loses the first three trials and learns from each');
   });
 
   it('should send nothing on a first round', async () => {
-    expect(await tasteStep.inputs?.({ previous: null } as never)).toEqual([]);
+    expect(await tasteStep.inputs?.({ previous: null, ledger: [] } as never)).toEqual([]);
   });
 });
 

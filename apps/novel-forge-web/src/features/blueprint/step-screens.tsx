@@ -1,13 +1,17 @@
 import { type ReactElement } from 'react';
 
+import { ArcsStep } from './ArcsStep';
 import { type StepScreenProps } from './blueprint-steps';
+import { CastStep } from './CastStep';
 import { ConceptsStep } from './ConceptsStep';
 import { HeartStep } from './HeartStep';
 import { OppositionStep } from './OppositionStep';
 import { PowerStep } from './PowerStep';
+import { PlacesStep } from './PlacesStep';
 import { PremiseStep } from './PremiseStep';
 import { PromiseStep } from './PromiseStep';
 import { ProtagonistStep } from './ProtagonistStep';
+import { SpineStep } from './SpineStep';
 import { StartStep } from './StartStep';
 import { TasteStep } from './TasteStep';
 import { TitleStep } from './TitleStep';
@@ -28,6 +32,10 @@ export const BLUEPRINT_STEP_SCREENS: Record<string, StepScreenRenderer> = {
   opposition: props => <OppositionStep {...props} />,
   world: props => <WorldStep {...props} />,
   power: props => <PowerStep {...props} />,
+  spine: props => <SpineStep {...props} />,
+  cast: props => <CastStep {...props} />,
+  places: props => <PlacesStep {...props} />,
+  arcs: props => <ArcsStep {...props} />,
 };
 
 export function blueprintStepScreen(key: string): StepScreenRenderer | null {

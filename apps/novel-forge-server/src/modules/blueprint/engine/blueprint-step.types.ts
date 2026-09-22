@@ -3,8 +3,9 @@ import { type SchemaClass } from '@shadow-library/class-schema';
 import { type Blueprint, type DbExecutor, type Ledger, type PrimaryTransaction, type Project, type Refinement } from '@server/database';
 
 import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
+import { type CatalogOptions } from '../../ai/context/catalog.service';
 import { type PromptModule } from '../../ai/prompts/types';
-import { type ContentOp } from '../../refinement/change-set';
+import { type ActionOp, type ContentOp } from '../../refinement/change-set';
 import { type NewLedgerEntry } from '../ledger/ledger.types';
 
 export const BLUEPRINT_ROLES = ['blueprint', 'blueprint_pass'] as const;
@@ -20,6 +21,8 @@ export interface StepInputContext<TOptions = unknown> {
   previous: TOptions | null;
   /** The screen a pass round was started from; null when the round regenerates everything. */
   focus: string | null;
+  /** The project's entities and canon facts as the planners read them, so a planning pass cites what exists instead of inventing it. */
+  catalog(options?: CatalogOptions): Promise<string>;
 }
 
 /** An option as the author and the ledger name it: the id feedback and locks address it by, and the label a rejected entry records. */
@@ -32,6 +35,8 @@ export interface RoundContext<TOptions, TInput> {
   previous: TOptions | null;
   input: TInput | null;
   focus: string | null;
+  /** Active entries, so options a locked decision already settles are shaped in code rather than asked of the model. */
+  ledger: Ledger.Entry[];
 }
 
 export interface StepRoundResult<TOptions> {
@@ -59,6 +64,8 @@ export interface AfterCommitContext {
   projectId: bigint;
   entries: Ledger.Entry[];
   proposal: Refinement.Proposal | null;
+  /** Action ops cannot run inside the lock's transaction; this runs them in order once it has committed, failing on the first that throws. */
+  runActions(ops: ActionOp[]): Promise<void>;
 }
 
 export interface LockPlan {

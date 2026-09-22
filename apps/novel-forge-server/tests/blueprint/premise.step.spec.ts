@@ -27,7 +27,7 @@ function output(overrides: Partial<BlueprintPremiseOutput> = {}): BlueprintPremi
 }
 
 function options(input: PremiseInput | null = null, previous: PremiseOptions | null = null): PremiseOptions {
-  return premiseStep.toRound(output(), { previous, input, focus: null }).options;
+  return premiseStep.toRound(output(), { previous, input, focus: null, ledger: [] }).options;
 }
 
 function materialise(selection: PremiseSelection, round: PremiseOptions | null = options(), page: string | null = null): ReturnType<typeof premiseStep.materialise> {
@@ -73,7 +73,7 @@ describe('premiseStep.toRound', () => {
         ),
         why: 'a different why',
       }),
-      { previous, input, focus: null },
+      { previous, input, focus: null, ledger: [] },
     ).options;
 
     expect(reworked.parts[1]?.text).toBe('where every debt is paid in borrowed names,');
@@ -90,13 +90,13 @@ describe('premiseStep.toRound', () => {
     const previous = options();
     const input: PremiseInput = { part: 'p3', current: previous.parts.map(part => ({ id: part.id, text: part.text })) };
     const short = output({ parts: output().parts.slice(0, 2) });
-    const reworked = premiseStep.toRound(short, { previous, input, focus: null }).options;
+    const reworked = premiseStep.toRound(short, { previous, input, focus: null, ledger: [] }).options;
     expect(reworked.parts).toEqual(previous.parts);
   });
 
   it('should rewrite the whole sentence when no part is opened', () => {
     const previous = options();
-    const next = premiseStep.toRound(output({ why: 'a different why' }), { previous, input: { current: [{ id: 'p1', text: 'edited' }] }, focus: null }).options;
+    const next = premiseStep.toRound(output({ why: 'a different why' }), { previous, input: { current: [{ id: 'p1', text: 'edited' }] }, focus: null, ledger: [] }).options;
     expect(next.why).toBe('a different why');
     expect(next.parts[0]?.text).toBe('In the harbour city of Vell,');
   });

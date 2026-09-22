@@ -13,8 +13,8 @@ export function PassSliceAlert({ moved, onAdopt }: PassSliceAlertProps): ReactEl
   if (!moved) return null;
   return (
     <Alert intent="warning" title="These options changed after you locked this step" action={onAdopt ? { label: 'Use the new version', onClick: onAdopt } : undefined}>
-      One generation writes several screens, and the whole of it has been run again since you answered here. What you decided still stands until you lock again — take the new
-      version to answer from what is on screen now.
+      The options this screen was answered from have been generated again since you locked. What you decided still stands until you lock again — take the new version to answer from
+      what is on screen now.
     </Alert>
   );
 }

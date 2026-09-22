@@ -116,6 +116,38 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     costToChange: 'medium',
     lockLabel: 'Lock the ladder',
   },
+  spine: {
+    key: 'spine',
+    label: 'The whole novel',
+    title: 'The whole novel, movement by movement',
+    lede: 'One movement per volume, with the ending question pinned above them and the big truths placed under them. Sketches, not plans: only volume one is detailed after this.',
+    costToChange: 'expensive',
+    lockLabel: 'Lock the spine',
+  },
+  cast: {
+    key: 'cast',
+    label: 'Cast',
+    title: 'The people volume one needs',
+    lede: 'Full cards only for the characters volume one actually uses; everyone later stays a one-liner. Hand a minor detail to the system and you can overrule it whenever you like.',
+    costToChange: 'medium',
+    lockLabel: 'Lock the cast',
+  },
+  places: {
+    key: 'places',
+    label: 'Places & factions',
+    title: 'Where volume one happens',
+    lede: 'Detail where the story actually goes, a sketch for the rest. Anything that changes no sentence in the next twenty chapters goes to the backlog — kept, not refused.',
+    costToChange: 'medium',
+    lockLabel: 'Lock places and factions',
+  },
+  arcs: {
+    key: 'arcs',
+    label: 'Arcs',
+    title: 'Volume one, arc by arc',
+    lede: 'Each arc needs a purpose and a turn, and the relationship rungs are placed onto the arcs that land them. Only arc one gets chapter briefs, in the next phase.',
+    costToChange: 'medium',
+    lockLabel: 'Lock volume one’s arcs',
+  },
 };
 
 const WORD_BREAK = /[._-]+/;

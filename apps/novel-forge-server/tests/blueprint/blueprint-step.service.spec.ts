@@ -1,11 +1,13 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { sliceDigest } from '@modules/blueprint/engine/blueprint-round';
+import { AppErrorCode } from '@server/classes';
 import { type RoundWithJob } from '@modules/blueprint/engine/blueprint-round.service';
 import { blueprintStep, BlueprintStepRegistry } from '@modules/blueprint/engine/blueprint-step.registry';
 import { BLUEPRINT_CHANGE_OPS, BlueprintStepService } from '@modules/blueprint/engine/blueprint-step.service';
 import { type AnyBlueprintStep, type LockPlan } from '@modules/blueprint/engine/blueprint-step.types';
 import { type NewLedgerEntry } from '@modules/blueprint/ledger/ledger.types';
+import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { startStep } from '@modules/blueprint/steps/start.step';
 import { type Blueprint, type Ledger } from '@server/database';
 
@@ -77,8 +79,9 @@ function fakeService(state: FakeState = {}, steps: AnyBlueprintStep[] = ALL_STEP
   const proposalApply = { apply: mock<(...args: unknown[]) => Promise<unknown>>(async () => ({ proposal: { id: 300n, status: 'applied' } })) };
   const databaseService = { getPostgresClient: () => db };
   const registry = new BlueprintStepRegistry(steps);
-  const service = new BlueprintStepService(databaseService as never, rounds as never, registry, ledger as never, proposals as never, proposalApply as never);
-  return { service, calls, rounds, ledger, proposals, proposalApply, tx };
+  const actions = new ActionExecutorRegistry();
+  const service = new BlueprintStepService(databaseService as never, rounds as never, registry, ledger as never, proposals as never, proposalApply as never, actions);
+  return { service, calls, rounds, ledger, proposals, proposalApply, actions, tx };
 }
 
 function withPlan(plan: Partial<LockPlan>): AnyBlueprintStep {
@@ -242,6 +245,53 @@ describe('BlueprintStepService.lock', () => {
   it('should report a follow-up that succeeded', async () => {
     const { service } = fakeService({ ready: readyRound }, [withPlan({ afterCommit: async () => undefined })]);
     expect((await service.lock(7n, 'start', selection)).followUp).toEqual({ ok: true });
+  });
+
+  it('should run a follow-up action through the executor registry once the lock has committed', async () => {
+    const approve = mock(async () => ({ summary: 'approved the volume plan' }));
+    const plan = withPlan({ afterCommit: context => context.runActions([{ op: 'action.approve_volume_plan' }]) });
+    const { service, actions, calls } = fakeService({ ready: readyRound }, [plan]);
+    actions.register('action.approve_volume_plan', approve);
+
+    const result = await service.lock(7n, 'start', selection);
+
+    expect(approve).toHaveBeenCalledWith(7n, { op: 'action.approve_volume_plan' }, { autoApplied: false, blueprintLock: true });
+    expect(result.followUp).toEqual({ ok: true });
+    expect(calls.indexOf('ledger.append')).toBeLessThan(calls.length);
+  });
+
+  it('should refuse a follow-up action outside the Blueprint allowlist, and never claim an auto-mode turn', async () => {
+    const generate = mock(async () => ({ summary: 'enqueued' }));
+    const plan = withPlan({ afterCommit: context => context.runActions([{ op: 'action.generate_chapters', count: 3 }]) });
+    const { service, actions } = fakeService({ ready: readyRound }, [plan]);
+    actions.register('action.generate_chapters', generate);
+
+    expect((await service.lock(7n, 'start', selection)).followUp).toMatchObject({ ok: false });
+    expect(generate).not.toHaveBeenCalled();
+
+    const approve = mock(async () => ({ summary: 'approved' }));
+    const allowed = withPlan({ afterCommit: context => context.runActions([{ op: 'action.approve_arcs', volumeKey: 'volume_1' }]) });
+    const second = fakeService({ ready: readyRound }, [allowed]);
+    second.actions.register('action.approve_arcs', approve);
+    await second.service.lock(7n, 'start', selection);
+
+    expect(approve).toHaveBeenCalledWith(7n, { op: 'action.approve_arcs', volumeKey: 'volume_1' }, { autoApplied: false, blueprintLock: true });
+  });
+
+  it('should surface a failing follow-up action beside the lock instead of undoing it', async () => {
+    const plan = withPlan({
+      entries: [{ kind: 'decision', topic: 'start', statement: 'A ferry town' }],
+      afterCommit: context => context.runActions([{ op: 'action.approve_arcs', volumeKey: 'volume_1' }]),
+    });
+    const { service, actions } = fakeService({ ready: readyRound }, [plan]);
+    actions.register('action.approve_arcs', async () => {
+      throw AppErrorCode.ARC_002.create();
+    });
+
+    const result = await service.lock(7n, 'start', selection);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.followUp).toMatchObject({ ok: false });
   });
 
   it('should refuse to lock while a round is running or on an option no round offered', async () => {

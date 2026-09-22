@@ -177,12 +177,17 @@ export function lockedSliceMoved(step: AnyBlueprintStep, view: unknown, ledger: 
 }
 
 /**
- * What a lock has not already said. A rejection lives outside the topics a lock replaces, because the author's refusal survives every
- * later answer — which also means a re-lock that repeats it must not write it a second time. Every step that kills options uses this.
+ * What a lock has not already said. A rejection and a backlog item live outside the topics a lock replaces, because they survive every
+ * later answer — which also means a re-lock that repeats one must not write it a second time.
  */
+export function withoutKnownEntries(entries: PlannedLedgerEntry[], ledger: Ledger.Entry[], kind: Ledger.Kind): PlannedLedgerEntry[] {
+  const said = (entry: Pick<Ledger.Entry, 'topic' | 'statement'>): string => `${entry.topic}|${entry.statement.trim().toLowerCase()}`;
+  const known = new Set(ledger.filter(entry => entry.kind === kind).map(said));
+  return entries.filter(entry => entry.kind !== kind || !known.has(said(entry)));
+}
+
 export function withoutKnownRejections(entries: PlannedLedgerEntry[], ledger: Ledger.Entry[]): PlannedLedgerEntry[] {
-  const known = new Set(ledger.filter(entry => entry.kind === 'rejected').map(entry => `${entry.topic}|${entry.statement.trim().toLowerCase()}`));
-  return entries.filter(entry => entry.kind !== 'rejected' || !known.has(`${entry.topic}|${entry.statement.trim().toLowerCase()}`));
+  return withoutKnownEntries(entries, ledger, 'rejected');
 }
 
 export interface LedgerReconciliation {

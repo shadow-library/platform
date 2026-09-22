@@ -33,7 +33,7 @@ function output(overrides: Partial<BlueprintTitleOutput> = {}): BlueprintTitleOu
 }
 
 function options(): TitleOptions {
-  return titleStep.toRound(output(), { previous: null, input: null, focus: null }).options;
+  return titleStep.toRound(output(), { previous: null, input: null, focus: null, ledger: [] }).options;
 }
 
 function materialise(selection: TitleSelection, ledger: Ledger.Entry[] = [], round: TitleOptions | null = options()): ReturnType<typeof titleStep.materialise> {

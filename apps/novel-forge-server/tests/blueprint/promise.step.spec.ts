@@ -31,7 +31,7 @@ function output(overrides: Partial<BlueprintPromiseOutput> = {}): BlueprintPromi
 }
 
 function options(): PromiseOptions {
-  return promiseStep.toRound(output(), { previous: null, input: null, focus: null }).options;
+  return promiseStep.toRound(output(), { previous: null, input: null, focus: null, ledger: [] }).options;
 }
 
 function materialise(selection: PromiseSelection, page: string | null = null): ReturnType<typeof promiseStep.materialise> {
@@ -61,6 +61,7 @@ describe('promiseStep.toRound', () => {
       previous: null,
       input: null,
       focus: null,
+      ledger: [],
     }).options;
     expect(round.drivers.map(driver => driver.id)).toEqual([...PROMISE_DRIVERS]);
     expect(round.lengths.map(length => length.id)).toEqual(['short', 'medium', 'long']);

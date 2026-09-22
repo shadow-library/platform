@@ -94,6 +94,8 @@ interface ApplyContext {
   projectId: bigint;
   applied: AppliedArtifact[];
   staleMarked: string[];
+  /** A Blueprint lock is the author redrawing the plan itself, so it may retire the approved volumes and arcs its own earlier lock made. */
+  blueprintLock: boolean;
 }
 
 type TxResult =
@@ -281,7 +283,7 @@ export class ProposalApplyService {
         return { outcome: 'conflicted', proposal: conflicted ?? proposal };
       }
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [], blueprintLock: proposal.kind === 'blueprint' };
       const turnOrdinal = contentOps.some(c => c.op.op === 'seed.update') ? await this.turnOrdinal(ctx.tx, proposal.messageId) : null;
       const inverseOps: ContentOp[] = [];
       for (const { op } of contentOps) {
@@ -853,7 +855,7 @@ export class ProposalApplyService {
   private async applyVolumeRemove(ctx: ApplyContext, op: VolumeRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
     if (!existing) throw AppErrorCode.VOL_001.create();
-    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
+    if (existing.status !== 'draft' && !ctx.blueprintLock) throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.volumes).where(eq(schema.volumes.id, existing.id));
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: null });
@@ -862,7 +864,7 @@ export class ProposalApplyService {
   private async applyArcRemove(ctx: ApplyContext, op: ArcRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
     if (!existing) throw AppErrorCode.ARC_001.create();
-    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
+    if (existing.status !== 'draft' && !ctx.blueprintLock) throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.arcs).where(eq(schema.arcs.id, existing.id));
     ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: null });
@@ -1099,7 +1101,7 @@ export class ProposalApplyService {
       }
       if (mismatches.length > 0) return { outcome: 'conflicted' as const, mismatches };
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [], blueprintLock: proposal.kind === 'blueprint' };
       for (const op of inverseOps) await this.applyOp(ctx, op);
 
       const [reverted] = await tx

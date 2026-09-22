@@ -35,12 +35,20 @@ export function lockedLinks(ledger: Ledger.Entry[], stepKey: string, topics?: re
     .reduce<Ledger.Links>((merged, entry) => mergeLedgerLinks(merged, entry.links), {});
 }
 
-/** Content an earlier lock of the same step materialised that this one no longer claims: a retired rule must not keep holding the writer to it. */
-export function removedContentOps(previous: Ledger.Links, next: Ledger.Links): ContentOp[] {
-  const entities = new Set(next.entityKeys ?? []);
-  const facts = new Set(next.factKeys ?? []);
+/**
+ * Content an earlier lock of the same step materialised that this one no longer claims: a retired rule must not keep holding the writer
+ * to it. `keep` names records another step now owns — a character this step listed before the Core phase made them the opposition — and
+ * they are never dropped, because the links this is read from say only what this step once claimed, not who claims it today.
+ */
+export function removedContentOps(previous: Ledger.Links, next: Ledger.Links, keep: ReadonlySet<string> = new Set()): ContentOp[] {
+  const dropped = <K extends 'entityKeys' | 'factKeys' | 'volumeKeys' | 'arcKeys'>(key: K): string[] => {
+    const kept = new Set(next[key] ?? []);
+    return (previous[key] ?? []).filter(item => !kept.has(item) && !keep.has(item));
+  };
   return [
-    ...(previous.entityKeys ?? []).filter(key => !entities.has(key)).map((entityKey): ContentOp => ({ op: 'entity.remove', entityKey })),
-    ...(previous.factKeys ?? []).filter(key => !facts.has(key)).map((factKey): ContentOp => ({ op: 'fact.remove', factKey })),
+    ...dropped('entityKeys').map((entityKey): ContentOp => ({ op: 'entity.remove', entityKey })),
+    ...dropped('factKeys').map((factKey): ContentOp => ({ op: 'fact.remove', factKey })),
+    ...dropped('arcKeys').map((arcKey): ContentOp => ({ op: 'arc.remove', arcKey })),
+    ...dropped('volumeKeys').map((volumeKey): ContentOp => ({ op: 'volume.remove', volumeKey })),
   ];
 }

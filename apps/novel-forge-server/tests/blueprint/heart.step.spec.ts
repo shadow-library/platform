@@ -35,7 +35,7 @@ function output(overrides: Partial<BlueprintHeartOutput> = {}): BlueprintHeartOu
 }
 
 function options(): HeartOptions {
-  return heartStep.toRound(output(), { previous: null, input: null, focus: null }).options;
+  return heartStep.toRound(output(), { previous: null, input: null, focus: null, ledger: [] }).options;
 }
 
 function materialise(selection: HeartSelection, round: HeartOptions | null = options(), page: string | null = null): ReturnType<typeof heartStep.materialise> {

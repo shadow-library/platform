@@ -38,7 +38,7 @@ describe('blueprint-start prompt', () => {
 
 describe('start step', () => {
   it('should turn the read-back into chips with ids the author can address', () => {
-    const round = startStep.toRound(modelOutput, { previous: null, input: null, focus: null });
+    const round = startStep.toRound(modelOutput, { previous: null, input: null, focus: null, ledger: [] });
     expect(round.options.understood).toEqual([
       { id: 'c1', label: 'A ferry that only runs at night', kind: 'element' },
       { id: 'c2', label: 'Quiet dread, not gore', kind: 'want' },
@@ -75,7 +75,7 @@ describe('start step', () => {
   });
 
   it('should retire every chip the round offered, so one the author deleted outright goes too', async () => {
-    const offered = startStep.toRound(modelOutput, { previous: null, input: null, focus: null }).options;
+    const offered = startStep.toRound(modelOutput, { previous: null, input: null, focus: null, ledger: [] }).options;
     const selection = { chips: [{ optionId: 'c1', label: 'A ferry that only runs at night', kind: 'element' as const }] };
     const plan = await startStep.materialise(selection, { round: { round: 1, options: offered }, ledger: [], project: {} as Project.Row, tx: {} as never });
     expect(plan.retires).toEqual(['c1', 'c2', 'c3']);

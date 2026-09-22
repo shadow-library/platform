@@ -72,6 +72,9 @@ Seven phases in a fixed order, grouped by altitude:
 
 - The whole novel as movements, one per volume, with the ending question pinned, the protagonist's change across the movements and a reveal schedule. Movements are sketches;
   only volume one is detailed in the next phase.
+- A reveal is a spoiler and is kept as one. Each one becomes a canon fact scheduled to the movement it is placed in, carrying the note the earlier chapters' writer is shown
+  instead of it and the give-away phrases they may not use. The truth itself is never written onto a Story Bible page: the page carries where each reveal comes out and which
+  fact holds it, the author reads the truth in the Notebook, and a chapter before it is told how to hold the secret rather than what it is.
 
 ### Volume one
 
@@ -163,12 +166,18 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   a lock never rewrites a section it did not ask about. The premise page carries the premise, the theme and the ending question this way.
 - The novel's working title is an effect of the title decision, so only a Blueprint lock may set it. No other scope is offered the field, and one that sends it anyway is
   refused — a title that moved without a decision superseding the one that named the novel would leave the book and the Notebook disagreeing with no record of why.
+- The same grant lets a Blueprint lock retire an approved volume or arc, which no other scope may do: the lock that approved them is the one redrawing the shape, and a spine
+  the author shortened would otherwise leave the volumes it dropped standing in the plan.
 - One lock writes the step's whole answer. Locking it again replaces what the step's earlier locks wrote on its topics (superseding entry for
   entry, the same option first, and withdrawing the rest), so a revisit never leaves two answers to one question active; a step may narrow which
   topics a lock replaces. Entries the author wrote directly, directions and rejections written while steering, and backlog entries are never
   replaced by a lock.
 - The ledger entries and the materialised content of one lock commit together or not at all. Work that can only follow a commit (approving what
   was materialised, queueing a job) runs after it; if it fails, the lock stands and the failure is reported beside it.
+- Approving a volume plan or a volume's arcs is never done automatically anywhere else, because it has to be somebody's decision. A Blueprint lock **is** that decision, taken
+  by the author on content the same lock just wrote, so it runs those approvals itself rather than staging them for a review that already happened. Only a short, named list of
+  actions may follow a lock, nothing that generates or spends a model call is on it, and every one of them is safe to run again — locking the step a second time is the only
+  retry a failed follow-up has.
 
 ## Stage
 
