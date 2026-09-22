@@ -1,8 +1,34 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { type InvalidateQueryFilters, type Query, QueryClient } from '@tanstack/react-query';
 
 import { flushInvalidations, invalidateSoon } from '../src/lib/apis/batched-invalidation';
 import { invalidateChat } from '../src/lib/apis/refinement.api';
+
+const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
+let scheduled: (() => void) | undefined;
+
+function fireBatchWindow(): void {
+  const callback = scheduled;
+  scheduled = undefined;
+  callback?.();
+}
+
+beforeEach(() => {
+  scheduled = undefined;
+  globalThis.setTimeout = ((callback: () => void) => {
+    scheduled = callback;
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  globalThis.clearTimeout = (() => {
+    scheduled = undefined;
+  }) as typeof clearTimeout;
+});
+
+afterEach(() => {
+  globalThis.setTimeout = realSetTimeout;
+  globalThis.clearTimeout = realClearTimeout;
+});
 
 describe('invalidateSoon', () => {
   let queryClient: QueryClient;
@@ -16,30 +42,30 @@ describe('invalidateSoon', () => {
     }) as QueryClient['invalidateQueries'];
   });
 
-  it('should wait for the batch window before invalidating', async () => {
+  it('should wait for the batch window before invalidating', () => {
     invalidateSoon(queryClient, { queryKey: ['projects', '3', 'jobs'] });
 
     expect(calls).toHaveLength(0);
-    await Bun.sleep(200);
+    fireBatchWindow();
     expect(calls).toHaveLength(1);
   });
 
-  it('should collapse repeats of the same filter within a window into one invalidation', async () => {
+  it('should collapse repeats of the same filter within a window into one invalidation', () => {
     invalidateSoon(queryClient, { queryKey: ['projects', '3', 'chat-sessions', 's1', 'messages'], exact: true });
     invalidateSoon(queryClient, { queryKey: ['projects', '3', 'chat-sessions', 's1', 'messages'], exact: true });
     invalidateSoon(queryClient, { queryKey: ['projects', '3', 'runs'] });
 
-    await Bun.sleep(200);
+    fireBatchWindow();
 
     expect(calls.map(filters => filters.queryKey?.join('/'))).toEqual(['projects/3/chat-sessions/s1/messages', 'projects/3/runs']);
   });
 
-  it('should invalidate at once when the batch is flushed, and not again when the window closes', async () => {
+  it('should invalidate at once when the batch is flushed, and not again when the window closes', () => {
     invalidateSoon(queryClient, { queryKey: ['projects', '3', 'jobs'] });
 
     flushInvalidations(queryClient);
     expect(calls).toHaveLength(1);
-    await Bun.sleep(200);
+    fireBatchWindow();
     expect(calls).toHaveLength(1);
   });
 
