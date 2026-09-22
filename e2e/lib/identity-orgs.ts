@@ -67,6 +67,18 @@ export interface OrgOAuthApp extends OAuthTestClient {
   readonly organisationId: string;
 }
 
+export type OrganisationDomainStatus = 'PENDING' | 'VERIFIED' | 'FAILED';
+
+export interface OrganisationDomainRow {
+  readonly id: string;
+  readonly domain: string;
+  readonly status: OrganisationDomainStatus;
+  readonly verificationToken: string;
+  readonly verifiedAt: Date | null;
+  readonly lastCheckedAt: Date | null;
+  readonly lastCheckError: string | null;
+}
+
 export interface ScimGroup {
   readonly groupId: string;
   readonly displayName: string;
@@ -184,9 +196,52 @@ export async function addScimGroupMember(group: ScimGroup, userId: string): Prom
   await identityDb()`INSERT INTO scim_group_members (group_id, directory_id) VALUES (${group.groupId}, ${directoryId}) ON CONFLICT DO NOTHING`;
 }
 
+/** Backdates an invitation past its expiry — the one pending state no API reaches. */
+export async function expireOrganisationInvitation(invitationId: string): Promise<void> {
+  await identityDb()`UPDATE organisation_invitations SET expires_at = now() - interval '1 day' WHERE id = ${invitationId}`;
+}
+
+export async function readOrganisationDomain(domainId: string): Promise<OrganisationDomainRow | undefined> {
+  const [row] = await identityDb()<OrganisationDomainRow[]>`
+    SELECT id::text, domain, status, verification_token AS "verificationToken", verified_at AS "verifiedAt", last_checked_at AS "lastCheckedAt", last_check_error AS "lastCheckError"
+    FROM organisation_domains WHERE id = ${domainId}
+  `;
+  return row;
+}
+
+/** Promotes a registered domain to VERIFIED, the state only a matching TXT record reaches and no test DNS can produce. */
+export async function markOrganisationDomainVerified(domainId: string): Promise<void> {
+  await identityDb()`UPDATE organisation_domains SET status = 'VERIFIED', verified_at = now(), last_check_error = NULL WHERE id = ${domainId}`;
+}
+
+/** A name under `.invalid`, which the DNS root answers NXDOMAIN for, so identity's TXT lookup can only fail. */
+export function unresolvableDomain(label = 'domain'): string {
+  return `e2e-${label}-${randomBytes(6).toString('hex')}.invalid`;
+}
+
 export async function listOwnedApplicationIds(organisationId: string): Promise<number[]> {
   const rows = await identityDb()<{ id: number }[]>`SELECT id FROM applications WHERE owner_organisation_id = ${organisationId} ORDER BY id`;
   return rows.map(row => row.id);
+}
+
+/** Fills `count` of the organisation's ten application slots with bare owned rows, which registering that many through the API would otherwise cost. */
+export async function seedOwnedApplications(organisationId: string, count: number): Promise<number[]> {
+  const rows = await identityDb()<{ id: number }[]>`
+    INSERT INTO applications ${identityDb()(
+      Array.from({ length: count }, () => {
+        const name = `org-${organisationId}-seed-${randomBytes(4).toString('hex')}`;
+        return { name, sub_domain: name, visibility: 'RESTRICTED', owner_organisation_id: organisationId };
+      }),
+    )}
+    RETURNING id
+  `;
+  return rows.map(row => row.id);
+}
+
+/** Removes application rows directly; only safe for rows carrying no OAuth client, whose foreign key is `ON DELETE restrict`. */
+export async function deleteApplicationRows(applicationIds: number[]): Promise<void> {
+  if (applicationIds.length === 0) return;
+  await identityDb()`DELETE FROM applications WHERE id = ANY(${applicationIds})`;
 }
 
 /** Assigns an application to the organisation; `orgAdmin` must be an elevated OWNER or ADMIN of it. */

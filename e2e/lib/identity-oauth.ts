@@ -59,6 +59,8 @@ export interface OAuthApplication {
 export interface ApplicationPatch {
   visibility?: ApplicationVisibility;
   isActive?: boolean;
+  /** Name shown to members, e.g. beside a scope an organisation may lend its own applications. */
+  displayName?: string;
 }
 
 export type OAuthClientKind = 'SPA_PUBLIC' | 'WEB_CONFIDENTIAL' | 'SERVICE';

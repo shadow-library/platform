@@ -41,6 +41,9 @@ export interface PasswordCredentialSnapshot {
 /** Default poll budget for outbox reads — the rows are written transactionally, so they land fast; a few seconds covers replica/commit lag. */
 const DEFAULT_POLL: Required<PollOptions> = { timeoutMs: 8_000, intervalMs: 300 };
 
+/** The outbox template an organisation invitation is enqueued under; its payload carries the raw accept token. */
+const INVITE_TEMPLATE = 'organisation-invitation';
+
 /** A unique, unmistakably-synthetic `.test` email per registration run — timestamped so a rerun never collides with a prior account. */
 export function uniqueRegistrationEmail(): string {
   return `e2e.reg.${Date.now()}@shadow-apps.test`;
@@ -63,20 +66,20 @@ export async function fillOtp(page: Page, code: string): Promise<void> {
   await page.keyboard.type(code, { delay: 40 });
 }
 
-async function pollRecipientOtp(field: OutboxRecipient, recipient: string, templateKey: string, options: PollOptions): Promise<string> {
+async function pollPayloadValue(field: OutboxRecipient, recipient: string, templateKey: string, payloadKey: string, options: PollOptions): Promise<string> {
   const { timeoutMs, intervalMs } = { ...DEFAULT_POLL, ...options };
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const rows = await identityDb()<{ code: string | null }[]>`
-      SELECT ((payload #>> '{}')::jsonb) ->> 'code' AS code
+    const rows = await identityDb()<{ value: string | null }[]>`
+      SELECT ((payload #>> '{}')::jsonb) ->> ${payloadKey} AS value
       FROM notification_outbox
       WHERE ((recipients #>> '{}')::jsonb) ->> ${field} = ${recipient} AND template_key = ${templateKey}
       ORDER BY id DESC
       LIMIT 1
     `;
-    const code = rows[0]?.code ?? undefined;
-    if (code) return code;
-    if (Date.now() >= deadline) throw new Error(`No ${templateKey} OTP for ${recipient} within ${timeoutMs}ms`);
+    const value = rows[0]?.value ?? undefined;
+    if (value) return value;
+    if (Date.now() >= deadline) throw new Error(`No ${templateKey} ${payloadKey} for ${recipient} within ${timeoutMs}ms`);
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
 }
@@ -88,12 +91,17 @@ async function pollRecipientOtp(field: OutboxRecipient, recipient: string, templ
  * plain `->> 'email'` the shared `fetchLatestOtp` uses, which returns NULL against this shape.
  */
 export function pollOtp(email: string, templateKey: string, options: PollOptions = {}): Promise<string> {
-  return pollRecipientOtp('email', email, templateKey, options);
+  return pollPayloadValue('email', email, templateKey, 'code', options);
 }
 
 /** `pollOtp` for a code texted to `phone`. */
 export function pollSmsOtp(phone: string, templateKey: string, options: PollOptions = {}): Promise<string> {
-  return pollRecipientOtp('phone', phone, templateKey, options);
+  return pollPayloadValue('phone', phone, templateKey, 'code', options);
+}
+
+/** The raw accept token of the newest organisation invitation enqueued for `email`. */
+export function pollInviteToken(email: string, options: PollOptions = {}): Promise<string> {
+  return pollPayloadValue('email', email, INVITE_TEMPLATE, 'token', options);
 }
 
 /** How many outbox rows identity has enqueued for `recipient`, optionally under one template. */
