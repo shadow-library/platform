@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, TokenInput, toast } from '@shadow-library/ui';
+import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, TokenInput } from '@shadow-library/ui';
 
 import { ChevronRightIcon, CloseIcon, GripIcon, PlusIcon, SparkIcon } from '@/components/icons';
 import { PaneError, PaneLoader, QueryState, RegenerateChapterButton, StatusChip } from '@/components/nf';
@@ -27,16 +27,16 @@ import {
 } from '@/lib/apis';
 
 import {
+  briefBodyText,
   type BriefDraft,
+  briefDraftOf,
   type BriefEditModel,
   type BriefEditSection,
-  briefBodyText,
-  briefDraftOf,
   type BriefListItem,
   briefListItem,
   briefSaveOf,
-  type EndingDraft,
   endingContractOf,
+  type EndingDraft,
   HOOK_TYPE_LABELS,
   HOOK_TYPES,
   outlineObjectiveProblem,
@@ -642,24 +642,24 @@ function ListEditor({ items, onChange, noun, addLabel }: ListEditorProps): React
     setOverId(null);
   };
 
-  const dropTarget = (id: string, index: number): React.HTMLAttributes<HTMLElement> => ({
-    onDragOver: event => {
-      if (!dragId) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      setOverId(id);
-    },
-    onDragLeave: event => {
-      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-      setOverId(current => (current === id ? null : current));
-    },
-    onDrop: event => {
-      if (!dragId) return;
-      event.preventDefault();
-      dropBefore(index);
-      endDrag();
-    },
-  });
+  const onDropTargetDragOver = (event: React.DragEvent, id: string): void => {
+    if (!dragId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setOverId(id);
+  };
+
+  const onDropTargetDragLeave = (event: React.DragEvent, id: string): void => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setOverId(current => (current === id ? null : current));
+  };
+
+  const onDropTargetDrop = (event: React.DragEvent, index: number): void => {
+    if (!dragId) return;
+    event.preventDefault();
+    dropBefore(index);
+    endDrag();
+  };
 
   const onHandleKeyDown = (event: React.KeyboardEvent, index: number): void => {
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
@@ -694,7 +694,9 @@ function ListEditor({ items, onChange, noun, addLabel }: ListEditorProps): React
                 setDragId(item.id);
               }}
               onDragEnd={endDrag}
-              {...dropTarget(item.id, index)}
+              onDragOver={event => onDropTargetDragOver(event, item.id)}
+              onDragLeave={event => onDropTargetDragLeave(event, item.id)}
+              onDrop={event => onDropTargetDrop(event, index)}
             >
               {/* A span, not a button: Firefox never starts a drag from inside a <button>. */}
               <span
@@ -730,7 +732,14 @@ function ListEditor({ items, onChange, noun, addLabel }: ListEditorProps): React
           ))}
         </ol>
       )}
-      {dragId && <div className={`${styles.listDropEnd} ${overId === LIST_END_DROP_ID ? styles.listDropEndOver : ''}`} {...dropTarget(LIST_END_DROP_ID, items.length)} />}
+      {dragId && (
+        <div
+          className={`${styles.listDropEnd} ${overId === LIST_END_DROP_ID ? styles.listDropEndOver : ''}`}
+          onDragOver={event => onDropTargetDragOver(event, LIST_END_DROP_ID)}
+          onDragLeave={event => onDropTargetDragLeave(event, LIST_END_DROP_ID)}
+          onDrop={event => onDropTargetDrop(event, items.length)}
+        />
+      )}
       <button ref={addButton} type="button" className={styles.addRow} onClick={() => insertAt(items.length)}>
         <PlusIcon size={14} />
         {addLabel}
