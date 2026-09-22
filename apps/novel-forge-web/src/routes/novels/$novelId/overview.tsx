@@ -388,7 +388,7 @@ function OverviewScreen(): React.JSX.Element {
           toast.success(`Cloned to “${created.title || created.name}”`);
           setCloneOpen(false);
           setCloneName('');
-          navigate({ to: '/novels/$novelId/overview', params: { novelId: created.id } });
+          navigate({ to: '/novels/$novelId', params: { novelId: created.id } });
         },
         onError: err => toast.danger(err.message),
       },

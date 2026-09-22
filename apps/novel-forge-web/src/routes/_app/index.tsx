@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Button, SegmentedControl } from '@shadow-library/ui';
 
 import { BookIcon, PlusIcon, SparkIcon, UploadIcon } from '@/components/icons';
-import { projectHomeRoute } from '@/components/Layout';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
@@ -51,7 +50,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
   const draftsDone = (status?.draftsTotal ?? 0) > 0 && status?.draftsFinal === status?.draftsTotal;
   const ownerLabel = sharedOwnerLabel(project);
   const open = (): void => {
-    navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } });
+    navigate({ to: '/novels/$novelId', params: { novelId: project.id } });
   };
 
   return (
@@ -181,7 +180,7 @@ function Dashboard(): React.JSX.Element {
       <NewNovelModal
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={project => navigate({ to: projectHomeRoute(project.kind), params: { novelId: project.id } })}
+        onCreated={project => navigate({ to: '/novels/$novelId', params: { novelId: project.id } })}
         onSeedCreated={seed => navigate({ to: '/ideas/$seedId', params: { seedId: seed.projectId } })}
       />
     </div>

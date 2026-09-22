@@ -21,8 +21,10 @@ import {
   useTranslationStatusQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
+import { blueprintNavSections } from '@/features/blueprint/blueprint-nav';
+import { blueprintStepMeta } from '@/features/blueprint/blueprint-steps';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
-import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
+import { blueprintStage, currentBlueprintPhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
 import { firstTitle } from '@/lib/idea-title';
 import { useIsAdmin } from '@/lib/session';
 
@@ -115,6 +117,11 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const isAdmin = useIsAdmin();
   const screens = useMemo(() => screensForWorkflow(project?.kind).filter(screen => !screen.adminOnly || isAdmin), [project?.kind, isAdmin]);
+  // While the stage is Blueprint the sidebar is the Blueprint's own rail: the Workspace screens have
+  // nothing to show yet, and the phases are the only navigation the author has.
+  const inBlueprint = blueprintStage(status) === 'blueprint';
+  const blueprintPhases = status?.blueprint?.phases ?? [];
+  const blueprintPhasesDone = blueprintPhases.filter(candidate => candidate.status === 'done').length;
   const nav: NavConfig = inProject
     ? {
         variant: 'project',
@@ -123,10 +130,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           options,
           emptyLabel: 'All projects',
           loading: projectsQuery.isLoading,
-          onSelect: id => void navigate({ to: '/novels/$novelId/overview', params: { novelId: id } }),
+          onSelect: id => void navigate({ to: '/novels/$novelId', params: { novelId: id } }),
           footerAction: { label: 'View all projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
         },
-        sections: [{ items: screens.filter(screen => !screen.trailing).map(toLeaf) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
+        sections: inBlueprint
+          ? blueprintNavSections(novelId ?? '', status?.blueprint?.phases ?? [])
+          : [{ items: screens.filter(screen => !screen.trailing).map(toLeaf) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
       }
     : {
         variant: 'sections',
@@ -140,7 +149,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           {
             label: 'Pinned',
             hidden: projects.length === 0,
-            items: projects.slice(0, 3).map(pinned => ({ to: '/novels/$novelId/overview', params: { novelId: pinned.id }, label: projectTitle(pinned), icon: <BookIcon /> })),
+            items: projects.slice(0, 3).map(pinned => ({ to: '/novels/$novelId', params: { novelId: pinned.id }, label: projectTitle(pinned), icon: <BookIcon /> })),
           },
           { items: [{ to: '/settings', label: 'Settings', icon: <SettingsIcon /> }] },
         ],
@@ -169,7 +178,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         label: `${projectTitle(candidate)} · #${candidate.id}`,
         icon: <BookIcon />,
         keywords: [candidate.name, candidate.id],
-        onRun: () => navigate({ to: '/novels/$novelId/overview', params: { novelId: candidate.id } }),
+        onRun: () => navigate({ to: '/novels/$novelId', params: { novelId: candidate.id } }),
       });
     }
     return items;
@@ -192,8 +201,11 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const paletteView = resolvePaletteView(palette, commands);
 
-  const leafSegment = pathname.split('/').filter(Boolean).pop();
-  const crumbLeaf = inProject && leafSegment != null ? SCREEN_LABEL.get(leafSegment) : undefined;
+  const segments = pathname.split('/').filter(Boolean);
+  const leafSegment = segments.at(-1);
+  const blueprintStepKey = segments.at(-2) === 'blueprint' ? leafSegment : undefined;
+  const crumbLeaf =
+    !inProject || leafSegment == null ? undefined : blueprintStepKey != null ? `Blueprint · ${blueprintStepMeta(blueprintStepKey).label}` : SCREEN_LABEL.get(leafSegment);
   const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : pathname === '/settings' ? 'Settings' : 'Projects';
 
   const saveIdeaName = (next: string): void => {
@@ -275,7 +287,23 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
         utility={<ThemeToggle />}
         sidebarFooter={
-          inProject && phase.total > 0 ? (
+          inBlueprint ? (
+            <div className={styles.lifecycle}>
+              <div className={styles.lifecycleHeading}>Blueprint</div>
+              <div className={styles.lifecycleBar}>
+                {blueprintPhases.map(blueprintPhase => (
+                  <div
+                    key={blueprintPhase.phase}
+                    className={styles.lifecycleSeg}
+                    data-state={blueprintPhase.status === 'done' ? 'done' : blueprintPhase.status === 'current' ? 'current' : 'todo'}
+                  />
+                ))}
+              </div>
+              <div className={styles.lifecycleLabel}>
+                {currentBlueprintPhase(status)?.label ?? 'Every phase done'} · {blueprintPhasesDone} of {blueprintPhases.length} phases
+              </div>
+            </div>
+          ) : inProject && phase.total > 0 ? (
             <div className={styles.lifecycle}>
               <div className={styles.lifecycleHeading}>Lifecycle</div>
               <div className={styles.lifecycleBar}>

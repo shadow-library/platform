@@ -5,6 +5,7 @@ export interface NovelParams {
 
 export type ProjectRoute =
   | '/novels/$novelId/overview'
+  | '/novels/$novelId/blueprint'
   | '/novels/$novelId/translation'
   | '/novels/$novelId/source'
   | '/novels/$novelId/rebrand'

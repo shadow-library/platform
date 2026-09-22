@@ -623,7 +623,7 @@ function GraduateDialog({ seed, open, onOpenChange }: GraduateDialogProps): Reac
           toast.success(
             `“${result.project.title ?? result.project.name}” is a novel — ${result.documents.map(documentLabel).join(' and ')} written, ${result.factKeys.length} promise fact(s) kept.`,
           );
-          void navigate({ to: '/novels/$novelId/overview', params: { novelId: result.project.id } });
+          void navigate({ to: '/novels/$novelId', params: { novelId: result.project.id } });
         },
         onError: err => toast.danger(err.message),
       },

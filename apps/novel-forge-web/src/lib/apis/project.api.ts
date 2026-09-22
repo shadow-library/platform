@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
   type CloneProjectBody,
@@ -13,6 +13,7 @@ import {
   type UpdateProjectBody,
   type UploadImageBody,
 } from './api-types.gen';
+import { invalidateSoon } from './batched-invalidation';
 import { ApiError, APIRequest } from './transport';
 
 const projectKeys = {
@@ -59,6 +60,11 @@ export function useProjectQuery(projectId: string, enabled = true): UseQueryResu
 
 export function useProjectStatusQuery(projectId: string, enabled = true): UseQueryResult<ProjectStatusResponse, ApiError> {
   return useQuery({ ...projectStatusQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+/** The status the shell reads its lifecycle and Blueprint stage from; anything that can complete a phase has to reach it. */
+export function invalidateProjectStatus(queryClient: QueryClient, projectId: string): void {
+  invalidateSoon(queryClient, { queryKey: projectKeys.status(projectId) });
 }
 
 export function useCreateProjectMutation(): UseMutationResult<ProjectResponse, ApiError, CreateProjectBody> {

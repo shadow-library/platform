@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react';
 
-import { type ProjectKind } from '@/lib/apis';
+import { type BlueprintStage, type ProjectKind } from '@/lib/apis';
 
 import {
   BookIcon,
   ChatIcon,
+  ConceptIcon,
   EditIcon,
   GlobeIcon,
   ImageIcon,
@@ -56,6 +57,7 @@ export interface ProjectScreen {
  */
 export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'overview', to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon />, workflows: ALL_WORKFLOWS },
+  { segment: 'blueprint', to: '/novels/$novelId/blueprint', label: 'Blueprint', icon: <ConceptIcon />, workflows: ['new_novel'] },
   { segment: 'translation', to: '/novels/$novelId/translation', label: 'Translation', icon: <LanguageIcon />, workflows: ['translation'] },
   { segment: 'source', to: '/novels/$novelId/source', label: 'Source Pipeline', icon: <SourceIcon />, workflows: ['source'] },
   { segment: 'rebrand', to: '/novels/$novelId/rebrand', label: 'Rebrand', icon: <GlobeIcon />, workflows: ['source'] },
@@ -87,7 +89,13 @@ export function screenVisible(segment: string, kind?: ProjectKind): boolean {
   return !screen || kind === undefined || screen.workflows.includes(kind);
 }
 
-/** Where a freshly created project should land — the workflow's own screen when it has one, else Overview. */
-export function projectHomeRoute(kind: ProjectKind): ProjectRoute {
+/**
+ * Where opening a project should land — the workflow's own screen when it has one, else Overview. A novel
+ * still in its Blueprint has no Overview worth showing: the Blueprint is its home until the gate opens.
+ * `stage` has no default on purpose — a caller that does not know it cannot pick a home, and should send
+ * the author through `/novels/$novelId`, which resolves it.
+ */
+export function projectHomeRoute(kind: ProjectKind, stage: BlueprintStage | null): ProjectRoute {
+  if (stage === 'blueprint') return '/novels/$novelId/blueprint';
   return kind === 'translation' ? '/novels/$novelId/translation' : '/novels/$novelId/overview';
 }

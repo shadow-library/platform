@@ -1,6 +1,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { invalidateBlueprintProgress } from './blueprint.api';
 import { invalidateSeed } from './ideation.api';
 import { invalidateJobs } from './insight.api';
 import { setEventStreamLive } from './live-polling';
@@ -20,6 +21,10 @@ export type ProjectEvent =
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
 const SEED_TARGET_PREFIX = 'seed:';
+const BLUEPRINT_JOB_KIND = 'blueprint';
+// A blueprint round only changes what a screen shows once its job settles; the start mutation already
+// refetched the pending round, so the progress events in between would be refetches of nothing new.
+const SETTLED_JOB_STATUSES = ['done', 'failed', 'cancelled'];
 const IDEATION_GRAPH_PREFIX = 'ideation-';
 // The stream ends itself every 15 minutes and reconnects within its 3-second retry; only an outage longer than this
 // hands changes back to polling at full speed.
@@ -38,7 +43,11 @@ export function parseProjectEvent(data: unknown): ProjectEvent | undefined {
 }
 
 export function applyProjectEvent(queryClient: QueryClient, projectId: string, event: ProjectEvent): void {
-  if (event.type === 'job') return invalidateJobs(queryClient, projectId);
+  if (event.type === 'job') {
+    invalidateJobs(queryClient, projectId);
+    if (event.kind === BLUEPRINT_JOB_KIND && SETTLED_JOB_STATUSES.includes(event.status)) invalidateBlueprintProgress(queryClient, projectId);
+    return;
+  }
   if (event.type === 'chat') return invalidateChatSession(queryClient, projectId, event.sessionId);
 
   invalidateRuns(queryClient, projectId);
@@ -56,6 +65,7 @@ function resynchronise(queryClient: QueryClient, projectId: string): void {
   invalidateRuns(queryClient, projectId);
   invalidateChatSessions(queryClient, projectId);
   invalidateSeed(queryClient, projectId);
+  invalidateBlueprintProgress(queryClient, projectId);
 }
 
 /**

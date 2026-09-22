@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Button, Dialog, Skeleton, toast } from '@shadow-library/ui';
 
 import { EditIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { projectHomeRoute } from '@/components/Layout';
 import { IdeaRename, PageHeader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { applySeedName, invalidateSeed, listSeedsQueryOptions, type SeedSummaryResponse, useDeleteSeedMutation, useListSeedsQuery, useUpdateProjectMutation } from '@/lib/apis';
@@ -172,7 +171,7 @@ function IdeasShelf(): React.JSX.Element {
         onOpenChange={setCreateOpen}
         defaultDoor="idea"
         onSeedCreated={seed => openStudio(seed.projectId)}
-        onCreated={project => navigate({ to: projectHomeRoute(project.kind), params: { novelId: project.id } })}
+        onCreated={project => navigate({ to: '/novels/$novelId', params: { novelId: project.id } })}
       />
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
