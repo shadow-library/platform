@@ -1,6 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
+import { OPEN_FROM_CHAPTER } from '@server/common';
 import { type Ledger } from '@server/database';
 
 import { ENGINE_LINE_MAX, ENGINE_TEXT_MAX, ENGINE_WRITER_LINE_MAX, WORLD_RULES_MAX } from '../../ai/schemas/blueprint-engine.schema';
@@ -18,8 +19,6 @@ export const WORLD_WHY_MAX = 400;
 export const WORLD_PAGE: PageRef = { section: 'world', slug: 'setting-overview' };
 export const POWER_PAGE: PageRef = { section: 'power', slug: 'system-and-limits' };
 export const COST_RULE_KEY = 'cost_of_power';
-/** Canon the reader may meet in the first sentence: scheduled rather than unscheduled, which is what keeps it out of the writer-hidden set. */
-export const OPEN_FROM_CHAPTER = 1;
 
 const COST_HEADING = 'The cost of power';
 

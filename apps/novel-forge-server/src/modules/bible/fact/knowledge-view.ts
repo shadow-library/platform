@@ -1,7 +1,7 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-import { revealTermPattern } from '@server/common';
+import { isOpenCanon, revealTermPattern } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
@@ -90,7 +90,8 @@ export function splitKnowledgeView(facts: FactLike[], knownKeys: ReadonlySet<str
 
 /**
  * Recomputes the chapter's knowledge view from the ledger — deterministic, never trusted from model
- * output. "Known entering chapter N" means a POV-cast member ledgered the fact before chapter N.
+ * output. "Known entering chapter N" means a POV-cast member ledgered the fact before chapter N, or the
+ * fact is open canon, which nobody had to learn.
  */
 export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chapter: number, contract: KnowledgeContract): Promise<KnowledgeView> {
   const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
@@ -121,6 +122,10 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   }
 
   const learnKeys = new Set(contract.learns.map(reveal => reveal.factKey));
+  // Open canon is a rule the whole cast lives under, not a truth anyone had to learn, so a contract narrows what is privately known and never withholds it.
+  for (const fact of facts) {
+    if (isOpenCanon(fact.revealChapter) && !learnKeys.has(fact.factKey)) knownKeys.add(fact.factKey);
+  }
   return splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys);
 }
 

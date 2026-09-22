@@ -1,7 +1,8 @@
+import { and, eq, max } from 'drizzle-orm';
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
-import { type Ledger } from '@server/database';
+import { type Ledger, type PrimaryTransaction, schema } from '@server/database';
 
 import {
   MOVEMENT_CHAPTERS_MAX,
@@ -20,7 +21,6 @@ import { mergeLedgerLinks } from '../ledger/ledger-entries';
 import { promiseTailoringApplies } from '../stage/promise-tailoring';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
 import { lockedLinks, removedContentOps } from './content-keys';
-import { OPEN_FROM_CHAPTER } from './world.step';
 import { endingQuestion, SPINE_PASS_STEP_KEY, type SpineMode, spineMode, type SpineOptions, type SpineSliceOptions } from './spine-pass.step';
 
 export const SPINE_STEP_KEY = 'spine';
@@ -34,6 +34,45 @@ const REVEAL_HEADINGS: Record<SpineMode, string> = { movements: 'Reveal schedule
 /** Ordinal-keyed and never named after the secret: the key itself rides the planner's reveal schedule, where the truth must not. */
 export function revealFactKey(ordinal: number): string {
   return `reveal_${ordinal}`;
+}
+
+export interface LedgerReveal {
+  factKey: string;
+  revealChapter: number;
+  movement: number;
+  when: string;
+  truth: string;
+  writerNote: string;
+  terms: string[];
+  pinned: boolean;
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/** The schedule as the notebook holds it. Every later phase reads its secrets from here rather than from the pages, which never carry them. */
+export function ledgerReveals(ledger: Ledger.Entry[]): LedgerReveal[] {
+  const decision = [...ledger].reverse().find(entry => entry.topic === SPINE_REVEALS_TOPIC && entry.kind === 'decision');
+  const payload = typeof decision?.payload === 'object' && decision?.payload !== null ? (decision.payload as Record<string, unknown>) : {};
+  const reveals = payload['reveals'];
+  return (Array.isArray(reveals) ? reveals : [])
+    .map(item => (typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : {}))
+    .filter(reveal => text(reveal['factKey']))
+    .map(reveal => ({
+      factKey: text(reveal['factKey']),
+      revealChapter: count(reveal['revealChapter']),
+      movement: count(reveal['movement']),
+      when: text(reveal['when']),
+      truth: text(reveal['truth']),
+      writerNote: text(reveal['writerNote']),
+      terms: (Array.isArray(reveal['terms']) ? reveal['terms'] : []).map(text).filter(Boolean),
+      pinned: reveal['pinned'] === true,
+    }));
 }
 
 /** Ordinal-keyed, so re-locking a renamed movement updates the volume it renamed rather than leaving an orphan beside a new one. */
@@ -125,20 +164,35 @@ interface KeyedReveal {
 /**
  * A reveal placed in a movement is scheduled to that movement's last chapter: at sketch altitude the volume is all the author has
  * said, and the conservative reading is the safe one — nothing earlier may surface it, and the Opening phase's briefs reveal it on the
- * page where they actually do, through their own knowledge contract.
+ * page where they actually do, through their own knowledge contract. `firstChapter` is where the Blueprint's own volumes begin, which
+ * is chapter one unless imported source volumes already hold the chapters before it, exactly as approving the plan lays them out.
  */
-export function revealChapterOf(keyed: KeyedMovement[], movement: number): number {
-  const at = Math.min(Math.max(movement, 1), Math.max(keyed.length, 1));
-  return keyed.slice(0, at).reduce((chapters, item) => chapters + Math.max(item.movement.chapters, 1), 0) || OPEN_FROM_CHAPTER;
+export function revealChapterOf(keyed: KeyedMovement[], movement: number, firstChapter: number): number {
+  if (keyed.length === 0) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: 'a reveal cannot be scheduled against a spine with no movements' });
+  const at = Math.min(Math.max(movement, 1), keyed.length);
+  return firstChapter - 1 + keyed.slice(0, at).reduce((chapters, item) => chapters + Math.max(item.movement.chapters, 1), 0);
 }
 
-function keyReveals(reveals: SpineRevealChoice[], keyed: KeyedMovement[]): KeyedReveal[] {
+function keyReveals(reveals: SpineRevealChoice[], keyed: KeyedMovement[], firstChapter: number): KeyedReveal[] {
   return reveals.map((reveal, index) => ({
     reveal,
     factKey: revealFactKey(index + 1),
-    revealChapter: revealChapterOf(keyed, reveal.movement),
+    revealChapter: revealChapterOf(keyed, reveal.movement, firstChapter),
     pinned: index === 0,
   }));
+}
+
+/**
+ * The chapter the Blueprint's first volume starts at. `approveVolumePlan` continues the planned volumes after the last imported
+ * `source` volume, and a `new_novel` can carry those (a finished plan imported in final mode), so a schedule that assumed chapter one
+ * would place every reveal far too early.
+ */
+export async function blueprintFirstChapter(tx: PrimaryTransaction, projectId: bigint): Promise<number> {
+  const [row] = await tx
+    .select({ endChapter: max(schema.volumes.endChapter) })
+    .from(schema.volumes)
+    .where(and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.status, 'source')));
+  return (row?.endChapter ?? 0) + 1;
 }
 
 /** A real spoiler, so it is scheduled and carries the two things that let the drafter work around it without being told it. */
@@ -229,6 +283,15 @@ function assertSelection(selection: SpineSelection, reveals: SpineRevealChoice[]
       issues: `the note for "${told.when.trim()}" states the truth it is meant to withhold; it is the one part of it the writer is shown`,
     });
   }
+  // `when` goes verbatim onto the escalation map and into the fact's constraintNote, both of which the writer can reach, so it is
+  // withheld by the same rule as the note — "When Mira learns her father killed the king" is the secret with a preposition in front.
+  const named = reveals.find(reveal => reveal.when.trim().toLowerCase().includes(reveal.truth.trim().toLowerCase()));
+  if (named) {
+    throw AppErrorCode.BPR_004.create({
+      part: 'selection',
+      issues: `"${named.when.trim()}" states the truth it places; name where it comes out, not what comes out`,
+    });
+  }
 }
 
 export const spineStep: SourcedScreenStep<SpineOptions, SpineSliceOptions | null, SpineSelection> = {
@@ -267,7 +330,7 @@ export const spineStep: SourcedScreenStep<SpineOptions, SpineSliceOptions | null
     const mode = spineMode(ledger);
     const question = endingQuestion(ledger);
     const keyed = keyMovements(selection.movements);
-    const keyedReveals = keyReveals(reveals, keyed);
+    const keyedReveals = keyReveals(reveals, keyed, await blueprintFirstChapter(tx, project.id));
     const page = await loadPageBody(tx, project.id, SPINE_PAGE);
 
     const links: Ledger.Links = { bibleDocuments: [SPINE_PAGE], volumeKeys: keyed.map(item => item.volumeKey) };

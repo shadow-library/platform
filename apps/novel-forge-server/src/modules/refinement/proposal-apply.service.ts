@@ -541,6 +541,9 @@ export class ProposalApplyService {
       writeMode: brief.writeMode,
       handEdited: brief.handEdited,
       contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
+      pov: brief.pov ?? undefined,
+      chapterPurpose: brief.chapterPurpose ?? undefined,
+      readerValue: (brief.readerValue as string[] | null) ?? undefined,
       endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
       // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
       knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
@@ -888,6 +891,9 @@ export class ProposalApplyService {
       volumeKey: op.volumeKey ?? existing?.volumeKey ?? null,
       arcKey: op.arcKey ?? existing?.arcKey ?? null,
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
+      pov: op.pov ?? existing?.pov ?? null,
+      chapterPurpose: op.chapterPurpose ?? existing?.chapterPurpose ?? null,
+      readerValue: op.readerValue ?? existing?.readerValue ?? null,
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
       knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
     };

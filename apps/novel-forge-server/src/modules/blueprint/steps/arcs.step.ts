@@ -97,7 +97,8 @@ interface KeyedArc extends ChapterRange {
   ordinal: number;
 }
 
-async function firstVolume(tx: PrimaryTransaction, projectId: bigint): Promise<Plan.Volume> {
+/** Volume one as the Blueprint owns it: the first volume it planned, never an imported `source` volume that sits before it. */
+export async function firstVolume(tx: PrimaryTransaction, projectId: bigint): Promise<Plan.Volume> {
   const volumes = await tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) });
   const volume = volumes.find(candidate => candidate.status !== 'source') ?? volumes[0];
   if (!volume) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: 'there are no volumes yet — lock the spine before breaking volume one into arcs' });

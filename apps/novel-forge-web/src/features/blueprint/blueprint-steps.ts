@@ -148,6 +148,30 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     costToChange: 'medium',
     lockLabel: 'Lock volume one’s arcs',
   },
+  briefs: {
+    key: 'briefs',
+    label: 'Arc 1 briefs',
+    title: 'Arc one, chapter by chapter',
+    lede: 'The closest altitude. Read chapter one’s brief properly and skim the rest; each one cites the Story Bible pages the chapter is written from. Later arcs are briefed in the Workspace when you reach them.',
+    costToChange: 'cheap',
+    lockLabel: 'Lock arc one’s briefs',
+  },
+  voice: {
+    key: 'voice',
+    label: 'Voice',
+    title: 'How the book sounds',
+    lede: 'Three openings of your real chapter one in different voices. Pick one, push it, and hand-edit a paragraph. The samples are thrown away; the notes and the paragraph are kept.',
+    costToChange: 'medium',
+    lockLabel: 'Lock the voice',
+  },
+  check: {
+    key: 'check',
+    label: 'Final check',
+    title: 'One last pass before the gate',
+    lede: 'Arithmetic and contradictions are one click. Story problems are A or B, your own fix, or a dismissal with a reason — and every one of them becomes a decision.',
+    costToChange: 'cheap',
+    lockLabel: 'Resolve and finish the Blueprint',
+  },
 };
 
 const WORD_BREAK = /[._-]+/;

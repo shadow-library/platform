@@ -112,8 +112,10 @@
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
-  drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`, and a hidden
-  fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list. A chapter-scoped `fact:` ref obeys the same gate (plus
+  drafter sees only open canon, facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`,
+  and a hidden fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list. Open canon is a fact scheduled from the first chapter, a rule the whole
+  book obeys rather than a truth anyone had to learn, so a brief's knowledge contract narrows what its POV cast privately knows and never withholds one; a reveal scheduled later
+  stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone. A chapter-scoped `fact:` ref obeys the same gate (plus
   the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored.
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.

@@ -10,6 +10,7 @@ export * from './draft-fields';
 export * from './draft-staleness';
 export * from './enum.dto';
 export * from './finalize-gate';
+export * from './open-canon';
 export * from './opposition';
 export * from './owner';
 export * from './project-status';

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import { loadWriterHiddenFactKeys } from '@modules/bible/fact/knowledge-view';
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
 import { type WorldSliceOptions } from '@modules/blueprint/steps/engine.step';
-import { COST_RULE_KEY, OPEN_FROM_CHAPTER, type WorldSelection, worldStep } from '@modules/blueprint/steps/world.step';
+import { COST_RULE_KEY, type WorldSelection, worldStep } from '@modules/blueprint/steps/world.step';
+import { OPEN_FROM_CHAPTER } from '@server/common';
 import { type Ledger } from '@server/database';
 
 import { ledgerEntry, pageTx } from './blueprint-fixtures';

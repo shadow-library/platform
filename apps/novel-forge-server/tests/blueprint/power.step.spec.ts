@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
 import { type PowerSliceOptions } from '@modules/blueprint/steps/engine.step';
 import { type PowerSelection, powerStep } from '@modules/blueprint/steps/power.step';
-import { OPEN_FROM_CHAPTER } from '@modules/blueprint/steps/world.step';
+import { OPEN_FROM_CHAPTER } from '@server/common';
 import { type Ledger } from '@server/database';
 
 import { ledgerEntry, pageTx } from './blueprint-fixtures';

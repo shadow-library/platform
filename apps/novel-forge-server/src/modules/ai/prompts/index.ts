@@ -1,6 +1,8 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
+import { blueprintBriefsPrompt } from './blueprint-briefs.prompt';
+import { blueprintCheckPrompt } from './blueprint-check.prompt';
 import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
 import { blueprintEnginePrompt } from './blueprint-engine.prompt';
 import { blueprintHeartPrompt } from './blueprint-heart.prompt';
@@ -11,6 +13,7 @@ import { blueprintSpinePrompt } from './blueprint-spine.prompt';
 import { blueprintStartPrompt } from './blueprint-start.prompt';
 import { blueprintTastePrompt } from './blueprint-taste.prompt';
 import { blueprintTitlePrompt } from './blueprint-title.prompt';
+import { blueprintVoicePrompt } from './blueprint-voice.prompt';
 import { blueprintVolumeOnePrompt } from './blueprint-volume-one.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
@@ -127,6 +130,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'blueprint-engine': blueprintEnginePrompt as PromptModule<unknown>,
   'blueprint-spine': blueprintSpinePrompt as PromptModule<unknown>,
   'blueprint-volume-one': blueprintVolumeOnePrompt as PromptModule<unknown>,
+  'blueprint-briefs': blueprintBriefsPrompt as PromptModule<unknown>,
+  'blueprint-voice': blueprintVoicePrompt as PromptModule<unknown>,
+  'blueprint-check': blueprintCheckPrompt as PromptModule<unknown>,
 };
 
 export * from './types';

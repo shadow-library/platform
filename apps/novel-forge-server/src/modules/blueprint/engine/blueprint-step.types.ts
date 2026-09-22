@@ -12,13 +12,15 @@ export const BLUEPRINT_ROLES = ['blueprint', 'blueprint_pass'] as const;
 
 export type BlueprintRole = (typeof BLUEPRINT_ROLES)[number];
 
-export interface StepInputContext<TOptions = unknown> {
+export interface StepInputContext<TOptions = unknown, TInput = unknown> {
   projectId: bigint;
   project: Project.Row;
   ledger: Ledger.Entry[];
   db: DbExecutor;
   /** The generating step's latest ready options, so a focused round can show the model what it must keep. */
   previous: TOptions | null;
+  /** The step's own input for this round, so the sections it assembles answer the question the round is actually asking. */
+  input: TInput | null;
   /** The screen a pass round was started from; null when the round regenerates everything. */
   focus: string | null;
   /** The project's entities and canon facts as the planners read them, so a planning pass cites what exists instead of inventing it. */
@@ -101,7 +103,7 @@ export interface GeneratingStep<TOutput, TOptions, TInput> extends StepBase {
   /** The step's own freeform input for a round; a step without one refuses any. */
   inputSchema?: SchemaClass;
   budgetTokens?: number;
-  inputs?(context: StepInputContext<TOptions>): Promise<BlueprintInputSection[]>;
+  inputs?(context: StepInputContext<TOptions, TInput>): Promise<BlueprintInputSection[]>;
   renderInput?(input: TInput): string | null;
   toRound(output: TOutput, context: RoundContext<TOptions, TInput>): StepRoundResult<TOptions>;
   /** Every option the round offers, with ids unique across the whole round. */

@@ -224,15 +224,29 @@ describe('spineStep.materialise', () => {
     });
   });
 
+  it('should refuse a reveal whose "when" states the truth, which goes verbatim onto the page and into the fact’s note', async () => {
+    const pinned = (selection().reveals ?? [])[0] as SpineRevealChoice;
+    await expect(materialise(selection({ reveals: [{ ...pinned, when: 'When the memory in the jar is his' }] }))).rejects.toMatchObject({ code: 'BPR_004' });
+  });
+
   it('should schedule a reveal to the last chapter of the movement it is placed in', () => {
     const movements = [
       { title: 'A', summary: 'a', change: 'one', chapters: 60 },
       { title: 'B', summary: 'b', change: 'two', chapters: 50 },
     ].map((movement, index) => ({ movement, ordinal: index + 1, volumeKey: `volume_${index + 1}` }));
 
-    expect(revealChapterOf(movements, 1)).toBe(60);
-    expect(revealChapterOf(movements, 2)).toBe(110);
-    expect(revealChapterOf(movements, 9)).toBe(110);
+    expect(revealChapterOf(movements, 1, 1)).toBe(60);
+    expect(revealChapterOf(movements, 2, 1)).toBe(110);
+    expect(revealChapterOf(movements, 9, 1)).toBe(110);
+  });
+
+  it('should start the schedule after the imported volumes a new novel already carries, never at chapter one', () => {
+    const movements = [{ movement: { title: 'A', summary: 'a', change: 'one', chapters: 60 }, ordinal: 1, volumeKey: 'volume_1' }];
+    expect(revealChapterOf(movements, 1, 121)).toBe(180);
+  });
+
+  it('should refuse to schedule a reveal against a spine with no movements rather than defaulting it to chapter one', () => {
+    expect(() => revealChapterOf([], 1, 1)).toThrow();
   });
 
   it('should call them seasons and milestones for a slice-of-life novel', async () => {

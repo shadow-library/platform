@@ -3,7 +3,9 @@ import { AppError } from '@shadow-library/common';
 import { PROMPT_REGISTRY } from '../../ai/prompts';
 import { blueprintStep, BlueprintStepRegistry, validateBlueprintSteps } from '../engine/blueprint-step.registry';
 import { arcsStep } from './arcs.step';
+import { briefsStep } from './briefs.step';
 import { castStep } from './cast.step';
+import { checkStep } from './check.step';
 import { conceptsStep } from './concepts.step';
 import { enginePass } from './engine.step';
 import { heartStep } from './heart.step';
@@ -18,6 +20,7 @@ import { spineStep } from './spine.step';
 import { startStep } from './start.step';
 import { tasteStep } from './taste.step';
 import { titleStep } from './title.step';
+import { voiceStep } from './voice.step';
 import { volumeOnePass } from './volume-one-pass.step';
 import { worldStep } from './world.step';
 
@@ -40,6 +43,9 @@ export const BLUEPRINT_STEPS = [
   blueprintStep(castStep),
   blueprintStep(placesStep),
   blueprintStep(arcsStep),
+  blueprintStep(briefsStep),
+  blueprintStep(voiceStep),
+  blueprintStep(checkStep),
 ];
 
 const issues = validateBlueprintSteps(BLUEPRINT_STEPS, PROMPT_REGISTRY);

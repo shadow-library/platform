@@ -55,14 +55,14 @@ describe('titleStep.toRound', () => {
 
 describe('titleStep.inputs', () => {
   it('should tell a re-roll what is already on screen and what the novel is called now', async () => {
-    const sections = await titleStep.inputs?.({ previous: options(), project: { title: 'The Memory Tithe' } } as unknown as StepInputContext<TitleOptions>);
+    const sections = await titleStep.inputs?.({ previous: options(), project: { title: 'The Memory Tithe' } } as unknown as StepInputContext<TitleOptions, never>);
     expect(sections?.[0]?.key).toBe('already_shown');
     expect(sections?.[0]?.content).toContain('The Memory Tithe');
     expect(sections?.[0]?.content).toContain('current working title');
   });
 
   it('should send nothing before the first round', async () => {
-    expect(await titleStep.inputs?.({ previous: null, project: { title: null } } as unknown as StepInputContext<TitleOptions>)).toEqual([]);
+    expect(await titleStep.inputs?.({ previous: null, project: { title: null } } as unknown as StepInputContext<TitleOptions, never>)).toEqual([]);
   });
 });
 

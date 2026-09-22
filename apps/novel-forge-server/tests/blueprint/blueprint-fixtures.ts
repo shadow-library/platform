@@ -114,8 +114,16 @@ export const engineOptions: EngineOptions = {
   world: [{ id: 'w1', label: 'Every crossing costs a memory' }],
 };
 
-/** A transaction that answers `loadPageBody` with one stored page body and nothing else. */
-export function pageTx(body: string | null = null): PrimaryTransaction {
-  const rows = body === null ? [] : [{ body }];
-  return { select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }) }) } as unknown as PrimaryTransaction;
+/**
+ * A transaction that answers the two `select` reads a lock makes: `loadPageBody` with one stored page body, and the last chapter of
+ * any imported source volume. The `where` result is both awaitable and chainable, because only one of the two ends in `limit`.
+ */
+export function pageTx(body: string | null = null, sourceEndChapter: number | null = null): PrimaryTransaction {
+  const answer = (columns: Record<string, unknown>): Record<string, unknown>[] => ('endChapter' in columns ? [{ endChapter: sourceEndChapter }] : body === null ? [] : [{ body }]);
+  return {
+    select: (columns: Record<string, unknown>) => {
+      const rows = answer(columns);
+      return { from: () => ({ where: () => Object.assign(Promise.resolve(rows), { limit: () => Promise.resolve(rows) }) }) };
+    },
+  } as unknown as PrimaryTransaction;
 }

@@ -1,6 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
+import { OPEN_FROM_CHAPTER } from '@server/common';
 import { type Ledger } from '@server/database';
 
 import { ENGINE_LINE_MAX, ENGINE_NAME_MAX, ENGINE_WRITER_LINE_MAX, LADDER_RUNGS_MAX } from '../../ai/schemas/blueprint-engine.schema';
@@ -10,7 +11,7 @@ import { promiseTailoringApplies } from '../stage/promise-tailoring';
 import { loadPageBody, upsertPageSections } from './bible-page';
 import { contentKey, lockedLinks, removedContentOps } from './content-keys';
 import { ENGINE_STEP_KEY, type EngineOptions, type PowerSliceOptions } from './engine.step';
-import { OPEN_FROM_CHAPTER, POWER_PAGE } from './world.step';
+import { POWER_PAGE } from './world.step';
 
 export const POWER_STEP_KEY = 'power';
 export const POWER_TOPIC = 'world.power';

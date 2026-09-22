@@ -40,14 +40,16 @@ export function lockedLinks(ledger: Ledger.Entry[], stepKey: string, topics?: re
  * to it. `keep` names records another step now owns — a character this step listed before the Core phase made them the opposition — and
  * they are never dropped, because the links this is read from say only what this step once claimed, not who claims it today.
  */
-export function removedContentOps(previous: Ledger.Links, next: Ledger.Links, keep: ReadonlySet<string> = new Set()): ContentOp[] {
+export function removedContentOps(previous: Ledger.Links, next: Ledger.Links, keep: ReadonlySet<string | number> = new Set()): ContentOp[] {
   const dropped = <K extends 'entityKeys' | 'factKeys' | 'volumeKeys' | 'arcKeys'>(key: K): string[] => {
     const kept = new Set(next[key] ?? []);
     return (previous[key] ?? []).filter(item => !kept.has(item) && !keep.has(item));
   };
+  const keptChapters = new Set(next.briefChapters ?? []);
   return [
     ...dropped('entityKeys').map((entityKey): ContentOp => ({ op: 'entity.remove', entityKey })),
     ...dropped('factKeys').map((factKey): ContentOp => ({ op: 'fact.remove', factKey })),
+    ...(previous.briefChapters ?? []).filter(chapter => !keptChapters.has(chapter) && !keep.has(chapter)).map((chapter): ContentOp => ({ op: 'brief.remove', chapter })),
     ...dropped('arcKeys').map((arcKey): ContentOp => ({ op: 'arc.remove', arcKey })),
     ...dropped('volumeKeys').map((volumeKey): ContentOp => ({ op: 'volume.remove', volumeKey })),
   ];

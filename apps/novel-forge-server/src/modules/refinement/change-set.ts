@@ -92,6 +92,9 @@ export interface BriefUpdateOp {
   volumeKey?: string;
   arcKey?: string;
   contextRefs?: string[];
+  pov?: string;
+  chapterPurpose?: string;
+  readerValue?: string[];
   endingContract?: EndingContract;
   /** Explicit `null` drops the chapter's contract — the only way to un-reveal without deleting the brief. */
   knowledgeContract?: KnowledgeContract | null;
@@ -349,6 +352,9 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       volumeKey: 'string',
       arcKey: 'string',
       contextRefs: 'string[]',
+      pov: 'string',
+      chapterPurpose: 'string',
+      readerValue: 'string[]',
       endingContract: 'object',
       knowledgeContract: 'object|null',
     },

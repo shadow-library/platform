@@ -86,12 +86,18 @@ Seven phases in a fixed order, grouped by altitude:
 
 ### Opening
 
-- **Arc one briefs.** Only the first arc gets chapter briefs, planned by the existing arc outliner and citing Story Bible pages directly, with POV and purpose. Briefs for later
-  arcs are written in the Workspace when those arcs are reached (today through the existing arc outline), never far ahead.
-- **Voice.** Three openings of chapter one in different voices. The author picks, pushes and hand-edits a paragraph; the result becomes voice notes and a pacing and tone
-  page.
-- **Final check.** One check across the whole Blueprint. Arithmetic findings are one click; story findings are offered as A or B, or the author's own fix, or a dismissal that
-  requires a reason. Every resolution becomes a decision.
+- **Arc one briefs.** Only the first arc gets chapter briefs, written to the same shape the arc outliner writes and citing Story Bible pages directly, with POV and purpose. The
+  author reads chapter one's brief properly and skims the rest; steering revises one brief and leaves every other one exactly as it is. Briefs for later arcs are written in the
+  Workspace when those arcs are reached, never far ahead. The briefs are reviewed before they are locked, so they are produced by a Blueprint round rather than by the lock: a
+  plan the author has not seen is not a plan they agreed to.
+- **The pinned reveal is dated here.** The spine schedules its reveals conservatively, to the last chapter of the movement they sit in; the brief that actually lands the one
+  pinned inside volume one is what finally dates it, so locking the briefs moves that fact's reveal chapter to the chapter that tells it and names it in that chapter's knowledge
+  contract. Every other chapter carries no contract at all, because a contract on a chapter that reveals nothing says only what it withholds.
+- **Voice.** Three openings of chapter one in different voices, written from chapter one's own brief. The author picks, pushes and hand-edits a paragraph; the result becomes
+  voice notes and a pacing and tone page. The samples are prose written to be thrown away: none of them is ever stored as a draft, and the Blueprint cannot write one.
+- **Final check.** One check across the whole Blueprint, run a slice at a time — the rules against the briefs, the cast and its arithmetic, then the shape — because the whole
+  design does not fit one pack and a check that quietly dropped half of it would pass on nothing. Arithmetic findings are one click; story findings are offered as A or B, or the
+  author's own fix, or a dismissal that requires a reason. Every resolution becomes a decision, and a dismissal records the reason in place of a fix.
 
 ## Reader-promise drivers
 

@@ -888,3 +888,95 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Up close: arc one's briefs, the voice lab and the final check */
+.briefsLayout {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .briefsLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chapterList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface);
+}
+
+.chapterRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 5px 7px;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-text-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chapterRow:hover:not(:disabled) {
+  background: var(--sh-surface-hover);
+  color: var(--sh-text-primary);
+}
+
+.chapterRow[aria-pressed='true'] {
+  background: var(--sh-surface-hover);
+  color: var(--sh-text-primary);
+  font-weight: 600;
+}
+
+.chapterRow em {
+  flex-shrink: 0;
+  width: 18px;
+  color: var(--sh-text-tertiary);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.beatList {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.citeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sh-surface-hover);
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.voiceSample {
+  display: block;
+  margin-top: 6px;
+  color: var(--sh-text-primary);
+  font-size: var(--sh-text-caption);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.chapterRow:focus-visible {
+  outline: 2px solid var(--sh-accent);
+  outline-offset: 2px;
+}

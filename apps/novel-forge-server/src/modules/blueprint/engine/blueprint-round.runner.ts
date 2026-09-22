@@ -109,7 +109,7 @@ export class BlueprintRoundRunner {
     const role = step.prompt.role ?? 'blueprint';
     const policy = await this.pluginPolicy.resolve(projectId, { role, promptKey: step.prompt.key }, project);
     const catalog = (options?: CatalogOptions): Promise<string> => this.contextAssembler.catalog(projectId, options);
-    const inputs = (await step.inputs?.({ projectId, project, ledger, db: this.db, previous, focus: round.focus, catalog })) ?? [];
+    const inputs = (await step.inputs?.({ projectId, project, ledger, db: this.db, previous, input: round.input, focus: round.focus, catalog })) ?? [];
     const pack = await this.contextAssembler.forBlueprint(
       projectId,
       ledger,
