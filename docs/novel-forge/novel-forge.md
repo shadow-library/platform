@@ -13,14 +13,14 @@
 - **Project `kind` is the workflow.** `new_novel` original authoring; `source` imported English manuscript being adapted; `translation` original-language novel translated to
   English; `curated` finished English manuscript held for publishing (never created directly; minted by curated ingest or reforge promote, and also reachable by the translation-to-curated workflow switch and by cloning).
   A project's `kind` can change via workflow switch, clone or reset; `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
-- **Seed**: an idea in the Ideation Studio, not yet a novel. Generation, refinement, fact writes, publishing, insert/amend and clone refuse seeds (extract, consolidate,
-  skeleton, export and illustration do not); graduation turns it into an active project.
+- **Blueprint and Workspace** (`blueprint.md`): a new novel is a project from the first click. It opens in the Blueprint, a guided top-down design flow whose decisions live in
+  an append-only decision ledger and materialise as ordinary pages, entities, facts, volumes, arcs and briefs; a gate switches the same project into the Workspace, where
+  chapters are written. The stage is computed from data, never stored. Imports land in the Workspace.
 - **Volume -> arc -> chapter brief.** Approval derives chapter ranges from volume target counts. Arcs partition a volume exactly and are optional. A brief carries context refs,
   an ending contract, an optional knowledge contract, and a write mode (`standard` or `external`).
 - **Draft vs chapter.** A draft is working prose with a human review loop; finalizing writes a locked chapter and advances the story cursor.
 - **Canon**: finalized chapters, bible (documents plus entities), trackers. Everything else is intent or working state, labeled as such in prompts.
-- **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter. Facts
-  with `source = 'seed'` are reader promises written at graduation, not withheld truths.
+- **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter.
 - **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
 - **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
@@ -31,7 +31,7 @@
 
 ## Capabilities
 
-- Ideation, bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
+- Blueprint design (idea to arc one briefs), bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
 - Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, curated ingest, per-novel plugins, per-account AI quota.
 - Source pipeline (extract, consolidate, skeleton, recombine, rebrand, reforge, transform), translation, and publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 
@@ -60,7 +60,8 @@
 - **Approval** is author-initiated and never auto-applied from chat, may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction; hand edits reset it.
 - **Finalize** runs strictly in order; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
-- **Ideation**: studio turns stage seed proposals; graduation is deterministic (premise, reader-promise documents, one seed-source fact per promise; no volumes or entities).
+- **Blueprint** (`blueprint.md`): each step runs rounds of options as jobs; locking a step appends decisions to the ledger and materialises their content through change-set
+  ops applied as the author's action, with change history and revert. Every step sees the active ledger plus the step's last four messages, never full history.
 - **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
 - **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
   scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
@@ -112,7 +113,7 @@
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
   drafter sees only facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`, and a hidden
-  fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list (seed-source facts excluded). A chapter-scoped `fact:` ref obeys the same gate (plus
+  fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list. A chapter-scoped `fact:` ref obeys the same gate (plus
   the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored.
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
@@ -124,9 +125,9 @@
 
 ### Proposals and chat
 
-- Chat, audit, premise, arc-plan and plugin output MUST NEVER write domain tables directly (the studio's own readiness/concepts columns are the exception); only a proposal apply does, in a transaction with a baseline conflict check.
+- Chat, audit, premise, arc-plan and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
-- `action.finalize`, `action.graduate_seed`, `action.approve_draft`, `action.approve_volume_plan` and `action.approve_arcs` MUST NEVER be auto-applied. Action ops run after the
+- `action.finalize`, `action.approve_draft`, `action.approve_volume_plan` and `action.approve_arcs` MUST NEVER be auto-applied. Action ops run after the
   content transaction commits and stop at first failure.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
 - Plan edits stay plan edits: a chat turn MUST NEVER rewrite a chapter's prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose
@@ -143,7 +144,7 @@
 
 - A transform write MUST NEVER invent structure: the approved plan is the only authority for output chapters; no write runs against an unapproved or superseded plan; plans are
   never auto-approved. Cut material MUST stay cut: the ledger is append-only, rendered into every later output chapter as a risk-ranked, token-budgeted slice, and a resurfaced cut is a judge issue.
-- Rebrand, reforge, recombine MUST refuse non-`source` projects; translation refuses non-`translation`; generation, planning and outlining refuse seeds, `translation`, `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
+- Rebrand, reforge, recombine MUST refuse non-`source` projects; translation refuses non-`translation`; generation, planning and outlining refuse `translation` and `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
 - Rebrand, reforge and translation flag and continue per chapter (extract and generate stop at the first failed chapter); a failed run NEVER overwrites a good translation row, and a finalized translation is never a target. Phase and resume state MUST be
   derived from data, never advisory status columns.
 - Translation glossary is pipeline data, not canon; nothing reaches `chapters.content` except through finalize, which refuses on pending terms, stale glossary or changed original.

@@ -24,7 +24,7 @@
 - `docs/architecture.md` — topology, integrations, contract-first API types, monorepo rules.
 - `docs/packages.md` — shared package roles and hard rules.
 - `docs/identity.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md` — one per product (server and web).
-- `docs/novel-forge/` — Novel Forge: `novel-forge.md` (the product doc) and `ai-testing.md` (manual test recipes for every AI feature).
+- `docs/novel-forge/` — Novel Forge: `novel-forge.md` (the product doc), `blueprint.md` (the guided design flow a new novel starts in) and `ai-testing.md` (manual test recipes for every AI feature).
 
 ## Reading rule
 
