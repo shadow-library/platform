@@ -11,15 +11,18 @@ import {
   type AdminApi,
   clearIpState,
   createAdminApi,
+  type CreateBotOptions,
   createIdentitySession,
   createIdentityUser,
   createOAuthApplication,
   createOAuthTestClient,
+  createOrganisationBot,
   createTeamOrganisation,
   deleteIdentityUser,
   deleteOAuthApplication,
   deleteOAuthTestClient,
   deleteOrganisation,
+  deleteOrganisationBotRecord,
   deleteOrgOAuthApp,
   findIdentityUserByEmail,
   freshClientIp,
@@ -33,11 +36,14 @@ import {
   type OAuthApplication,
   type OAuthApplicationOptions,
   type OAuthTestClient,
+  type OrganisationBot,
   type OrgOAuthApp,
   registerOAuthClient,
   type RegisterOAuthClientOptions,
   registerOrgOAuthApp,
   type RegisterOrgOAuthAppOptions,
+  type SeedBotsOptions,
+  seedOrganisationBots,
   type TeamOrganisation,
   type TeamOrganisationOptions,
   updateIdentitySession,
@@ -73,6 +79,12 @@ export interface IdentityHarness {
   createOrgOAuthApp(team: IdentityTeam, options?: RegisterOrgOAuthAppOptions): Promise<OrgOAuthApp>;
   /** Removes an application the test created through the API after the test, like `createOAuthApp`'s. */
   trackApplication(applicationId: number, name: string): void;
+  /** A bot of `team`, created through the API by its elevated owner and removed — with its client and grants — after the test. */
+  createBot(team: IdentityTeam, options?: CreateBotOptions): Promise<OrganisationBot>;
+  /** `count` database-inserted bots of `team`, for the states a scenario cannot afford to reach one API call at a time. */
+  seedBots(team: IdentityTeam, count: number, options?: SeedBotsOptions): Promise<OrganisationBot[]>;
+  /** Removes a bot the test created some other way after the test, like `createBot`'s. */
+  trackBot(bot: OrganisationBot): void;
   /** A database-created team organisation with a factory OWNER, removed after the test together with every app it owns. */
   createTeam(options?: TeamOrganisationOptions): Promise<IdentityTeam>;
   /** Removes an organisation the test created some other way (e.g. through the API) after the test, like `createTeam`'s. */
@@ -112,6 +124,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const oauthClients: OAuthTestClient[] = [];
     const oauthApps: OAuthApplication[] = [];
     const organisations: { organisationId: string; ownerUserId: string }[] = [];
+    const bots: OrganisationBot[] = [];
     const registeredEmails: string[] = [];
     const extraAdmins: AdminApi[] = [];
     let adminApi: Promise<AdminApi> | undefined;
@@ -176,6 +189,19 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       trackApplication: (applicationId, name) => {
         oauthApps.push({ applicationId, name, audience: `api://${name}`, serviceClient: { clientId: name } });
       },
+      createBot: async (team, options) => {
+        const bot = await createOrganisationBot(team.ownerCtx, team.organisationId, options);
+        bots.push(bot);
+        return bot;
+      },
+      seedBots: async (team, count, options) => {
+        const seeded = await seedOrganisationBots(team.organisationId, count, { createdBy: team.owner.userId, ...options });
+        bots.push(...seeded);
+        return seeded;
+      },
+      trackBot: bot => {
+        bots.push(bot);
+      },
       createTeam: async options => {
         const owner = await createUser({ label: `${options?.label ?? 'team'}-owner` });
         const team = await createTeamOrganisation(options);
@@ -196,6 +222,8 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     await runAll([
       ...oauthClients.map(client => async () => deleteOAuthTestClient((await admin()).ctx, client)),
       ...oauthApps.map(application => async () => deleteOAuthApplication((await admin()).ctx, application)),
+      // Before the organisations: a bot's client is `ON DELETE restrict`, so an organisation taken down first strands it.
+      ...bots.map(bot => () => deleteOrganisationBotRecord(bot)),
       ...organisations.map(organisation => () => removeOrganisation(organisation)),
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
       ...extraAdmins.map(api => () => api.dispose()),

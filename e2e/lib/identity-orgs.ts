@@ -161,10 +161,11 @@ export async function addOrganisationMember(organisationId: string, userId: stri
   `;
 }
 
-export async function updateOrganisationMember(organisationId: string, userId: string, patch: Pick<MembershipOptions, 'status' | 'statusUntil'>): Promise<void> {
+export async function updateOrganisationMember(organisationId: string, userId: string, patch: Pick<MembershipOptions, 'role' | 'status' | 'statusUntil'>): Promise<void> {
   const sql = identityDb();
-  const fields = { status: patch.status, status_until: patch.statusUntil, status_changed_at: new Date() };
+  const fields = { role: patch.role, status: patch.status, status_until: patch.statusUntil, status_changed_at: patch.status === undefined ? undefined : new Date() };
   const columns = Object.entries(fields).filter(([, value]) => value !== undefined);
+  if (columns.length === 0) return;
   await sql`UPDATE organisation_members SET ${sql(Object.fromEntries(columns))} WHERE organisation_id = ${organisationId} AND user_id = ${userId}`;
 }
 
