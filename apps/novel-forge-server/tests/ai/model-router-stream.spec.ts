@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, jest } from 'bun:test';
 
 import { ModelRouterService, type ReplyStreamHandlers } from '@modules/ai/model-router.service';
 import { type ChatRefineOutput, ChatRefineSchema } from '@modules/ai/schemas/chat-refine.schema';
@@ -67,6 +67,7 @@ function makeRouter(client: unknown, cachedResponse?: string) {
     { defaultsFor: async () => undefined } as never,
   );
   (router as unknown as Record<string, unknown>)['buildClient'] = () => client;
+  (router as unknown as Record<string, unknown>)['llmBackoffMs'] = 0;
   (router as unknown as Record<string, unknown>)['logger'] = {
     debug: () => undefined,
     error: () => undefined,
@@ -90,6 +91,20 @@ const deltaText = (events: StreamEvent[]): string =>
     .join('');
 
 const tick = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 50; i++) await Promise.resolve();
+};
+
+async function runClockUntil(isDone: () => boolean): Promise<void> {
+  for (let step = 0; step < 100; step++) {
+    await settle();
+    if (isDone()) return;
+    if (jest.getTimerCount() === 0) throw new Error('clock stalled before the scenario finished');
+    jest.advanceTimersToNextTimer();
+  }
+  throw new Error('clock never settled');
+}
 
 const split = (text: string, size: number): string[] => text.match(new RegExp(`[\\s\\S]{1,${size}}`, 'g')) ?? [];
 
@@ -202,11 +217,11 @@ describe('ModelRouterService.streamStructured', () => {
     });
     expect(result.reply).toBe('Sink is gone.');
   });
+
   it('should stop feeding the relay when an attempt is abandoned, not when its backoff ends', async () => {
     const payload = JSON.stringify({ reply: 'SECOND.', changeSet: [] });
     const yielded: string[] = [];
-    let announceLate = (): void => undefined;
-    const lateChunkYielded = new Promise<void>(resolve => (announceLate = resolve));
+    let lateChunkYielded = false;
     let streamCalls = 0;
     const client = {
       invoke: async () => ({ content: payload }),
@@ -231,7 +246,7 @@ describe('ModelRouterService.streamStructured', () => {
             yielded.push(chunk);
             // Before the yield: breaking the consumer's `for await` returns into the generator, so nothing
             // after the yield ever runs.
-            if (chunk === 'LATE') announceLate();
+            if (chunk === 'LATE') lateChunkYielded = true;
             yield { content: chunk };
           }
         })();
@@ -241,13 +256,19 @@ describe('ModelRouterService.streamStructured', () => {
     (router as unknown as Record<string, unknown>)['llmTimeoutMs'] = 300;
     (router as unknown as Record<string, unknown>)['llmBackoffMs'] = 800;
     const { handlers, events } = recorder();
+    let result: ChatRefineOutput | undefined;
 
-    const result = await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
-    // The abandoned generator is still mid-sleep when the retry lands, so the assertions wait for it
-    // rather than assuming a wall-clock ordering that a loaded suite does not honour. The generator can
-    // only announce before its `yield`, so the drain is what gives an unguarded delivery time to land.
-    await lateChunkYielded;
-    await tick(25);
+    jest.useFakeTimers();
+    try {
+      let settled = false;
+      const run = router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers).finally(() => (settled = true));
+      // The abandoned generator is still mid-sleep when the retry lands, so the clock runs until both the retry
+      // has settled and the zombie chunk has been produced — an unguarded delivery would land in between.
+      await runClockUntil(() => settled && lateChunkYielded);
+      result = await run;
+    } finally {
+      jest.useRealTimers();
+    }
     const texts = events.filter(event => event.type === 'delta').map(event => event.text);
 
     expect(yielded).toContain('LATE');
@@ -260,7 +281,7 @@ describe('ModelRouterService.streamStructured', () => {
         ),
       ),
     ).toBe('AB');
-    expect(result.reply).toBe('SECOND.');
+    expect(result?.reply).toBe('SECOND.');
   });
 
   it('should treat a chunk whose content is neither a string nor a parts array as empty', async () => {

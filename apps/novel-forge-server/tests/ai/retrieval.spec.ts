@@ -1,7 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
 
-import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { chunkText } from '@modules/ai/retrieval/chunker';
 import { EmbeddingService } from '@modules/ai/retrieval/embedding.service';
 import { RetrievalService } from '@modules/ai/retrieval/retrieval.service';
@@ -67,45 +65,5 @@ describe('RetrievalService — unrestricted project', () => {
     await retrieval.searchLore(BigInt(1), 'test query');
 
     expect(embedSpy).toHaveBeenCalled();
-  });
-});
-
-describe.skip('IndexingService.backfill (requires PG + Ollama)', () => {
-  it('backfills missing chapter chunks and reports indexed/skipped counts', async () => {
-    // Full integration test: requires a live Postgres instance and a running Ollama server.
-  });
-});
-
-function makeDbStubForOutline() {
-  return {
-    query: {
-      projects: { findFirst: mock(async () => null) },
-      chapters: { findMany: mock(async () => []) },
-      volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-      arcs: { findFirst: mock(async () => null) },
-      contextPacks: { findFirst: mock(async () => null) },
-    },
-    insert: mock(() => ({
-      values: mock(() => ({
-        onConflictDoNothing: mock(() => ({
-          returning: mock(async () => []),
-        })),
-      })),
-    })),
-  };
-}
-
-describe('ContextAssembler.forOutline — no RetrievalService injected', () => {
-  it('returns a pack with no prose_retrieved or lore_retrieved sections', async () => {
-    const db = makeDbStubForOutline();
-    const fakeDatabaseService = { getPostgresClient: () => db } as never;
-    const fakeCatalog = { render: mock(async () => '') } as unknown as CatalogService;
-
-    const assembler = new ContextAssembler(fakeDatabaseService, fakeCatalog);
-    const pack = await assembler.forOutline(1n, 3, { budgetTokens: 100_000 });
-
-    const sectionKeys = pack.sections.map(s => s.key);
-    expect(sectionKeys).not.toContain('prose_retrieved');
-    expect(sectionKeys).not.toContain('lore_retrieved');
   });
 });

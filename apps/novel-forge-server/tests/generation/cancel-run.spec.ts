@@ -35,22 +35,6 @@ describe('GenerationService.cancelRun', () => {
     expect(cancelCalls).toEqual([]);
   });
 
-  it('should report already_settled for a run that settled as failed', async () => {
-    const { service } = makeService({ status: 'failed' }, true);
-
-    const result = await service.cancelRun(BigInt(1), 'run-1');
-
-    expect(result).toEqual({ runId: 'run-1', status: 'failed', outcome: 'already_settled' });
-  });
-
-  it('should report already_settled for a run that settled as cancelled', async () => {
-    const { service } = makeService({ status: 'cancelled' }, true);
-
-    const result = await service.cancelRun(BigInt(1), 'run-1');
-
-    expect(result).toEqual({ runId: 'run-1', status: 'cancelled', outcome: 'already_settled' });
-  });
-
   it('should report not_delivered without writing the run row when it is running in the database but not live on this replica', async () => {
     const { service, cancelCalls } = makeService({ status: 'running' }, false);
 

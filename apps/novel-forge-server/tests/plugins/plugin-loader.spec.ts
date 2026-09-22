@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { loadPlugins, PLUGIN_ID_PATTERN, type PluginHostApi, validateManifest } from '@modules/plugins';
 
@@ -152,6 +152,13 @@ describe('PLUGIN_ID_PATTERN', () => {
 });
 
 describe('loadPlugins', () => {
+  // Bun transpiles the first dynamically imported plugin entry cold; paying that here keeps it out of the tests.
+  beforeAll(async () => {
+    const root = makeRoot();
+    writePlugin(root, 'warmup');
+    await loadPlugins(root, () => noopHost);
+  });
+
   it('should return an empty list when the directory does not exist', async () => {
     await expect(loadPlugins(join(makeRoot(), 'absent'), () => noopHost)).resolves.toEqual([]);
   });

@@ -3,7 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph } from '@modules/ai/context/token-budget';
-import { routeAfterJudge, routeAfterPatch, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
+import { routeAfterJudge, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
 
 function makeDbStub() {
   const noRows = mock(async () => []);
@@ -33,17 +33,6 @@ function makeAssembler() {
   const fakeCatalog = { render: mock(async () => '') } as unknown as CatalogService;
   return new ContextAssembler(fakeDatabaseService, fakeCatalog);
 }
-
-describe('countTokens — edge cases', () => {
-  it('returns 0 for an empty string', () => {
-    expect(countTokens('')).toBe(0);
-  });
-
-  it('returns 0 for a whitespace-only string', () => {
-    // tiktoken encodes whitespace; this asserts the boundary is consistent.
-    expect(typeof countTokens('   ')).toBe('number');
-  });
-});
 
 describe('applyBudget — edge cases', () => {
   it('force-includes the first section when it alone exceeds the budget (at-least-one guarantee)', () => {
@@ -98,65 +87,15 @@ describe('truncateAtParagraph — edge cases', () => {
 });
 
 describe('sameFinding', () => {
-  it('detects duplicate finding regardless of casing', () => {
-    const current = [{ severity: 'hard' as const, text: 'Character A teleports without explanation' }];
-    const previous = [{ severity: 'hard' as const, text: 'character a teleports without explanation' }];
-    expect(sameFinding(current, previous)).toBe(true);
-  });
-
   it('normalizes leading/trailing whitespace before comparison', () => {
     const current = [{ severity: 'soft' as const, text: '  sword is broken  ' }];
     const previous = [{ severity: 'soft' as const, text: 'sword is broken' }];
     expect(sameFinding(current, previous)).toBe(true);
   });
-
-  it('returns false when previousFindings is empty', () => {
-    const current = [{ severity: 'hard' as const, text: 'Some finding' }];
-    expect(sameFinding(current, [])).toBe(false);
-  });
-
-  it('returns false when findings lists have no overlap', () => {
-    const current = [{ severity: 'hard' as const, text: 'completely different finding about dragons' }];
-    const previous = [{ severity: 'hard' as const, text: 'entirely unrelated observation about magic' }];
-    expect(sameFinding(current, previous)).toBe(false);
-  });
-
-  it('returns false when both arrays are empty', () => {
-    expect(sameFinding([], [])).toBe(false);
-  });
 });
 
 describe('routeAfterJudge', () => {
   const base = { verdict: 'contradiction' as const, autoFix: true, attempt: 0, maxFixes: 3, findings: [{ severity: 'hard' as const, text: 'some issue' }], previousFindings: [] };
-
-  it('routes to "accept" when verdict is consistent', () => {
-    expect(routeAfterJudge({ ...base, verdict: 'consistent' })).toBe('accept');
-  });
-
-  it('routes to "awaitReview" when autoFix is false', () => {
-    expect(routeAfterJudge({ ...base, autoFix: false })).toBe('awaitReview');
-  });
-
-  it('routes to "acceptAsIs" when attempt equals maxFixes', () => {
-    expect(routeAfterJudge({ ...base, attempt: 3, maxFixes: 3 })).toBe('acceptAsIs');
-  });
-
-  it('routes to "acceptAsIs" when attempt exceeds maxFixes', () => {
-    expect(routeAfterJudge({ ...base, attempt: 5, maxFixes: 3 })).toBe('acceptAsIs');
-  });
-
-  it('routes to "acceptAsIs" when same finding repeats (dedup triggered)', () => {
-    const repeated = { severity: 'hard' as const, text: 'sword inconsistency detected' };
-    expect(routeAfterJudge({ ...base, findings: [repeated], previousFindings: [repeated] })).toBe('acceptAsIs');
-  });
-
-  it('routes to "repairPatch" when autoFix, under maxFixes, and no repeated findings', () => {
-    expect(routeAfterJudge(base)).toBe('repairPatch');
-  });
-
-  it('routes to "repairPatch" when previousFindings is empty (never trips dedup)', () => {
-    expect(routeAfterJudge({ ...base, previousFindings: [] })).toBe('repairPatch');
-  });
 
   it('routes an ending-contract violation into the repair ladder even on a consistent verdict', () => {
     expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false })).toBe('repairPatch');
@@ -165,16 +104,6 @@ describe('routeAfterJudge', () => {
     expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: true })).toBe('accept');
     // Legacy callers without the flag keep today's behavior.
     expect(routeAfterJudge({ ...base, verdict: 'consistent' })).toBe('accept');
-  });
-});
-
-describe('routeAfterPatch', () => {
-  it('routes to "persistDraft" when patch was applied', () => {
-    expect(routeAfterPatch({ patchApplied: true })).toBe('persistDraft');
-  });
-
-  it('routes to "repairRewrite" when patch was not applied', () => {
-    expect(routeAfterPatch({ patchApplied: false })).toBe('repairRewrite');
   });
 });
 

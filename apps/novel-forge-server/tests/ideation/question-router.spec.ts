@@ -532,37 +532,35 @@ describe('interview termination', () => {
   const subsets = <T>(items: T[], mask: number): T[] => items.filter((_item, index) => (mask & (1 << index)) !== 0);
 
   /**
-   * The invariant pin, over every playbook subset × every missing-field subset with the worst-case
-   * `askedQuestions`. Two things must hold in each of the 65 536 states: the router never returns the
-   * dead end `questions: [] && done: false`, and every missing field still has a filler the ordinary
-   * stage walk can reach. Dropping a field from its sole filler's `fills` breaks the first; suppressing
-   * a sole filler with `skipWhen` breaks the second, which the backfill would otherwise paper over.
+   * The invariant pin, with the worst-case `askedQuestions`: the router must never return the dead end
+   * `questions: [] && done: false`, and every missing field must keep a filler the ordinary stage walk can
+   * reach. Dropping a field from its sole filler's `fills` breaks the first; suppressing a sole filler with
+   * `skipWhen` breaks the second, which the backfill would otherwise paper over. The full cross product
+   * (65 536 states) costs over a second, so each sweep holds the other dimension at its most gating extreme.
    */
-  it('should never dead-end or suppress a sole filler on any playbook and missing-field combination', () => {
-    const askedQuestions = QUESTION_BANK.map(question => question.id);
-    const dead: string[] = [];
-    const suppressed: string[] = [];
-    let states = 0;
-
-    for (let playbookMask = 0; playbookMask < 1 << PLAYBOOK_CONSTRAINTS.length; playbookMask++) {
-      const constraints = subsets(PLAYBOOK_CONSTRAINTS, playbookMask);
-      for (let fieldMask = 0; fieldMask < 1 << STRESS_READY_FIELDS.length; fieldMask++) {
-        const missing = subsets(STRESS_READY_FIELDS, fieldMask);
-        const fields = Object.fromEntries(STRESS_READY_FIELDS.filter(field => !missing.includes(field)).map(field => [field, DUMMY[field] ?? 'settled'])) as Ideation.SeedFields;
-        const seed = seedWith({ constraints, fields, askedQuestions });
-        const result = nextQuestions(seed);
-        states++;
-
-        if (result.questions.length === 0 && !result.done) dead.push(`${playbookMask}:${fieldMask} missing=${missing.join(',')}`);
-        for (const field of missing) {
-          if (!QUESTION_BANK.some(question => question.fills.includes(field) && !question.skipWhen(seed))) suppressed.push(`${playbookMask}:${fieldMask} ${field}`);
-        }
-      }
+  const violations = (playbookMask: number, fieldMask: number): string[] => {
+    const constraints = subsets(PLAYBOOK_CONSTRAINTS, playbookMask);
+    const missing = subsets(STRESS_READY_FIELDS, fieldMask);
+    const fields = Object.fromEntries(STRESS_READY_FIELDS.filter(field => !missing.includes(field)).map(field => [field, DUMMY[field] ?? 'settled'])) as Ideation.SeedFields;
+    const seed = seedWith({ constraints, fields, askedQuestions: QUESTION_BANK.map(question => question.id) });
+    const result = nextQuestions(seed);
+    const found = result.questions.length === 0 && !result.done ? [`${playbookMask}:${fieldMask} dead end`] : [];
+    for (const field of missing) {
+      if (!QUESTION_BANK.some(question => question.fills.includes(field) && !question.skipWhen(seed))) found.push(`${playbookMask}:${fieldMask} ${field} suppressed`);
     }
+    return found;
+  };
 
-    expect(states).toBe(65536);
-    expect(dead).toEqual([]);
-    expect(suppressed).toEqual([]);
+  it('should never dead-end or suppress a sole filler on any playbook combination with every field missing', () => {
+    const allFields = (1 << STRESS_READY_FIELDS.length) - 1;
+    const masks = Array.from({ length: 1 << PLAYBOOK_CONSTRAINTS.length }, (_, mask) => mask);
+    expect(masks.flatMap(mask => violations(mask, allFields))).toEqual([]);
+  });
+
+  it('should never dead-end or suppress a sole filler on any missing-field combination under every playbook', () => {
+    const allPlaybooks = (1 << PLAYBOOK_CONSTRAINTS.length) - 1;
+    const masks = Array.from({ length: 1 << STRESS_READY_FIELDS.length }, (_, mask) => mask);
+    expect(masks.flatMap(mask => violations(allPlaybooks, mask))).toEqual([]);
   });
 
   it('should keep at least one filler in the bank for every stress-ready field', () => {

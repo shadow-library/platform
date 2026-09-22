@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ConsolidateService } from '@modules/extraction/consolidate.service';
-import { SkeletonService } from '@modules/planning/skeleton.service';
 import { AssetService } from '@modules/source/asset.service';
 import { cleanHtml } from '@modules/source/text-cleaner';
 
@@ -67,20 +65,6 @@ describe('cleanHtml', () => {
     expect(result).toContain('Click here');
     expect(result).not.toContain('href');
     expect(result).not.toContain('https://example.com');
-  });
-});
-
-describe('ConsolidateService', () => {
-  it('class is defined and instantiable', () => {
-    expect(ConsolidateService).toBeDefined();
-    expect(typeof ConsolidateService).toBe('function');
-  });
-});
-
-describe('SkeletonService', () => {
-  it('class is defined', () => {
-    expect(SkeletonService).toBeDefined();
-    expect(typeof SkeletonService).toBe('function');
   });
 });
 

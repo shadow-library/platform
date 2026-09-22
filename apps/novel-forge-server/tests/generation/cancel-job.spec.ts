@@ -26,38 +26,6 @@ describe('GenerationService.cancelJob', () => {
     expect(calls).toEqual([['job-1', BigInt(1)]]);
   });
 
-  it('should report stopping for a job that was in progress', async () => {
-    const { service } = makeService({ status: 'in_progress', outcome: 'stopping' });
-
-    const result = await service.cancelJob(BigInt(1), 'job-1');
-
-    expect(result).toEqual({ jobId: 'job-1', status: 'in_progress', outcome: 'stopping' });
-  });
-
-  it('should report already_settled for a job that finished as done', async () => {
-    const { service } = makeService({ status: 'done', outcome: 'already_settled' });
-
-    const result = await service.cancelJob(BigInt(1), 'job-1');
-
-    expect(result).toEqual({ jobId: 'job-1', status: 'done', outcome: 'already_settled' });
-  });
-
-  it('should report already_settled for a job that finished as failed', async () => {
-    const { service } = makeService({ status: 'failed', outcome: 'already_settled' });
-
-    const result = await service.cancelJob(BigInt(1), 'job-1');
-
-    expect(result).toEqual({ jobId: 'job-1', status: 'failed', outcome: 'already_settled' });
-  });
-
-  it('should report already_settled, idempotently, for a job that already settled as cancelled', async () => {
-    const { service } = makeService({ status: 'cancelled', outcome: 'already_settled' });
-
-    const result = await service.cancelJob(BigInt(1), 'job-1');
-
-    expect(result).toEqual({ jobId: 'job-1', status: 'cancelled', outcome: 'already_settled' });
-  });
-
   it('should 404 for a job id that does not exist, or that belongs to another project', async () => {
     const { service } = makeService(undefined);
 

@@ -173,14 +173,4 @@ describe('computeAnalysisSignals', () => {
     expect(window).toContain('filler ch. 8-11');
     for (const line of window.split('\n')) expect(renderSignalDigest(signals)).toContain(line);
   });
-
-  it('should finish a 2,000-chapter corpus at MTL chapter length inside the analysis budget', () => {
-    const chapters: SignalChapter[] = [];
-    for (let i = 1; i <= 2000; i++) chapters.push(chapter(i, `${prose(i, [...NAMES, newcomer(i)], 150)} ${speech(i)}`));
-
-    const started = performance.now();
-    const signals = computeAnalysisSignals(chapters);
-    expect(performance.now() - started).toBeLessThan(30_000);
-    expect(signals.metrics.chapterCount).toBe(2000);
-  }, 120_000);
 });

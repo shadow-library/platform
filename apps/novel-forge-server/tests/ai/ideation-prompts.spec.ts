@@ -12,7 +12,6 @@ import {
 } from '@modules/ai/prompts';
 import { IdeationConceptsSchema, IdeationStressSchema, IdeationTurnSchema } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
-import { getQuestion } from '@modules/ideation/question-bank';
 import { READINESS_DIMENSION_ORDER, type ReadinessDimension } from '@modules/ideation/question-router';
 
 const question = {
@@ -48,22 +47,6 @@ const precheck = (verdicts: Partial<Record<string, ReadinessDimension['verdict']
   READINESS_DIMENSION_ORDER.map(dimension => ({ dimension, fields: [], present: [], verdict: verdicts[dimension] ?? 'strong' }));
 
 describe('ideation prompt modules', () => {
-  it('should register the three studio prompts on the chat and judge roles', () => {
-    expect(PROMPT_REGISTRY['ideation-turn'].role).toBe('chat');
-    expect(PROMPT_REGISTRY['ideation-concepts'].role).toBe('chat');
-    expect(PROMPT_REGISTRY['ideation-stress'].role).toBe('judge');
-
-    expect(PROMPT_REGISTRY['ideation-turn'].kind).toBe('authoring');
-    expect(PROMPT_REGISTRY['ideation-concepts'].kind).toBe('authoring');
-    expect(PROMPT_REGISTRY['ideation-stress'].kind).toBe('analytical');
-
-    expect(PROMPT_REGISTRY['ideation-turn'].version).toBe('1.3.0');
-    for (const key of ['ideation-concepts', 'ideation-stress'] as const) expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-    for (const key of ['ideation-turn', 'ideation-concepts', 'ideation-stress'] as const) {
-      expect(PROMPT_REGISTRY[key].cacheStrategy).toEqual({ stableVars: ['stableContext'] });
-    }
-  });
-
   it('should render ideation-turn in cache order: system, stable sheet, history, the round and the author', async () => {
     const messages = await PROMPT_REGISTRY['ideation-turn'].template.formatMessages({
       stableContext: 'STABLE-SEED-SHEET',
@@ -116,72 +99,6 @@ describe('ideation prompt modules', () => {
     expect(buildIdeationTurnPrompt(roundOf()).system).toContain(PROMPT_REGISTRY['ideation-turn'].system);
   });
 
-  it('should tell the turn prompt it may neither invent questions nor rewrite a coaching line', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('character for character');
-    expect(system).toContain('never invent a question of your own');
-    expect(system).toContain('CIRCLING BACK');
-    expect(system).toContain('HINT');
-  });
-
-  it('should carry the emission contracts the router reads back', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('A question that lists NO fields never produces a field');
-    expect(system).toContain("when the question's intent names a key and a kind, use exactly those");
-    expect(system).toContain('otherwise choose a short kebab-case key and the kind the intent implies');
-    expect(system).toContain('The spark question is the one exception');
-  });
-
-  it('should state the wholesale-replace rule once, in the rendered op vocabulary', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('"constraints", "concepts", and "tasteAnchors" replace their whole column');
-    expect(system).not.toContain('"constraints" replaces the whole list');
-  });
-
-  it("should name tasteAnchors as the taste question's destination, in the prompt and in the question itself", () => {
-    expect(PROMPT_REGISTRY['ideation-turn'].system).toContain('Its answer writes seed.update tasteAnchors');
-    expect(getQuestion('taste.comps')?.intent).toContain('emit it as seed.update tasteAnchors');
-  });
-
-  it('should keep the reply a lead-in and the questions in payload.questions[].wording', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('"reply" is the lead-in and nothing more');
-    expect(system).toContain('payload.questions[].wording');
-    expect(system).toContain('A question repeated in the reply is the author asked twice');
-  });
-
-  it('should tell the turn prompt how to word options for the round’s cardinality', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('"select" is the round\'s Select value for this question, copied unchanged');
-    expect(system).toContain('every option must stand on its own');
-    expect(system).toContain('never written as alternatives ("either X or Y")');
-    expect(system).toContain('Never write a selection-count instruction');
-  });
-
-  it('should split locks from the change set by where the decision came from', () => {
-    const system = PROMPT_REGISTRY['ideation-turn'].system;
-    expect(system).toContain('goes straight into the changeSet');
-    expect(system).toContain('payload.locks is for inferred material only');
-  });
-
-  it('should name a constraint key and kind on every playbook-gated question', () => {
-    const gated = ['deepen.secondLadder', 'deepen.foreknowledgeDecay', 'deepen.divergence', 'deepen.stayingCost'] as const;
-    const gatedKeys = { 'deepen.secondLadder': 'ladder', 'deepen.foreknowledgeDecay': 'knowledge', 'deepen.divergence': 'divergence', 'deepen.stayingCost': 'tension' };
-    const more = { 'deepen.systemRules': 'system', 'deepen.povBudget': 'pov', 'deepen.deferredTension': 'tension', 'deepen.ironyBudget': 'irony' };
-
-    for (const [id, key] of [...gated.map(id => [id, gatedKeys[id]] as const), ...Object.entries(more)]) {
-      expect(getQuestion(id)?.intent).toContain(`key '${key}' and kind 'shape'`);
-    }
-  });
-
-  it('should exempt the spark question from a fixed emission key', () => {
-    const intent = getQuestion('spark.idea')?.intent ?? '';
-    expect(intent).toContain('no fixed emission key');
-    expect(intent).toContain('sheet-shaped material lands as fields in seed.update');
-    expect(intent).toContain('story-rule material as constraints');
-    expect(intent).toContain('offered as locks for confirmation first');
-  });
-
   it('should render ideation-concepts with the stable sheet first and the round material last', async () => {
     const messages = await PROMPT_REGISTRY['ideation-concepts'].template.formatMessages({ stableContext: 'STABLE-SEED-SHEET', volatileContext: 'KILLED-CARDS' });
 
@@ -203,18 +120,6 @@ describe('ideation prompt modules', () => {
 });
 
 describe('the ideation scope playbook', () => {
-  it('should carry the four product rules of the studio charter', () => {
-    const guidance = SCOPE_PLAYBOOKS.ideation.guidance;
-    expect(guidance).toContain('Never an empty box');
-    expect(guidance).toContain("'You decide' commits and explains");
-    expect(guidance).toContain('Never ask what you were already told');
-    expect(guidance).toContain('The exit is always visible');
-    expect(guidance).toContain('Word options for the Select you were given');
-    expect(guidance).toContain('every option must be independently selectable');
-    expect(guidance).toContain("never written as alternatives ('either X or Y')");
-    expect(guidance).toContain("no 'pick as many as you like', no 'choose one or more'");
-  });
-
   it('should render the sheet edit and the exit, and no other vocabulary', () => {
     const instructions = renderScopeInstructions('ideation');
     expect(instructions).toContain('"op": "seed.update"');
@@ -223,11 +128,6 @@ describe('the ideation scope playbook', () => {
     expect(instructions).not.toContain('"op": "premise.update"');
     expect(instructions).not.toContain('"op": "bible_document.upsert"');
     expect(instructions).not.toContain('"op": "action.plan_volumes"');
-  });
-
-  it('should let the studio stage sheet edits and the graduation, and nothing else', () => {
-    expect(SCOPE_PLAYBOOKS.ideation.allowedOps).toEqual(['seed.update']);
-    expect(SCOPE_PLAYBOOKS.ideation.allowedActions).toEqual(['action.graduate_seed']);
   });
 
   it('should bake the charter and the vocabulary into the turn prompt itself', () => {

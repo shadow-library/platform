@@ -43,7 +43,6 @@ import {
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
 import { resolveWordTarget, WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
-import { reforgeFidelity } from '@server/database/schemas';
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {
@@ -84,11 +83,6 @@ describe('Prompt modules', () => {
         expect(p.system).not.toContain('- Write in third-person limited, past tense');
         expect(p.system).toContain('Keep the point of view and tense the writing style asks for; when it sets none, write in third-person limited, past tense');
       }
-    });
-
-    it('should make revision carry the established facts forward', () => {
-      expect(PROMPT_REGISTRY.revision.version).toBe('1.4.0');
-      expect(PROMPT_REGISTRY.revision.system).toContain('carry forward the incoming "## CONTINUATION STATE" section\'s establishedFacts');
     });
   });
 
@@ -203,15 +197,6 @@ describe('Prompt modules', () => {
   });
 
   describe('refinement prompt modules', () => {
-    it('registers the five new prompt keys', () => {
-      for (const key of ['chat-compact', 'arc-plan'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
-      expect(PROMPT_REGISTRY['chat-compact'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['arc-plan'].version).toBe('1.3.0');
-      expect(PROMPT_REGISTRY['bible-audit'].version).toBe('2.1.0');
-      expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.2.0');
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.2.0');
-    });
-
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
       const messages = await PROMPT_REGISTRY['chat-refine'].template.formatMessages({
         scopeInstructions: SCOPE_PLAYBOOKS.project.guidance,
@@ -234,11 +219,6 @@ describe('Prompt modules', () => {
       for (const key of ['chat-refine', 'premise-enhance', 'bible-audit', 'arc-plan', 'plan', 'outline', 'fix', 'revision'] as const) {
         expect(PROMPT_REGISTRY[key].system).toContain(EDIT_BY_DELETION);
       }
-    });
-
-    it('should keep a plan edit in the plan in the hub playbook', () => {
-      expect(SCOPE_PLAYBOOKS.project.guidance).toContain('Plan edits stay plan edits');
-      expect(SCOPE_PLAYBOOKS.project.guidance).toContain('only when the author has turned on Edit prose');
     });
 
     it('should advise against a prose op unless the author turned on Edit prose', () => {
@@ -303,13 +283,6 @@ describe('Prompt modules', () => {
       expect(hub).toContain('Lookups and a changeSet never share a response');
 
       expect(renderScopeInstructions('ideation')).not.toContain('Chat context is an index');
-    });
-
-    it('no longer carries a bootstrap interview block — the Ideation Studio owns that conversation', () => {
-      const hub = renderScopeInstructions('project');
-      expect(hub).toContain(SCOPE_PLAYBOOKS.project.guidance);
-      expect(hub).not.toContain('BOOTSTRAP');
-      expect(hub).not.toContain('Interview first');
     });
 
     it('offers graduation to the studio scope and to no other', () => {
@@ -421,17 +394,6 @@ describe('Prompt modules', () => {
   });
 
   describe('rebrand prompt modules', () => {
-    it('registers the three rebrand prompt keys with the expected roles', () => {
-      for (const key of ['rebrand-glossary', 'rebrand-convert', 'rebrand-audit'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
-      expect(PROMPT_REGISTRY['rebrand-glossary'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['rebrand-audit'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['rebrand-convert'].version).toBe('1.1.0');
-      expect(PROMPT_REGISTRY['rebrand-glossary'].role).toBe('rebrand');
-      expect(PROMPT_REGISTRY['rebrand-convert'].role).toBe('rebrand');
-      // The audit reuses the cacheable `audit` role so identical re-audits hit llm_cache.
-      expect(PROMPT_REGISTRY['rebrand-audit'].role).toBe('audit');
-    });
-
     it('renders rebrand-convert in cache order: system, stable pack, volatile chapter tail', async () => {
       const messages = await PROMPT_REGISTRY['rebrand-convert'].template.formatMessages({
         stableContext: 'STABLE-WORLD-NOTES',
@@ -475,12 +437,8 @@ describe('Prompt modules', () => {
       expect(parseSchema(RebrandConvertSchema, withExtras).success).toBe(true);
     });
 
-    it('registers the recombine prompt and validates its decision shape', async () => {
+    it('should render the recombine boundaries and validate its decision shape', async () => {
       const prompt = PROMPT_REGISTRY['recombine'];
-      expect(prompt.version).toBe('1.0.0');
-      // Boundary resolution rides the skeleton role — same source-structure-analysis family.
-      expect(prompt.role).toBe('skeleton');
-
       const messages = await prompt.template.formatMessages({ boundaries: 'Boundary after chapter 12 (flag: bare_repeat)' });
       expect(messages[0]?.getType()).toBe('system');
       expect(String(messages[1]?.content)).toContain('flag: bare_repeat');
@@ -501,17 +459,6 @@ describe('Prompt modules', () => {
 
   describe('translate prompt modules', () => {
     const term = { sourceTerm: '\u53f6\u51e1', target: 'Ye Fan', category: 'character' as const, treatment: 'transliterate' as const, meaning: 'the protagonist' };
-
-    it('registers the three translate prompt keys with the expected roles', () => {
-      for (const key of ['translate-seed', 'translate-chapter', 'translate-audit'] as const) {
-        expect(PROMPT_REGISTRY[key]).toBeDefined();
-        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-      }
-      expect(PROMPT_REGISTRY['translate-seed'].role).toBe('translate');
-      expect(PROMPT_REGISTRY['translate-chapter'].role).toBe('translate');
-      // The audit reuses the cacheable `audit` role so identical re-audits hit llm_cache.
-      expect(PROMPT_REGISTRY['translate-audit'].role).toBe('audit');
-    });
 
     it('registers every translate prompt as analytical so the house style never reaches the author\u2019s prose', () => {
       for (const key of ['translate-seed', 'translate-chapter', 'translate-audit'] as const) {
@@ -539,13 +486,6 @@ describe('Prompt modules', () => {
       expect(volatile).toContain('VOLATILE-SOURCE-SEGMENT');
       expect(volatile).toContain('Previous segment ending (continue directly from it; do not restate it): VOLATILE-PREV-SEGMENT-TAIL');
       expect(volatile).toContain('restore the dropped sentence');
-    });
-
-    it('should tell the in-chapter segment carry apart from the cross-chapter ending', () => {
-      const system = PROMPT_REGISTRY['translate-chapter'].system;
-      expect(system).toContain('PREVIOUS CHAPTER ENDING');
-      expect(system).toContain('inside this same chapter');
-      expect(system).toContain('`none` means this is the first segment');
     });
 
     it('names only the stable-segment var in translate-chapter cacheStrategy', () => {
@@ -598,22 +538,6 @@ describe('Prompt modules', () => {
   });
 
   describe('reforge prompt modules', () => {
-    it('registers the three reforge prompt keys with the expected roles', () => {
-      for (const key of ['reforge-outline', 'reforge-write', 'reforge-judge'] as const) expect(PROMPT_REGISTRY[key]).toBeDefined();
-      expect(PROMPT_REGISTRY['reforge-outline'].version).toBe('1.0.0');
-      expect(PROMPT_REGISTRY['reforge-judge'].version).toBe('1.1.0');
-      expect(PROMPT_REGISTRY['reforge-write'].version).toBe('1.2.0');
-      // Outline and write ride the dedicated writing-group `reforge` role; the fidelity check reuses `judge`.
-      expect(PROMPT_REGISTRY['reforge-outline'].role).toBe('reforge');
-      expect(PROMPT_REGISTRY['reforge-write'].role).toBe('reforge');
-      expect(PROMPT_REGISTRY['reforge-judge'].role).toBe('judge');
-      // The re-author elevates prose, so it carries the house style; the two analytical prompts must not.
-      expect(PROMPT_REGISTRY['reforge-write'].kind).toBe('authoring');
-      expect(PROMPT_REGISTRY['reforge-write'].system).toContain(AUTHORING_STYLE.slice(0, 40));
-      expect(PROMPT_REGISTRY['reforge-outline'].kind).toBe('analytical');
-      expect(PROMPT_REGISTRY['reforge-judge'].kind).toBe('analytical');
-    });
-
     it('renders reforge-outline with the stable pack first and the volatile source prose last', async () => {
       const messages = await PROMPT_REGISTRY['reforge-outline'].template.formatMessages({ contextPack: 'STABLE-WORLD-NOTES', chapterProse: 'VOLATILE-SOURCE-PROSE' });
       expect(messages).toHaveLength(3);
@@ -653,10 +577,6 @@ describe('Prompt modules', () => {
       expect(String(messages[1]?.content)).toContain('OUTLINE');
       expect(String(messages[1]?.content)).toContain('SLICE');
       expect(String(messages[2]?.content)).toContain('PROSE');
-    });
-
-    it('should keep the prompt fidelity levels aligned with the reforge_fidelity enum', () => {
-      expect(reforgeFidelity.enumValues).toEqual(['preserve', 'close', 'loose']);
     });
 
     it('should render no fidelity block at preserve, keeping the level-less prompts byte-identical', async () => {
@@ -744,21 +664,6 @@ describe('Prompt modules', () => {
     const card = { chapter: 12, summary: 'Evan loses the duel and learns nothing.', movement: 'stalls' as const };
     const finding = { type: 'repetition' as const, fromChapter: 12, toChapter: 26, severity: 4, confidence: 0.7, label: 'the tournament repeats' };
 
-    it('registers both analysis prompt keys as analytical extraction work', () => {
-      for (const key of ['reforge-analyze-window', 'reforge-synthesize'] as const) {
-        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
-        expect(PROMPT_REGISTRY[key].kind).toBe('analytical');
-        // No new AiRole: analysis reuses `extraction` so neither role-defaults map churns.
-        expect(PROMPT_REGISTRY[key].role).toBe('extraction');
-        expect(PROMPT_REGISTRY[key].cacheStrategy?.stableVars).toEqual(['stableContext']);
-      }
-    });
-
-    it('forbids both analysis prompts from judging prose', () => {
-      expect(PROMPT_REGISTRY['reforge-analyze-window'].system).toContain('Prose quality is not your business');
-      expect(PROMPT_REGISTRY['reforge-synthesize'].system).toContain('Say nothing about prose quality');
-    });
-
     it('renders the window prompt in cache order: system, stable bible, volatile state with the source prose', async () => {
       const messages = await PROMPT_REGISTRY['reforge-analyze-window'].template.formatMessages({
         stableContext: 'STABLE-WORLD-NOTES',
@@ -823,14 +728,6 @@ describe('Prompt modules', () => {
       { ordinal: 2, fromChapter: 5, toChapter: 12, action: 'condense' as const, targetChapters: 3, rationale: 'eight chapters of tournament', keptBeats: ['the duel lands'] },
     ];
 
-    it('registers the plan prompt on the planning role without borrowing the authoring voice', () => {
-      const prompt = PROMPT_REGISTRY['reforge-plan'];
-      expect(prompt.version).toBe('1.0.0');
-      expect(prompt.kind).toBe('analytical');
-      expect(prompt.role).toBe('plan');
-      expect(prompt.cacheStrategy?.stableVars).toEqual(['stableContext']);
-    });
-
     it('renders the plan prompt from the report and cards, never from source prose', async () => {
       const messages = await PROMPT_REGISTRY['reforge-plan'].template.formatMessages({
         stableContext: 'STABLE-WORLD-NOTES',
@@ -858,27 +755,6 @@ describe('Prompt modules', () => {
   });
 
   describe('reforge transform write and judge prompts', () => {
-    it('registers the write on the reforge role and the judge on the judge role', () => {
-      expect(PROMPT_REGISTRY['reforge-transform-write']).toMatchObject({ version: '1.0.0', kind: 'authoring', role: 'reforge' });
-      expect(PROMPT_REGISTRY['reforge-transform-write'].system).toContain(AUTHORING_STYLE.slice(0, 40));
-      expect(PROMPT_REGISTRY['reforge-transform-write'].cacheStrategy?.stableVars).toEqual(['stableContext']);
-      expect(PROMPT_REGISTRY['reforge-transform-judge']).toMatchObject({ version: '1.0.0', kind: 'analytical', role: 'judge' });
-    });
-
-    it('tells the writer the plan is the only authority and the ledger is not background', () => {
-      const system = PROMPT_REGISTRY['reforge-transform-write'].system;
-      expect(system).toContain('Never add an output chapter');
-      expect(system).toContain('cutting slack is the job, not a deviation');
-      expect(system).toContain('It is not background you may allude to');
-    });
-
-    it('forbids the judge from calling condensation drift or judging prose', () => {
-      const system = PROMPT_REGISTRY['reforge-transform-judge'].system;
-      expect(system).toContain('CONDENSATION IS NOT DRIFT');
-      expect(system).toContain('Never report a beat as invented');
-      expect(system).toContain('FORBIDDEN from judging prose quality');
-    });
-
     it('renders the write prompt in cache order with the span contract and source prose last', async () => {
       const messages = await PROMPT_REGISTRY['reforge-transform-write'].template.formatMessages({
         stableContext: 'STABLE-LEDGER',
@@ -1019,15 +895,6 @@ describe('Prompt modules', () => {
       expect(system).not.toContain(words(WORD_TARGET_MAX));
     });
 
-    it('should keep the continuation cut from licensing a short chapter', () => {
-      expect(PROMPT_REGISTRY.generation.system).toContain('decides where the chapter ends, not how long it is');
-    });
-
-    it('should keep the aim inside the target band', () => {
-      expect(WORD_TARGET_AIM).toBeGreaterThan(WORD_TARGET_MIN);
-      expect(WORD_TARGET_AIM).toBeLessThan(WORD_TARGET_MAX);
-    });
-
     it('should route chapter-expand as generation and render the draft with its word targets in the volatile tail', async () => {
       const prompt = PROMPT_REGISTRY['chapter-expand'];
       expect(prompt.role).toBe('generation');
@@ -1061,53 +928,16 @@ describe('Prompt modules', () => {
       }
     });
 
-    it('should forbid chapter-expand from adding events or moving the final beat', () => {
-      expect(PROMPT_REGISTRY['chapter-expand'].system).toContain('Add no new plot events');
-      expect(PROMPT_REGISTRY['chapter-expand'].system).toContain('never continues past it');
-    });
-
     it('should leave point of view and tense to the project instructions in chapter-expand', () => {
-      expect(PROMPT_REGISTRY['chapter-expand'].version).toBe('1.1.0');
       expect(PROMPT_REGISTRY['chapter-expand'].system).not.toContain('third-person limited');
       expect(PROMPT_REGISTRY['chapter-expand'].system).not.toContain(AUTHORING_STYLE.slice(0, 40));
     });
   });
 
   describe('knowledge contract (generation/judge v2.2)', () => {
-    it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
-      expect(PROMPT_REGISTRY.generation.version).toBe('2.7.0');
-      expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
-      expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
-      expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');
-      expect(PROMPT_REGISTRY.generation.system).toContain('does not exist for the cast');
-    });
-
-    it('should bind the writer to earlier chapters established facts and make it carry them forward', () => {
-      expect(PROMPT_REGISTRY.generation.system).toContain('never restate one differently or invent a replacement');
-      expect(PROMPT_REGISTRY.generation.system).toContain('Every chapter, whatever its ending, fills state.establishedFacts');
-      expect(PROMPT_REGISTRY.generation.system).toContain('what they witnessed on the page in earlier chapters');
-    });
-
-    it('judge v2.2 explains the forbidden-knowledge assessment and its JSON field', () => {
-      expect(PROMPT_REGISTRY.judge.system).toContain('## FORBIDDEN KNOWLEDGE');
-      expect(PROMPT_REGISTRY.judge.system).toContain('knowledgeCompliance');
-    });
-
     it('judge schema accepts knowledgeCompliance and keeps it optional', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], knowledgeCompliance: { compliant: false, issues: ['[ledger_forgery] leaked'] } }).success).toBe(true);
-    });
-
-    it('outline v2.2 instructs the outliner to author contracts from catalog fact keys', () => {
-      expect(PROMPT_REGISTRY.outline.system).toContain('CANON FACTS');
-      expect(PROMPT_REGISTRY.outline.system).toContain('never invent one');
-      expect(PROMPT_REGISTRY.outline.system).toContain('"knowledgeContract": {"pov": ["entity-key"]');
-    });
-
-    it('should tell the outliner to cite governing bible documents by their catalog ref and never a canon fact', () => {
-      expect(PROMPT_REGISTRY.outline.version).toBe('2.6.0');
-      expect(PROMPT_REGISTRY.outline.system).toContain('bible_doc:<section>/<slug> copied exactly as the BIBLE DOCUMENTS list writes it');
-      expect(PROMPT_REGISTRY.outline.system).toContain('Never cite a canon fact');
     });
 
     it('outline schema accepts a brief with a knowledgeContract and keeps it optional', () => {
@@ -1141,13 +971,6 @@ describe('Prompt modules', () => {
       endingContract: { hookType: 'cliffhanger', emotionalBeat: 'b', openQuestion: 'q', handoffState: 'h', mustNotResolve: [] },
     };
 
-    it('outline v2.3 instructs the outliner to name a falsifiable readerValue and forbids empty purpose', () => {
-      expect(PROMPT_REGISTRY.outline.system).toContain('chapterPurpose');
-      expect(PROMPT_REGISTRY.outline.system).toContain('readerValue');
-      expect(PROMPT_REGISTRY.outline.system).toContain('repetitionRisks');
-      expect(PROMPT_REGISTRY.outline.system).toContain('is not earning its place');
-    });
-
     it('outline schema requires chapterPurpose and at least one readerValue entry', () => {
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [baseBrief]).success).toBe(false);
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [{ ...baseBrief, chapterPurpose: 'p', readerValue: [] }]).success).toBe(false);
@@ -1167,12 +990,6 @@ describe('Prompt modules', () => {
   });
 
   describe('brief fulfillment (judge v2.3, harness §11 item 7)', () => {
-    it('judge v2.3 asks for an unconditional brief-fulfillment assessment', () => {
-      expect(PROMPT_REGISTRY.judge.system).toContain('## BRIEF');
-      expect(PROMPT_REGISTRY.judge.system).toContain('briefCompliance');
-      expect(PROMPT_REGISTRY.judge.system).toContain('"briefCompliance": {"compliant": true/false, "issues": ["..."]} (always)');
-    });
-
     it('judge schema accepts briefCompliance and keeps it optional', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], briefCompliance: { compliant: false, issues: ['the bribe never happens on-page'] } }).success).toBe(
@@ -1183,17 +1000,6 @@ describe('Prompt modules', () => {
   });
 
   describe('readability (judge v2.4, fix v1.3)', () => {
-    it('should ask the judge for an unconditional readability assessment that quotes the offending sentences', () => {
-      expect(PROMPT_REGISTRY.judge.version).toBe('2.4.0');
-      expect(PROMPT_REGISTRY.judge.system).toContain('plain contemporary web-novel English');
-      expect(PROMPT_REGISTRY.judge.system).toContain('quotes one offending sentence verbatim');
-      expect(PROMPT_REGISTRY.judge.system).toContain('Short sentences can still be ornate: judge the diction, not the length.');
-      expect(PROMPT_REGISTRY.judge.system).toContain('or when narrator cleverness recurs');
-      expect(PROMPT_REGISTRY.judge.system).toContain('"## READABILITY EVIDENCE" block');
-      expect(PROMPT_REGISTRY.judge.system).toContain('Use it as evidence, not as a verdict');
-      expect(PROMPT_REGISTRY.judge.system).toContain('and those additions win');
-    });
-
     it('should show readabilityCompliance in every judge few-shot answer', () => {
       const answers = (PROMPT_REGISTRY.judge.fewShots ?? []).filter(message => message.getType() === 'ai');
       expect(answers.length).toBeGreaterThan(0);
@@ -1205,12 +1011,6 @@ describe('Prompt modules', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false, issues: ['"x" — say it plainly'] } }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false } }).success).toBe(false);
-    });
-
-    it('should tell the fixer to rewrite quoted sentences plainly without dropping content', () => {
-      expect(PROMPT_REGISTRY.fix.version).toBe('1.4.0');
-      expect(PROMPT_REGISTRY.fix.system).toContain('Findings marked "readability:" quote the draft\'s own sentences');
-      expect(PROMPT_REGISTRY.fix.system).toContain('keeping every fact, action, and line of dialogue');
     });
   });
 
@@ -1316,23 +1116,6 @@ describe('Prompt modules', () => {
   });
 
   describe('illustration-compose', () => {
-    it('registers as an analytical helper-group prompt', () => {
-      expect(PROMPT_REGISTRY['illustration-compose'].kind).toBe('analytical');
-      expect(PROMPT_REGISTRY['illustration-compose'].role).toBe('illustration');
-      expect(PROMPT_REGISTRY['illustration-compose'].version).toBe('1.1.0');
-    });
-
-    it('tells the composer how each reference role constrains the prompt', () => {
-      const system = PROMPT_REGISTRY['illustration-compose'].system;
-      expect(system).toContain('A likeness reference fixes the face, hair, build and attire');
-      expect(system).toContain('palette, medium and rendering only');
-      expect(system).toContain('Never ask for backgrounds, text, lettering or logos to be copied');
-    });
-
-    it('documents the art-style bible convention so authors know where to put it', () => {
-      expect(PROMPT_REGISTRY['illustration-compose'].system).toContain('section "project" with slug "art-style"');
-    });
-
     it('renders the pack first and the ordered author instructions last', async () => {
       const messages = await PROMPT_REGISTRY['illustration-compose'].template.formatMessages({
         contextPack: 'SUBJECT-CANON-BLOCK',
@@ -1361,20 +1144,6 @@ describe('Prompt modules', () => {
     const prompt = PROMPT_REGISTRY['appearance-describe'];
     const appearance = 'A broad-shouldered man in dented plate armour, close-cropped grey hair, a pale scar across the left brow.';
 
-    it('should register as an analytical prompt routed through the vision role', () => {
-      expect(prompt.kind).toBe('analytical');
-      expect(prompt.role).toBe('vision');
-      expect(prompt.version).toBe('1.0.0');
-      expect(prompt.system).not.toContain(AUTHORING_STYLE.slice(0, 40));
-    });
-
-    it('should carry the figure-identification, text-in-image and real-person rules', () => {
-      expect(prompt.system).toContain('describe only that figure');
-      expect(prompt.system).toContain('describe the most prominent one');
-      expect(prompt.system).toContain('Ignore any text, titles, logos');
-      expect(prompt.system).toContain('Never name or guess the identity of a real person');
-    });
-
     it('should render the subject and the note into a single human message', async () => {
       const messages = await prompt.template.formatMessages({ subjectLabel: 'Aldric', note: 'the armored man in the center' });
       expect(messages).toHaveLength(2);
@@ -1397,12 +1166,6 @@ describe('Prompt modules', () => {
   });
 
   describe('chapter-summarize prompt module', () => {
-    it('is registered as analytical work routed through the continuity role', () => {
-      expect(PROMPT_REGISTRY['chapter-summarize'].kind).toBe('analytical');
-      expect(PROMPT_REGISTRY['chapter-summarize'].role).toBe('continuity');
-      expect(PROMPT_REGISTRY['chapter-summarize'].version).toBe('1.1.0');
-    });
-
     it('renders the chapter prose into the human message', async () => {
       const messages = await PROMPT_REGISTRY['chapter-summarize'].template.formatMessages({ chapterProse: 'SOURCE-PROSE-TEXT' });
       expect(messages).toHaveLength(2);

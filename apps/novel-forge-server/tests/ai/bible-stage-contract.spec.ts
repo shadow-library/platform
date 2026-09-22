@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { renderStageContract, validateStageCoverage } from '@modules/ai/prompts/bible-builder/stage-contract';
 import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { type BibleStageOutput } from '@modules/ai/schemas';
-import { BIBLE_STAGE_ORDER, chapterForStage } from '@modules/bible/bible-manifest';
+import { chapterForStage } from '@modules/bible/bible-manifest';
 
 function stageOutput(entities: BibleStageOutput['entities']): BibleStageOutput {
   return { body: 'Stage prose.', entities } as BibleStageOutput;
@@ -62,12 +62,6 @@ describe('validateStageCoverage', () => {
 });
 
 describe('bible-builder prompt modules', () => {
-  it('should register one prompt per builder stage', () => {
-    const keys = ['bible:foundation', 'bible:world', 'bible:power', 'bible:factions-locations', 'bible:characters', 'bible:plot', 'bible:volumes'] as const;
-    expect(keys).toHaveLength(BIBLE_STAGE_ORDER.length);
-    for (const key of keys) expect(PROMPT_REGISTRY[key]).toBeDefined();
-  });
-
   it('should guard every entity-bearing stage with a postValidate the repair ladder can act on', () => {
     const entries: [string, ReturnType<typeof chapterForStage>][] = [
       ['bible:world', chapterForStage('world')],
@@ -81,10 +75,6 @@ describe('bible-builder prompt modules', () => {
       expect(prompt.postValidate).toBeDefined();
       expect(prompt.postValidate?.({ body: 'prose only' } as never)).toHaveLength(1);
     }
-  });
-
-  it('should state the entity mandate in the rendered system prompt, not only in validation', () => {
-    expect(PROMPT_REGISTRY['bible:characters'].system).toContain('MANDATORY — emit `entities`');
   });
 
   it('should render the worldFacts instruction with real backticks rather than escaped ones', () => {

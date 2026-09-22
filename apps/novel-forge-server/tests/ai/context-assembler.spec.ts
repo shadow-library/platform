@@ -225,8 +225,8 @@ describe('ContextAssembler.forChapter — isolated-adjacency', () => {
 describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
   it('keeps the END of the previous chapter, not its opening, when content exceeds PREV_ENDING_TAIL', async () => {
     // Build enough paragraphs that the opening and closing paragraphs can't both fit in the budget.
-    const openingPara = 'OPENING_MARKER: '.repeat(200);
-    const closingPara = 'CLOSING_MARKER: '.repeat(200);
+    const openingPara = 'OPENING_MARKER: '.repeat(80);
+    const closingPara = 'CLOSING_MARKER: '.repeat(80);
     const content = [openingPara, closingPara].join('\n\n');
     expect(countTokens(content)).toBeGreaterThan(PREV_ENDING_TAIL);
 
@@ -1152,11 +1152,11 @@ describe('ContextAssembler — memory budget trimming', () => {
         projects: {
           findFirst: mock(async () => ({
             id: 1n,
-            instructions: 'A'.repeat(5000),
+            instructions: 'Keep the prose tight. '.repeat(250),
             contentMode: 'standard',
           })),
         },
-        briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 1, body: 'B'.repeat(5000), contextRefs: [] })) },
+        briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 1, body: 'Ash climbs the bell tower. '.repeat(250), contextRefs: [] })) },
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => [{ number: 1, summary: 'A short prior chapter.' }]) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
@@ -1178,7 +1178,7 @@ describe('ContextAssembler — memory budget trimming', () => {
     expect(pack.sections.length).toBeGreaterThan(0);
     expect(pack.omitted.length).toBeGreaterThan(0);
     expect(pack.omitted.every(o => o.reason === 'budget')).toBe(true);
-  }, 15_000); // consistently ~5.4s on GitHub Actions' 2-vCPU runners, just over the 5s default — CI-speed headroom, not a functional change
+  });
 });
 
 describe('ContextAssembler.forRebrand', () => {
@@ -1187,7 +1187,7 @@ describe('ContextAssembler.forRebrand', () => {
     directives: 'weave romance in',
     glossarySlice: 'Ye Fan → Evan Vale [character]',
     carryState: '{"activeThreads":"Mira spark"}',
-    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+    prevBody: `${'OPENING_MARKER: '.repeat(80)}\n\n${'CLOSING_MARKER: '.repeat(80)}`,
   };
 
   it('puts world notes and directives in the stable segment and the rest in the volatile tail', async () => {
@@ -1247,7 +1247,7 @@ describe('ContextAssembler.forTranslate', () => {
     styleNotes: 'Past tense, close third. Honorifics dropped. Given name first.',
     termPolicy: 'Approved entries are binding; provisional entries bind until a reviewer says otherwise.',
     glossarySlice: '\u53f6\u51e1 \u2192 Ye Fan [character]',
-    prevTranslatedTail: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+    prevTranslatedTail: `${'OPENING_MARKER: '.repeat(80)}\n\n${'CLOSING_MARKER: '.repeat(80)}`,
   };
 
   it('puts the style notes and term policy in the stable segment and the glossary slice in the volatile tail', async () => {
@@ -1342,7 +1342,7 @@ describe('ContextAssembler.forReforge', () => {
     instructions: 'cut the filler tournament arc; raise the prose',
     glossarySlice: 'Ye Fan → Evan Vale [character]',
     carryState: '{"activeThreads":"Mira spark"}',
-    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+    prevBody: `${'OPENING_MARKER: '.repeat(80)}\n\n${'CLOSING_MARKER: '.repeat(80)}`,
   };
 
   it('puts world notes, directives, and author instructions in the stable segment and the rest in the volatile tail', async () => {
@@ -1450,7 +1450,7 @@ describe('ContextAssembler.forReforgeTransform', () => {
     bridge: 'The source chapters 13-16 are cut. The reader never saw them.',
     glossarySlice: 'Ye Fan → Evan Vale [character]',
     carryState: '{"activeThreads":"Mira spark"}',
-    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+    prevBody: `${'OPENING_MARKER: '.repeat(80)}\n\n${'CLOSING_MARKER: '.repeat(80)}`,
   };
 
   it('keeps the seeded ledger stable and the per-chapter plan contract volatile', async () => {

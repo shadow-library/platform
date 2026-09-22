@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import { ClassSchema } from '@shadow-library/class-schema';
 
 import { HOOK_TYPES } from '@modules/ai/schemas/enums';
@@ -17,6 +17,8 @@ function brief(hookType: string): Record<string, unknown> {
 }
 
 describe('plan-import endingContract.hookType', () => {
+  beforeAll(() => parseSchema(PlanBundleBrief, brief(HOOK_TYPES[0])));
+
   it('should accept every hook type the server enum declares', () => {
     for (const hookType of HOOK_TYPES) {
       expect(parseSchema(PlanBundleBrief, brief(hookType)).success).toBe(true);

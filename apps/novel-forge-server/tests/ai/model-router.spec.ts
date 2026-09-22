@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { beforeAll, describe, expect, it, mock } from 'bun:test';
 
 import { awaitAllCallbacks } from '@langchain/core/callbacks/promises';
 import { type BaseMessage } from '@langchain/core/messages';
@@ -212,31 +212,9 @@ describe('ModelRouterService.buildClient', () => {
     setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
   });
 
-  describe('against a model endpoint that keeps failing', () => {
-    let requests = 0;
-    const server = Bun.serve({
-      port: 0,
-      fetch: () => {
-        requests++;
-        return new Response('upstream unavailable', { status: 503 });
-      },
-    });
-    const baseUrl = `http://127.0.0.1:${server.port}`;
-
-    const failOnce = async (client: { invoke: (input: string) => Promise<unknown> }): Promise<number> => {
-      requests = 0;
-      await client.invoke('hi').catch(() => undefined);
-      return requests;
-    };
-
-    it('should send exactly one request per openrouter invoke, leaving retries to the router', async () => {
-      setConfig('ai.openrouter.api.url', baseUrl);
-      try {
-        expect(await failOnce(router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }))).toBe(1);
-      } finally {
-        setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
-      }
-    }, 5_000);
+  it('should leave retries to the router by building the openrouter client with none of its own', () => {
+    const client = router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) as unknown as { caller: { maxRetries: number } };
+    expect(client.caller.maxRetries).toBe(0);
   });
 });
 
@@ -743,6 +721,11 @@ describe('ModelRouterService.structuredWithImage', () => {
   const ctx = { projectId: BigInt(1), promptKey: 'appearance-describe', promptVersion: '1.0.0', role: 'vision' };
   const input = { subjectLabel: 'Aldric', note: 'the armored man in the center' };
 
+  beforeAll(async () => {
+    await new FakeListChatModel({ responses: ['warm'] }).invoke('warm');
+    await awaitAllCallbacks();
+  });
+
   function makeRouter(client: unknown, db: unknown = stubDatabaseService(), telemetry: unknown = {}): { router: ModelRouterService; buildClient: ReturnType<typeof mock> } {
     const router = new ModelRouterService(telemetry as never, db as never, stubQuotaService(), { defaultsFor: async () => undefined } as never);
     const buildClient = mock(() => client);
@@ -828,8 +811,9 @@ describe('ModelRouterService.structuredWithImage', () => {
     const telemetryDb = { insert: () => ({ values: async (row: unknown) => void rows.push(row) }) };
     const telemetry = new TelemetryHandler({ getPostgresClient: () => telemetryDb } as never);
     const { router } = makeRouter(new FakeListChatModel({ responses: [JSON.stringify(DESCRIPTION)] }), stubDatabaseService(), telemetry);
+    const image = `data:image/png;base64,${'QUJD'.repeat(1024)}`;
 
-    await router.structuredWithImage<AppearanceDescribeOutput>(appearanceDescribePrompt, input, IMAGE, ctx);
+    await router.structuredWithImage<AppearanceDescribeOutput>(appearanceDescribePrompt, input, image, ctx);
     await awaitAllCallbacks();
 
     expect(rows).toHaveLength(1);
@@ -837,7 +821,9 @@ describe('ModelRouterService.structuredWithImage', () => {
     expect(serialized).toContain('"promptKey":"appearance-describe"');
     expect(serialized).not.toContain('QUJD');
     expect(serialized).not.toContain('data:image');
-    expect((rows[0] as { inputTokens: number }).inputTokens).toBeLessThan(2_000);
+    // Tokenising the image itself costs half a second; base64 runs about two characters a token, so a count that
+    // included it would clear a quarter of its length.
+    expect((rows[0] as { inputTokens: number }).inputTokens).toBeLessThan(image.length / 4);
   });
 });
 

@@ -1,7 +1,7 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { type CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, ENTITY_CARD_BUDGET, WRITING_STYLE_BUDGET } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, ENTITY_CARD_BUDGET, FULL_CAST_MAX, WRITING_STYLE_BUDGET } from '@modules/ai/context/context-assembler.service';
 import { countTokens } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 
@@ -19,7 +19,7 @@ const wren = {
   name: 'Wren Aldous',
   type: 'character',
   status: 'active',
-  body: `${filler('Wren', 14)}\n\n${POV_TAIL}`,
+  body: `${filler('Wren', 5)}\n\n${POV_TAIL}`,
   notes: null,
   aliases: [{ alias: 'the tallyman' }],
 };
@@ -30,7 +30,7 @@ const tobin = {
   name: 'Tobin Reyes',
   type: 'character',
   status: 'active',
-  body: `${filler('Tobin', 12)}\n\n${DESCRIPTION_TAIL}\n\n## Drafter guidance\n\nKeep his humour dry and brief. ${CAUTION}\n\n**Never:** he never raises his voice at a crew member. ${PROHIBITION}`,
+  body: `${filler('Tobin', 5)}\n\n${DESCRIPTION_TAIL}\n\n## Drafter guidance\n\nKeep his humour dry and brief. ${CAUTION}\n\n**Never:** he never raises his voice at a crew member. ${PROHIBITION}`,
   notes: null,
   aliases: [],
 };
@@ -85,7 +85,7 @@ const arcs: ArcFixture[] = [
 
 const bibleDocs = [
   { section: 'world', slug: 'harbor', body: 'BIBLE_HARBOR_MARKER The harbor is tidal and shallow.' },
-  { section: 'world', slug: 'ledger', body: filler('The ledger', 40) },
+  { section: 'world', slug: 'ledger', body: filler('The ledger', 15) },
 ];
 
 const baseRefs = [
@@ -142,6 +142,8 @@ function makeAssembler(db: ReturnType<typeof chapterOneDb>): ContextAssembler {
 }
 
 describe('ContextAssembler.forChapter — chapter pack assembly', () => {
+  beforeAll(() => countTokens('warm'));
+
   it('should render the POV card uncapped and in authored order', async () => {
     const pack = await makeAssembler(chapterOneDb()).forChapter(1n, 1, { dryRun: true });
 
@@ -156,7 +158,7 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     const pack = await makeAssembler(chapterOneDb()).forChapter(1n, 1, { dryRun: true });
 
     const card = pack.sections.find(s => s.key === 'ref:entity:tobin');
-    expect(ENTITY_CARD_BUDGET).toBe(800);
+    expect(countTokens(tobin.body)).toBeGreaterThan(ENTITY_CARD_BUDGET);
     expect(card?.truncated).toBe(true);
     expect(card?.rendered).toContain(CAUTION);
     expect(card?.rendered).toContain(PROHIBITION);
@@ -221,6 +223,8 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     const refs = [...baseRefs, 'bible_doc:world/ledger'];
     const pack = await makeAssembler(chapterOneDb({ contextRefs: refs })).forChapter(1n, 1, { dryRun: true, budgetTokens: 3_000 });
 
+    expect(countTokens(bibleDocs[1]!.body)).toBeGreaterThan(3_000 - pack.usedTokens);
+
     expect(pack.sections.find(s => s.key === 'writing_style')?.rendered).toContain('WRITING_STYLE_MARKER');
     expect(pack.omitted.map(o => o.key)).toContain('ref:bible_doc:world/ledger');
     expect(pack.usedTokens).toBeLessThanOrEqual(3_000);
@@ -268,7 +272,7 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
   });
 
   it('should cap oversized project additions so they cannot claim the whole budget, keeping the default whole', async () => {
-    const instructions = `WRITING_STYLE_MARKER\n\n${filler('The narrator', 60)}`;
+    const instructions = `WRITING_STYLE_MARKER\n\n${filler('The narrator', 20)}`;
     const pack = await makeAssembler(chapterOneDb({ instructions })).forChapter(1n, 1, { dryRun: true });
 
     const style = pack.sections.find(s => s.key === 'writing_style');
@@ -281,25 +285,26 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
   });
 
   it('should warn with unresolved refs and non-routine omissions on a persisted pack', async () => {
-    const extras = Array.from({ length: 5 }, (_, i) => ({
+    const extras = Array.from({ length: 3 }, (_, i) => ({
       ...guild,
       id: BigInt(10 + i),
       entityKey: `crew_${i}`,
       name: `Crew ${i}`,
       type: 'character',
-      body: filler(`Crew ${i}`, 6),
+      body: filler(`Crew ${i}`, 3),
     }));
     const refs = [...baseRefs, ...extras.map(e => `entity:${e.entityKey}`), 'bible_doc:world/ledger', 'nocolon', 'unknown:thing'];
     const assembler = makeAssembler(chapterOneDb({ contextRefs: refs, extraEntities: extras }));
     const warn = spyOn((assembler as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger, 'warn').mockImplementation(() => undefined);
 
-    const pack = await assembler.forChapter(1n, 1, { budgetTokens: 7_000 });
+    const pack = await assembler.forChapter(1n, 1, { budgetTokens: 4_500 });
     const calls = [...warn.mock.calls];
     warn.mockRestore();
 
     const omittedKeys = pack.omitted.map(o => o.key);
     const routine = omittedKeys.filter(key => key.startsWith('ref:entity:crew_'));
-    expect(routine.length).toBeGreaterThan(0);
+    expect([wren, tobin, guild, ...extras].length).toBeGreaterThan(FULL_CAST_MAX);
+    expect(routine).toEqual(['ref:entity:crew_2']);
     expect(calls).toHaveLength(1);
     const [message, payload] = calls[0] as [string, { unresolvedRefs: string[]; omitted: string[] }];
     expect(message).toBe('chapter pack dropped context');
