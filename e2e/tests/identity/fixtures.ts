@@ -127,7 +127,7 @@ export class HarnessTeardownError extends AggregateError {
 }
 
 /** Runs every step even when earlier ones fail, then surfaces all failures together. */
-async function runAll(steps: (() => Promise<unknown>)[]): Promise<void> {
+export async function runAll(steps: (() => Promise<unknown>)[]): Promise<void> {
   const errors: unknown[] = [];
   for (const step of steps) await step().catch((error: unknown) => errors.push(error));
   if (errors.length > 0) throw new HarnessTeardownError(errors, `identity harness teardown failed in ${errors.length} step(s)`);

@@ -75,3 +75,21 @@ export async function findAuditEvents(action: string, targetId: string): Promise
     FROM audit_events WHERE action = ${action} AND target_id = ${targetId} ORDER BY id
   `;
 }
+
+/** Rows of `action` recorded against `ipAddress` — the security events that name no target. */
+export async function findAuditEventsByIp(action: string, ipAddress: string): Promise<AuditRow[]> {
+  return identityDb()<AuditRow[]>`
+    SELECT id::text, action, outcome::text, actor_type::text AS "actorType", actor_id AS "actorId", organisation_id AS "organisationId",
+           target_type AS "targetType", target_id AS "targetId", ((detail #>> '{}')::jsonb) AS detail, prev_hash AS "prevHash", hash
+    FROM audit_events WHERE action = ${action} AND ip_address = ${ipAddress} ORDER BY id
+  `;
+}
+
+/** Rows of `action` recorded for `actorId`, in write order. */
+export async function findAuditEventsByActor(action: string, actorId: string): Promise<AuditRow[]> {
+  return identityDb()<AuditRow[]>`
+    SELECT id::text, action, outcome::text, actor_type::text AS "actorType", actor_id AS "actorId", organisation_id AS "organisationId",
+           target_type AS "targetType", target_id AS "targetId", ((detail #>> '{}')::jsonb) AS detail, prev_hash AS "prevHash", hash
+    FROM audit_events WHERE action = ${action} AND actor_id = ${actorId} ORDER BY id
+  `;
+}
