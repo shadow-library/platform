@@ -6762,8 +6762,8 @@ export interface components {
       /** @description Ledger topics whose active decisions mean the step is done. */
       completionTopics: string[];
       nudges: string[];
-      /** @description The latest round of the step (of its pass, for a sourced screen, with options narrowed to this screen). Earlier rounds are history. */
-      latestRound: components['schemas']['BlueprintRoundResponse'] | null;
+      /** @description The latest round of the step (of its pass, for a sourced screen, with options narrowed to this screen); absent before its first round. Earlier rounds are history. */
+      latestRound?: components['schemas']['BlueprintRoundResponse'];
       /** @description The screen is locked and a later whole-pass rerun moved the options it was locked from, so its answer no longer matches what is on screen. */
       sliceMoved: boolean;
     };

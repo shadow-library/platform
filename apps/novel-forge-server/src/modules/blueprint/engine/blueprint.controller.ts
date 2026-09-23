@@ -55,7 +55,7 @@ export class BlueprintController {
         required: isLocking(step) && step.required,
         completionTopics: isLocking(step) ? [...step.completionTopics] : [],
         nudges: [...step.nudges],
-        latestRound,
+        latestRound: latestRound ?? undefined,
         sliceMoved,
       })),
     };

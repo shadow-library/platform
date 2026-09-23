@@ -1,11 +1,11 @@
-import { type BlueprintStepStateResponse } from '@/lib/apis';
+import { type BlueprintStepState } from '@/lib/apis';
 
 export type CostToChange = 'cheap' | 'medium' | 'expensive';
 
 /** Every step screen takes the same three things; the layout owns the frame, the Notebook and the event stream. */
 export interface StepScreenProps {
   projectId: string;
-  step: BlueprintStepStateResponse;
+  step: BlueprintStepState;
   onLocked: () => void;
 }
 

@@ -4,6 +4,7 @@ import {
   type BlueprintGateResponse,
   type BlueprintRoundResponse,
   type BlueprintStateResponse,
+  type BlueprintStepStateResponse,
   type CancelBlueprintRoundResponse,
   type LedgerEntryResponse,
   type LockBlueprintStepBody,
@@ -37,18 +38,30 @@ export function isRoundLive(round: BlueprintRoundResponse | null): boolean {
   return round?.status === 'pending' || round?.status === 'running';
 }
 
-const hasLiveRound = (data?: BlueprintStateResponse): boolean => data?.steps.some(step => isRoundLive(step.latestRound)) ?? false;
+export interface BlueprintStepState extends Omit<BlueprintStepStateResponse, 'latestRound'> {
+  latestRound: BlueprintRoundResponse | null;
+}
 
-export const blueprintStateQueryOptions = (projectId: string): UseQueryOptions<BlueprintStateResponse, ApiError> =>
-  queryOptions<BlueprintStateResponse, ApiError>({
+export interface BlueprintState {
+  steps: BlueprintStepState[];
+}
+
+function toBlueprintState({ steps }: BlueprintStateResponse): BlueprintState {
+  return { steps: steps.map(step => ({ ...step, latestRound: step.latestRound ?? null })) };
+}
+
+const hasLiveRound = (data?: BlueprintState): boolean => data?.steps.some(step => isRoundLive(step.latestRound)) ?? false;
+
+export const blueprintStateQueryOptions = (projectId: string): UseQueryOptions<BlueprintState, ApiError> =>
+  queryOptions<BlueprintState, ApiError>({
     queryKey: blueprintKeys.state(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/blueprint`).execute(),
+    queryFn: async () => toBlueprintState(await APIRequest.get(`/projects/${projectId}/blueprint`).execute()),
     // The same safety net every job-backed query has: the event stream normally settles a round, and this
     // only covers an event the stream dropped.
     refetchInterval: livePolling(projectId, query => (hasLiveRound(query.state.data) ? LIVE_ROUND_POLL_MS : false)),
   });
 
-export function useBlueprintStateQuery(projectId: string, enabled = true): UseQueryResult<BlueprintStateResponse, ApiError> {
+export function useBlueprintStateQuery(projectId: string, enabled = true): UseQueryResult<BlueprintState, ApiError> {
   return useQuery({ ...blueprintStateQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
