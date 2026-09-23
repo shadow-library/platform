@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
 
-import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
+import { authorBriefInput, type BlueprintInputSection } from '../../ai/context/blueprint-sections';
 import { blueprintConceptsPrompt } from '../../ai/prompts/blueprint-concepts.prompt';
 import {
   BLUEPRINT_CONCEPT_COUNT,
@@ -121,7 +121,7 @@ export const conceptsStep: ScreenStep<BlueprintConceptsOutput, ConceptsOptions, 
 
   inputs(context: StepInputContext<ConceptsOptions>): Promise<BlueprintInputSection[]> {
     const shown = context.previous?.cards.length ? renderShown(context.previous) : '';
-    return Promise.resolve(shown ? [{ key: 'already_shown', content: shown }] : []);
+    return Promise.resolve([...authorBriefInput(context.ledger), ...(shown ? [{ key: 'already_shown', content: shown }] : [])]);
   },
 
   toRound(output) {

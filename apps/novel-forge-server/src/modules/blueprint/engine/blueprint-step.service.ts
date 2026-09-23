@@ -201,7 +201,7 @@ export class BlueprintStepService {
     const view = ready ? viewOf(step, ready.options) : null;
     assertOfferedOptions(step.chosenOptionIds(selection), ready ? describeView(step, view) : []);
     const active = await loadActiveLedger(tx, projectId);
-    const materialised = await step.materialise(selection, { round: ready ? { round: ready.round, options: view } : null, ledger: active, project, tx });
+    const materialised = await step.materialise(selection, { round: ready ? { round: ready.round, options: view, input: ready.input } : null, ledger: active, project, tx });
     // A lock with no ready round was answered from nothing, so there is no slice it could later be said to have moved away from.
     const plan = isSourced(step) && ready ? { ...materialised, entries: stampLockedSlice(materialised.entries, sliceDigest(view)) } : materialised;
 

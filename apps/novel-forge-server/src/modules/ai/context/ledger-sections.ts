@@ -13,6 +13,9 @@ const EMPTY_LEDGER = 'Nothing has been decided yet.';
 
 export const WRITER_LINES_BUDGET = 1_200;
 
+/** The author's starting text, kept whole. It is too long for every step, so the shared ledger leaves it to the steps that read it. */
+export const AUTHOR_BRIEF_TOPIC = 'start.brief';
+
 interface WriterLine {
   phase: Ledger.Phase | null;
   line: string;
@@ -71,7 +74,8 @@ function doNotPropose(entries: LedgerContextEntry[]): string[] {
   return [...rejected, ...passedOver];
 }
 
-export function renderLedger(entries: LedgerContextEntry[]): string {
+export function renderLedger(all: LedgerContextEntry[]): string {
+  const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC);
   const blocks = [
     renderDecisions(entries.filter(entry => DECIDED_KINDS.has(entry.kind))),
     renderList('Author directions', byPhase(entries.filter(entry => entry.kind === 'direction')).map(tagged)),
@@ -131,7 +135,7 @@ function ledgerRefs(entries: LedgerContextEntry[]): string[] {
 
 /** The active ledger is what every Blueprint step builds on, so it is required and never evicted to fit a budget. */
 export function ledgerSection(entries: LedgerContextEntry[], segment: ContextSegment = 'stable'): ContextSection {
-  return requiredSection('ledger', renderLedger(entries), segment, ledgerRefs(entries));
+  return requiredSection('ledger', renderLedger(entries), segment, ledgerRefs(entries.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC)));
 }
 
 export function writerLinesSection(entries: LedgerContextEntry[], forbidden: FactLike[]): ContextSection | null {

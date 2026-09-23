@@ -73,6 +73,7 @@ const TOPIC_LABELS: Record<string, string> = {
   gate: 'The gate',
   promise: 'Reader promise',
   start: 'Starting point',
+  'start.brief': 'Your starting text',
   volume_one: 'Volume one',
 };
 

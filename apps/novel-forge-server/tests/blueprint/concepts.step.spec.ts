@@ -129,14 +129,21 @@ describe('conceptsStep.materialise', () => {
 
 describe('conceptsStep.inputs', () => {
   it('should name the cards on screen so a re-roll cannot offer them again', async () => {
-    const sections = await conceptsStep.inputs?.({ previous: options() } as never);
+    const sections = await conceptsStep.inputs?.({ previous: options(), ledger: [] } as never);
     expect(sections?.[0]?.key).toBe('already_shown');
     expect(sections?.[0]?.content).toContain('never offer any of these again');
     expect(sections?.[0]?.content).toContain('Ninth Heir — engine: a court that must not be contradicted');
   });
 
   it('should send nothing on a first round', async () => {
-    expect(await conceptsStep.inputs?.({ previous: null } as never)).toEqual([]);
+    expect(await conceptsStep.inputs?.({ previous: null, ledger: [] } as never)).toEqual([]);
+  });
+
+  it("should put the author's own words ahead of everything else it reads", async () => {
+    const brief = ledgerEntry({ kind: 'direction', topic: 'start.brief', statement: 'Two rival cartographers are hired to map the same vanishing island.' });
+    const sections = await conceptsStep.inputs?.({ previous: options(), ledger: [brief] } as never);
+    expect(sections?.map(section => section.key)).toEqual(['author_brief', 'already_shown']);
+    expect(sections?.[0]?.content).toBe(brief.statement);
   });
 });
 

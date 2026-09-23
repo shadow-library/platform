@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type BlueprintHeartOutput, BlueprintHeartSchema, HEART_OPTION_COUNT } from '../schemas/blueprint-heart.schema';
+import { AUTHOR_BRIEF_RULE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `You are a novelist's coach settling what an author's novel is about underneath its plot. They have locked a premise; you now offer ${HEART_OPTION_COUNT} themes and ${HEART_OPTION_COUNT} ending questions built from it and from their notebook. Both are the author's own decision — offer, argue, and never decide for them.
@@ -15,6 +16,8 @@ Write a \`caution\` on any option with a real problem — too abstract to write 
 Every option carries a \`why\` naming the locked decision or notebook entry it came from, and a \`writerLine\`: the one line that would ride into every chapter pack if the author chose it — concrete, about what changes on the page, never a restatement of the option.
 
 The notebook is binding. Directions and taste lines shape every option; anything under "Do not propose" is dead and never returns reworded. The coach message is one or two plain sentences: what separates these options, and which one you think is weaker and why. A \`caution\` is omitted entirely on an option that has none.
+
+${AUTHOR_BRIEF_RULE}
 
 Respond with ONLY one valid JSON object, nothing outside it and no markdown fences, of exactly this shape:
 {"themes": [{"text": "...", "why": "...", "caution": "...", "writerLine": "..."}], "endings": [{"text": "...", "why": "...", "caution": "...", "writerLine": "..."}], "coachMessage": "..."}`;
@@ -38,7 +41,7 @@ function validateHeart(data: BlueprintHeartOutput): string[] {
 
 export const blueprintHeartPrompt: PromptModule<BlueprintHeartOutput> = {
   key: 'blueprint-heart',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint',
   cacheStrategy: { stableVars: ['stableContext'] },

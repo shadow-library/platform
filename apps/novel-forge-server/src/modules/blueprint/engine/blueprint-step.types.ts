@@ -49,6 +49,8 @@ export interface StepRoundResult<TOptions> {
 export interface LockedRound<TView> {
   round: number;
   options: TView;
+  /** The step's own input for that round, as the author gave it. */
+  input: unknown;
 }
 
 export interface MaterialiseContext<TView> {

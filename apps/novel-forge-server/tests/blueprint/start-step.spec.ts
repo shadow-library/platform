@@ -4,7 +4,7 @@ import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { type BlueprintStartOutput, BlueprintStartSchema } from '@modules/ai/schemas/blueprint-start.schema';
 import { parseSchema } from '@modules/ai/schemas/validate';
 import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
-import { StartOptions, StartSelection, startStep } from '@modules/blueprint/steps/start.step';
+import { StartInput, StartOptions, StartSelection, startStep } from '@modules/blueprint/steps/start.step';
 import { type Project } from '@server/database';
 
 import { ledgerEntry } from './blueprint-fixtures';
@@ -70,14 +70,14 @@ describe('start step', () => {
       { kind: 'direction', topic: 'start', statement: 'Found family', payload: { kind: 'want' } },
       { kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } },
     ]);
-    expect(plan.replaces).toEqual(['start']);
+    expect(plan.replaces).toEqual(['start', 'start.brief']);
     expect(plan.retires).toEqual(['c1', 'c3']);
   });
 
   it('should retire every chip the round offered, so one the author deleted outright goes too', async () => {
     const offered = startStep.toRound(modelOutput, { previous: null, input: null, focus: null, ledger: [] }).options;
     const selection = { chips: [{ optionId: 'c1', label: 'A ferry that only runs at night', kind: 'element' as const }] };
-    const plan = await startStep.materialise(selection, { round: { round: 1, options: offered }, ledger: [], project: {} as Project.Row, tx: {} as never });
+    const plan = await startStep.materialise(selection, { round: { round: 1, options: offered, input: null }, ledger: [], project: {} as Project.Row, tx: {} as never });
     expect(plan.retires).toEqual(['c1', 'c2', 'c3']);
 
     const stale = ledgerEntry({ id: 33n, kind: 'direction', topic: 'start', stepKey: 'start', statement: 'Quiet dread, not gore', payload: { kind: 'want', optionId: 'c2' } });
@@ -104,6 +104,39 @@ describe('start step', () => {
     const already = ledgerEntry({ id: 31n, kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy' });
     const plan = await startStep.materialise(selection, { round: null, ledger: [already], project: {} as Project.Row, tx: {} as never });
     expect(plan.entries).toEqual([]);
+  });
+
+  it("should keep the author's whole starting text as the brief, beside the chips it was read into", async () => {
+    const text = `A tide clock stops the night the town forgets its drowned. ${'The keeper remembers every name. '.repeat(200)}`;
+    const offered = startStep.toRound(modelOutput, { previous: null, input: null, focus: null, ledger: [] }).options;
+    const selection = { chips: [{ optionId: 'c1', label: 'A ferry that only runs at night', kind: 'element' as const }] };
+    const plan = await startStep.materialise(selection, {
+      round: { round: 2, options: offered, input: { text: `  ${text}  ` } },
+      ledger: [],
+      project: {} as Project.Row,
+      tx: {} as never,
+    });
+
+    expect(plan.entries).toContainEqual({ kind: 'direction', topic: 'start.brief', statement: text.trim() });
+    expect(plan.replaces).toContain('start.brief');
+  });
+
+  it('should write no brief when the round had no text, while still retiring an earlier one', async () => {
+    const selection = { chips: [{ label: 'Found family', kind: 'want' as const }] };
+    const plan = await startStep.materialise(selection, {
+      round: { round: 1, options: { understood: [] }, input: { startingType: 'nothing' } },
+      ledger: [],
+      project: {} as Project.Row,
+      tx: {} as never,
+    });
+
+    expect(plan.entries.some(entry => entry.topic === 'start.brief')).toBe(false);
+    expect(plan.replaces).toContain('start.brief');
+  });
+
+  it('should take a starting text of up to 12,000 characters and refuse a longer one', () => {
+    expect(parseSchema(StartInput, { text: 'a'.repeat(12_000) }).success).toBe(true);
+    expect(parseSchema(StartInput, { text: 'a'.repeat(12_001) }).success).toBe(false);
   });
 
   it('should refuse a lock with no chips', () => {

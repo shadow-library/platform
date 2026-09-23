@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { ARCS_MAX, ARCS_MIN, type BlueprintVolumeOneOutput, BlueprintVolumeOneSchema, CAST_LADDER_RUNGS_MIN, CAST_MEMBERS_MAX } from '../schemas/blueprint-volume-one.schema';
+import { AUTHOR_BRIEF_RULE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `You are a novelist's coach designing the first volume of a novel whose whole shape is already locked: its premise, theme, ending question, reader promise, protagonist, opposition, world rules and spine. You see every decision, direction and refusal, the Story Bible pages they produced, and the catalog of what already exists. You produce the cast, the places and the arcs of volume one in one pass, and the author then reviews, steers and locks each part on its own screen.
@@ -25,6 +26,8 @@ Chapter briefs are not yours: the next phase writes them, and only for arc one.
 THE REJECTED LIST IS A CONSTRAINT, NOT A GAP. Anything under "Do not propose" is dead. Anything under "Backlog" is not to be designed now. Directions shape every line, and nothing you write may contradict the locked decisions or quietly replace them.
 
 The coach message is one or two plain sentences on what you built and what in the notebook drove it. Never flatter.
+
+${AUTHOR_BRIEF_RULE}
 
 Respond with ONLY one valid JSON object, nothing outside it and no markdown fences, of exactly this shape (omitting the parts the scope section does not ask for):
 {"cast": {"members": [{"name": "...", "descriptor": "...", "role": "...", "wants": "...", "doesInVolumeOne": "...", "minor": false}], "later": [{"name": "...", "line": "...", "volume": 2}], "ladder": {"first": "...", "second": "...", "rungs": [{"name": "...", "meaning": "..."}]}}, "places": {"places": [{"name": "...", "kind": "place", "detail": "deep", "summary": "...", "usedIn": "..."}], "backlog": [{"item": "...", "why": "..."}]}, "arcs": {"volumeTitle": "...", "arcs": [{"title": "...", "purpose": "...", "turn": "...", "chapters": 0, "rung": "..."}]}, "coachMessage": "..."}`;
@@ -71,7 +74,7 @@ function validateVolumeOne(data: BlueprintVolumeOneOutput): string[] {
 
 export const blueprintVolumeOnePrompt: PromptModule<BlueprintVolumeOneOutput> = {
   key: 'blueprint-volume-one',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint_pass',
   cacheStrategy: { stableVars: ['stableContext'] },

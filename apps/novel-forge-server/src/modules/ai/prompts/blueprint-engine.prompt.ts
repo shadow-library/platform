@@ -10,6 +10,7 @@ import {
   OPPOSITION_GOALS_MIN,
   PROTAGONIST_VERSIONS,
 } from '../schemas/blueprint-engine.schema';
+import { AUTHOR_BRIEF_RULE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const kinds = OPPOSITION_KINDS.map(kind => `${kind} (${OPPOSITION_KIND_LABELS[kind]})`).join(', ');
@@ -27,6 +28,8 @@ WORLD. Rules first, detail later; places and factions are not asked for here. St
 THE REJECTED LIST IS A CONSTRAINT, NOT A GAP. Anything under "Do not propose" is dead: never offer it back, and where the author refused the obvious answer, say in \`honoured\` which refusal you worked around and build the rules the other way. "Lifespan cost is on your rejected list, so here are memory-based ways to make the cheapest rung dangerous" is the tone.
 
 The notebook is binding throughout: the premise, theme, ending question and reader promise are settled, and nothing you write may contradict them or quietly replace them. Directions shape every line. The coach message is one or two plain sentences on what you built and what in the notebook drove it. Never flatter.
+
+${AUTHOR_BRIEF_RULE}
 
 Respond with ONLY one valid JSON object, nothing outside it and no markdown fences, of exactly this shape (omitting the parts the scope section does not ask for):
 {"protagonist": {"leads": [{"name": "...", "descriptor": "...", "versions": [{"lie": "...", "wound": "...", "want": "...", "need": "...", "change": "...", "chapterOne": "..."}]}]}, "opposition": {"preselected": "...", "why": "...", "forms": [{"kind": "...", "name": "...", "summary": "...", "argument": "...", "wants": "...", "neverWill": "...", "faces": [{"arc": "...", "face": "..."}], "goals": ["..."], "rhythm": "...", "costOfWinning": "...", "stakes": "...", "returnsFor": "..."}]}, "world": {"summary": "...", "costRules": [{"rule": "...", "why": "...", "writerLine": "..."}], "rules": [{"rule": "...", "why": "..."}], "society": {"order": "...", "economy": "..."}, "honoured": ["..."]}, "power": {"rungs": [{"name": "...", "buys": "...", "cost": "..."}], "note": "..."}, "coachMessage": "..."}`;
@@ -72,7 +75,7 @@ function validateEngine(data: BlueprintEngineOutput): string[] {
 
 export const blueprintEnginePrompt: PromptModule<BlueprintEngineOutput> = {
   key: 'blueprint-engine',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint_pass',
   cacheStrategy: { stableVars: ['stableContext'] },

@@ -47,6 +47,14 @@ function wholeSentence(overrides: Partial<PremiseSelection> = {}): PremiseSelect
   };
 }
 
+describe('premiseStep.inputs', () => {
+  it("should read the author's own words when they wrote some, and nothing more", async () => {
+    const brief = ledgerEntry({ kind: 'direction', topic: 'start.brief', statement: 'A lamplighter keeps the last lit street in a city that has chosen the dark.' });
+    expect(await premiseStep.inputs?.({ ledger: [brief] } as never)).toEqual([{ key: 'author_brief', content: brief.statement, required: true }]);
+    expect(await premiseStep.inputs?.({ ledger: [] } as never)).toEqual([]);
+  });
+});
+
 describe('premiseStep.toRound', () => {
   it('should number the parts and their alternatives', () => {
     const round = options();

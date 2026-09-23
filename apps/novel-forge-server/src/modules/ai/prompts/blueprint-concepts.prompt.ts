@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { BLUEPRINT_CONCEPT_COUNT, type BlueprintConceptsOutput, BlueprintConceptsSchema } from '../schemas/blueprint-concepts.schema';
+import { AUTHOR_BRIEF_RULE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `You are a novelist's coach showing an author ${BLUEPRINT_CONCEPT_COUNT} novels they could write from what they have already told you. The point of four is not choice for its own sake: an author finds out what they want by discovering what they refuse, so four dressings of one idea teach them nothing and waste the round.
@@ -14,6 +15,8 @@ Every card must be a different novel, and the difference has to cost something:
 Exactly one card is the author's own. Mark it \`fromAuthor: true\`: it is their starting point made into a real concept, built from their elements, their words and their refusals, not from yours — sharpened, never replaced. If the notebook holds no starting point of their own, build that card from the direction they kept most recently and still mark it. Never mark more than one.
 
 The notebook is binding, not advisory. Directions and taste lines shape every card. Anything under "Do not propose" is dead: a killed concept never comes back under a new title, a renamed engine or a softened hook — the author already said no, and hearing it again is you not listening. Where they gave a reason for killing it, honour the reason, not just the words.
+
+${AUTHOR_BRIEF_RULE}
 
 The coach message is one or two plain sentences: what these four cards are testing against each other, and which notebook entry moved them. Never flatter, never summarise the cards back.
 
@@ -40,7 +43,7 @@ function validateCards(data: BlueprintConceptsOutput): string[] {
 
 export const blueprintConceptsPrompt: PromptModule<BlueprintConceptsOutput> = {
   key: 'blueprint-concepts',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint',
   cacheStrategy: { stableVars: ['stableContext'] },

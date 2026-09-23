@@ -1,4 +1,4 @@
-import { type LedgerContextEntry, ledgerSection } from './ledger-sections';
+import { AUTHOR_BRIEF_TOPIC, type LedgerContextEntry, ledgerSection } from './ledger-sections';
 import { type ContextSection, type ContextSegment, type ContextTier, renderSection } from './sections';
 import { countTokens } from './token-budget';
 
@@ -23,6 +23,12 @@ export interface BlueprintPackParts {
   /** The step's conversation, oldest first; only the last few messages reach the model. */
   thread: BlueprintStepMessage[];
   roundInput: string;
+}
+
+/** The author's own words for the steps that build premise and people; the start chips summarise them, and never stand in for them. */
+export function authorBriefInput(ledger: Pick<LedgerContextEntry, 'topic' | 'statement'>[]): BlueprintInputSection[] {
+  const brief = ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC);
+  return brief ? [{ key: 'author_brief', content: brief.statement, required: true }] : [];
 }
 
 function section(key: string, content: string, tier: ContextTier, segment: ContextSegment, required = false): ContextSection {

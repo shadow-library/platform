@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type LedgerContextEntry, ledgerSection, renderLedger, renderWriterLines, WRITER_LINES_BUDGET, writerLinesSection } from '@modules/ai/context/ledger-sections';
+import { authorBriefInput } from '@modules/ai/context/blueprint-sections';
+import {
+  AUTHOR_BRIEF_TOPIC,
+  type LedgerContextEntry,
+  ledgerSection,
+  renderLedger,
+  renderWriterLines,
+  WRITER_LINES_BUDGET,
+  writerLinesSection,
+} from '@modules/ai/context/ledger-sections';
 import { applyBudget, countTokens } from '@modules/ai/context/token-budget';
 
 function entry(overrides: Partial<LedgerContextEntry>): LedgerContextEntry {
@@ -32,6 +41,22 @@ const ledger: LedgerContextEntry[] = [
     writerLine: 'The clerk moves slowly and misses nothing.',
   }),
 ];
+
+describe('the author brief', () => {
+  const brief = entry({ kind: 'direction', topic: AUTHOR_BRIEF_TOPIC, statement: 'The keeper has kept the tide clock for forty years and never once wound it.' });
+
+  it('should stay out of the ledger every step reads', () => {
+    const section = ledgerSection([...ledger, brief]);
+
+    expect(renderLedger([...ledger, brief])).not.toContain('never once wound it');
+    expect(section.sourceRefs).not.toContain(`ledger:${AUTHOR_BRIEF_TOPIC}`);
+  });
+
+  it('should reach a step that asks for it as a required input, and nothing when there is none', () => {
+    expect(authorBriefInput([...ledger, brief])).toEqual([{ key: 'author_brief', content: brief.statement, required: true }]);
+    expect(authorBriefInput(ledger)).toEqual([]);
+  });
+});
 
 describe('renderLedger', () => {
   it('should group decisions by phase in Blueprint order with their why and writer line', () => {

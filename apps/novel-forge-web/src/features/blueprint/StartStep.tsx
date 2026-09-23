@@ -29,6 +29,7 @@ import {
   STARTING_TYPE_LABELS,
   STARTING_TYPES,
   type StartingType,
+  startTextLength,
 } from './start-step';
 import { SteerBox } from './SteerBox';
 import styles from './blueprint.module.css';
@@ -75,8 +76,11 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
   const running = isRoundLive(round);
   const busy = running || startRound.isPending;
   const hasChips = chips.some(chip => chip.label.trim().length > 0);
+  const textLength = startTextLength(text);
+  const overLimit = textLength > START_TEXT_MAX;
 
   const run = (): void => {
+    if (overLimit) return void toast.danger(`Your starting text is over ${START_TEXT_MAX.toLocaleString()} characters. Shorten it first.`);
     startRound.mutate(buildRoundBody(draft, {}, stepPayload(resolveStartInput(text, startingType, round))), {
       onSuccess: () => setDraft(EMPTY_STEER),
       onError: err => toast.danger(err.message),
@@ -106,12 +110,18 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
           placeholder="e.g. a kid who collects debts for the city and finds something in a jar that belongs to him. I like when magic costs something real. Not a chosen one."
           value={text}
           onValueChange={setText}
-          maxLength={START_TEXT_MAX}
           minRows={4}
           maxRows={12}
           autoGrow
           aria-label="Your starting point"
+          aria-describedby="start-text-count"
+          aria-invalid={overLimit || undefined}
         />
+        <p id="start-text-count" className={styles.startCount} data-over={overLimit || undefined} aria-live="polite">
+          {overLimit
+            ? `${(textLength - START_TEXT_MAX).toLocaleString()} characters over the ${START_TEXT_MAX.toLocaleString()} limit. Nothing is cut, so shorten it before it can be read: lead with what the story is about, then the people.`
+            : `${textLength.toLocaleString()} / ${START_TEXT_MAX.toLocaleString()}`}
+        </p>
         <div className={styles.startTypes}>
           <span className={styles.startTypesLabel}>Or start from:</span>
           {STARTING_TYPES.map(type => (
@@ -127,7 +137,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
           ))}
         </div>
         <div className={styles.cardActions}>
-          <Button variant="primary" loading={busy} disabled={busy || (!text.trim() && startingType == null)} onClick={run}>
+          <Button variant="primary" loading={busy} disabled={busy || overLimit || (!text.trim() && startingType == null)} onClick={run}>
             {round == null ? 'Read it back to me' : 'Read it again'}
           </Button>
         </div>

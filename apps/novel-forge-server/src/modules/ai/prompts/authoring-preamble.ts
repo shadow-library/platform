@@ -1,3 +1,5 @@
+export const AUTHOR_BRIEF_RULE = `THE AUTHOR'S OWN WORDS, when present, is what the author wrote before anything was decided. It is the source for who their people are and what their story is: build from its characters, situation and stakes, keep their names and traits, and never reinvent them from the notebook's short summaries. Where it and a locked decision or a later direction disagree, the decision or direction wins — the author made it afterwards.`;
+
 export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
 - Show character emotion through action and dialogue — never state it directly.

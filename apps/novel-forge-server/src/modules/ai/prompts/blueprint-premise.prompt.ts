@@ -9,13 +9,14 @@ import {
   PREMISE_PART_MAX,
   PREMISE_PART_MIN,
 } from '../schemas/blueprint-premise.schema';
+import { AUTHOR_BRIEF_RULE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `You write the author's premise: one sentence, broken into the parts that carry its weight, so they can change one part without losing the rest.
 
 The sentence:
 - One sentence a person can read aloud in one breath, at most sixty words. It says where the story happens, what the world charges for what it gives, who it happens to, and what turns it personal.
-- It is built only from what the notebook already holds — the concept they kept, the directions they wrote, the taste they showed. Never introduce a world, a power or a character the author has not chosen, and never offer anything under "Do not propose".
+- It is built only from what the notebook and the author's own words already hold — the concept they kept, the directions they wrote, the taste they showed. Never introduce a world, a power or a character the author has not chosen, and never offer anything under "Do not propose".
 - Specific nouns beat impressive ones. Back-cover adjectives, "ancient evil", "destiny" and "little does he know" are all failures.
 
 The parts:
@@ -29,6 +30,8 @@ Also return:
 - coachMessage: one or two plain sentences on what the sentence commits them to, and which part is the one worth arguing with. Say plainly when a part is the weak one.
 
 When the round input names a part to rework, that part alone is in play: offer fresh alternatives for it and leave every other part exactly as the author has it.
+
+${AUTHOR_BRIEF_RULE}
 
 Respond with ONLY one valid JSON object, nothing outside it and no markdown fences, of exactly this shape:
 {"parts": [{"text": "...", "kind": "setting", "alternatives": ["...", "..."]}], "why": "...", "writerLine": "...", "coachMessage": "..."}`;
@@ -52,7 +55,7 @@ function validateParts(data: BlueprintPremiseOutput): string[] {
 
 export const blueprintPremisePrompt: PromptModule<BlueprintPremiseOutput> = {
   key: 'blueprint-premise',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint',
   cacheStrategy: { stableVars: ['stableContext'] },

@@ -3,7 +3,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 import { AppErrorCode } from '@server/classes';
 import { OPPOSITION_KIND_LABELS, OPPOSITION_KINDS, type OppositionKind } from '@shadow-library/sdk';
 
-import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
+import { authorBriefInput, type BlueprintInputSection } from '../../ai/context/blueprint-sections';
 import { blueprintEnginePrompt } from '../../ai/prompts/blueprint-engine.prompt';
 import {
   type BlueprintEngineOutput,
@@ -381,7 +381,10 @@ export const enginePass: PassStep<BlueprintEngineOutput, EngineOptions, never> =
     const applicable = ENGINE_SLICES.filter(slice => engineSliceApplies(slice, context.ledger));
     const asked = focus ? [focus] : applicable;
     const leads = context.previous?.protagonist?.leads.length ?? 1;
-    const sections: BlueprintInputSection[] = [{ key: 'engine_scope', content: renderScope(asked, applicable.includes('power'), leads), required: true }];
+    const sections: BlueprintInputSection[] = [
+      ...authorBriefInput(context.ledger),
+      { key: 'engine_scope', content: renderScope(asked, applicable.includes('power'), leads), required: true },
+    ];
     const kept = focus && context.previous ? renderKept(context.previous, focus) : null;
     if (kept) sections.push({ key: 'engine_so_far', content: kept });
     return Promise.resolve(sections);

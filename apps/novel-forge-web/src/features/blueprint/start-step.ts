@@ -8,7 +8,7 @@ export type StartingType = (typeof STARTING_TYPES)[number];
 
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
-export const START_TEXT_MAX = 4000;
+export const START_TEXT_MAX = 12_000;
 export const START_TOPIC = 'start';
 export const START_RULED_OUT_TOPIC = 'start.ruled_out';
 
@@ -80,6 +80,11 @@ export function mergeStartChips(fromRound: StartChip[], restored: StartChip[], k
 export interface StartRoundInput {
   text?: string;
   startingType?: StartingType;
+}
+
+/** Counted the way the server's schema counts, by code point, so the box and the server agree on what fits. */
+export function startTextLength(text: string): number {
+  return [...text.trim()].length;
 }
 
 export function buildStartInput(text: string, startingType: StartingType | null): StartRoundInput {

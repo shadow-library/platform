@@ -54,6 +54,14 @@ function chosen(overrides: Partial<HeartSelection> = {}): HeartSelection {
   };
 }
 
+describe('heartStep.inputs', () => {
+  it("should read the author's own words when they wrote some, and nothing more", async () => {
+    const brief = ledgerEntry({ kind: 'direction', topic: 'start.brief', statement: 'A lamplighter keeps the last lit street in a city that has chosen the dark.' });
+    expect(await heartStep.inputs?.({ ledger: [brief] } as never)).toEqual([{ key: 'author_brief', content: brief.statement, required: true }]);
+    expect(await heartStep.inputs?.({ ledger: [] } as never)).toEqual([]);
+  });
+});
+
 describe('heartStep.toRound', () => {
   it('should number themes and endings apart so one round has no two options with one id', () => {
     const round = options();

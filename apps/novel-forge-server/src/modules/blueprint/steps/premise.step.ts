@@ -3,6 +3,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 import { AppErrorCode } from '@server/classes';
 import { type Bible } from '@server/database';
 
+import { authorBriefInput } from '../../ai/context/blueprint-sections';
 import { blueprintPremisePrompt } from '../../ai/prompts/blueprint-premise.prompt';
 import {
   type BlueprintPremiseOutput,
@@ -147,6 +148,10 @@ export const premiseStep: ScreenStep<BlueprintPremiseOutput, PremiseOptions, Pre
   optionsSchema: PremiseOptions,
   inputSchema: PremiseInput,
   selectionSchema: PremiseSelection,
+
+  inputs(context) {
+    return Promise.resolve(authorBriefInput(context.ledger));
+  },
 
   renderInput(input) {
     const current = input.current?.map(part => part.text.trim()).filter(Boolean) ?? [];

@@ -3,6 +3,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 export const START_CHIP_KINDS = ['element', 'want', 'not'] as const;
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
+export const START_TEXT_MAX = 12_000;
 
 export type StartChipKind = (typeof START_CHIP_KINDS)[number];
 

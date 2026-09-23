@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { mergeStartChips, restoreStartChips } from '../src/features/blueprint/start-step';
+import { ledgerTopicLabel } from '../src/features/blueprint/notebook';
+import { mergeStartChips, restoreStartChips, START_TEXT_MAX, startTextLength } from '../src/features/blueprint/start-step';
 import { type LedgerEntryResponse } from '../src/lib/apis';
 
 function entry(overrides: Partial<LedgerEntryResponse> = {}): LedgerEntryResponse {
@@ -76,5 +77,23 @@ describe('mergeStartChips', () => {
 
   it('should not add a chip the reading already says', () => {
     expect(mergeStartChips(fromRound, [{ label: '  quiet dread  ', kind: 'want' }], false)).toEqual(fromRound);
+  });
+});
+
+describe('startTextLength', () => {
+  it('should count what is sent, by code point, as the server does', () => {
+    expect(startTextLength('  a ferry at dusk \n')).toBe(15);
+    expect(startTextLength('dusk — 🌒')).toBe(8);
+  });
+
+  it('should let a full-length starting text through and flag one character more', () => {
+    expect(startTextLength('a'.repeat(START_TEXT_MAX))).toBeLessThanOrEqual(START_TEXT_MAX);
+    expect(startTextLength('a'.repeat(START_TEXT_MAX + 1))).toBeGreaterThan(START_TEXT_MAX);
+  });
+});
+
+describe('ledgerTopicLabel', () => {
+  it('should name the kept starting text for the author', () => {
+    expect(ledgerTopicLabel('start.brief')).toBe('Your starting text');
   });
 });

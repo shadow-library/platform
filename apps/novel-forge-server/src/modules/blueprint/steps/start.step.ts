@@ -1,7 +1,8 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
+import { AUTHOR_BRIEF_TOPIC } from '../../ai/context/ledger-sections';
 import { blueprintStartPrompt } from '../../ai/prompts/blueprint-start.prompt';
-import { type BlueprintStartOutput, START_CHIP_KINDS, START_CHIP_LABEL_MAX, START_CHIP_MAX, type StartChipKind } from '../../ai/schemas/blueprint-start.schema';
+import { type BlueprintStartOutput, START_CHIP_KINDS, START_CHIP_LABEL_MAX, START_CHIP_MAX, START_TEXT_MAX, type StartChipKind } from '../../ai/schemas/blueprint-start.schema';
 import { withoutKnownRejections } from '../engine/blueprint-round';
 import { type PlannedLedgerEntry, type ScreenStep } from '../engine/blueprint-step.types';
 
@@ -43,7 +44,11 @@ export class StartOptions {
 
 @Schema()
 export class StartInput {
-  @Field({ optional: true, maxLength: 4000, description: 'Whatever the author already imagines, in their own words; may be empty.' })
+  @Field({
+    optional: true,
+    maxLength: START_TEXT_MAX,
+    description: 'Whatever the author already imagines, in their own words; may be empty. Locking keeps it whole for the steps that build premise and people.',
+  })
   text?: string;
 
   @Field(() => String, { optional: true, enum: [...STARTING_TYPES], description: 'What kind of starting point the text is.' })
@@ -66,6 +71,11 @@ export class StartSelectionChip {
 export class StartSelection {
   @Field(() => [StartSelectionChip], { minItems: 1, maxItems: START_CHIP_MAX, description: 'The corrected reading: the chips the author kept, edited or added.' })
   chips: StartSelectionChip[];
+}
+
+function briefEntry(input: unknown): PlannedLedgerEntry[] {
+  const text = (input as StartInput | null)?.text?.trim();
+  return text ? [{ kind: 'direction', topic: AUTHOR_BRIEF_TOPIC, statement: text }] : [];
 }
 
 function toEntry(chip: StartSelectionChip): PlannedLedgerEntry {
@@ -113,8 +123,8 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
     const offered = round?.options.understood.map(chip => chip.id) ?? [];
     const answered = selection.chips.flatMap(chip => (chip.optionId ? [chip.optionId] : []));
     return Promise.resolve({
-      entries: withoutKnownRejections(selection.chips.map(toEntry), ledger),
-      replaces: [START_TOPIC],
+      entries: [...withoutKnownRejections(selection.chips.map(toEntry), ledger), ...briefEntry(round?.input ?? null)],
+      replaces: [START_TOPIC, AUTHOR_BRIEF_TOPIC],
       retires: [...new Set([...offered, ...answered])],
     });
   },

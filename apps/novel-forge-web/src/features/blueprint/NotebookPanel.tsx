@@ -12,6 +12,9 @@ const KIND_INTENT = { decision: 'success', system: 'info', direction: 'accent', 
 
 const EMPTY = 'Empty. Every choice you lock, every direction you keep and every idea you kill collects here.';
 
+// Past this the panel shows the opening lines; the topic's history shows the whole text.
+const LONG_STATEMENT = 400;
+
 const FOOT = 'Every step reads this, not the chat. Rejected lines reach the model only as “don’t propose”.';
 
 // A stable identity for "nothing loaded yet", so the new-entry effect can tell a first paint from an empty ledger.
@@ -33,7 +36,9 @@ function EntryRow({ entry, isNew, onOpenTopic }: EntryRowProps): ReactElement {
           {ledgerTopicLabel(entry.topic)}
         </button>
       </div>
-      <p className={styles.nbStatement}>{entry.statement}</p>
+      <p className={styles.nbStatement} data-long={entry.statement.length > LONG_STATEMENT || undefined}>
+        {entry.statement}
+      </p>
       {entry.why != null && <p className={styles.nbWhy}>{entry.why}</p>}
       {entry.writerLine != null && <p className={styles.nbWriterLine}>Means for the writer: {entry.writerLine}</p>}
     </article>

@@ -2,6 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
 
+import { authorBriefInput } from '../../ai/context/blueprint-sections';
 import { blueprintHeartPrompt } from '../../ai/prompts/blueprint-heart.prompt';
 import { type BlueprintHeartOutput, HEART_CAUTION_MAX, HEART_TEXT_MAX, HEART_WHY_MAX, HEART_WRITER_LINE_MAX } from '../../ai/schemas/blueprint-heart.schema';
 import { type ContentOp } from '../../refinement/change-set';
@@ -129,6 +130,10 @@ export const heartStep: ScreenStep<BlueprintHeartOutput, HeartOptions, never, He
   prompt: blueprintHeartPrompt,
   optionsSchema: HeartOptions,
   selectionSchema: HeartSelection,
+
+  inputs(context) {
+    return Promise.resolve(authorBriefInput(context.ledger));
+  },
 
   toRound(output) {
     return { options: { themes: asOptions(output.themes, 't'), endings: asOptions(output.endings, 'e') }, coachMessage: output.coachMessage.trim() };

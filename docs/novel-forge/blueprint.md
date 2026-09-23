@@ -35,7 +35,8 @@ Seven phases in a fixed order, grouped by altitude:
 ### Idea
 
 - **Starting point.** Whatever the author already imagines (a scene, a feeling, "like X but Y", a character, nothing yet) is read back as short chips so a misunderstanding
-  shows immediately. The corrected reading is saved as directions every later step reads.
+  shows immediately. The corrected reading is saved as directions every later step reads. The author's own text is kept whole beside it: the chips summarise
+  it, and never stand in for it. The box never cuts text silently; an over-long starting point is refused with a count, not trimmed.
 - **Taste.** Either-or pairs shaped by the starting point, answerable with both, neither or "depends" plus a reason, and "a book you gave up on: why?" reasons. Taste
   becomes directions; dislikes become rejected entries.
 - **Concepts.** Rounds of four concept cards. The author's own idea is always one of the cards. Each card can be kept, killed with a reason, mixed into another, edited or
@@ -129,6 +130,8 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - Links address produced content by the keys change-set operations use (a page's section and slug, entity and fact keys, volume and arc keys, brief chapters), so a revert and
   re-apply keeps them, and inserting a chapter renumbers linked briefs with everything else.
 - Every Blueprint step's context includes the active ledger, and it is never evicted to fit a budget.
+- The author's starting text is the one entry the shared ledger leaves out, because it is too long for every step. The steps that build premise and people (concepts,
+  premise, heart, the engine pass and the volume-one pass) read it verbatim as a required section. Locked decisions and later directions win where they disagree with it.
 - Chapter packs carry the writer lines of active decisions as their own section, so a decision made in the Blueprint reaches the prose. The section is never evicted and has
   its own cap, which keeps every phase's newest lines first.
 

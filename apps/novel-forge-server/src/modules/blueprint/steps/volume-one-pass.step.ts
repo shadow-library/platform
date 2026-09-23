@@ -3,7 +3,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { AppErrorCode } from '@server/classes';
 import { type Ledger } from '@server/database';
 
-import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
+import { authorBriefInput, type BlueprintInputSection } from '../../ai/context/blueprint-sections';
 import { blueprintVolumeOnePrompt } from '../../ai/prompts/blueprint-volume-one.prompt';
 import {
   ARC_CHAPTERS_MAX,
@@ -355,7 +355,7 @@ export const volumeOnePass: PassStep<BlueprintVolumeOneOutput, VolumeOneOptions,
   async inputs(context: StepInputContext<VolumeOneOptions>): Promise<BlueprintInputSection[]> {
     const focus = VOLUME_ONE_SLICES.find(slice => slice === context.focus) ?? null;
     const asked = focus ? [focus] : [...VOLUME_ONE_SLICES];
-    const sections: BlueprintInputSection[] = [{ key: 'volume_one_scope', content: renderScope(asked, context.ledger), required: true }];
+    const sections: BlueprintInputSection[] = [...authorBriefInput(context.ledger), { key: 'volume_one_scope', content: renderScope(asked, context.ledger), required: true }];
     sections.push(...(await planningSections(context)));
     const kept = focus && context.previous ? renderKept(context.previous, focus) : null;
     if (kept) sections.push({ key: 'volume_one_so_far', content: kept });

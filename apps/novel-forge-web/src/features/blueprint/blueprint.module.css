@@ -224,6 +224,18 @@
   padding: 0;
 }
 
+.startCount {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
+.startCount[data-over] {
+  color: var(--sh-danger-solid);
+  text-align: left;
+}
+
 .startTypesLabel {
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
@@ -756,6 +768,14 @@
   margin: 0;
   font-size: var(--sh-text-body-sm);
   line-height: 1.4;
+}
+
+.nbStatement[data-long] {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
 }
 
 .nbWhy,
