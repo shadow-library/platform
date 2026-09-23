@@ -19,13 +19,17 @@ import {
   createOAuthApplication,
   createOAuthTestClient,
   createOrganisationBot,
+  createSamlSp,
   createTeamOrganisation,
+  createWebhook,
   deleteIdentityUser,
   deleteOAuthApplication,
   deleteOAuthTestClient,
   deleteOrganisation,
   deleteOrganisationBotRecord,
   deleteOrgOAuthApp,
+  deleteSamlSpRecord,
+  deleteWebhookRecord,
   findIdentityUserByEmail,
   freshClientIp,
   identityApi,
@@ -45,12 +49,16 @@ import {
   type RegisterOAuthClientOptions,
   registerOrgOAuthApp,
   type RegisterOrgOAuthAppOptions,
+  type SamlSp,
+  type SamlSpOptions,
   type SeedBotsOptions,
   seedOrganisationBots,
   type TeamOrganisation,
   type TeamOrganisationOptions,
   updateIdentitySession,
   updateOrganisation,
+  type WebhookOptions,
+  type WebhookSubscription,
 } from '../../lib';
 
 /**
@@ -74,6 +82,12 @@ export interface IdentityHarness {
   admin(): Promise<AdminApi>;
   /** A further bootstrap-admin caller at a chosen assurance level, terminated after the test — for the routes that separate reads from mutations. */
   adminAt(options: IdentitySessionOptions): Promise<AdminApi>;
+  /** A SAML service provider registered through the admin API, removed after the test. */
+  createSamlSp(options?: SamlSpOptions): Promise<SamlSp>;
+  /** Removes a service provider the test registered some other way after the test, like `createSamlSp`'s. */
+  trackSamlSp(serviceProviderId: string): void;
+  /** An admin webhook subscription — by default on a target the SSRF guard refuses at delivery — removed, with its deliveries, after the test. */
+  createWebhook(options?: WebhookOptions): Promise<WebhookSubscription>;
   /** A throwaway PUBLIC application with a first-party public client, removed after the test. */
   createOAuthClient(label?: string): Promise<OAuthTestClient>;
   /** A throwaway application (PUBLIC unless told otherwise); it and every client registered on it are removed after the test. */
@@ -144,6 +158,8 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const oauthApps: OAuthApplication[] = [];
     const organisations: { organisationId: string; ownerUserId: string }[] = [];
     const bots: OrganisationBot[] = [];
+    const samlSps: string[] = [];
+    const webhooks: string[] = [];
     const registeredEmails: string[] = [];
     const extraAdmins: AdminApi[] = [];
     let adminApi: Promise<AdminApi> | undefined;
@@ -194,6 +210,19 @@ export const test = base.extend<{ identity: IdentityHarness }>({
         extraAdmins.push(api);
         return api;
       },
+      createSamlSp: async options => {
+        const serviceProvider = await createSamlSp((await admin()).ctx, options);
+        samlSps.push(serviceProvider.id);
+        return serviceProvider;
+      },
+      trackSamlSp: serviceProviderId => {
+        samlSps.push(serviceProviderId);
+      },
+      createWebhook: async options => {
+        const subscription = await createWebhook((await admin()).ctx, options);
+        webhooks.push(subscription.id);
+        return subscription;
+      },
       createOAuthClient: async label => {
         const client = await createOAuthTestClient((await admin()).ctx, label);
         oauthClients.push(client);
@@ -240,6 +269,8 @@ export const test = base.extend<{ identity: IdentityHarness }>({
 
     const pendingAdmin = adminApi;
     await runAll([
+      ...samlSps.map(serviceProviderId => () => deleteSamlSpRecord(serviceProviderId)),
+      ...webhooks.map(webhookId => () => deleteWebhookRecord(webhookId)),
       ...oauthClients.map(client => async () => deleteOAuthTestClient((await admin()).ctx, client)),
       ...oauthApps.map(application => async () => deleteOAuthApplication((await admin()).ctx, application)),
       // Before the organisations: a bot's client is `ON DELETE restrict`, so an organisation taken down first strands it.

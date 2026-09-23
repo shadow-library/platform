@@ -312,6 +312,7 @@
         "@types/bun": "catalog:",
         "postgres": "^3.4.5",
         "typescript": "catalog:",
+        "xml-crypto": "^6.1.2",
       },
     },
     "packages/app": {
