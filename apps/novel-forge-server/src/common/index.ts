@@ -1,4 +1,5 @@
 export * from './amend-republish';
+export * from './authoring-project';
 export * from './batch-selection';
 export * from './bible-doc-title';
 export * from './brief-body';
@@ -14,7 +15,6 @@ export * from './open-canon';
 export * from './opposition';
 export * from './owner';
 export * from './plan-staleness';
-export * from './project-status';
 export * from './publish-token';
 export * from './reader-promise';
 export * from './reveal-term';

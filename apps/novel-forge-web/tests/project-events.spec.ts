@@ -66,37 +66,15 @@ describe('applyProjectEvent', () => {
     expect(invalidated).toEqual(['projects/7/runs', 'projects/7/chat-sessions/s1/messages']);
   });
 
-  it('should refetch everything a finished studio turn can have moved, including the seed sheet', () => {
-    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'ideation-turn', target: 'session:s1', status: 'completed' });
+  it('should refetch everything a finished chat turn can have moved', () => {
+    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chat-turn', target: 'session:s1', status: 'completed' });
     flushInvalidations(queryClient);
 
-    expect(invalidated).toEqual([
-      'projects/7/runs',
-      'projects/7/chat-sessions/s1/messages',
-      'projects/7/chat-sessions',
-      'projects/7/refinement-proposals',
-      'projects/7/changes',
-      'projects/7/seed',
-      'seeds',
-    ]);
+    expect(invalidated).toEqual(['projects/7/runs', 'projects/7/chat-sessions/s1/messages', 'projects/7/chat-sessions', 'projects/7/refinement-proposals', 'projects/7/changes']);
   });
 
   it('should refetch only the runs for a run that is not a chat turn', () => {
     applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chapter-generation', target: 'chapter-3', status: 'completed' });
-    flushInvalidations(queryClient);
-
-    expect(invalidated).toEqual(['projects/7/runs']);
-  });
-
-  it('should refetch the seed for a naming run on a seed target', () => {
-    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'ideation-name', target: 'seed:7', status: 'completed' });
-    flushInvalidations(queryClient);
-
-    expect(invalidated).toEqual(['projects/7/runs', 'projects/7/seed', 'seeds']);
-  });
-
-  it('should not refetch the seed for a non-ideation run on a seed target', () => {
-    applyProjectEvent(queryClient, '7', { type: 'run', runId: 'r1', graph: 'chapter-generation', target: 'seed:7', status: 'completed' });
     flushInvalidations(queryClient);
 
     expect(invalidated).toEqual(['projects/7/runs']);

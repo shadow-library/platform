@@ -5,7 +5,6 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -25,9 +24,6 @@ import {
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
 import { loadActiveLedger } from '../../blueprint/ledger/ledger-entries';
-import { matchPlaybooks } from '../../ideation/constraint-playbooks';
-import { SEED_FIELD_KEYS } from '../../ideation/question-bank';
-import { type RouterResult, toRouterSeedState } from '../../ideation/question-router';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
@@ -70,13 +66,6 @@ export interface OutlinePackOptions extends PackOptions {
 export interface ChapterPackOptions extends PackOptions {
   dryRun?: boolean;
 }
-
-export interface IdeationPackOptions extends ChapterPackOptions {
-  /** Question ids the turn pipeline has decided must be settled this turn rather than asked again. */
-  commitIds?: string[];
-}
-
-export type IdeationSeedInput = Pick<schema.Ideation.StorySeed, 'projectId' | 'fields' | 'constraints' | 'tasteAnchors' | 'concepts' | 'readiness' | 'askedQuestions'>;
 
 export interface ChatScopeInput {
   scopeType: schema.Refinement.ChatScope;
@@ -128,13 +117,6 @@ export const REFORGE_ANALYSIS_BUDGET = 12_000;
 // span's source prose still travels as a template var.
 export const REFORGE_TRANSFORM_BUDGET = 16_000;
 // An image prompt is a paragraph: the composer needs the subject, the look, and nothing else.
-// The studio turn IS the authoring session: every answer the author gave must reach the model in their
-// own words, because every later step of the novel is derived from them — so the seed pack gets far
-// more headroom than a scoped chat turn.
-export const IDEATION_BUDGET = 32_000;
-// The conversation is never packed: it reaches the model as prompt messages through the template's
-// `history` placeholder, so this budget caps that message list at the turn pipeline, not the pack.
-export const IDEATION_HISTORY_BUDGET = 10_000;
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
 
@@ -408,79 +390,6 @@ function latestRelationships(rows: EntityRelationshipRow[]): EntityRelationshipR
     if (!current || (row.chapter ?? -1) > (current.chapter ?? -1) || ((row.chapter ?? -1) === (current.chapter ?? -1) && row.id > current.id)) latest.set(key, row);
   }
   return [...latest.values()];
-}
-
-/** Every sheet field in a fixed order, empty ones included — the model must see what is still open. */
-function renderSeedSheet(fields: schema.Ideation.SeedFields): string {
-  return SEED_FIELD_KEYS.map(key => {
-    const value = fields[key];
-    const text = Array.isArray(value) ? value.join(', ') : (value ?? '');
-    return `${key}: ${text.trim() === '' ? '(empty)' : text}`;
-  }).join('\n');
-}
-
-// Sorted by key — as are the playbook excerpts derived from it — so re-locking an existing constraint,
-// or the column coming back in a different order, cannot reshuffle the stable segment and throw away the
-// prompt cache for a sheet that has not actually changed.
-function renderSeedConstraints(constraints: schema.Ideation.SeedConstraint[]): string {
-  return [...constraints]
-    .sort((left, right) => left.key.localeCompare(right.key))
-    .map(c => `- ${c.key} (${c.kind}, locked by ${c.lockedBy}${c.playbookKey ? `, playbook ${c.playbookKey}` : ''}): ${c.text}`)
-    .join('\n');
-}
-
-function renderTasteAnchors(anchors: schema.Ideation.TasteAnchors): string {
-  const lines: string[] = [];
-  if (anchors.comps.length > 0) lines.push(`Comps: ${anchors.comps.join(' | ')}`);
-  if (anchors.preferences.length > 0) lines.push(`What those comps have in common: ${anchors.preferences.join(' | ')}`);
-  return lines.join('\n');
-}
-
-/** One excerpt per matched playbook — what the shape promises, what it removes, and what must carry the load. */
-function renderPlaybookExcerpts(constraints: schema.Ideation.SeedConstraint[]): string {
-  const { matched } = matchPlaybooks(constraints);
-  const byKey = new Map(matched.map(({ playbook }) => [playbook.key, playbook]));
-  return [...byKey.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, playbook]) => `**${key}**\nPromises: ${playbook.promises}\nKills: ${playbook.kills}\nMust replace: ${playbook.mustReplace}`)
-    .join('\n\n');
-}
-
-function renderRoundQuestions(router: RouterResult, commitIds: string[]): string {
-  const header = router.done
-    ? `Stage: ${router.stage}. Every stress-ready field is filled — the author can start the novel whenever they want, and should hear that.`
-    : `Stage: ${router.stage}.`;
-  if (router.questions.length === 0) return `${header}\n\nNo questions this round: there is nothing left to ask. Answer the author in prose and return an empty payload.questions.`;
-
-  const backfilled = new Set(router.backfilled);
-  const commit = new Set(commitIds);
-  const blocks = router.questions.map(question => {
-    const lines = [
-      `[${question.id}] fills: ${question.fills.length > 0 ? question.fills.join(', ') : 'nothing — this answer is a locked constraint'}`,
-      `Select: ${question.select} — ${question.select === 'many' ? 'options must be independently selectable, never mutually exclusive' : 'options are mutually exclusive alternatives'}`,
-      `Intent: ${question.intent}`,
-      `Coaching (reproduce verbatim): ${question.coaching}`,
-    ];
-    const hint = router.hints[question.id];
-    if (hint) lines.push(`HINT — already settled: ${hint}. Confirm it instead of asking again.`);
-    if (backfilled.has(question.id)) lines.push('CIRCLING BACK — this was offered before and left unanswered. Say so, make it easier, lead with your own answer.');
-    if (commit.has(question.id))
-      lines.push(
-        "COMMIT NOW — the author has passed on this three times running. Stop asking: take the youDecide answer yourself, record it in the changeSet under this question's emission contract, and tell them in one line what you committed to and why they can overturn it whenever they like.",
-      );
-    return lines.join('\n');
-  });
-  return [header, ...blocks].join('\n\n');
-}
-
-/** Prior rounds with their fates — the killed mechanisms the next round may not resurrect. */
-function renderConceptHistory(concepts: schema.Ideation.ConceptCard[]): string {
-  return concepts
-    .map(
-      card =>
-        `Round ${card.round} — ${card.title} [${card.fate}]${card.reason ? `: ${card.reason}` : ''}\n  ${card.logline}\n  engine: ${card.engine} | ladder: ${card.ladder} | posture: ${card.posture}`,
-    )
-    .join('\n\n');
 }
 
 @Injectable()
@@ -1157,12 +1066,6 @@ export class ContextAssembler {
    * prompt messages so provider caching can extend across turns.
    */
   async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
-    // An ideation session assembles through forIdeationTurn, which needs the seed row and the round the
-    // router chose — neither of which a chat-scope input carries. ChatService rejects the scope before it
-    // gets here; RefineService's /context/preview endpoint reaches this branch directly.
-    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
-
-    // Every other scope value, legacy rows included, is the hub.
     const [project, docs, volumes, arcs, catalogText] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
@@ -1188,40 +1091,6 @@ export class ContextAssembler {
     if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
 
     return this.finalize(projectId, 'chat_hub', null, sections, [], CHAT_HUB_BUDGET, opts);
-  }
-
-  /**
-   * Pack for one Ideation Studio turn. Stable: the sheet, the locked
-   * constraints, the taste anchors, and the playbooks for the shapes already committed to — all of it
-   * byte-identical until the sheet itself moves. Volatile: the round the router just chose and the
-   * concept rounds already offered. The conversation is NOT here — it travels as prompt messages
-   * through the template's `history` placeholder, which carries its own cache breakpoint.
-   */
-  async forIdeationTurn(seed: IdeationSeedInput, router: RouterResult, opts?: IdeationPackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    return this.ideationPack(seed, router, opts);
-  }
-
-  /** The concept round runs off the same seed pack, minus the interview: the cards answer no question. */
-  async forIdeationConcepts(seed: IdeationSeedInput, opts?: Omit<IdeationPackOptions, 'commitIds'>): Promise<AssembledPack & { id: bigint | null }> {
-    return this.ideationPack(seed, null, opts);
-  }
-
-  private async ideationPack(seed: IdeationSeedInput, router: RouterResult | null, opts?: IdeationPackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const state = toRouterSeedState(seed);
-    const sections: ContextSection[] = [asStable(makeSection('seed_sheet', renderSeedSheet(state.fields), 'canonical', ['seed']))];
-
-    if (state.constraints.length > 0) sections.push(asStable(makeSection('locked_constraints', renderSeedConstraints(state.constraints), 'canonical', ['seed'])));
-    const anchors = renderTasteAnchors(state.tasteAnchors);
-    if (anchors) sections.push(asStable(makeSection('taste_anchors', anchors, 'canonical', ['seed'])));
-    const playbooks = renderPlaybookExcerpts(state.constraints);
-    if (playbooks) sections.push(asStable(makeSection('shape_playbooks', playbooks, 'canonical', [])));
-
-    // The round is what the turn is FOR: a sheet long enough to crowd it out would leave the model
-    // wording nothing, so it is reserved against the budget instead of competing for what is left.
-    if (router) sections.push({ ...makeSection('round_questions', renderRoundQuestions(router, opts?.commitIds ?? []), 'working', []), required: true });
-    if (state.concepts.length > 0) sections.push(makeSection('concept_history', renderConceptHistory(state.concepts), 'working', ['seed']));
-
-    return this.finalize(seed.projectId, 'ideation', null, sections, [], opts?.budgetTokens ?? IDEATION_BUDGET, opts);
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */

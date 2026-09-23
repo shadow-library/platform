@@ -13,9 +13,8 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/source')).toBe('rows');
   });
 
-  it('should resolve the refinement chat and idea studio routes to the chat variant', () => {
+  it('should resolve the refinement chat route to the chat variant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/chat')).toBe('chat');
-    expect(resolveSkeletonVariant('/ideas/seed-1')).toBe('chat');
   });
 
   it('should resolve a migrated collection route to the card-grid variant rather than a rail it no longer renders', () => {
@@ -63,9 +62,8 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/import')).toBe('form');
   });
 
-  it('should resolve the dashboard and ideas shelf to the list variant', () => {
+  it('should resolve the dashboard to the list variant', () => {
     expect(resolveSkeletonVariant('/')).toBe('list');
-    expect(resolveSkeletonVariant('/ideas')).toBe('list');
   });
 
   it('should fall back to the default variant for an unmapped route', () => {
@@ -79,6 +77,5 @@ describe('resolveSkeletonVariant', () => {
 
   it('should ignore a trailing slash', () => {
     expect(resolveSkeletonVariant('/novels/abc123/chapters/')).toBe('rows');
-    expect(resolveSkeletonVariant('/ideas/')).toBe('list');
   });
 });

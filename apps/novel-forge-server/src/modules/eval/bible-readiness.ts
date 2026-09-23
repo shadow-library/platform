@@ -72,7 +72,7 @@ export interface BibleReadinessReport {
 /** Below this a role's documents read as a stub rather than something an author could write a scene from. */
 export const DOC_WORD_FLOOR = 250;
 
-/** A premise is a pitch, and graduation writes it short on purpose. */
+/** A premise is a pitch: the Blueprint writes `project/premise` short on purpose, so it is judged against a lower floor than a lore chapter. */
 const ROLE_WORD_FLOOR: Partial<Record<BibleStage, number>> = { foundation: 100 };
 
 const PLACEHOLDER_PATTERN = /\b(?:tbd|todo|fixme)\b|\[(?:placeholder|fill in|tbd)\]|lorem ipsum/i;

@@ -33,10 +33,6 @@ import { epitomePrompt } from './epitome.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
-import { ideaNamePrompt } from './idea-name.prompt';
-import { ideationConceptsPrompt } from './ideation-concepts.prompt';
-import { ideationStressPrompt } from './ideation-stress.prompt';
-import { ideationTurnPrompt } from './ideation-turn.prompt';
 import { illustrationComposePrompt } from './illustration-compose.prompt';
 import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
@@ -93,12 +89,6 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
-  /** Shape-only — the round echo rules live in `buildIdeationTurnPrompt`; the studio calls the builder. */
-  'ideation-turn': ideationTurnPrompt as PromptModule<unknown>,
-  'ideation-concepts': ideationConceptsPrompt as PromptModule<unknown>,
-  /** Shape-only — the no-contradiction rule lives in `buildIdeationStressPrompt`; the studio calls the builder. */
-  'ideation-stress': ideationStressPrompt as PromptModule<unknown>,
-  'idea-name': ideaNamePrompt as PromptModule<unknown>,
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
@@ -139,9 +129,6 @@ export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
-export { buildIdeationStressPrompt, renderReadinessPrecheck } from './ideation-stress.prompt';
-export { buildIdeationTurnPrompt } from './ideation-turn.prompt';
-export { CONCEPT_CARD_COUNT } from './ideation-concepts.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
 export { renderReforgeFidelityGuidance } from './reforge-write.prompt';

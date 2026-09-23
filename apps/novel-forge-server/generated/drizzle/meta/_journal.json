@@ -351,6 +351,13 @@
       "when": 1790123180130,
       "tag": "0049_mature_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790124931701,
+      "tag": "0050_broken_the_twelve",
+      "breakpoints": true
     }
   ]
 }

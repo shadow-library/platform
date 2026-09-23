@@ -164,8 +164,8 @@ export const PLAN_BIBLE_DOC_TOKENS = 4_000;
 
 /**
  * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
- * An allowlist rather than a denylist of background graphs (`chat-title`, `chat-compact`, `ideation-name` —
- * fire-and-forget metadata graphs no `turn()`/`nameIdea()` caller awaits or reports through) because a
+ * An allowlist rather than a denylist of background graphs (`chat-title`, `chat-compact` —
+ * fire-and-forget metadata graphs no `turn()` caller awaits or reports through) because a
  * forgotten entry then fails closed: a new background graph stays off this list by default and never
  * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
  */
@@ -173,9 +173,6 @@ const AUTHOR_FACING_GRAPHS = [
   'translate-seed',
   'rebrand-glossary',
   'recombine',
-  'ideation-turn',
-  'ideation-concepts',
-  'ideation-stress',
   'chat-turn',
   'premise-enhance',
   'bible-audit',
@@ -227,14 +224,14 @@ export class GenerationService {
   }
 
   async seedFromBrief(projectId: bigint, body: SeedFromBriefBody): Promise<WorkflowRunResult> {
-    await this.assertActive(projectId);
+    await this.assertAuthoring(projectId);
     const result = await this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
     if (result.outcome === 'completed') await this.stagePluginCanon(projectId);
     return result;
   }
 
-  private async assertActive(projectId: bigint): Promise<void> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true, kind: true } });
+  private async assertAuthoring(projectId: bigint): Promise<void> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { kind: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
     assertAuthoringProject(project);
   }
@@ -329,7 +326,7 @@ export class GenerationService {
   }
 
   async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertActive(projectId);
+    await this.assertAuthoring(projectId);
     const volumes = await this.db.query.volumes.findMany({
       where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')),
       orderBy: asc(schema.volumes.ordinal),
@@ -435,7 +432,7 @@ export class GenerationService {
    * boundary. Gated on the whole volume's arcs being approved.
    */
   async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertActive(projectId);
+    await this.assertAuthoring(projectId);
     const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
     if (!arc) throw AppErrorCode.ARC_001.create();
     if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
@@ -662,7 +659,7 @@ export class GenerationService {
   }
 
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
-    await this.assertActive(projectId);
+    await this.assertAuthoring(projectId);
     const limit = body.limit ?? 1;
 
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
@@ -716,7 +713,7 @@ export class GenerationService {
    * at or before this one blocks it, and only one generation job runs at a time.
    */
   async regenerateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
-    await this.assertActive(projectId);
+    await this.assertAuthoring(projectId);
 
     const [approvedVolumes, brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
       this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) }),

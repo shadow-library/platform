@@ -16,7 +16,7 @@ import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
-import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, renderTurnRules, scopeAllowedOps } from '../ai/prompts';
+import { buildChatRefinePrompt, HUB_ALLOWED_OPS, HUB_INSTRUCTIONS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
@@ -190,14 +190,7 @@ const CHAT_TITLE_GRAPH = 'chat-title';
 // A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
 // can't leave a session's thinking indicator stuck on forever.
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
-const TURN_GRAPHS = ['chat-turn', 'ideation-turn', 'ideation-concepts', 'ideation-stress'];
-
-// The chat model role for a scope: every scope but ideation now runs the
-// single hub playbook, so every scope but ideation runs the single 'chat' model role too — a legacy
-// per-artifact scope no longer gets its own planning-discipline model.
-export function chatRoleForScope(scope: Refinement.ChatScope): AiRole {
-  return scope === 'ideation' ? 'ideation' : 'chat';
-}
+const TURN_GRAPHS = ['chat-turn'];
 
 @Injectable()
 export class ChatService {
@@ -231,7 +224,7 @@ export class ChatService {
   }
 
   async updateSession(projectId: bigint, sessionId: string, update: { mode?: Refinement.ChatMode; title?: string }): Promise<Refinement.ChatSession> {
-    const session = await this.mutableSession(projectId, sessionId);
+    const session = await this.getSession(projectId, sessionId);
     const set: Record<string, unknown> = { updatedAt: new Date() };
     if (update.mode !== undefined) set['mode'] = update.mode;
     if (update.title !== undefined) set['title'] = update.title;
@@ -244,7 +237,6 @@ export class ChatService {
     const value = scopeRef?.includes(':') ? (scopeRef.split(':')[1] ?? '') : '';
     switch (scopeType) {
       case 'project':
-      case 'ideation':
       case 'novel':
       case 'volume_plan':
         return null;
@@ -310,19 +302,8 @@ export class ChatService {
     return session;
   }
 
-  /**
-   * The studio owns its own conversation end to end: its mode, title, lifetime and archival are
-   * consequences of the seed, not of a chat setting. Every mutating path but the model pin funnels
-   * through here so a new verb on the controller cannot reopen the hole.
-   */
-  private async mutableSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
-    return session;
-  }
-
   async setSessionStatus(projectId: bigint, sessionId: string, status: Refinement.ChatSessionStatus): Promise<Refinement.ChatSession> {
-    const session = await this.mutableSession(projectId, sessionId);
+    const session = await this.getSession(projectId, sessionId);
     const [updated] = await this.db.update(schema.chatSessions).set({ status, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id)).returning();
     if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
@@ -330,7 +311,7 @@ export class ChatService {
 
   /** Deletes a chat and its whole history (messages cascade); staged proposals survive with the session detached. */
   async deleteSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
-    const session = await this.mutableSession(projectId, sessionId);
+    const session = await this.getSession(projectId, sessionId);
     await this.db.delete(schema.chatSessions).where(eq(schema.chatSessions.id, session.id));
     return session;
   }
@@ -447,7 +428,6 @@ export class ChatService {
   async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter, options: ChatTurnOptions = {}): Promise<ChatTurnResult> {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
-    if (session.scopeType === 'ideation') throw AppErrorCode.IDE_005.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
@@ -464,7 +444,7 @@ export class ChatService {
     const proseEdits = options.proseEdits === true;
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
     const turnRules = renderTurnRules({ proseEdits });
-    const scopeInstructions = `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}`;
+    const scopeInstructions = `${HUB_INSTRUCTIONS}\n\n${this.renderLookupVocabulary()}`;
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
@@ -671,11 +651,11 @@ export class ChatService {
   /**
    * The chat model resolution ladder, most specific first:
    *  1. the chat's own override (the author picked a model for this conversation),
-   *  2. otherwise the model routed for the scope's role — the router folds in the project's group
+   *  2. otherwise the model routed for the `chat` role — the router folds in the project's group
    *     selection, then the owner's defaults.
    */
   private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
-    const role = chatRoleForScope(session.scopeType);
+    const role: AiRole = 'chat';
     if (session.modelProvider && session.modelId) {
       const picked = { provider: session.modelProvider, model: session.modelId };
       if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, picked)) return picked;
@@ -731,7 +711,7 @@ export class ChatService {
         kind: session.scopeType === 'project' ? 'hub' : 'chat',
         summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
         changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: scopeAllowedOps(session.scopeType),
+        allowedOps: HUB_ALLOWED_OPS,
         runId,
         warnings,
       });

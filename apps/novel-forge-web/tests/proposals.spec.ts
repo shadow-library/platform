@@ -133,8 +133,8 @@ describe('opLabel', () => {
 
 describe('defaultDeclined', () => {
   it('should pre-decline the one-way-door ops so they never apply by accident', () => {
-    const declined = defaultDeclined([{ op: 'entity.upsert' }, { op: 'action.finalize' }, { op: 'action.graduate_seed' }]);
-    expect([...declined]).toEqual([1, 2]);
+    const declined = defaultDeclined([{ op: 'entity.upsert' }, { op: 'action.finalize' }]);
+    expect([...declined]).toEqual([1]);
   });
 
   it('should decline nothing when the change-set holds no guarded op', () => {

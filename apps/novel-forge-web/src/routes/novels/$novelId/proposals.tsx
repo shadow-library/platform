@@ -175,7 +175,7 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
     const selected = selectedOpIndexes(proposal.changeSet.length, declined);
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
-    // one-way door, so naming the indexes is what makes finalize and graduation reachable at all.
+    // one-way door, so naming the indexes is what makes finalize reachable at all.
     apply.mutate(
       { proposalId: proposal.id, opIndexes: selected },
       {

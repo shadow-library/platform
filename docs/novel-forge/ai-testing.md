@@ -11,7 +11,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part                                  | Features                                                                                                                       |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                            |
-| Part 2: Idea to lore bible            | Ideation Studio (the Idea), graduation, premise enhancement, bible builder, readiness, audit, one end-to-end sample            |
+| Part 2: Blueprint to lore bible       | The Blueprint (the guided design flow), premise enhancement, bible builder, readiness, audit, one end-to-end sample            |
 | Part 3: planning, generation          | Volume and arc planning, briefs, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
 | Part 4: manuscript pipelines          | Novel import, extraction, recombine, rebrand, reforge (chapter and transform), translation, curated ingest                     |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)                   |
@@ -282,7 +282,8 @@ Model selection is **code + database**, not environment.
 - Production group defaults (`defaults.ts:85-95`):
   `writing` → `moonshotai/kimi-k3`, `planning` → `z-ai/glm-5.2`, `review` → `anthropic/claude-sonnet-5`,
   `chat` → `z-ai/glm-5.2`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
-  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`, `ideation` → `anthropic/claude-opus-5`.
+  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`, `ideation` → `anthropic/claude-opus-5`
+  (the `ideation` group is the Blueprint's small steps; its large passes run on `planning`).
 - Unrestricted map (`defaults.ts:101-111`) applies when `project.contentMode === 'unrestricted'`; overrides are
   clamped to `UNRESTRICTED_LLM_ALLOWLIST` (`defaults.ts:117`).
 - Reasoning effort per group: `REASONING_POLICY` (`defaults.ts:142-152`) — every authoring group asks for `low`.
@@ -324,8 +325,6 @@ Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `in
 - `contentMode`: `standard | unrestricted` (`projects.ts:74`).
 - `originalLanguage` is required for `translation` and rejected otherwise — the check is exclusive-or, so setting
   it on any other kind is also a `PRJ_006` (`project.service.ts:34-36,104`).
-- A new project's `status` is `active`; only Ideation Studio seeds are `seed`, and `status` is not a
-  `CreateProjectBody` field, so no HTTP caller can mint one (`project.service.ts:101`).
 - A `new_novel` create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
   no `contentHash`, which is how the plan importer tells them from authored docs
   (`src/modules/plan-import/plan-import.service.ts:114-120`).
@@ -343,9 +342,10 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 (`project.dto.ts:201-202`). The Story Bible screen refuses to run without one
 (`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:541-543`).
 
-**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — the "Direct" door posts
-`{name, title, kind:'new_novel', contentMode}` (`:77-95`); "Translate" posts `kind:'translation'` (`:97-116`);
-"Idea" posts to `/api/v1/seeds` and creates a seed-status project (`:118-130`). Screens are declared once in
+**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — every door posts to
+`POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project and opens the Blueprint; "I know the
+novel" creates the same project and leaves you on Overview; "Translate a novel" posts `kind:'translation'`; "Import a
+plan" creates a `new_novel` project and opens Import Plan. Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
 project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Import Plan
 (deprecated)**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
@@ -660,12 +660,13 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 
 ---
 
-## Part 2: Idea to lore bible
+## Part 2: Blueprint to lore bible
 
-Covers: Ideation Studio (seed, studio turns, concept cards, stress pass, constraint playbooks, graduation), premise
-enhancement, bible builder, bible readiness, bible audit, and proposal-only writes into bible documents / entities /
-canon facts. The refinement **chat hub** (`/novels/$novelId/chat`, `scopeType != 'ideation'`) is covered in
+Covers: the **Blueprint** — the guided design flow that replaced the Ideation Studio — its rounds, locks, decision
+ledger and gate, then premise enhancement, bible builder, bible readiness, bible audit, and proposal-only writes into
+bible documents / entities / canon facts. The refinement **chat hub** (`/novels/$novelId/chat`) is covered in
 Part 5 (chat hub and admin) — cross-referenced here where it is the only editor for something.
+Intent and invariants for the flow itself live in `docs/novel-forge/blueprint.md`; this part is how to exercise it.
 
 Everything below is read off current code in `apps/novel-forge-server` / `apps/novel-forge-web`.
 
@@ -674,9 +675,9 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - All API paths are relative to the server host; every route below is `@Authenticated()` and needs
   `novel-forge:projects:read`, plus `novel-forge:projects:write` + `novel-forge:generation:run` on anything that
   spends a model call.
-- `projectId` is a numeric string. `:projectId` on studio routes must be a project with `projects.status = 'seed'`
-  (`loadNamedSeed`, else `IDE_001`); graduation is the last call that requires `seed`, and everything after it
-  requires `status = 'active'` and a `kind` other than `translation`/`curated` (`assertAuthoringProject`).
+- `projectId` is a numeric string. Blueprint routes require `kind = 'new_novel'` (`BPR_003`); the authoring
+  pipeline behind them refuses a `translation` or `curated` project with `PRJ_009` (`assertAuthoringProject`).
+  There is no project status any more — a project is authorable from the moment it is created.
 - Observability for every recipe (one place): **Workflow Runs** screen (`/novels/$novelId/runs`, needs the
   `novel-forge:admin` scope) or `GET /api/v1/projects/{projectId}/runs` (not admin-gated), `GET …/runs/{runId}`,
   `GET …/runs/{runId}/context` (the context pack), `GET …/runs/{runId}/calls/{callId}` (raw output) — the last
@@ -694,162 +695,107 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 > every crime she rings back into public memory rewrites who owes what to whom. The magistrates want her hands. The
 > debtors want her voice. Each bell she sounds makes her better at hearing and worse at forgetting.
 
-Working title for graduation: **The Bell Debt**.
+Working title to reach for in the Title step: **The Bell Debt**.
 
 ---
 
-#### Ideation Studio — create a seed (spark → opening turn)
+#### Blueprint — create the novel and open the design flow
 
-- **Entry:** **Ideas** shelf (`/ideas`) → **New idea**; `POST /api/v1/seeds`. Creates the project itself (`kind: new_novel`, `status: seed`).
+- **Entry:** **Projects** → **New project** → **Design a new novel**; `POST /api/v1/projects` with
+  `{"name": "Untitled novel", "kind": "new_novel", "contentMode": "standard"}`. The project exists from this call —
+  there is no separate idea artifact, and nothing has to graduate.
 - **Preconditions:** none. This is the first recipe; everything else in this file builds on its `projectId`.
-- **Input:** `{"spark": "<the sample spark above>"}` (optional `"contentMode": "standard" | "unrestricted"`).
-- **Run:** 1. POST the body (responds `201`). 2. Note `projectId` and `sessionId` from the response. 3. Poll
-  `GET /api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages` until `pendingTurn` is **null** (it is an
-  object while a turn runs, not a boolean; the opening turn is fired detached, after the create commits). 4. Reload
-  `/ideas` and open the card.
-- **Verify:** `story_seeds` has exactly one row for the project (`story_seeds_project_id_unique`), all jsonb columns at
-  their empty defaults, `content_hash` set. `chat_sessions` has one row `scope_type='ideation'`, `mode='auto'`,
-  `title='Ideation Studio'`; `chat_messages` ordinal 1 is the spark **verbatim** (role `user`). Two background runs
-  appear: `graph='ideation-turn'` (prompt `ideation-turn@1.3.0`, role `chat`) and `graph='ideation-name'`
-  (prompt `idea-name@1.0.0`, role `title`, _excluded_ from `GET …/runs` and the runs rail by design — it is off the
-  `AUTHOR_FACING_GRAPHS` allowlist, so read it straight from `workflow_runs`). `projects.title` flips from null to a
-  short name; the shelf card shows a “Naming this idea…” skeleton until it lands and then that name, with the spark
-  excerpt beneath it (“Untitled idea” is the fallback only for a seed created with no spark).
-  **Quality:** the assistant reply is a lead-in only — it must _not_ restate the questions (those live in
-  `payload.questions[].wording`), and it should read back decisions _already inside the spark_ (bells, debt, a
-  hearing/forgetting trade) rather than generic craft advice.
-- **Fails when:** spark echoed twice in the transcript (the adopt-unanswered-message path in
-  `persistUserMessage` broke); `projects.title` stays null (naming run failed — it is fire-and-forget and only logs);
-  seed row missing but a `seed`-status project exists (compensating delete in `createSeed` failed);
-  `IDE_006` on the first manual turn (opening turn still in flight).
-- **Cost:** 2 model calls (turn + naming).
+- **Run:** 1. POST. 2. `GET /api/v1/projects/{projectId}/status`. 3. `GET /api/v1/projects/{projectId}/blueprint`.
+  4. Open `/novels/{projectId}/blueprint` in the web app.
+- **Verify:** `status.blueprint.stage = 'blueprint'` and `status.blueprint.phases` holds **7** phases in order
+  (`idea`, `heart`, `core`, `world`, `spine`, `volume_one`, `opening`), each with `status` of `done|current|locked|open`,
+  a `lockReason` when locked, and its sub-steps. `GET …/blueprint` lists the 21 registered steps in registry order
+  (`steps/blueprint-steps.ts`): `start, taste, concepts, premise, heart, promise, title, engine, protagonist,
+  opposition, world, power, spine_pass, spine, volume_one_pass, cast, places, arcs, briefs, voice, check`. The three
+  generators — `engine`, `spine_pass`, `volume_one_pass` — carry `kind: 'pass'`; the other eighteen are
+  `kind: 'screen'`, and a screen fed by a pass names it in `source`. No `decision_ledger_entries` rows yet.
+  **Quality:** the sidebar groups the phases by altitude (The novel / The engine / The shape / Up close) and every
+  phase below the current one is locked with a reason the author can read.
+- **Fails when:** `status.blueprint` is `null` — the project is not `kind: new_novel`, and the Blueprint is
+  new-novel-only. A step the registry rejects answers `BPR_001`.
 
-#### Ideation Studio — one interview turn
+#### Blueprint — one round on a small step (`start`)
 
-- **Entry:** Idea studio composer at `/ideas/$seedId` — the route param is the **projectId**, not `story_seeds.id`;
-  `POST /api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages`.
-- **Preconditions:** seed created; no turn in flight (`GET …/chat/sessions/{sessionId}/turn`).
-- **Input:** answer the open round in your own words, 1–200,000 characters, e.g.
-  `{"content": "Shelf: low-fantasy city fantasy, heist-adjacent. Room: the Bellhouse and the flooded lower wards of Ghelvarn. Length: open-ended, two chapters a week."}`
-- **Run:** 1. Read the last assistant message's `payload` (`kind: "questions"`). 2. Answer with the composer (or tap
-  option chips and press **Put N verdicts in the reply** on a card round). 3. POST. 4. Re-read the seed:
-  `GET /api/v1/projects/{projectId}/seed`.
-- **Verify:** run `graph='ideation-turn'`, `target='session:{id}'`, prompt `ideation-turn@1.3.0`, one linked
-  `context_packs` row with `purpose='ideation'` whose sections include `seed_sheet`, `round_questions` (required, never
-  truncated) and — once locks exist — `locked_constraints`, `taste_anchors`, `shape_playbooks`.
-  `story_seeds.asked_questions` grows with **every offered** id, answered or not. A `refinement_proposals` row
-  (`kind='ideation'`, `scope_type='ideation'`; the studio's op allowlist is `seed.update` plus `action.graduate_seed`,
-  and an interview turn should only ever stage `seed.update`) is created _and auto-applied_ (session is
-  `auto`), so `story_seeds.fields` / `.constraints` / `.taste_anchors` move in the same request and
-  `story_seeds.revision` bumps. Room answers must land as `constraints[].kind='scope'` whose lowercased key, split on
-  non-alphanumerics, contains one of the tokens room/setting/world/place/location/locale (the bank's emission contract
-  says `setting`) — any other key or kind is invisible to the router and the question re-asks.
-  **Quality:** ≤3 questions, each with ≥2 _concrete_ tappable options built from this seed (never “something else”),
-  `coaching` copied character-for-character from the bank, and a `youDecide` line that commits to one answer with a
-  reason. Options for a `select: "many"` question must each stand alone (no “either X or Y”).
-- **Fails when:** the same question id is offered a third time (`circlingIds` should force a commit at
-  `CIRCLING_LIMIT = 3`); `IDE_006` (turn already running); `IDE_003` (model returned a question id not in the bank);
-  proposal left `pending` with an `applyNote` — a baseline conflict downgraded the auto-apply.
-- **Cost:** 1 model call per turn; the full interview is ~6–10 turns.
+- **Entry:** the Blueprint's first screen; `POST /api/v1/projects/{projectId}/blueprint/steps/start/rounds`.
+- **Preconditions:** the project above; no round already running on that step (`BPR_002`).
+- **Input:** `{"input": {"text": "<the sample spark above>", "startingType": "book"}}`.
+  Optional on any round: `steer` (free text), `nudges` (short chips), `keepAsDirection`, and
+  `feedback: [{optionId, verdict: 'more'|'not'|'mix', reason?}]`.
+- **Run:** 1. POST → `201` with the round in `pending`. 2. Poll `GET …/blueprint` (or watch the project event stream
+  for `{"type":"job","kind":"blueprint"}`) until the round reads `ready`.
+- **Verify:** one `jobs` row of kind `blueprint`; one `workflow_runs` row with `graph='blueprint-step'` and
+  `target='start#<round>'`; one `context_packs` row with `purpose='blueprint'` whose sections are, in order,
+  `ledger` (required, stable), the step's own inputs, `step_thread` (the last **4** messages of this step only — steers,
+  nudges and coach lines, never options) and `round_input` (required). A `blueprint_rounds` row carries the step key,
+  the round number, `status`, `focus` and the options as jsonb. A kept steer writes a `direction` ledger entry on
+  `<step>.steer`; a "not this" with a reason writes a `rejected` entry on `<step>.rejected`.
+  **Quality:** the options are built from the author's own words, not genre defaults, and the coach message says what
+  the round is trying to find out.
+- **Fails when:** `BPR_002` (a round is already running), `BPR_004` (the input, selection or nudges fail the step's
+  schema — free text belongs in `steer`, not in a nudge), `BPR_003` (the project is not `new_novel`).
+  `POST …/blueprint/steps/start/rounds/cancel` stops a live round; `BPR_006` when there is nothing to cancel.
 
-#### Ideation Studio — concept-card round (diverge)
+#### Blueprint — lock a step and read the Notebook
 
-- **Entry:** same composer; the router fires this when `diverge.cards` is offered (no `premise` on the sheet yet).
-- **Preconditions:** `story_seeds.fields.premise` empty. Start the sample idea **without** a premise if you want this
-  round: with a premise on the sheet the diverge stage is skipped entirely.
-- **Input:** `{"content": "Re-roll these. No amnesia openings, and keep the bells physical — I want metal, not metaphor."}`
-- **Run:** 1. Reach the round. 2. Judge cards in the UI (keep / kill / crossed + a reason) and send. 3. Re-read the seed.
-- **Verify:** run `graph='ideation-concepts'`, prompt `ideation-concepts@1.0.0`, role `chat`. Assistant message
-  `payload.kind='cards'` with `round` and exactly **4** cards; each card has a server-minted uuid `id` and
-  `fate='offered'`. `story_seeds.concepts` is appended (never replaced) and `round` increments per generation.
-  The assistant `content` is the bank's `diverge.cards` coaching line verbatim.
-  **Quality:** the four cards should differ on **engine**, **ladder** _and_ **posture** — four dressings of one idea is
-  the headline failure. Each `logline` names who / what pressure / what is lost; each `hookLine` would make a browsing
-  reader open chapter one.
-- **Fails when:** `payload.filtersFailed` present — a locked playbook's `conceptFilter` rejected cards twice and they
-  are shown anyway (by design: author judgement outranks the filter). Check the log line
-  `studio concepts: filters still rejecting`. Fewer or more than 4 cards means schema `minItems/maxItems` was bypassed.
-  A verdict landing on the wrong card means the model dropped/reordered ids instead of echoing them.
-- **Cost:** 1 model call, 2 if the playbook filter rejects the first set.
+- **Entry:** the screen's **Lock** bar; `POST /api/v1/projects/{projectId}/blueprint/steps/premise/lock`.
+- **Preconditions:** a `ready` round on `premise` (or the author's own text), and the phase above it complete.
+- **Input:** `{"selection": {"parts": [{"optionId": "p1"}, {"text": "<the author's own second clause>"}],
+  "sentence": "<the whole premise sentence>", "why": "<why this one>", "writerLine": "<what it means for the writer>"}}`.
+  `writerLine` is required and refused blank (`BPR_004`).
+- **Run:** 1. POST. 2. `GET /api/v1/projects/{projectId}/ledger`. 3. Open the bible page the lock wrote.
+- **Verify:** the response carries `entries`, `withdrawn`, `proposalId` and `followUp`. `decision_ledger_entries`
+  gains one active `decision` on topic `premise` carrying `why`, `writerLine`, every passed-over part under
+  `rejectedAlternatives`, and `links.bibleDocuments = [{section:'project', slug:'premise'}]`. Exactly one
+  `refinement_proposals` row with `kind='blueprint'`, `scope_ref='blueprint:premise'`, already `applied` — the
+  proposal is created and applied in the same transaction, so it is never observable as `pending`. `projects.premise`
+  moves and `bible_documents project/premise` is written. **No** row is updated in place: superseding writes a new
+  row and marks the old one `superseded`, and `GET …/ledger` returns only the active set.
+  **Quality:** the writer line reads as an instruction to whoever writes the prose, not as a restatement of the
+  decision; it is what rides every later chapter pack.
+- **Fails when:** `BPR_005` (an option id the round never offered), `BPR_004` (the selection fails the step schema),
+  `BPR_007` (a lock addressed to a pass rather than one of its screens). `followUp.ok = false` means the lock stood
+  but its after-commit work (an approval or an outline job) failed — re-locking is the retry.
 
-#### Ideation Studio — constraint playbooks (forced questions)
+#### Blueprint — a large pass and its screens (Core + World)
 
-- **Entry:** no endpoint of its own — it is the lock-matching layer under every turn (`matchPlaybooks`).
-- **Preconditions:** a seed with at least one locked constraint.
-- **Input:** lock an open-ended run and a single viewpoint, e.g.
-  `{"content": "Open-ended, I'll run it for years. One POV only — Tin's. And no harem, ever."}`
-- **Run:** 1. Send. 2. Read `GET …/seed` → `constraints[]` and note which of the three locks landed as constraints
-  rather than sheet fields. 3. Open the turn's context pack (`GET …/runs/{runId}/context`) and read its
-  `shape_playbooks` section. 4. Take the next two turns and watch which questions arrive.
-- **Verify:** matching is **lexical and computed at read time** — no code writes `constraints[].playbookKey`, so it is
-  normally absent and its absence proves nothing. The observable is the `shape_playbooks` context-pack section, which
-  names every matched playbook key (library keys: `dual-leads`, `regression`,
-  `no-harem`, `litrpg-system`, `open-ended-length`, `ensemble`, `slow-burn`, `single-pov`). Each one forces its
-  question: `open-ended-length` → `deepen.renewal`; `single-pov` → `deepen.ironyBudget`; `no-harem` →
-  `deepen.stayingCost`; `litrpg-system` → `deepen.systemRules`; `ensemble` → `deepen.povBudget`; `dual-leads` →
-  `deepen.secondLadder`; `regression` → `deepen.foreknowledgeDecay` + `deepen.divergence`; `slow-burn` →
-  `deepen.deferredTension`. A forced question is gated on `asked_questions` alone, so it must appear **exactly once**.
-  A matched playbook's needles are matched against the constraint's `text` plus its `key`/`kind` — so a lock recorded
-  only as a **sheet field** never matches (`orient.length` fills `serializationNotes`, and its open-ended follow-up
-  forces `deepen.renewal` through `followUps`, not through a playbook match).
-  **Quality:** the forced question's wording should reference the lock (“your ladder tops out…”), not ask generically.
-- **Fails when:** a forced question re-offers forever (`recordOffered` not persisted — check `asked_questions` after
-  the turn); a locked constraint is absent from `shape_playbooks` although its text plainly matches (lexical matcher
-  miss — the server logs `locked constraint has no playbook` for every unmatched lock).
+- **Entry:** the **Protagonist** screen; `POST /api/v1/projects/{projectId}/blueprint/steps/protagonist/rounds`.
+- **Preconditions:** the Idea and Heart phases complete — `promise` in particular, because its drivers decide which
+  slices apply at all.
+- **Run:** 1. Request a round on `protagonist`. 2. Let it finish, then request one on `world`. 3. Lock each screen.
+- **Verify:** a round requested on a sourced screen runs on the **pass** (`engine`) with `focus` set to that screen
+  key, and the screen's `latestRound` is the pass round narrowed to its slice. The other three slices must come back
+  byte-identical — the runner deep-compares and fails the round if another slice moved. The four slices are
+  `protagonist`, `opposition`, `world`, `power`; `opposition` is skipped entirely for a slice-of-life promise and
+  `power` only appears when `progression` is one of the drivers, so check `status.blueprint` marks them
+  `applies: false` rather than rendering them. Locking `world` writes **two** decisions (`world.cost` and
+  `world.rules`) and mints one `canon_facts` row per rule plus one for the cost rule, each scheduled
+  `reveal_chapter = 1` — open canon, which is what makes them visible to the drafter.
+  **Quality:** re-running the whole pass after a screen is locked flags that screen with `sliceMoved: true`, and the
+  UI offers **Use the new version** rather than silently replacing the locked answer.
+- **Fails when:** a whole-pass round is running and you lock a sibling screen (`BPR_002`) — a round focused on a
+  *different* screen is allowed to run beside a lock. `AI_001` when the merged pass output is empty.
 
-#### Ideation Studio — stress pass (readiness)
+#### Blueprint — the gate into the Workspace
 
-- **Entry:** **Run stress check** in the _Story seed_ side panel; `POST /api/v1/projects/{projectId}/seed/stress`.
-  Also fires automatically as a turn once the sheet is stress-ready.
-- **Preconditions:** for the _automatic_ pass, all of `genre, premise, hook, castShape, progressionSystem,
-protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any sheet.
-- **Input:** none (empty POST).
-- **Run:** 1. POST. 2. Read `readiness[]` in the response and in the side panel. 3. Press it a second time with the
-  sheet unchanged.
-- **Verify:** run `graph='ideation-stress'`, `target='seed:{seedId}'` (on-demand) or `session:{id}` (turn), prompt
-  `ideation-stress@1.0.0`, role `judge`. `story_seeds.readiness` is replaced with **exactly 7 entries in this order**:
-  `hook, protagonist, engine, ladder, promise, voice, room`. Every `thin`/`empty` verdict carries a `fix`. The count
-  comes from the schema's `minItems`/`maxItems`; the order, the fix rule and the “a structurally empty dimension may
-  never be called strong” rule come from the prompt's `postValidate`, so a first reply that breaks one is repaired
-  rather than rejected. The on-demand endpoint writes **no** chat messages; the router-triggered turn writes two.
-  The second press on an unchanged sheet should be served from `llm_cache` (role `judge` is cacheable, and `readiness`
-  is not part of the pack the key hashes) — a second `ideation-stress` run row still appears, but with **no** new
-  `model_calls` row behind it; the server logs `LLM cache hit — skipping model call`.
-  **Quality:** each `note` should quote the sheet (“‘better at hearing, worse at forgetting’”), not describe it in the
-  abstract; a `fix` must be one takeable step, not “develop this further”.
-- **Fails when:** fewer than 7 entries, or an order/`fix`/`strong`-on-empty violation that survived the repair pass
-  (a repaired first attempt shows as `model_calls.status='repaired'`, not as a failure); `promise` reported strong
-  with no `constraints[].kind='promise'` on the sheet — the readiness dimension reads the _kind_, so a promise filed
-  under any other kind never counts.
-- **Cost:** 1 model call, 0 on a cache hit.
-
-#### Ideation Studio — graduation (deterministic, zero AI)
-
-- **Entry:** **Start the novel** (side-panel footer or the graduate dialog);
-  `POST /api/v1/projects/{projectId}/seed/graduate`.
-- **Preconditions:** `status='seed'`, `story_seeds.fields.premise` non-empty, no turn in flight. Readiness advises and
-  never blocks.
-- **Input:** `{"title": "The Bell Debt"}`
-- **Run:** 1. POST. 2. Read the response `documents`, `factKeys`, `provenance`. 3. Open
-  `GET /api/v1/projects/{projectId}/bible` and the two documents.
-- **Verify:** **no** `workflow_runs` row and **no** `model_calls` row — graduation is pure rendering. One transaction:
-  `projects.status='active'`, `name`/`title` = the title, `premise` = the sheet premise, `themes` = sheet themes,
-  `instructions` appended with `Narration voice, decided in the Ideation Studio: …`.
-  `bible_documents` gains exactly `project/premise` and `project/reader-promise`. One `canon_facts` row per **distinct
-  promise-constraint key**, `fact_key` = `promise:<slugified key>`, `source='seed'`, `reveal_chapter` NULL,
-  `constraint_note` prefixed `Reader promise locked at ideation — …`. The bank tells the model to file every promise
-  under the key `promise`, so several promise constraints collapse into a single `promise:promise` row and only the
-  last one survives — count `factKeys` against the promise constraints on the sheet and expect the shortfall (see
-  Finding 8). `story_seeds` row **deleted**; every `ideation` chat session set to `archived`. No volumes, no
-  entities — by design.
-  **Quality:** `project/premise` must carry no chapter structure or volume detail (sheet is idea-altitude only);
-  `project/reader-promise` must list the promises as falsifiable rules, plus locked shape/scope rules, serialization,
-  voice, taste anchors. Read `provenance`: `author` vs `studio` vs `crossed` counts are the honesty check, and this
-  response is the **only** place they can ever be read (the seed is gone).
-- **Fails when:** `IDE_008` (no premise), `IDE_002` (blank title), `IDE_001` (already graduated / not a seed),
-  `IDE_006` (turn in flight). The sibling failure is `IDE_007`, raised only by a **blanket manual apply** of a
-  proposal containing `action.graduate_seed`; an auto-mode studio turn does not fail on that op — it declines it and
-  reports the reason in `applyNote`, leaving the proposal `pending`.
+- **Entry:** the gate summary screen; `GET` then `POST /api/v1/projects/{projectId}/blueprint/gate`.
+- **Preconditions:** every **required** step locked. Five steps are optional and never block the gate: `start`,
+  `taste`, `concepts`, `title` and `voice`.
+- **Run:** 1. `GET …/gate` for readiness. 2. `POST …/gate` to open the Workspace.
+- **Verify:** `GET` reports unfinished required steps plus non-blocking warnings — `arc_stale`, `arc_brief_range`,
+  `brief_stale`, `check_outdated` (a decision was superseded or withdrawn after the final check ran). `POST` writes a
+  single ledger entry: kind `system`, `phase` null, topic `gate`, `decidedBy: system`. A partial unique index holds
+  one active gate per project, and the entry can never be superseded or withdrawn (`LDG_005`). Afterwards
+  `status.blueprint.stage` reads `workspace`, the project home route becomes Overview, and the Blueprint stays
+  reachable read-only from the Workspace sidebar.
+  **Quality:** the summary states all seven phases and the final check's counts (passed / fixed / left as they are /
+  open) from the `check` decision's payload; "0 open findings" is `payload.open`.
+- **Fails when:** `BPR_009` names the **phases** still unfinished (never step keys). Nothing re-runs the final check
+  after a later revisit — the gate only reports `check_outdated`.
 
 #### Premise enhancement (refine)
 
@@ -869,7 +815,7 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
   `POST /api/v1/projects/{projectId}/proposals/{proposalId}/apply`.
   **Quality:** the enhanced premise reads as back-cover copy in 2–3 paragraphs — it must **not** walk the arc and must
   **never** state the ending. Serialization machinery belongs in `serializationNotes`, not in the premise prose.
-- **Fails when:** `PRM_001` (no overview and no brief/premise on the project); `IDE_004` (project still a seed);
+- **Fails when:** `PRM_001` (no overview and no brief/premise on the project);
   `model_calls.status='repaired'` with a `changeSet` postValidate failure (ops outside the two allowed types).
 - **Cost:** 1 model call.
 
@@ -879,7 +825,8 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
   has zero entities); `POST /api/v1/projects/{projectId}/seed-from-brief`.
 - **Preconditions:** `status='active'` and a `kind` other than `translation`/`curated`. The API reads the brief from
   the **body only** and never touches `projects.brief`; the web button is what requires a non-empty `projects.brief`,
-  and a graduated project has none — set it in **Project Settings → “Premise / brief”** first (see Findings).
+  and neither project creation nor a Blueprint lock writes it — set it in **Project Settings → “Premise / brief”**
+  first (see Findings).
 - **Input:** `{"brief": "<the sample spark, plus: open-ended serial, single POV (Tin), low-fantasy river city>", "force": false}`
   (`brief` is required and unbounded; `force` is optional and defaults to false.)
 - **Run:** 1. POST (the request blocks for the whole run — minutes). 2. Watch `GET …/runs` for
@@ -900,9 +847,9 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
   `project/cast` must name a protagonist, an antagonist and the relationships that generate conflict — a cast document
   with no antagonist is the classic weak output here.
 - **Fails when:** repeated `model_calls` rows with `attempt=1` on one stage — the coverage floor was missed and the
-  reply was retried; a stage silently skipped because graduation already wrote its document (`project/premise`);
-  `PRJ_001`/`IDE_004`; an HTTP timeout at the gateway while the run keeps going server-side (check `workflow_runs`, not
-  the response).
+  reply was retried; a stage silently skipped because a Blueprint lock already wrote its document (`project/premise`,
+  `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`/`PRJ_009`; an HTTP timeout at the
+  gateway while the run keeps going server-side (check `workflow_runs`, not the response).
 - **Cost:** 7 model calls (fewer if stages skip) + embeddings for `indexLore`; minutes of wall clock.
 
 #### Bible readiness (deterministic score)
@@ -958,21 +905,21 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
   (revert: `/revert`, discard: `/discard`; list: **Proposals** screen). Conversational refinement of an individual
   document or entity is the **refinement chat hub** (`/novels/$novelId/chat`) — covered in
   Part 5 (chat hub and admin).
-- **Preconditions:** a pending proposal from premise-enhance, bible-audit, or a studio turn.
+- **Preconditions:** a pending proposal from premise-enhance, bible-audit, or a chat turn.
 - **Input:** none for apply; `PATCH …/proposals/{id}` to select a subset of ops first.
 - **Run:** 1. List proposals. 2. Apply. 3. Re-read the affected rows and the readiness score.
 - **Verify:** `refinement_proposals.status` goes `pending → applied` (the other terminal values are `conflicted` when
   a baseline moved, `superseded`, `reverted` and `discarded`). The domain write and the status change are one
   transaction with a baseline conflict check —
   audit / premise / arc-plan / chat output must **never** appear in `bible_documents`, `entities` or `canon_facts`
-  without a corresponding applied proposal (the studio's own `readiness` / `concepts` columns are the documented
-  exception). `bible_documents.revision` and `content_hash` move on every upsert that changes the body — an upsert
+  without a corresponding applied proposal — a Blueprint lock is no exception: it creates and applies its own
+  `kind='blueprint'` proposal inside the lock transaction. `bible_documents.revision` and `content_hash` move on every upsert that changes the body — an upsert
   whose `content_hash` is unchanged is a no-op and leaves the revision alone. Direct author edits stay available:
   `PUT /api/v1/projects/{projectId}/bible/{section}/{slug}`, `PATCH …/entities/{entityKey}`,
   `PUT …/facts/{factKey}` (+ `POST …/facts/{factKey}/reveal`).
   **Quality:** `GET …/changes` then `POST …/changes/rollback` must restore the previous body exactly — an applied
   proposal that cannot be reverted is a defect.
-- **Fails when:** `IDE_007` on a blanket manual apply that includes `action.graduate_seed`; status `conflicted` (the
+- **Fails when:** `RFN_009` on a blanket manual apply that includes `action.finalize`; status `conflicted` (the
   artifact moved under the proposal — expected, re-run the producer); `FCT_002` (a fact op names an unknown entity key);
   `ENT_001` / `DOC_001` / `FCT_001` on a removed target.
 
@@ -982,59 +929,70 @@ protagonistDrive, stakes, voice` filled. The on-demand endpoint runs on any shee
 
 Run this whole sequence once against the sample idea; keep the outputs and diff them against your baseline bible (a hand-written one, or one produced by a single prompt of your own). Total ≈ 18–25 model calls.
 
-**Stage 0 — create the idea.** `POST /api/v1/seeds` with `{"spark": "<the sample spark>"}` (responds `201`).
-☐ `projectId` + `sessionId` returned ☐ spark is `chat_messages` ordinal 1, verbatim ☐ `projects.title` becomes a real
-name within a few seconds ☐ one `ideation-turn` run reached `completed`, and an `ideation-name` run exists in
-`workflow_runs` although `GET …/runs` does not list it.
+**Stage 0 — create the novel.** `POST /api/v1/projects` with
+`{"name": "Untitled novel", "kind": "new_novel", "contentMode": "standard"}` (responds `201`).
+☐ `projectId` returned ☐ `GET …/status` reports `blueprint.stage = 'blueprint'` and 7 phases ☐ `GET …/blueprint`
+lists the step registry with only `start` reachable.
 
-**Stage 1 — interview (≈6–8 turns).** Answer each round through `POST …/chat/sessions/{sessionId}/messages` with
-`{"content": "<answer>"}` (1–200,000 characters). The sample spark is premise-shaped, so the studio normally extracts a
-premise on the opening turn and the concept-card round is skipped — run the concept recipe separately on a spark with
-no premise. Suggested answers, one per round: shelf = _low-fantasy city fantasy, heist-adjacent_; room = _the
-Bellhouse and the flooded lower wards of Ghelvarn_; length = _open-ended, I'll run it for years; two chapters a week_;
-tags = _civic memory, debt, guilt, craft_; cast = _one lead, and one POV only — Tin's_; hook = _the first bell she
-rings cancels a debt that was keeping someone alive_; engine = _her hearing widens
-while her own memory thins — the reader can count what she has lost_; want = _her mother's name struck off the
-Bellhouse ledger_; refusal = _she will not ring a memory a living person still needs_; cost = _every ring takes a
-year she cannot name_; foil = _Oren, the debt-clerk who taught her to read the ledger_; promise = _no memory is ever
-restored for free; no romance solves the debt_; voice = _close third, past tense, dry, tactile_.
-☐ `story_seeds.fields` carries all 8 stress-ready fields ☐ `asked_questions` contains every offered id, never a repeat
-past 3 ☐ room landed as `constraints[].kind='scope'` under a `setting`-like key ☐ the cast answer locked a
-single-viewpoint constraint, so `single-pov` appears in the next turn's `shape_playbooks` section and
-`deepen.ironyBudget` is offered exactly once ☐ `deepen.renewal` is offered exactly once, forced by `orient.length`'s
-open-ended follow-up off `serializationNotes` (a length answer filed as a sheet field matches no playbook)
-☐ at least one `promise`-kind constraint exists ☐ every turn produced an auto-applied `kind='ideation'` proposal.
+**Stage 1 — the Idea phase.** Round and lock `start`, `taste`, `concepts` and `premise` through
+`POST …/blueprint/steps/{step}/rounds` and `POST …/blueprint/steps/{step}/lock`. Feed the sample spark to `start`.
+Suggested answers, one per step: taste = _craft over spectacle; a city that remembers; consequences that compound_;
+concepts = keep the bell-memory card, kill anything that turns the debt into a romance (give the reason — it becomes a
+standing "do not propose"); premise = the sample spark reduced to one sentence, writer line _every bell she rings
+costs her a year she cannot name_.
+☐ `start` and `taste` write only `direction` / `rejected` entries (they are optional steps; an optional step is done
+only when a **lock** wrote an entry on its completion topic) ☐ `concepts` offers exactly 4 cards and a killed card
+never comes back ☐ `premise` writes one active `decision` on topic `premise` with a non-empty `writerLine`, plus
+`project/premise` ☐ each round's `context_packs` row opens with the `ledger` section and carries at most 4 messages
+of `step_thread`.
 
-**Stage 2 — stress pass.** It fires automatically on the turn after the sheet completes; press **Run stress check** once
-more from the panel.
-☐ 7 dimensions in fixed order ☐ every non-`strong` verdict has a `fix` ☐ `promise` is `strong` (the constraint exists)
-☐ the second press opened a second `ideation-stress` run with **no** `model_calls` row behind it (cache hit).
+**Stage 2 — the Heart phase.** Lock `heart` (theme + ending question), `promise` (drivers, length, tone) and,
+optionally, `title`.
+☐ `heart` writes two decisions (`theme`, `ending`) and merges `## Theme` / `## The ending question` into
+`project/premise` rather than rebuilding it ☐ `promise` writes `payload.drivers` — these are what decide which later
+steps apply at all ☐ `POST …/blueprint/title/checks` with ≤8 titles runs **no** model call and reports the
+published-titles check as `unknown` (there is no web search in this deployment) — it must never render as a pass.
 
-**Stage 3 — graduate.** `POST …/seed/graduate` with `{"title": "The Bell Debt"}`.
-☐ zero model calls ☐ `projects.status='active'`, `premise`/`themes`/`instructions` populated ☐ `project/premise` and
-`project/reader-promise` exist ☐ `canon_facts` holds one `source='seed'`, `reveal_chapter` NULL row per **distinct**
-promise-constraint key — with both sample promises filed under the key `promise` expect a single `promise:promise`
-row carrying only the second one (Finding 8) ☐ `story_seeds` row gone, ideation session archived
-☐ `provenance.author + studio + crossed + unattributed = filled`.
+**Stage 3 — the engine pass (Core + World).** Round and lock `protagonist`, `opposition`, `world`, `power`.
+☐ every round runs on the `engine` pass with `focus` set to the screen, and the other slices come back untouched
+☐ `opposition` is absent for a slice-of-life promise and `power` only appears when `progression` is a driver
+☐ locking materialises `entities` (character/faction/concept/power_rule) **and** the bible pages, and every
+`canon_facts` row it mints carries `reveal_chapter = 1` — open canon the drafter is held to.
 
-**Stage 4 — give the project a brief.** `PATCH /api/v1/projects/{projectId}` with
+**Stage 4 — the shape and the opening.** Lock `spine`, then `cast`, `places`, `arcs`, then `briefs`, `voice`, `check`.
+☐ `spine` writes the movements as volumes and pins the reveal schedule ☐ `arcs` approves volume one's arcs
+☐ `briefs` writes arc one's chapter briefs, flagged hand-edited so the Workspace's mid-arc reconciliation leaves them
+alone, and a chapter that lands a pinned reveal carries a `knowledgeContract.learns` naming it ☐ `check` runs all
+three slices (`rules`, `cast`, `shape`) before it will lock, and refuses otherwise
+☐ `POST …/blueprint/gate` writes the single `system` / `gate` ledger entry and `status.blueprint.stage` flips to
+`workspace`.
+
+**Stage 4b — give the project a brief.** `PATCH /api/v1/projects/{projectId}` with
 `{"brief": "<the sample spark plus the locked shape: open-ended, single POV, low fantasy>"}` (or Settings → “Premise /
-brief”). Graduation does not write `projects.brief`; the builder's **UI button** is what needs it, so this stage is
-required to test the screen and optional if you only drive `POST …/seed-from-brief` directly.
+brief”). Nothing in the Blueprint writes `projects.brief`; the bible builder's **UI button** is what needs it, so this
+stage is required to test the screen and optional if you only drive `POST …/seed-from-brief` directly.
 ☐ `projects.brief` non-empty ☐ the Story Bible empty state now offers **Generate story bible** instead of **Add a
 brief in Settings**.
 
-**Stage 5 — readiness, before.** `GET …/bible/readiness`.
-☐ `coverage` thin — 1 of 7, since `project/reader-promise` serves no role ☐ `records` empty (0 of 4)
-☐ `substance` judges only the premise role (against its 100-word floor); `project/reader-promise` is checked for
-placeholder text only ☐ `readyToDraft` false
-☐ `blockingGaps` holds 10 strings: the 6 missing manifest chapters plus the 4 unmet entity floors.
+**Stage 5 — readiness.** `GET …/bible/readiness`.
+☐ read it once after the Idea phase and once after the gate, and keep both — the delta is what the Blueprint is worth
+☐ `substance` judges only the roles a manifest document serves, against its word floor
+☐ `readyToDraft` reads coverage + records only ☐ `blockingGaps` names each missing manifest chapter and each unmet
+entity floor.
+**Expect `substance: thin` straight after the gate, and do not treat it as a defect.** `project/reader-promise`
+matches no manifest role, so it is only checked for placeholder text and counts for nothing; `project/premise` is the
+`foundation` role and the Blueprint writes it as a pitch, comfortably under that role's 100-word floor
+(`ROLE_WORD_FLOOR`, `eval/bible-readiness.ts`) — so a fully designed novel still reads thin. It is non-blocking:
+`readyToDraft` is coverage + records only.
 
-**Stage 6 — build the bible.** `POST …/seed-from-brief` with the brief, `force: false`.
-☐ `node_trace` has all 8 nodes ☐ **`foundation` was skipped** because graduation already wrote `project/premise` —
-confirm `counts.foundation = 0` and that downstream stages received the graduated premise as `{foundation}`
-☐ all 7 manifest addresses present ☐ entity floors met (≥3 location/concept, ≥4 power_rule/concept, ≥4 faction/location,
-≥3 character) ☐ character cards each have want + cost + a voice tic ☐ `lore_chunks` populated.
+**Stage 6 — build the bible (the other path).** `POST …/seed-from-brief` with the brief, `force: false`. A project
+the Blueprint designed already carries `project/premise`, `project/cast`, `world/setting-overview` and
+`power/system-and-limits`, so those stages **skip** — run this stage on a second `new_novel` project created without
+the Blueprint if you want to compare the builder against it.
+☐ `node_trace` has all 8 nodes ☐ a stage whose document already had a body reports `counts[stage] = 0` and still
+appears in `stagesDone` ☐ all 7 manifest addresses present ☐ entity floors met (≥3 location/concept,
+≥4 power_rule/concept, ≥4 faction/location, ≥3 character) ☐ character cards each have want + cost + a voice tic
+☐ `lore_chunks` populated.
 
 **Stage 7 — readiness, after.** `GET …/bible/readiness`.
 ☐ `coverage` strong ☐ `records` strong ☐ `readyToDraft` true ☐ note which roles `substance` still flags ☐ `reveal` shows how many generated facts got a `revealChapter`.
@@ -1056,20 +1014,19 @@ volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
 
 ### Findings — code vs product doc, and seams worth reporting
 
-1. **Graduation does not set `projects.brief`, and the bible builder reads only the brief.**
-   `apps/novel-forge-server/src/modules/ideation/graduation.service.ts:99-113` writes
-   `name/title/premise/themes/instructions`; `apps/novel-forge-server/src/modules/project/project/project.service.ts:108-120`
-   never sets `brief`. `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:539-547` refuses to run
-   without one (`'Add a project brief in Settings before generating the bible.'`), so the headline path Idea → Bible
-   has a manual copy-paste step in the middle. The API itself takes the brief in the request body and never reads
+1. **Nothing writes `projects.brief`, and the bible builder's UI button reads only that.**
+   Neither project creation nor a Blueprint lock sets `brief`;
+   `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx` refuses to run without one
+   (`'Add a project brief in Settings before generating the bible.'`), so the path Blueprint → bible builder has a
+   manual copy-paste step in the middle. The API itself takes the brief in the request body and never reads
    `projects.brief`, so this is a UI-path gap only.
-2. **The seed's own output barely reaches the builder.** `apps/novel-forge-server/src/modules/ai/graphs/bible-builder.graph.ts`
-   templates take `projectBrief` plus
-   previously written stage bodies only — it links **no context pack**, and never reads `project/reader-promise`, the
-   `source='seed'` promise facts, the taste anchors, or the locked constraints. The one channel is indirect: because
-   graduation already wrote `project/premise`, the `foundation` stage is skipped (`bible-builder.graph.ts:73-81`) and
-   the graduated premise is what every later stage receives as `{foundation}`. This is the most likely reason a
-   single prompt that sees the whole idea can out-write the harness here.
+2. **The Blueprint's own output barely reaches the bible builder.**
+   `apps/novel-forge-server/src/modules/ai/graphs/bible-builder.graph.ts` templates take `projectBrief` plus
+   previously written stage bodies only — it links **no context pack**, and never reads the decision ledger, the
+   Blueprint's canon facts, or `project/reader-promise`. The one channel is indirect: because a Blueprint lock
+   already wrote `project/premise`, the `foundation` stage is skipped and the locked premise is what every later
+   stage receives as `{foundation}`. The Blueprint materialises most of the bible itself, so the builder is now the
+   path for a project that was never designed — not a follow-on stage.
 3. **`POST /api/v1/projects/{projectId}/premise/enhance` is unreachable from the web app.** Only
    `apps/novel-forge-web/src/lib/apis/api-types.gen.ts:1618` mentions it; no hook or component calls it (contrast
    `bible/audit` → `apps/novel-forge-web/src/lib/apis/refinement.api.ts:695` →
@@ -1082,20 +1039,6 @@ volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
    (`apps/novel-forge-server/src/modules/generation/generation.service.ts:182`,
    `apps/novel-forge-server/src/modules/ai/graphs/workflow-run.service.ts:346`) with no job row unless a caller
    supplies `jobId`. Expect minute-scale requests and client timeouts that do not reflect the run's real outcome.
-6. **Substance floor vs graduation output.** The floor is judged per role (`apps/novel-forge-server/src/modules/eval/bible-readiness.ts`,
-   `substance`), with a 100-word floor for the premise; graduation's `project/reader-promise` serves no role and is only
-   checked for placeholder text. A graduated idea whose premise is under 100 words still reads `substance: thin` —
-   non-blocking, since `readyToDraft` reads coverage + records only.
-7. Product doc `docs/novel-forge/novel-forge.md:55` and `:109` match the code (graduation deterministic; only proposal
-   applies write domain tables, studio `readiness`/`concepts` excepted). No contradiction found on this path.
-8. **Several reader promises graduate as one canon fact.** `deepen.promise`'s emission contract tells the model to
-   file every promise under the key `promise`
-   (`apps/novel-forge-server/src/modules/ideation/question-bank.ts`, `deepen.promise.intent`), and
-   `apps/novel-forge-server/src/modules/ideation/graduation-render.ts:136-139` derives the fact key from that key,
-   so `promiseFactKey` returns `promise:promise` for all of them. The `Map` in
-   `apps/novel-forge-server/src/modules/ideation/graduation.service.ts:155-158` then keeps only the last, and the
-   rest are dropped silently — they survive only as prose in `project/reader-promise`. The fallback to the
-   constraint's text only fires when the key slugs to nothing.
 
 ---
 
@@ -1107,10 +1050,10 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 ### Shared preconditions (continue the project Part 2 built)
 
-- A project of `kind: 'new_novel'`, `status` **not** `seed` (`POST /projects` → `{name, kind:"new_novel"}`;
-  a graduated seed is already `active`). `translation`/`curated` kinds are refused with `PRJ_009`
-  (`common/project-status.ts:20`), a seed with `IDE_004`. `kind: 'source'` also runs this pipeline.
-- A graduated bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts`.
+- A project of `kind: 'new_novel'` (`POST /projects` → `{name, kind:"new_novel"}`). `translation`/`curated` kinds
+  are refused with `PRJ_009` (`common/authoring-project.ts`). `kind: 'source'` also runs this pipeline.
+- A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
+  Blueprint materialised, or what the bible builder wrote.
   Check with `GET /projects/:projectId/bible/readiness` → `readyToDraft: true`, and the **Story Bible** screen.
 - Admin scope (`novel-forge:admin`) for `GET /runs/:runId`, `/runs/:runId/context`, `/runs/:runId/calls/:callId`
   and the **Workflow Runs** screen — these are `@RequirePermission(ADMIN_PERMISSION, {highRisk:true})`
@@ -1121,8 +1064,8 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 ### Sample material
 
-These recipes continue whichever project you graduated — normally _The Bell Debt_, the sample idea
-Part 2 (Idea to lore bible) tells you to reuse verbatim. If you instead want a standalone project for this
+These recipes continue whichever project you designed — normally _The Bell Debt_, the sample idea
+Part 2 (Blueprint to lore bible) tells you to reuse verbatim. If you instead want a standalone project for this
 doc alone, seed it with:
 
 > **The Tidewright's Ledger.** In Calder Quay, debt is paid in remembered years: a tidewright can lift a
@@ -1142,7 +1085,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 #### Volume planning
 
 - **Entry:** **Volumes & Arcs** screen → "Generate volumes" dialog; `POST /projects/:projectId/plan`.
-  Requires `kind: new_novel|source`, status ≠ `seed`.
+  Requires `kind: new_novel|source`.
 - **Preconditions:** bible documents exist (Part 2). No volumes needed — this creates them.
 - **Input:** `{"volumeCount": 2, "chaptersPerVolume": 4}` (UI dialog defaults are 3 × 8; keep it at 2 × 4 so
   the whole chain below is 8 chapters). Optional `skeleton` overrides the derived one; omit it.
@@ -1158,7 +1101,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   three _different_ statements — a payoff that restates the objective, or a conflict that is just "she must
   survive", is the harness under-performing. `cast` should name entity keys that actually exist in `entities`.
 - **Fails when:** empty `volumes[]` (weak model read a blank skeleton — `generation.service.ts:203-213`
-  is the fallback that should prevent it); `PRJ_009` on a translation/curated project; `IDE_004` on a seed;
+  is the fallback that should prevent it); `PRJ_009` on a translation/curated project;
   log line `plan: volumes upserted` with a count below `volumeCount`.
 - **Cost:** 1 model call.
 
@@ -1502,7 +1445,7 @@ bible_document.remove`, `model` recorded. `model_calls`: `chapter-extract@1.0.0`
 - **Entry:** **Chapters** → split-button menu → "Insert a chapter ahead of ch 1" (disabled once anything is
   finalized), or a chapter row's "Insert a chapter after N";
   `POST /projects/:projectId/chapters/:afterChapter/insert`.
-- **Preconditions:** project not `seed`; `afterChapter >= max(finalized chapter number)` (`CHP_003`);
+- **Preconditions:** `afterChapter >= max(finalized chapter number)` (`CHP_003`);
   `afterChapter <= max(chapter, brief)` (`CHP_001`); **no active `generate` job** (`CHP_004`).
 - **Input (planner):** `{"briefOrigin":"planner","intent":"A quiet chapter where Amara reads her mother's
 own withdrawal slip and realizes the handwriting is hers."}`
@@ -1553,7 +1496,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
 #### Amend a finalized chapter
 
 - **Entry:** **Chapters** → a `final` chapter → "Amend"; `POST /projects/:projectId/chapters/:n/amend`.
-- **Preconditions:** `chapters.status='done'` (else `CHP_006`); project not `seed`.
+- **Preconditions:** `chapters.status='done'` (else `CHP_006`).
 - **Input:** `{"content":"…full replacement prose…","title":"The Withdrawal Slip",
 "note":"Rewritten after the Assize timeline changed."}`
 - **Run:** 1. Open a finalized chapter. 2. "Amend" → paste → confirm.
@@ -1564,7 +1507,7 @@ true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `
   transaction; on failure the chunks are dropped and `indexed:false` (fix with `POST /backfill`).
   Republish only when the reader payload hash moved. The UI then shows the "Canon was not re-derived" alert —
   **the bible, continuity and downstream chapters are untouched by design**; the follow-up is "Add to bible".
-- **Fails when:** `CHP_006` (chapter not finalized), `CHP_001`, `IDE_004`; log
+- **Fails when:** `CHP_006` (chapter not finalized), `CHP_001`; log
   `amend: could not drop the superseded chunks; the index still holds pre-amend prose` — retrieval will serve
   deleted prose until a backfill.
 - **Cost:** 0 model calls (embeddings only).
@@ -1589,8 +1532,10 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
   (`forChapter` and `renderHiddenConstraints`; section refs carry the key but are not part of `rendered`). Read it
   at `GET /drafts/3/prompt` and confirm the words "collateral childhood" appear nowhere.
   (b) _Judge asymmetry_: the judge's human message carries a `## FORBIDDEN KNOWLEDGE`
-  block with the full text — `source='seed'` facts are excluded on purpose
-  (`chapter-generation.graph.ts:367`) — and returns `knowledgeCompliance`. (c) _Deterministic pre-scan_:
+  block with the full text and returns `knowledgeCompliance`. It still filters out `source='seed'` facts, but
+  nothing writes that source any more — open canon is carried by `revealChapter <= OPEN_FROM_CHAPTER`
+  (`common/open-canon.ts`), which is what keeps a Blueprint-minted world rule out of the hidden set in the first
+  place. (c) _Deterministic pre-scan_:
   `scanKnowledgeLeaks` word-boundary-matches each `terms[]` entry (≥3 chars, case-insensitive) and **forces**
   non-compliance regardless of what the model said (`mergeKnowledgeCompliance`). Expect a soft finding
   `knowledge leak: "the Veil pledge" exposes [amara_is_the_pledge] — …excerpt…` in `drafts.judge_note`, and
@@ -1603,7 +1548,8 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
   feature in silence. `PUT /briefs/:n` cannot produce that state (`minItems: 1` rejects it at the DTO), so it
   only arises from an outliner-written or proposal-written contract — check `briefs.knowledge_contract`
   directly if the layers below never fire. A fact with no `terms[]` gets no pre-scan and relies on the judge
-  alone; terms under 3 characters are skipped; a `source='seed'` fact is excluded from the judge's list.
+  alone; terms under 3 characters are skipped. The `source='seed'` exclusion in the judge's list is vestigial —
+  no code mints such a fact today.
 - **Cost:** pre-scan is free; the judge call is the one already made per attempt.
 
 #### Harness observability (use for every block above)
@@ -2075,7 +2021,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 
 1. Take `promptKey@promptVersion` from the call row and open `ai/prompts/<promptKey>.prompt.ts` (chat hub: `chat-refine.prompt.ts`, version 2.1.0). The template is there, and the version must bump on any wording change.
 2. Fill the variables. For `chat-refine`:
-   - `scopeInstructions` = `renderScopeInstructions('project')` (`ai/prompts/scope-playbooks.ts`) plus the lookup vocabulary.
+   - `scopeInstructions` = `HUB_INSTRUCTIONS` (`ai/prompts/scope-playbooks.ts`) plus the lookup vocabulary.
    - `stableContext` = the pack's stable segment.
    - `history` = `chat_sessions.summary` (as "Conversation so far…") plus `chat_messages` with `ordinal > summary_through_ordinal`. On a lookup round it also carries the previous JSON reply and a "Lookup results:" human message.
    - `volatileContext` = the pack's volatile segment.
@@ -2192,11 +2138,11 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
   - **Cherry-pick is final.** The proposal is `applied`, so the declined ops can never be applied later; you must ask again.
   - Bad selection returns 400 `RFN_011`. A second apply returns 400 `RFN_002` (not pending).
   - **Baseline conflict.** Stage a proposal touching entity E, hand-edit E (`PATCH /entities/:key {"notes":"x"}`), then apply. The result is 409 `RFN_003` and the proposal is now `conflicted` (`error.mismatches` lists refs). It can only be discarded (`POST /proposals/:id/discard`); UI "Baseline changed underneath this proposal".
-- **Fails when:** an unselected op still lands (apply guard bug). Note that the `changeSet` PATCH accepts ops outside the hub scope by design-gap: `updateChangeSet` validates with no scope allowlist (`proposal.service.ts:184`), so a hand-edit can add `seed.update` to a hub proposal. Confirm it, and treat it as the defect in 6.8 rather than a test failure.
+- **Fails when:** an unselected op still lands (apply guard bug). Note that the `changeSet` PATCH accepts ops outside the hub scope by design-gap: `updateChangeSet` validates with no scope allowlist (`proposal.service.ts:184`), so a hand-edit can add an op outside the hub scope to a hub proposal. Confirm it, and treat it as the defect in 6.8 rather than a test failure.
 
 #### 1.5 Action ops and one-way doors (`never auto-applied`)
 
-- **Entry:** proposals containing `action.*` ops (hub `HUB_ACTION_TYPES`: generate_chapters, plan_volumes, plan_arcs, outline_arc, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, approve_volume_plan, approve_arcs, validate, finalize).
+- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`, all of which the hub offers: generate_chapters, plan_volumes, plan_arcs, outline_arc, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, approve_volume_plan, approve_arcs, validate, finalize).
 - **Preconditions:** a pending proposal (any) from 1.1, or a fresh one from a cheap turn.
 - **Run** (deterministic; no model needed to stage):
   1. `PATCH /proposals/$X {"changeSet":[{"op":"entity.upsert","entityKey":"harbour-bell","type":"item","name":"Harbour Bell"},{"op":"action.finalize","upTo":1}]}`
@@ -2209,7 +2155,6 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
   - **Audit action.** `opResults[0].status='applied'`, `result.summary` "bible audit staged N finding(s) — proposal Y pending review" (or "found nothing to change"). A new proposal `kind='bible_audit'` appears; `workflow_runs.graph='bible-audit'` (role `audit`, claude-sonnet-5).
   - **Actions never revert.** An action-only proposal has empty `inverse_ops` and `revertible:false`. Actions run after the content transaction commits, sequentially and fail-fast. A failed action gives `opResults[i].status='failed'` plus `error`, later actions "skipped", HTTP still 200, and `proposal.error={"actionFailure":true}`.
   - UI: a guarded op is unchecked by default with "Applies only when you select it deliberately." The UI always sends explicit `opIndexes`.
-  - `action.graduate_seed` is the same door (`RFN_009`/`IDE_007`) but belongs to the Ideation Studio; it is not offered to the hub.
 - **Fails when:**
   - 500 `RFN_008`: it means "no executor registered for this action" (`proposal-apply.service.ts:246`), not an action failure, despite its message. Per-action failures are in `opResults`.
   - An action runs during a blanket apply of a proposal that contains finalize (guard broken).
@@ -2224,7 +2169,7 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
   - Response has `proposal.status='applied'`, `autoApplied:true`, `applied.applied[]` with `artifactRef:'entity:<key>'`. The `entities` row is updated in the same request. `GET /changes` lists it with `autoApplied:true` (UI chip "auto").
   - Only the changed fields are in the op (`notes` or `body`). Untouched fields are unchanged in DB.
   - **Failure downgrade.** If the canon moved since context assembly, `applyNote` carries the error message and the proposal is `conflicted` (`chat.service.ts:503`; its comment wrongly says "pending"). Reproducing it needs a race — auto staging and applying are one request, so use two tabs or a slow model — and may take several tries.
-  - One-way doors: if the model includes `action.finalize` or `graduate`, auto apply lands the other ops and returns the door's `note` in `applyNote`, with that op `declined`. Model-dependent; the deterministic path is 1.5.
+  - One-way doors: if the model includes `action.finalize`, auto apply lands the other ops and returns the door's `note` in `applyNote`, with that op `declined`. Model-dependent; the deterministic path is 1.5.
 - **Fails when:** `applied` is missing on an auto turn with a proposal (auto-apply threw: read `applyNote`), or the turn returns 500 (auto-apply must never fail the turn).
 
 #### 1.7 Revert, rollback, change history
@@ -2470,7 +2415,7 @@ export default function createPlugin() {
 
 #### 4.1 Settings, precedence and routing
 
-- **Entry:** UI Settings (`/settings`, "Your defaults for every project and idea you own"; rows Ideation studio / Writing / Planning & canon / Review & QA / Refinement chat / Fast helpers / Illustrations; "Save changes"; alert "Unrestricted projects"). API `GET /ai/models`, `GET|PUT /ai/settings`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
+- **Entry:** UI Settings (`/settings`, "Your defaults for every project you own"; rows Writing / Planning & canon / Review & QA / Refinement chat / Blueprint / Fast helpers / Illustrations; "Save changes"; alert "Unrestricted projects"). API `GET /ai/models`, `GET|PUT /ai/settings`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
 - **Input:** `PUT /ai/settings {"models":{"chat":{"provider":"openrouter","model":"anthropic/claude-haiku-4.5"},"helper":{"provider":"openrouter","model":"openai/gpt-5.4-mini"}}}`.
 - **Run:**
   1. `GET /ai/models` → note `profile:'production'`, `defaults` per group and prices.
@@ -2526,8 +2471,8 @@ export default function createPlugin() {
 5. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
 6. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
 7. **Unused error codes.** `CHT_004`, `CHT_005` and `AI_003` are never thrown anywhere in the server, though the web app still maps `AI_003` to failure copy. Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
-8. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list, `seed.update` included. (Plugin proposals keep their own allowlist.)
+8. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
 9. **Auto-apply conflict leaves `conflicted`, not `pending`.** The `autoApply` doc comment says pending (`chat.service.ts:503`); the conflict status flip commits inside `apply`, so the reloaded proposal is `conflicted`.
 10. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `arc_plan`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
-11. **Stale comments.** `ai/defaults.ts:79` says the ideation studio has no settings screen, but `/settings` has an "Ideation studio" row and `ideation` is in `ACCOUNT_MODEL_GROUPS`. `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
+11. **Stale comments.** `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
 12. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).

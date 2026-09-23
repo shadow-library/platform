@@ -7,7 +7,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, generatePublishToken } from '@server/common';
+import { generatePublishToken } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type ImportedNovelMetaData, type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
@@ -86,7 +86,6 @@ export class PublishingService {
   async publishNovel(projectId: bigint, body: PublishNovelBody): Promise<Publishing.Publication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
 
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     /**
@@ -177,9 +176,8 @@ export class PublishingService {
    * bumping `revision` only when the rendered payload's hash actually changed.
    */
   async publishChapter(projectId: bigint, chapterNumber: number, body: PublishChapterBody): Promise<Publishing.ChapterPublication> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
     const publication = await this.getPublication(projectId);
 
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)) });

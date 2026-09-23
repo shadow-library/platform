@@ -1,6 +1,5 @@
 export interface NovelParams {
   novelId?: string;
-  seedId?: string;
 }
 
 export type ProjectRoute =

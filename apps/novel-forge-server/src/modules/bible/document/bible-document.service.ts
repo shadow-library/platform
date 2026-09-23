@@ -51,7 +51,7 @@ export class BibleDocumentService {
       .then(r => r ?? null);
   }
 
-  /** `executor` lets a caller that already owns a transaction — graduation, say — write the document inside it. */
+  /** `executor` lets a caller that already owns a transaction — a Blueprint lock, say — write the document inside it. */
   async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody, executor?: DbExecutor): Promise<Bible.Document> {
     const existing = await this.get(projectId, section, slug, executor);
     // Hashed both ways: a title folded into a document whose stored hash predates title derivation

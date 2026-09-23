@@ -15,7 +15,6 @@ export * from './bible.api';
 export * from './fact.api';
 export * from './insight.api';
 export * from './refinement.api';
-export * from './ideation.api';
 export * from './ledger.api';
 export * from './blueprint.api';
 export * from './run.api';

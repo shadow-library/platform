@@ -1,22 +1,21 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, Dialog, FormField, Input, SegmentedControl, Select, Textarea, toast } from '@shadow-library/ui';
+import { Button, Dialog, FormField, Input, SegmentedControl, Select, toast } from '@shadow-library/ui';
 
 import { AiTag } from '@/components/nf';
-import { type CreateProjectBody, type ProjectResponse, type SeedResponse, useCreateProjectMutation, useCreateSeedMutation } from '@/lib/apis';
+import { type CreateProjectBody, type ProjectResponse, useCreateProjectMutation } from '@/lib/apis';
 
 import styles from './NewNovelModal.module.css';
 
 type Mode = NonNullable<CreateProjectBody['contentMode']>;
 
 /**
- * The ways into a novel: the Blueprint designs one from nothing, the studio interviews an idea into shape,
- * the author already knows the book, it's a translation of a novel written in another language, or a plan
- * bundle authored offline is ready to load. The import door only creates the project — the bundle itself is
- * uploaded on the Import Plan screen this door hands off to, since that screen already owns the
- * upload/preview/overwrite/approve flow.
+ * The ways into a novel: the Blueprint designs one from nothing, the author already knows the book, it's a
+ * translation of a novel written in another language, or a plan bundle authored offline is ready to load.
+ * The import door only creates the project — the bundle itself is uploaded on the Import Plan screen this
+ * door hands off to, since that screen already owns the upload/preview/overwrite/approve flow.
  */
-type Door = 'blueprint' | 'idea' | 'direct' | 'translate' | 'import';
+type Door = 'blueprint' | 'direct' | 'translate' | 'import';
 
 const OTHER_LANGUAGE = 'other';
 
@@ -43,25 +42,21 @@ export interface NewNovelModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (project: ProjectResponse) => void;
-  onSeedCreated?: (seed: SeedResponse) => void;
   defaultDoor?: Door;
 }
 
 /**
  * The "New novel" dialog. The direct door always creates a `new_novel` project — chapters for a `source`-kind
  * project only ever arrive through a novel-import bundle (see the "Import novel" screen), which creates its
- * own project, so there is nothing this manual dialog could usefully create for that kind. The idea door
- * creates a seed instead and hands the author to the Ideation Studio. The translate door creates a
- * `translation` project with a required original language. The import door creates a `new_novel` project —
+ * own project, so there is nothing this manual dialog could usefully create for that kind. The translate
+ * door creates a `translation` project with a required original language. The import door creates a `new_novel` project —
  * plan import only ever applies to that kind — then routes to its Import Plan screen to upload the bundle.
  */
-export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, defaultDoor = 'blueprint' }: NewNovelModalProps): React.JSX.Element {
+export function NewNovelModal({ open, onOpenChange, onCreated, defaultDoor = 'blueprint' }: NewNovelModalProps): React.JSX.Element {
   const navigate = useNavigate();
   const createProject = useCreateProjectMutation();
-  const createSeed = useCreateSeedMutation();
   const [door, setDoor] = useState<Door>(defaultDoor);
   const [title, setTitle] = useState('');
-  const [spark, setSpark] = useState('');
   const [contentMode, setContentMode] = useState<Mode>('standard');
   const [language, setLanguage] = useState<string>(DEFAULT_LANGUAGE);
   const [customLanguage, setCustomLanguage] = useState('');
@@ -76,7 +71,6 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
   const reset = (): void => {
     setDoor(defaultDoor);
     setTitle('');
-    setSpark('');
     setContentMode('standard');
     setLanguage(DEFAULT_LANGUAGE);
     setCustomLanguage('');
@@ -159,20 +153,6 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
     });
   };
 
-  const submitIdea = (): void => {
-    createSeed.mutate(
-      { spark: spark.trim() || undefined, contentMode },
-      {
-        onSuccess: seed => {
-          onOpenChange(false);
-          reset();
-          onSeedCreated?.(seed);
-        },
-        onError: err => toast.danger(err.message),
-      },
-    );
-  };
-
   return (
     <Dialog
       open={open}
@@ -187,20 +167,17 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
           description={
             door === 'blueprint'
               ? 'Seven guided phases from an idea to a novel ready to write: the book as a whole, then its engine, its shape, and its first chapters. You don’t need an idea yet.'
-              : door === 'idea'
-                ? 'The studio asks the questions a developmental editor would, and keeps a story seed sheet as you answer.'
-                : door === 'translate'
-                  ? "Bring a novel written in another language. You add the chapters as written; translation drafts English beside them and nothing becomes the novel's text until you finalize it."
-                  : door === 'import'
-                    ? 'Create the project, then upload a plan bundle authored offline — bible documents, entities, volumes, arcs and chapter briefs land in one transactional call.'
-                    : 'Create an original novel from a premise. To adapt an existing manuscript, use Import novel instead.'
+              : door === 'translate'
+                ? "Bring a novel written in another language. You add the chapters as written; translation drafts English beside them and nothing becomes the novel's text until you finalize it."
+                : door === 'import'
+                  ? 'Create the project, then upload a plan bundle authored offline — bible documents, entities, volumes, arcs and chapter briefs land in one transactional call.'
+                  : 'Create an original novel from a premise. To adapt an existing manuscript, use Import novel instead.'
           }
         />
         <Dialog.Body>
           <div className={styles.form}>
             <SegmentedControl value={door} onValueChange={v => setDoor(v as Door)} fullWidth>
               <SegmentedControl.Item value="blueprint">Design a new novel</SegmentedControl.Item>
-              <SegmentedControl.Item value="idea">Start from an idea</SegmentedControl.Item>
               <SegmentedControl.Item value="direct">I know the novel</SegmentedControl.Item>
               <SegmentedControl.Item value="translate">Translate a novel</SegmentedControl.Item>
               <SegmentedControl.Item value="import">Import a plan</SegmentedControl.Item>
@@ -221,34 +198,6 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
                     <AiTag>AI</AiTag>
                     <span className={styles.hintText}>
                       The novel exists from the first click: everything you decide is its own data. Roughly 3–5 hours over several sittings, and you can stop at any phase.
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : door === 'idea' ? (
-              <>
-                <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
-                  <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
-                    <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
-                    <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
-                  </SegmentedControl>
-                </FormField>
-                <FormField label="The spark" helper="Optional — a sentence, a paragraph, or nothing at all. The studio starts from whatever you have.">
-                  <Textarea
-                    placeholder="e.g. a salvager who can hear what drowned ships remember"
-                    value={spark}
-                    onValueChange={setSpark}
-                    minRows={3}
-                    maxRows={8}
-                    autoGrow
-                    autoFocus
-                  />
-                </FormField>
-                <div className={styles.hint}>
-                  <div className={styles.hintRow}>
-                    <AiTag>AI</AiTag>
-                    <span className={styles.hintText}>
-                      You answer questions and pick between concepts; the sheet fills in as you go. Nothing is a novel until you press <strong>Start the novel</strong>.
                     </span>
                   </div>
                 </div>
@@ -343,10 +292,6 @@ export function NewNovelModal({ open, onOpenChange, onCreated, onSeedCreated, de
           {door === 'blueprint' ? (
             <Button variant="primary" loading={createProject.isPending} onClick={submitBlueprint}>
               Create and start
-            </Button>
-          ) : door === 'idea' ? (
-            <Button variant="primary" loading={createSeed.isPending} onClick={submitIdea}>
-              Open the studio
             </Button>
           ) : door === 'translate' ? (
             <Button variant="primary" loading={createProject.isPending} onClick={submitTranslate}>

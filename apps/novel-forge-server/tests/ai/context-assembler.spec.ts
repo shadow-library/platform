@@ -1,11 +1,10 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, FULL_CAST_MAX, type IdeationSeedInput, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
-import { nextQuestions, toRouterSeedState } from '@modules/ideation/question-router';
 
 describe('countTokens', () => {
   it('returns a positive integer for a non-empty string', () => {
@@ -1527,8 +1526,8 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     id: 4n,
     factKey: 'promise:no-harem',
     text: 'she never collects suitors',
-    constraintNote: 'Reader promise locked at ideation — plan and write nothing that breaks it: she never collects suitors',
-    writerNote: 'Reader promise locked at ideation — plan and write nothing that breaks it: she never collects suitors',
+    constraintNote: 'Reader promise — plan and write nothing that breaks it: she never collects suitors',
+    writerNote: 'Reader promise — plan and write nothing that breaks it: she never collects suitors',
     terms: [] as string[],
     source: 'seed',
   };
@@ -1590,7 +1589,7 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     expect(pack.rendered).not.toContain('The killer used the service door.');
   });
 
-  it('keeps a graduation promise fact in the behavioral constraints — the drafter must obey it, spoiler or not', async () => {
+  it('keeps a seed-sourced promise fact in the behavioral constraints — the drafter must obey it, spoiler or not', async () => {
     const brief = { chapter: 5, body: 'Boone canvasses the street.', contextRefs: [], knowledgeContract: { pov: ['boone'], learns: [] } };
     const overrides = knowledgeOverrides(brief);
     overrides.query.entities.findMany = mock(async () => []);
@@ -1599,7 +1598,7 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
     const pack = await assembler.forChapter(1n, 5, { dryRun: true });
 
     const constraints = pack.sections.find(s => s.key === 'hidden_constraints');
-    expect(constraints?.rendered).toContain('Reader promise locked at ideation');
+    expect(constraints?.rendered).toContain('Reader promise — plan and write nothing that breaks it');
     expect(constraints?.sourceRefs).toContain('fact:promise:no-harem');
   });
 
@@ -1781,202 +1780,5 @@ describe('ContextAssembler.forIllustration', () => {
     expect(pack.rendered).toContain('Chapter 3: The Ridge');
     expect(pack.rendered).toContain('## CAST APPEARANCE');
     expect(pack.rendered).toContain('Evan Vale (character): silver hair');
-  });
-});
-
-describe('ContextAssembler.forIdeationTurn', () => {
-  const killedCard = {
-    round: 1,
-    title: 'The Salvage Line',
-    logline: 'l',
-    engine: 'debt',
-    ladder: 'ship class',
-    posture: 'opportunist',
-    fate: 'killed',
-    reason: 'debt plots bore me',
-  };
-
-  const seed = (overrides: Partial<IdeationSeedInput> = {}) =>
-    ({
-      projectId: 1n,
-      fields: { genre: 'progression fantasy', premise: 'PREMISE_MARKER', castShape: 'dual leads, bonded' },
-      constraints: [{ key: 'leads', kind: 'shape', text: 'dual leads, both salvagers', lockedBy: 'author' }],
-      tasteAnchors: { comps: ['COMP_MARKER'], preferences: ['competence over destiny'] },
-      concepts: [],
-      readiness: [],
-      askedQuestions: [],
-      ...overrides,
-    }) as IdeationSeedInput;
-
-  const round = (state = seed()) => nextQuestions(toRouterSeedState(state));
-
-  it('should carry the sheet, the locks, the taste anchors and the playbooks as the stable segment', async () => {
-    const pack = await makeAssembler().forIdeationTurn(seed({ concepts: [killedCard] as IdeationSeedInput['concepts'] }), round(), { dryRun: true });
-
-    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
-    expect(segments).toMatchObject({
-      seed_sheet: 'stable',
-      locked_constraints: 'stable',
-      taste_anchors: 'stable',
-      shape_playbooks: 'stable',
-      concept_history: 'volatile',
-      round_questions: 'volatile',
-    });
-
-    expect(pack.purpose).toBe('ideation');
-    for (const marker of ['PREMISE_MARKER', 'COMP_MARKER', 'dual-leads']) expect(pack.renderedStable).toContain(marker);
-  });
-
-  it('should keep this round under budget pressure that drops everything else', async () => {
-    const pack = await makeAssembler().forIdeationTurn(seed(), round(), { dryRun: true, budgetTokens: 1 });
-
-    expect(pack.sections.map(s => s.key)).toEqual(['round_questions']);
-    expect(pack.omitted.map(o => o.key)).toContain('seed_sheet');
-    expect(pack.renderedVolatile).toContain('Coaching (reproduce verbatim)');
-  });
-
-  it('should never pack the conversation — history travels as prompt messages, not as pack text', async () => {
-    const pack = await makeAssembler().forIdeationTurn(seed(), round(), { dryRun: true });
-
-    expect(pack.sections.map(s => s.key)).not.toContain('recent_turns');
-    expect(pack.rendered).not.toContain('RECENT TURNS');
-  });
-
-  it('should put this round ahead of the concepts already offered', async () => {
-    const withCards = seed({ concepts: [killedCard] as IdeationSeedInput['concepts'] });
-    const pack = await makeAssembler().forIdeationTurn(withCards, round(withCards), { dryRun: true });
-
-    const volatileKeys = pack.sections.filter(s => s.segment === 'volatile').map(s => s.key);
-    expect(volatileKeys).toEqual(['round_questions', 'concept_history']);
-    expect(pack.renderedVolatile.indexOf('THIS ROUND')).toBeLessThan(pack.renderedVolatile.indexOf('CONCEPTS ALREADY OFFERED'));
-  });
-
-  it('should render every sheet field, naming the ones still open', async () => {
-    const pack = await makeAssembler().forIdeationTurn(seed(), round(), { dryRun: true });
-
-    expect(pack.renderedStable).toContain('genre: progression fantasy');
-    expect(pack.renderedStable).toContain('voice: (empty)');
-    expect(pack.renderedStable).toContain('themes: (empty)');
-  });
-
-  it('should render the locked constraints in key order, so re-locking one cannot move the stable bytes', async () => {
-    const forward = seed({
-      constraints: [
-        { key: 'promise', kind: 'promise', text: 'no harem', lockedBy: 'author' },
-        { key: 'leads', kind: 'shape', text: 'dual leads, both salvagers', lockedBy: 'author' },
-      ] as IdeationSeedInput['constraints'],
-    });
-    const reversed = seed({ constraints: [...(forward.constraints ?? [])].reverse() as IdeationSeedInput['constraints'] });
-
-    const first = await makeAssembler().forIdeationTurn(forward, round(forward), { dryRun: true });
-    const second = await makeAssembler().forIdeationTurn(reversed, round(reversed), { dryRun: true });
-
-    expect(second.renderedStable).toBe(first.renderedStable);
-    expect(first.renderedStable.indexOf('- leads ')).toBeLessThan(first.renderedStable.indexOf('- promise '));
-  });
-
-  it('should keep the stable segment byte-identical while the interview state moves underneath it', async () => {
-    const before = seed();
-    const first = await makeAssembler().forIdeationTurn(before, round(before), { dryRun: true });
-
-    const after = seed({
-      askedQuestions: round().questions.map(q => q.id),
-      concepts: [killedCard] as IdeationSeedInput['concepts'],
-      readiness: [{ dimension: 'hook', verdict: 'thin', note: 'n' }] as IdeationSeedInput['readiness'],
-    });
-    const second = await makeAssembler().forIdeationTurn(after, nextQuestions(toRouterSeedState(after)), { dryRun: true });
-
-    expect(first.renderedStable.length).toBeGreaterThan(0);
-    expect(second.renderedStable).toBe(first.renderedStable);
-    expect(second.renderedVolatile).not.toBe(first.renderedVolatile);
-    expect(second.renderedVolatile).toContain('The Salvage Line');
-  });
-
-  it('should say outright that a round with no questions asks nothing', async () => {
-    const pack = await makeAssembler().forIdeationTurn(seed(), { ...round(), questions: [] }, { dryRun: true });
-
-    expect(pack.renderedVolatile).toContain('No questions this round');
-    expect(pack.renderedVolatile).toContain('return an empty payload.questions');
-    expect(pack.renderedVolatile).not.toContain('Coaching (reproduce verbatim)');
-  });
-
-  it('should hand the model each question with its intent and its coaching line unaltered', async () => {
-    const result = round();
-    const pack = await makeAssembler().forIdeationTurn(seed(), result, { dryRun: true });
-
-    for (const question of result.questions) {
-      expect(pack.renderedVolatile).toContain(`[${question.id}]`);
-      expect(pack.renderedVolatile).toContain(question.coaching);
-      expect(pack.renderedVolatile).toContain(question.intent);
-      expect(pack.renderedVolatile).toContain(
-        `Select: ${question.select} — ${question.select === 'many' ? 'options must be independently selectable, never mutually exclusive' : 'options are mutually exclusive alternatives'}`,
-      );
-    }
-  });
-
-  it('should mark a hinted question as settled and a re-offered one as circling back', async () => {
-    const result = round();
-    const [first] = result.questions;
-    const marked = { ...result, hints: { [first?.id ?? '']: 'the cast shape is locked' }, backfilled: [first?.id ?? ''] };
-    const pack = await makeAssembler().forIdeationTurn(seed(), marked, { dryRun: true });
-
-    expect(pack.renderedVolatile).toContain('HINT — already settled: the cast shape is locked');
-    expect(pack.renderedVolatile).toContain('CIRCLING BACK');
-  });
-
-  it('should tell a finished sheet that the door is open', async () => {
-    const finished = seed({
-      fields: {
-        genre: 'progression fantasy',
-        premise: 'p',
-        hook: 'h',
-        castShape: 'c',
-        progressionSystem: 'l',
-        protagonistDrive: 'd',
-        stakes: 's',
-        voice: 'v',
-      },
-    });
-    const pack = await makeAssembler().forIdeationTurn(finished, nextQuestions(toRouterSeedState(finished)), { dryRun: true });
-
-    expect(pack.renderedVolatile).toContain('start the novel whenever they want');
-  });
-
-  it('should carry the fates of the concepts already offered so a killed mechanism is never resurrected', async () => {
-    const withCards = seed({ concepts: [killedCard] as IdeationSeedInput['concepts'] });
-    const pack = await makeAssembler().forIdeationTurn(withCards, round(withCards), { dryRun: true });
-
-    expect(pack.renderedVolatile).toContain('Round 1 — The Salvage Line [killed]: debt plots bore me');
-    expect(pack.renderedVolatile).toContain('engine: debt | ladder: ship class | posture: opportunist');
-  });
-
-  it('should omit the optional stable sections a bare seed has nothing to fill them with', async () => {
-    const bare = seed({ fields: {}, constraints: [], tasteAnchors: { comps: [], preferences: [] } });
-    const pack = await makeAssembler().forIdeationTurn(bare, round(bare), { dryRun: true });
-
-    const keys = pack.sections.map(s => s.key);
-    expect(keys).toContain('seed_sheet');
-    expect(keys).not.toContain('locked_constraints');
-    expect(keys).not.toContain('taste_anchors');
-    expect(keys).not.toContain('shape_playbooks');
-  });
-});
-
-describe('ContextAssembler.forIdeationConcepts', () => {
-  it('should hand the concept round the same sheet without the interview', async () => {
-    const seed = {
-      projectId: 1n,
-      fields: { genre: 'progression fantasy' },
-      constraints: [],
-      tasteAnchors: { comps: ['COMP_MARKER'], preferences: [] },
-      concepts: [],
-      readiness: [],
-      askedQuestions: [],
-    } as unknown as IdeationSeedInput;
-    const pack = await makeAssembler().forIdeationConcepts(seed, { dryRun: true });
-
-    expect(pack.sections.map(s => s.key)).not.toContain('round_questions');
-    expect(pack.renderedStable).toContain('COMP_MARKER');
-    expect(pack.rendered).not.toContain('Coaching (reproduce verbatim)');
   });
 });

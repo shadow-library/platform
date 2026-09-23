@@ -2155,75 +2155,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/seeds': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Seeds */
-    get: operations['get_api_v1_seeds'];
-    put?: never;
-    /** Create Seed */
-    post: operations['post_api_v1_seeds'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/seed': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Seed */
-    get: operations['get_api_v1_projects_projectId_seed'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/seed/stress': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Stress Seed */
-    post: operations['post_api_v1_projects_projectId_seed_stress'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/seed/graduate': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Graduate Seed */
-    post: operations['post_api_v1_projects_projectId_seed_graduate'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/illustrations': {
     parameters: {
       query?: never;
@@ -3437,7 +3368,7 @@ export interface components {
       helper?: components['schemas']['AccountModelRef'];
       /** @description Cover and scene art; must name an image model. */
       image?: components['schemas']['AccountModelRef'];
-      /** @description Ideation studio chats. */
+      /** @description The Blueprint’s small, one-screen steps. */
       ideation?: components['schemas']['AccountModelRef'];
     };
     AccountModelRef: {
@@ -3831,8 +3762,6 @@ export interface components {
       id: string;
       name: string;
       kind: components['schemas']['ProjectKind'];
-      /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
-      status: components['schemas']['ProjectStatus'];
       /** @description Whether the project was created by a signed-in person or an organisation bot. */
       ownerKind: components['schemas']['OwnerKind'];
       /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
@@ -3855,8 +3784,6 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @enum {string} */
-    ProjectStatus: 'seed' | 'active';
     /** @enum {string} */
     OwnerKind: 'user' | 'bot';
     ProjectConfig: {
@@ -3905,8 +3832,6 @@ export interface components {
       id: string;
       name: string;
       kind: components['schemas']['ProjectKind'];
-      /** @description A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates. */
-      status: components['schemas']['ProjectStatus'];
       /** @description Whether the project was created by a signed-in person or an organisation bot. */
       ownerKind: components['schemas']['OwnerKind'];
       /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
@@ -3998,7 +3923,7 @@ export interface components {
       evidence: string;
     };
     UpdateProjectBody: {
-      /** @description The working title — for a seed, the idea’s name. Trimmed; a blank title clears it. */
+      /** @description The working title. Trimmed; a blank title clears it. */
       title?: string;
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
@@ -4163,9 +4088,9 @@ export interface components {
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'ideation' | 'plugin' | 'blueprint';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'plugin' | 'blueprint';
     /** @enum {string} */
-    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
+    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
     ListProposalResponse: {
       total: number;
       limit: number;
@@ -4335,9 +4260,6 @@ export interface components {
       ordinal: number;
       role: string;
       content: string;
-      /** @description Structured turn payload the studio renders beside the prose. Discriminated by `kind`: "questions" (option chips), "cards" (concept cards), "readiness" (the stress table). */
-      payload?:
-        components['schemas']['StudioQuestionsPayloadResponse'] | components['schemas']['StudioCardsPayloadResponse'] | components['schemas']['StudioReadinessPayloadResponse'];
       proposalId?: null | string;
       runId?: null | string;
       modelProvider?: null | string;
@@ -4345,101 +4267,10 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
-    /** @description An interview turn: what to ask next, plus anything the turn inferred from the author’s own words. */
-    StudioQuestionsPayloadResponse: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'questions';
-      questions: components['schemas']['StudioQuestionResponse'][];
-      /** @description Absent when the turn inferred nothing. */
-      locks?: components['schemas']['StudioLockResponse'][];
-    };
-    /** @description One question the studio is asking this turn. */
-    StudioQuestionResponse: {
-      /** @description The question id the round handed over; the sheet records it as asked under this id. */
-      id: string;
-      /** @description The question as asked, in full — the prose reply never repeats it. */
-      wording: string;
-      /** @description Reviewed prose shown under the question; rendered as-is. */
-      coaching: string;
-      /** @description Concrete answers the author can tap; tapping one sends it as the next turn. */
-      options: string[];
-      /** @description The commit-and-explain escape hatch: the answer the studio would pick, and why. */
-      youDecide: string;
-      /**
-       * @description Whether the author can hold only one of the options at a time, or several at once. 'one' renders as radio buttons, 'many' as checkboxes; 'many' also makes "You decide" mutually exclusive with picking any option.
-       * @enum {string}
-       */
-      select: 'one' | 'many';
-    };
-    /** @description A decision inferred from material the author supplied, offered back for confirmation before anything is written to the sheet. */
-    StudioLockResponse: {
-      key: string;
-      /** @enum {string} */
-      kind: 'shape' | 'scope' | 'promise';
-      /** @description The decision as one falsifiable rule the plan can be checked against. */
-      text: string;
-    };
-    /** @description A divergence turn: the concepts generated this round, for the author to keep, kill or cross. */
-    StudioCardsPayloadResponse: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'cards';
-      /** @description The round these cards were generated in; each card carries its own too. */
-      round: number;
-      cards: components['schemas']['ConceptCardResponse'][];
-      /** @description Absent when every card cleared the locked playbooks. */
-      filtersFailed?: components['schemas']['StudioFilterRejectionResponse'][];
-    };
-    ConceptCardResponse: {
-      /** @description The card's stable identity, minted when the round was generated; verdicts are attributed by it, never by position. */
-      id: string;
-      round: number;
-      title: string;
-      logline: string;
-      engine: string;
-      ladder: string;
-      posture: string;
-      /** @description The line that would make a browsing reader open chapter one. */
-      hookLine?: string;
-      /**
-       * @description Offered until the author reacts to the card, then their verdict.
-       * @enum {string}
-       */
-      fate: 'offered' | 'kept' | 'killed' | 'crossed';
-      reason?: string;
-    };
-    /** @description A concept card shown despite failing a locked playbook filter — author judgement outranks the filter. */
-    StudioFilterRejectionResponse: {
-      playbookKey: string;
-      /** @description Title of the card that failed the filter. */
-      card: string;
-      mustReplace: string;
-    };
-    /** @description A stress turn: the critic’s readiness verdict, one row per dimension. */
-    StudioReadinessPayloadResponse: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      kind: 'readiness';
-      readiness: components['schemas']['ReadinessEntryResponse'][];
-    };
-    ReadinessEntryResponse: {
-      dimension: string;
-      /** @enum {string} */
-      verdict: 'strong' | 'thin' | 'empty';
-      note: string;
-      fix?: string;
-    };
     /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
     PendingTurnResponse: {
       runId: string;
-      /** @description Workflow graph driving the turn — `chat-turn`, `ideation-turn`, `ideation-concepts` or `ideation-stress`. */
+      /** @description Workflow graph driving the turn — `chat-turn`. */
       graph: string;
       /**
        * Format: date-time
@@ -4484,8 +4315,6 @@ export interface components {
       applied?: components['schemas']['TurnAppliedResult'];
       /** @description why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure) */
       applyNote?: string;
-      /** @description the story seed sheet as this turn left it; present only on Ideation Studio turns */
-      seed?: components['schemas']['SeedResponse'];
       runId: string;
     };
     /** @description Proposal application outcome returned as part of an automatic-mode turn. */
@@ -4493,80 +4322,6 @@ export interface components {
       applied: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
       opResults: components['schemas']['OpResultItem'][];
-    };
-    SeedResponse: {
-      id: string;
-      projectId: string;
-      /** @description The ideation chat session driving this seed. */
-      sessionId?: null | string;
-      /** @description The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named. */
-      name?: null | string;
-      fields: components['schemas']['SeedFieldsResponse'];
-      provenance: components['schemas']['SeedProvenanceResponse'];
-      constraints: components['schemas']['SeedConstraintResponse'][];
-      tasteAnchors: components['schemas']['TasteAnchorsResponse'];
-      concepts: components['schemas']['ConceptCardResponse'][];
-      /** @description The last stress-pass result; empty until a stress pass has run. */
-      readiness: components['schemas']['ReadinessEntryResponse'][];
-      /** @description Question-bank ids already answered or skipped, which is what the question router remembers. */
-      askedQuestions: string[];
-      revision: number;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @description The story seed sheet — idea altitude only: no places, chapter structure, or volume detail. */
-    SeedFieldsResponse: {
-      genre?: string;
-      themes?: string[];
-      premise?: string;
-      hook?: string;
-      /** @description Lead count plus configuration — one lead, dual leads bonded, an ensemble of four. */
-      castShape?: string;
-      progressionSystem?: string;
-      protagonistDrive?: string;
-      stakes?: string;
-      serializationNotes?: string;
-      voice?: string;
-      workingTitle?: string;
-    };
-    /** @description Provenance for each sheet field the studio or the author has settled. */
-    SeedProvenanceResponse: {
-      genre?: components['schemas']['FieldProvenanceResponse'];
-      themes?: components['schemas']['FieldProvenanceResponse'];
-      premise?: components['schemas']['FieldProvenanceResponse'];
-      hook?: components['schemas']['FieldProvenanceResponse'];
-      castShape?: components['schemas']['FieldProvenanceResponse'];
-      progressionSystem?: components['schemas']['FieldProvenanceResponse'];
-      protagonistDrive?: components['schemas']['FieldProvenanceResponse'];
-      stakes?: components['schemas']['FieldProvenanceResponse'];
-      serializationNotes?: components['schemas']['FieldProvenanceResponse'];
-      voice?: components['schemas']['FieldProvenanceResponse'];
-      workingTitle?: components['schemas']['FieldProvenanceResponse'];
-    };
-    /** @description Who settled one sheet field, and on which turn. */
-    FieldProvenanceResponse: {
-      /** @enum {string} */
-      source: 'author' | 'studio' | 'crossed';
-      /** @description The chat ordinal that settled the field; null when no conversational turn did. */
-      turnOrdinal: null | number;
-    };
-    SeedConstraintResponse: {
-      key: string;
-      /** @enum {string} */
-      kind: 'shape' | 'scope' | 'promise';
-      text: string;
-      /** @description The matching constraint playbook; absent when nothing in the library recognised the constraint. */
-      playbookKey?: string;
-      /** @enum {string} */
-      lockedBy: 'author' | 'inferred';
-    };
-    TasteAnchorsResponse: {
-      /** @description Comparable works the author named at the Taste stage. */
-      comps: string[];
-      /** @description The preferences derived from those comps, in editor terms. */
-      preferences: string[];
     };
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
@@ -5743,87 +5498,6 @@ export interface components {
     };
     /** @enum {string} */
     BibleStage: 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
-    CreateSeedBody: {
-      /** @description The idea as the author first typed it; kept verbatim as the opening turn of the studio conversation. */
-      spark?: string;
-      /** @description Content mode for the seed. Unrestricted routes studio chat through the unrestricted model map. */
-      contentMode?: components['schemas']['ContentMode'];
-    };
-    ListSeedsResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['SeedSummaryResponse'][];
-    };
-    /** @description One card on the Ideas shelf. */
-    SeedSummaryResponse: {
-      id: string;
-      projectId: string;
-      sessionId?: null | string;
-      /** @description The idea's display name — the project's title, written once by the helper model from the spark or first message, or set by the author. Null until the idea is named. */
-      name?: null | string;
-      workingTitle?: null | string;
-      /** @description Opening of the spark the author typed, for a seed that has not earned a working title yet. */
-      sparkExcerpt?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @description The result of a stress pass: the readiness verdict and the sheet carrying it. */
-    SeedStressResponse: {
-      seed: components['schemas']['SeedResponse'];
-      /** @description The verdict per dimension, in the fixed dimension order. It advises; it never blocks graduation. */
-      readiness: components['schemas']['ReadinessEntryResponse'][];
-      runId: string;
-    };
-    GraduateSeedBody: {
-      /** @description The novel’s title. Graduation names the project after it; there is no other hard requirement beyond a premise. */
-      title: string;
-    };
-    /** @description What graduation wrote: the project, the two handoff documents, the betrayal facts, and the provenance honesty check. */
-    GraduationResponse: {
-      project: components['schemas']['GraduatedProjectResponse'];
-      provenance: components['schemas']['ProvenanceSummaryResponse'];
-      /** @description The `section/slug` of every bible document graduation wrote — the entire handoff into lore-bible refinement. */
-      documents: string[];
-      /** @description Canon facts written for the named reader-promise betrayals, and nothing else. */
-      factKeys: string[];
-    };
-    /** @description The project the seed became. */
-    GraduatedProjectResponse: {
-      id: string;
-      name: string;
-      title?: null | string;
-      /** @enum {string} */
-      status: 'seed' | 'active';
-      premise?: null | string;
-      themes?: null | string[];
-      /** @description The chapter-instruction channel, now carrying the narration voice the studio settled. */
-      instructions?: null | string;
-    };
-    /** @description The honesty check: how much of the graduated sheet the author decided themselves. The seed is deleted at graduation, so this response is the last place it can be read. */
-    ProvenanceSummaryResponse: {
-      /** @description Sheet fields carrying a value. */
-      filled: number;
-      author: number;
-      studio: number;
-      crossed: number;
-      /** @description Filled fields with no recorded source — counted apart so the check never overstates authorship. */
-      unattributed: number;
-      fields: components['schemas']['ProvenanceFieldResponse'][];
-    };
-    /** @description One sheet field and where its value came from. */
-    ProvenanceFieldResponse: {
-      field: string;
-      /**
-       * @description Absent when the sheet carries a value the studio never recorded a source for.
-       * @enum {string}
-       */
-      source?: 'author' | 'studio' | 'crossed';
-      /** @description The chat ordinal that settled the field; null when no conversational turn did. */
-      turnOrdinal?: null | number;
-    };
     StartIllustrationBody: {
       subjectType: components['schemas']['IllustrationSubjectType'];
       /** @description Entity key for 'entity', the chapter number for 'chapter'; omitted for the project cover. */
@@ -8217,7 +7891,6 @@ export interface operations {
         sortOrder?: components['schemas']['SortOrder'];
         sortBy?: components['schemas']['SortByTime'];
         kind?: components['schemas']['ProjectKind'];
-        status?: components['schemas']['ProjectStatus'];
       };
       header?: never;
       path?: never;
@@ -9936,7 +9609,7 @@ export interface operations {
         /** @description required for generation/outline */
         chapter?: number | string;
         /** @description chat scope type */
-        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief' | 'ideation';
+        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
         /** @description volume for arc_plan previews */
         volumeKey?: string;
       };
@@ -13724,215 +13397,6 @@ export interface operations {
       };
     };
   };
-  get_api_v1_seeds: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListSeedsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_seeds: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateSeedBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SeedResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_seed: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SeedResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_seed_stress: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SeedStressResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_seed_graduate: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['GraduateSeedBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['GraduationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   get_api_v1_projects_projectId_illustrations: {
     parameters: {
       query?: {
@@ -17449,7 +16913,6 @@ export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
 export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
-export type ProjectStatus = components['schemas']['ProjectStatus'];
 export type OwnerKind = components['schemas']['OwnerKind'];
 export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
@@ -17512,14 +16975,6 @@ export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
 export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
 export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
-export type StudioQuestionsPayloadResponse = components['schemas']['StudioQuestionsPayloadResponse'];
-export type StudioQuestionResponse = components['schemas']['StudioQuestionResponse'];
-export type StudioLockResponse = components['schemas']['StudioLockResponse'];
-export type StudioCardsPayloadResponse = components['schemas']['StudioCardsPayloadResponse'];
-export type ConceptCardResponse = components['schemas']['ConceptCardResponse'];
-export type StudioFilterRejectionResponse = components['schemas']['StudioFilterRejectionResponse'];
-export type StudioReadinessPayloadResponse = components['schemas']['StudioReadinessPayloadResponse'];
-export type ReadinessEntryResponse = components['schemas']['ReadinessEntryResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnOutcome = components['schemas']['ChatTurnOutcome'];
@@ -17527,12 +16982,6 @@ export type ChatTurnStatusResponse = components['schemas']['ChatTurnStatusRespon
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
-export type SeedResponse = components['schemas']['SeedResponse'];
-export type SeedFieldsResponse = components['schemas']['SeedFieldsResponse'];
-export type SeedProvenanceResponse = components['schemas']['SeedProvenanceResponse'];
-export type FieldProvenanceResponse = components['schemas']['FieldProvenanceResponse'];
-export type SeedConstraintResponse = components['schemas']['SeedConstraintResponse'];
-export type TasteAnchorsResponse = components['schemas']['TasteAnchorsResponse'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];
@@ -17675,15 +17124,6 @@ export type BibleReadinessDimension = components['schemas']['BibleReadinessDimen
 export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
 export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRoleResponse'];
 export type BibleStage = components['schemas']['BibleStage'];
-export type CreateSeedBody = components['schemas']['CreateSeedBody'];
-export type ListSeedsResponse = components['schemas']['ListSeedsResponse'];
-export type SeedSummaryResponse = components['schemas']['SeedSummaryResponse'];
-export type SeedStressResponse = components['schemas']['SeedStressResponse'];
-export type GraduateSeedBody = components['schemas']['GraduateSeedBody'];
-export type GraduationResponse = components['schemas']['GraduationResponse'];
-export type GraduatedProjectResponse = components['schemas']['GraduatedProjectResponse'];
-export type ProvenanceSummaryResponse = components['schemas']['ProvenanceSummaryResponse'];
-export type ProvenanceFieldResponse = components['schemas']['ProvenanceFieldResponse'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
 export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
@@ -17952,8 +17392,6 @@ export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
 export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
-export type ListSeedsQueryParams = Exclude<paths['/api/v1/seeds']['get']['parameters']['query'], undefined>;
-export type GetSeedPathParams = Exclude<paths['/api/v1/projects/{projectId}/seed']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
 export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
 export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;

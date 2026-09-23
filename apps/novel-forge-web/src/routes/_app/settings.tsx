@@ -30,7 +30,6 @@ interface GroupRow {
 }
 
 const SECTIONS: { title: string; rows: GroupRow[] }[] = [
-  { title: 'Ideas', rows: [{ key: 'ideation', label: 'Ideation studio', hint: 'Every idea chat and its sheet', kind: 'llm' }] },
   {
     title: 'Writing a novel',
     rows: [
@@ -38,12 +37,13 @@ const SECTIONS: { title: string; rows: GroupRow[] }[] = [
       { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, arcs, outlines, bible and extraction', kind: 'llm' },
       { key: 'review', label: 'Review & QA', hint: 'Continuity judge, validation and editorial review', kind: 'llm' },
       { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals on a novel', kind: 'llm' },
+      { key: 'ideation', label: 'Blueprint', hint: 'The guided design flow’s small steps', kind: 'llm' },
     ],
   },
   {
     title: 'Everywhere',
     rows: [
-      { key: 'helper', label: 'Fast helpers', hint: 'Idea names, chapter titles and context compaction', kind: 'llm' },
+      { key: 'helper', label: 'Fast helpers', hint: 'Chapter titles and context compaction', kind: 'llm' },
       { key: 'image', label: 'Illustrations', hint: 'Cover and scene art', kind: 'image' },
     ],
   },
@@ -97,7 +97,7 @@ function SettingsScreen(): React.JSX.Element {
 
   return (
     <PageContainer>
-      <PageHeader title="Settings" subtitle="Your defaults for every project and idea you own. A change applies to runs that start after you save." />
+      <PageHeader title="Settings" subtitle="Your defaults for every project you own. A change applies to runs that start after you save." />
       <QueryState isLoading={settingsQuery.isLoading || modelsQuery.isLoading} error={settingsQuery.error ?? modelsQuery.error}>
         <div className={styles.page}>
           <div className={styles.precedence}>

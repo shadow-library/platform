@@ -2,7 +2,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ContentMode, OwnerKind, ProjectKind, ProjectStatus, SortByTime } from '@server/common';
+import { ContentMode, OwnerKind, ProjectKind, SortByTime } from '@server/common';
 import { type Owner, type Project } from '@server/database';
 
 import { BlueprintProgressResponse } from '../../blueprint/stage/blueprint-stage.dto';
@@ -157,9 +157,6 @@ export class ProjectResponse {
   @Field(() => ProjectKind)
   kind: Project.Kind;
 
-  @Field(() => ProjectStatus, { description: 'A `seed` project is an Ideation Studio idea and has no bible, plan, or chapters until it graduates.' })
-  status: Project.Status;
-
   @Field(() => OwnerKind, { description: 'Whether the project was created by a signed-in person or an organisation bot.' })
   ownerKind: Owner.Kind;
 
@@ -237,7 +234,7 @@ export class UploadImageBody {
 
 @Schema({ minProperties: 1 })
 export class UpdateProjectBody {
-  @Field({ optional: true, maxLength: 500, description: 'The working title — for a seed, the idea’s name. Trimmed; a blank title clears it.' })
+  @Field({ optional: true, maxLength: 500, description: 'The working title. Trimmed; a blank title clears it.' })
   title?: string;
 
   @Field(() => ProjectConfig, { optional: true })
@@ -298,9 +295,6 @@ export class CloneProjectBody {
 export class ListProjectsQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => ProjectKind, { optional: true })
   kind?: Project.Kind;
-
-  @Field(() => ProjectStatus, { optional: true, description: 'Defaults to `active`; seeds live on the Ideas shelf and are listed only when asked for explicitly.' })
-  status?: Project.Status;
 }
 
 @Schema()

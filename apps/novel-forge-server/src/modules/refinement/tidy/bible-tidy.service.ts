@@ -4,7 +4,6 @@ import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -76,9 +75,8 @@ export class BibleTidyService {
   }
 
   private async analyse(executor: DbExecutor, projectId: bigint): Promise<{ docs: TidyDoc[]; items: TidyItem[] }> {
-    const project = await executor.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    const project = await executor.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
 
     const rows = await executor.query.bibleDocuments.findMany({
       where: eq(schema.bibleDocuments.projectId, projectId),

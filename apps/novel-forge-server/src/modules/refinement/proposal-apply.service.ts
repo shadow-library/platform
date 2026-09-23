@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
@@ -13,11 +11,10 @@ import {
   PLAN_STALE_ARC_CHANGED,
   PLAN_STALE_RANGE_SHIFTED,
   PLAN_STALE_VOLUME_CHANGED,
-  seedContentHash,
   volumeContentHash,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
@@ -32,7 +29,6 @@ import {
   type BriefUpdateOp,
   type ChangeOp,
   changeSetRefs,
-  type ConceptCardInput,
   type ContentOp,
   type DraftRemoveOp,
   type DraftUpdateOp,
@@ -42,7 +38,6 @@ import {
   type FactUpsertOp,
   isActionOp,
   type PremiseUpdateOp,
-  type SeedUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
@@ -116,17 +111,13 @@ type TxResult =
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
 
 /**
- * The one-way doors: finalize locks prose and graduation deletes the sheet, so neither is covered by the
- * revert guarantee. An auto-mode turn declines them and applies the rest of its change-set — throwing
- * would discard a whole turn's work over the one op that may not run — and a blanket manual apply
- * refuses, so the author must select the op's own index to walk through the door.
+ * The one-way doors: finalize locks prose, so it is not covered by the revert guarantee. An auto-mode
+ * turn declines them and applies the rest of its change-set — throwing would discard a whole turn's work
+ * over the one op that may not run — and a blanket manual apply refuses, so the author must select the
+ * op's own index to walk through the door.
  */
 const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
   'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never applied automatically — select the finalize step and apply it deliberately.' },
-  'action.graduate_seed': {
-    code: AppErrorCode.IDE_007,
-    note: 'Graduation is never applied automatically — use “Start the novel” in the studio, or select the graduation step and apply it deliberately.',
-  },
   'action.approve_draft': { code: AppErrorCode.DRF_009, note: 'Draft approval is never applied automatically — select the approval step and apply it deliberately.' },
   'action.approve_volume_plan': {
     code: AppErrorCode.PLN_003,
@@ -147,58 +138,6 @@ function withoutRationale<T extends ChangeOp>(op: T): T {
   const rest = { ...op } as Record<string, unknown>;
   delete rest['rationale'];
   return rest as T;
-}
-
-/** Per-key merge for the seed sheet's keyed jsonb columns, where a null value clears the key. */
-function mergeKeys<T extends object>(prior: T | null, patch: Record<string, unknown>): T {
-  const merged = { ...(prior ?? ({} as T)) } as Record<string, unknown>;
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) delete merged[key];
-    else merged[key] = value;
-  }
-  return merged as T;
-}
-
-/**
- * The deterministic provenance floor. The studio prompt marks material
- * that came from the author's own words; a field written with no source named is therefore the studio's
- * own suggestion, and the honesty check at graduation must be able to say so. Stamped onto the op before
- * the inverse is captured, so a revert still restores exactly the provenance the sheet had.
- */
-function withStudioProvenance(op: SeedUpdateOp, turnOrdinal: number | null): SeedUpdateOp {
-  const written = Object.entries(op.fields ?? {}).filter(([, value]) => value !== null);
-  if (written.length === 0 && op.provenance === undefined) return op;
-
-  const provenance: NonNullable<SeedUpdateOp['provenance']> = {};
-  for (const [key, entry] of Object.entries(op.provenance ?? {})) provenance[key] = entry === null ? null : { source: entry.source, turnOrdinal };
-  for (const [key] of written) {
-    if (!(key in provenance)) provenance[key] = { source: 'studio', turnOrdinal };
-  }
-  return { ...op, provenance };
-}
-
-/** The patch's keys mapped to their current values — null where the key is not there yet. */
-function priorKeys(patch: Record<string, unknown>, prior: object | null): Record<string, unknown> {
-  const current = (prior ?? {}) as Record<string, unknown>;
-  return Object.fromEntries(Object.keys(patch).map(key => [key, current[key] ?? null]));
-}
-
-/**
- * The concepts column replaces wholesale, so every re-sent card has to come back out of the op with an
- * identity. An id the model echoed is kept verbatim — that is the whole point, since the fate beside it
- * is a verdict on THAT card however the collection was reordered — and a card that arrives with no id, or
- * that repeats an id already used earlier in the same collection, is a new card and gets a fresh uuid.
- * An id the sheet does not recognise is likewise a new card; it is kept rather than re-minted because an
- * inverse op restoring a prior collection is applied through here too, and re-minting would restore the
- * content but not the identity, breaking the exact-restore guarantee reverts are held to.
- */
-function stampConceptIds(incoming: ConceptCardInput[]): Ideation.ConceptCard[] {
-  const seen = new Set<string>();
-  return incoming.map(card => {
-    const id = card.id && !seen.has(card.id) ? card.id : randomUUID();
-    seen.add(id);
-    return { ...card, id };
-  });
 }
 
 @Injectable()
@@ -289,12 +228,10 @@ export class ProposalApplyService {
       }
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [], blueprintLock: proposal.kind === 'blueprint' };
-      const turnOrdinal = contentOps.some(c => c.op.op === 'seed.update') ? await this.turnOrdinal(ctx.tx, proposal.messageId) : null;
       const inverseOps: ContentOp[] = [];
       for (const { op } of contentOps) {
-        const effective = op.op === 'seed.update' ? withStudioProvenance(op, turnOrdinal) : op;
-        const inverse = await this.captureInverse(ctx, effective);
-        await this.applyOp(ctx, effective);
+        const inverse = await this.captureInverse(ctx, op);
+        await this.applyOp(ctx, op);
         if (inverse) inverseOps.unshift(inverse);
       }
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
@@ -343,13 +280,6 @@ export class ProposalApplyService {
 
     this.logger.info(`proposal ${proposalId} applied: ${result.applied.map(a => a.artifactRef).join(', ') || 'actions only'}`);
     return { proposal, applied: result.applied, staleMarked: result.staleMarked, opResults };
-  }
-
-  /** The chat ordinal a sheet edit was settled on; null when the edit came from no conversational turn — an ordinal 0 would read as a real, impossibly early turn. */
-  private async turnOrdinal(tx: PrimaryDatabase, messageId: bigint | null): Promise<number | null> {
-    if (messageId === null) return null;
-    const message = await tx.query.chatMessages.findFirst({ where: eq(schema.chatMessages.id, messageId), columns: { ordinal: true } });
-    return message?.ordinal ?? null;
   }
 
   private opResultsFor(ops: ChangeOp[], selected: number[], declinedNotes: Map<number, string>): OpResult[] {
@@ -465,8 +395,6 @@ export class ProposalApplyService {
       case 'fact.upsert':
       case 'fact.remove':
         return this.inverseFact(ctx, op);
-      case 'seed.update':
-        return this.inverseSeedUpdate(ctx, op);
     }
   }
 
@@ -592,20 +520,6 @@ export class ProposalApplyService {
     };
   }
 
-  private async inverseSeedUpdate(ctx: ApplyContext, op: SeedUpdateOp): Promise<ContentOp | null> {
-    const seed = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
-    if (!seed) return null;
-    const inverse: SeedUpdateOp = { op: 'seed.update' };
-    // Per-key inverses, not the whole prior object: a key the op introduced has no prior value, and
-    // only an explicit null in the inverse removes it again under the applier's merge.
-    if (op.fields !== undefined) inverse.fields = priorKeys(op.fields, seed.fields) as SeedUpdateOp['fields'];
-    if (op.provenance !== undefined) inverse.provenance = priorKeys(op.provenance, seed.provenance) as SeedUpdateOp['provenance'];
-    if (op.constraints !== undefined) inverse.constraints = seed.constraints ?? [];
-    if (op.concepts !== undefined) inverse.concepts = seed.concepts ?? [];
-    if (op.tasteAnchors !== undefined) inverse.tasteAnchors = seed.tasteAnchors ?? { comps: [], preferences: [] };
-    return inverse;
-  }
-
   private applyOp(ctx: ApplyContext, incoming: ChangeOp): Promise<void> {
     const op = withoutRationale(incoming);
     switch (op.op) {
@@ -639,8 +553,6 @@ export class ProposalApplyService {
         return this.applyFactUpsert(ctx, op);
       case 'fact.remove':
         return this.applyFactRemove(ctx, op);
-      case 'seed.update':
-        return this.applySeedUpdate(ctx, op);
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit. Reaching here is a programming error, not bad input.
@@ -1050,32 +962,6 @@ export class ProposalApplyService {
 
     await ctx.tx.delete(schema.canonFacts).where(eq(schema.canonFacts.id, existing.id));
     ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
-  }
-
-  /**
-   * The sheet is a singleton per seed project, so there is nothing to create and nothing downstream to
-   * mark stale — no bible, plan, or brief can depend on a project that has not graduated. The hash
-   * covers `fields` alone.
-   */
-  private async applySeedUpdate(ctx: ApplyContext, op: SeedUpdateOp): Promise<void> {
-    const existing = await ctx.tx.query.storySeeds.findFirst({ where: eq(schema.storySeeds.projectId, ctx.projectId) });
-    if (!existing) throw AppErrorCode.IDE_001.create();
-
-    const fields = op.fields ? mergeKeys<Ideation.SeedFields>(existing.fields, op.fields) : (existing.fields ?? {});
-    const merged = {
-      fields,
-      provenance: op.provenance ? mergeKeys<Ideation.SeedProvenance>(existing.provenance, op.provenance) : (existing.provenance ?? {}),
-      constraints: op.constraints ?? existing.constraints ?? [],
-      concepts: op.concepts ? stampConceptIds(op.concepts) : (existing.concepts ?? []),
-      tasteAnchors: op.tasteAnchors ?? existing.tasteAnchors ?? { comps: [], preferences: [] },
-    };
-    const revision = existing.revision + 1;
-
-    await ctx.tx
-      .update(schema.storySeeds)
-      .set({ ...merged, revision, contentHash: seedContentHash(fields), updatedAt: new Date() })
-      .where(eq(schema.storySeeds.id, existing.id));
-    ctx.applied.push({ artifactRef: 'seed', newRevision: revision });
   }
 
   /**

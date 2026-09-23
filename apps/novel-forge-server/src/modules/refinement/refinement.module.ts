@@ -9,7 +9,6 @@ import { ChangeHistoryController } from './change-history.controller';
 import { ChatCompactionService } from './chat-compaction.service';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
-import { ChatTurnRegistry } from './chat-turn.registry';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
@@ -23,17 +22,7 @@ import { TurnStreamService } from './turn-stream.service';
 @Module({
   imports: [DatabaseModule, AiModule, EventsModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
-  providers: [
-    ActionExecutorRegistry,
-    ChatTurnRegistry,
-    ProposalService,
-    ProposalApplyService,
-    ChatCompactionService,
-    ChatService,
-    RefineService,
-    TurnStreamService,
-    BibleTidyService,
-  ],
-  exports: [ActionExecutorRegistry, ChatTurnRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService],
+  providers: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, BibleTidyService],
+  exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService],
 })
 export class RefinementModule {}

@@ -5,7 +5,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, markDescendantDraftsStale, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
+import { markDescendantDraftsStale, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type Plan, type PrimaryDatabase, schema } from '@server/database';
 
@@ -135,7 +135,6 @@ export class ChapterInsertService {
   async insertAfter(projectId: bigint, afterChapter: number, opts: InsertOptions): Promise<InsertResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
     if (opts.briefOrigin === 'hand' ? !opts.briefBody?.trim() : !opts.intent?.trim()) throw AppErrorCode.S003.create();
 
     await this.assertInsertable(projectId, afterChapter);

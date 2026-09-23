@@ -6,7 +6,7 @@ import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertActiveProject, ownedBy } from '@server/common';
+import { ownedBy } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
@@ -38,11 +38,6 @@ const WORKFLOW_SWITCHES: Partial<Record<Project.Kind, Project.Kind[]>> = { curat
 
 function assertLanguageMatchesKind(kind: Project.Kind, language: string | null | undefined): void {
   if ((kind === 'translation') !== (language != null)) throw AppErrorCode.PRJ_006.create();
-}
-
-export interface CreateProjectOptions {
-  /** Defaults to `active`; `seed` creates an Ideation Studio project with no blank bible documents. */
-  status?: Project.Status;
 }
 
 @Injectable()
@@ -108,13 +103,8 @@ export class ProjectService {
     return { ...rest, config: project.config ?? undefined, instructions, wordTarget, coverUrl };
   }
 
-  /**
-   * `options.status` is internal-only — it is not part of `CreateProjectBody`, so no HTTP caller can
-   * mint a seed; the ideation module passes it directly.
-   */
-  async create(body: CreateProjectBody, options?: CreateProjectOptions): Promise<Project.Presented> {
-    const status = options?.status ?? 'active';
-    this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode, status });
+  async create(body: CreateProjectBody): Promise<Project.Presented> {
+    this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
     if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
     assertLanguageMatchesKind(body.kind, body.originalLanguage);
     this.assertWordTargetValid(body.wordTarget);
@@ -127,7 +117,6 @@ export class ProjectService {
         ...projectOwnerColumns(actor),
         name: body.name,
         kind: body.kind,
-        status,
         title: body.title,
         instructions: writingInstructionAdditions(body.instructions),
         contentMode: body.contentMode,
@@ -139,11 +128,9 @@ export class ProjectService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!project) throw AppErrorCode.S001.create();
-    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind, status: project.status });
+    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
 
-    // A seed gets no blank bible documents: graduation writes real ones, and blanks would defeat the
-    // emptiness checks the bible builder and audit rely on.
-    if (body.kind === 'new_novel' && status !== 'seed') {
+    if (body.kind === 'new_novel') {
       await this.db
         .insert(schema.bibleDocuments)
         .values(BIBLE_SECTIONS.map(section => ({ projectId: project.id, section, slug: 'default' })))
@@ -160,9 +147,7 @@ export class ProjectService {
     });
 
     const visibility = await this.listVisibilityFilter(this.actor());
-    // Seeds are hidden unless asked for by name: the main shelf is the novels shelf, and an unfiltered
-    // list would fill it with ideas that have no bible, plan, or chapters.
-    const conditions = [visibility, eq(schema.projects.status, filter.status ?? 'active')];
+    const conditions = [visibility];
     if (filter.kind) conditions.push(eq(schema.projects.kind, filter.kind));
     const where = and(...conditions);
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;
@@ -296,7 +281,6 @@ export class ProjectService {
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
       if (!source) throw AppErrorCode.PRJ_001.create();
-      assertActiveProject(source);
 
       if (body.resetDerived === false) {
         this.logger.warn(`clone resetDerived=false for project ${id}: full child-table copy is not yet implemented`);

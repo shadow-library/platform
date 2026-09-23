@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 
 import { type JobStatus } from './api-types.gen';
 import { invalidateBlueprintProgress } from './blueprint.api';
-import { invalidateSeed } from './ideation.api';
 import { invalidateJobs } from './insight.api';
 import { setEventStreamLive } from './live-polling';
 import { invalidateChat, invalidateChatSession, invalidateChatSessions } from './refinement.api';
@@ -21,13 +20,11 @@ export type ProjectEvent =
 
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
-const SEED_TARGET_PREFIX = 'seed:';
 const BLUEPRINT_JOB_KIND = 'blueprint';
 // Settled is the complement of the two in-flight statuses rather than a list of the terminal ones: a
 // status the server adds later that this misses would leave a finished round on screen forever, while
 // mistaking a new in-flight status for a settled one costs only a refetch.
 const LIVE_JOB_STATUSES: readonly JobStatus[] = ['pending', 'in_progress'];
-const IDEATION_GRAPH_PREFIX = 'ideation-';
 // The stream ends itself every 15 minutes and reconnects within its 3-second retry; only an outage longer than this
 // hands changes back to polling at full speed.
 const OUTAGE_AFTER_MS = 5_000;
@@ -58,12 +55,10 @@ export function applyProjectEvent(queryClient: QueryClient, projectId: string, e
   if (event.type === 'chat') return invalidateChatSession(queryClient, projectId, event.sessionId);
 
   invalidateRuns(queryClient, projectId);
-  if (event.target.startsWith(SEED_TARGET_PREFIX) && event.graph.startsWith(IDEATION_GRAPH_PREFIX)) return invalidateSeed(queryClient, projectId);
   if (!event.target.startsWith(SESSION_TARGET_PREFIX)) return;
   const sessionId = event.target.slice(SESSION_TARGET_PREFIX.length);
   if (event.status === 'running') return invalidateChatSession(queryClient, projectId, sessionId);
   invalidateChat(queryClient, projectId, sessionId);
-  if (event.graph.startsWith(IDEATION_GRAPH_PREFIX)) invalidateSeed(queryClient, projectId);
 }
 
 /** Whatever a disconnected tab may have missed: everything the stream would otherwise have told it to refetch. */
@@ -71,7 +66,6 @@ function resynchronise(queryClient: QueryClient, projectId: string): void {
   invalidateJobs(queryClient, projectId);
   invalidateRuns(queryClient, projectId);
   invalidateChatSessions(queryClient, projectId);
-  invalidateSeed(queryClient, projectId);
   invalidateBlueprintProgress(queryClient, projectId);
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash, volumeContentHash } from '@server/common';
+import { arcContentHash, briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
 
 describe('volumeContentHash', () => {
   it('should hash only the contracted fields', () => {
@@ -34,15 +34,6 @@ describe('briefContentHash', () => {
     const base = briefContentHash({ chapter: 1, body: 'b' });
     expect(briefContentHash({ chapter: 1, body: 'b', pov: 'hero' })).not.toBe(base);
     expect(briefContentHash({ chapter: 1, body: 'b', guidance: 'slow down' })).not.toBe(base);
-  });
-});
-
-describe('seedContentHash', () => {
-  it('should hash the fields sheet, treating null and undefined as empty', () => {
-    const empty = seedContentHash({});
-    expect(seedContentHash(null)).toBe(empty);
-    expect(seedContentHash(undefined)).toBe(empty);
-    expect(seedContentHash({ premise: 'a salvager' })).not.toBe(empty);
   });
 });
 

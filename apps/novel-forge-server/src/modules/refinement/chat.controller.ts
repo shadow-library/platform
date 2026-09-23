@@ -19,17 +19,13 @@ import {
   UpdateSessionModelBody,
 } from './chat.dto';
 import { ChatService } from './chat.service';
-import { type ChatTurnHandler, ChatTurnRegistry } from './chat-turn.registry';
 import { serialiseMessage, serialiseTurn } from './serialise';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chat/sessions')
 export class ChatController {
-  constructor(
-    private readonly chatService: ChatService,
-    private readonly turnRegistry: ChatTurnRegistry,
-  ) {}
+  constructor(private readonly chatService: ChatService) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post()
@@ -67,22 +63,13 @@ export class ChatController {
     return this.chatService.turnStatus(params.projectId, params.sessionId);
   }
 
-  /**
-   * One endpoint, two pipelines: a scope with a registered handler (the Ideation Studio) runs its own
-   * turn, everything else runs the chat turn. The session is read here only to choose between them —
-   * both pipelines re-read and re-guard it, and ownership was settled by the project middleware.
-   */
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
   async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
-    const session = await this.chatService.getSession(params.projectId, params.sessionId);
-    const scoped = this.turnRegistry.get(session.scopeType);
-    const turn: ChatTurnHandler =
-      scoped ?? ((projectId, sessionId, content) => this.chatService.turn(projectId, sessionId, content, undefined, { proseEdits: body.proseEdits ?? false }));
-
-    return serialiseTurn(await turn(params.projectId, params.sessionId, body.content));
+    const result = await this.chatService.turn(params.projectId, params.sessionId, body.content, undefined, { proseEdits: body.proseEdits ?? false });
+    return serialiseTurn(result);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

@@ -22,8 +22,8 @@ describe('togglePanelState', () => {
 
 describe('panelToggleLabel', () => {
   it('should name the state the press moves to', () => {
-    expect(panelToggleLabel('Story seed', 'expanded')).toBe('Collapse the Story seed panel');
-    expect(panelToggleLabel('Story seed', 'collapsed')).toBe('Expand the Story seed panel');
+    expect(panelToggleLabel('Story bible', 'expanded')).toBe('Collapse the Story bible panel');
+    expect(panelToggleLabel('Story bible', 'collapsed')).toBe('Expand the Story bible panel');
   });
 
   it('should announce what a collapsed panel is hiding', () => {
@@ -31,6 +31,6 @@ describe('panelToggleLabel', () => {
   });
 
   it('should leave the name alone when there is nothing to summarise', () => {
-    expect(panelToggleLabel('Story seed', 'collapsed', '')).toBe('Expand the Story seed panel');
+    expect(panelToggleLabel('Story bible', 'collapsed', '')).toBe('Expand the Story bible panel');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ACTION_TYPES, type ChangeOp, changeSetRefs, HUB_ACTION_TYPES, isActionOp, renderActionVocabulary, renderOpVocabulary, validateChangeSet } from '@modules/refinement';
+import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, renderOpVocabulary, validateChangeSet } from '@modules/refinement';
 
 const validOps: ChangeOp[] = [
   { op: 'premise.update', premise: 'a cultivator returns from death', themes: ['revenge'] },
@@ -117,14 +117,6 @@ describe('hub ops and actions', () => {
     expect(validateChangeSet([{ op: 'action.audit_bible', target: 'all' }])[0]).toMatch(/unexpected field 'target'/);
   });
 
-  it('should validate graduation like any other action and keep it out of the hub vocabulary', () => {
-    expect(validateChangeSet([{ op: 'action.graduate_seed', title: 'The Wreck Singer' }])).toEqual([]);
-    expect(validateChangeSet([{ op: 'action.graduate_seed' }])[0]).toMatch(/required field 'title'/);
-    expect(validateChangeSet([{ op: 'action.graduate_seed', title: '  ' }])[0]).toMatch(/title must be a non-empty string/);
-    expect(validateChangeSet([{ op: 'action.graduate_seed', title: 'x' }], ['seed.update'])[0]).toMatch(/not allowed for this scope/);
-    expect(HUB_ACTION_TYPES).not.toContain('action.graduate_seed');
-  });
-
   it('should classify action ops and render their vocabulary with purposes', () => {
     expect(isActionOp({ op: 'action.audit_bible' })).toBe(true);
     expect(isActionOp({ op: 'draft.update', chapter: 1, body: 'x' })).toBe(false);
@@ -190,7 +182,6 @@ describe('the rationale every op may carry', () => {
     const ops: ChangeOp[] = [
       { op: 'premise.update', premise: 'sharper', rationale: 'the pitch buried the hook' },
       { op: 'brief.update', chapter: 3, body: 'a brief', rationale: 'the chapter had no brief' },
-      { op: 'seed.update', fields: { hook: 'a hook' }, rationale: 'the sheet had no hook' },
       { op: 'action.generate_chapters', count: 2, rationale: 'the queue had run dry' },
     ];
     expect(validateChangeSet(ops)).toEqual([]);

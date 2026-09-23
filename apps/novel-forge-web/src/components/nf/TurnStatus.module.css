@@ -136,8 +136,7 @@
 }
 
 /* Every placeholder shares one sweep timing, so the lines read as a single reply being written. */
-.line,
-.verdict {
+.line {
   display: block;
   height: 9px;
   border-radius: 5px;
@@ -170,73 +169,6 @@
   to {
     background-position: 0% 0;
   }
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  height: 30px;
-  border: 1px dashed var(--ghost-edge);
-  border-radius: 99px;
-}
-
-.chip:nth-child(1) {
-  width: 168px;
-}
-
-.chip:nth-child(2) {
-  width: 132px;
-}
-
-.chip:nth-child(3) {
-  width: 150px;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.card {
-  border: 1px dashed var(--ghost-edge);
-  border-radius: var(--sh-radius-lg);
-  padding: 10px;
-}
-
-.card .line {
-  height: 7px;
-}
-
-.readiness {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.readinessRow {
-  display: grid;
-  grid-template-columns: 26% 16% minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
-.readinessRow .line {
-  width: 100%;
-  height: 7px;
-}
-
-.readinessRow .line:last-child {
-  width: 86%;
-}
-
-.verdict {
-  height: 14px;
-  border-radius: 99px;
 }
 
 .failureTitle {

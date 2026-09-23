@@ -7,7 +7,6 @@ export * from './story';
 export * from './bible';
 export * from './generation';
 export * from './refinement';
-export * from './ideation';
 export * from './ledger';
 export * from './blueprint';
 export * from './rebrand';

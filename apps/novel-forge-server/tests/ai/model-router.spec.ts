@@ -116,13 +116,13 @@ describe('ModelRouterService.resolveModel', () => {
     for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
   });
 
-  it('should resolve an unpinned ideation role to Claude Opus 5 on a standard project', () => {
-    const resolved = router.resolveModel('ideation', { contentMode: 'standard' });
+  it('should resolve an unpinned blueprint role to Claude Opus 5 on a standard project', () => {
+    const resolved = router.resolveModel('blueprint', { contentMode: 'standard' });
     expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
   });
 
-  it('should resolve an unpinned ideation role to GLM 5.2 on an unrestricted project, since Opus is not on the unrestricted allowlist', () => {
-    const resolved = router.resolveModel('ideation', { contentMode: 'unrestricted' });
+  it('should resolve an unpinned blueprint role to GLM 5.2 on an unrestricted project, since Opus is not on the unrestricted allowlist', () => {
+    const resolved = router.resolveModel('blueprint', { contentMode: 'unrestricted' });
     expect(resolved).toEqual({ provider: 'openrouter', model: 'z-ai/glm-5.2' });
   });
 
@@ -131,7 +131,7 @@ describe('ModelRouterService.resolveModel', () => {
     const kimi = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
 
     it('should use the owner’s default for a group the project leaves unset', () => {
-      expect(router.resolveModel('ideation', { contentMode: 'standard' }, undefined, { ideation: sonnet })).toEqual(sonnet);
+      expect(router.resolveModel('blueprint', { contentMode: 'standard' }, undefined, { ideation: sonnet })).toEqual(sonnet);
       expect(router.resolveModel('revision', { contentMode: 'standard' }, undefined, { writing: sonnet })).toEqual(sonnet);
     });
 
@@ -141,13 +141,13 @@ describe('ModelRouterService.resolveModel', () => {
     });
 
     it('should skip an owner default the registry no longer lists', () => {
-      const resolved = router.resolveModel('ideation', { contentMode: 'standard' }, undefined, { ideation: { provider: 'openrouter', model: 'retired/model' } });
+      const resolved = router.resolveModel('blueprint', { contentMode: 'standard' }, undefined, { ideation: { provider: 'openrouter', model: 'retired/model' } });
       expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
     });
 
     it('should only honour an owner default on an unrestricted project when the allowlist carries it', () => {
       expect(router.resolveModel('generation', { contentMode: 'unrestricted' }, undefined, { writing: kimi })).toEqual(kimi);
-      expect(router.resolveModel('ideation', { contentMode: 'unrestricted' }, undefined, { ideation: sonnet }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.ideation.model);
+      expect(router.resolveModel('blueprint', { contentMode: 'unrestricted' }, undefined, { ideation: sonnet }).model).toBe(UNRESTRICTED_GROUP_DEFAULTS.ideation.model);
     });
 
     it('should load the defaults for the project before resolving', async () => {

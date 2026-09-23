@@ -67,6 +67,8 @@ Seven phases in a fixed order, grouped by altitude:
   and a page is only what they are told. These facts are open from chapter one rather than scheduled reveals: a rule the writer may not read is a rule they cannot keep. A
   power ladder is its own step, asked for only when progression is a driver; without it the rules step covers society and economy instead. Places and factions wait for
   Volume one.
+- Open canon is carried by the schedule — a reveal chapter at or below `OPEN_FROM_CHAPTER` — and never by a fact's `source`. Nothing writes the `seed` source any more, so a
+  new caller must schedule a fact open rather than mark it; the readers that still exclude `source = 'seed'` are legacy guards, not the mechanism.
 
 ### Spine
 

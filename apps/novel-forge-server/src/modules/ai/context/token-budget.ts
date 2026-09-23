@@ -90,7 +90,7 @@ export function applyBudget<T extends { key: string; tokens: number; required?: 
   const fitting: T[] = [];
   const omitted: BudgetOmission[] = [];
   // Required sections are charged against the budget before anything competes for it, so a pack whose
-  // meaning depends on one section (the ideation round's questions) can never lose it to a long prefix.
+  // meaning depends on one section (a Blueprint round's input) can never lose it to a long prefix.
   let used = sections.reduce((sum, section) => sum + (section.required ? section.tokens : 0), 0);
   for (const section of sections) {
     if (section.required) {

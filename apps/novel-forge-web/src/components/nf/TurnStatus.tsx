@@ -7,12 +7,9 @@ import { useElapsed } from '@/lib/use-elapsed';
 
 import styles from './TurnStatus.module.css';
 
-type ReplyShape = 'questions' | 'cards' | 'readiness' | 'prose';
-
 interface Phase {
   label: string;
   slowLabel: string;
-  shape: ReplyShape;
 }
 
 interface FailureCopy {
@@ -20,13 +17,10 @@ interface FailureCopy {
   reason: string;
 }
 
-// The graph is the only phase the server reports without streaming, so it names the wait and decides which
-// shape the placeholder takes — the reply then lands in the space the placeholder already holds.
+// The graph is the only phase the server reports without streaming, so it names the wait — the reply then
+// lands in the space the placeholder already holds.
 const PHASES: Record<string, Phase> = {
-  'chat-turn': { label: 'Reading the chapter and your ask', slowLabel: 'Still reading the chapter and your ask', shape: 'prose' },
-  'ideation-turn': { label: 'Shaping the next questions', slowLabel: 'Still shaping the next questions', shape: 'questions' },
-  'ideation-concepts': { label: 'Drafting concept cards', slowLabel: 'Still drafting concept cards', shape: 'cards' },
-  'ideation-stress': { label: 'Stress-testing the sheet', slowLabel: 'Still stress-testing the sheet', shape: 'readiness' },
+  'chat-turn': { label: 'Reading the chapter and your ask', slowLabel: 'Still reading the chapter and your ask' },
 };
 
 // The server's error messages are written for the model call log. A code missing here gets the generic copy,
@@ -78,7 +72,6 @@ interface GhostReplyProps {
 function GhostReply({ phase, fallbackLabel, elapsed }: GhostReplyProps): React.JSX.Element {
   const slow = elapsed >= SLOW_AFTER_MS;
   const label = phase ? (slow ? phase.slowLabel : phase.label) : fallbackLabel;
-  const shape = phase?.shape ?? 'prose';
 
   return (
     <div className={styles.row} data-pace={slow ? 'slow' : 'steady'}>
@@ -97,25 +90,9 @@ function GhostReply({ phase, fallbackLabel, elapsed }: GhostReplyProps): React.J
               </span>
             )}
           </div>
-          {shape === 'readiness' ? <ReadinessGhost /> : <LinesGhost count={shape === 'cards' ? 1 : shape === 'prose' ? 4 : 3} />}
+          <LinesGhost count={4} />
           {slow && <p className={styles.note}>This one’s taking longer than usual. The model is still answering.</p>}
         </div>
-        {shape === 'questions' && (
-          <div className={styles.chips} aria-hidden="true">
-            <span className={styles.chip} />
-            <span className={styles.chip} />
-            <span className={styles.chip} />
-          </div>
-        )}
-        {shape === 'cards' && (
-          <div className={styles.cards} aria-hidden="true">
-            {[0, 1, 2, 3].map(card => (
-              <div key={card} className={styles.card}>
-                <LinesGhost count={3} />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -126,20 +103,6 @@ function LinesGhost({ count }: { count: number }): React.JSX.Element {
     <div className={styles.lines} aria-hidden="true">
       {Array.from({ length: count }, (_, line) => (
         <span key={line} className={styles.line} />
-      ))}
-    </div>
-  );
-}
-
-function ReadinessGhost(): React.JSX.Element {
-  return (
-    <div className={styles.readiness} aria-hidden="true">
-      {[0, 1, 2, 3].map(row => (
-        <div key={row} className={styles.readinessRow}>
-          <span className={styles.line} />
-          <span className={styles.verdict} />
-          <span className={styles.line} />
-        </div>
       ))}
     </div>
   );

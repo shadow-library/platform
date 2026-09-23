@@ -27,7 +27,6 @@ export type AiRole =
   | 'illustration'
   | 'image'
   | 'vision'
-  | 'ideation'
   | 'blueprint'
   | 'blueprint_pass';
 
@@ -70,7 +69,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   // Not author-selectable: account and project picks for a text-only group must never strip image input from a caller that needs it.
   vision: 'vision',
   embedding: 'embedding',
-  ideation: 'ideation',
   blueprint: 'ideation',
   blueprint_pass: 'planning',
 };
@@ -88,16 +86,15 @@ export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   // IllustrationService resolves through resolveModel('image', project), so a project-level override is honoured.
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
-  // Cheapest registered model OpenRouter lists with image input; fixed like `ideation`, not author-configured.
+  // Cheapest registered model OpenRouter lists with image input.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
-  // The ideation studio has no settings screen, so this is the studio's fixed default, not an author-configured group.
   ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
 // GLM-5.2 (same structured stack as Standard); review/helper move off Claude/Luna onto DeepSeek V4 Pro.
-// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so ideation falls back to GLM-5.2 there too. Vision takes Grok 4.6: DeepSeek and GLM
+// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so the ideation group falls back to GLM-5.2 there too. Vision takes Grok 4.6: DeepSeek and GLM
 // accept no image input, and it is the cheaper of the two allowlisted models that do.
 export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },

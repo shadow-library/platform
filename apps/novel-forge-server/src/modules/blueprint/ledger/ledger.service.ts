@@ -4,7 +4,7 @@ import { type AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertAuthoringKind } from '@server/common';
+import { assertAuthoringProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Ledger, type PrimaryDatabase, type PrimaryTransaction, schema } from '@server/database';
 
@@ -185,6 +185,6 @@ export class LedgerService {
   private async assertLedgerProject(projectId: bigint, executor: DbExecutor): Promise<void> {
     const project = await executor.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { kind: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringKind(project);
+    assertAuthoringProject(project);
   }
 }

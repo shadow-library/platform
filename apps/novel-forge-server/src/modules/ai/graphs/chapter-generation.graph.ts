@@ -455,9 +455,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
     // asymmetric visibility is what lets it catch leaks the pack-level filtering cannot prevent.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     const knowledgeView = knowledgeContract ? await loadKnowledgeView(db, projectId, state.chapter, knowledgeContract) : null;
-    // Seed facts are the reader promises graduation wrote, not withheld truths: they are rules the whole
-    // book obeys, and naming one here would have the judge flag its own constraint as a leak. They stay in
-    // the drafting pack's behavioral constraints, which is where they belong.
+    // Open canon is scheduled (`revealChapter <= OPEN_FROM_CHAPTER`), never marked by source — nothing writes
+    // `source: 'seed'` any more, so this filter only guards facts an older install minted.
     const forbidden = (knowledgeView?.hidden ?? []).filter(fact => fact.source !== 'seed');
     const knowledgeBlock =
       forbidden.length > 0

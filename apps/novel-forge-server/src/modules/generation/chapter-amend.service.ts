@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { applyAmendRepublish, assertActiveProject, declaredDraftFields, sanitizeMarkdown } from '@server/common';
+import { applyAmendRepublish, declaredDraftFields, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type DbExecutor, type PrimaryDatabase, schema } from '@server/database';
 
@@ -36,9 +36,8 @@ export class ChapterAmendService {
    * offer `extract-to-bible` as the author's explicit follow-up.
    */
   async amend(projectId: bigint, chapterNumber: number, body: AmendChapterBody): Promise<AmendChapterResponse> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { status: true } });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertActiveProject(project);
 
     const where = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber));
     const chapter = await this.db.query.chapters.findFirst({ where });

@@ -22,7 +22,6 @@ export { type DetailAsideWidth, type DetailIdentityProps, DetailPage, type Detai
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { FieldCard, type FieldCardProps } from './FieldCard';
 export { GenerationStatus, type GenerationStatusProps } from './GenerationStatus';
-export { IdeaRename } from './IdeaRename';
 export { ItemPager, type ItemPagerJump, type ItemPagerProps } from './ItemPager';
 export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';
 export { ProseEditsToggle, type ProseEditsToggleProps } from './ProseEditsToggle';

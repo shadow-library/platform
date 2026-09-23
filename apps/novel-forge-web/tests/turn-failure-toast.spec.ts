@@ -6,7 +6,7 @@ import { isTurnFailureRecorded } from '../src/lib/apis/refinement.api';
 
 const failedTurn = (runId: string): ListChatMessagesResponse['failedTurn'] => ({
   runId,
-  graph: 'ideation-turn',
+  graph: 'chat-turn',
   status: 'failed' as const,
   endedAt: '2026-09-12T19:00:01.000Z',
   code: 'AI_007',

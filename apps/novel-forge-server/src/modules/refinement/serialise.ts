@@ -1,8 +1,7 @@
 import { type Refinement } from '@server/database';
 
-import { asStudioPayload } from '../ideation/studio-payload.dto';
 import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
-import { type ScopedTurnResult } from './chat-turn.registry';
+import { type ChatTurnResult } from './chat.service';
 import { type ProposalResponse } from './refinement.dto';
 
 /**
@@ -23,7 +22,6 @@ interface ChatMessageRow {
   ordinal: number;
   role: string;
   content: string;
-  payload?: Record<string, unknown> | null;
   proposalId?: bigint | null;
   runId?: string | null;
   modelProvider?: string | null;
@@ -38,7 +36,6 @@ export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
     ordinal: message.ordinal,
     role: message.role,
     content: message.content,
-    payload: asStudioPayload(message.payload),
     proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint),
     runId: message.runId ?? null,
     modelProvider: message.modelProvider ?? null,
@@ -76,7 +73,7 @@ export function serialiseProposal(proposal: Refinement.Proposal): ProposalRespon
 }
 
 /** One turn on the wire. Shared by the synchronous turn endpoint and the stream's `done` event, which carry the same shape by contract. */
-export function serialiseTurn(result: ScopedTurnResult): ChatTurnResponse {
+export function serialiseTurn(result: ChatTurnResult): ChatTurnResponse {
   const applied = result.applied;
   return {
     userMessage: serialiseMessage(result.userMessage),
@@ -88,7 +85,6 @@ export function serialiseTurn(result: ScopedTurnResult): ChatTurnResponse {
       opResults: applied.opResults,
     },
     applyNote: result.applyNote,
-    seed: result.seed,
     runId: result.runId,
   };
 }

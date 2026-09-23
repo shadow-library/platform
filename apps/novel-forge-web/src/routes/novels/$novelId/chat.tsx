@@ -193,7 +193,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
     const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
-    // one-way door, so naming the indexes is what makes finalize and graduation reachable at all.
+    // one-way door, so naming the indexes is what makes finalize reachable at all.
     apply.mutate(
       { proposalId: proposal.id, opIndexes: selected },
       {
@@ -440,9 +440,7 @@ function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDelet
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Ideation chats belong to the studio, not the hub; they are keyed by seed rather than novel, so this
-  // only ever trims a stray, and the segment counts stay the server's own totals.
-  const loaded = (pages.data?.pages ?? []).flatMap(page => page.items).filter(session => session.scopeType !== 'ideation');
+  const loaded = (pages.data?.pages ?? []).flatMap(page => page.items);
   const matches = loaded.filter(session => matchesChatQuery(session, query));
   const groups = groupByRecency(matches, session => session.lastTurnAt ?? session.updatedAt);
   const view = chatHistoryView({ loading: pages.isLoading, error: Boolean(pages.error), matches: matches.length, query, status });
@@ -1098,9 +1096,7 @@ function ChatScreen(): React.JSX.Element {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [changeHistoryOpen, setChangeHistoryOpen] = useState(false);
 
-  // Ideation sessions belong to the studio, not the hub: renaming, archiving, deleting or flipping the mode
-  // of one is refused with IDE_005, and its turns need the studio's own router and payload renderers.
-  const sessions = (sessionsQuery.data?.items ?? []).filter(session => session.scopeType !== 'ideation');
+  const sessions = sessionsQuery.data?.items ?? [];
 
   // The URL param wins when it names a session still in the list; otherwise fall back to the first
   // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.

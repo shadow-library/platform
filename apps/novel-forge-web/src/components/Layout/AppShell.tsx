@@ -1,14 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import { IdeaRename } from '@/components/nf';
 import {
-  applySeedName,
-  invalidateSeed,
   translationJobActive,
   useListProjectsQuery,
   useListProposalsQuery,
@@ -17,18 +13,15 @@ import {
   useProjectQuery,
   useProjectStatusQuery,
   useReviewQueueQuery,
-  useSeedQuery,
   useTranslationStatusQuery,
-  useUpdateProjectMutation,
 } from '@/lib/apis';
 import { blueprintNavSections } from '@/features/blueprint/blueprint-nav';
 import { blueprintStepMeta } from '@/features/blueprint/blueprint-steps';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
 import { blueprintStage, currentBlueprintPhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
-import { firstTitle } from '@/lib/idea-title';
 import { useIsAdmin } from '@/lib/session';
 
-import { BookIcon, EditIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon } from '../icons';
+import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
@@ -50,14 +43,9 @@ function ThemeToggle(): React.JSX.Element {
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { novelId, seedId } = useParams({ strict: false }) as NovelParams;
+  const { novelId } = useParams({ strict: false }) as NovelParams;
   const inProject = Boolean(novelId);
-  const inIdeas = pathname === '/ideas' || pathname.startsWith('/ideas/');
-  const onIdeaStudio = inIdeas && Boolean(seedId);
   const [palette, setPalette] = useState<PaletteState>({ kind: 'closed' });
-  const [renamingIdea, setRenamingIdea] = useState(false);
-  const renameIdea = useUpdateProjectMutation(seedId ?? '');
 
   const openScope = useCallback((scope: JumpScope) => setPalette({ kind: 'scoped', scope }), []);
   const dropScope = useCallback(() => setPalette(current => (current.kind === 'scoped' ? { kind: 'closed' } : current)), []);
@@ -72,7 +60,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const statusQuery = useProjectStatusQuery(novelId ?? '', inProject);
   const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
   const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: PROJECT_LIMIT }, inProject);
-  const seedQuery = useSeedQuery(seedId ?? '', onIdeaStudio);
   const isTranslation = projectQuery.data?.kind === 'translation';
   const translationQuery = useTranslationStatusQuery(novelId ?? '', inProject && isTranslation);
 
@@ -141,10 +128,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         variant: 'sections',
         sections: [
           {
-            items: [
-              { to: '/', label: 'Projects', icon: <GridIcon />, exact: true },
-              { to: '/ideas', label: 'Ideas', icon: <SparkIcon /> },
-            ],
+            items: [{ to: '/', label: 'Projects', icon: <GridIcon />, exact: true }],
           },
           {
             label: 'Pinned',
@@ -169,7 +153,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       }
     }
     items.push({ id: 'go-projects', group: 'Go to', label: 'All projects', icon: <GridIcon />, onRun: () => navigate({ to: '/' }) });
-    items.push({ id: 'go-ideas', group: 'Go to', label: 'Ideas', icon: <SparkIcon />, onRun: () => navigate({ to: '/ideas' }) });
     items.push({ id: 'go-settings', group: 'Go to', label: 'Settings', icon: <SettingsIcon />, keywords: ['models', 'defaults'], onRun: () => navigate({ to: '/settings' }) });
     for (const candidate of projects) {
       items.push({
@@ -206,50 +189,9 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const blueprintStepKey = segments.at(-2) === 'blueprint' ? leafSegment : undefined;
   const crumbLeaf =
     !inProject || leafSegment == null ? undefined : blueprintStepKey != null ? `Blueprint · ${blueprintStepMeta(blueprintStepKey).label}` : SCREEN_LABEL.get(leafSegment);
-  const crumbRoot = inProject && project ? projectTitle(project) : inIdeas ? 'Ideas' : pathname === '/settings' ? 'Settings' : 'Projects';
+  const crumbRoot = inProject && project ? projectTitle(project) : pathname === '/settings' ? 'Settings' : 'Projects';
 
-  const saveIdeaName = (next: string): void => {
-    if (!seedId) return;
-    renameIdea.mutate(
-      { title: next },
-      {
-        onSuccess: () => {
-          applySeedName(queryClient, seedId, next);
-          invalidateSeed(queryClient, seedId);
-          setRenamingIdea(false);
-        },
-        onError: err => {
-          toast.danger(err.message);
-          setRenamingIdea(false);
-        },
-      },
-    );
-  };
-
-  const ideaTitle = firstTitle([seedQuery.data?.name, seedQuery.data?.fields.workingTitle], 'Idea');
-  const ideaCrumb = onIdeaStudio ? (
-    renamingIdea ? (
-      <IdeaRename compact name={ideaTitle} saving={renameIdea.isPending} onCommit={next => (next == null ? setRenamingIdea(false) : saveIdeaName(next))} />
-    ) : (
-      <>
-        <span className={styles.crumbName} title={ideaTitle}>
-          {ideaTitle}
-        </span>
-        <IconButton variant="ghost" size="sm" aria-label="Rename idea" icon={<EditIcon size={13} />} onClick={() => setRenamingIdea(true)} />
-      </>
-    )
-  ) : undefined;
-
-  const breadcrumb = onIdeaStudio ? (
-    <span className={styles.crumbTrail}>
-      <span className={styles.crumbRoot}>{crumbRoot} /</span>
-      {ideaCrumb}
-    </span>
-  ) : crumbLeaf != null ? (
-    `${crumbRoot} / ${crumbLeaf}`
-  ) : (
-    crumbRoot
-  );
+  const breadcrumb = crumbLeaf != null ? `${crumbRoot} / ${crumbLeaf}` : crumbRoot;
 
   return (
     <CommandScopeProvider onOpenScope={openScope} onScopeGone={dropScope}>

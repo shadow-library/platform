@@ -34,8 +34,8 @@ import { type AnyBlueprintStep, type AnyGeneratingStep, type AnyLockingStep, isS
 
 export const RELOCK_WITHDRAW_REASON = 'Replaced when the step was locked again.';
 
-/** A lock materialises plan content; drafts and the retired seed sheet are never Blueprint output, and actions belong after the commit. */
-export const BLUEPRINT_CHANGE_OPS: readonly OpType[] = CONTENT_OP_TYPES.filter(op => !op.startsWith('draft.') && op !== 'seed.update');
+/** A lock materialises plan content; drafts are never Blueprint output, and actions belong after the commit. */
+export const BLUEPRINT_CHANGE_OPS: readonly OpType[] = CONTENT_OP_TYPES.filter(op => !op.startsWith('draft.'));
 
 /**
  * The only actions a lock may run after its commit — the counterpart of `BLUEPRINT_CHANGE_OPS`, and deliberately short. Both approvals

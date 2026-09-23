@@ -68,16 +68,11 @@ export namespace Project {
   export type Presented = Omit<Row, 'config' | 'wordTargetMin' | 'wordTargetMax'> & { config?: ProjectConfigData; coverUrl?: string; wordTarget?: WordTarget };
   export type PresentedDetail = Presented & { defaultInstructions: string; defaultCopyRemoved: boolean };
   export type Kind = InferEnum<typeof projectKind>;
-  export type Status = InferEnum<typeof projectStatus>;
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
 
 export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'translation', 'curated']);
-// A `seed` project is an idea under construction in the Ideation Studio: it owns chat, proposal and run
-// history like any project, but the generation, planning and publishing pipelines reject it until
-// graduation flips it to `active`.
-export const projectStatus = pgEnum('project_status', ['seed', 'active']);
 export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'unrestricted', 'human']);
 
@@ -93,7 +88,6 @@ export const projects = pgTable(
     sharedWithOrg: boolean('shared_with_org').notNull().default(false),
     name: varchar('name', { length: 255 }).notNull(),
     kind: projectKind('kind').notNull(),
-    status: projectStatus('status').notNull().default('active'),
     title: varchar('title', { length: 500 }),
     coverImagePath: varchar('cover_image_path'),
     contentMode: contentMode('content_mode').notNull().default('standard'),

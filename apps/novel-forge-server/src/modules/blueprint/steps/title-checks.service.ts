@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -64,7 +64,7 @@ export class TitleChecksService {
     const rows = await this.db
       .select({ name: schema.projects.name, title: schema.projects.title })
       .from(schema.projects)
-      .where(and(ownedBy(schema.projects, owner), ne(schema.projects.id, projectId), eq(schema.projects.status, 'active')));
+      .where(and(ownedBy(schema.projects, owner), ne(schema.projects.id, projectId)));
     return new Set(rows.flatMap(row => [row.title, row.name].filter((value): value is string => Boolean(value)).map(normalise)));
   }
 }

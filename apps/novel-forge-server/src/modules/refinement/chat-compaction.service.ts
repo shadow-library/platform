@@ -19,11 +19,7 @@ import { type ChatCompactOutput } from '../ai/schemas';
 const MAX_VERBATIM_TURNS = 12;
 const KEEP_VERBATIM_TURNS = 6;
 
-/**
- * The conversation window every chat-shaped turn pipeline shares: the rolling summary, the watermark
- * that moves it, and the prompt messages read back off it. ChatService and the Ideation Studio differ
- * in everything around the turn and in nothing here, so this is a collaborator rather than a base class.
- */
+/** The conversation window every chat-shaped turn pipeline shares: the rolling summary, the watermark that moves it, and the prompt messages read back off it. */
 @Injectable()
 export class ChatCompactionService {
   private readonly logger = Logger.getLogger(APP_NAME, ChatCompactionService.name);

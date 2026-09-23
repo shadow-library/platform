@@ -1,4 +1,4 @@
-import { type Bible, type Generation, type Ideation } from '@server/database';
+import { type Bible, type Generation } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
@@ -156,33 +156,6 @@ export interface FactRemoveOp {
   factKey: string;
 }
 
-/**
- * The Ideation Studio sheet edit. `fields` and `provenance` merge per
- * key — a `null` value clears that key, which is what makes the captured inverse exact; the three
- * collection columns replace wholesale.
- */
-/** `turnOrdinal` is the apply engine's to fill in — the model names the source, the server knows the turn. */
-interface SeedProvenanceInput {
-  source: Ideation.FieldSource;
-  turnOrdinal?: number | null;
-}
-
-/**
- * A card as it arrives on a re-sent collection. `id` is optional on the wire only: the model is asked to
- * echo the server's id verbatim, and the applier stamps a fresh one on any card that arrives without a
- * recognised one, so an id never vanishes from the stored column.
- */
-export type ConceptCardInput = Omit<Ideation.ConceptCard, 'id'> & { id?: string };
-
-export interface SeedUpdateOp {
-  op: 'seed.update';
-  fields?: { [K in keyof Ideation.SeedFields]?: Ideation.SeedFields[K] | null };
-  provenance?: Record<string, SeedProvenanceInput | null>;
-  constraints?: Ideation.SeedConstraint[];
-  concepts?: ConceptCardInput[];
-  tasteAnchors?: Ideation.TasteAnchors;
-}
-
 // Action ops drive the pipeline through existing service code. They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
@@ -253,11 +226,6 @@ interface FinalizeAction {
   upTo?: number;
 }
 
-interface GraduateSeedAction {
-  op: 'action.graduate_seed';
-  title: string;
-}
-
 export type ContentOp =
   | PremiseUpdateOp
   | BibleDocumentUpsertOp
@@ -273,8 +241,7 @@ export type ContentOp =
   | EntityUpsertOp
   | EntityRemoveOp
   | FactUpsertOp
-  | FactRemoveOp
-  | SeedUpdateOp;
+  | FactRemoveOp;
 
 export type ActionOp =
   | GenerateChaptersAction
@@ -289,8 +256,7 @@ export type ActionOp =
   | ApproveVolumePlanAction
   | ApproveArcsAction
   | ValidateAction
-  | FinalizeAction
-  | GraduateSeedAction;
+  | FinalizeAction;
 
 /** Rationale is metadata about the change, not part of it: it reaches the author beside the op and is stripped before any applier sees it, so `ContentOp` — the shape inverses are captured as — deliberately lacks it. */
 export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
@@ -308,16 +274,6 @@ interface OpSpec {
 const BRIEF_WRITE_MODES = ['standard', 'external'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
-const SEED_COLUMNS = ['fields', 'provenance', 'constraints', 'concepts', 'tasteAnchors'] as const;
-const SEED_FIELD_KEYS = ['genre', 'themes', 'premise', 'hook', 'castShape', 'progressionSystem', 'protagonistDrive', 'stakes', 'serializationNotes', 'voice', 'workingTitle'];
-const SEED_FIELD_SOURCES = ['author', 'studio', 'crossed'];
-const SEED_CONSTRAINT_KINDS = ['shape', 'scope', 'promise'];
-const SEED_CONSTRAINT_LOCKED_BY = ['author', 'inferred'];
-// 'offered' is a legal emission, not just a persisted state: the column replaces wholesale, so every
-// re-send of the collection carries the cards the author has not judged yet — and un-judging one back
-// to 'offered' is a verdict the author is allowed to take back.
-const SEED_CONCEPT_FATES = ['offered', 'kept', 'killed', 'crossed'];
-
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { title: 'string', premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
@@ -373,12 +329,6 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
     optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number' },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
-  'seed.update': {
-    required: {},
-    optional: { fields: 'object', provenance: 'object', constraints: 'object[]', concepts: 'object[]', tasteAnchors: 'object' },
-    description:
-      'edit the story seed sheet. Only the top-level keys you send are touched; the rest of the sheet is left alone. Inside "fields" and "provenance" the merge is per key — send only the entries you are changing, and send a key with the value null to clear it. "constraints", "concepts", and "tasteAnchors" replace their whole column, so send the complete list every time you change one. A provenance entry is {"source": "author" | "studio" | "crossed"} — the turn it was settled on is recorded for you.',
-  },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
   'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
   'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
@@ -392,7 +342,6 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.approve_arcs': { required: { volumeKey: 'string' }, optional: {} },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
-  'action.graduate_seed': { required: { title: 'string' }, optional: {} },
 };
 
 // Rationale is metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
@@ -403,9 +352,6 @@ const OP_SPECS = Object.fromEntries(
 const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
 export const CONTENT_OP_TYPES: readonly OpType[] = OP_TYPES.filter(op => !op.startsWith('action.'));
-// Graduation belongs to the studio alone: a hub project has already graduated, so offering it there is
-// an action the model can only fail with (IDE_001).
-export const HUB_ACTION_TYPES = ACTION_TYPES.filter(action => action !== 'action.graduate_seed');
 const VALIDATION_SCOPES = ['novel', 'chapter'];
 
 // What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
@@ -424,8 +370,6 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.approve_arcs': 'approve all arcs of one volume (unlocks outlining)',
   'action.validate': 'run continuity validation over the novel or one chapter',
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
-  'action.graduate_seed':
-    'turn the story seed into a novel under `title` — writes the premise and reader-promise bible documents, keeps the named betrayals as canon facts, and ends the studio conversation. Propose it only when the author says they are ready to start the novel; it is never auto-applied',
 };
 
 export function isActionOp(op: ChangeOp): op is ActionOp;
@@ -480,86 +424,6 @@ function validateKnowledgeContract(value: unknown, path: string, errors: string[
       if (key !== 'entityKey' && key !== 'factKey') errors.push(`${at}: unexpected field '${key}'`);
     }
   });
-}
-
-function validateSeedFields(value: Record<string, unknown>, path: string, errors: string[]): void {
-  for (const [key, entry] of Object.entries(value)) {
-    if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'fields.${key}'`);
-    if (entry === null) continue;
-    if (key === 'themes') {
-      if (!isKind(entry, 'string[]') || (entry as string[]).some(theme => theme.trim() === '')) errors.push(`${path}: fields.themes must be an array of non-empty strings or null`);
-      continue;
-    }
-    if (typeof entry !== 'string' || entry.trim() === '') errors.push(`${path}: fields.${key} must be a non-empty string or null`);
-  }
-}
-
-function validateSeedProvenance(value: Record<string, unknown>, path: string, errors: string[]): void {
-  for (const [key, entry] of Object.entries(value)) {
-    if (!SEED_FIELD_KEYS.includes(key)) errors.push(`${path}: unknown sheet field 'provenance.${key}'`);
-    if (entry === null) continue;
-    if (!isKind(entry, 'object')) {
-      errors.push(`${path}: provenance.${key} must be an object or null`);
-      continue;
-    }
-    const record = entry as Record<string, unknown>;
-    if (!SEED_FIELD_SOURCES.includes(record['source'] as string)) errors.push(`${path}: provenance.${key}.source must be one of ${SEED_FIELD_SOURCES.join(', ')}`);
-    if (record['turnOrdinal'] !== undefined && !isKind(record['turnOrdinal'], 'number')) errors.push(`${path}: provenance.${key}.turnOrdinal must be an integer`);
-    for (const field of Object.keys(record)) {
-      if (field !== 'source' && field !== 'turnOrdinal') errors.push(`${path}: unexpected field 'provenance.${key}.${field}'`);
-    }
-  }
-}
-
-function validateItems(items: unknown[], path: string, validate: (record: Record<string, unknown>, at: string) => void): void {
-  items.forEach((item, index) => validate(item as Record<string, unknown>, `${path}[${index}]`));
-}
-
-function requireStrings(record: Record<string, unknown>, keys: string[], at: string, errors: string[]): void {
-  for (const key of keys) {
-    if (typeof record[key] !== 'string' || record[key] === '') errors.push(`${at}.${key} must be a non-empty string`);
-  }
-}
-
-function validateSeedUpdate(record: Record<string, unknown>, path: string, errors: string[]): void {
-  if (SEED_COLUMNS.every(column => record[column] === undefined)) return void errors.push(`${path}: seed.update must set at least one of ${SEED_COLUMNS.join(', ')}`);
-
-  // `fields`/`provenance` merge per key, so an empty object is a genuine no-op (a revision bump with
-  // nothing changed) rather than the "clear everything" a wholesale-replace column would mean.
-  for (const column of ['fields', 'provenance'] as const) {
-    const value = record[column];
-    if (value !== undefined && isKind(value, 'object') && Object.keys(value as Record<string, unknown>).length === 0) {
-      errors.push(`${path}: ${column} must not be empty when provided`);
-    }
-  }
-
-  if (isKind(record['fields'], 'object')) validateSeedFields(record['fields'] as Record<string, unknown>, path, errors);
-  if (isKind(record['provenance'], 'object')) validateSeedProvenance(record['provenance'] as Record<string, unknown>, path, errors);
-
-  if (isKind(record['constraints'], 'object[]')) {
-    validateItems(record['constraints'] as unknown[], `${path}: constraints`, (constraint, at) => {
-      requireStrings(constraint, ['key', 'text'], at, errors);
-      if (!SEED_CONSTRAINT_KINDS.includes(constraint['kind'] as string)) errors.push(`${at}.kind must be one of ${SEED_CONSTRAINT_KINDS.join(', ')}`);
-      if (!SEED_CONSTRAINT_LOCKED_BY.includes(constraint['lockedBy'] as string)) errors.push(`${at}.lockedBy must be one of ${SEED_CONSTRAINT_LOCKED_BY.join(', ')}`);
-    });
-  }
-
-  if (isKind(record['concepts'], 'object[]')) {
-    validateItems(record['concepts'] as unknown[], `${path}: concepts`, (card, at) => {
-      requireStrings(card, ['title', 'logline', 'engine', 'ladder', 'posture'], at, errors);
-      for (const key of ['id', 'hookLine'] as const) {
-        if (card[key] !== undefined && (typeof card[key] !== 'string' || card[key] === '')) errors.push(`${at}.${key} must be a non-empty string when provided`);
-      }
-      if (!isKind(card['round'], 'number')) errors.push(`${at}.round must be an integer`);
-      if (!SEED_CONCEPT_FATES.includes(card['fate'] as string)) errors.push(`${at}.fate must be one of ${SEED_CONCEPT_FATES.join(', ')}`);
-    });
-  }
-
-  const anchors = record['tasteAnchors'];
-  if (!isKind(anchors, 'object')) return;
-  const { comps, preferences } = anchors as Record<string, unknown>;
-  if (!isKind(comps, 'string[]')) errors.push(`${path}: tasteAnchors.comps must be a string array`);
-  if (!isKind(preferences, 'string[]')) errors.push(`${path}: tasteAnchors.preferences must be a string array`);
 }
 
 /**
@@ -686,10 +550,8 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
         if (record[field] !== undefined) errors.push(`${path}: field '${field}' is not allowed for this scope`);
       }
     }
-    if (op === 'seed.update') validateSeedUpdate(record, path, errors);
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
-    if (op === 'action.graduate_seed' && typeof record['title'] === 'string' && record['title'].trim() === '') errors.push(`${path}: title must be a non-empty string`);
   });
 
   if (errors.length === 0 && options?.entityMaterialization !== false) errors.push(...validateEntityMaterialization(value, allowedOps));
@@ -784,7 +646,6 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
-    if (op.op === 'seed.update') return ['seed'];
     return [`chapter:${op.chapter}`];
   });
   return [...new Set(refs)];

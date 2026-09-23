@@ -18,28 +18,6 @@
   --nf-page-pad-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
 }
 
-/* The shell clips the breadcrumb as one line; only the idea's name gives way, so the rename button stays reachable
-   and the padding keeps the rename field's focus ring inside that clip. */
-.crumbTrail {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  padding: 3px;
-}
-
-.crumbRoot,
-.crumbTrail > button {
-  flex-shrink: 0;
-}
-
-.crumbName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--sh-text-primary);
-}
-
 .search {
   display: flex;
   align-items: center;
