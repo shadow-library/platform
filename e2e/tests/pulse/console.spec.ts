@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
-import { uniqueKey } from './helpers';
+import { deactivateTemplate, uniqueKey } from './helpers';
 
 /**
  * Defining types
@@ -133,8 +133,9 @@ test.describe('console UI', () => {
     // `.first()`: the new name renders both in the page subtitle and in the metadata description list.
     await expect(page.getByText('E2E console template (edited)').first()).toBeVisible();
 
-    // Cleanup: no DELETE route for templates — deactivate via the API instead of a second UI round trip.
-    if (created) await ctx.patch(`/api/v1/templates/${created.id}`, { data: { isActive: false } });
+    // Cleanup: no DELETE route for templates — deactivate via the API instead of a second UI round trip. It goes
+    // through `deactivateTemplate` because a bare `ctx.patch` on a session-carrying context is refused by CSRF.
+    if (created) await deactivateTemplate(ctx, created.id);
   });
 
   test('should show the seeded e2e-dev sender profile in /senders', async ({ page }) => {

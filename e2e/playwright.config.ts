@@ -32,6 +32,12 @@ const isCI = !!process.env.CI;
 /** Identity specs that must never overlap with a copy of themselves — they flip state the whole deployment shares. */
 const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](federation|sms-otp|rate-limit|workload-identity)\.spec\.ts$/;
 
+/** Pulse specs that assert deltas on a deployment-wide aggregate, so no copy of them may run beside another. */
+const SERIAL_PULSE_SPECS = /tests[\\/]pulse[\\/]dashboard\.spec\.ts$/;
+
+/** Every other pulse spec; they share one back-channel budget with identity, so they run at a capped width. */
+const PULSE_SPECS = /tests[\\/]pulse[\\/].*\.spec\.ts$/;
+
 export default defineConfig({
   testDir: './tests',
   // Seed the dev cluster's Postgres before anything runs, and drain DB clients after. `globalSetup` spawns the
@@ -69,10 +75,21 @@ export default defineConfig({
   // `identity-serial` holds the specs that drive identity-wide state no other spec may observe mid-flight — a global
   // auth mode, a per-IP rate-limit budget, the deployment-wide namespace of Kubernetes workload-subject bindings. One
   // worker and no in-file parallelism means even `--repeat-each` copies of the same test run one after another, which
-  // `test.describe.configure({ mode: 'serial' })` alone does not guarantee.
+  // `test.describe.configure({ mode: 'serial' })` alone does not guarantee. `pulse-serial` holds the one pulse spec
+  // with the same problem: `GET /api/v1/dashboard/stats` aggregates every notification job in the deployment, so a
+  // second copy queueing its own rows would move the counts the first one is asserting a delta on.
+  //
+  // The rest of pulse runs in its own `pulse` project at two workers. Everything pulse-server does for a signed-in
+  // caller — opening an app session, minting its token, every permission decision — is a back-channel call to
+  // identity, and all of them arrive from the one pod address, so what they spend is identity's per-IP general
+  // budget (`GENERAL_LIMIT`, 100 a minute, `security.constants.ts`) rather than the far roomier per-client M2M one.
+  // A handful of concurrent sessions exhausts it, and identity then answers 429 — which pulse surfaces as a 503
+  // login or, fail-closed, a 403 on a route the caller is entitled to.
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS] },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS, PULSE_SPECS] },
     { name: 'identity-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_IDENTITY_SPECS, workers: 1, fullyParallel: false },
+    { name: 'pulse', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: PULSE_SPECS, testIgnore: SERIAL_PULSE_SPECS, workers: 2 },
+    { name: 'pulse-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_PULSE_SPECS, workers: 1, fullyParallel: false },
   ],
 });

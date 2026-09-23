@@ -49,6 +49,7 @@ import {
   type RegisterOAuthClientOptions,
   registerOrgOAuthApp,
   type RegisterOrgOAuthAppOptions,
+  runAll,
   type SamlSp,
   type SamlSpOptions,
   type SeedBotsOptions,
@@ -121,17 +122,6 @@ export interface IdentityTeam extends TeamOrganisation {
 /**
  * Declaring the constants
  */
-
-export class HarnessTeardownError extends AggregateError {
-  override readonly name = 'HarnessTeardownError';
-}
-
-/** Runs every step even when earlier ones fail, then surfaces all failures together. */
-export async function runAll(steps: (() => Promise<unknown>)[]): Promise<void> {
-  const errors: unknown[] = [];
-  for (const step of steps) await step().catch((error: unknown) => errors.push(error));
-  if (errors.length > 0) throw new HarnessTeardownError(errors, `identity harness teardown failed in ${errors.length} step(s)`);
-}
 
 export interface IdentityTeamMember {
   readonly user: IdentityUser;

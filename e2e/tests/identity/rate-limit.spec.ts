@@ -24,6 +24,7 @@ import {
   redisTtl,
   refreshGrant,
   registerInit,
+  runAll,
   signInWithPassword,
   spendRateLimit,
   startLogin,
@@ -31,7 +32,7 @@ import {
   uniqueEmail,
   verifyChallenge,
 } from '../../lib';
-import { expect, test as identityTest, runAll } from './fixtures';
+import { expect, test as identityTest } from './fixtures';
 import { countOutboxRows, expectRefused, flowStepOf } from './helpers';
 
 /**

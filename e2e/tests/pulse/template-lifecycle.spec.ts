@@ -107,6 +107,50 @@ test.describe('template lifecycle', () => {
     expect(body.code).toBe('TPL_PUB_001');
   });
 
+  test('should archive the previously published version when a second version publishes', async () => {
+    const ctx = await apiContext('pulse', 'admin');
+    const created = await createTemplate(ctx, { templateKey: uniqueKey('tpl-history'), messageType: 'TRANSACTIONAL' });
+    createdTemplateIds.push(created.id);
+    await mutate(ctx, 'put', `/api/v1/templates/${created.id}/channels/EMAIL`, { data: { isEnabled: true } });
+
+    for (const body of ['First cut', 'Second cut']) {
+      await openDraft(ctx, created.id);
+      await putDraftContent(ctx, created.id, { channel: 'EMAIL', locale: 'en-ZZ', subject: 'Hi', body });
+      const published = await publishDraft(ctx, created.id);
+      expect(published.status(), await published.text()).toBe(200);
+    }
+
+    const versions = await ctx.get(`/api/v1/templates/${created.id}/versions`);
+    expect(versions.status()).toBe(200);
+    const { items } = (await versions.json()) as { items: { version: number; status: string }[] };
+    expect(items.map(item => ({ version: item.version, status: item.status })).sort((left, right) => left.version - right.version)).toEqual([
+      { version: 1, status: 'ARCHIVED' },
+      { version: 2, status: 'PUBLISHED' },
+    ]);
+  });
+
+  test('should persist a channel toggle and reflect it on the template detail read', async () => {
+    const ctx = await apiContext('pulse', 'admin');
+    const created = await createTemplate(ctx, { templateKey: uniqueKey('tpl-channel'), messageType: 'TRANSACTIONAL' });
+    createdTemplateIds.push(created.id);
+
+    const channelOf = async (channel: string): Promise<{ channel: string; isEnabled: boolean } | undefined> => {
+      const detail = await ctx.get(`/api/v1/templates/${created.id}`);
+      expect(detail.status()).toBe(200);
+      const { channels } = (await detail.json()) as { channels: { channel: string; isEnabled: boolean }[] };
+      return channels.find(setting => setting.channel === channel);
+    };
+
+    const enabled = await mutate(ctx, 'put', `/api/v1/templates/${created.id}/channels/SMS`, { data: { isEnabled: true } });
+    expect(enabled.status()).toBe(200);
+    expect((await enabled.json()) as { channel: string; isEnabled: boolean }).toMatchObject({ channel: 'SMS', isEnabled: true });
+    expect(await channelOf('SMS')).toMatchObject({ isEnabled: true });
+
+    const disabled = await mutate(ctx, 'put', `/api/v1/templates/${created.id}/channels/SMS`, { data: { isEnabled: false } });
+    expect(disabled.status()).toBe(200);
+    expect(await channelOf('SMS'), 'the toggle is an update of the same setting, not a second row').toMatchObject({ isEnabled: false });
+  });
+
   /**
    * `assertContentsRender` strict-renders every draft content block through LiquidJS; a body referencing a
    * variable the template's `variableSchema` never declared fails that render and maps to `TPL_PUB_003` (422).

@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { randomBytes } from 'node:crypto';
+
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
@@ -44,6 +46,22 @@ export interface RoutingRuleOverrides {
   messageType?: 'OTP' | 'TRANSACTIONAL' | 'PROMOTIONAL';
 }
 
+export type NotificationChannel = 'EMAIL' | 'SMS' | 'PUSH';
+
+export type NotificationJobStatus = 'PENDING' | 'PROCESSING' | 'FAILED' | 'SENT' | 'PERMANENTLY_FAILED';
+
+export interface NotificationJobRow {
+  templateId: string;
+  templateVersionId: string;
+  channel: NotificationChannel;
+  recipient: string;
+  status: NotificationJobStatus;
+  /** Default `en-ZZ`, the locale the baseline catalogue publishes. */
+  locale?: string;
+  /** Default now. The dashboard buckets a job by this, so a past date lands it in an earlier trend day. */
+  createdAt?: Date;
+}
+
 /**
  * Declaring the constants
  *
@@ -54,9 +72,18 @@ export interface RoutingRuleOverrides {
  * builds via `apiContext('pulse', 'admin')`.
  */
 
-/** A collision-safe resource key: `e2e-<concern>-<epoch-ms>`, unique enough for a suite run without a central counter. */
+/**
+ * A wall-clock literal for pulse's naive `timestamp` columns. A `Date` would be sent with this host's offset and
+ * stored with it dropped, landing the row in the wrong day whenever the host is not on UTC — which is exactly the
+ * bucket `DashboardService` reads.
+ */
+function utcTimestamp(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', '');
+}
+
+/** A collision-safe resource key: `e2e-<concern>-<epoch-ms><random>` — two copies of one test can start in the same millisecond. */
 export function uniqueKey(concern: string): string {
-  return `e2e-${concern}-${Date.now()}`;
+  return `e2e-${concern}-${Date.now()}${randomBytes(3).toString('hex')}`;
 }
 
 /** Creates a template via `POST /api/v1/templates` and returns the parsed 201 body (or throws with the raw body on failure). */
@@ -140,4 +167,73 @@ export async function findRoutingRuleId(senderProfileId: string, service?: strin
 /** Deletes a routing rule by id. */
 export async function deleteRoutingRule(ctx: APIRequestContext, routingRuleId: string): Promise<APIResponse> {
   return mutate(ctx, 'delete', `/api/v1/sender-routing-rules/${routingRuleId}`);
+}
+
+/**
+ * A template of the caller's own with one published `en-ZZ` EMAIL body, and the row id of that published version —
+ * everything a `notification_jobs` row needs to point at, with no dependency on the baseline catalogue.
+ */
+export async function createPublishedTemplate(ctx: APIRequestContext, concern: string): Promise<{ id: string; templateKey: string; versionId: string }> {
+  const created = await createTemplate(ctx, { templateKey: uniqueKey(concern), messageType: 'TRANSACTIONAL' });
+  await mutate(ctx, 'put', `/api/v1/templates/${created.id}/channels/EMAIL`, { data: { isEnabled: true } });
+  await openDraft(ctx, created.id);
+  await putDraftContent(ctx, created.id, { channel: 'EMAIL', locale: 'en-ZZ', subject: 'E2E', body: 'E2E body' });
+  const published = await publishDraft(ctx, created.id, 'e2e publish');
+  if (published.status() !== 200) throw new Error(`publishing ${created.templateKey} failed: ${published.status()} ${await published.text()}`);
+  return { ...created, versionId: await findPublishedVersionId(created.id) };
+}
+
+/**
+ * The id of `templateId`'s currently `PUBLISHED` version — `notification_jobs.template_version_id` is NOT NULL and
+ * no API surfaces a version's row id (`VersionResponse` carries the version *number*).
+ */
+export async function findPublishedVersionId(templateId: string): Promise<string> {
+  const rows = await pulseDb()<{ id: string }[]>`
+    SELECT id::text FROM template_versions WHERE template_id = ${templateId} AND status = 'PUBLISHED' ORDER BY version DESC LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) throw new Error(`template ${templateId} has no PUBLISHED version`);
+  return row.id;
+}
+
+/**
+ * Writes the `notification_jobs` row a queued delivery produces and returns its id.
+ *
+ * Every send path into pulse is `@RequireScope('notifications:send')`, a service-only scope no host-side caller can
+ * hold (see `security.spec.ts`), so a delivery state is arranged by writing the row the queue would have written.
+ */
+export async function insertNotificationJob(row: NotificationJobRow): Promise<string> {
+  const createdAt = utcTimestamp(row.createdAt ?? new Date());
+  const rows = await pulseDb()<{ id: string }[]>`
+    INSERT INTO notification_jobs (template_id, template_version_id, channel, locale, recipient, status, created_at, updated_at)
+    VALUES (
+      ${row.templateId}, ${row.templateVersionId}, ${row.channel}::notification_channel, ${row.locale ?? 'en-ZZ'}, ${row.recipient},
+      ${row.status}::notification_status, ${createdAt}, ${createdAt}
+    )
+    RETURNING id::text
+  `;
+  const inserted = rows[0];
+  if (!inserted) throw new Error(`notification_jobs insert for ${row.recipient} returned no row`);
+  return inserted.id;
+}
+
+/** Writes the `notification_messages` row `DevNotificationProvider` writes — the only place rendered content ever lands. */
+export async function insertNotificationMessage(jobId: string, content: { renderedBody: string; renderedSubject?: string }): Promise<string> {
+  const rows = await pulseDb()<{ id: string }[]>`
+    INSERT INTO notification_messages (notification_job_id, rendered_subject, rendered_body)
+    VALUES (${jobId}, ${content.renderedSubject ?? null}, ${content.renderedBody})
+    RETURNING id::text
+  `;
+  const inserted = rows[0];
+  if (!inserted) throw new Error(`notification_messages insert for job ${jobId} returned no row`);
+  return inserted.id;
+}
+
+/** Removes `jobIds` and the messages hanging off them; safe to call with ids that are already gone. */
+export async function deleteNotificationJobs(jobIds: readonly string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+  const sql = pulseDb();
+  const ids = sql(jobIds as string[]);
+  await sql`DELETE FROM notification_messages WHERE notification_job_id IN ${ids}`;
+  await sql`DELETE FROM notification_jobs WHERE id IN ${ids}`;
 }
