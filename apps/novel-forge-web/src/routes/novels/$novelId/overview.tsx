@@ -5,6 +5,7 @@ import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
+import { blueprintComplete, BlueprintOverviewCard } from '@/features/blueprint';
 import {
   type CostBreakdownItem,
   type GenerationJobItem,
@@ -31,7 +32,18 @@ import {
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, lifecyclePhase, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, translationLifecycle } from '@/lib/format';
+import {
+  blueprintStage,
+  currentBlueprintPhase,
+  LIFECYCLE_PHASES,
+  lifecyclePhase,
+  projectKindIntent,
+  projectKindLabel,
+  projectKindTag,
+  projectTitle,
+  relativeTime,
+  translationLifecycle,
+} from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
 
 import styles from './overview.module.css';
@@ -319,6 +331,9 @@ function OverviewScreen(): React.JSX.Element {
     isAuthoring && nextStepReady
       ? computeNextStep(
           deriveNextStepInput({
+            blueprintStage: blueprintStage(status),
+            blueprintPhaseLabel: currentBlueprintPhase(status)?.label,
+            blueprintComplete: blueprintComplete(status?.blueprint?.phases ?? []),
             volumesTotal,
             planApproved: status?.planApproved ?? false,
             draftsTotal,
@@ -349,6 +364,9 @@ function OverviewScreen(): React.JSX.Element {
 
   const goToNextStepTarget = (target: NextStepTarget): void => {
     switch (target.screen) {
+      case 'blueprint':
+        navigate({ to: '/novels/$novelId/blueprint', params: { novelId } });
+        return;
       case 'story-bible':
         navigate({ to: '/novels/$novelId/story-bible', params: { novelId } });
         return;
@@ -567,6 +585,12 @@ function OverviewScreen(): React.JSX.Element {
               </div>
             </StatCard>
           </div>
+
+          {status?.blueprint && (
+            <div className={styles.sectionSpacer}>
+              <BlueprintOverviewCard novelId={novelId} blueprint={status.blueprint} />
+            </div>
+          )}
 
           <div className={styles.mainGrid}>
             <SectionCard>

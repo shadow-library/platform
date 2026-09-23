@@ -13,6 +13,7 @@ export * from './finalize-gate';
 export * from './open-canon';
 export * from './opposition';
 export * from './owner';
+export * from './plan-staleness';
 export * from './project-status';
 export * from './publish-token';
 export * from './reader-promise';

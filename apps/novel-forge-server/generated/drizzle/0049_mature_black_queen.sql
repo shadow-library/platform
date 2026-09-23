@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "decision_ledger_entries_project_id_gate_unique" ON "decision_ledger_entries" USING btree ("project_id") WHERE "decision_ledger_entries"."topic" = 'gate' AND "decision_ledger_entries"."kind" = 'system' AND "decision_ledger_entries"."superseded_at" IS NULL;

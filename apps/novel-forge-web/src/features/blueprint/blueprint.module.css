@@ -980,3 +980,121 @@
   outline: 2px solid var(--sh-accent);
   outline-offset: 2px;
 }
+
+/* The gate and the Workspace's read-only design summary */
+.gateHero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: linear-gradient(135deg, var(--sh-accent-soft), var(--sh-surface-card));
+}
+
+.gateTitle {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.gateIssues {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.gateActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.designGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.designCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.designCellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.designCellBody {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.stopTest {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.stopTest dt {
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+}
+
+.stopTest dd {
+  margin: 2px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.stopTest dd[data-empty='true'] {
+  color: var(--sh-text-tertiary);
+  font-style: italic;
+}
+
+.coverageList {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coverageRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.coverageRow[data-intent='covered'] {
+  color: var(--sh-success-text);
+}
+
+.coverageRow[data-intent='recommended'] {
+  color: var(--sh-warning-text);
+}
+
+.coverageRow[data-intent='blocking'] {
+  color: var(--sh-danger-text);
+}
+
+.coverageRow span {
+  color: var(--sh-text-secondary);
+}

@@ -1,10 +1,8 @@
 import { type Ledger } from '@server/database';
 
-import { BLUEPRINT_PHASE_LABELS, BLUEPRINT_PHASES } from '../blueprint-phase';
+import { BLUEPRINT_PHASE_LABELS, BLUEPRINT_PHASES, GATE_TOPIC } from '../blueprint-phase';
 import { type AnyBlueprintStep, type AnyLockingStep, isLocking } from '../engine/blueprint-step.types';
 import { filterLedgerEntries } from '../ledger/ledger-entries';
-
-export const GATE_TOPIC = 'gate';
 
 export type BlueprintStage = 'blueprint' | 'workspace';
 export type BlueprintPhaseStatus = 'done' | 'current' | 'locked' | 'open';

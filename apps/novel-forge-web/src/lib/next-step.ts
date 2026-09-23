@@ -1,4 +1,6 @@
-export type NextStepScreen = 'story-bible' | 'volumes' | 'chapters' | 'review' | 'chat';
+import { type BlueprintStage } from '@/lib/apis';
+
+export type NextStepScreen = 'blueprint' | 'story-bible' | 'volumes' | 'chapters' | 'review' | 'chat';
 
 export interface NextStepTarget {
   screen: NextStepScreen;
@@ -8,7 +10,8 @@ export interface NextStepTarget {
   review?: boolean;
 }
 
-export type NextStepId = 'repair-chapter' | 'review-queue' | 'build-plan' | 'approve-plan' | 'generate-chapter' | 'plan-next-arc' | 'finalize-chapters';
+export type NextStepId =
+  'continue-blueprint' | 'open-workspace' | 'repair-chapter' | 'review-queue' | 'build-plan' | 'approve-plan' | 'generate-chapter' | 'plan-next-arc' | 'finalize-chapters';
 
 export interface NextStepAction {
   id: NextStepId;
@@ -28,6 +31,12 @@ export interface NextStepResult {
 }
 
 export interface NextStepInput {
+  /** Null for a project with no Blueprint at all; `blueprint` while the design is still being settled. */
+  blueprintStage?: BlueprintStage | null;
+  /** The phase the author is on, for the reason line. */
+  blueprintPhaseLabel?: string;
+  /** Every required step that applies is locked, so the only thing left in the Blueprint is the gate. */
+  blueprintComplete?: boolean;
   volumesTotal: number;
   planApproved: boolean;
   draftsTotal: number;
@@ -50,12 +59,17 @@ export interface NextStepInput {
 
 interface NextStepRule {
   id: NextStepId;
+  /** Replaces the roadmap padding for a rule whose own path is not the Workspace roadmap. */
+  comingUp?: (input: NextStepInput) => readonly ComingUpItem[];
   /** Position in the bible → plan → draft → arc → finalize roadmap; interrupts (repair/review) have none. */
   roadmapIndex?: number;
   test(input: NextStepInput): boolean;
   build(input: NextStepInput): NextStepAction;
   comingUpLabel: string;
 }
+
+const OPEN_WORKSPACE: ComingUpItem = { id: 'open-workspace', label: 'Open the Workspace' };
+const FIRST_CHAPTER: ComingUpItem = { id: 'generate-chapter', label: 'Generate chapter 1' };
 
 const RULES: readonly NextStepRule[] = [
   {
@@ -79,6 +93,31 @@ const RULES: readonly NextStepRule[] = [
       target: { screen: 'review' },
     }),
     comingUpLabel: 'Clear the review queue',
+  },
+  {
+    // The Blueprint answers "what do I do next" on its own, and it settles the plan the Workspace roadmap
+    // would otherwise tell the author to build by hand — so it replaces the roadmap rather than joining it.
+    id: 'continue-blueprint',
+    // At the gate the next step already IS opening the Workspace, so listing it again would be the same click twice.
+    comingUp: input => (input.blueprintComplete === true ? [FIRST_CHAPTER] : [OPEN_WORKSPACE, FIRST_CHAPTER]),
+    test: input => input.blueprintStage === 'blueprint',
+    build: input =>
+      input.blueprintComplete === true
+        ? {
+            id: 'continue-blueprint',
+            label: 'Open the gate',
+            reason: 'Every phase of the Blueprint is settled — read the design once more and open the Workspace.',
+            target: { screen: 'blueprint' },
+          }
+        : {
+            id: 'continue-blueprint',
+            label: 'Continue the Blueprint',
+            reason: input.blueprintPhaseLabel
+              ? `${input.blueprintPhaseLabel} is the phase you’re on. Nothing is written until the Blueprint is done.`
+              : 'The novel is still being designed. Nothing is written until the Blueprint is done.',
+            target: { screen: 'blueprint' },
+          },
+    comingUpLabel: 'Finish the Blueprint',
   },
   {
     id: 'build-plan',
@@ -170,6 +209,8 @@ export function computeNextStep(input: NextStepInput): NextStepResult {
   const nextEntry = evaluated.find(entry => entry.isTrue);
   if (!nextEntry) return { comingUp: [] };
 
+  if (nextEntry.rule.comingUp) return { next: nextEntry.rule.build(input), comingUp: [...nextEntry.rule.comingUp(input)] };
+
   const nextRuleIndex = RULES.indexOf(nextEntry.rule);
   const comingUp: ComingUpItem[] = [];
   const usedIds = new Set<NextStepId>([nextEntry.rule.id]);
@@ -215,6 +256,9 @@ interface DraftedChapterLike {
 }
 
 export interface NextStepStateInput {
+  blueprintStage?: BlueprintStage | null;
+  blueprintPhaseLabel?: string;
+  blueprintComplete?: boolean;
   volumesTotal: number;
   planApproved: boolean;
   draftsTotal: number;
@@ -298,6 +342,9 @@ export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
     .sort((a, b) => a - b)[0];
 
   return {
+    blueprintStage: state.blueprintStage,
+    blueprintPhaseLabel: state.blueprintPhaseLabel,
+    blueprintComplete: state.blueprintComplete,
     volumesTotal: state.volumesTotal,
     planApproved: state.planApproved,
     draftsTotal: state.draftsTotal,

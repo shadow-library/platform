@@ -2,7 +2,7 @@ import { AppErrorCode } from '@server/classes';
 import { type Ledger } from '@server/database';
 
 import { type PromptKey, type PromptModule } from '../../ai/prompts/types';
-import { BLUEPRINT_PHASES } from '../blueprint-phase';
+import { BLUEPRINT_PHASES, GATE_TOPIC } from '../blueprint-phase';
 import { TOPIC_KEY_PATTERN } from '../ledger/ledger.types';
 import {
   type AnyBlueprintStep,
@@ -18,6 +18,13 @@ import {
 } from './blueprint-step.types';
 
 export const STEP_KEY_PATTERN = /^[a-z][a-z0-9_]{0,59}$/;
+
+/**
+ * Keys a step may not take. `gate` is the mode switch's ledger topic and the name its write serialises on
+ * in the step advisory-lock namespace; a step called `gate` would take that lock and write that topic, and
+ * the stage would read the Workspace as open.
+ */
+const RESERVED_STEP_KEYS: readonly string[] = [GATE_TOPIC];
 
 export interface RoundTarget {
   generator: AnyGeneratingStep;
@@ -63,6 +70,7 @@ export function validateBlueprintSteps(steps: readonly AnyBlueprintStep[], promp
 
   for (const step of steps) {
     if (!STEP_KEY_PATTERN.test(step.key)) issues.push(`step "${step.key}" has a key that is not lowercase words joined by underscores`);
+    if (RESERVED_STEP_KEYS.includes(step.key)) issues.push(`step "${step.key}" takes a key the Blueprint reserves`);
     if (!BLUEPRINT_PHASES.includes(step.phase)) issues.push(`step "${step.key}" names an unknown phase "${step.phase}"`);
     if (isGenerating(step)) issues.push(...generatorIssues(step, prompts));
     issues.push(...sourceIssues(step, byKey));

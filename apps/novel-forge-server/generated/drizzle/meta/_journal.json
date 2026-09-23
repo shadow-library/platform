@@ -344,6 +344,13 @@
       "when": 1790097246087,
       "tag": "0048_small_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790123180130,
+      "tag": "0049_mature_black_queen",
+      "breakpoints": true
     }
   ]
 }

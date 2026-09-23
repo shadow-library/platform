@@ -246,3 +246,26 @@ describe('ledgerEntryStatus', () => {
     expect(ledgerEntryStatus(entry({ supersededAt: new Date(1), withdrawnReason: 'Dropped' }))).toBe('withdrawn');
   });
 });
+
+describe('the gate entry', () => {
+  const gate = entry({ id: 9n, kind: 'system', decidedBy: 'system', phase: null, topic: 'gate', statement: 'The Workspace is open.' });
+
+  it('should refuse to be superseded through the ledger API', async () => {
+    const { service, inserted } = fakeLedger({ stored: gate, marked: [] });
+
+    await expect(service.supersedeByAuthor(7n, 9n, { statement: 'Back to the Blueprint' })).rejects.toMatchObject({ code: 'LDG_005' });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it('should refuse to be withdrawn through the ledger API', async () => {
+    const { service } = fakeLedger({ stored: gate, marked: [] });
+
+    await expect(service.withdraw(7n, 9n, 'Opened it by accident')).rejects.toMatchObject({ code: 'LDG_005' });
+  });
+
+  it('should still report an ordinary retired entry as already retired', async () => {
+    const { service } = fakeLedger({ stored: entry({ supersededAt: new Date(1) }), marked: [] });
+
+    await expect(service.withdraw(7n, 1n, 'Dropped')).rejects.toMatchObject({ code: 'LDG_002' });
+  });
+});

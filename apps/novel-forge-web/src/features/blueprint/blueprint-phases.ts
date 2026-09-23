@@ -67,19 +67,63 @@ export function phasePosition(phases: BlueprintPhaseProgressResponse[], phase: B
   return phases.findIndex(candidate => candidate.phase === phase) + 1;
 }
 
+export type BlueprintEntry = { kind: 'gate' } | { kind: 'step'; step: string } | { kind: 'unreachable' };
+
+/** Every required step the novel actually needs; an optional one the author skipped never holds the Blueprint open. */
+export function requiredSteps(phase: BlueprintPhaseProgressResponse): BlueprintStepProgressResponse[] {
+  return phase.steps.filter(step => step.applies && step.required);
+}
+
 /**
- * Where `/blueprint` sends the author: the current phase's first unfinished applicable step, then the
- * first unfinished step of any other unlocked phase. Null once every reachable step is done — the state a
- * Blueprint whose later phases are still being built ends in, and what the shell shows a message for
- * instead of a step that would only repeat itself.
+ * The same test the server makes a phase `done` by, phase for phase: a phase with no required step that
+ * applies has not been settled, it has nothing to settle yet, so it can never carry the Blueprint to
+ * the gate on its own.
  */
-export function blueprintEntryStep(phases: BlueprintPhaseProgressResponse[]): string | null {
+export function blueprintComplete(phases: BlueprintPhaseProgressResponse[]): boolean {
+  return (
+    phases.length > 0 &&
+    phases.every(phase => {
+      const counted = requiredSteps(phase);
+      return counted.length > 0 && counted.every(step => step.done);
+    })
+  );
+}
+
+/**
+ * Where `/blueprint` sends the author: the gate once every required step that applies is done, then the
+ * current phase's first unfinished applicable step, then the first unfinished step of any other unlocked
+ * phase. `unreachable` is what is left when only a locked phase still has a step — the state a Blueprint
+ * whose later phases are still being built ends in.
+ */
+export function blueprintEntry(phases: BlueprintPhaseProgressResponse[]): BlueprintEntry {
+  if (blueprintComplete(phases)) return { kind: 'gate' };
+  const step = firstUnfinishedStep(phases);
+  return step != null ? { kind: 'step', step } : { kind: 'unreachable' };
+}
+
+/** The current phase's first unfinished applicable step, then any other unlocked phase's. */
+function firstUnfinishedStep(phases: BlueprintPhaseProgressResponse[]): string | null {
   const reachable = phases.filter(phase => phase.status !== 'locked');
   const current = reachable.find(phase => phase.status === 'current');
   const ordered = current ? [current, ...reachable.filter(phase => phase !== current)] : reachable;
   for (const phase of ordered) {
     const next = applicableSteps(phase).find(step => !step.done);
     if (next) return next.key;
+  }
+  return null;
+}
+
+/**
+ * Where "Keep refining" goes from the gate: whatever the author has not settled yet — an optional step they
+ * skipped is exactly what "refine" means here — and failing that the last step they could have locked,
+ * which is where they just were. Null only when the Blueprint offers no step at all.
+ */
+export function keepRefiningStep(phases: BlueprintPhaseProgressResponse[]): string | null {
+  const unfinished = firstUnfinishedStep(phases);
+  if (unfinished != null) return unfinished;
+  for (const phase of [...phases].reverse()) {
+    const last = applicableSteps(phase).at(-1);
+    if (last) return last.key;
   }
   return null;
 }

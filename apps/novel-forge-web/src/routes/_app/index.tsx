@@ -6,7 +6,7 @@ import { BookIcon, PlusIcon, SparkIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, sharedOwnerLabel } from '@/lib/format';
+import { blueprintStageLabel, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, sharedOwnerLabel } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -48,6 +48,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
   const status = statusQuery.data;
   const isSource = project.kind === 'source';
   const draftsDone = (status?.draftsTotal ?? 0) > 0 && status?.draftsFinal === status?.draftsTotal;
+  const stageLabel = blueprintStageLabel(status);
   const ownerLabel = sharedOwnerLabel(project);
   const open = (): void => {
     navigate({ to: '/novels/$novelId', params: { novelId: project.id } });
@@ -96,7 +97,9 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
           </div>
         </div>
         <div className={styles.cardFooter}>
-          {draftsDone ? (
+          {stageLabel ? (
+            <StatusChip intent="info">{stageLabel}</StatusChip>
+          ) : draftsDone ? (
             <StatusChip intent="success">On track</StatusChip>
           ) : status?.planApproved ? (
             <StatusChip intent="info">Drafting</StatusChip>

@@ -199,6 +199,16 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 ## The gate
 
 - The gate is one page showing the whole design, phase by phase, with the stop test: what happens in chapter one, what the reader is waiting for at the end of arc one, and
-  the terminal question. Readiness is checked without a model.
+  the terminal question. Every line of it is read back out of the decisions themselves, and the stop test's answers are the author's own — the chapter-one brief's purpose,
+  when the pinned reveal lands, and the ending question. The reveal is named by when it comes out, never by what it is.
+- Readiness is checked without a model: the gate opens when every required step that applies to the novel is locked, and is refused while one is not.
+- What the design cannot settle by itself is said rather than passed over. Volume one's arcs redrawn by a later spine, briefs that no longer cover arc one's chapters, and a
+  final check that ran before a later revisit are all shown at the gate, each naming the step that settles it. None of them bars the gate: they are things the author is
+  owed before they start writing, not a design the system refuses to accept.
 - Opening the Workspace writes the gate entry and switches the menu and home screen. It is a mode switch, not a copy: nothing is moved, duplicated or dropped.
-- The Blueprint stays one click away from the Workspace, and any part of it can be reopened after writing has started.
+- The gate entry is the one entry the ledger will not retire. Superseding or withdrawing it would move the project back into the Blueprint with nothing recording why; a
+  novel that should not have been opened is reopened by revisiting a phase, not by unwriting the gate. Because it cannot be taken back down, a project has one active gate
+  or none, whatever races to write it — the database holds that, not the code that checks first.
+- The Blueprint stays one click away from the Workspace, and any part of it can be reopened after writing has started. From there it is the same page, read-only, with a way
+  back into each phase. An imported plan has no ledger to read back, so there it shows what its content already covers instead. Overview knows which stage the novel is in:
+  a novel still being designed is told to finish the Blueprint rather than to build the plan by hand, and an imported one is shown the same coverage.

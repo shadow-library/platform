@@ -203,6 +203,17 @@ export function currentBlueprintPhase(status?: Pick<ProjectStatusResponse, 'blue
   return status?.blueprint?.phases.find(phase => phase.status === 'current') ?? null;
 }
 
+/**
+ * The stage chip a library card carries, and the phase the design is on. Null once the Workspace is open:
+ * from there the card's own writing progress is the more useful thing to say, and "Workspace" would be the
+ * last thing a finished novel ever said about itself.
+ */
+export function blueprintStageLabel(status?: Pick<ProjectStatusResponse, 'blueprint'>): string | null {
+  if (blueprintStage(status) !== 'blueprint') return null;
+  const phase = currentBlueprintPhase(status);
+  return phase ? `Blueprint · ${phase.label}` : 'Blueprint';
+}
+
 export interface TranslationLifecycleInput {
   counts: { originals: number; untranslated: number; translated: number; attention: number; finalized: number };
   glossary: { approved: number; suggested: number };

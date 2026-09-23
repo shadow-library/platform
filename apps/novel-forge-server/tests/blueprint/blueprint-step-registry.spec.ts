@@ -24,6 +24,10 @@ describe('validateBlueprintSteps', () => {
     expect(issues.some(issue => issue.includes('unknown phase "epilogue"'))).toBe(true);
   });
 
+  it('should refuse a step keyed "gate", which the mode switch already owns as a topic and a lock', () => {
+    expect(validateBlueprintSteps([blueprintStep({ ...startStep, key: 'gate' })], PROMPT_REGISTRY)).toEqual(['step "gate" takes a key the Blueprint reserves']);
+  });
+
   it('should flag a prompt missing from the prompt registry', () => {
     const unregistered = { ...startStep.prompt, version: '9.9.9' };
     expect(validateBlueprintSteps([blueprintStep({ ...startStep, prompt: unregistered })], PROMPT_REGISTRY)).toEqual([

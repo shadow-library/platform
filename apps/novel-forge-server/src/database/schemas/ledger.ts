@@ -1,5 +1,5 @@
 import { InferEnum, InferInsertModel, InferSelectModel, relations, sql } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, check, index, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, bigint, bigserial, check, index, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { type Bible } from './bible';
 import { jsonb } from './jsonb';
@@ -68,6 +68,10 @@ export const decisionLedgerEntries = pgTable(
   },
   t => [
     unique('decision_ledger_entries_supersedes_id_unique').on(t.supersedesId),
+    // The gate is the project's mode switch, not a decision: one active gate or none, whatever races to write it.
+    uniqueIndex('decision_ledger_entries_project_id_gate_unique')
+      .on(t.projectId)
+      .where(sql`${t.topic} = 'gate' AND ${t.kind} = 'system' AND ${t.supersededAt} IS NULL`),
     index('decision_ledger_entries_project_id_active_idx')
       .on(t.projectId, t.createdAt)
       .where(sql`${t.supersededAt} IS NULL`),

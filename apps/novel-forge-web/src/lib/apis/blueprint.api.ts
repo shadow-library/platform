@@ -1,9 +1,11 @@
 import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
+  type BlueprintGateResponse,
   type BlueprintRoundResponse,
   type BlueprintStateResponse,
   type CancelBlueprintRoundResponse,
+  type LedgerEntryResponse,
   type LockBlueprintStepBody,
   type LockBlueprintStepResponse,
   type PremisePreviewBody,
@@ -25,6 +27,7 @@ import { ApiError, APIRequest } from './transport';
  */
 const blueprintKeys = {
   state: (projectId: string) => ['projects', projectId, 'blueprint'] as const,
+  gate: (projectId: string) => ['projects', projectId, 'blueprint', 'gate'] as const,
 };
 
 const LIVE_ROUND_POLL_MS = 2_500;
@@ -47,6 +50,26 @@ export const blueprintStateQueryOptions = (projectId: string): UseQueryOptions<B
 
 export function useBlueprintStateQuery(projectId: string, enabled = true): UseQueryResult<BlueprintStateResponse, ApiError> {
   return useQuery({ ...blueprintStateQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+/** Readiness for the gate: what is still unfinished, and what the author should see before they open the Workspace. No model runs. */
+export const blueprintGateQueryOptions = (projectId: string): UseQueryOptions<BlueprintGateResponse, ApiError> =>
+  queryOptions<BlueprintGateResponse, ApiError>({
+    queryKey: blueprintKeys.gate(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/blueprint/gate`).execute(),
+  });
+
+export function useBlueprintGateQuery(projectId: string, enabled = true): UseQueryResult<BlueprintGateResponse, ApiError> {
+  return useQuery({ ...blueprintGateQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+/** Opening the Workspace is a mode switch: it writes the gate entry, and every screen that reads the stage has to refetch. */
+export function useOpenWorkspaceMutation(projectId: string): UseMutationResult<LedgerEntryResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<LedgerEntryResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(`/projects/${projectId}/blueprint/gate`).execute(),
+    onSuccess: () => invalidateBlueprintProgress(queryClient, projectId),
+  });
 }
 
 export function useStartBlueprintRoundMutation(projectId: string, stepKey: string): UseMutationResult<BlueprintRoundResponse, ApiError, StartBlueprintRoundBody> {

@@ -6,7 +6,16 @@ import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { arcContentHash, briefContentHash, computeBibleDocHash, seedContentHash, volumeContentHash } from '@server/common';
+import {
+  arcContentHash,
+  briefContentHash,
+  computeBibleDocHash,
+  PLAN_STALE_ARC_CHANGED,
+  PLAN_STALE_RANGE_SHIFTED,
+  PLAN_STALE_VOLUME_CHANGED,
+  seedContentHash,
+  volumeContentHash,
+} from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ideation, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
@@ -102,10 +111,6 @@ type TxResult =
   | { outcome: 'applied'; proposal: Refinement.Proposal; applied: AppliedArtifact[]; staleMarked: string[]; opResults: OpResult[] }
   | { outcome: 'declined'; proposal: Refinement.Proposal; opResults: OpResult[] }
   | { outcome: 'conflicted'; proposal: Refinement.Proposal };
-
-const STALE_VOLUME_CHANGED = 'volume_changed';
-const STALE_RANGE_SHIFTED = 'volume_range_shifted';
-const STALE_ARC_CHANGED = 'arc_changed';
 
 // Fields whose change invalidates the artifacts planned beneath the volume.
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
@@ -723,7 +728,7 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: revision });
 
     const structuralChange = existing !== undefined && VOLUME_STRUCTURAL_FIELDS.some(field => op[field] !== undefined && op[field] !== existing[field]);
-    if (structuralChange) await this.markArcsStale(ctx, [op.volumeKey], STALE_VOLUME_CHANGED);
+    if (structuralChange) await this.markArcsStale(ctx, [op.volumeKey], PLAN_STALE_VOLUME_CHANGED);
 
     const countChanged = op.targetChapterCount !== undefined && op.targetChapterCount !== existing?.targetChapterCount;
     if (countChanged && existing?.status === 'approved') {
@@ -731,7 +736,7 @@ export class ProposalApplyService {
       await this.markArcsStale(
         ctx,
         shifted.filter(key => key !== op.volumeKey),
-        STALE_RANGE_SHIFTED,
+        PLAN_STALE_RANGE_SHIFTED,
       );
     }
   }
@@ -817,7 +822,7 @@ export class ProposalApplyService {
     if (existing && merged.chapterStart !== null && merged.chapterEnd !== null) {
       const stale = await ctx.tx
         .update(schema.briefs)
-        .set({ staleReason: STALE_ARC_CHANGED, updatedAt: new Date() })
+        .set({ staleReason: PLAN_STALE_ARC_CHANGED, updatedAt: new Date() })
         .where(and(eq(schema.briefs.projectId, ctx.projectId), gte(schema.briefs.chapter, merged.chapterStart), lte(schema.briefs.chapter, merged.chapterEnd)))
         .returning();
       ctx.staleMarked.push(...stale.map(brief => `chapter:${brief.chapter}`));

@@ -9,6 +9,7 @@ export * from './engine/blueprint-step.registry';
 export * from './engine/blueprint-step.service';
 export * from './engine/blueprint-step.types';
 export * from './engine/blueprint.dto';
+export * from './gate';
 export * from './ledger/ledger-entries';
 export * from './ledger/ledger.service';
 export * from './ledger/ledger.types';

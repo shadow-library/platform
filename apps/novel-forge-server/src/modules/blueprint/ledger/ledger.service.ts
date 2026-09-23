@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -8,8 +8,12 @@ import { assertAuthoringKind } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Ledger, type PrimaryDatabase, type PrimaryTransaction, schema } from '@server/database';
 
+import { GATE_TOPIC } from '../blueprint-phase';
 import { filterLedgerEntries, loadActiveLedger, mergeLedgerLinks } from './ledger-entries';
 import { type AuthorLedgerEntry, type AuthorSupersession, type LedgerFilter, type NewLedgerEntry, type SupersedingEntry, TOPIC_KEY_PATTERN } from './ledger.types';
+
+/** Retiring the gate would move the project back into the Blueprint with nothing recording why, so the ledger API cannot reach it. */
+const notTheGate = () => or(ne(schema.decisionLedgerEntries.topic, GATE_TOPIC), ne(schema.decisionLedgerEntries.kind, 'system'));
 
 function clearable(value: string | undefined, inherited: string | null): string | null {
   if (value === undefined) return inherited;
@@ -103,9 +107,9 @@ export class LedgerService {
       const [previous] = await executor
         .update(table)
         .set({ supersededAt: new Date() })
-        .where(and(eq(table.id, entryId), eq(table.projectId, projectId), isNull(table.supersededAt)))
+        .where(and(eq(table.id, entryId), eq(table.projectId, projectId), isNull(table.supersededAt), notTheGate()))
         .returning();
-      if (!previous) throw await this.unsupersedable(projectId, entryId, executor);
+      if (!previous) throw await this.retireFailure(projectId, entryId, executor);
 
       const [successor] = await executor
         .insert(table)
@@ -133,9 +137,9 @@ export class LedgerService {
     const [withdrawn] = await executor
       .update(table)
       .set({ supersededAt: new Date(), withdrawnReason: reason.trim() })
-      .where(and(eq(table.id, entryId), eq(table.projectId, projectId), isNull(table.supersededAt)))
+      .where(and(eq(table.id, entryId), eq(table.projectId, projectId), isNull(table.supersededAt), notTheGate()))
       .returning();
-    if (!withdrawn) throw await this.unsupersedable(projectId, entryId, executor);
+    if (!withdrawn) throw await this.retireFailure(projectId, entryId, executor);
 
     this.logger.info('ledger entry withdrawn', { projectId, topic: withdrawn.topic, entryId: withdrawn.id, kind: withdrawn.kind });
     return withdrawn;
@@ -170,10 +174,12 @@ export class LedgerService {
     return entry;
   }
 
-  private async unsupersedable(projectId: bigint, entryId: bigint, executor: DbExecutor): Promise<AppError> {
+  private async retireFailure(projectId: bigint, entryId: bigint, executor: DbExecutor): Promise<AppError> {
     const table = schema.decisionLedgerEntries;
-    const entry = await executor.query.decisionLedgerEntries.findFirst({ where: and(eq(table.id, entryId), eq(table.projectId, projectId)), columns: { id: true } });
-    return entry ? AppErrorCode.LDG_002.create() : AppErrorCode.LDG_001.create();
+    const entry = await executor.query.decisionLedgerEntries.findFirst({ where: and(eq(table.id, entryId), eq(table.projectId, projectId)), columns: { kind: true, topic: true } });
+    if (!entry) return AppErrorCode.LDG_001.create();
+    if (entry.kind === 'system' && entry.topic === GATE_TOPIC) return AppErrorCode.LDG_005.create();
+    return AppErrorCode.LDG_002.create();
   }
 
   private async assertLedgerProject(projectId: bigint, executor: DbExecutor): Promise<void> {

@@ -286,6 +286,7 @@ export class AppErrorCode extends ServerErrorCode {
     'Only a decision or a system detail can be rewritten as a decision — other decisions come from locking a Blueprint step',
   );
   static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
+  static readonly LDG_005 = AppErrorCode.conflict('LDG_005', 'The gate records that the Workspace was opened — it cannot be superseded or withdrawn');
 
   /*!
    * Blueprint Errors
@@ -298,6 +299,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BPR_006 = AppErrorCode.notFound('BPR_006', 'This step has no running round to cancel');
   static readonly BPR_007 = AppErrorCode.badRequest('BPR_007', 'Step "{step}" is a generation pass — lock the screens it feeds instead');
   static readonly BPR_008 = AppErrorCode.badRequest('BPR_008', 'A preview paragraph was written moments ago — wait {seconds}s before asking for another', 429);
+  static readonly BPR_009 = AppErrorCode.conflict('BPR_009', 'The Blueprint is not finished — {phases} still needs deciding');
 
   /*!
    * Publishing Errors

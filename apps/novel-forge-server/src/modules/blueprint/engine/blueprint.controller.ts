@@ -4,7 +4,9 @@ import { Body, Get, HttpController, Params, Post, RespondFor } from '@shadow-lib
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 import { type Ledger } from '@server/database';
 
-import { type LedgerEntryResponse } from '../ledger/ledger.dto';
+import { BlueprintGateResponse } from '../gate/gate.dto';
+import { BlueprintGateService } from '../gate/gate.service';
+import { LedgerEntryResponse } from '../ledger/ledger.dto';
 import { ledgerEntryStatus } from '../ledger/ledger.service';
 import { PremisePreviewBody, PremisePreviewResponse } from '../steps/premise-preview.dto';
 import { PremisePreviewService } from '../steps/premise-preview.service';
@@ -37,6 +39,7 @@ export class BlueprintController {
     private readonly queue: BlueprintRoundQueue,
     private readonly premisePreview: PremisePreviewService,
     private readonly titleChecks: TitleChecksService,
+    private readonly gate: BlueprintGateService,
   ) {}
 
   @Get()
@@ -56,6 +59,19 @@ export class BlueprintController {
         sliceMoved,
       })),
     };
+  }
+
+  @Get('/gate')
+  @RespondFor(200, BlueprintGateResponse)
+  gateReadiness(@Params() params: BlueprintProjectParams): Promise<BlueprintGateResponse> {
+    return this.gate.readiness(params.projectId);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/gate')
+  @RespondFor(201, LedgerEntryResponse)
+  async openWorkspace(@Params() params: BlueprintProjectParams): Promise<LedgerEntryResponse> {
+    return entryResponse(await this.gate.open(params.projectId));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

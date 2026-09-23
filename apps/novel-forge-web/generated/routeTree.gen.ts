@@ -38,6 +38,7 @@ import { Route as NovelsNovelIdChaptersRouteImport } from './../src/routes/novel
 import { Route as NovelsNovelIdCanonFactsRouteImport } from './../src/routes/novels/$novelId/canon-facts'
 import { Route as NovelsNovelIdBlueprintRouteImport } from './../src/routes/novels/$novelId/blueprint'
 import { Route as NovelsNovelIdBlueprintIndexRouteImport } from './../src/routes/novels/$novelId/blueprint/index'
+import { Route as NovelsNovelIdBlueprintGateRouteImport } from './../src/routes/novels/$novelId/blueprint/gate'
 import { Route as NovelsNovelIdBlueprintStepRouteImport } from './../src/routes/novels/$novelId/blueprint/$step'
 
 const LoginRoute = LoginRouteImport.update({
@@ -187,6 +188,12 @@ const NovelsNovelIdBlueprintIndexRoute =
     path: '/',
     getParentRoute: () => NovelsNovelIdBlueprintRoute,
   } as any)
+const NovelsNovelIdBlueprintGateRoute =
+  NovelsNovelIdBlueprintGateRouteImport.update({
+    id: '/gate',
+    path: '/gate',
+    getParentRoute: () => NovelsNovelIdBlueprintRoute,
+  } as any)
 const NovelsNovelIdBlueprintStepRoute =
   NovelsNovelIdBlueprintStepRouteImport.update({
     id: '/$step',
@@ -223,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
+  '/novels/$novelId/blueprint/gate': typeof NovelsNovelIdBlueprintGateRoute
   '/novels/$novelId/blueprint/': typeof NovelsNovelIdBlueprintIndexRoute
 }
 export interface FileRoutesByTo {
@@ -252,6 +260,7 @@ export interface FileRoutesByTo {
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
+  '/novels/$novelId/blueprint/gate': typeof NovelsNovelIdBlueprintGateRoute
   '/novels/$novelId/blueprint': typeof NovelsNovelIdBlueprintIndexRoute
 }
 export interface FileRoutesById {
@@ -285,6 +294,7 @@ export interface FileRoutesById {
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
+  '/novels/$novelId/blueprint/gate': typeof NovelsNovelIdBlueprintGateRoute
   '/novels/$novelId/blueprint/': typeof NovelsNovelIdBlueprintIndexRoute
 }
 export interface FileRouteTypes {
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
     | '/novels/$novelId/blueprint/$step'
+    | '/novels/$novelId/blueprint/gate'
     | '/novels/$novelId/blueprint/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/volumes'
     | '/novels/$novelId'
     | '/novels/$novelId/blueprint/$step'
+    | '/novels/$novelId/blueprint/gate'
     | '/novels/$novelId/blueprint'
   id:
     | '__root__'
@@ -379,6 +391,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
     | '/novels/$novelId/blueprint/$step'
+    | '/novels/$novelId/blueprint/gate'
     | '/novels/$novelId/blueprint/'
   fileRoutesById: FileRoutesById
 }
@@ -594,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdBlueprintIndexRouteImport
       parentRoute: typeof NovelsNovelIdBlueprintRoute
     }
+    '/novels/$novelId/blueprint/gate': {
+      id: '/novels/$novelId/blueprint/gate'
+      path: '/gate'
+      fullPath: '/novels/$novelId/blueprint/gate'
+      preLoaderRoute: typeof NovelsNovelIdBlueprintGateRouteImport
+      parentRoute: typeof NovelsNovelIdBlueprintRoute
+    }
     '/novels/$novelId/blueprint/$step': {
       id: '/novels/$novelId/blueprint/$step'
       path: '/$step'
@@ -622,12 +642,14 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface NovelsNovelIdBlueprintRouteChildren {
   NovelsNovelIdBlueprintStepRoute: typeof NovelsNovelIdBlueprintStepRoute
+  NovelsNovelIdBlueprintGateRoute: typeof NovelsNovelIdBlueprintGateRoute
   NovelsNovelIdBlueprintIndexRoute: typeof NovelsNovelIdBlueprintIndexRoute
 }
 
 const NovelsNovelIdBlueprintRouteChildren: NovelsNovelIdBlueprintRouteChildren =
   {
     NovelsNovelIdBlueprintStepRoute: NovelsNovelIdBlueprintStepRoute,
+    NovelsNovelIdBlueprintGateRoute: NovelsNovelIdBlueprintGateRoute,
     NovelsNovelIdBlueprintIndexRoute: NovelsNovelIdBlueprintIndexRoute,
   }
 

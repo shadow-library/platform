@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { type BlueprintPhaseProgressResponse, type BlueprintProgressResponse } from '../src/lib/apis';
 import {
   blueprintStage,
+  blueprintStageLabel,
   currentBlueprintPhase,
   groupByRecency,
   LIFECYCLE_PHASES,
@@ -120,6 +121,26 @@ describe('currentBlueprintPhase', () => {
     expect(currentBlueprintPhase({ blueprint: blueprint('workspace', [phase('idea', 'done'), phase('heart', 'open')]) })).toBeNull();
     expect(currentBlueprintPhase({ blueprint: blueprint('blueprint', [phase('idea', 'done')]) })).toBeNull();
     expect(currentBlueprintPhase({ blueprint: null })).toBeNull();
+  });
+});
+
+describe('blueprintStageLabel', () => {
+  it('should name the phase a novel still being designed is on', () => {
+    const phases = [phase('idea', 'done'), phase('heart', 'current')];
+    expect(blueprintStageLabel({ blueprint: blueprint('blueprint', phases) })).toBe('Blueprint · heart');
+  });
+
+  it('should say only Blueprint when no phase is current', () => {
+    expect(blueprintStageLabel({ blueprint: blueprint('blueprint', [phase('idea', 'done')]) })).toBe('Blueprint');
+  });
+
+  it('should carry no chip once the Workspace is open, so the card shows its writing progress instead', () => {
+    expect(blueprintStageLabel({ blueprint: blueprint('workspace', [phase('idea', 'open')]) })).toBeNull();
+  });
+
+  it('should carry no stage for a project that has no Blueprint', () => {
+    expect(blueprintStageLabel({ blueprint: null })).toBeNull();
+    expect(blueprintStageLabel(undefined)).toBeNull();
   });
 });
 

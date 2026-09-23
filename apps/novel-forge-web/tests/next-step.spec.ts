@@ -15,6 +15,32 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
   };
 }
 
+describe('computeNextStep for a novel still in its Blueprint', () => {
+  it('should send the author back to the Blueprint rather than telling them to build the plan by hand', () => {
+    const result = computeNextStep(input({ blueprintStage: 'blueprint', blueprintPhaseLabel: 'Spine', volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
+
+    expect(result.next).toMatchObject({ id: 'continue-blueprint', label: 'Continue the Blueprint', target: { screen: 'blueprint' } });
+    expect(result.next?.reason).toContain('Spine');
+    expect(result.comingUp.map(item => item.id)).toEqual(['open-workspace', 'generate-chapter']);
+  });
+
+  it('should offer the gate once every required step is locked', () => {
+    const result = computeNextStep(input({ blueprintStage: 'blueprint', blueprintComplete: true, volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
+
+    expect(result.next).toMatchObject({ id: 'continue-blueprint', label: 'Open the gate', target: { screen: 'blueprint' } });
+  });
+
+  it('should still put a contradicted chapter first, because a Blueprint-stage novel can already have drafts', () => {
+    expect(computeNextStep(input({ blueprintStage: 'blueprint', contradictedChapter: 4 })).next?.id).toBe('repair-chapter');
+  });
+
+  it('should go back to the Workspace roadmap once the gate is open', () => {
+    const result = computeNextStep(input({ blueprintStage: 'workspace', briefsRemaining: 3, nextBriefChapter: 1 }));
+
+    expect(result.next?.id).toBe('generate-chapter');
+  });
+});
+
 describe('computeNextStep', () => {
   it('should send a first-time novelist to the story bible when nothing is outlined yet', () => {
     const result = computeNextStep(input({ volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));

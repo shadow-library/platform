@@ -2,10 +2,10 @@ import { type ReactElement } from 'react';
 import { Tooltip } from '@shadow-library/ui';
 import { type NavSection } from '@shadow-library/ui/router';
 
-import { BookIcon, CheckIcon, EditIcon, ListIcon, LockIcon, OverviewIcon, SettingsIcon } from '@/components/icons';
+import { BookIcon, CheckIcon, ConceptIcon, EditIcon, ListIcon, LockIcon, OverviewIcon, SettingsIcon } from '@/components/icons';
 import { type BlueprintPhaseProgressResponse, type BlueprintPhaseStatus } from '@/lib/apis';
 
-import { applicableSteps, groupPhasesByAltitude } from './blueprint-phases';
+import { applicableSteps, blueprintComplete, groupPhasesByAltitude } from './blueprint-phases';
 import { blueprintStepMeta } from './blueprint-steps';
 import styles from './blueprint.module.css';
 
@@ -65,6 +65,9 @@ export function blueprintNavSections(novelId: string, phases: BlueprintPhaseProg
 
   return [
     ...altitudes,
+    // The gate is not a phase, and it appears only once there is something behind it: without this row a
+    // finished Blueprint is a dead end from every step the author happens to be standing on.
+    ...(blueprintComplete(phases) ? [{ items: [{ to: '/novels/$novelId/blueprint/gate' as const, params: { novelId }, label: 'The gate', icon: <ConceptIcon /> }] }] : []),
     {
       label: 'Your novel',
       items: [

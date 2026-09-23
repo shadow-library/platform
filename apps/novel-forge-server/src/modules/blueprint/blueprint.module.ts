@@ -9,6 +9,7 @@ import { BlueprintRoundRunner } from './engine/blueprint-round.runner';
 import { BlueprintRoundService } from './engine/blueprint-round.service';
 import { BlueprintStepRegistry } from './engine/blueprint-step.registry';
 import { BlueprintStepService } from './engine/blueprint-step.service';
+import { BlueprintGateService } from './gate/gate.service';
 import { LedgerController } from './ledger/ledger.controller';
 import { LedgerService } from './ledger/ledger.service';
 import { BlueprintStageService } from './stage/blueprint-stage.service';
@@ -26,6 +27,7 @@ import { TitleChecksService } from './steps/title-checks.service';
     BlueprintStepService,
     BlueprintRoundRunner,
     BlueprintStageService,
+    BlueprintGateService,
     PremisePreviewService,
     TitleChecksService,
   ],
@@ -36,6 +38,7 @@ import { TitleChecksService } from './steps/title-checks.service';
     BlueprintRoundRunner,
     BlueprintStepRegistry,
     BlueprintStageService,
+    BlueprintGateService,
     PremisePreviewService,
     TitleChecksService,
   ],

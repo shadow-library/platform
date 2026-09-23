@@ -3259,6 +3259,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/blueprint/gate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Gate Readiness */
+    get: operations['get_api_v1_projects_projectId_blueprint_gate'];
+    put?: never;
+    /** Open Workspace */
+    post: operations['post_api_v1_projects_projectId_blueprint_gate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/blueprint/steps/{step}/rounds': {
     parameters: {
       query?: never;
@@ -7115,6 +7133,33 @@ export interface components {
     };
     /** @enum {string} */
     BlueprintFeedbackVerdict: 'more' | 'not' | 'mix';
+    BlueprintGateResponse: {
+      /** @description Whether every required step that applies to this novel is done. Checked without a model. */
+      ready: boolean;
+      /** @description Whether the gate entry already exists — the project is in the Workspace. */
+      opened: boolean;
+      /** @description Required, applicable steps still waiting on a lock; the gate refuses while any remain. */
+      unfinished: components['schemas']['GateStepGapResponse'][];
+      /** @description What the author should see before opening the Workspace. None of them blocks the gate. */
+      warnings: components['schemas']['GateWarningResponse'][];
+    };
+    GateStepGapResponse: {
+      phase: components['schemas']['BlueprintPhase'];
+      phaseLabel: string;
+      /** @description The step to open; the client holds its wording. */
+      step: string;
+    };
+    GateWarningResponse: {
+      kind: components['schemas']['GateWarningKind'];
+      title: string;
+      detail: string;
+      /** @description The step whose lock settles the warning. */
+      step: string;
+      /** @description Other steps the warning is about, by key; the client holds their wording. */
+      steps: string[];
+    };
+    /** @enum {string} */
+    GateWarningKind: 'arc_stale' | 'arc_brief_range' | 'brief_stale' | 'check_outdated';
     StartBlueprintRoundBody: {
       /** @description Applies to this round only unless `keepAsDirection` is set. */
       steer?: string;
@@ -17056,6 +17101,86 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_blueprint_gate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BlueprintGateResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_blueprint_gate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_blueprint_steps_step_rounds: {
     parameters: {
       query?: never;
@@ -17740,6 +17865,10 @@ export type BlueprintRoundResponse = components['schemas']['BlueprintRoundRespon
 export type BlueprintRoundStatus = components['schemas']['BlueprintRoundStatus'];
 export type BlueprintOptionFeedbackResponse = components['schemas']['BlueprintOptionFeedbackResponse'];
 export type BlueprintFeedbackVerdict = components['schemas']['BlueprintFeedbackVerdict'];
+export type BlueprintGateResponse = components['schemas']['BlueprintGateResponse'];
+export type GateStepGapResponse = components['schemas']['GateStepGapResponse'];
+export type GateWarningResponse = components['schemas']['GateWarningResponse'];
+export type GateWarningKind = components['schemas']['GateWarningKind'];
 export type StartBlueprintRoundBody = components['schemas']['StartBlueprintRoundBody'];
 export type BlueprintOptionFeedbackBody = components['schemas']['BlueprintOptionFeedbackBody'];
 export type CancelBlueprintRoundResponse = components['schemas']['CancelBlueprintRoundResponse'];
@@ -17862,3 +17991,4 @@ export type ApiV1ProjectsProjectIdTranslationManuscriptPathParams = Exclude<path
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
 export type StatePathParams = Exclude<paths['/api/v1/projects/{projectId}/blueprint']['get']['parameters']['path'], undefined>;
+export type GateReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/blueprint/gate']['get']['parameters']['path'], undefined>;

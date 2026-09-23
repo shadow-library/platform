@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { blueprintAltitude, blueprintEntryStep, findPhaseOfStep, groupPhasesByAltitude, phasePosition } from '../src/features/blueprint/blueprint-phases';
+import {
+  blueprintAltitude,
+  blueprintComplete,
+  blueprintEntry,
+  findPhaseOfStep,
+  groupPhasesByAltitude,
+  keepRefiningStep,
+  phasePosition,
+} from '../src/features/blueprint/blueprint-phases';
 import { blueprintStepMeta } from '../src/features/blueprint/blueprint-steps';
 import { type BlueprintPhase, type BlueprintPhaseProgressResponse, type BlueprintPhaseStatus, type BlueprintStepProgressResponse } from '../src/lib/apis';
 
@@ -41,37 +49,90 @@ describe('groupPhasesByAltitude', () => {
   });
 });
 
-describe('blueprintEntryStep', () => {
+describe('blueprintEntry', () => {
   it('should send the author to the current phase’s first unfinished applicable step', () => {
     const phases = [phase('idea', 'done', [step('start', { done: true })]), phase('heart', 'current', [step('theme', { done: true }), step('promise')])];
 
-    expect(blueprintEntryStep(phases)).toBe('promise');
+    expect(blueprintEntry(phases)).toEqual({ kind: 'step', step: 'promise' });
   });
 
   it('should skip a step the reader promise rules out', () => {
     const phases = [phase('world', 'current', [step('power', { applies: false }), step('rules')])];
 
-    expect(blueprintEntryStep(phases)).toBe('rules');
+    expect(blueprintEntry(phases)).toEqual({ kind: 'step', step: 'rules' });
   });
 
   it('should never send the author into a locked phase', () => {
     const phases = [phase('idea', 'done', [step('start', { done: true })]), phase('heart', 'locked', [step('theme')], 'Opens when the premise is locked')];
 
-    expect(blueprintEntryStep(phases)).toBeNull();
+    expect(blueprintEntry(phases)).toEqual({ kind: 'unreachable' });
   });
 
   it('should fall back to an unfinished step outside the current phase', () => {
     const phases = [phase('idea', 'open', [step('start')]), phase('heart', 'open', [step('theme', { done: true })])];
 
-    expect(blueprintEntryStep(phases)).toBe('start');
+    expect(blueprintEntry(phases)).toEqual({ kind: 'step', step: 'start' });
   });
 
-  it('should return null once every reachable step is done, so the shell says the next phase is being built', () => {
-    expect(blueprintEntryStep([phase('idea', 'done', [step('start', { done: true })])])).toBeNull();
+  it('should send the author to the gate once every required applicable step is done', () => {
+    const phases = [phase('idea', 'done', [step('premise', { done: true })]), phase('heart', 'done', [step('theme', { done: true })])];
+
+    expect(blueprintEntry(phases)).toEqual({ kind: 'gate' });
   });
 
-  it('should return null for a Blueprint with no steps at all', () => {
-    expect(blueprintEntryStep(EVERY_PHASE.map(name => phase(name, 'open')))).toBeNull();
+  it('should let the gate win over an optional step the author skipped', () => {
+    const phases = [phase('idea', 'done', [step('taste', { required: false }), step('premise', { done: true })])];
+
+    expect(blueprintComplete(phases)).toBe(true);
+    expect(blueprintEntry(phases)).toEqual({ kind: 'gate' });
+  });
+
+  it('should not call a Blueprint complete while a required step it needs is open', () => {
+    const phases = [phase('idea', 'done', [step('premise', { done: true })]), phase('world', 'current', [step('rules'), step('power', { applies: false })])];
+
+    expect(blueprintComplete(phases)).toBe(false);
+    expect(blueprintEntry(phases)).toEqual({ kind: 'step', step: 'rules' });
+  });
+
+  it('should ignore a required step the novel does not need when deciding it is complete', () => {
+    const phases = [phase('world', 'done', [step('rules', { done: true }), step('power', { applies: false })])];
+
+    expect(blueprintComplete(phases)).toBe(true);
+  });
+
+  it('should report a Blueprint with no steps at all as unreachable rather than complete-by-vacuum', () => {
+    const phases = EVERY_PHASE.map(name => phase(name, 'open'));
+
+    expect(blueprintComplete(phases)).toBe(false);
+    expect(blueprintEntry(phases)).toEqual({ kind: 'unreachable' });
+  });
+
+  it('should not carry the Blueprint to the gate on a phase that has nothing required to settle', () => {
+    const phases = [phase('idea', 'done', [step('premise', { done: true })]), phase('opening', 'open', [step('voice', { required: false, done: true })])];
+
+    expect(blueprintComplete(phases)).toBe(false);
+  });
+});
+
+describe('keepRefiningStep', () => {
+  it('should send "Keep refining" to the optional step the author skipped', () => {
+    const phases = [phase('idea', 'done', [step('taste', { required: false }), step('premise', { done: true })]), phase('heart', 'done', [step('theme', { done: true })])];
+
+    expect(keepRefiningStep(phases)).toBe('taste');
+  });
+
+  it('should fall back to the last step the author could have locked, which is where they just were', () => {
+    const phases = [phase('idea', 'done', [step('premise', { done: true })]), phase('opening', 'done', [step('briefs', { done: true }), step('check', { done: true })])];
+
+    expect(keepRefiningStep(phases)).toBe('check');
+  });
+
+  it('should skip a step the novel does not need when falling back', () => {
+    expect(keepRefiningStep([phase('world', 'done', [step('rules', { done: true }), step('power', { applies: false })])])).toBe('rules');
+  });
+
+  it('should answer null when no phase offers a step, so the button can hide rather than do nothing', () => {
+    expect(keepRefiningStep([phase('idea', 'open')])).toBeNull();
   });
 });
 
