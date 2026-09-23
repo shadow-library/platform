@@ -141,6 +141,12 @@ export async function expectErrorCode(response: APIResponse, code: string): Prom
   expect(body.code, `expected error code ${code}, got body ${JSON.stringify(body)}`).toBe(code);
 }
 
+/** `expectErrorCode` with the status, named by what was attempted so a refusal matrix says which row failed. */
+export async function expectRefused(response: APIResponse, status: number, code: string, message?: string): Promise<void> {
+  expect(response.status(), message ?? (await response.text())).toBe(status);
+  await expectErrorCode(response, code);
+}
+
 /**
  * Snapshots `userId`'s PASSWORD credential (and the password-history high-water mark) so a spec that exercises a
  * real password change can put the seeded credential back verbatim afterwards. A UI "change it back" cannot do

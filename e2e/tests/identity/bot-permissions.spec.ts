@@ -7,7 +7,6 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  * Importing user defined packages
  */
 import {
-  addOrganisationMember,
   assignApplicationRole,
   type AuthzApi,
   type BotGrant,
@@ -20,11 +19,9 @@ import {
   IDENTITY_CSRF_SEED_PATH,
   identityDb,
   identityMutate,
-  type IdentityUser,
   invalidateAllGrants,
   type OAuthApplication,
   type OrganisationBot,
-  type OrganisationRole,
   PLATFORM_APPLICATION_NAME,
   readBotAuthzVersion,
   readCatalogRole,
@@ -33,8 +30,8 @@ import {
   updateOrganisation,
   updateOrganisationMember,
 } from '../../lib';
-import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
-import { expectErrorCode } from './helpers';
+import { expect, type IdentityHarness, teamMember, test } from './fixtures';
+import { expectRefused } from './helpers';
 
 /**
  * Defining types
@@ -101,18 +98,6 @@ const WIDGET_MANIFEST: CatalogManifest = {
     { name: 'LedgerReader', permissions: [LEDGER] },
   ],
 };
-
-async function expectRefused(response: APIResponse, status: number, code: string, message?: string): Promise<void> {
-  expect(response.status(), message ?? (await response.text())).toBe(status);
-  await expectErrorCode(response, code);
-}
-
-async function teamMember(identity: IdentityHarness, team: IdentityTeam, label: string, role: OrganisationRole): Promise<{ user: IdentityUser; ctx: APIRequestContext }> {
-  const user = await identity.createUser({ label });
-  await addOrganisationMember(team.organisationId, user.userId, { role });
-  const { ctx } = await identity.signIn(user, { aal: 'AAL2' });
-  return { user, ctx };
-}
 
 /** A throwaway application carrying `WIDGET_MANIFEST`, reachable by every `ALL_APPS` organisation once the grant cache is dropped. */
 async function widgetApplication(identity: IdentityHarness, label: string, visibility?: 'RESTRICTED'): Promise<AuthzApi> {

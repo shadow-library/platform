@@ -9,6 +9,7 @@ import { type APIRequestContext, test as base } from '@playwright/test';
 import {
   addOrganisationMember,
   type AdminApi,
+  botApi,
   clearIpState,
   createAdminApi,
   type CreateBotOptions,
@@ -37,6 +38,7 @@ import {
   type OAuthApplicationOptions,
   type OAuthTestClient,
   type OrganisationBot,
+  type OrganisationRole,
   type OrgOAuthApp,
   registerOAuthClient,
   type RegisterOAuthClientOptions,
@@ -59,6 +61,8 @@ export interface IdentityHarness {
   readonly clientIp: string;
   /** A fresh cookie-less identity context. Use a new one per login: a completed login leaves `__Host-sid` in the jar. */
   anonymous(): Promise<APIRequestContext>;
+  /** A caller authenticated by nothing but `Authorization: Bearer sl_bot_…`, and cookie-less, since a session cookie puts CSRF in front of the bot guard. */
+  botCaller(key: string): Promise<APIRequestContext>;
   /** A factory user, deleted after the test. */
   createUser(options?: IdentityUserOptions): Promise<IdentityUser>;
   /** A database-minted session for `user` and an identity context carrying it. */
@@ -114,6 +118,20 @@ async function runAll(steps: (() => Promise<unknown>)[]): Promise<void> {
   if (errors.length > 0) throw new HarnessTeardownError(errors, `identity harness teardown failed in ${errors.length} step(s)`);
 }
 
+export interface IdentityTeamMember {
+  readonly user: IdentityUser;
+  /** A stepped-up session, since most of what a member is refused is refused for the role rather than the assurance level. */
+  readonly ctx: APIRequestContext;
+}
+
+/** A factory user joined to `team` at `role`, signed in and torn down with the rest of the harness. */
+export async function teamMember(identity: IdentityHarness, team: IdentityTeam, label: string, role: OrganisationRole): Promise<IdentityTeamMember> {
+  const user = await identity.createUser({ label });
+  await addOrganisationMember(team.organisationId, user.userId, { role });
+  const { ctx } = await identity.signIn(user, { aal: 'AAL2' });
+  return { user, ctx };
+}
+
 export const test = base.extend<{ identity: IdentityHarness }>({
   // Playwright reads fixture dependencies from the destructuring pattern, so a dependency-free fixture must still declare one.
   // eslint-disable-next-line no-empty-pattern
@@ -165,6 +183,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     await use({
       clientIp,
       anonymous: async () => track(await identityApi(clientIp)),
+      botCaller: async key => track(await botApi(key, clientIp)),
       createUser,
       signIn,
       contextFor,

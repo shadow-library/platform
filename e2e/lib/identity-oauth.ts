@@ -8,6 +8,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
+import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
 import { createIdentitySession, type IdentitySession, identitySessionContext, type IdentitySessionOptions, updateIdentitySession } from './identity-sessions';
 import { readSeedManifest } from './personas';
@@ -434,6 +435,24 @@ export async function createResourceScope(admin: APIRequestContext, identifier: 
 
 export async function grantClientScope(admin: APIRequestContext, clientId: string, scopeId: string): Promise<void> {
   await expectStatus(await identityMutate(admin, 'post', `/api/v1/admin/clients/${clientId}/scopes`, { scopeId }), 200, `grant scope to ${clientId}`);
+}
+
+/**
+ * Takes an application's `api://` resource out of service, the one state in which a first-party client resolves no own
+ * audience. Nothing reaches it through the API: the resource is provisioned with the application and never retired.
+ */
+export async function setApiResourceActive(identifier: string, isActive: boolean): Promise<void> {
+  await identityDb()`UPDATE api_resources SET is_active = ${isActive} WHERE identifier = ${identifier}`;
+}
+
+/** Copies `from`'s live secret hash onto `to`, so a client identity never issues one to can still be offered a secret that would verify. */
+export async function copyClientSecret(from: string, to: string): Promise<void> {
+  const inserted = await identityDb()<{ id: string }[]>`
+    INSERT INTO oauth_client_secrets (client_id, secret_hash)
+    SELECT ${to}, secret_hash FROM oauth_client_secrets WHERE client_id = ${from} AND revoked_at IS NULL LIMIT 1
+    RETURNING id::text
+  `;
+  if (inserted.length === 0) throw new OAuthKitError(`client ${from} holds no live secret to copy`);
 }
 
 export async function rotateClientSecret(admin: APIRequestContext, clientId: string): Promise<RotatedClientSecret> {

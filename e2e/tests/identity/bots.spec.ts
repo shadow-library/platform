@@ -9,7 +9,6 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  * Importing user defined packages
  */
 import {
-  addOrganisationMember,
   auditChain,
   botKeySecretHash,
   csrfHeaders,
@@ -17,10 +16,8 @@ import {
   findAuditEvents,
   IDENTITY_CSRF_SEED_PATH,
   identityMutate,
-  type IdentityUser,
   issueBotKey,
   type OrganisationBot,
-  type OrganisationRole,
   parseBotKeyParts,
   PLATFORM_APPLICATION_NAME,
   readBotClient,
@@ -32,8 +29,8 @@ import {
   updateBotKeyRecord,
   updateOrganisation,
 } from '../../lib';
-import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
-import { expectErrorCode } from './helpers';
+import { expect, type IdentityHarness, teamMember, test } from './fixtures';
+import { expectErrorCode, expectRefused } from './helpers';
 
 /**
  * Defining types
@@ -135,24 +132,12 @@ function uniqueHandle(label: string): string {
   return `e2e-${label}-${randomBytes(3).toString('hex')}`;
 }
 
-async function expectRefused(response: APIResponse, status: number, code: string, message?: string): Promise<void> {
-  expect(response.status(), message ?? (await response.text())).toBe(status);
-  await expectErrorCode(response, code);
-}
-
 /** Reads a successful creation and hands the bot to the harness, whose client and grants no organisation cascade reaches. */
 async function trackCreated(identity: IdentityHarness, organisationId: string, response: APIResponse): Promise<BotItem> {
   expect(response.status(), await response.text()).toBe(201);
   const bot = (await response.json()) as BotItem;
   identity.trackBot({ botId: bot.id, clientId: bot.clientId, handle: bot.handle, organisationId });
   return bot;
-}
-
-async function teamMember(identity: IdentityHarness, team: IdentityTeam, label: string, role: OrganisationRole): Promise<{ user: IdentityUser; ctx: APIRequestContext }> {
-  const user = await identity.createUser({ label });
-  await addOrganisationMember(team.organisationId, user.userId, { role });
-  const { ctx } = await identity.signIn(user, { aal: 'AAL2' });
-  return { user, ctx };
 }
 
 function createBot(ctx: APIRequestContext, organisationId: string, body: Record<string, unknown>): Promise<APIResponse> {

@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { crc32 } from 'node:zlib';
 
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
@@ -12,6 +13,7 @@ import { clientIpHeaders } from './client-ip';
 import { identityDb } from './db';
 import { requireProductUrl } from './env';
 import { identityMutate } from './identity-auth';
+import { type OAuthClientCredentials, TOKEN_EXCHANGE_GRANT } from './identity-oauth';
 import { deleteRoleAssignmentsFor, findApplicationIdByName, PLATFORM_APPLICATION_NAME } from './identity-roles';
 import { type IdentitySession, identityStorageState } from './identity-sessions';
 import { redisGet } from './redis';
@@ -98,6 +100,41 @@ export interface BotKeyRow {
   readonly secretHash: string;
   readonly expiresAt: Date;
   readonly revokedAt: Date | null;
+  readonly lastUsedAt: Date | null;
+  /** Stored as `inet`, so a bare address comes back as a single-host range. */
+  readonly lastUsedIp: string | null;
+}
+
+export type BotTransferStatus = 'PENDING' | 'DONE' | 'FAILED';
+
+export interface BotTransferRow {
+  readonly applicationId: number;
+  readonly toUserId: string;
+  readonly status: BotTransferStatus;
+  readonly attempts: number;
+  readonly lastError: string | null;
+  readonly nextAttemptAt: Date;
+  readonly completedAt: Date | null;
+}
+
+export interface BotTransferPatch {
+  status?: BotTransferStatus;
+  attempts?: number;
+  lastError?: string | null;
+  nextAttemptAt?: Date;
+}
+
+export interface BotKeyExchangeRequest {
+  /** The `sl_bot_…` key presented as the RFC 8693 subject token; omitted entirely when absent. */
+  subjectToken?: string;
+  /** Default the bot-key type; `null` omits the parameter. */
+  subjectTokenType?: string | null;
+  /** Address the exchanging service says the key came from, checked against the bot's allowlist. */
+  clientIp?: string;
+  resource?: string;
+  scope?: string;
+  requestedTokenType?: string;
+  actorToken?: string;
 }
 
 export interface BotKeyPatch {
@@ -133,6 +170,22 @@ export interface RoleBotGrant {
 const KEY_LIFETIME_MS = 60 * 60 * 1000;
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+/** RFC 8693 subject-token type identity accepts a bot key under. */
+export const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
+
+/** Fixed lifetime of the access token a key exchange issues. */
+export const BOT_ACCESS_TOKEN_TTL_SECONDS = 300;
+
+/** Rate-limiter buckets a bot spends: one keyed on the key being exchanged, one on the bot making direct calls. */
+export const BOT_KEY_EXCHANGE_BUCKET = 'bot-key-exchange';
+export const BOT_API_BUCKET = 'bot-api';
+
+/** Exchanges one key may make in a minute, before the bot's own `rateLimitPerMinute` is even consulted. */
+export const BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE = 60;
+
+/** Attempts a handover gets before the worker stops retrying it and an administrator has to. */
+export const MAX_BOT_TRANSFER_ATTEMPTS = 10;
 
 /** `sl_bot_<22-char key id>_<43-char secret>_<6-char checksum>` — identity's own key shape. */
 const BOT_KEY_PATTERN = /^sl_bot_([0-9A-Za-z]{22})_([0-9A-Za-z]{43})_([0-9A-Za-z]{6})$/;
@@ -264,10 +317,60 @@ export async function readBotClient(clientId: string): Promise<BotClientRow | un
 
 export async function readBotKeyRecord(keyId: string): Promise<BotKeyRow | undefined> {
   const [row] = await identityDb()<BotKeyRow[]>`
-    SELECT id::text, bot_id::text AS "botId", key_prefix AS "keyPrefix", secret_hash AS "secretHash", expires_at AS "expiresAt", revoked_at AS "revokedAt"
+    SELECT id::text, bot_id::text AS "botId", key_prefix AS "keyPrefix", secret_hash AS "secretHash", expires_at AS "expiresAt", revoked_at AS "revokedAt",
+           last_used_at AS "lastUsedAt", last_used_ip::text AS "lastUsedIp"
     FROM bot_keys WHERE id = ${keyId}
   `;
   return row;
+}
+
+/**
+ * An RFC 8693 exchange of a bot key by `client`, which authenticates itself as on any other token-endpoint call.
+ * Only a first-party client may forward `clientIp`; without it identity checks the connection address instead.
+ */
+export function exchangeBotKey(ctx: APIRequestContext, client: OAuthClientCredentials, input: BotKeyExchangeRequest): Promise<APIResponse> {
+  const subjectTokenType = input.subjectTokenType === undefined ? BOT_KEY_TOKEN_TYPE : input.subjectTokenType;
+  const form: Record<string, string> = {
+    grant_type: TOKEN_EXCHANGE_GRANT,
+    client_id: client.clientId,
+    ...(client.secret ? { client_secret: client.secret } : {}),
+  };
+  if (input.subjectToken !== undefined) form.subject_token = input.subjectToken;
+  if (subjectTokenType !== null) form.subject_token_type = subjectTokenType;
+  if (input.clientIp !== undefined) form.client_ip = input.clientIp;
+  if (input.resource !== undefined) form.resource = input.resource;
+  if (input.scope !== undefined) form.scope = input.scope;
+  if (input.requestedTokenType !== undefined) form.requested_token_type = input.requestedTokenType;
+  if (input.actorToken !== undefined) form.actor_token = input.actorToken;
+  return ctx.post('/oauth2/token', { form });
+}
+
+/** The handovers queued for a bot, ordered by application, as the worker and the deletion detail read them. */
+export async function readBotTransfers(botId: string): Promise<BotTransferRow[]> {
+  return identityDb()<BotTransferRow[]>`
+    SELECT application_id AS "applicationId", to_user_id::text AS "toUserId", status, attempts, last_error AS "lastError",
+           next_attempt_at AS "nextAttemptAt", completed_at AS "completedAt"
+    FROM bot_ownership_transfers WHERE bot_id = ${botId} ORDER BY application_id
+  `;
+}
+
+/** Rewrites every one of the bot's handovers — the exhausted state a worker would take six hours of retries to reach. */
+export async function updateBotTransfers(botId: string, patch: BotTransferPatch): Promise<void> {
+  const sql = identityDb();
+  const fields = { status: patch.status, attempts: patch.attempts, last_error: patch.lastError, next_attempt_at: patch.nextAttemptAt };
+  const columns = Object.entries(fields).filter(([, value]) => value !== undefined);
+  if (columns.length === 0) return;
+  await sql`UPDATE bot_ownership_transfers SET ${sql(Object.fromEntries(columns))}, updated_at = now() WHERE bot_id = ${botId}`;
+}
+
+/** Queues a handover the deletion API would only enqueue for a bot-aware application, so any application can stand in for one. */
+export async function insertBotTransfer(botId: string, applicationId: number, toUserId: string): Promise<void> {
+  await identityDb()`INSERT INTO bot_ownership_transfers (bot_id, application_id, to_user_id) VALUES (${botId}, ${applicationId}, ${toUserId})`;
+}
+
+/** Releases the applications and recipients a handover holds by `ON DELETE restrict`; deleting the bot itself cascades them. */
+export async function deleteBotTransfers(botId: string): Promise<void> {
+  await identityDb()`DELETE FROM bot_ownership_transfers WHERE bot_id = ${botId}`;
 }
 
 /** Rewrites a key's lifecycle columns — an expiry in the past, or the use identity would have stamped on it. */
@@ -303,4 +406,28 @@ export function parseBotKeyParts(key: string): BotKeyParts | null {
 /** What identity stores for a key: the SHA-256 of its secret segment alone, never of the whole key. */
 export function botKeySecretHash(secret: string): string {
   return createHash('sha256').update(secret, 'utf8').digest('hex');
+}
+
+function encodeBase62(value: bigint, length: number): string {
+  let encoded = '';
+  for (let remaining = value; remaining > 0n; remaining /= 62n) encoded = BASE62[Number(remaining % 62n)] + encoded;
+  return encoded.padStart(length, '0');
+}
+
+/** Only the leading character moves, so the segment stays base62 and inside the 128-bit id / 256-bit secret ranges identity checks. */
+function alterSegment(segment: string): string {
+  return `${segment.startsWith('0') ? '1' : '0'}${segment.slice(1)}`;
+}
+
+/**
+ * The key with a different id, or its own id and a different secret — well formed down to the crc32 checksum, so only the
+ * lookup can refuse them. A key mangled without recomputing the checksum never reaches the lookup at all.
+ */
+export function forgeBotKey(key: string, part: 'keyId' | 'secret'): string {
+  const parts = parseBotKeyParts(key);
+  if (!parts) throw new IdentityBotError(`${key.slice(0, 16)}… is not a bot key`);
+  const encodedKeyId = part === 'keyId' ? alterSegment(parts.encodedKeyId) : parts.encodedKeyId;
+  const secret = part === 'secret' ? alterSegment(parts.secret) : parts.secret;
+  const body = `sl_bot_${encodedKeyId}_${secret}`;
+  return `${body}_${encodeBase62(BigInt(crc32(Buffer.from(body, 'utf8'))), 6)}`;
 }
