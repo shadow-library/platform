@@ -116,9 +116,9 @@ describe('ModelRouterService.resolveModel', () => {
     for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
   });
 
-  it('should resolve an unpinned blueprint role to Claude Opus 5 on a standard project', () => {
+  it('should resolve an unpinned blueprint role to Claude Opus 5.5 on a standard project', () => {
     const resolved = router.resolveModel('blueprint', { contentMode: 'standard' });
-    expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+    expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5.5' });
   });
 
   it('should resolve an unpinned blueprint role to GLM 5.2 on an unrestricted project, since Opus is not on the unrestricted allowlist', () => {
@@ -142,7 +142,7 @@ describe('ModelRouterService.resolveModel', () => {
 
     it('should skip an owner default the registry no longer lists', () => {
       const resolved = router.resolveModel('blueprint', { contentMode: 'standard' }, undefined, { ideation: { provider: 'openrouter', model: 'retired/model' } });
-      expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+      expect(resolved).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5.5' });
     });
 
     it('should only honour an owner default on an unrestricted project when the allowlist carries it', () => {

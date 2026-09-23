@@ -79,17 +79,17 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
 // Sonnet was the reliable, low-cost prose pick.
 export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
-  planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
+  planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
   review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
   // Its own group, independent of `planning` — resolveModel's project-override fallback is the one place it inherits `plan`.
-  chat: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
+  chat: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   // IllustrationService resolves through resolveModel('image', project), so a project-level override is honoured.
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   // Cheapest registered model OpenRouter lists with image input.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
-  ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5' },
+  ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on

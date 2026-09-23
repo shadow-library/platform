@@ -280,9 +280,9 @@ Model selection is **code + database**, not environment.
 - Roles → groups: `src/modules/ai/defaults.ts:42-72`. `bible`, `plan`, `outline`, `arc`, `skeleton`, `premise`,
   `extraction` all map to **`planning`**.
 - Production group defaults (`defaults.ts:85-95`):
-  `writing` → `moonshotai/kimi-k3`, `planning` → `z-ai/glm-5.2`, `review` → `anthropic/claude-sonnet-5`,
-  `chat` → `z-ai/glm-5.2`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
-  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`, `ideation` → `anthropic/claude-opus-5`
+  `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
+  `chat` → `anthropic/claude-opus-5.5`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
+  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`, `ideation` → `anthropic/claude-opus-5.5`
   (the `ideation` group is the Blueprint's small steps; its large passes run on `planning`).
 - Unrestricted map (`defaults.ts:101-111`) applies when `project.contentMode === 'unrestricted'`; overrides are
   clamped to `UNRESTRICTED_LLM_ALLOWLIST` (`defaults.ts:117`).
