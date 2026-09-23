@@ -174,7 +174,8 @@ test.describe('identity bot key exchange — the token a key buys', () => {
     expect(claims, 'a bot token carries no scope').not.toHaveProperty('scope');
     expect(claims, 'no delegation').not.toHaveProperty('act');
     expect(claims, 'and no session').not.toHaveProperty('sid');
-    expect(Number(claims.exp) - Number(claims.iat), 'the lifetime is fixed rather than policy-driven').toBe(BOT_ACCESS_TOKEN_TTL_SECONDS);
+    // A failure here means the server's own BOT_ACCESS_TOKEN_TTL_SECONDS moved, or the lifetime became policy-driven like every other grant's.
+    expect(Number(claims.exp) - Number(claims.iat), 'the lifetime is the fixed bot constant').toBe(BOT_ACCESS_TOKEN_TTL_SECONDS);
   });
 
   test("should accept only the exchanging client's own audience and no scope at all", async ({ identity }) => {
@@ -332,6 +333,8 @@ test.describe('identity bot key exchange — the caller address and the budgets'
     const retryAfter = (response: APIResponse): number => Number(response.headers()['retry-after']);
 
     try {
+      // Pre-spending the window rather than sending sixty exchanges: `enforce` increments, so the next call is the sixty-first.
+      // A failure here means the server's own BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE moved, or the quota stopped being per key.
       await spendRateLimit(BOT_KEY_EXCHANGE_BUCKET, key.keyId, BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE, RATE_WINDOW_SECONDS);
       const overKeyBudget = await exchange(fresh);
       await expectRefused(overKeyBudget, 429, 'RATE_LIMITED', 'the sixty-first exchange of one key inside a minute');

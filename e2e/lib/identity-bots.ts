@@ -11,7 +11,7 @@ import { type APIRequestContext, type APIResponse, request } from '@playwright/t
  */
 import { clientIpHeaders } from './client-ip';
 import { identityDb } from './db';
-import { requireProductUrl } from './env';
+import { type ProductKey, requireProductUrl } from './env';
 import { identityMutate } from './identity-auth';
 import { type OAuthClientCredentials, TOKEN_EXCHANGE_GRANT } from './identity-oauth';
 import { deleteRoleAssignmentsFor, findApplicationIdByName, PLATFORM_APPLICATION_NAME } from './identity-roles';
@@ -80,6 +80,8 @@ export interface BotRow {
   readonly rateLimitPerMinute: number;
   readonly suspendedAt: Date | null;
   readonly suspendedBy: string | null;
+  /** The tombstone stamp; set only once the worker has finished the deletion. */
+  readonly deletedAt: Date | null;
 }
 
 export interface BotClientRow {
@@ -174,14 +176,14 @@ const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 /** RFC 8693 subject-token type identity accepts a bot key under. */
 export const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
 
-/** Fixed lifetime of the access token a key exchange issues. */
+/** Fixed lifetime of the access token a key exchange issues — `BOT_ACCESS_TOKEN_TTL_SECONDS` in the server's `bot.constants.ts`, deliberately not policy-driven. */
 export const BOT_ACCESS_TOKEN_TTL_SECONDS = 300;
 
 /** Rate-limiter buckets a bot spends: one keyed on the key being exchanged, one on the bot making direct calls. */
 export const BOT_KEY_EXCHANGE_BUCKET = 'bot-key-exchange';
 export const BOT_API_BUCKET = 'bot-api';
 
-/** Exchanges one key may make in a minute, before the bot's own `rateLimitPerMinute` is even consulted. */
+/** Exchanges one key may make in a minute, before the bot's own `rateLimitPerMinute` is consulted — `BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE` in the server's `bot.constants.ts`. */
 export const BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE = 60;
 
 /** Attempts a handover gets before the worker stops retrying it and an administrator has to. */
@@ -238,12 +240,14 @@ export async function resumeOrganisationBot(orgAdmin: APIRequestContext, bot: Or
 export interface BotApiOptions {
   /** A user session carried alongside the bot key, to prove the guard admits the bot on its own and attaches no session. */
   session?: IdentitySession;
+  /** Default `identity`. Any first-party product accepts the same key: it exchanges it for a bot token behind the request. */
+  product?: ProductKey;
 }
 
-/** An identity caller authenticated by a bot key, charged to `clientIp`. */
+/** A caller authenticated by a bot key, charged to `clientIp`. */
 export function botApi(key: string, clientIp: string, options: BotApiOptions = {}): Promise<APIRequestContext> {
   return request.newContext({
-    baseURL: requireProductUrl('identity'),
+    baseURL: requireProductUrl(options.product ?? 'identity'),
     ignoreHTTPSErrors: true,
     extraHTTPHeaders: { ...clientIpHeaders(clientIp), authorization: `Bearer ${key}` },
     ...(options.session ? { storageState: identityStorageState(options.session) } : {}),
@@ -298,7 +302,7 @@ export async function setOrganisationBotStatus(botId: string, status: BotStatus)
 export async function readOrganisationBot(botId: string): Promise<BotRow | undefined> {
   const [row] = await identityDb()<BotRow[]>`
     SELECT id::text, client_id AS "clientId", handle, display_name AS "displayName", description, status, ip_allowlist::text[] AS "ipAllowlist",
-           rate_limit_per_minute AS "rateLimitPerMinute", suspended_at AS "suspendedAt", suspended_by::text AS "suspendedBy"
+           rate_limit_per_minute AS "rateLimitPerMinute", suspended_at AS "suspendedAt", suspended_by::text AS "suspendedBy", deleted_at AS "deletedAt"
     FROM bots WHERE id = ${botId}
   `;
   return row;
@@ -354,13 +358,16 @@ export async function readBotTransfers(botId: string): Promise<BotTransferRow[]>
   `;
 }
 
-/** Rewrites every one of the bot's handovers — the exhausted state a worker would take six hours of retries to reach. */
-export async function updateBotTransfers(botId: string, patch: BotTransferPatch): Promise<void> {
+/** Rewrites the bot's handovers, or the one to `applicationId` — the exhausted state a worker would take six hours of retries to reach. */
+export async function updateBotTransfers(botId: string, patch: BotTransferPatch, applicationId?: number): Promise<void> {
   const sql = identityDb();
   const fields = { status: patch.status, attempts: patch.attempts, last_error: patch.lastError, next_attempt_at: patch.nextAttemptAt };
   const columns = Object.entries(fields).filter(([, value]) => value !== undefined);
   if (columns.length === 0) return;
-  await sql`UPDATE bot_ownership_transfers SET ${sql(Object.fromEntries(columns))}, updated_at = now() WHERE bot_id = ${botId}`;
+  await sql`
+    UPDATE bot_ownership_transfers SET ${sql(Object.fromEntries(columns))}, updated_at = now()
+    WHERE bot_id = ${botId} AND (${applicationId ?? null}::int IS NULL OR application_id = ${applicationId ?? null})
+  `;
 }
 
 /** Queues a handover the deletion API would only enqueue for a bot-aware application, so any application can stand in for one. */
@@ -369,8 +376,10 @@ export async function insertBotTransfer(botId: string, applicationId: number, to
 }
 
 /** Releases the applications and recipients a handover holds by `ON DELETE restrict`; deleting the bot itself cascades them. */
-export async function deleteBotTransfers(botId: string): Promise<void> {
-  await identityDb()`DELETE FROM bot_ownership_transfers WHERE bot_id = ${botId}`;
+export async function deleteBotTransfers(botId: string, applicationId?: number): Promise<void> {
+  await identityDb()`
+    DELETE FROM bot_ownership_transfers WHERE bot_id = ${botId} AND (${applicationId ?? null}::int IS NULL OR application_id = ${applicationId ?? null})
+  `;
 }
 
 /** Rewrites a key's lifecycle columns — an expiry in the past, or the use identity would have stamped on it. */

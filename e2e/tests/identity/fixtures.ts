@@ -10,6 +10,7 @@ import {
   addOrganisationMember,
   type AdminApi,
   botApi,
+  type BotApiOptions,
   clearIpState,
   createAdminApi,
   type CreateBotOptions,
@@ -62,7 +63,7 @@ export interface IdentityHarness {
   /** A fresh cookie-less identity context. Use a new one per login: a completed login leaves `__Host-sid` in the jar. */
   anonymous(): Promise<APIRequestContext>;
   /** A caller authenticated by nothing but `Authorization: Bearer sl_bot_…`, and cookie-less, since a session cookie puts CSRF in front of the bot guard. */
-  botCaller(key: string): Promise<APIRequestContext>;
+  botCaller(key: string, options?: BotApiOptions): Promise<APIRequestContext>;
   /** A factory user, deleted after the test. */
   createUser(options?: IdentityUserOptions): Promise<IdentityUser>;
   /** A database-minted session for `user` and an identity context carrying it. */
@@ -183,7 +184,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     await use({
       clientIp,
       anonymous: async () => track(await identityApi(clientIp)),
-      botCaller: async key => track(await botApi(key, clientIp)),
+      botCaller: async (key, options) => track(await botApi(key, clientIp, options)),
       createUser,
       signIn,
       contextFor,
