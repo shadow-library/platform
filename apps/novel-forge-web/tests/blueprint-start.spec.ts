@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import { ledgerTopicLabel } from '../src/features/blueprint/notebook';
-import { mergeStartChips, restoreStartChips, START_TEXT_MAX, startTextLength } from '../src/features/blueprint/start-step';
+import {
+  countWords,
+  mergeStartChips,
+  restoreStartChips,
+  START_TEXT_MAX,
+  START_WORD_MAX,
+  startTextLength,
+  startTextMeter,
+  startTextStatus,
+} from '../src/features/blueprint/start-step';
 import { type LedgerEntryResponse } from '../src/lib/apis';
 
 function entry(overrides: Partial<LedgerEntryResponse> = {}): LedgerEntryResponse {
@@ -89,6 +98,32 @@ describe('startTextLength', () => {
   it('should let a full-length starting text through and flag one character more', () => {
     expect(startTextLength('a'.repeat(START_TEXT_MAX))).toBeLessThanOrEqual(START_TEXT_MAX);
     expect(startTextLength('a'.repeat(START_TEXT_MAX + 1))).toBeGreaterThan(START_TEXT_MAX);
+  });
+});
+
+describe('startTextStatus', () => {
+  const words = (count: number): string => Array.from({ length: count }, () => 'tide').join(' ');
+
+  it('should count words across any whitespace', () => {
+    expect(countWords('  a ferry\n\nat   dusk\t ')).toBe(4);
+    expect(countWords('   ')).toBe(0);
+  });
+
+  it('should say how many words are left, and warn in the last tenth', () => {
+    expect(startTextStatus(words(1))).toEqual({ state: 'ok', words: 1 });
+    expect(startTextMeter(startTextStatus(words(1)))).toBe('1 word · 9,999 left');
+    expect(startTextStatus(words(START_WORD_MAX * 0.9)).state).toBe('near');
+    expect(startTextStatus(words(START_WORD_MAX))).toEqual({ state: 'near', words: START_WORD_MAX });
+  });
+
+  it('should refuse one word past the limit and say by how much', () => {
+    const status = startTextStatus(words(START_WORD_MAX + 12));
+    expect(status).toEqual({ state: 'over', words: START_WORD_MAX + 12, reason: 'words' });
+    expect(startTextMeter(status)).toStartWith('10,012 words, 12 over the 10,000-word limit.');
+  });
+
+  it('should refuse a text past the character ceiling even with few words', () => {
+    expect(startTextStatus('a'.repeat(START_TEXT_MAX + 1))).toEqual({ state: 'over', words: 1, reason: 'characters' });
   });
 });
 

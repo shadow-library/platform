@@ -226,14 +226,28 @@
 
 .startCount {
   margin: 0;
-  font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
-  text-align: right;
+  font-size: var(--sh-text-body-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-secondary);
 }
 
-.startCount[data-over] {
+.startCount[data-state='near'] {
+  color: var(--sh-warning-text);
+}
+
+.startCount[data-state='over'] {
   color: var(--sh-danger-solid);
-  text-align: left;
+  font-weight: 500;
+}
+
+.steerCount {
+  font-size: var(--sh-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-tertiary);
+}
+
+.steerCount[data-over] {
+  color: var(--sh-danger-solid);
 }
 
 .startTypesLabel {
@@ -274,6 +288,10 @@
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
+}
+
+.steerRow[data-multiline] {
+  align-items: flex-end;
 }
 
 .steerInput {

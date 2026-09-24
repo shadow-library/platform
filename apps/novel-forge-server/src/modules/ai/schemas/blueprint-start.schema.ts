@@ -3,7 +3,13 @@ import { Field, Schema } from '@shadow-library/class-schema';
 export const START_CHIP_KINDS = ['element', 'want', 'not'] as const;
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
-export const START_TEXT_MAX = 12_000;
+export const START_WORD_MAX = 10_000;
+/** A ceiling on characters so one pathological "word" cannot slip past the word limit; ten thousand words of prose sit well inside it. */
+export const START_TEXT_MAX = 100_000;
+
+export function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
 
 export type StartChipKind = (typeof START_CHIP_KINDS)[number];
 

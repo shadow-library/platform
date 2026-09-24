@@ -107,6 +107,8 @@ export interface GeneratingStep<TOutput, TOptions, TInput> extends StepBase {
   budgetTokens?: number;
   inputs?(context: StepInputContext<TOptions, TInput>): Promise<BlueprintInputSection[]>;
   renderInput?(input: TInput): string | null;
+  /** Checks the schema cannot express, run on the round's input once it has parsed; throws a typed error to refuse it. */
+  assertInput?(input: TInput): void;
   toRound(output: TOutput, context: RoundContext<TOptions, TInput>): StepRoundResult<TOptions>;
   /** Every option the round offers, with ids unique across the whole round. */
   describeOptions(options: TOptions): StepOption[];

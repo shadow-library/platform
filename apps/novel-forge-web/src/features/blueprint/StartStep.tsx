@@ -21,15 +21,16 @@ import {
   START_CHIP_LABEL_MAX,
   START_CHIP_MAX,
   START_RULED_OUT_TOPIC,
-  START_TEXT_MAX,
   START_TOPIC,
+  START_WORD_MAX,
   type StartChip,
   type StartChipKind,
   startChipsKey,
   STARTING_TYPE_LABELS,
   STARTING_TYPES,
   type StartingType,
-  startTextLength,
+  startTextMeter,
+  startTextStatus,
 } from './start-step';
 import { SteerBox } from './SteerBox';
 import styles from './blueprint.module.css';
@@ -76,11 +77,11 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
   const running = isRoundLive(round);
   const busy = running || startRound.isPending;
   const hasChips = chips.some(chip => chip.label.trim().length > 0);
-  const textLength = startTextLength(text);
-  const overLimit = textLength > START_TEXT_MAX;
+  const textStatus = startTextStatus(text);
+  const overLimit = textStatus.state === 'over';
 
   const run = (): void => {
-    if (overLimit) return void toast.danger(`Your starting text is over ${START_TEXT_MAX.toLocaleString()} characters. Shorten it first.`);
+    if (overLimit) return void toast.danger(`Your starting text is over the ${START_WORD_MAX.toLocaleString()}-word limit. Shorten it first.`);
     startRound.mutate(buildRoundBody(draft, {}, stepPayload(resolveStartInput(text, startingType, round))), {
       onSuccess: () => setDraft(EMPTY_STEER),
       onError: err => toast.danger(err.message),
@@ -110,17 +111,15 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
           placeholder="e.g. a kid who collects debts for the city and finds something in a jar that belongs to him. I like when magic costs something real. Not a chosen one."
           value={text}
           onValueChange={setText}
-          minRows={4}
-          maxRows={12}
+          minRows={6}
+          maxRows={24}
           autoGrow
           aria-label="Your starting point"
           aria-describedby="start-text-count"
           aria-invalid={overLimit || undefined}
         />
-        <p id="start-text-count" className={styles.startCount} data-over={overLimit || undefined} aria-live="polite">
-          {overLimit
-            ? `${(textLength - START_TEXT_MAX).toLocaleString()} characters over the ${START_TEXT_MAX.toLocaleString()} limit. Nothing is cut, so shorten it before it can be read: lead with what the story is about, then the people.`
-            : `${textLength.toLocaleString()} / ${START_TEXT_MAX.toLocaleString()}`}
+        <p id="start-text-count" className={styles.startCount} data-state={textStatus.state} aria-live="polite">
+          {startTextMeter(textStatus)}
         </p>
         <div className={styles.startTypes}>
           <span className={styles.startTypesLabel}>Or start from:</span>
@@ -205,7 +204,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
       )}
 
       {round != null && (
-        <SteerBox nudges={step.nudges} draft={draft} onDraftChange={setDraft} messages={roundThread(round)} onSubmit={run} submitLabel="Read it again" running={busy} />
+        <SteerBox multiline nudges={step.nudges} draft={draft} onDraftChange={setDraft} messages={roundThread(round)} onSubmit={run} submitLabel="Read it again" running={busy} />
       )}
 
       {chips.length > 0 && (

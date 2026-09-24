@@ -93,9 +93,14 @@ function authorInput(addressed: AnyBlueprintStep, generator: AnyGeneratingStep, 
     nudges: resolveNudges(addressed, input.nudges ?? []),
     keepAsDirection: input.keepAsDirection ?? false,
     feedback: input.feedback ?? [],
-    input: generator.inputSchema && input.input !== undefined ? validateStepPart(generator.inputSchema, input.input, 'input') : null,
+    input: generator.inputSchema && input.input !== undefined ? checkedInput(generator, validateStepPart(generator.inputSchema, input.input, 'input')) : null,
     focus,
   };
+}
+
+function checkedInput(generator: AnyGeneratingStep, input: unknown): unknown {
+  generator.assertInput?.(input);
+  return input;
 }
 
 function viewRound(step: AnyBlueprintStep, round: Blueprint.Round): Blueprint.Round {

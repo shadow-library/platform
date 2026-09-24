@@ -1,8 +1,19 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
+import { AppErrorCode } from '@server/classes';
+
 import { AUTHOR_BRIEF_TOPIC } from '../../ai/context/ledger-sections';
 import { blueprintStartPrompt } from '../../ai/prompts/blueprint-start.prompt';
-import { type BlueprintStartOutput, START_CHIP_KINDS, START_CHIP_LABEL_MAX, START_CHIP_MAX, START_TEXT_MAX, type StartChipKind } from '../../ai/schemas/blueprint-start.schema';
+import {
+  type BlueprintStartOutput,
+  countWords,
+  START_CHIP_KINDS,
+  START_CHIP_LABEL_MAX,
+  START_CHIP_MAX,
+  START_TEXT_MAX,
+  START_WORD_MAX,
+  type StartChipKind,
+} from '../../ai/schemas/blueprint-start.schema';
 import { withoutKnownRejections } from '../engine/blueprint-round';
 import { type PlannedLedgerEntry, type ScreenStep } from '../engine/blueprint-step.types';
 
@@ -47,7 +58,7 @@ export class StartInput {
   @Field({
     optional: true,
     maxLength: START_TEXT_MAX,
-    description: 'Whatever the author already imagines, in their own words; may be empty. Locking keeps it whole for the steps that build premise and people.',
+    description: `Whatever the author already imagines, in their own words; may be empty, and at most ${START_WORD_MAX} words. Locking keeps it whole for the steps that build premise and people.`,
   })
   text?: string;
 
@@ -95,6 +106,11 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
   optionsSchema: StartOptions,
   inputSchema: StartInput,
   selectionSchema: StartSelection,
+
+  assertInput(input) {
+    const words = countWords(input.text ?? '');
+    if (words > START_WORD_MAX) throw AppErrorCode.BPR_004.create({ part: 'input', issues: `the starting text is ${words} words; the limit is ${START_WORD_MAX}` });
+  },
 
   renderInput(input) {
     const text = input.text?.trim();

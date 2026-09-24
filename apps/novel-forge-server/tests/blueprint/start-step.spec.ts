@@ -134,9 +134,16 @@ describe('start step', () => {
     expect(plan.replaces).toContain('start.brief');
   });
 
-  it('should take a starting text of up to 12,000 characters and refuse a longer one', () => {
-    expect(parseSchema(StartInput, { text: 'a'.repeat(12_000) }).success).toBe(true);
-    expect(parseSchema(StartInput, { text: 'a'.repeat(12_001) }).success).toBe(false);
+  it('should take a starting text of up to 10,000 words and refuse a longer one', () => {
+    const words = (count: number): string => Array.from({ length: count }, () => 'tide').join(' \n');
+    expect(() => startStep.assertInput?.({ text: words(10_000) })).not.toThrow();
+    expect(() => startStep.assertInput?.({ text: words(10_001) })).toThrow('the starting text is 10001 words; the limit is 10000');
+    expect(() => startStep.assertInput?.({ startingType: 'nothing' })).not.toThrow();
+  });
+
+  it('should refuse a text past the character ceiling however few words it holds', () => {
+    expect(parseSchema(StartInput, { text: 'a'.repeat(100_000) }).success).toBe(true);
+    expect(parseSchema(StartInput, { text: 'a'.repeat(100_001) }).success).toBe(false);
   });
 
   it('should refuse a lock with no chips', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { authorBriefInput } from '@modules/ai/context/blueprint-sections';
+import { authorBriefInput, blueprintBudget, blueprintSections } from '@modules/ai/context/blueprint-sections';
 import {
   AUTHOR_BRIEF_TOPIC,
   type LedgerContextEntry,
@@ -50,6 +50,14 @@ describe('the author brief', () => {
 
     expect(renderLedger([...ledger, brief])).not.toContain('never once wound it');
     expect(section.sourceRefs).not.toContain(`ledger:${AUTHOR_BRIEF_TOPIC}`);
+  });
+
+  it('should ride on top of the step budget, so a long brief never evicts what the step was sized for', () => {
+    const sections = blueprintSections(ledger, { inputs: [...authorBriefInput([brief]), { key: 'catalog', content: 'x' }], thread: [], roundInput: 'Offer four concepts.' });
+    const authorText = sections.filter(section => section.key === 'author_brief' || section.key === 'round_input').reduce((sum, section) => sum + section.tokens, 0);
+
+    expect(authorText).toBeGreaterThan(0);
+    expect(blueprintBudget(sections, 24_000)).toBe(24_000 + authorText);
   });
 
   it('should reach a step that asks for it as a required input, and nothing when there is none', () => {

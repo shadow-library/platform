@@ -36,7 +36,9 @@ Seven phases in a fixed order, grouped by altitude:
 
 - **Starting point.** Whatever the author already imagines (a scene, a feeling, "like X but Y", a character, nothing yet) is read back as short chips so a misunderstanding
   shows immediately. The corrected reading is saved as directions every later step reads. The author's own text is kept whole beside it: the chips summarise
-  it, and never stand in for it. The box never cuts text silently; an over-long starting point is refused with a count, not trimmed.
+  it, and never stand in for it. The starting point may run to about ten thousand words, so an author can bring the concrete detail they already have. The box never
+  cuts text silently; an over-long starting point is refused with a live word count, not trimmed. A long starting text rides on top of a step's context budget rather
+  than crowding out what the step reads.
 - **Taste.** Either-or pairs shaped by the starting point, answerable with both, neither or "depends" plus a reason, and "a book you gave up on: why?" reasons. Taste
   becomes directions; dislikes become rejected entries.
 - **Concepts.** Rounds of four concept cards. The author's own idea is always one of the cards. Each card can be kept, killed with a reason, mixed into another, edited or

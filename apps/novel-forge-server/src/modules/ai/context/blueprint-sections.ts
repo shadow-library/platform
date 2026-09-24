@@ -5,6 +5,9 @@ import { countTokens } from './token-budget';
 export const BLUEPRINT_BUDGET = 24_000;
 export const STEP_THREAD_MESSAGES = 4;
 
+/** The author's own words ride on top of a step's budget, so a long starting text never crowds out the material the step was sized for. */
+const AUTHOR_TEXT_SECTIONS: ReadonlySet<string> = new Set(['author_brief', 'round_input']);
+
 export interface BlueprintStepMessage {
   from: 'author' | 'coach';
   text: string;
@@ -46,4 +49,8 @@ export function blueprintSections(ledger: LedgerContextEntry[], parts: Blueprint
   if (thread.length > 0) sections.push(section('step_thread', renderThread(thread), 'working', 'volatile'));
   sections.push(section('round_input', parts.roundInput, 'working', 'volatile', true));
   return sections;
+}
+
+export function blueprintBudget(sections: ContextSection[], stepBudget: number): number {
+  return sections.reduce((budget, section) => budget + (AUTHOR_TEXT_SECTIONS.has(section.key) ? section.tokens : 0), stepBudget);
 }

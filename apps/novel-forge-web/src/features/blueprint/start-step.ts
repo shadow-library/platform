@@ -8,7 +8,9 @@ export type StartingType = (typeof STARTING_TYPES)[number];
 
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
-export const START_TEXT_MAX = 12_000;
+export const START_WORD_MAX = 10_000;
+export const START_TEXT_MAX = 100_000;
+const START_NEAR_RATIO = 0.9;
 export const START_TOPIC = 'start';
 export const START_RULED_OUT_TOPIC = 'start.ruled_out';
 
@@ -85,6 +87,27 @@ export interface StartRoundInput {
 /** Counted the way the server's schema counts, by code point, so the box and the server agree on what fits. */
 export function startTextLength(text: string): number {
   return [...text.trim()].length;
+}
+
+export function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+export type StartTextStatus = { state: 'ok' | 'near'; words: number } | { state: 'over'; words: number; reason: 'words' | 'characters' };
+
+/** The server refuses both a text over the word limit and one over the character ceiling; the box says which before it is sent. */
+export function startTextStatus(text: string): StartTextStatus {
+  const words = countWords(text);
+  if (words > START_WORD_MAX) return { state: 'over', words, reason: 'words' };
+  if (startTextLength(text) > START_TEXT_MAX) return { state: 'over', words, reason: 'characters' };
+  return { state: words >= START_WORD_MAX * START_NEAR_RATIO ? 'near' : 'ok', words };
+}
+
+export function startTextMeter(status: StartTextStatus): string {
+  const words = `${status.words.toLocaleString()} ${status.words === 1 ? 'word' : 'words'}`;
+  if (status.state !== 'over') return `${words} · ${(START_WORD_MAX - status.words).toLocaleString()} left`;
+  if (status.reason === 'characters') return 'Too long to read back as it stands. Nothing is cut: shorten it before it can be read.';
+  return `${words}, ${(status.words - START_WORD_MAX).toLocaleString()} over the ${START_WORD_MAX.toLocaleString()}-word limit. Nothing is cut: shorten it before it can be read.`;
 }
 
 export function buildStartInput(text: string, startingType: StartingType | null): StartRoundInput {
