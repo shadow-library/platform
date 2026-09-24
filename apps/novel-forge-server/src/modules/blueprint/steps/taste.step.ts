@@ -16,7 +16,7 @@ export const TASTE_TOPIC = 'taste';
  */
 export const TASTE_GAVE_UP_TOPIC = 'taste.gave_up';
 export const TASTE_VERDICTS = ['a', 'b', 'both', 'neither', 'depends'] as const;
-export const TASTE_NOTE_MAX = 300;
+export const TASTE_NOTE_MAX = 1000;
 export const TASTE_OWN_REASONS_MAX = 5;
 
 export type TasteVerdictValue = (typeof TASTE_VERDICTS)[number];
@@ -71,7 +71,11 @@ export class TastePairVerdict {
   })
   verdict: TasteVerdictValue;
 
-  @Field({ optional: true, maxLength: TASTE_NOTE_MAX, description: 'Required on `depends`: the author’s own words, saved as the taste line.' })
+  @Field({
+    optional: true,
+    maxLength: TASTE_NOTE_MAX,
+    description: 'The author’s own words, saved as the taste line: required on `depends`, and on `neither` the optional answer to what they would rather read.',
+  })
   note?: string;
 }
 
@@ -151,14 +155,18 @@ function verdictEntries(pair: TastePairOption, verdict: TastePairVerdict): Plann
       return [chose(b.label, `Would rather read “${b.text}” than “${a.text}”.`)];
     case 'both':
       return [chose(`${a.label} and ${b.label}`, `Wants both “${a.text}” and “${b.text}”.`)];
-    case 'neither':
-      return (['a', 'b'] as const).map(side => ({
+    case 'neither': {
+      // The scenes are rejected, not the labels: "not this example" must not rule out a whole region of the story for good.
+      const rejected = (['a', 'b'] as const).map((side): PlannedLedgerEntry => ({
         kind: 'rejected',
         topic: TASTE_TOPIC,
-        statement: pair[side].label,
+        statement: pair[side].text,
         why: `Would read neither side of “${pairLabel(pair)}”.`,
         payload: { optionId: pair.id, verdict: 'neither', side },
       }));
+      const instead = verdict.note?.trim();
+      return instead ? [...rejected, chose(instead, `Rather than either side of “${pairLabel(pair)}”.`)] : rejected;
+    }
     default: {
       const note = verdict.note?.trim();
       if (!note) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: `“${pairLabel(pair)}” is answered with “depends” but says what it depends on nowhere` });

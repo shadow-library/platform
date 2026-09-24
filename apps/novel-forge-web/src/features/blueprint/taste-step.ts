@@ -4,7 +4,7 @@ export const TASTE_VERDICTS = ['a', 'b', 'both', 'neither', 'depends'] as const;
 export const TASTE_TOPIC = 'taste';
 export const TASTE_GAVE_UP_TOPIC = 'taste.gave_up';
 export const TASTE_PAIR_MAX = 16;
-export const TASTE_NOTE_MAX = 300;
+export const TASTE_NOTE_MAX = 1000;
 export const TASTE_OWN_REASON_MAX = 120;
 export const TASTE_OWN_REASONS_MAX = 5;
 
@@ -12,9 +12,27 @@ export type TasteVerdictValue = (typeof TASTE_VERDICTS)[number];
 
 export const TASTE_ASIDE_LABELS: Record<'both' | 'neither' | 'depends', string> = {
   both: 'Both',
-  neither: 'Neither',
-  depends: 'Depends…',
+  neither: 'Neither — I’d rather…',
+  depends: 'Depends on…',
 };
+
+export type NotedVerdict = 'neither' | 'depends';
+
+/** The answers that open a note: required on "depends", where the note is the answer; optional on "neither", where it says what instead. */
+export function takesNote(verdict: TasteVerdictValue): verdict is NotedVerdict {
+  return verdict === 'neither' || verdict === 'depends';
+}
+
+export function noteLength(note: string | undefined): number {
+  return [...(note ?? '').trim()].length;
+}
+
+/** Whether the answer on screen can be kept and the author moved on: an empty "depends" says nothing yet, and no note may run past the limit. */
+export function canSaveAnswer(answer: TasteAnswer | undefined): boolean {
+  if (answer == null) return false;
+  if (noteLength(answer.note) > TASTE_NOTE_MAX) return false;
+  return answer.verdict !== 'depends' || noteLength(answer.note) > 0;
+}
 
 export interface TasteSide {
   text: string;
@@ -102,6 +120,7 @@ export function buildTasteSelection(round: TasteRound, answers: TasteAnswers, re
     if (!offered.has(optionId)) return [];
     const note = answer.note?.trim();
     if (answer.verdict === 'depends') return note ? [{ optionId, verdict: 'depends', note }] : [];
+    if (answer.verdict === 'neither' && note) return [{ optionId, verdict: 'neither', note }];
     return [{ optionId, verdict: answer.verdict }];
   });
   const written = [...new Set(ownReasons.map(reason => reason.trim()).filter(Boolean))].slice(0, TASTE_OWN_REASONS_MAX);
@@ -150,7 +169,9 @@ export function restoreTasteAnswers(entries: LedgerEntryResponse[]): RestoredTas
   for (const entry of entries) {
     const { optionId, verdict } = payloadOf(entry);
     if (entry.topic === TASTE_TOPIC && optionId && isVerdict(verdict)) {
-      restored.answers[optionId] = { verdict, ...(verdict === 'depends' ? { note: entry.statement } : {}) };
+      // A "neither" is two rejections and, when the author said what instead, a direction; only the direction carries the note.
+      const note = verdict === 'depends' || (verdict === 'neither' && entry.kind === 'direction') ? entry.statement : restored.answers[optionId]?.note;
+      restored.answers[optionId] = { verdict, ...(note !== undefined ? { note } : {}) };
       continue;
     }
     if (entry.topic !== TASTE_GAVE_UP_TOPIC || entry.kind !== 'rejected') continue;

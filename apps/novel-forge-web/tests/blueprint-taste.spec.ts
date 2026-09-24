@@ -3,10 +3,13 @@ import { describe, expect, it } from 'bun:test';
 import {
   answerPair,
   buildTasteSelection,
+  canSaveAnswer,
   firstUnansweredPair,
   hasTasteAnswer,
   parseTasteRound,
   restoreTasteAnswers,
+  takesNote,
+  TASTE_NOTE_MAX,
   type TasteAnswers,
   tasteRoundKey,
   toggleReason,
@@ -134,6 +137,13 @@ describe('restoreTasteAnswers', () => {
     });
   });
 
+  it('should read back what the author would rather read, whichever order the three entries of a “neither” arrive in', () => {
+    const rejected = (side: string) => entry({ id: side, kind: 'rejected', topic: 'taste', payload: { optionId: 'p5', verdict: 'neither', side } });
+    const instead = entry({ id: 'i', kind: 'direction', topic: 'taste', statement: 'a rival who is right', payload: { optionId: 'p5', verdict: 'neither' } });
+    expect(restoreTasteAnswers([rejected('a'), instead, rejected('b')]).answers).toEqual({ p5: { verdict: 'neither', note: 'a rival who is right' } });
+    expect(restoreTasteAnswers([instead, rejected('a'), rejected('b')]).answers).toEqual({ p5: { verdict: 'neither', note: 'a rival who is right' } });
+  });
+
   it('should read a “neither” back from either of the two rejections it wrote', () => {
     const rejected = (side: string) => entry({ id: side, kind: 'rejected', topic: 'taste', payload: { optionId: 'p4', verdict: 'neither', side } });
     expect(restoreTasteAnswers([rejected('a'), rejected('b')]).answers).toEqual({ p4: { verdict: 'neither' } });
@@ -155,6 +165,25 @@ describe('restoreTasteAnswers', () => {
   });
 });
 
+describe('canSaveAnswer', () => {
+  it('should open a note only for the answers that take one', () => {
+    expect(['a', 'b', 'both', 'neither', 'depends'].map(verdict => takesNote(verdict as never))).toEqual([false, false, false, true, true]);
+  });
+
+  it('should keep a “neither” with or without words, but a “depends” only once it says what it depends on', () => {
+    expect(canSaveAnswer({ verdict: 'neither' })).toBe(true);
+    expect(canSaveAnswer({ verdict: 'neither', note: 'a rival who is right' })).toBe(true);
+    expect(canSaveAnswer({ verdict: 'depends', note: '   ' })).toBe(false);
+    expect(canSaveAnswer({ verdict: 'depends', note: 'on who is watching' })).toBe(true);
+    expect(canSaveAnswer(undefined)).toBe(false);
+  });
+
+  it('should refuse a note past the limit rather than cut it', () => {
+    expect(canSaveAnswer({ verdict: 'depends', note: 'a'.repeat(TASTE_NOTE_MAX) })).toBe(true);
+    expect(canSaveAnswer({ verdict: 'neither', note: 'a'.repeat(TASTE_NOTE_MAX + 1) })).toBe(false);
+  });
+});
+
 describe('buildTasteSelection', () => {
   const parsed = parseTasteRound(ready());
 
@@ -171,6 +200,13 @@ describe('buildTasteSelection', () => {
     expect(buildTasteSelection(parsed, { p2: { verdict: 'depends', note: '  on who is watching  ' } }, [], []).verdicts).toEqual([
       { optionId: 'p2', verdict: 'depends', note: 'on who is watching' },
     ]);
+  });
+
+  it('should send what the author would rather read with a “neither”, and a bare “neither” when they left it empty', () => {
+    expect(buildTasteSelection(parsed, { p1: { verdict: 'neither', note: '  a rival who is right  ' } }, [], []).verdicts).toEqual([
+      { optionId: 'p1', verdict: 'neither', note: 'a rival who is right' },
+    ]);
+    expect(buildTasteSelection(parsed, { p1: { verdict: 'neither', note: '  ' } }, [], []).verdicts).toEqual([{ optionId: 'p1', verdict: 'neither' }]);
   });
 
   it('should drop answers and reasons the round never offered', () => {

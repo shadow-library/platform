@@ -12,10 +12,13 @@ import { SteerBox } from './SteerBox';
 import {
   answerPair,
   buildTasteSelection,
+  canSaveAnswer,
   firstUnansweredPair,
   hasTasteAnswer,
+  noteLength,
   parseTasteRound,
   restoreTasteAnswers,
+  takesNote,
   TASTE_ASIDE_LABELS,
   TASTE_GAVE_UP_TOPIC,
   TASTE_NOTE_MAX,
@@ -25,6 +28,7 @@ import {
   TASTE_TOPIC,
   type TasteAnswers,
   tasteRoundKey,
+  type TasteVerdictValue,
   toggleReason,
 } from './taste-step';
 import styles from './blueprint.module.css';
@@ -32,6 +36,11 @@ import styles from './blueprint.module.css';
 const RUNNING_LABEL = 'Looking for the pairs worth asking…';
 const ASIDES = ['both', 'neither', 'depends'] as const;
 const LEDGER_QUERY = { topics: `${TASTE_TOPIC},${TASTE_GAVE_UP_TOPIC}` };
+
+const NOTE_COPY = {
+  depends: { label: 'What it depends on', placeholder: 'e.g. depends on whether the loss is his fault', empty: 'Say what it depends on to keep this answer.' },
+  neither: { label: 'What you would rather read', placeholder: 'Optional — e.g. neither: I want the danger to come from people, not the monsters', empty: null },
+} as const;
 
 /** Either-or pairs the author taps their way through: what they choose becomes taste directions, what stopped them becomes rejections. */
 export function TasteStep({ projectId, step, onLocked }: StepScreenProps): ReactElement {
@@ -77,19 +86,37 @@ export function TasteStep({ projectId, step, onLocked }: StepScreenProps): React
   const canLock = hasTasteAnswer(selection);
   const position = Math.min(index, Math.max(0, parsed.pairs.length - 1));
   const pair = parsed.pairs[position];
+  const pairAnswer = pair ? answers[pair.id] : undefined;
+  const noteOver = noteLength(pairAnswer?.note) > TASTE_NOTE_MAX;
+  const noteEmptyHint = pairAnswer?.verdict === 'depends' && noteLength(pairAnswer.note) === 0 ? NOTE_COPY.depends.empty : null;
   const pairsFull = parsed.pairs.length >= TASTE_PAIR_MAX;
 
   const run = (): void => {
     startRound.mutate(buildRoundBody(draft), { onSuccess: () => setDraft(EMPTY_STEER), onError: err => toast.danger(err.message) });
   };
 
-  const answer = (verdict: 'a' | 'b' | 'both' | 'neither' | 'depends'): void => {
+  const nextUnanswered = (updated: TasteAnswers): number | null => {
+    const after = parsed.pairs.findIndex((candidate, at) => at > position && updated[candidate.id] == null);
+    if (after !== -1) return after;
+    const before = parsed.pairs.findIndex(candidate => updated[candidate.id] == null);
+    return before === -1 ? null : before;
+  };
+
+  // A note-taking answer stays open for its words and moves on only when saved; tapping it again keeps the note rather than clearing it.
+  const answer = (verdict: TasteVerdictValue): void => {
     if (!pair) return;
     const current = answers[pair.id];
-    const next = current?.verdict === verdict && verdict !== 'depends' ? null : { verdict, note: verdict === 'depends' ? (current?.note ?? '') : undefined };
-    const updated = answerPair(answers, pair.id, next);
-    setAnswers(updated);
-    if (next != null && verdict !== 'depends') setIndex(Math.min(position + 1, parsed.pairs.length - 1));
+    const noted = takesNote(verdict);
+    const next = current?.verdict === verdict && !noted ? null : { verdict, ...(noted ? { note: current?.note ?? '' } : {}) };
+    setAnswers(answerPair(answers, pair.id, next));
+    if (next != null && !noted) setIndex(Math.min(position + 1, parsed.pairs.length - 1));
+  };
+
+  const saveAndNext = (): void => {
+    if (!pair || !canSaveAnswer(answers[pair.id])) return;
+    const target = nextUnanswered(answers);
+    if (target === null) return void toast.success('Every pair has an answer. Save your taste below when you are ready.');
+    setIndex(target);
   };
 
   const addOwnReason = (): void => {
@@ -154,7 +181,7 @@ export function TasteStep({ projectId, step, onLocked }: StepScreenProps): React
             </span>
           </div>
           <div className={styles.progress} role="presentation">
-            <i style={{ width: `${(Object.keys(answers).length / parsed.pairs.length) * 100}%` }} />
+            <i style={{ width: `${(Object.values(answers).filter(canSaveAnswer).length / parsed.pairs.length) * 100}%` }} />
           </div>
 
           <div className={styles.pair}>
@@ -181,16 +208,33 @@ export function TasteStep({ projectId, step, onLocked }: StepScreenProps): React
             </Button>
           </div>
 
-          {answers[pair.id]?.verdict === 'depends' && (
-            <Textarea
-              placeholder="e.g. depends on whether the loss is his fault"
-              value={answers[pair.id]?.note ?? ''}
-              onValueChange={note => setAnswers(current => answerPair(current, pair.id, { verdict: 'depends', note }))}
-              maxLength={TASTE_NOTE_MAX}
-              minRows={2}
-              autoGrow
-              aria-label="What it depends on"
-            />
+          {pairAnswer != null && takesNote(pairAnswer.verdict) && (
+            <div className={styles.tasteNote}>
+              <Textarea
+                placeholder={NOTE_COPY[pairAnswer.verdict].placeholder}
+                value={pairAnswer.note ?? ''}
+                onValueChange={note => setAnswers(current => answerPair(current, pair.id, { verdict: pairAnswer.verdict, note }))}
+                minRows={2}
+                maxRows={10}
+                autoGrow
+                aria-label={NOTE_COPY[pairAnswer.verdict].label}
+                aria-invalid={noteOver || undefined}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return;
+                  event.preventDefault();
+                  saveAndNext();
+                }}
+              />
+              <div className={styles.cardActions}>
+                <span className={styles.steerCount} data-over={noteOver || undefined} aria-live="polite">
+                  {noteEmptyHint ?? `${noteLength(pairAnswer.note).toLocaleString()} / ${TASTE_NOTE_MAX.toLocaleString()}`}
+                </span>
+                <span className={styles.spacer} />
+                <Button size="sm" variant="primary" disabled={busy || !canSaveAnswer(pairAnswer)} onClick={saveAndNext}>
+                  Save and next
+                </Button>
+              </div>
+            </div>
           )}
         </section>
       )}

@@ -240,6 +240,12 @@
   font-weight: 500;
 }
 
+.tasteNote {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .steerCount {
   font-size: var(--sh-text-caption);
   font-variant-numeric: tabular-nums;

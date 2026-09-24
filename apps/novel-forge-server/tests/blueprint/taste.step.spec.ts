@@ -112,15 +112,26 @@ describe('tasteStep.materialise', () => {
     expect(plan.entries[0]).toMatchObject({ kind: 'direction', statement: 'slow-burn rise and early triumph' });
   });
 
-  it('should reject both sides, as this pair’s answer, when the author would read neither', async () => {
+  it('should reject both scenes, not their labels, as this pair’s answer when the author would read neither', async () => {
     const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'neither' }] }), options());
     expect(plan.entries).toHaveLength(2);
     expect(plan.entries.map(entry => [entry.kind, entry.topic, entry.statement])).toEqual([
-      ['rejected', 'taste', 'slow-burn rise'],
-      ['rejected', 'taste', 'early triumph'],
+      ['rejected', 'taste', 'She loses the first three trials and learns from each'],
+      ['rejected', 'taste', 'She wins the first trial nobody expected her to'],
     ]);
     expect(plan.replaces).toEqual(['taste']);
     expect(plan.retires).toEqual(['p1']);
+  });
+
+  it('should keep what the author would rather read as this pair’s direction, beside the two rejections', async () => {
+    const note = '  Neither: she should lose to a friend, not a stranger  ';
+    const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'neither', note }] }), options());
+    expect(plan.entries.map(entry => [entry.kind, entry.statement, entry.payload])).toEqual([
+      ['rejected', 'She loses the first three trials and learns from each', { optionId: 'p1', verdict: 'neither', side: 'a' }],
+      ['rejected', 'She wins the first trial nobody expected her to', { optionId: 'p1', verdict: 'neither', side: 'b' }],
+      ['direction', note.trim(), { optionId: 'p1', verdict: 'neither' }],
+    ]);
+    expect(plan.entries[2]?.why).toBe('Rather than either side of “slow-burn rise or early triumph”.');
   });
 
   it('should retire every pair on screen, so taking a verdict back takes its direction with it', async () => {
@@ -225,17 +236,45 @@ describe('tasteStep re-lock', () => {
     const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'neither' }] }), options());
     const reconciled = reconcileLockEntries(tasteStep, plan, active());
     expect(reconciled.withdraw.map(entry => entry.id)).toEqual([40n]);
-    expect(reconciled.append.map(entry => entry.statement)).toEqual(['slow-burn rise', 'early triumph']);
+    expect(reconciled.append.map(entry => entry.statement)).toEqual(['She loses the first three trials and learns from each', 'She wins the first trial nobody expected her to']);
   });
 
   it('should keep a pair answered neither twice answered', async () => {
     const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'neither' }] }), options(), [
-      ledgerEntry({ id: 50n, kind: 'rejected', topic: 'taste', stepKey: 'taste', statement: 'slow-burn rise', payload: { optionId: 'p1', verdict: 'neither', side: 'a' } }),
-      ledgerEntry({ id: 51n, kind: 'rejected', topic: 'taste', stepKey: 'taste', statement: 'early triumph', payload: { optionId: 'p1', verdict: 'neither', side: 'b' } }),
+      ledgerEntry({
+        id: 50n,
+        kind: 'rejected',
+        topic: 'taste',
+        stepKey: 'taste',
+        statement: 'She loses the first three trials and learns from each',
+        payload: { optionId: 'p1', verdict: 'neither', side: 'a' },
+      }),
+      ledgerEntry({
+        id: 51n,
+        kind: 'rejected',
+        topic: 'taste',
+        stepKey: 'taste',
+        statement: 'She wins the first trial nobody expected her to',
+        payload: { optionId: 'p1', verdict: 'neither', side: 'b' },
+      }),
     ]);
     const reconciled = reconcileLockEntries(tasteStep, plan, [
-      ledgerEntry({ id: 50n, kind: 'rejected', topic: 'taste', stepKey: 'taste', statement: 'slow-burn rise', payload: { optionId: 'p1', verdict: 'neither', side: 'a' } }),
-      ledgerEntry({ id: 51n, kind: 'rejected', topic: 'taste', stepKey: 'taste', statement: 'early triumph', payload: { optionId: 'p1', verdict: 'neither', side: 'b' } }),
+      ledgerEntry({
+        id: 50n,
+        kind: 'rejected',
+        topic: 'taste',
+        stepKey: 'taste',
+        statement: 'She loses the first three trials and learns from each',
+        payload: { optionId: 'p1', verdict: 'neither', side: 'a' },
+      }),
+      ledgerEntry({
+        id: 51n,
+        kind: 'rejected',
+        topic: 'taste',
+        stepKey: 'taste',
+        statement: 'She wins the first trial nobody expected her to',
+        payload: { optionId: 'p1', verdict: 'neither', side: 'b' },
+      }),
     ]);
     expect(reconciled.supersede.map(pair => pair.previous.id)).toEqual([50n, 51n]);
     expect(reconciled.withdraw).toHaveLength(0);
@@ -245,7 +284,10 @@ describe('tasteStep re-lock', () => {
     const plan = await materialise(selection({ verdicts: [{ optionId: 'p1', verdict: 'a' }] }), options());
     const banned = (side: string, statement: string) =>
       ledgerEntry({ id: side === 'a' ? 50n : 51n, kind: 'rejected', topic: 'taste', stepKey: 'taste', statement, payload: { optionId: 'p1', verdict: 'neither', side } });
-    const reconciled = reconcileLockEntries(tasteStep, plan, [banned('a', 'slow-burn rise'), banned('b', 'early triumph')]);
+    const reconciled = reconcileLockEntries(tasteStep, plan, [
+      banned('a', 'She loses the first three trials and learns from each'),
+      banned('b', 'She wins the first trial nobody expected her to'),
+    ]);
     expect(reconciled.withdraw.map(entry => entry.id)).toEqual([50n, 51n]);
     expect(reconciled.append.map(entry => entry.statement)).toEqual(['slow-burn rise']);
   });

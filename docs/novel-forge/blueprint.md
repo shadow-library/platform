@@ -40,7 +40,9 @@ Seven phases in a fixed order, grouped by altitude:
   cuts text silently; an over-long starting point is refused with a live word count, not trimmed. A long starting text rides on top of a step's context budget rather
   than crowding out what the step reads.
 - **Taste.** Either-or pairs shaped by the starting point, answerable with both, neither or "depends" plus a reason, and "a book you gave up on: why?" reasons. Taste
-  becomes directions; dislikes become rejected entries.
+  becomes directions; dislikes become rejected entries. A pick records the axis the pair tests, with the scenes only as its reason, so a quick answer never hardens into
+  plot. "Neither" rejects the two scenes, never the axis, and takes an optional line on what the author would rather read, kept as a direction: "not this example" must
+  not rule out a whole region of the story.
 - **Concepts.** Rounds of four concept cards. The author's own idea is always one of the cards. Each card can be kept, killed with a reason, mixed into another, edited or
   pushed further; the whole round can be steered. Earlier rounds never return to the model.
 - **Premise.** One sentence with its load-bearing parts highlighted. Opening a part regenerates alternatives for that part only; the author can write their own. A throwaway
