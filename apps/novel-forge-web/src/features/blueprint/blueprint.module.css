@@ -1158,3 +1158,65 @@
 .coverageRow span {
   color: var(--sh-text-secondary);
 }
+
+/* Organise my notes */
+.organiseGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.organiseGroup + .organiseGroup {
+  padding-top: 10px;
+  border-top: 1px dashed var(--sh-border-subtle);
+}
+
+.organiseRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .organiseRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.organisePage {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface);
+}
+
+.organisePageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.organiseSection {
+  display: grid;
+  gap: 4px;
+  padding-left: 24px;
+}
+
+.organiseText {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.organiseWarning {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-warning-text);
+}

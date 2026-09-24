@@ -9,7 +9,7 @@ import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type PlannedLedgerEntry, type SourcedScreenStep } from '../engine/blueprint-step.types';
 import { mergeLedgerLinks } from '../ledger/ledger-entries';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
-import { contentKey, lockedLinks, removedContentOps, shortName } from './content-keys';
+import { contentKey, linkedByOtherSteps, lockedLinks, removedContentOps, shortName } from './content-keys';
 import { ENGINE_STEP_KEY, type EngineOptions, type WorldSliceOptions } from './engine.step';
 
 export const WORLD_STEP_KEY = 'world';
@@ -167,7 +167,7 @@ export const worldStep: SourcedScreenStep<EngineOptions, WorldSliceOptions | nul
       { op: 'bible_document.upsert', ...POWER_PAGE, body: costBody(powerPage, selection) },
       factOp(COST_RULE_KEY, selection.cost.rule.trim(), selection.cost.why, COST_RULE_KEY),
       ...keyed.map(({ rule, factKey, entityKey }) => factOp(factKey, rule.rule.trim(), rule.why, entityKey)),
-      ...removedContentOps(lockedLinks(ledger, WORLD_STEP_KEY), mergeLedgerLinks(costLinks, ruleLinks)),
+      ...removedContentOps(lockedLinks(ledger, WORLD_STEP_KEY), mergeLedgerLinks(costLinks, ruleLinks), new Set(), linkedByOtherSteps(ledger, WORLD_STEP_KEY)),
     ];
 
     const offered = round?.options ?? null;

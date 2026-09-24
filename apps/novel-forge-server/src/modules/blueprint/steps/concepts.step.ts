@@ -14,6 +14,7 @@ import {
 } from '../../ai/schemas/blueprint-concepts.schema';
 import { withoutKnownRejections } from '../engine/blueprint-round';
 import { type PlannedLedgerEntry, type ScreenStep, type StepInputContext } from '../engine/blueprint-step.types';
+import { organisedTimelineInput } from './organised-timeline';
 
 export const CONCEPTS_TOPIC = 'concepts';
 /** Kills live apart from the kept card so a later lock can never replace them: a refusal the author gave a reason for is permanent. */
@@ -121,9 +122,9 @@ export const conceptsStep: ScreenStep<BlueprintConceptsOutput, ConceptsOptions, 
   optionsSchema: ConceptsOptions,
   selectionSchema: ConceptsSelection,
 
-  inputs(context: StepInputContext<ConceptsOptions>): Promise<BlueprintInputSection[]> {
+  async inputs(context: StepInputContext<ConceptsOptions>): Promise<BlueprintInputSection[]> {
     const shown = context.previous?.cards.length ? renderShown(context.previous) : '';
-    return Promise.resolve([...authorBriefInput(context.ledger), ...(shown ? [{ key: 'already_shown', content: shown }] : [])]);
+    return [...authorBriefInput(context.ledger), ...(await organisedTimelineInput(context)), ...(shown ? [{ key: 'already_shown', content: shown }] : [])];
   },
 
   toRound(output) {

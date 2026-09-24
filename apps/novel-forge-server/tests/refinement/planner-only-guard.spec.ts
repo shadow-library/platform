@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'bun:test';
+
+import { autoApplies, chatTurnWarnings, PLANNER_ONLY_WARNING, readsPlannerOnlyPage } from '@modules/refinement/planner-only-guard';
+
+describe('planner-only guard', () => {
+  it('should notice a lookup that read the organised timeline or the open questions, and no other page', () => {
+    expect(readsPlannerOnlyPage('get_bible_document', { section: 'project', slug: 'timeline' })).toBe(true);
+    expect(readsPlannerOnlyPage('get_bible_document', { section: 'project', slug: 'open-questions' })).toBe(true);
+    expect(readsPlannerOnlyPage('get_bible_document', { section: 'world', slug: 'timeline' })).toBe(false);
+    expect(readsPlannerOnlyPage('get_entity', { section: 'project', slug: 'timeline' })).toBe(false);
+    expect(readsPlannerOnlyPage('get_bible_document', null)).toBe(false);
+  });
+
+  it('should warn once on a turn that read one, and leave any other turn’s warnings as they are', () => {
+    expect(chatTurnWarnings([], true)).toEqual([PLANNER_ONLY_WARNING]);
+    expect(chatTurnWarnings(['echo'], true)).toEqual(['echo', PLANNER_ONLY_WARNING]);
+    expect(chatTurnWarnings([PLANNER_ONLY_WARNING], true)).toEqual([PLANNER_ONLY_WARNING]);
+    expect(chatTurnWarnings(['echo'], false)).toEqual(['echo']);
+  });
+
+  it('should hold an auto-mode proposal drawn from a planner-only page for review, and apply a clean one', () => {
+    expect(autoApplies('auto', { warnings: chatTurnWarnings([], true) })).toBe(false);
+    expect(autoApplies('auto', { warnings: [] })).toBe(true);
+    expect(autoApplies('auto', { warnings: null })).toBe(true);
+    expect(autoApplies('manual', { warnings: [] })).toBe(false);
+    expect(autoApplies('auto', null)).toBe(false);
+  });
+});

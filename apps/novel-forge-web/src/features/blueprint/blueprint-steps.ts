@@ -20,6 +20,8 @@ export interface BlueprintStepMeta {
   costToChange?: CostToChange;
   /** The label of the button that turns the chosen options into decisions. */
   lockLabel?: string;
+  /** What to say when the novel's decisions rule the step out; the default speaks of the reader promise, which rules most steps out. */
+  notNeeded?: { title: string; description: string };
 }
 
 /**
@@ -35,6 +37,18 @@ export const BLUEPRINT_STEP_META: Record<string, BlueprintStepMeta> = {
     lede: 'A scene, a feeling, “like X but Y”, a character, a single image. Leave it empty if there’s nothing yet.',
     costToChange: 'cheap',
     lockLabel: 'Save the starting point',
+  },
+  organise: {
+    key: 'organise',
+    label: 'Organise my notes',
+    title: 'Your notes, organised',
+    lede: 'One long read of everything you wrote: Story Bible pages in your own terms, a timeline and the questions your notes leave open. Anything the model would add is kept apart, for you to accept or turn down one by one.',
+    costToChange: 'cheap',
+    lockLabel: 'Add to my Story Bible',
+    notNeeded: {
+      title: 'Nothing long enough to organise yet',
+      description: 'This step is offered when your starting point runs to about 600 words or more. Add your notes on the Starting point step to use it.',
+    },
   },
   taste: {
     key: 'taste',

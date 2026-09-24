@@ -5,7 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { renderChapterBrief } from '@server/common';
 import { type DbExecutor, type Ledger, schema } from '@server/database';
 
-import { renderBibleDigest } from '../../ai/context/bible-docs';
+import { isPlannerOnlyBibleDoc, renderBibleDigest } from '../../ai/context/bible-docs';
 import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
 import { blueprintVoicePrompt } from '../../ai/prompts/blueprint-voice.prompt';
 import { type BlueprintVoiceOutput, VOICE_LABEL_MAX, VOICE_LINE_MAX, VOICE_NOTES_MAX, VOICE_SAMPLE_MAX, VOICE_SAMPLES_MAX } from '../../ai/schemas/blueprint-voice.schema';
@@ -96,13 +96,16 @@ async function openingChapter(db: Pick<DbExecutor, 'query'>, projectId: bigint):
   };
 }
 
+/** Only the pages the brief cites, matched by section and slug, and never a planner-only one: the samples are written as chapter one. */
 async function citedPagesSection(db: Pick<DbExecutor, 'query'>, projectId: bigint, refs: string[]): Promise<BlueprintInputSection | null> {
-  const slugs = refs.map(ref => ref.slice('bible_doc:'.length).split('/')[1] ?? '').filter(Boolean);
+  const cited = new Set(refs.map(ref => ref.slice('bible_doc:'.length)));
+  const slugs = [...cited].map(address => address.split('/')[1] ?? '').filter(Boolean);
   if (slugs.length === 0) return null;
-  const documents = await db.query.bibleDocuments.findMany({
+  const rows = await db.query.bibleDocuments.findMany({
     columns: { section: true, slug: true, frontmatter: true, body: true },
     where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.slug, slugs)),
   });
+  const documents = rows.filter(doc => cited.has(`${doc.section}/${doc.slug}`) && !isPlannerOnlyBibleDoc(doc));
   const digest = renderBibleDigest(documents, { totalTokens: VOICE_PAGES_BUDGET, perDocTokens: VOICE_PAGE_TOKENS, coreOnly: false });
   return digest.text ? { key: 'voice_pages', content: digest.text } : null;
 }

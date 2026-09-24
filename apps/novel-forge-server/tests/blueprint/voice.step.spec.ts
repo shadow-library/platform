@@ -118,6 +118,24 @@ describe('voiceStep.inputs', () => {
     expect(await scopeFor([])).toContain('Lyrical third');
   });
 
+  it('should read only the pages chapter one cites, by section and slug, and never a planner-only one', async () => {
+    const brief = { chapter: 1, title: 'The Round', body: 'He walks the round.', contextRefs: ['bible_doc:world/timeline', 'bible_doc:project/timeline', 'bible_doc:world/river'] };
+    const documents = [
+      { section: 'project', slug: 'timeline', frontmatter: null, body: '# Timeline\n\n- The ferryman takes the throne' },
+      { section: 'world', slug: 'timeline', frontmatter: null, body: '# Tides\n\nThe tide turns twice a day.' },
+      { section: 'plot', slug: 'river', frontmatter: null, body: '# River plot\n\nNot cited.' },
+      { section: 'world', slug: 'river', frontmatter: null, body: '# River\n\nThe river runs east.' },
+    ];
+    const citing = { query: { briefs: { findFirst: async () => brief }, bibleDocuments: { findMany: async () => documents } } };
+    const sections = await voiceStep.inputs!({ projectId: 7n, project: {}, ledger: [], db: citing, previous: null, input: null, focus: null, catalog: async () => '' } as never);
+    const pages = sections.find(section => section.key === 'voice_pages')?.content ?? '';
+
+    expect(pages).toContain('The tide turns twice a day.');
+    expect(pages).toContain('The river runs east.');
+    expect(pages).not.toContain('takes the throne');
+    expect(pages).not.toContain('Not cited.');
+  });
+
   it('should always offer the two that face each other, whatever the third is', async () => {
     const scope = await scopeFor([promise(['mystery'])]);
     expect(scope).toContain('Close third, past, dry and concrete');

@@ -25,6 +25,7 @@ import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { requestedNegations } from './negation-echo';
+import { autoApplies, chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
@@ -486,9 +487,10 @@ export class ChatService {
       // fold the results into the conversation, and re-invoke — bounded, audited, hub-only.
       let output = await invoke();
       const lookupCallCounts = new Map<string, number>();
+      const planner = { read: false };
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, round, relay);
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, round, relay, planner);
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
         relay?.supersedeOnNextDelta();
@@ -514,14 +516,14 @@ export class ChatService {
         }
       }
 
-      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, warnings);
+      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, chatTurnWarnings(warnings, planner.read));
     });
 
     this.logger.debug('chat turn complete', { projectId, sessionId, runId, hasProposal: !!result.proposal, proposalId: result.proposal?.id });
 
-    if (session.mode === 'auto' && result.proposal?.warnings?.length) return { ...result, applyNote: AUTO_APPLY_HELD_NOTE, runId };
-    // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply).
+    // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply), unless something on it asks for review first.
     if (session.mode === 'auto' && result.proposal) {
+      if (!autoApplies(session.mode, result.proposal)) return { ...result, applyNote: AUTO_APPLY_HELD_NOTE, runId };
       const settled = await this.autoApply(projectId, result.proposal);
       return { ...result, ...settled, runId };
     }
@@ -594,6 +596,7 @@ export class ChatService {
     callCounts: Map<string, number>,
     round: number,
     relay: EmitterRelay | null,
+    planner: { read: boolean },
   ): Promise<string> {
     const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
     const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
@@ -626,6 +629,7 @@ export class ChatService {
             resultStr = typeof result === 'string' ? result : JSON.stringify(result);
             if (rawTool.tokensBudget > 0 && resultStr.length > rawTool.tokensBudget * 4) resultStr = resultStr.slice(0, rawTool.tokensBudget * 4) + '\n...[truncated]';
             auditStatus = 'ok';
+            if (readsPlannerOnlyPage(lookup.tool, parsed.data)) planner.read = true;
           } catch (err) {
             this.logger.error('lookup handler error', { err, tool: lookup.tool });
             resultStr = 'error: lookup failed';

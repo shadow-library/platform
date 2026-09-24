@@ -8,6 +8,7 @@ import { CheckStep } from './CheckStep';
 import { ConceptsStep } from './ConceptsStep';
 import { HeartStep } from './HeartStep';
 import { OppositionStep } from './OppositionStep';
+import { OrganiseStep } from './OrganiseStep';
 import { PowerStep } from './PowerStep';
 import { PlacesStep } from './PlacesStep';
 import { PremiseStep } from './PremiseStep';
@@ -25,6 +26,7 @@ export type StepScreenRenderer = (props: StepScreenProps) => ReactElement;
 /** The screen each step key renders. A step the server registers before its screen exists is simply absent here. */
 export const BLUEPRINT_STEP_SCREENS: Record<string, StepScreenRenderer> = {
   start: props => <StartStep {...props} />,
+  organise: props => <OrganiseStep {...props} />,
   taste: props => <TasteStep {...props} />,
   concepts: props => <ConceptsStep {...props} />,
   premise: props => <PremiseStep {...props} />,

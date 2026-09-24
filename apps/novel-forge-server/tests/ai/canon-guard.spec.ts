@@ -362,7 +362,7 @@ describe('planning prompt gates', () => {
 });
 
 describe('catalog canon guard', () => {
-  function stubCatalog(rows: { entities?: unknown[]; worldFacts?: unknown[]; canonFacts?: unknown[] }): CatalogService {
+  function stubCatalog(rows: { entities?: unknown[]; worldFacts?: unknown[]; canonFacts?: unknown[]; bibleDocuments?: unknown[] }): CatalogService {
     const table = (data: unknown[] = []) => ({ findMany: async () => data });
     const db = {
       query: {
@@ -374,11 +374,24 @@ describe('catalog canon guard', () => {
         mysteries: table(),
         canonFacts: table(rows.canonFacts),
         characterKnowledge: table(),
-        bibleDocuments: table(),
+        bibleDocuments: table(rows.bibleDocuments),
       },
     };
     return new CatalogService({ getPostgresClient: () => db } as never);
   }
+
+  it('should never offer the organised timeline or the open questions for an outliner to cite', async () => {
+    const bibleDocuments = [
+      { section: 'project', slug: 'timeline', frontmatter: null, body: '# Timeline\n\n- The bell ringer is crowned' },
+      { section: 'project', slug: 'open-questions', frontmatter: null, body: '# Open questions\n\n1. Who rang the bell?' },
+      { section: 'world', slug: 'bells', frontmatter: null, body: '# Bells\n\nEvery tower has one.' },
+    ];
+    const rendered = await stubCatalog({ bibleDocuments }).render(1n, { documents: true });
+
+    expect(rendered).toContain('bible_doc:world/bells');
+    expect(rendered).not.toContain('bible_doc:project/timeline');
+    expect(rendered).not.toContain('bible_doc:project/open-questions');
+  });
 
   const rows = {
     entities: [{ entityKey: 'emberweave', type: 'power_rule', status: 'active', significance: 'major', body: 'Emberweave only warms; it never cools.', notes: null }],

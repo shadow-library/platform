@@ -29,6 +29,8 @@ export * from './NotebookPanel';
 export * from './opposition-step';
 export * from './OppositionStep';
 export * from './OptionCard';
+export * from './organise-step';
+export * from './OrganiseStep';
 export * from './PassSliceAlert';
 export * from './PhaseHeader';
 export * from './power-step';

@@ -18,6 +18,7 @@ import {
 } from '../../ai/schemas/blueprint-premise.schema';
 import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type ScreenStep } from '../engine/blueprint-step.types';
+import { organisedTimelineInput } from './organised-timeline';
 import { loadPageBody, upsertPageSections } from './bible-page';
 
 export const PREMISE_TOPIC = 'premise';
@@ -149,8 +150,8 @@ export const premiseStep: ScreenStep<BlueprintPremiseOutput, PremiseOptions, Pre
   inputSchema: PremiseInput,
   selectionSchema: PremiseSelection,
 
-  inputs(context) {
-    return Promise.resolve(authorBriefInput(context.ledger));
+  async inputs(context) {
+    return [...authorBriefInput(context.ledger), ...(await organisedTimelineInput(context))];
   },
 
   renderInput(input) {

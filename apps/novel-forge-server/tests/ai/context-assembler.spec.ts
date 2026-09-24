@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { ARC_PLAN_TIMELINE_TOKENS, ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
@@ -459,6 +459,68 @@ describe('ContextAssembler.forChapter — established state carry', () => {
   });
 });
 
+describe('ContextAssembler.forArcPlanning — the organised timeline', () => {
+  const timeline = { section: 'project', slug: 'timeline', frontmatter: null, body: '# Timeline\n\n## Later\n\n- The ferryman takes the throne' };
+  const organised = {
+    kind: 'decision',
+    topic: 'organise',
+    statement: 'Organised.',
+    links: { bibleDocuments: [{ section: 'project', slug: 'timeline' }] },
+    payload: { notesDigest: '00000000' },
+  };
+
+  it('should give an arc planner the author’s organised timeline whole, rule first', async () => {
+    const assembler = makeAssembler({
+      query: { bibleDocuments: { findMany: mock(async () => [timeline]) }, decisionLedgerEntries: { findMany: mock(async () => [organised]) } },
+    });
+    const pack = await assembler.forArcPlanning(1n, 'volume_2');
+    const section = pack.sections.find(candidate => candidate.key === 'organised_timeline');
+
+    expect(section?.required).toBe(true);
+    expect(section?.rendered).toContain('happens where it is placed and never in the opening');
+    expect(section?.rendered).toContain('- The ferryman takes the throne');
+  });
+
+  it('should cap the timeline at its own ceiling, since the author may add sections of their own to the page', async () => {
+    const long = { ...timeline, body: `# Timeline\n\n## Later\n\n${Array.from({ length: 4_000 }, (_, index) => `- Event ${index} happens.`).join('\n\n')}` };
+    const assembler = makeAssembler({
+      query: { bibleDocuments: { findMany: mock(async () => [long]) }, decisionLedgerEntries: { findMany: mock(async () => [organised]) } },
+    });
+    const pack = await assembler.forArcPlanning(1n, 'volume_2', { budgetTokens: 1_000_000 });
+    const section = pack.sections.find(candidate => candidate.key === 'organised_timeline');
+
+    expect(section?.truncated).toBe(true);
+    expect(section?.tokens).toBeLessThanOrEqual(ARC_PLAN_TIMELINE_TOKENS + 50);
+    expect(section?.rendered).toContain('- Event 0 happens.');
+  });
+
+  it('should leave the timeline out until an organise lock has written it', async () => {
+    const assembler = makeAssembler({ query: { bibleDocuments: { findMany: mock(async () => [timeline]) } } });
+    const pack = await assembler.forArcPlanning(1n, 'volume_2');
+    expect(pack.sections.some(candidate => candidate.key === 'organised_timeline')).toBe(false);
+    expect(pack.rendered).not.toContain('takes the throne');
+  });
+});
+
+describe('ContextAssembler.forChatTurn — planner-only pages', () => {
+  it('should list the organised timeline by address alone, so its content reaches a chat turn only through a lookup', async () => {
+    const bibleDocuments = [
+      { section: 'project', slug: 'timeline', body: '# Timeline\n\n## The ending\n\n- The ferryman takes the throne', revision: 1, updatedAt: new Date(0) },
+      { section: 'world', slug: 'river', body: 'The river runs east.', revision: 1, updatedAt: new Date(0) },
+    ];
+    const assembler = makeAssembler({
+      query: { bibleDocuments: { findMany: mock(async () => bibleDocuments) }, briefs: { findFirst: mock(async () => null), findMany: mock(async () => []) } },
+      $count: mock(async () => 0),
+    });
+    const pack = await assembler.forChatTurn(1n, { createdAt: new Date(1) } as never);
+    const inventory = pack.sections.find(section => section.key === 'doc_inventory')?.rendered ?? '';
+
+    expect(inventory).toContain('world/river: The river runs east.');
+    expect(inventory).toContain('project/timeline: (planner-only');
+    expect(pack.rendered).not.toContain('takes the throne');
+  });
+});
+
 describe('ContextAssembler — writer-pack scrub', () => {
   const HIDDEN_TEXT = 'The ferryman is the drowned heir of the tide court';
   const TERM = 'tide court';
@@ -550,6 +612,25 @@ describe('ContextAssembler — writer-pack scrub', () => {
     expect(sectionOf(pack, 'ref:bible_doc:world/river')).toContain('The river runs east. [withheld].');
     expect(sectionOf(pack, 'writing_style')).toContain('Keep it quiet: [withheld].');
     expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+  });
+
+  it('should never carry the organised timeline or the open questions into a chapter pack, even when a brief cites them', async () => {
+    const bibleDocuments = [
+      { section: 'project', slug: 'timeline', body: '# Timeline\n\n## The ending\n\n- The ferryman takes the throne' },
+      { section: 'project', slug: 'open-questions', body: '# Open questions\n\n1. **Who drowned the heir?**' },
+      { section: 'world', slug: 'river', body: 'The river runs east.' },
+    ];
+    const fixture = scrubDb({ brief: { contextRefs: ['bible_doc:project/timeline', 'bible_doc:project/open-questions', 'bible_doc:world/river'] }, bibleDocuments });
+    const assembler = makeAssembler(fixture);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
+
+    expect(sectionOf(pack, 'ref:bible_doc:world/river')).toContain('The river runs east.');
+    expect(pack.rendered).not.toContain('takes the throne');
+    expect(pack.rendered).not.toContain('Who drowned the heir');
+    expect(await assembler.sanitizeOutlinedRefs(1n, ['bible_doc:project/timeline', 'bible_doc:world/river'])).toEqual({
+      kept: ['bible_doc:world/river'],
+      dropped: ['bible_doc:project/timeline'],
+    });
   });
 
   it('should label a stale predecessor draft in its ending, carried state and summary', async () => {

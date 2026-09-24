@@ -110,7 +110,7 @@ describe('BlueprintStepService.openRound', () => {
       input: { text: 'A ferry town.' },
     });
 
-    expect(calls).toEqual(['lock:start', 'read:project', 'read:latest', 'read:ready', 'ledger.append', 'create']);
+    expect(calls).toEqual(['lock:start', 'read:project', 'read:ledger', 'read:latest', 'read:ready', 'ledger.append', 'create']);
     expect(rounds.lockStep.mock.calls[0]?.[2]).toBe(tx as never);
     expect(ledger.append.mock.calls[0]?.[1]).toEqual([
       { kind: 'direction', phase: 'idea', topic: 'start.steer', statement: 'Quieter', decidedBy: 'author' },
@@ -140,13 +140,22 @@ describe('BlueprintStepService.openRound', () => {
   it('should settle a round whose job was cancelled underneath it before opening the next', async () => {
     const { service, calls } = fakeService({ latest: { round: round({ status: 'pending' }), jobStatus: 'cancelled' } });
     await service.openRound(7n, 'start', {});
-    expect(calls).toEqual(['lock:start', 'read:project', 'read:latest', 'settle', 'read:ready', 'create']);
+    expect(calls).toEqual(['lock:start', 'read:project', 'read:ledger', 'read:latest', 'settle', 'read:ready', 'create']);
   });
 
   it('should refuse malformed input, a nudge the step does not offer and a project that is not an original novel', async () => {
     await expect(fakeService().service.openRound(7n, 'start', { input: { startingType: 'poem' } })).rejects.toMatchObject({ code: 'BPR_004' });
     await expect(fakeService().service.openRound(7n, 'start', { nudges: ['Make it a heist'] })).rejects.toMatchObject({ code: 'BPR_004' });
     await expect(fakeService({ projectKind: 'translation' }).service.openRound(7n, 'start', {})).rejects.toMatchObject({ code: 'BPR_003' });
+  });
+
+  it('should refuse a round on a step the novel’s decisions rule out, before spending anything on it', async () => {
+    const ruledOut = blueprintStep({ ...startStep, appliesWhen: () => false });
+    const { service, rounds, ledger } = fakeService({}, [ruledOut]);
+
+    await expect(service.openRound(7n, 'start', {})).rejects.toMatchObject({ code: 'BPR_010' });
+    expect(ledger.append).not.toHaveBeenCalled();
+    expect(rounds.create).not.toHaveBeenCalled();
   });
 });
 
@@ -301,6 +310,15 @@ describe('BlueprintStepService.lock', () => {
     await expect(fakeService().service.lock(7n, 'start', selection)).rejects.toMatchObject({ code: 'BPR_005' });
     await expect(fakeService({ ready: readyRound }).service.lock(7n, 'start', { chips: [] })).rejects.toMatchObject({ code: 'BPR_004' });
   });
+
+  it('should refuse to lock a step the novel’s decisions have since ruled out', async () => {
+    const ruledOut = blueprintStep({ ...startStep, appliesWhen: () => false });
+    const { service, ledger, proposals } = fakeService({ ready: readyRound }, [ruledOut]);
+
+    await expect(service.lock(7n, 'start', selection)).rejects.toMatchObject({ code: 'BPR_010' });
+    expect(ledger.append).not.toHaveBeenCalled();
+    expect(proposals.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('BlueprintStepService.state', () => {
@@ -314,5 +332,18 @@ describe('BlueprintStepService.state', () => {
     expect(byKey.get('engine')?.options).toEqual(engineOptions);
     expect(byKey.get('engine_world')?.options).toEqual(engineOptions.world);
     expect(byKey.get('engine_core')?.options).toEqual(engineOptions.core);
+  });
+
+  it('should keep the last ready round beside one that failed, and send none beside a ready one', async () => {
+    const failed = round({ id: 13n, round: 3, status: 'failed', options: null, error: 'The round failed.' });
+    const { service, rounds } = fakeService({ perStep: [{ round: failed, jobStatus: 'failed' }], ready: readyRound });
+
+    const [start] = await service.state(7n);
+    expect(start?.latestRound?.status).toBe('failed');
+    expect(start?.lastReadyRound?.options).toEqual(readyRound.options);
+    expect(rounds.latestReady).toHaveBeenCalledTimes(1);
+
+    const settled = await fakeService({ perStep: [{ round: readyRound, jobStatus: 'done' }], ready: readyRound }).service.state(7n);
+    expect(settled[0]?.lastReadyRound).toBeNull();
   });
 });

@@ -6,7 +6,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase } from '@server/database';
+import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
@@ -27,12 +27,13 @@ import { loadActiveLedger } from '../../blueprint/ledger/ledger-entries';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
-import { type BibleDocRow, renderBibleDigest } from './bible-docs';
-import { BLUEPRINT_BUDGET, blueprintBudget, type BlueprintPackParts, blueprintSections } from './blueprint-sections';
+import { type BibleDocRow, cutToTokens, isPlannerOnlyBibleDoc, renderBibleDigest } from './bible-docs';
+import { BLUEPRINT_BUDGET, blueprintBudget, type BlueprintPackParts, blueprintSections, ORGANISED_TIMELINE_SECTION } from './blueprint-sections';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
 import { type LedgerContextEntry, ledgerSection, writerLinesSection } from './ledger-sections';
+import { organisedTimelineText } from './organised-timeline';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -79,6 +80,7 @@ const RECENT_SUMMARY_COUNT = 3;
 const ESTABLISHED_FACTS_MAX = 15;
 // A stale draft is labelled, not dropped: an ancestor changed under it, but it is still the only continuity the next writer has.
 const STALE_LABEL = '[STALE — may not match the current plan]';
+const PLANNER_ONLY_INVENTORY_NOTE = '(planner-only: says what happens later in the book — look it up to read it; a change drawn from it waits for the author’s review)';
 
 // Refinement budgets. History is prompt messages, not pack text, so it does not count
 // against the pack; the history budgets are enforced by ChatService compaction.
@@ -91,6 +93,7 @@ export const OUTLINE_BUDGET = 32_000;
 export const ARC_PLAN_BUDGET = 32_000;
 export const ARC_PLAN_BIBLE_BUDGET = 8_000;
 export const ARC_PLAN_BIBLE_DOC_TOKENS = 2_500;
+export const ARC_PLAN_TIMELINE_TOKENS = 6_000;
 // The catalog's ceiling leaves the documents at least this much, so a long serial's catalog cannot squeeze them out entirely.
 export const ARC_PLAN_BIBLE_FLOOR = 4_000;
 // Held back for the uncached dormant-thread section, so the cached sections are sized from cached content alone and their cut
@@ -297,6 +300,11 @@ function castKeys(cast: unknown): string[] {
   return Array.isArray(cast) ? cast.filter((key): key is string => typeof key === 'string') : [];
 }
 
+/** A planner-only page is listed by address alone: the chat can look it up, and a turn that does is held for the author's review. */
+function inventoryLine(doc: Pick<BibleDocRow, 'section' | 'slug' | 'body'>): string {
+  return `${doc.section}/${doc.slug}: ${isPlannerOnlyBibleDoc(doc) ? PLANNER_ONLY_INVENTORY_NOTE : firstLine(doc.body)}`;
+}
+
 function firstLine(text: string | null): string {
   return (text ?? '').split('\n', 1)[0] ?? '';
 }
@@ -403,6 +411,11 @@ export class ContextAssembler {
     private readonly retrievalService?: RetrievalService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+  }
+
+  /** The active ledger, for a planner that reads the Story Bible outside a pack. */
+  activeLedger(projectId: bigint): Promise<Ledger.Entry[]> {
+    return loadActiveLedger(this.db, projectId);
   }
 
   async activeLedgerSection(projectId: bigint, segment?: ContextSegment): Promise<ContextSection> {
@@ -538,7 +551,8 @@ export class ContextAssembler {
 
   /**
    * Sanitizes a model-written `requiredContext`: drops refs that resolve to nothing and every `fact:` ref, because an
-   * outliner reading the catalog sees hidden facts in full and must never pin one into a chapter's context.
+   * outliner reading the catalog sees hidden facts in full and must never pin one into a chapter's context. A planner-only
+   * page never resolves, so a ref to one is dropped with the rest.
    */
   async sanitizeOutlinedRefs(projectId: bigint, refs: string[]): Promise<{ kept: string[]; dropped: string[] }> {
     const candidates = refs.filter(ref => !ref.startsWith('fact:'));
@@ -598,7 +612,7 @@ export class ContextAssembler {
       }
       case 'bible_doc': {
         const doc = rows.bibleDocMap.get(value.includes('/') ? value : `${value}/`);
-        if (!doc?.body) return null;
+        if (!doc?.body || isPlannerOnlyBibleDoc(doc)) return null;
         const { text: body, truncated } = truncateAtParagraph(doc.body, 8_000);
         return makeRefSection(ref, `BIBLE: ${doc.section}/${doc.slug}`, scrubForWriter(body, rows.forbidden), 'canonical', truncated);
       }
@@ -1077,7 +1091,7 @@ export class ContextAssembler {
 
     const sections: ContextSection[] = [];
     if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-    if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
+    if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(inventoryLine).join('\n'), 'canonical', [])));
     if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
     if (arcs.length > 0) {
       const lines = arcs.map(a => `${a.arcKey} [${a.volumeKey}] (chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'}, ${a.status}): ${a.title ?? a.objective ?? ''}`);
@@ -1124,7 +1138,7 @@ export class ContextAssembler {
   async forArcPlanning(projectId: bigint, volumeKey: string, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
 
-    const [project, volumes, openThreads, openMysteries, documents] = await Promise.all([
+    const [project, volumes, openThreads, openMysteries, documents, ledger] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
       this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
@@ -1133,6 +1147,7 @@ export class ContextAssembler {
         columns: { section: true, slug: true, frontmatter: true, body: true },
         where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.section, ['project', 'plot', 'world', 'power'])),
       }),
+      loadActiveLedger(this.db, projectId),
     ]);
     const volume = volumes.find(v => v.volumeKey === volumeKey);
     const prevVolume = volume ? volumes.filter(v => v.ordinal < volume.ordinal).at(-1) : undefined;
@@ -1151,6 +1166,13 @@ export class ContextAssembler {
     if (project?.skeletonCharacterArcs || project?.skeletonPowerCurve) {
       const skeleton = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
       sections.push(asStable(makeSection('skeleton', skeleton, 'canonical', [])));
+    }
+    // The author's later events reach the planner whatever the budget: the spine placed them across the book, and an arc that forgets them
+    // re-plots it. The page is capped all the same, since the author may add sections of their own to it.
+    const timeline = organisedTimelineText(documents, ledger);
+    if (timeline) {
+      const cut = cutToTokens(timeline, ARC_PLAN_TIMELINE_TOKENS);
+      sections.push({ ...asStable(makeSection(ORGANISED_TIMELINE_SECTION, cut.text, 'approved_intent', [])), required: true, truncated: cut.truncated });
     }
 
     const cachedBudget = budgetTokens - ARC_PLAN_UNCACHED_RESERVE;

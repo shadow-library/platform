@@ -9,7 +9,7 @@ import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type SourcedScreenStep } from '../engine/blueprint-step.types';
 import { promiseTailoringApplies } from '../stage/promise-tailoring';
 import { loadPageBody, upsertPageSections } from './bible-page';
-import { contentKey, lockedLinks, removedContentOps } from './content-keys';
+import { contentKey, linkedByOtherSteps, lockedLinks, removedContentOps } from './content-keys';
 import { ENGINE_STEP_KEY, type EngineOptions, type PowerSliceOptions } from './engine.step';
 import { POWER_PAGE } from './world.step';
 
@@ -111,7 +111,7 @@ export const powerStep: SourcedScreenStep<EngineOptions, PowerSliceOptions | nul
       ...keyed.map(({ rung, entityKey }): ContentOp => ({ op: 'entity.upsert', entityKey, type: 'power_rule', name: rung.name.trim(), body: rungFact(rung) })),
       { op: 'bible_document.upsert', ...POWER_PAGE, body },
       ...keyed.map(({ rung, factKey, entityKey }): ContentOp => ({ op: 'fact.upsert', factKey, body: rungFact(rung), subjects: [entityKey], revealChapter: OPEN_FROM_CHAPTER })),
-      ...removedContentOps(lockedLinks(ledger, POWER_STEP_KEY), links),
+      ...removedContentOps(lockedLinks(ledger, POWER_STEP_KEY), links, new Set(), linkedByOtherSteps(ledger, POWER_STEP_KEY)),
     ];
 
     const plan: LockPlan = {

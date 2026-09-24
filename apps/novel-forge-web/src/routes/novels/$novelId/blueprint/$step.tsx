@@ -53,7 +53,10 @@ function BlueprintStepScreen(): React.JSX.Element {
     return (
       <>
         {header}
-        <StepPlaceholder title="This novel doesn’t need this step" description="What you promised the reader rules it out, so it never holds its phase back." />
+        <StepPlaceholder
+          title={meta.notNeeded?.title ?? 'This novel doesn’t need this step'}
+          description={meta.notNeeded?.description ?? 'What you promised the reader rules it out, so it never holds its phase back.'}
+        />
       </>
     );
 

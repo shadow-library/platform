@@ -38,8 +38,10 @@ export function isRoundLive(round: BlueprintRoundResponse | null): boolean {
   return round?.status === 'pending' || round?.status === 'running';
 }
 
-export interface BlueprintStepState extends Omit<BlueprintStepStateResponse, 'latestRound'> {
+export interface BlueprintStepState extends Omit<BlueprintStepStateResponse, 'latestRound' | 'lastReadyRound'> {
   latestRound: BlueprintRoundResponse | null;
+  /** Present only while the latest round is not ready: the last good options, still on screen and lockable. */
+  lastReadyRound: BlueprintRoundResponse | null;
 }
 
 export interface BlueprintState {
@@ -47,7 +49,7 @@ export interface BlueprintState {
 }
 
 function toBlueprintState({ steps }: BlueprintStateResponse): BlueprintState {
-  return { steps: steps.map(step => ({ ...step, latestRound: step.latestRound ?? null })) };
+  return { steps: steps.map(step => ({ ...step, latestRound: step.latestRound ?? null, lastReadyRound: step.lastReadyRound ?? null })) };
 }
 
 const hasLiveRound = (data?: BlueprintState): boolean => data?.steps.some(step => isRoundLive(step.latestRound)) ?? false;

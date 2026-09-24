@@ -7,6 +7,7 @@ import { blueprintHeartPrompt } from '../../ai/prompts/blueprint-heart.prompt';
 import { type BlueprintHeartOutput, HEART_CAUTION_MAX, HEART_TEXT_MAX, HEART_WHY_MAX, HEART_WRITER_LINE_MAX } from '../../ai/schemas/blueprint-heart.schema';
 import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type PlannedLedgerEntry, type ScreenStep } from '../engine/blueprint-step.types';
+import { organisedTimelineInput } from './organised-timeline';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
 import { PREMISE_PAGE } from './premise.step';
 
@@ -131,8 +132,8 @@ export const heartStep: ScreenStep<BlueprintHeartOutput, HeartOptions, never, He
   optionsSchema: HeartOptions,
   selectionSchema: HeartSelection,
 
-  inputs(context) {
-    return Promise.resolve(authorBriefInput(context.ledger));
+  async inputs(context) {
+    return [...authorBriefInput(context.ledger), ...(await organisedTimelineInput(context))];
   },
 
   toRound(output) {

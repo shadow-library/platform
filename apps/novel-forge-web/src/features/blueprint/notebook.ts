@@ -1,3 +1,5 @@
+import { ORGANISE_ACCEPTED_TOPIC, ORGANISE_RULED_OUT_TOPIC, ORGANISE_RULES_TOPIC, ORGANISE_TOPIC } from '@shadow-library/sdk';
+
 import { type BlueprintPhase, type LedgerEntryKind, type LedgerEntryResponse, type LedgerEntryStatus } from '@/lib/apis';
 
 import { blueprintPhaseLabel } from './blueprint-phases';
@@ -72,6 +74,10 @@ const TOPIC_WORD_BREAK = /[._-]+/;
 const TOPIC_LABELS: Record<string, string> = {
   gate: 'The gate',
   promise: 'Reader promise',
+  [ORGANISE_TOPIC]: 'Your notes, organised',
+  [ORGANISE_ACCEPTED_TOPIC]: 'Suggestions you accepted',
+  [ORGANISE_RULES_TOPIC]: 'Rules from your notes',
+  [ORGANISE_RULED_OUT_TOPIC]: 'Suggestions you turned down',
   start: 'Starting point',
   'start.brief': 'Your starting text',
   'start.later': 'Later in the story',

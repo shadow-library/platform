@@ -257,6 +257,17 @@ describe('reconcileLockEntries', () => {
     expect(opted.supersede.map(pair => [pair.previous.id, pair.next.statement])).toEqual([[6n, 'Ending: the war is finally over']]);
     expect(opted.withdraw.map(entry => entry.id)).toEqual([7n]);
   });
+
+  it('should withdraw a named entry of its own outside the replaced topics, and never one another step wrote', () => {
+    const banned = ledgerEntry({ id: 20n, kind: 'rejected', topic: 'start.ruled_out', statement: 'A talking cat' });
+    const kept = ledgerEntry({ id: 21n, kind: 'rejected', topic: 'start.ruled_out', statement: 'A prophecy' });
+    const foreign = ledgerEntry({ id: 22n, kind: 'rejected', topic: 'taste.gave_up', statement: 'Slow openings', stepKey: 'taste' });
+
+    const result = reconcileLockEntries(step, { ...plan([{ kind: 'direction', statement: 'A ferry town' }], ['start']), withdraws: [20n, 22n] }, [banned, kept, foreign]);
+
+    expect(result.withdraw.map(entry => entry.id)).toEqual([20n]);
+    expect(result.append.map(entry => entry.statement)).toEqual(['A ferry town']);
+  });
 });
 
 describe('sliceDigest', () => {

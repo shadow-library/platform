@@ -17,7 +17,7 @@ Seven phases in a fixed order, grouped by altitude:
 
 | Altitude   | Phase      | Decides                                                         |
 | ---------- | ---------- | --------------------------------------------------------------- |
-| The novel  | Idea       | Starting point, taste, concept, premise                         |
+| The novel  | Idea       | Starting point, organising the notes, taste, concept, premise   |
 | The novel  | Heart      | Theme, ending question, reader promise, working title           |
 | The engine | Core       | Protagonist and what stands in their way                        |
 | The engine | World      | How the world works: its rules and the cost of power            |
@@ -41,6 +41,26 @@ Seven phases in a fixed order, grouped by altitude:
   follows. The author's own text is kept whole beside it: the chips summarise it, and never stand in for it. The starting point may run to about ten thousand words, so an
   author can bring the concrete detail they already have. The box never cuts text silently; an over-long starting point is refused with a live word count, not trimmed. A
   long starting text rides on top of a step's context budget rather than crowding out what the step reads.
+- **Organise my notes.** Offered, and optional, once the starting point runs to about six hundred words; once used it stays reachable whatever the notes become, so what
+  it wrote can be revisited and its staleness shown. One large pass reads the whole text and returns it organised: a one-paragraph reading, a timeline that keeps every event
+  where the notes place it (the opening, early, later, the ending, or not yet placed — never a guessed time), Story Bible pages in the author's terms with every section
+  marked as read or inferred, the records those pages describe, the hard rules the notes state and the open questions they leave, most important first. The Story Bible is
+  what the chapter writer reads, so pages, records and rules hold only the story as it stands when it opens and the laws the whole book obeys: anything the notes place later —
+  a reveal, a secret coming out, what someone later does, learns or becomes, a fate, the ending, the end goal — lives only on the timeline, a record says only what a reader
+  could know when it first appears, a rule holds from chapter one, and a secret is never a rule. Whatever the author leaves undecided is an open question, never a statement.
+  The timeline and the open questions sit at reserved, planner-only addresses: the Blueprint's planning passes, the Workspace volume and arc planners and the final check
+  read them, the chat may read them too, but a turn that looks one up never applies its proposal on its own — that turn waits for the author's review — and the chapter
+  writer never does. Anything the model would
+  add is a suggestion: kept apart, labelled as not from the notes, and never written into a page, a record or a rule. What the notes state goes in unless the author takes it
+  out; nothing inferred or suggested goes in until the author says yes, one piece at a time, and any event can be moved to another part of the timeline first. The rules become
+  directions every later step is bound by, but organising mints no canon facts: the world step remains the one place facts are made. An accepted suggestion is written into
+  the section it names and recorded as the author's choice, a declined one becomes a standing "do not propose", and an undecided one writes nothing. A section or record the
+  author or another step has changed since it was organised is theirs and is never rewritten or removed; the timeline and open-questions pages are rewritten on every lock,
+  keeping any section the author added. The screen says so when the starting point has changed since the notes were organised. The timeline page rides beside the author's own
+  words into every step that reads them, and into the spine pass; where it and the starting point's later items disagree, the timeline wins while it was organised from the
+  notes as they stand, and the notes win once they have changed. Because each step removes only what it made and no other step still links, a record can end up owned by
+  no step: organise makes it, a later step rewrites it, that step later drops it while organise still links it, and organise, re-locked with it left out, finds it changed
+  and yields rather than removing it. It then stays in the Story Bible until the author removes it; the lock's own wording warns that anything changed since is left alone.
 - **Taste.** Either-or pairs shaped by the starting point, answerable with both, neither or "depends" plus a reason, and "a book you gave up on: why?" reasons. Taste
   becomes directions; dislikes become rejected entries. A pick records the axis the pair tests, with the scenes only as its reason, so a quick answer never hardens into
   plot. "Neither" rejects the two scenes, never the axis, and takes an optional line on what the author would rather read, kept as a direction: "not this example" must
@@ -144,6 +164,8 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   contradict the author's stated ending.
 - The author's starting text is the one entry the shared ledger leaves out, because it is too long for every step. The steps that build premise and people (concepts,
   premise, heart, the engine pass and the volume-one pass) read it verbatim as a required section. Locked decisions and later directions win where they disagree with it.
+- The organised timeline is a planner-only Story Bible page, not ledger entries, so it never bloats what is never evicted. Once the author has organised their notes, the
+  steps that read their text read that page beside it as a required section, and so does the spine pass, which never reads the text itself.
 - Chapter packs carry the writer lines of active decisions as their own section, so a decision made in the Blueprint reaches the prose. The section is never evicted and has
   its own cap, which keeps every phase's newest lines first.
 
@@ -186,7 +208,9 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
   edit. There is no Blueprint-only storage for novel content.
 - Ledger entries link to what they produced, and what they produced is plain Workspace content, editable in the Workspace like anything else.
 - A Story Bible page more than one step writes to is merged section by section: one step owns the page's title and opening, every other step owns its own headed section, and
-  a lock never rewrites a section it did not ask about. The premise page carries the premise, the theme and the ending question this way.
+  a lock never rewrites a section it did not ask about. The premise page carries the premise, the theme and the ending question this way. Organising the notes writes into
+  pages other steps also write, so it records what each of its sections held: a section another step or the author has since changed is theirs and is never touched again,
+  and an organised section that would share a heading someone else wrote goes beside it under its own.
 - The novel's working title is an effect of the title decision, so only a Blueprint lock may set it. No other scope is offered the field, and one that sends it anyway is
   refused — a title that moved without a decision superseding the one that named the novel would leave the book and the Notebook disagreeing with no record of why.
 - The same grant lets a Blueprint lock retire an approved volume or arc, which no other scope may do: the lock that approved them is the one redrawing the shape, and a spine
@@ -208,8 +232,8 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - Phase completion is derived from active ledger topics. A project is in the Workspace once the gate entry exists, or when it has chapter briefs and no Blueprint ledger (an
   import).
 - A phase is done when every required step that applies to the novel is done; a step the reader promise rules out (a power ladder without progression) never holds its phase
-  back. The first unfinished phase is current and the rest wait behind the nearest unfinished phase above them; a phase finished before a revisit stays done. In the
-  Workspace nothing is locked: an unfinished phase is open to reopen.
+  back, and can neither run a round nor be locked. The first unfinished phase is current and the rest wait behind the nearest unfinished phase above them; a phase finished
+  before a revisit stays done. In the Workspace nothing is locked: an unfinished phase is open to reopen.
 - An import reports per-phase coverage derived from its content (bible pages, entities, volumes, arcs, briefs); gaps are recommendations, not blockers. Only a missing chapter
   brief blocks generation.
 

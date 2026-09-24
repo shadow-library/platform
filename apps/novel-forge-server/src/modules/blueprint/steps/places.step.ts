@@ -18,7 +18,7 @@ import { type ContentOp } from '../../refinement/change-set';
 import { withoutKnownEntries } from '../engine/blueprint-round';
 import { type LockPlan, type PlannedLedgerEntry, type SourcedScreenStep } from '../engine/blueprint-step.types';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
-import { contentKey, lockedLinks, removedContentOps } from './content-keys';
+import { contentKey, linkedByOtherSteps, lockedLinks, removedContentOps } from './content-keys';
 import { lockedCastKeys } from './locked-cast';
 import { type PlacesSliceOptions, VOLUME_ONE_PASS_STEP_KEY, type VolumeOneOptions } from './volume-one-pass.step';
 
@@ -175,7 +175,7 @@ export const placesStep: SourcedScreenStep<VolumeOneOptions, PlacesSliceOptions 
     const changeSet: ContentOp[] = [
       ...mine.map(entityOp),
       { op: 'bible_document.upsert', ...PLACES_PAGE, body: placesBody(page, keyed) },
-      ...removedContentOps(lockedLinks(ledger, PLACES_STEP_KEY), links, known),
+      ...removedContentOps(lockedLinks(ledger, PLACES_STEP_KEY), links, known, linkedByOtherSteps(ledger, PLACES_STEP_KEY)),
     ];
 
     const decision: PlannedLedgerEntry = {

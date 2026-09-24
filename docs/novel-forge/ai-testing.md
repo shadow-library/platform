@@ -737,8 +737,9 @@ Working title to reach for in the Title step: **The Bell Debt**.
   **Quality:** the options are built from the author's own words, not genre defaults, and the coach message says what
   the round is trying to find out.
 - **Fails when:** `BPR_002` (a round is already running), `BPR_004` (the input, selection or nudges fail the step's
-  schema — free text belongs in `steer`, not in a nudge), `BPR_003` (the project is not `new_novel`).
-  `POST …/blueprint/steps/start/rounds/cancel` stops a live round; `BPR_006` when there is nothing to cancel.
+  schema — free text belongs in `steer`, not in a nudge), `BPR_003` (the project is not `new_novel`), `BPR_010` (the
+  novel's decisions rule the step out — organising notes shorter than about six hundred words, a ladder without
+  progression). `POST …/blueprint/steps/start/rounds/cancel` stops a live round; `BPR_006` when there is nothing to cancel.
 
 #### Blueprint — lock a step and read the Notebook
 
@@ -758,7 +759,8 @@ Working title to reach for in the Title step: **The Bell Debt**.
   **Quality:** the writer line reads as an instruction to whoever writes the prose, not as a restatement of the
   decision; it is what rides every later chapter pack.
 - **Fails when:** `BPR_005` (an option id the round never offered), `BPR_004` (the selection fails the step schema),
-  `BPR_007` (a lock addressed to a pass rather than one of its screens). `followUp.ok = false` means the lock stood
+  `BPR_007` (a lock addressed to a pass rather than one of its screens), `BPR_010` (a step the novel's decisions have
+  since ruled out). `followUp.ok = false` means the lock stood
   but its after-commit work (an approval or an outline job) failed — re-locking is the retry.
 
 #### Blueprint — a large pass and its screens (Core + World)

@@ -7,7 +7,7 @@ import { ENGINE_LINE_MAX, ENGINE_NAME_MAX, ENGINE_WRITER_LINE_MAX, PROTAGONIST_L
 import { type ContentOp } from '../../refinement/change-set';
 import { type LockPlan, type SourcedScreenStep } from '../engine/blueprint-step.types';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
-import { contentKey, lockedLinks, removedContentOps } from './content-keys';
+import { contentKey, linkedByOtherSteps, lockedLinks, removedContentOps } from './content-keys';
 import { ENGINE_STEP_KEY, type EngineOptions, type ProtagonistSliceOptions } from './engine.step';
 
 export const PROTAGONIST_STEP_KEY = 'protagonist';
@@ -138,7 +138,7 @@ export const protagonistStep: SourcedScreenStep<EngineOptions, ProtagonistSliceO
     const changeSet: ContentOp[] = [
       ...entities.map(({ lead, entityKey }) => entityOp(lead, entityKey)),
       { op: 'bible_document.upsert', ...CAST_PAGE, body },
-      ...removedContentOps(lockedLinks(ledger, PROTAGONIST_STEP_KEY), links),
+      ...removedContentOps(lockedLinks(ledger, PROTAGONIST_STEP_KEY), links, new Set(), linkedByOtherSteps(ledger, PROTAGONIST_STEP_KEY)),
     ];
 
     const plan: LockPlan = {

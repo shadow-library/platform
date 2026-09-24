@@ -236,11 +236,12 @@ function crossesOptions(previous: Ledger.Entry, next: NewLedgerEntry): boolean {
  * kind and offered option (the same option first, then the same statement, then in order), so every topic keeps one history chain; leftovers
  * are appended or withdrawn. An entry that names an option is only withdrawn when the new answer speaks to its topic and kind at all, so a
  * lock that says nothing about a kind cannot silently retire it. What the author wrote directly and steering entries are never touched;
- * neither is a backlog entry, unless the plan opts it in with `relockKinds`.
+ * neither is a backlog entry, unless the plan opts it in with `relockKinds`. `withdraws` takes down named entries of this step's own
+ * outside all of that.
  */
 export function reconcileLockEntries(
   step: Pick<AnyLockingStep, 'key' | 'phase' | 'completionTopics'>,
-  plan: Pick<LockPlan, 'entries' | 'replaces' | 'retires' | 'relockKinds'>,
+  plan: Pick<LockPlan, 'entries' | 'replaces' | 'retires' | 'relockKinds' | 'withdraws'>,
   active: Ledger.Entry[],
 ): LedgerReconciliation {
   const next = plan.entries.map((entry): NewLedgerEntry => ({ ...entry, phase: entry.phase ?? step.phase, decidedBy: entry.decidedBy ?? 'author', stepKey: step.key }));
@@ -267,12 +268,16 @@ export function reconcileLockEntries(
     return optionId === undefined || retired.has(optionId) || answered.has(`${entry.topic}|${entry.kind}`);
   };
 
+  const withdraw = replaceable.filter(entry => !taken.has(entry) && stranded(entry));
+  const named = new Set(plan.withdraws ?? []);
+  const lifted = active.filter(entry => named.has(entry.id) && entry.stepKey === step.key && !taken.has(entry) && !withdraw.includes(entry));
+
   return {
     supersede: next.flatMap(entry => {
       const previous = pairs.get(entry);
       return previous ? [{ previous, next: entry }] : [];
     }),
     append: next.filter(entry => !pairs.has(entry)),
-    withdraw: replaceable.filter(entry => !taken.has(entry) && stranded(entry)),
+    withdraw: [...withdraw, ...lifted],
   };
 }

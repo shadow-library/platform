@@ -35,15 +35,26 @@ export function lockedLinks(ledger: Ledger.Entry[], stepKey: string, topics?: re
     .reduce<Ledger.Links>((merged, entry) => mergeLedgerLinks(merged, entry.links), {});
 }
 
+/** Records other steps' active decisions link, which no step may remove on its own re-lock: two steps can derive one key from one name. */
+export function linkedByOtherSteps(ledger: Pick<Ledger.Entry, 'kind' | 'stepKey' | 'links'>[], stepKey: string): Set<string> {
+  return new Set(ledger.filter(entry => entry.kind === 'decision' && entry.stepKey !== stepKey).flatMap(entry => entry.links.entityKeys ?? []));
+}
+
 /**
  * Content an earlier lock of the same step materialised that this one no longer claims: a retired rule must not keep holding the writer
  * to it. `keep` names records another step now owns — a character this step listed before the Core phase made them the opposition — and
  * they are never dropped, because the links this is read from say only what this step once claimed, not who claims it today.
+ * `keepRecords` protects entity keys alone, so a fact that shares a record's key is still removed with its step's answer.
  */
-export function removedContentOps(previous: Ledger.Links, next: Ledger.Links, keep: ReadonlySet<string | number> = new Set()): ContentOp[] {
+export function removedContentOps(
+  previous: Ledger.Links,
+  next: Ledger.Links,
+  keep: ReadonlySet<string | number> = new Set(),
+  keepRecords: ReadonlySet<string> = new Set(),
+): ContentOp[] {
   const dropped = <K extends 'entityKeys' | 'factKeys' | 'volumeKeys' | 'arcKeys'>(key: K): string[] => {
     const kept = new Set(next[key] ?? []);
-    return (previous[key] ?? []).filter(item => !kept.has(item) && !keep.has(item));
+    return (previous[key] ?? []).filter(item => !kept.has(item) && !keep.has(item) && !(key === 'entityKeys' && keepRecords.has(item)));
   };
   const keptChapters = new Set(next.briefChapters ?? []);
   return [

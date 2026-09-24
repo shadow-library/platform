@@ -33,6 +33,17 @@ function splitPage(body: string): { lead: string; sections: PageSection[] } {
   return { lead: lead.join('\n').trim(), sections: sections.map(section => ({ ...section, body: section.body.trim() })) };
 }
 
+/** The `##` sections a stored page holds, bodies trimmed as a merge reads them. */
+export function pageSections(body: string | null): PageSection[] {
+  return splitPage(body ?? '').sections;
+}
+
+/** A page with no section and nothing under its title says nothing, so a lock that emptied it removes it rather than leaving a bare heading. */
+export function isEmptyPage(body: string): boolean {
+  const { lead, sections } = splitPage(body);
+  return sections.every(section => !section.body) && lead.split('\n').every(line => !line.trim() || line.startsWith('# '));
+}
+
 function render(lead: string, sections: PageSection[]): string {
   return [lead, ...sections.filter(section => section.body).map(section => `## ${section.heading}\n\n${section.body}`)].filter(Boolean).join('\n\n');
 }

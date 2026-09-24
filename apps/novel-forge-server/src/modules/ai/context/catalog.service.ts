@@ -7,7 +7,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
-import { bibleDocExcerpt, bibleDocLabel, bibleDocRef, type BibleDocRow, clipAtBoundary, hasBibleContent, rankBibleDocs } from './bible-docs';
+import { bibleDocExcerpt, bibleDocLabel, bibleDocRef, type BibleDocRow, clipAtBoundary, hasBibleContent, isPlannerOnlyBibleDoc, rankBibleDocs } from './bible-docs';
 import { type ChapterSpan, renderHardLimits, renderRevealSchedule, scheduledReveals, shiftRevealsForInsert } from './canon-guard';
 import { countTokens } from './token-budget';
 
@@ -102,7 +102,7 @@ function renderEntityLines(ranked: EntityRow[], descriptors: CatalogOptions['des
 
 function renderDocumentLines(documents: BibleDocRow[]): { lines: string[]; omitted: number } {
   const lines: string[] = [];
-  const ranked = rankBibleDocs(documents.filter(hasBibleContent));
+  const ranked = rankBibleDocs(documents.filter(doc => hasBibleContent(doc) && !isPlannerOnlyBibleDoc(doc)));
   let used = 0;
   for (const doc of ranked) {
     const label = bibleDocLabel(doc);

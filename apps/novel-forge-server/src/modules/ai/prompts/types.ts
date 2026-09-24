@@ -56,6 +56,7 @@ export type PromptKey =
   | 'illustration-compose'
   | 'appearance-describe'
   | 'blueprint-start'
+  | 'blueprint-organise'
   | 'blueprint-taste'
   | 'blueprint-concepts'
   | 'blueprint-premise'

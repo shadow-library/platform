@@ -115,8 +115,8 @@ function tx(arc: ArcRowOverrides = {}, docSlugs = ['world/setting-overview'], en
   } as unknown as PrimaryTransaction;
 }
 
-function materialise(chosen: BriefsSelection, ledger: Ledger.Entry[] = [arcsDecision, revealsDecision], transaction = tx()) {
-  const context = { round: { round: 1, options: view }, ledger, project: { id: 7n }, tx: transaction } as unknown as MaterialiseContext<BriefsOptions>;
+function materialise(chosen: BriefsSelection, ledger: Ledger.Entry[] = [arcsDecision, revealsDecision], transaction = tx(), options: BriefsOptions = view) {
+  const context = { round: { round: 1, options }, ledger, project: { id: 7n }, tx: transaction } as unknown as MaterialiseContext<BriefsOptions>;
   return briefsStep.materialise(chosen, context);
 }
 
@@ -143,6 +143,16 @@ describe('briefsStep.materialise', () => {
 
   it('should keep only the refs that resolve, so a brief never cites a page the project does not have', async () => {
     const plan = await materialise(selection(), [arcsDecision, revealsDecision], tx({}, ['world/setting-overview'], []));
+    expect(briefOps(plan)[0]?.contextRefs).toEqual(['bible_doc:world/setting-overview']);
+  });
+
+  it('should never let a brief cite a page only planners read, even one the project has', async () => {
+    const citing = {
+      ...view,
+      briefs: view.briefs.map(item => ({ ...item, cites: ['bible_doc:project/timeline', 'bible_doc:project/open-questions', 'bible_doc:world/setting-overview'] })),
+    };
+    const plan = await materialise(selection(), [arcsDecision, revealsDecision], tx({}, ['project/timeline', 'project/open-questions', 'world/setting-overview'], []), citing);
+
     expect(briefOps(plan)[0]?.contextRefs).toEqual(['bible_doc:world/setting-overview']);
   });
 

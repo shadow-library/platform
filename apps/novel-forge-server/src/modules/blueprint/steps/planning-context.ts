@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { type Bible, type DbExecutor, schema } from '@server/database';
 
 import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
-import { renderBibleDigest } from '../../ai/context/bible-docs';
+import { ORGANISED_TIMELINE_DOC, renderBibleDigest } from '../../ai/context/bible-docs';
 import { type StepInputContext } from '../engine/blueprint-step.types';
 
 /** The pages a planning pass reads: the premise and cast it must stay true to, and the world, power and plot it plans inside. */
@@ -21,7 +21,8 @@ async function planningPagesSection(db: Pick<DbExecutor, 'query'>, projectId: bi
     columns: { section: true, slug: true, frontmatter: true, body: true },
     where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.section, [...PLANNING_PAGE_SECTIONS])),
   });
-  const digest = renderBibleDigest(documents, { totalTokens: PLANNING_PAGES_BUDGET, perDocTokens: PLANNING_PAGE_TOKENS, coreOnly: false });
+  const pages = documents.filter(doc => doc.section !== ORGANISED_TIMELINE_DOC.section || doc.slug !== ORGANISED_TIMELINE_DOC.slug);
+  const digest = renderBibleDigest(pages, { totalTokens: PLANNING_PAGES_BUDGET, perDocTokens: PLANNING_PAGE_TOKENS, coreOnly: false });
   return digest.text ? { key: 'bible_pages', content: digest.text } : null;
 }
 

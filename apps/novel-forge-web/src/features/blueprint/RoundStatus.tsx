@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
 import { Alert, Spinner } from '@shadow-library/ui';
 
 import { StopButton } from '@/components/nf';
@@ -14,10 +14,12 @@ export interface RoundStatusProps {
   onCancel?: () => void;
   retrying?: boolean;
   cancelling?: boolean;
+  /** What to tell the author when the round failed, in place of the engine's own message — a step that knows why it fails says so. */
+  failedMessage?: ReactNode;
 }
 
 /** Renders nothing for a round that is ready, or for a step that has never run one. */
-export function RoundStatus({ round, runningLabel = 'Working on it…', onRetry, onCancel, retrying, cancelling }: RoundStatusProps): ReactElement | null {
+export function RoundStatus({ round, runningLabel = 'Working on it…', onRetry, onCancel, retrying, cancelling, failedMessage }: RoundStatusProps): ReactElement | null {
   if (round == null || round.status === 'ready') return null;
 
   if (isRoundLive(round))
@@ -33,7 +35,7 @@ export function RoundStatus({ round, runningLabel = 'Working on it…', onRetry,
   if (round.status === 'failed')
     return (
       <Alert intent="danger" title="That round didn’t finish" action={retry}>
-        {round.error ?? 'The generation stopped before it produced anything. Nothing was saved.'}
+        {failedMessage ?? round.error ?? 'The generation stopped before it produced anything. Nothing was saved.'}
       </Alert>
     );
 

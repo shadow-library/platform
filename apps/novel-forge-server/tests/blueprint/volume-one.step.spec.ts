@@ -314,6 +314,14 @@ describe('castStep.materialise', () => {
     expect(plan.changeSet).not.toContainEqual({ op: 'entity.remove', entityKey: 'brannoc' });
   });
 
+  it('should keep a dropped character another step’s decision still links, and remove it only when no other step does', async () => {
+    const earlier = ledgerEntry({ kind: 'decision', phase: 'volume_one', topic: 'cast', stepKey: 'cast', links: { entityKeys: ['brannoc', 'tomas', 'lise_hart'] } });
+    const organised = ledgerEntry({ id: 30n, kind: 'decision', phase: 'idea', topic: 'organise', stepKey: 'organise', links: { entityKeys: ['lise_hart'] } });
+    const plan = await materialiseCast(castSelection(), [earlier, organised]);
+
+    expect(plan.changeSet).not.toContainEqual({ op: 'entity.remove', entityKey: 'lise_hart' });
+  });
+
   it('should refuse two cards with the same name, a ladder of one person, and a missing writer line', async () => {
     await expect(materialiseCast(castSelection({ members: [castSelection().members[0] as never, castSelection().members[0] as never] }))).rejects.toMatchObject({
       code: 'BPR_004',

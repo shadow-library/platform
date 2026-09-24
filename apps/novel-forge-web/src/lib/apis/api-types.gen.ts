@@ -6764,6 +6764,8 @@ export interface components {
       nudges: string[];
       /** @description The latest round of the step (of its pass, for a sourced screen, with options narrowed to this screen); absent before its first round. Earlier rounds are history. */
       latestRound?: components['schemas']['BlueprintRoundResponse'];
+      /** @description The latest ready round, sent only while the latest round is not ready: a round still running, cancelled or failed leaves the last good options on screen and lockable. */
+      lastReadyRound?: components['schemas']['BlueprintRoundResponse'];
       /** @description The screen is locked and a later whole-pass rerun moved the options it was locked from, so its answer no longer matches what is on screen. */
       sliceMoved: boolean;
     };

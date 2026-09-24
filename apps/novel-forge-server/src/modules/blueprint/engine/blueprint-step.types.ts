@@ -89,6 +89,11 @@ export interface LockPlan {
    * widens what THIS plan's topics match; a step that never sets it is unaffected.
    */
   relockKinds?: readonly Ledger.Kind[];
+  /**
+   * Active entries this step wrote on topics it does not replace that this answer takes back by id — a permanent rejection of an idea
+   * the author has since accepted. Entries another step wrote are never touched.
+   */
+  withdraws?: readonly bigint[];
   /** Work that must follow the commit, such as approving what was materialised or queueing a job; its failure never undoes the lock. */
   afterCommit?(context: AfterCommitContext): Promise<void>;
 }

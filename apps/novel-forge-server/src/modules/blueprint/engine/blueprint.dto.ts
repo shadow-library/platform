@@ -156,6 +156,13 @@ export class BlueprintStepStateResponse {
   })
   latestRound?: BlueprintRoundResponse;
 
+  @Field(() => BlueprintRoundResponse, {
+    optional: true,
+    description:
+      'The latest ready round, sent only while the latest round is not ready: a round still running, cancelled or failed leaves the last good options on screen and lockable.',
+  })
+  lastReadyRound?: BlueprintRoundResponse;
+
   @Field({ description: 'The screen is locked and a later whole-pass rerun moved the options it was locked from, so its answer no longer matches what is on screen.' })
   sliceMoved: boolean;
 }

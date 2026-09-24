@@ -78,6 +78,20 @@ export function bibleDocExcerpt(doc: BibleDocRow, maxChars: number): string {
   return clipAtBoundary(firstParagraph, maxChars);
 }
 
+export const ORGANISED_TIMELINE_DOC = { section: 'project', slug: 'timeline' } as const satisfies Pick<BibleDocRow, 'section' | 'slug'>;
+export const OPEN_QUESTIONS_DOC = { section: 'project', slug: 'open-questions' } as const satisfies Pick<BibleDocRow, 'section' | 'slug'>;
+
+/**
+ * Reserved addresses only planners read, whoever writes to them. The organised timeline and the open questions name what happens later in
+ * the book and no scheduled canon fact backs them for the writer's scrub, so they stay out of the outliner's citable catalog, every writer
+ * pack, brief refs, the voice step's cited pages and the lore index. The chat hub may look them up, and a turn that does is held for review.
+ */
+const PLANNER_ONLY_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [ORGANISED_TIMELINE_DOC, OPEN_QUESTIONS_DOC];
+
+export function isPlannerOnlyBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
+  return PLANNER_ONLY_DOCS.some(page => page.section === doc.section && page.slug === doc.slug);
+}
+
 export function isCoreBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
   return CORE_SECTIONS.has(doc.section) || (doc.section === 'project' && CORE_PROJECT_SLUGS.includes(doc.slug));
 }

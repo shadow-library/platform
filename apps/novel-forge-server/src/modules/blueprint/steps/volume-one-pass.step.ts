@@ -26,6 +26,7 @@ import {
   VOLUME_ONE_NAME_MAX,
 } from '../../ai/schemas/blueprint-volume-one.schema';
 import { type PassStep, type StepInputContext, type StepOption } from '../engine/blueprint-step.types';
+import { organisedTimelineInput } from './organised-timeline';
 import { lockedCast, renderLockedCast, renderLockedOpposition } from './locked-cast';
 import { planningSections } from './planning-context';
 import { SPINE_REVEALS_TOPIC, SPINE_TOPIC } from './spine.step';
@@ -355,7 +356,11 @@ export const volumeOnePass: PassStep<BlueprintVolumeOneOutput, VolumeOneOptions,
   async inputs(context: StepInputContext<VolumeOneOptions>): Promise<BlueprintInputSection[]> {
     const focus = VOLUME_ONE_SLICES.find(slice => slice === context.focus) ?? null;
     const asked = focus ? [focus] : [...VOLUME_ONE_SLICES];
-    const sections: BlueprintInputSection[] = [...authorBriefInput(context.ledger), { key: 'volume_one_scope', content: renderScope(asked, context.ledger), required: true }];
+    const sections: BlueprintInputSection[] = [
+      ...authorBriefInput(context.ledger),
+      ...(await organisedTimelineInput(context)),
+      { key: 'volume_one_scope', content: renderScope(asked, context.ledger), required: true },
+    ];
     sections.push(...(await planningSections(context)));
     const kept = focus && context.previous ? renderKept(context.previous, focus) : null;
     if (kept) sections.push({ key: 'volume_one_so_far', content: kept });

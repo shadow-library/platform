@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
+import { ROUND_MODEL_CALL_FAILED } from '@shadow-library/sdk';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -39,7 +40,8 @@ function roundInput(round: Blueprint.Round): RoundAuthorInput {
   return { steer: round.steer, nudges: round.nudges, keepAsDirection: round.keepAsDirection, feedback: round.feedback, input: round.input, focus: round.focus };
 }
 
-function failureMessage(err: unknown): string {
+export function failureMessage(err: unknown): string {
+  if (AppError.is(err) && err.code === AppErrorCode.AI_007.code) return ROUND_MODEL_CALL_FAILED;
   return AppError.is(err) && !err.isInternal ? err.message : 'The round failed. Try again.';
 }
 

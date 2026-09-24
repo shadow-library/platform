@@ -116,7 +116,12 @@
   and a hidden fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list. Open canon is a fact scheduled from the first chapter, a rule the whole
   book obeys rather than a truth anyone had to learn, so a brief's knowledge contract narrows what its POV cast privately knows and never withholds one; a reveal scheduled later
   stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone. A chapter-scoped `fact:` ref obeys the same gate (plus
-  the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored.
+  the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored. Two Story Bible addresses are reserved and planner-only, whoever
+  writes to them: the organised timeline (`project/timeline`) and the open questions (`project/open-questions`) say what happens later in the book, and no scheduled canon
+  fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, the lore index and the voice step's cited pages, never resolve
+  into a writer pack whatever ref names them, and are dropped from outlined refs. They are read by the Blueprint's planning passes, the Workspace volume and arc planners
+  and the final check; the chat hub may read them too, but only with review — the hub's inventory lists them by address alone, and a turn that looks one up never
+  auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.

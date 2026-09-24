@@ -12,7 +12,7 @@ import { type LockPlan, type SourcedScreenStep } from '../engine/blueprint-step.
 import { isDecided, type StageLedgerEntry } from '../stage/blueprint-stage';
 import { promiseTailoringApplies } from '../stage/promise-tailoring';
 import { loadPageBody, type PageRef, upsertPageSections } from './bible-page';
-import { contentKey, lockedLinks, removedContentOps, shortName } from './content-keys';
+import { contentKey, linkedByOtherSteps, lockedLinks, removedContentOps, shortName } from './content-keys';
 import { ENGINE_STEP_KEY, type EngineOptions, type OppositionSliceOptions } from './engine.step';
 
 export const OPPOSITION_STEP_KEY = 'opposition';
@@ -201,7 +201,7 @@ export const oppositionStep: SourcedScreenStep<EngineOptions, OppositionSliceOpt
     const changeSet: ContentOp[] = [
       ...(entityKey && entityType ? [entityOp(selection, entityKey, entityType)] : []),
       { op: 'bible_document.upsert', ...OPPOSITION_PAGE, body },
-      ...removedContentOps(lockedLinks(ledger, OPPOSITION_STEP_KEY), links),
+      ...removedContentOps(lockedLinks(ledger, OPPOSITION_STEP_KEY), links, new Set(), linkedByOtherSteps(ledger, OPPOSITION_STEP_KEY)),
     ];
 
     const offered = round?.options?.forms ?? [];

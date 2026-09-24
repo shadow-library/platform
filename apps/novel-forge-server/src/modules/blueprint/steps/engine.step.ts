@@ -27,6 +27,7 @@ import {
 import { type PassStep, type StepInputContext, type StepOption } from '../engine/blueprint-step.types';
 import { type StageLedgerEntry } from '../stage/blueprint-stage';
 import { promiseTailoringApplies } from '../stage/promise-tailoring';
+import { organisedTimelineInput } from './organised-timeline';
 
 export const ENGINE_STEP_KEY = 'engine';
 export const ENGINE_BUDGET_TOKENS = 36_000;
@@ -376,18 +377,19 @@ export const enginePass: PassStep<BlueprintEngineOutput, EngineOptions, never> =
   optionsSchema: EngineOptions,
   budgetTokens: ENGINE_BUDGET_TOKENS,
 
-  inputs(context: StepInputContext<EngineOptions>): Promise<BlueprintInputSection[]> {
+  async inputs(context: StepInputContext<EngineOptions>): Promise<BlueprintInputSection[]> {
     const focus = ENGINE_SLICES.find(slice => slice === context.focus) ?? null;
     const applicable = ENGINE_SLICES.filter(slice => engineSliceApplies(slice, context.ledger));
     const asked = focus ? [focus] : applicable;
     const leads = context.previous?.protagonist?.leads.length ?? 1;
     const sections: BlueprintInputSection[] = [
       ...authorBriefInput(context.ledger),
+      ...(await organisedTimelineInput(context)),
       { key: 'engine_scope', content: renderScope(asked, applicable.includes('power'), leads), required: true },
     ];
     const kept = focus && context.previous ? renderKept(context.previous, focus) : null;
     if (kept) sections.push({ key: 'engine_so_far', content: kept });
-    return Promise.resolve(sections);
+    return sections;
   },
 
   toRound(output, { previous, focus }) {

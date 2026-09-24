@@ -22,6 +22,7 @@ import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, ty
 import { renderBibleDigest } from '../ai/context/bible-docs';
 import { loadRevealGuard, sanitiseBriefReveals, type ScheduledReveal } from '../ai/context/canon-guard';
 import { ContextAssembler, OUTLINE_BUDGET } from '../ai/context/context-assembler.service';
+import { planningBibleText } from '../ai/context/organised-timeline';
 import { type ContextSection } from '../ai/context/sections';
 import { loadWriterBrief } from '../ai/context/writer-brief';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
@@ -237,9 +238,10 @@ export class GenerationService {
   }
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
-    const [project, bibleDocs] = await Promise.all([
+    const [project, bibleDocs, ledger] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+      this.contextAssembler.activeLedger(projectId),
     ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
     assertAuthoringProject(project);
@@ -251,9 +253,12 @@ export class GenerationService {
 
     // Same fallback pattern as `skeleton` above — an explicit placeholder rather than a silently empty var, so a
     // weak model doesn't misread a blank "Bible:" section as "no canon exists" when it just hasn't been built yet.
-    const digest = renderBibleDigest(bibleDocs, { totalTokens: PLAN_BIBLE_BUDGET, perDocTokens: PLAN_BIBLE_DOC_TOKENS });
-    if (digest.omitted.length > 0) this.logger.info('plan: bible documents left out for budget', { projectId, omitted: digest.omitted, truncated: digest.truncated });
-    const bibleDocsText = digest.text || '(no bible written yet)';
+    const bibleText = planningBibleText(bibleDocs, ledger, docs => {
+      const digest = renderBibleDigest(docs, { totalTokens: PLAN_BIBLE_BUDGET, perDocTokens: PLAN_BIBLE_DOC_TOKENS });
+      if (digest.omitted.length > 0) this.logger.info('plan: bible documents left out for budget', { projectId, omitted: digest.omitted, truncated: digest.truncated });
+      return digest.text;
+    });
+    const bibleDocsText = bibleText || '(no bible written yet)';
 
     this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
     const { result: volumeSpecs } = await this.workflowRunService.runChain(projectId, 'plan', 'volumes', body, async runId => {

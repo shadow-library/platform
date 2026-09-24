@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { AppErrorCode } from '@server/classes';
 import { type BlueprintPackParts } from '@modules/ai/context/blueprint-sections';
-import { BlueprintRoundRunner } from '@modules/blueprint/engine/blueprint-round.runner';
+import { BlueprintRoundRunner, failureMessage } from '@modules/blueprint/engine/blueprint-round.runner';
 import { blueprintStep, BlueprintStepRegistry } from '@modules/blueprint/engine/blueprint-step.registry';
 import { type AnyBlueprintStep } from '@modules/blueprint/engine/blueprint-step.types';
 import { startStep } from '@modules/blueprint/steps/start.step';
@@ -73,6 +73,15 @@ function fakeRunner(state: FakeState = {}) {
 }
 
 const job = { id: 'job-9', projectId: 7n, payload: { roundId: '12' } };
+
+describe('failureMessage', () => {
+  it('should word a failed model call for the author, and keep every other failure’s own message', () => {
+    expect(failureMessage(AppErrorCode.AI_007.create())).toBe('The model call did not finish.');
+    expect(failureMessage(AppErrorCode.AI_009.create())).toBe(AppErrorCode.AI_009.create().message);
+    expect(failureMessage(AppErrorCode.AI_008.create())).toBe(AppErrorCode.AI_008.create().message);
+    expect(failureMessage(new Error('socket hang up'))).toBe('The round failed. Try again.');
+  });
+});
 
 describe('BlueprintRoundRunner.run', () => {
   it('should store the parsed options and coach message on the round', async () => {

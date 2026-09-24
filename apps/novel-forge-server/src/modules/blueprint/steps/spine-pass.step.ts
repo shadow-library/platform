@@ -18,6 +18,7 @@ import {
 import { type PassStep, type StepInputContext, type StepOption } from '../engine/blueprint-step.types';
 import { type StageLedgerEntry } from '../stage/blueprint-stage';
 import { promiseLength, promiseTailoringApplies } from '../stage/promise-tailoring';
+import { organisedTimelineInput } from './organised-timeline';
 import { ENDING_TOPIC } from './heart.step';
 import { renderLockedCrucible, renderLockedOpposition } from './locked-cast';
 import { planningSections } from './planning-context';
@@ -185,7 +186,7 @@ export const spinePass: PassStep<BlueprintSpineOutput, SpineOptions, never> = {
   budgetTokens: SPINE_BUDGET_TOKENS,
 
   async inputs(context: StepInputContext<SpineOptions>): Promise<BlueprintInputSection[]> {
-    const sections: BlueprintInputSection[] = [{ key: 'spine_scope', content: renderScope(context.ledger), required: true }];
+    const sections: BlueprintInputSection[] = [...(await organisedTimelineInput(context)), { key: 'spine_scope', content: renderScope(context.ledger), required: true }];
     sections.push(...(await planningSections(context)));
     const kept = context.focus && context.previous ? renderKept(context.previous) : null;
     if (kept) sections.push({ key: 'spine_so_far', content: kept });

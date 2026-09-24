@@ -285,6 +285,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BPR_007 = AppErrorCode.badRequest('BPR_007', 'Step "{step}" is a generation pass — lock the screens it feeds instead');
   static readonly BPR_008 = AppErrorCode.badRequest('BPR_008', 'A preview paragraph was written moments ago — wait {seconds}s before asking for another', 429);
   static readonly BPR_009 = AppErrorCode.conflict('BPR_009', 'The Blueprint is not finished — {phases} still needs deciding');
+  static readonly BPR_010 = AppErrorCode.conflict('BPR_010', 'This step does not apply to this novel as it stands');
 
   /*!
    * Publishing Errors

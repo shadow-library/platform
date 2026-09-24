@@ -9,6 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { isPlannerOnlyBibleDoc } from '../context/bible-docs';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -261,7 +262,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     const docs = await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId) });
 
     for (const doc of docs) {
-      if (!doc.body) continue;
+      if (!doc.body || isPlannerOnlyBibleDoc(doc)) continue;
       try {
         await indexingService.addLore(projectId, 'bible_doc', `${doc.section}/${doc.slug}`, doc.body, doc.updatedAt ?? new Date());
       } catch (err) {

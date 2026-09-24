@@ -6,6 +6,7 @@ import { blueprintCheckPrompt } from './blueprint-check.prompt';
 import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
 import { blueprintEnginePrompt } from './blueprint-engine.prompt';
 import { blueprintHeartPrompt } from './blueprint-heart.prompt';
+import { blueprintOrganisePrompt } from './blueprint-organise.prompt';
 import { blueprintPremisePrompt } from './blueprint-premise.prompt';
 import { blueprintPremisePreviewPrompt } from './blueprint-premise-preview.prompt';
 import { blueprintPromisePrompt } from './blueprint-promise.prompt';
@@ -110,6 +111,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,
+  'blueprint-organise': blueprintOrganisePrompt as PromptModule<unknown>,
   'blueprint-taste': blueprintTastePrompt as PromptModule<unknown>,
   'blueprint-concepts': blueprintConceptsPrompt as PromptModule<unknown>,
   'blueprint-premise': blueprintPremisePrompt as PromptModule<unknown>,

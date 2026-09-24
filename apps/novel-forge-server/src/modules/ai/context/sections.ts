@@ -107,6 +107,7 @@ const SECTION_LABELS: Record<string, string> = {
   cast_appearance: '## CAST APPEARANCE',
   ledger: '## DECISION LEDGER',
   author_brief: "## THE AUTHOR'S OWN WORDS",
+  organised_timeline: "## THE AUTHOR'S ORGANISED TIMELINE",
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
   step_thread: '## THIS STEP SO FAR',
   round_input: '## THE AUTHOR, THIS ROUND',

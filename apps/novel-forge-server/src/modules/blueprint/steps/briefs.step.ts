@@ -5,6 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { type BriefSceneInput, renderBriefBody, renderSceneEvents } from '@server/common';
 import { type Ledger, type Plan, type PrimaryTransaction, schema } from '@server/database';
 
+import { isPlannerOnlyBibleDoc } from '../../ai/context/bible-docs';
 import { type BlueprintInputSection } from '../../ai/context/blueprint-sections';
 import { sanitiseBriefReveals, type ScheduledReveal } from '../../ai/context/canon-guard';
 import { blueprintBriefsPrompt } from '../../ai/prompts/blueprint-briefs.prompt';
@@ -367,7 +368,8 @@ async function resolvableCites(tx: PrimaryTransaction, projectId: bigint, cites:
       ? tx.query.entities.findMany({ columns: { entityKey: true }, where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) })
       : [],
   ]);
-  const known = new Set([...documents.map(doc => `bible_doc:${doc.section}/${doc.slug}`), ...entities.map(entity => `entity:${entity.entityKey}`)]);
+  const citable = documents.filter(doc => !isPlannerOnlyBibleDoc(doc));
+  const known = new Set([...citable.map(doc => `bible_doc:${doc.section}/${doc.slug}`), ...entities.map(entity => `entity:${entity.entityKey}`)]);
   return wanted.filter(ref => known.has(ref));
 }
 

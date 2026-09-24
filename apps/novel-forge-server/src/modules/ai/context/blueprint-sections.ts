@@ -4,9 +4,11 @@ import { countTokens } from './token-budget';
 
 export const BLUEPRINT_BUDGET = 24_000;
 export const STEP_THREAD_MESSAGES = 4;
+export const AUTHOR_BRIEF_SECTION = 'author_brief';
+export const ORGANISED_TIMELINE_SECTION = 'organised_timeline';
 
 /** The author's own words ride on top of a step's budget, so a long starting text never crowds out the material the step was sized for. */
-const AUTHOR_TEXT_SECTIONS: ReadonlySet<string> = new Set(['author_brief', 'round_input']);
+const AUTHOR_TEXT_SECTIONS: ReadonlySet<string> = new Set([AUTHOR_BRIEF_SECTION, ORGANISED_TIMELINE_SECTION, 'round_input']);
 
 export interface BlueprintStepMessage {
   from: 'author' | 'coach';
@@ -31,7 +33,7 @@ export interface BlueprintPackParts {
 /** The author's own words for the steps that build premise and people; the start chips summarise them, and never stand in for them. */
 export function authorBriefInput(ledger: Pick<LedgerContextEntry, 'topic' | 'statement'>[]): BlueprintInputSection[] {
   const brief = ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC);
-  return brief ? [{ key: 'author_brief', content: brief.statement, required: true }] : [];
+  return brief ? [{ key: AUTHOR_BRIEF_SECTION, content: brief.statement, required: true }] : [];
 }
 
 function section(key: string, content: string, tier: ContextTier, segment: ContextSegment, required = false): ContextSection {

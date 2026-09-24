@@ -57,6 +57,8 @@ export interface StepState {
   step: AnyBlueprintStep;
   /** The latest round of the step's generator, with its options narrowed to what this step shows. */
   latestRound: Blueprint.Round | null;
+  /** The latest ready round, only while the latest one is not ready, so a failed or running round never hides the last good options. */
+  lastReadyRound: Blueprint.Round | null;
   /** The screen is locked, and a later whole-pass rerun has moved the part it was locked from. */
   sliceMoved: boolean;
 }
@@ -134,10 +136,18 @@ export class BlueprintStepService {
     const [rounds, ledger] = await Promise.all([this.rounds.latestPerStep(projectId), loadActiveLedger(this.db, projectId)]);
     const latest = new Map(rounds.map(row => [row.round.stepKey, row]));
     const now = new Date();
+    const unready = rounds.filter(row => presentRound(row, now).status !== 'ready').map(row => row.round.stepKey);
+    const ready = new Map(await Promise.all(unready.map(async key => [key, await this.rounds.latestReady(projectId, key)] as const)));
     return this.registry.all.map(step => {
       const row = latest.get(generatorKeyOf(step));
       const latestRound = row ? viewRound(step, presentRound(row, now)) : null;
-      return { step, latestRound, sliceMoved: lockedSliceMoved(step, latestRound?.options ?? null, ledger) };
+      const lastReady = ready.get(generatorKeyOf(step));
+      return {
+        step,
+        latestRound,
+        lastReadyRound: lastReady ? viewRound(step, lastReady) : null,
+        sliceMoved: lockedSliceMoved(step, latestRound?.options ?? null, ledger),
+      };
     });
   }
 
@@ -152,6 +162,7 @@ export class BlueprintStepService {
     return this.db.transaction(async tx => {
       await this.rounds.lockStep(projectId, generator.key, tx);
       await loadBlueprintProject(tx, projectId);
+      this.assertApplies(addressed.key, await loadActiveLedger(tx, projectId));
       const latest = await this.rounds.latestForStep(projectId, generator.key, tx);
       if (latest) await this.settleStale(latest, tx);
 
@@ -206,6 +217,7 @@ export class BlueprintStepService {
     const view = ready ? viewOf(step, ready.options) : null;
     assertOfferedOptions(step.chosenOptionIds(selection), ready ? describeView(step, view) : []);
     const active = await loadActiveLedger(tx, projectId);
+    this.assertApplies(step.key, active);
     const materialised = await step.materialise(selection, { round: ready ? { round: ready.round, options: view, input: ready.input } : null, ledger: active, project, tx });
     // A lock with no ready round was answered from nothing, so there is no slice it could later be said to have moved away from.
     const plan = isSourced(step) && ready ? { ...materialised, entries: stampLockedSlice(materialised.entries, sliceDigest(view)) } : materialised;
@@ -267,6 +279,11 @@ export class BlueprintStepService {
     const withdrawn: Ledger.Entry[] = [];
     for (const entry of withdraw) withdrawn.push(await this.ledger.withdraw(projectId, entry.id, RELOCK_WITHDRAW_REASON, tx));
     return { entries, withdrawn };
+  }
+
+  /** A step the novel's decisions rule out is hidden from the author; refusing it here keeps a stale screen from spending a round or writing an answer. */
+  private assertApplies(stepKey: string, ledger: Ledger.Entry[]): void {
+    if (!this.registry.applies(stepKey, ledger)) throw AppErrorCode.BPR_010.create();
   }
 
   private async offeredOptions(addressed: AnyBlueprintStep, projectId: bigint, tx: PrimaryTransaction): Promise<StepOption[]> {

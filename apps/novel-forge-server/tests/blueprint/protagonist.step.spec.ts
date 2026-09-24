@@ -92,6 +92,14 @@ describe('protagonistStep.materialise', () => {
     expect(plan.changeSet).toContainEqual(expect.objectContaining({ op: 'entity.upsert', entityKey: 'wren' }));
   });
 
+  it('should keep the old lead’s record on a rename while the organise step still links it', async () => {
+    const organised = ledgerEntry({ id: 30n, kind: 'decision', phase: 'idea', topic: 'organise', stepKey: 'organise', links: { entityKeys: ['arden'] } });
+    const plan = await materialise(selection({ leads: [lead({ name: 'Wren' })] }), [locked(['arden']), organised]);
+
+    expect(plan.changeSet).not.toContainEqual({ op: 'entity.remove', entityKey: 'arden' });
+    expect(plan.changeSet).toContainEqual(expect.objectContaining({ op: 'entity.upsert', entityKey: 'wren' }));
+  });
+
   it('should refuse a lead without a lie, two leads of one name, and a missing writer line', async () => {
     await expect(materialise(selection({ leads: [lead({ lie: '  ' })] }))).rejects.toMatchObject({ code: 'BPR_004' });
     await expect(materialise(selection({ leads: [lead(), lead({ optionId: undefined })] }))).rejects.toMatchObject({ code: 'BPR_004' });

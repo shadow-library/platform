@@ -10,6 +10,7 @@ import { conceptsStep } from './concepts.step';
 import { enginePass } from './engine.step';
 import { heartStep } from './heart.step';
 import { oppositionStep } from './opposition.step';
+import { organiseStep } from './organise.step';
 import { powerStep } from './power.step';
 import { placesStep } from './places.step';
 import { premiseStep } from './premise.step';
@@ -26,6 +27,7 @@ import { worldStep } from './world.step';
 
 export const BLUEPRINT_STEPS = [
   blueprintStep(startStep),
+  blueprintStep(organiseStep),
   blueprintStep(tasteStep),
   blueprintStep(conceptsStep),
   blueprintStep(premiseStep),
