@@ -1,6 +1,6 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
-export const PREMISE_PART_KINDS = ['setting', 'rule', 'protagonist', 'hook'] as const;
+export const PREMISE_PART_KINDS = ['setting', 'rule', 'protagonist', 'hook', 'goal'] as const;
 export const PREMISE_PART_MIN = 3;
 export const PREMISE_PART_MAX = 6;
 export const PREMISE_PART_TEXT_MAX = 200;
@@ -19,7 +19,8 @@ export class BlueprintPremisePartOut {
 
   @Field(() => String, {
     enum: [...PREMISE_PART_KINDS],
-    description: "'setting' for where and when, 'rule' for what the world charges, 'protagonist' for who it happens to, 'hook' for what turns it personal",
+    description:
+      "'setting' for where and when, 'rule' for what the world charges, 'protagonist' for who it happens to, 'hook' for what turns it personal, 'goal' for the book's through-line — where it is heading, present only when the author has stated one",
   })
   kind: PremisePartKind;
 

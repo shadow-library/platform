@@ -224,18 +224,18 @@
   padding: 0;
 }
 
-.startCount {
+.charCount {
   margin: 0;
   font-size: var(--sh-text-body-sm);
   font-variant-numeric: tabular-nums;
   color: var(--sh-text-secondary);
 }
 
-.startCount[data-state='near'] {
+.charCount[data-state='near'] {
   color: var(--sh-warning-text);
 }
 
-.startCount[data-state='over'] {
+.charCount[data-state='over'] {
   color: var(--sh-danger-solid);
   font-weight: 500;
 }
@@ -617,12 +617,23 @@
   border-bottom-color: var(--sh-accent);
 }
 
-.premiseMark[aria-pressed='true'] {
+.premiseMark[aria-expanded='true'] {
   outline: 1.5px solid var(--sh-accent);
 }
 
 .premiseMark:disabled {
   cursor: default;
+}
+
+.partBadge {
+  display: inline-block;
+  margin-right: 3px;
+  font-size: 0.7em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--sh-accent-text);
+  vertical-align: super;
 }
 
 .previewProse {

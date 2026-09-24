@@ -12,8 +12,16 @@ import {
   nextPremiseLines,
   parsePremiseRound,
   passedOverAlternatives,
+  PREMISE_PART_KIND_LABELS,
+  PREMISE_REJECTED_MAX,
+  PREMISE_SENTENCE_MAX,
+  type PremiseDraftPart,
   premiseLinesFor,
+  premisePartKindLabel,
+  type PremiseRound,
   premiseRoundKey,
+  premiseSentenceMeter,
+  premiseSentenceStatus,
   previewPremiseText,
   resolvePremiseInput,
 } from '../src/features/blueprint/premise-step';
@@ -62,6 +70,21 @@ describe('parsePremiseRound', () => {
   it('should read a round it cannot understand as no premise at all', () => {
     expect(parsePremiseRound(round())).toBeNull();
     expect(parsePremiseRound(round({ options: { parts: [{ id: 'p1', text: 'no kind' }] } }))).toBeNull();
+  });
+
+  it('should read a goal part naming the book’s through-line like any other kind', () => {
+    const withGoal = round({ options: { ...OPTIONS, parts: [...OPTIONS.parts, { id: 'p3', text: 'until the debt is paid.', kind: 'goal', alternatives: [] }] } });
+    const parsed = parsePremiseRound(withGoal);
+    expect(parsed?.parts[2]).toEqual({ id: 'p3', text: 'until the debt is paid.', kind: 'goal', alternatives: [] });
+    expect(PREMISE_PART_KIND_LABELS.goal).toBe('Where it’s heading');
+  });
+
+  it('should keep a part whose kind this build does not recognise, rather than drop the clause', () => {
+    const withUnknownKind = round({ options: { ...OPTIONS, parts: [...OPTIONS.parts, { id: 'p3', text: 'a future clause', kind: 'destiny', alternatives: [] }] } });
+    const parsed = parsePremiseRound(withUnknownKind);
+    expect(parsed?.parts[2]).toEqual({ id: 'p3', text: 'a future clause', kind: 'destiny', alternatives: [] });
+    expect(premisePartKindLabel('destiny')).toBe('This part');
+    expect(premisePartKindLabel('goal')).toBe('Where it’s heading');
   });
 });
 
@@ -152,6 +175,18 @@ describe('previewPremiseText', () => {
   });
 });
 
+describe('premiseSentenceStatus', () => {
+  it('should count what is left under the limit', () => {
+    expect(premiseSentenceStatus('A short sentence.')).toEqual({ state: 'ok', length: 17 });
+  });
+
+  it('should say when the sentence is over, without cutting it', () => {
+    const over = premiseSentenceStatus('x'.repeat(PREMISE_SENTENCE_MAX + 1));
+    expect(over).toEqual({ state: 'over', length: PREMISE_SENTENCE_MAX + 1 });
+    expect(premiseSentenceMeter(over)).toContain('Nothing is cut');
+  });
+});
+
 describe('choosePremisePart', () => {
   const draft = initialPremiseDraft(parsePremiseRound(ready()));
 
@@ -191,8 +226,8 @@ describe('buildPremiseSelection', () => {
     const selection = buildPremiseSelection(initialPremiseDraft(parsed), LINES);
     expect(selection).toEqual({
       parts: [
-        { optionId: 'p1', text: 'In the harbour city of Vell,' },
-        { optionId: 'p2', text: 'a clerk who audits the dead' },
+        { partId: 'p1', optionId: 'p1', text: 'In the harbour city of Vell,' },
+        { partId: 'p2', optionId: 'p2', text: 'a clerk who audits the dead' },
       ],
       sentence: 'In the harbour city of Vell, a clerk who audits the dead',
       why: 'Built from the concept you kept.',
@@ -200,9 +235,9 @@ describe('buildPremiseSelection', () => {
     });
   });
 
-  it('should carry a part the author wrote with no option behind it', () => {
+  it('should carry a part the author wrote with no option behind it, still naming which part it is', () => {
     const draft = choosePremisePart(initialPremiseDraft(parsed), 'p1', { text: 'In the drowned quarter,' });
-    expect(buildPremiseSelection(draft, LINES)?.parts[0]).toEqual({ text: 'In the drowned quarter,' });
+    expect(buildPremiseSelection(draft, LINES)?.parts[0]).toEqual({ partId: 'p1', text: 'In the drowned quarter,' });
   });
 
   it('should refuse a sentence with nothing in it', () => {
@@ -212,6 +247,11 @@ describe('buildPremiseSelection', () => {
 
   it('should refuse a lock that says nothing about what the premise means for the writer', () => {
     expect(buildPremiseSelection(initialPremiseDraft(parsed), { why: 'a why', writerLine: '   ' })).toBeNull();
+  });
+
+  it('should refuse a sentence over the character limit rather than cut it', () => {
+    const long = [{ id: 'p1', kind: 'setting', text: 'x'.repeat(PREMISE_SENTENCE_MAX + 1) }];
+    expect(buildPremiseSelection(long, LINES)).toBeNull();
   });
 });
 
@@ -243,5 +283,34 @@ describe('passedOverAlternatives', () => {
     const draft = choosePremisePart(initialPremiseDraft(parsed), 'p2', { optionId: 'p2_a1', text: 'a diver who salvages contracts' });
     expect(passedOverAlternatives(parsed, draft)).toEqual(['On the terraced island of Vell,', 'a clerk who audits the dead']);
     expect(passedOverAlternatives(null, draft)).toEqual([]);
+  });
+
+  it('should collapse inner whitespace the same way the server matches, so a respaced choice is not shown as rejected', () => {
+    const round: PremiseRound = {
+      parts: [{ id: 'p1', kind: 'setting', text: 'In   the city,', alternatives: [{ id: 'p1_a1', text: 'Beyond the city,' }] }],
+      why: '',
+      writerLine: '',
+    };
+    const draft: PremiseDraftPart[] = [{ id: 'p1', kind: 'setting', optionId: 'p1', text: 'In the city,' }];
+    expect(passedOverAlternatives(round, draft)).toEqual(['Beyond the city,']);
+  });
+
+  it('should cap at the server’s PREMISE_REJECTED_MAX, so the decision card shows exactly what the lock records', () => {
+    const round: PremiseRound = {
+      parts: Array.from({ length: 5 }, (_, index) => ({
+        id: `p${index + 1}`,
+        kind: 'setting',
+        text: `own ${index}`,
+        alternatives: [
+          { id: `p${index + 1}_a1`, text: `alt ${index} a` },
+          { id: `p${index + 1}_a2`, text: `alt ${index} b` },
+          { id: `p${index + 1}_a3`, text: `alt ${index} c` },
+        ],
+      })),
+      why: '',
+      writerLine: '',
+    };
+    const draft: PremiseDraftPart[] = [{ id: 'p1', kind: 'setting', text: 'chosen text matching none of the offered parts' }];
+    expect(passedOverAlternatives(round, draft)).toHaveLength(PREMISE_REJECTED_MAX);
   });
 });

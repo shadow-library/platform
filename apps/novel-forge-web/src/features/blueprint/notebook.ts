@@ -81,6 +81,7 @@ const TOPIC_LABELS: Record<string, string> = {
   start: 'Starting point',
   'start.brief': 'Your starting text',
   'start.later': 'Later in the story',
+  'concepts.corrected': 'Your idea, corrected',
   volume_one: 'Volume one',
 };
 

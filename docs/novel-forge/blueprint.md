@@ -47,7 +47,10 @@ Seven phases in a fixed order, grouped by altitude:
   marked as read or inferred, the records those pages describe, the hard rules the notes state and the open questions they leave, most important first. The Story Bible is
   what the chapter writer reads, so pages, records and rules hold only the story as it stands when it opens and the laws the whole book obeys: anything the notes place later —
   a reveal, a secret coming out, what someone later does, learns or becomes, a fate, the ending, the end goal — lives only on the timeline, a record says only what a reader
-  could know when it first appears, a rule holds from chapter one, and a secret is never a rule. Whatever the author leaves undecided is an open question, never a statement.
+  could know when it first appears, a rule holds from chapter one, and a secret is never a rule. The one exception is the end goal itself: once the premise is locked with a
+  `goal` part, the premise page also carries it, framed as the destination and not the opening, and it is removed again the moment a re-lock has no goal part — see Premise
+  below.
+  Whatever the author leaves undecided is an open question, never a statement.
   The timeline and the open questions sit at reserved, planner-only addresses: the Blueprint's planning passes, the Workspace volume and arc planners and the final check
   read them, the chat may read them too, but a turn that looks one up never applies its proposal on its own — that turn waits for the author's review — and the chapter
   writer never does. Anything the model would
@@ -65,10 +68,21 @@ Seven phases in a fixed order, grouped by altitude:
   becomes directions; dislikes become rejected entries. A pick records the axis the pair tests, with the scenes only as its reason, so a quick answer never hardens into
   plot. "Neither" rejects the two scenes, never the axis, and takes an optional line on what the author would rather read, kept as a direction: "not this example" must
   not rule out a whole region of the story.
-- **Concepts.** Rounds of four concept cards. The author's own idea is always one of the cards. Each card can be kept, killed with a reason, mixed into another, edited or
-  pushed further; the whole round can be steered. Earlier rounds never return to the model.
-- **Premise.** One sentence with its load-bearing parts highlighted. Opening a part regenerates alternatives for that part only; the author can write their own. A throwaway
-  preview paragraph is available for motivation and is never saved as a decision. Locking the premise completes the Idea phase.
+- **Concepts.** Rounds of four concept cards. The author's own idea is always one of the cards, and its logline is a faithful synthesis of the whole book as the author
+  describes it — naming the direction or end state when their notes, timeline or organised timeline give one, never narrowed to the opening arc, and never carrying a
+  specific the author did not state. The other three cards remain free inventions. Each card can be kept, killed with a reason, mixed into another, edited or pushed
+  further; the whole round can be steered. Killing the author's own card is a correction, not a ban on their idea: it is kept on its own ledger topic, out of "Do not
+  propose", so the next round rebuilds the card honouring the reason instead of losing the idea or inventing a different one in its place. Earlier rounds never return
+  to the model.
+- **Premise.** One sentence with its load-bearing parts highlighted, one of them `goal` — "Where it's heading" — when the author's notes state a whole-book direction; it
+  is never invented to fill a gap, and it never names the secret behind a twist ending, only the goal the story visibly aims at. Its alternatives stay within that same
+  destination — a different facet or altitude of it, never a different ending. Material the timeline places later is never framed as the opening. The goal part is the one
+  framed exception to "the end goal lives only on the timeline": locking a sentence with one also writes a "Where it's heading" section to the project's premise page,
+  saying plainly that it is the destination and not the opening and that no character knows, wants or works toward it before their chapter's brief says so; a re-lock with
+  no goal part removes the section again. That page framing follows the part tagged `goal` specifically — a destination worked into the sentence through another part's
+  own wording is never pulled onto the page or reframed; it stays exactly as the author wrote it, inside the sentence alone. Opening a part regenerates alternatives for
+  that part only; the author can write their own. A throwaway preview paragraph is
+  available for motivation, never shows the destination itself, and is never saved as a decision. Locking the premise completes the Idea phase.
 
 ### Heart
 

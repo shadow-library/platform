@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { renderLedger } from '@modules/ai/context/ledger-sections';
+import { CONCEPTS_CORRECTED_TOPIC, renderLedger } from '@modules/ai/context/ledger-sections';
+import { blueprintConceptsPrompt } from '@modules/ai/prompts/blueprint-concepts.prompt';
 import { type BlueprintConceptsOutput } from '@modules/ai/schemas/blueprint-concepts.schema';
 import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
@@ -116,6 +117,16 @@ describe('conceptsStep.materialise', () => {
     await expect(materialise({ kept: { optionId: 'c1' } }, null)).rejects.toThrow(expect.objectContaining({ code: 'BPR_004' }));
   });
 
+  it('should mark a killed author card as a correction on its own topic, with a plain statement', async () => {
+    const plan = await materialise({ kept: { optionId: 'c3' }, killed: [{ optionId: 'c1', reason: 'too grim for me' }] });
+    expect(plan.entries[1]).toMatchObject({
+      kind: 'rejected',
+      topic: CONCEPTS_CORRECTED_TOPIC,
+      statement: 'The Ledger of Salt — A harbour clerk who audits the dead finds his own name on a manifest.',
+      why: 'too grim for me',
+    });
+  });
+
   it('should not write a kill the ledger already carries', async () => {
     const already = ledgerEntry({
       id: 80n,
@@ -140,6 +151,12 @@ describe('conceptsStep.inputs', () => {
     expect(await conceptsStep.inputs?.({ previous: null, ledger: [] } as never)).toEqual([]);
   });
 
+  it('should leave the author’s own card out of what must never return', async () => {
+    const sections = await conceptsStep.inputs?.({ previous: options(), ledger: [] } as never);
+    expect(sections?.[0]?.content).not.toContain('The Ledger of Salt');
+    expect(sections?.[0]?.content).toContain('Ninth Heir — engine: a court that must not be contradicted');
+  });
+
   it("should put the author's own words ahead of everything else it reads", async () => {
     const brief = ledgerEntry({ kind: 'direction', topic: 'start.brief', statement: 'Two rival cartographers are hired to map the same vanishing island.' });
     const sections = await conceptsStep.inputs?.({ previous: options(), ledger: [brief] } as never);
@@ -155,6 +172,14 @@ describe('conceptsStep killed cards', () => {
     expect(rendered).toContain('### Do not propose');
     expect(rendered).toContain("Ninth Heir — The succession picked the wrong sibling and nobody may say so. (the author's reason: chosen-one prophecy)");
     expect(rendered.slice(0, rendered.indexOf('### Do not propose'))).not.toContain('Ninth Heir');
+  });
+
+  it('should render a killed author card as a correction, never inside “Do not propose”', async () => {
+    const plan = await materialise({ kept: { optionId: 'c3' }, killed: [{ optionId: 'c1', reason: 'too grim for me' }] });
+    const rendered = renderLedger(plan.entries.map(entry => ledgerEntry({ ...entry, phase: 'idea', decidedBy: 'author' } as never)));
+    expect(rendered).toContain("### The author's idea, corrected");
+    expect(rendered).toContain("The Ledger of Salt — A harbour clerk who audits the dead finds his own name on a manifest. (the author's reason: too grim for me)");
+    expect(rendered).not.toContain('### Do not propose');
   });
 });
 
@@ -176,8 +201,9 @@ describe('conceptsStep re-lock', () => {
 describe('concept limits', () => {
   const card = { id: 'c1', title: 'The Tide Ledger', logline: 'x', engine: 'a debt that grows each tide', hook: 'The sea sends a bill.', fromAuthor: false };
 
-  it('should keep the coach’s card to one sentence but take the author’s own logline at paragraph length', () => {
-    expect(parseSchema(ConceptCardOption, { ...card, logline: 'a'.repeat(281) }).success).toBe(false);
+  it('should let a card’s logline run to the schema’s 400 characters, but no further', () => {
+    expect(parseSchema(ConceptCardOption, { ...card, logline: 'a'.repeat(400) }).success).toBe(true);
+    expect(parseSchema(ConceptCardOption, { ...card, logline: 'a'.repeat(401) }).success).toBe(false);
     expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', logline: 'a'.repeat(2000) } }).success).toBe(true);
     expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', logline: 'a'.repeat(2001) } }).success).toBe(false);
   });
@@ -185,5 +211,28 @@ describe('concept limits', () => {
   it('should take a reason for keeping or killing a card of up to 1,000 characters', () => {
     expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', why: 'a'.repeat(1000) }, killed: [{ optionId: 'c2', reason: 'b'.repeat(1000) }] }).success).toBe(true);
     expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', why: 'a'.repeat(1001) } }).success).toBe(false);
+  });
+});
+
+describe('blueprintConceptsPrompt.postValidate', () => {
+  it('should refuse an invented card that runs past a pitch line', () => {
+    const issues = blueprintConceptsPrompt.postValidate?.(output({ cards: [CARDS[0]!, { ...CARDS[1]!, logline: 'a'.repeat(281) }, CARDS[2]!, CARDS[3]!] }));
+    expect(issues?.join(' ')).toContain('pitch line');
+  });
+
+  it('should let the fromAuthor card run past a pitch line', () => {
+    const issues = blueprintConceptsPrompt.postValidate?.(output({ cards: [{ ...CARDS[0]!, logline: 'a'.repeat(281) }, CARDS[1]!, CARDS[2]!, CARDS[3]!] }));
+    expect(issues).toEqual([]);
+  });
+});
+
+describe('blueprintConceptsPrompt.advise', () => {
+  it('should nudge when no card is marked fromAuthor', () => {
+    const issues = blueprintConceptsPrompt.advise?.(output({ cards: CARDS.map(card => ({ ...card, fromAuthor: false })) }));
+    expect(issues?.join(' ')).toContain('fromAuthor');
+  });
+
+  it('should say nothing when one card is already marked fromAuthor', () => {
+    expect(blueprintConceptsPrompt.advise?.(output())).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 import { AppErrorCode } from '@server/classes';
 
 import { authorBriefInput, type BlueprintInputSection } from '../../ai/context/blueprint-sections';
+import { CONCEPTS_CORRECTED_TOPIC } from '../../ai/context/ledger-sections';
 import { blueprintConceptsPrompt } from '../../ai/prompts/blueprint-concepts.prompt';
 import {
   BLUEPRINT_CONCEPT_COUNT,
@@ -103,11 +104,14 @@ function keptEntry(card: ConceptCardOption, kept: ConceptKept): PlannedLedgerEnt
 }
 
 function killedEntry(card: ConceptCardOption, killed: ConceptKilled): PlannedLedgerEntry {
-  return { kind: 'rejected', topic: CONCEPTS_KILLED_TOPIC, statement: `${card.title} — ${card.logline}`, why: killed.reason.trim() };
+  const topic = card.fromAuthor ? CONCEPTS_CORRECTED_TOPIC : CONCEPTS_KILLED_TOPIC;
+  return { kind: 'rejected', topic, statement: `${card.title} — ${card.logline}`, why: killed.reason.trim() };
 }
 
+/** The fromAuthor card is rebuilt faithfully every round, not offered from a fixed set, so "never offer these again" would contradict it. */
 function renderShown(options: ConceptsOptions): string {
-  const cards = options.cards.map(card => `- ${card.title} — engine: ${card.engine}`);
+  const cards = options.cards.filter(card => !card.fromAuthor).map(card => `- ${card.title} — engine: ${card.engine}`);
+  if (cards.length === 0) return '';
   return `Cards the author is looking at right now. A new round is a new set: never offer any of these again, renamed, reworded or resworn to a different title.\n${cards.join('\n')}`;
 }
 

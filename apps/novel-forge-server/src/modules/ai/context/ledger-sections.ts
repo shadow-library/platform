@@ -21,6 +21,14 @@ export const AUTHOR_TIMELINE_TOPIC = 'start.later';
 const AUTHOR_TIMELINE_RULE =
   "These are the author's own story events placed after the opening. Every one that is not the ending goes wherever in the story it first belongs, never in the opening situation — a last scene is part of the ending, not a separate later event. Whatever is the author's stated ending binds every step.";
 
+/**
+ * A killed dressing of the author's own idea, never `rejectedTopic(step)` for any step, so a reconciled lock never confuses it with an
+ * ordinary kill. Kept out of "Do not propose" and rendered in its own block: the idea itself is corrected, not banned.
+ */
+export const CONCEPTS_CORRECTED_TOPIC = 'concepts.corrected';
+
+const CONCEPTS_CORRECTED_RULE = 'The author corrected the reading of their own idea — honour the reason; the idea itself is not banned.';
+
 interface WriterLine {
   phase: Ledger.Phase | null;
   line: string;
@@ -77,9 +85,20 @@ function renderTimeline(entries: LedgerContextEntry[]): string | null {
   return `### The author's timeline — later in the story\n\n${AUTHOR_TIMELINE_RULE}\n\n${lines.join('\n')}`;
 }
 
+/** A killed dressing of the author's own idea is a correction, kept apart so "never propose this again" never reads onto the idea itself. */
+function renderConceptsCorrected(entries: LedgerContextEntry[]): string | null {
+  const lines = byPhase(entries.filter(entry => entry.kind === 'rejected' && entry.topic === CONCEPTS_CORRECTED_TOPIC)).map(
+    entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`,
+  );
+  if (lines.length === 0) return null;
+  return `### The author's idea, corrected\n\n${CONCEPTS_CORRECTED_RULE}\n\n${lines.join('\n')}`;
+}
+
 /** Rejected ideas and the alternatives a decision passed over reach the model only as things never to offer again. */
 function doNotPropose(entries: LedgerContextEntry[]): string[] {
-  const rejected = byPhase(entries.filter(entry => entry.kind === 'rejected')).map(entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`);
+  const rejected = byPhase(entries.filter(entry => entry.kind === 'rejected' && entry.topic !== CONCEPTS_CORRECTED_TOPIC)).map(
+    entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`,
+  );
   const passedOver = byPhase(entries.filter(entry => DECIDED_KINDS.has(entry.kind))).flatMap(entry =>
     entry.rejectedAlternatives.map(alternative => `- ${alternative} (passed over for ${entry.topic})`),
   );
@@ -93,6 +112,7 @@ export function renderLedger(all: LedgerContextEntry[]): string {
     renderList('Author directions', byPhase(entries.filter(entry => entry.kind === 'direction')).map(tagged)),
     renderTimeline(entries),
     renderList('Backlog — not yet', byPhase(entries.filter(entry => entry.kind === 'backlog' && entry.topic !== AUTHOR_TIMELINE_TOPIC)).map(tagged)),
+    renderConceptsCorrected(entries),
     renderList('Do not propose', doNotPropose(entries)),
   ].filter((block): block is string => block !== null);
   return blocks.length === 0 ? EMPTY_LEDGER : blocks.join('\n\n');

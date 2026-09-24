@@ -1,10 +1,12 @@
 import { type BlueprintRoundResponse } from '@/lib/apis';
 
-export const PREMISE_PART_KINDS = ['setting', 'rule', 'protagonist', 'hook'] as const;
+export const PREMISE_PART_KINDS = ['setting', 'rule', 'protagonist', 'hook', 'goal'] as const;
 export const PREMISE_PART_TEXT_MAX = 200;
 export const PREMISE_SENTENCE_MAX = 600;
 export const PREMISE_WRITER_LINE_MAX = 240;
 export const PREMISE_WHY_MAX = 400;
+/** Matches the server's PREMISE_REJECTED_MAX, so the decision card shows exactly what the lock records. */
+export const PREMISE_REJECTED_MAX = 15;
 
 export type PremisePartKind = (typeof PREMISE_PART_KINDS)[number];
 
@@ -13,7 +15,15 @@ export const PREMISE_PART_KIND_LABELS: Record<PremisePartKind, string> = {
   rule: 'What it costs',
   protagonist: 'Who it happens to',
   hook: 'What makes it personal',
+  goal: 'Where it’s heading',
 };
+
+const UNKNOWN_PART_KIND_LABEL = 'This part';
+
+/** A kind this build does not recognise still gets a generic label — never dropped, so an older build never locks a shortened sentence. */
+export function premisePartKindLabel(kind: string): string {
+  return (PREMISE_PART_KIND_LABELS as Record<string, string>)[kind] ?? UNKNOWN_PART_KIND_LABEL;
+}
 
 export interface PremiseAlternative {
   id: string;
@@ -23,7 +33,8 @@ export interface PremiseAlternative {
 export interface PremisePart {
   id: string;
   text: string;
-  kind: PremisePartKind;
+  /** Whatever kind the server sent; a value this build does not know is kept, not dropped, and shown with a generic label. */
+  kind: string;
   alternatives: PremiseAlternative[];
 }
 
@@ -33,17 +44,13 @@ export interface PremiseRound {
   writerLine: string;
 }
 
-function isPartKind(value: unknown): value is PremisePartKind {
-  return typeof value === 'string' && PREMISE_PART_KINDS.includes(value as PremisePartKind);
-}
-
 /** Null for a round that is not ready, or one whose shape this build does not know. */
 export function parsePremiseRound(round: BlueprintRoundResponse | null): PremiseRound | null {
   const options = round?.options as { parts?: unknown; why?: unknown; writerLine?: unknown } | null;
   if (!Array.isArray(options?.parts)) return null;
   const parts = options.parts.flatMap(candidate => {
     const part = candidate as { id?: unknown; text?: unknown; kind?: unknown; alternatives?: unknown };
-    if (typeof part.id !== 'string' || typeof part.text !== 'string' || !isPartKind(part.kind)) return [];
+    if (typeof part.id !== 'string' || typeof part.text !== 'string' || typeof part.kind !== 'string' || part.kind.length === 0) return [];
     const alternatives = Array.isArray(part.alternatives)
       ? part.alternatives.flatMap(item => {
           const alternative = item as { id?: unknown; text?: unknown };
@@ -62,7 +69,7 @@ export function premiseRoundKey(round: BlueprintRoundResponse | null): string {
 
 export interface PremiseDraftPart {
   id: string;
-  kind: PremisePartKind;
+  kind: string;
   /** The part or alternative the text came from; absent once the author has written their own. */
   optionId?: string;
   text: string;
@@ -97,10 +104,29 @@ export function assemblePremise(draft: PremiseDraftPart[]): string {
 }
 
 export interface PremiseSelection {
-  parts: { optionId?: string; text: string }[];
+  parts: { optionId?: string; partId?: string; text: string }[];
   sentence: string;
   why?: string;
   writerLine: string;
+}
+
+export type PremiseSentenceStatus = { state: 'ok'; length: number } | { state: 'over'; length: number };
+
+/** Counted the way the server's schema counts, by code point, so the count on screen and the server agree on what fits. */
+export function premiseSentenceLength(sentence: string): number {
+  return [...sentence.trim()].length;
+}
+
+export function premiseSentenceStatus(sentence: string): PremiseSentenceStatus {
+  const length = premiseSentenceLength(sentence);
+  return length > PREMISE_SENTENCE_MAX ? { state: 'over', length } : { state: 'ok', length };
+}
+
+/** The server refuses a sentence over the character ceiling; the meter says so before it is sent. */
+export function premiseSentenceMeter(status: PremiseSentenceStatus): string {
+  const length = status.length.toLocaleString();
+  if (status.state === 'ok') return `${length} · ${(PREMISE_SENTENCE_MAX - status.length).toLocaleString()} left`;
+  return `${length}, ${(status.length - PREMISE_SENTENCE_MAX).toLocaleString()} over the ${PREMISE_SENTENCE_MAX.toLocaleString()}-character limit. Nothing is cut: shorten a part before it can be locked.`;
 }
 
 export interface PremiseLines {
@@ -142,14 +168,19 @@ export function premiseLinesFor(lines: PremiseLinesDraft, sentence: string): Pre
   return { why: stale ? '' : lines.why, writerLine: stale ? '' : lines.writerLine, stale };
 }
 
-/** The writer line rides every chapter pack, so a lock without one is refused rather than filled in from a discarded sentence. */
+/**
+ * The writer line rides every chapter pack, so a lock without one is refused rather than filled in from a discarded sentence. A
+ * sentence over the character ceiling is refused the same way — never silently cut, which would lock a shorter promise than the
+ * author saw on screen.
+ */
 export function buildPremiseSelection(draft: PremiseDraftPart[], lines: PremiseLines): PremiseSelection | null {
-  const parts = draft.map(part => ({ ...(part.optionId ? { optionId: part.optionId } : {}), text: part.text.trim() })).filter(part => part.text.length > 0);
+  const parts = draft.map(part => ({ partId: part.id, ...(part.optionId ? { optionId: part.optionId } : {}), text: part.text.trim() })).filter(part => part.text.length > 0);
   const sentence = assemblePremise(draft);
   const writerLine = lines.writerLine.trim();
   const why = lines.why.trim();
   if (parts.length === 0 || !sentence || !writerLine) return null;
-  return { parts, sentence: sentence.slice(0, PREMISE_SENTENCE_MAX), ...(why ? { why } : {}), writerLine };
+  if (premiseSentenceStatus(sentence).state === 'over') return null;
+  return { parts, sentence, ...(why ? { why } : {}), writerLine };
 }
 
 export const PREMISE_PREVIEW_MIN_LENGTH = 20;
@@ -183,10 +214,15 @@ export function resolvePremiseInput(draft: PremiseDraftPart[], partId: string | 
   return { ...(partId ? { part: partId } : {}), ...(current ? { current } : {}) };
 }
 
-/** What the decision card shows as rejected: every part and alternative the sentence passed over. */
+/** The same key the server's lock normalises on, so a part reworded only in its spacing is not shown as a separate rejection. */
+function normalisedKey(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** What the decision card shows as rejected: every part and alternative the sentence passed over, deduped and capped exactly as the lock records it. */
 export function passedOverAlternatives(round: PremiseRound | null, draft: PremiseDraftPart[]): string[] {
   if (!round) return [];
-  const chosen = new Set(draft.map(part => part.text.trim().toLowerCase()));
-  const offered = round.parts.flatMap(part => [part.text, ...part.alternatives.map(alternative => alternative.text)]);
-  return [...new Set(offered.filter(text => !chosen.has(text.trim().toLowerCase())))];
+  const chosen = new Set(draft.map(part => normalisedKey(part.text)));
+  const offered = round.parts.flatMap(part => [part.text, ...part.alternatives.map(alternative => alternative.text)]).filter(text => !chosen.has(normalisedKey(text)));
+  return [...new Set(offered)].slice(0, PREMISE_REJECTED_MAX);
 }

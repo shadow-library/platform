@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { Button, Input, Textarea, toast } from '@shadow-library/ui';
 
 import { isRoundLive, useCancelBlueprintRoundMutation, useLockBlueprintStepMutation, usePremisePreviewMutation, useStartBlueprintRoundMutation } from '@/lib/apis';
@@ -17,14 +17,16 @@ import {
   nextPremiseLines,
   parsePremiseRound,
   passedOverAlternatives,
-  PREMISE_PART_KIND_LABELS,
   PREMISE_PART_TEXT_MAX,
   PREMISE_WHY_MAX,
   PREMISE_WRITER_LINE_MAX,
   type PremiseDraftPart,
   type PremiseLinesDraft,
   premiseLinesFor,
+  premisePartKindLabel,
   premiseRoundKey,
+  premiseSentenceMeter,
+  premiseSentenceStatus,
   previewPremiseText,
   resolvePremiseInput,
 } from './premise-step';
@@ -35,7 +37,12 @@ import styles from './blueprint.module.css';
 
 const RUNNING_LABEL = 'Writing the sentence your novel is about…';
 const WRITER_LINE_STALE = 'The sentence changed — say what it means for whoever writes chapter one.';
-const WRITER_LINE_HINT = 'This line rides every chapter pack, so it has to describe the sentence you are locking.';
+const WRITER_LINE_HINT = 'This line rides every chapter pack — say what chapter one owes this sentence, not where the book ends up.';
+const PART_PANEL_ID = 'premise-part-panel';
+const PART_PANEL_HEADING_ID = 'premise-part-panel-heading';
+const GOAL_PANEL_LEDE =
+  'These keep the ending you stated and change only how it reads — if one moves the ending itself, it isn’t yours. Everything else in the sentence stays exactly as it is.';
+const PART_PANEL_LEDE = 'Swapping this part changes the novel. Everything else in the sentence stays exactly as it is.';
 
 /** One sentence with its load-bearing parts open to swap. Locking it writes the premise decision and the project's premise page. */
 export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): ReactElement {
@@ -50,6 +57,7 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
   const [steer, setSteer] = useState<SteerDraft>(EMPTY_STEER);
   const [preview, setPreview] = useState<string | null>(null);
   const [roundKey, setRoundKey] = useState(() => premiseRoundKey(round));
+  const panelRef = useRef<HTMLElement>(null);
 
   const startRound = useStartBlueprintRoundMutation(projectId, step.key);
   const cancelRound = useCancelBlueprintRoundMutation(projectId, step.key);
@@ -70,9 +78,15 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
   const busy = running || startRound.isPending;
   const sentence = assemblePremise(draft);
   const shown = premiseLinesFor(lines, sentence);
+  const sentenceStatus = premiseSentenceStatus(sentence);
   const selection = buildPremiseSelection(draft, shown);
   const opened = parsed?.parts.find(part => part.id === openPart);
   const openedDraft = draft.find(part => part.id === openPart);
+  const hasGoal = draft.some(part => part.kind === 'goal');
+
+  useEffect(() => {
+    if (openPart != null) panelRef.current?.focus();
+  }, [openPart]);
 
   const run = (partId: string | null): void => {
     startRound.mutate(buildRoundBody(steer, {}, stepPayload(resolvePremiseInput(draft, partId, round))), {
@@ -138,20 +152,27 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
                 key={part.id}
                 type="button"
                 className={styles.premiseMark}
-                aria-pressed={openPart === part.id}
-                aria-label={`${PREMISE_PART_KIND_LABELS[part.kind]}: ${part.text}`}
+                aria-expanded={openPart === part.id}
+                aria-controls={PART_PANEL_ID}
+                aria-label={`${premisePartKindLabel(part.kind)}: ${part.text}`}
                 disabled={busy}
                 onClick={() => openAlternatives(part.id)}
               >
+                {part.kind === 'goal' && <span className={styles.partBadge}>{premisePartKindLabel('goal')}</span>}
                 {part.text}
               </button>
             ))}
           </p>
+          <p className={styles.charCount} data-state={sentenceStatus.state} aria-live={sentenceStatus.state === 'over' ? 'polite' : 'off'}>
+            {premiseSentenceMeter(sentenceStatus)}
+          </p>
 
           {opened != null && openedDraft != null && (
-            <section className={styles.card}>
-              <h2 className={styles.cardTitle}>{PREMISE_PART_KIND_LABELS[opened.kind]}</h2>
-              <p className={styles.cardLede}>Swapping this part changes the novel. Everything else in the sentence stays exactly as it is.</p>
+            <section className={styles.card} id={PART_PANEL_ID} ref={panelRef} tabIndex={-1} aria-labelledby={PART_PANEL_HEADING_ID}>
+              <h2 id={PART_PANEL_HEADING_ID} className={styles.cardTitle}>
+                {premisePartKindLabel(opened.kind)}
+              </h2>
+              <p className={styles.cardLede}>{opened.kind === 'goal' ? GOAL_PANEL_LEDE : PART_PANEL_LEDE}</p>
               <div className={styles.pillRow}>
                 {[{ id: opened.id, text: opened.text }, ...opened.alternatives].map(choice => (
                   <button
@@ -205,7 +226,7 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
             <h2 className={styles.cardTitle}>What it means for the writer</h2>
             <p className={styles.cardLede}>{shown.stale ? WRITER_LINE_STALE : WRITER_LINE_HINT}</p>
             <Textarea
-              placeholder="e.g. the mystery is personal from chapter 1: every clue is also about who he was"
+              placeholder="e.g. the mystery is personal from chapter 1: every clue is also about who he was…"
               value={shown.writerLine}
               onValueChange={writerLine => editLines({ writerLine })}
               maxLength={PREMISE_WRITER_LINE_MAX}
@@ -215,7 +236,7 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
               aria-invalid={shown.writerLine.trim().length === 0}
             />
             <Input
-              placeholder="Why this premise — the decisions it is built from"
+              placeholder="Why this premise — the decisions it is built from…"
               value={shown.why}
               onValueChange={why => editLines({ why })}
               maxLength={PREMISE_WHY_MAX}
@@ -265,7 +286,11 @@ export function PremiseStep({ projectId, step, onLocked }: StepScreenProps): Rea
       {draft.length > 0 && (
         <LockBar
           label={meta.lockLabel ?? 'Lock premise'}
-          hint="Locking writes the premise decision, the project’s premise and its Story Bible page. It is expensive to change later."
+          hint={
+            hasGoal
+              ? 'Locking writes the premise decision, the project’s premise and its Story Bible page — including where the book is heading. It is expensive to change later.'
+              : 'Locking writes the premise decision, the project’s premise and its Story Bible page. It is expensive to change later.'
+          }
           onLock={lock}
           loading={lockStep.isPending}
           disabled={selection == null || busy || lockStep.isPending}

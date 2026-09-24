@@ -23,7 +23,11 @@ import { loadPageBody, upsertPageSections } from './bible-page';
 
 export const PREMISE_TOPIC = 'premise';
 export const PREMISE_PAGE: { section: Bible.Section; slug: string } = { section: 'project', slug: 'premise' };
-export const PREMISE_REJECTED_MAX = 12;
+/** Sized for five parts (the four original kinds plus goal) at three typically passed-over texts each. */
+export const PREMISE_REJECTED_MAX = 15;
+export const WHERE_ITS_HEADING = "Where it's heading";
+const WHERE_ITS_HEADING_FRAME =
+  "Where the book ends up, as the author states it — not the situation chapter one opens in. No character knows, wants or works toward it before their chapter's brief says so.";
 
 @Schema()
 export class PremiseAlternativeOption {
@@ -84,6 +88,9 @@ export class PremiseSelectedPart {
   @Field({ optional: true, pattern: '^p[0-9]+(_a[0-9]+)?$', description: 'The part or alternative the text came from; absent when the author wrote their own.' })
   optionId?: string;
 
+  @Field({ optional: true, pattern: '^p[0-9]+$', description: 'Which part this is, so a part the author rewrote in their own words can still be told apart from the others.' })
+  partId?: string;
+
   @Field({ minLength: 1, maxLength: PREMISE_PART_TEXT_MAX })
   text: string;
 }
@@ -124,11 +131,27 @@ function currentTextOf(part: PremisePartOption, input: PremiseInput | null): str
   return input?.current?.find(candidate => candidate.id === part.id)?.text.trim() || part.text;
 }
 
+function partIdOf(part: PremiseSelectedPart): string | undefined {
+  return part.partId ?? part.optionId?.match(/^p[0-9]+/)?.[0];
+}
+
+/** The one goal-kind part in the locked sentence, resolved from what the round offered rather than from the sentence's own wording. */
+function goalTextOf(selection: PremiseSelection, offered: PremiseOptions | null): string | null {
+  if (!offered) return null;
+  const kinds = new Map(offered.parts.map(part => [part.id, part.kind]));
+  const goal = selection.parts.find(part => {
+    const id = partIdOf(part);
+    return id != null && kinds.get(id) === 'goal';
+  });
+  return goal?.text.trim() || null;
+}
+
 /** The Heart phase writes its own sections onto this page, so a re-lock merges its sections in rather than rewriting the body. */
-function premiseBody(current: string | null, sentence: string, why: string | null, writerLine: string): string {
+function premiseBody(current: string | null, sentence: string, why: string | null, writerLine: string, goalText: string | null): string {
   return upsertPageSections(current, 'Premise', sentence, [
     { heading: 'Why', body: why ?? '' },
     { heading: 'What it means for the writer', body: writerLine },
+    { heading: WHERE_ITS_HEADING, body: goalText ? `${WHERE_ITS_HEADING_FRAME}\n\n${goalText}` : '' },
   ]);
 }
 
@@ -198,10 +221,11 @@ export const premiseStep: ScreenStep<BlueprintPremiseOutput, PremiseOptions, Pre
     const writerLine = selection.writerLine.trim();
     if (!writerLine) throw AppErrorCode.BPR_004.create({ part: 'selection', issues: 'say what the premise means for whoever writes chapter one' });
     const chosen = new Set(selection.parts.map(part => normalise(part.text)));
+    const goalText = goalTextOf(selection, offered);
 
     const changeSet: ContentOp[] = [
       { op: 'premise.update', premise: sentence },
-      { op: 'bible_document.upsert', ...PREMISE_PAGE, body: premiseBody(await loadPageBody(tx, project.id, PREMISE_PAGE), sentence, why, writerLine) },
+      { op: 'bible_document.upsert', ...PREMISE_PAGE, body: premiseBody(await loadPageBody(tx, project.id, PREMISE_PAGE), sentence, why, writerLine, goalText) },
     ];
     const plan: LockPlan = {
       entries: [

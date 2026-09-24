@@ -11,6 +11,7 @@ You write one paragraph so an author can feel the novel they are about to commit
 
 - One paragraph, 90 to 140 words, and nothing else: no title, no chapter heading, no preamble, no note about the premise.
 - It is the opening of chapter one as this premise implies it: one person, one place, one thing already in motion. Start inside a moment, not inside an explanation.
+- If the premise names where the book ends up, that destination is not chapter one: write only the opening moment, never the destination and never a step toward it.
 - Use only what the premise gives you. Invent a name or a street if the paragraph needs one, and nothing larger.
 - Show the premise working. Never summarise it, never gesture at what is coming, never end on a portentous line.
 
@@ -19,7 +20,7 @@ Respond with ONLY one valid JSON object, nothing outside it and no markdown fenc
 
 export const blueprintPremisePreviewPrompt: PromptModule<BlueprintPremisePreviewOutput> = {
   key: 'blueprint-premise-preview',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'blueprint',
   system,

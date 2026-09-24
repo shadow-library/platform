@@ -104,6 +104,7 @@ describe('ledgerTopicLabel', () => {
   it('should name the topics the author meets most', () => {
     expect(ledgerTopicLabel('promise')).toBe('Reader promise');
     expect(ledgerTopicLabel('start')).toBe('Starting point');
+    expect(ledgerTopicLabel('concepts.corrected')).toBe('Your idea, corrected');
   });
 
   it('should turn an unnamed key into words rather than show the slug', () => {

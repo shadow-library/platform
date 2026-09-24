@@ -226,7 +226,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
           aria-describedby="start-text-count"
           aria-invalid={overLimit || undefined}
         />
-        <p id="start-text-count" className={styles.startCount} data-state={textStatus.state} aria-live="polite">
+        <p id="start-text-count" className={styles.charCount} data-state={textStatus.state} aria-live="polite">
           {startTextMeter(textStatus)}
         </p>
         <div className={styles.startTypes}>

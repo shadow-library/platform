@@ -4,6 +4,7 @@ import { authorBriefInput, blueprintBudget, blueprintSections } from '@modules/a
 import {
   AUTHOR_BRIEF_TOPIC,
   AUTHOR_TIMELINE_TOPIC,
+  CONCEPTS_CORRECTED_TOPIC,
   type LedgerContextEntry,
   ledgerSection,
   renderLedger,
@@ -115,6 +116,27 @@ describe('renderLedger', () => {
     expect(doNotPropose).toContain('- A smuggler hides a map in a lighthouse. (passed over for premise)');
     expect(rendered.indexOf('A sea monster siege')).toBeGreaterThan(rendered.indexOf('### Do not propose'));
     expect(rendered.split('A smuggler hides a map')).toHaveLength(2);
+  });
+
+  it('should render a killed author card as a correction, kept out of Do not propose', () => {
+    const corrected = entry({ kind: 'rejected', topic: CONCEPTS_CORRECTED_TOPIC, statement: 'The Ledger of Salt — a clerk audits the dead.', why: 'too grim for me' });
+    const rendered = renderLedger([...ledger, corrected]);
+
+    expect(rendered).toContain(
+      [
+        "### The author's idea, corrected",
+        '',
+        'The author corrected the reading of their own idea — honour the reason; the idea itself is not banned.',
+        '',
+        "- The Ledger of Salt — a clerk audits the dead. (the author's reason: too grim for me)",
+      ].join('\n'),
+    );
+    const doNotPropose = rendered.slice(rendered.indexOf('### Do not propose'));
+    expect(doNotPropose).not.toContain('The Ledger of Salt');
+  });
+
+  it('should say nothing about a correction when there is none', () => {
+    expect(renderLedger(ledger)).not.toContain('idea, corrected');
   });
 
   it('should say so when nothing is decided yet', () => {

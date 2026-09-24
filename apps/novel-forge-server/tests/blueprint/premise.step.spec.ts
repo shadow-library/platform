@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { blueprintPremisePrompt } from '@modules/ai/prompts/blueprint-premise.prompt';
 import { type BlueprintPremiseOutput } from '@modules/ai/schemas/blueprint-premise.schema';
 import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
@@ -108,6 +109,54 @@ describe('premiseStep.toRound', () => {
     expect(next.why).toBe('a different why');
     expect(next.parts[0]?.text).toBe('In the harbour city of Vell,');
   });
+
+  it('should number a goal part like any other and let it be reworked on its own', () => {
+    const withGoal = output({
+      parts: [
+        ...output().parts,
+        { text: 'until the ledger itself is abolished.', kind: 'goal', alternatives: ['until the debt is paid in full.', 'until no one owes a year again.'] },
+      ],
+    });
+    const round = premiseStep.toRound(withGoal, { previous: null, input: null, focus: null, ledger: [] }).options;
+    expect(round.parts[4]).toMatchObject({ id: 'p5', kind: 'goal', text: 'until the ledger itself is abolished.' });
+
+    const previous = round;
+    const input: PremiseInput = { part: 'p5', current: previous.parts.map(part => ({ id: part.id, text: part.text })) };
+    const reworked = premiseStep.toRound(
+      output({
+        parts: previous.parts.map((part, index) =>
+          index === 4 ? { text: 'ignored', kind: 'goal', alternatives: ['until the city forgives every debt.', 'until the ledger burns.'] } : output().parts[index]!,
+        ),
+      }),
+      { previous, input, focus: null, ledger: [] },
+    ).options;
+    expect(reworked.parts[4]).toMatchObject({ id: 'p5', kind: 'goal', text: 'until the ledger itself is abolished.' });
+    expect(reworked.parts[4]?.alternatives).toEqual([
+      { id: 'p5_a1', text: 'until the city forgives every debt.' },
+      { id: 'p5_a2', text: 'until the ledger burns.' },
+    ]);
+  });
+});
+
+describe('blueprintPremisePrompt.postValidate', () => {
+  it('should refuse more than one part claiming the book’s through-line', () => {
+    const issues = blueprintPremisePrompt.postValidate?.(
+      output({
+        parts: [
+          { text: 'a', kind: 'goal', alternatives: ['b', 'c'] },
+          { text: 'd', kind: 'goal', alternatives: ['e', 'f'] },
+        ],
+      }),
+    );
+    expect(issues?.join(' ')).toContain('through-line');
+  });
+
+  it('should let exactly one goal part through', () => {
+    const issues = blueprintPremisePrompt.postValidate?.(
+      output({ parts: [...output().parts, { text: 'until the ledger itself is abolished.', kind: 'goal', alternatives: ['a', 'b'] }] }),
+    );
+    expect(issues).toEqual([]);
+  });
 });
 
 describe('premiseStep.renderInput', () => {
@@ -163,6 +212,81 @@ describe('premiseStep.materialise', () => {
     const body = (plan.changeSet?.[1] as { body: string }).body;
     expect(body.startsWith('# Premise')).toBe(true);
     expect(body).toContain('## What it means for the writer');
+  });
+
+  it('should write no “Where it’s heading” section when the locked sentence has no goal part', async () => {
+    const plan = await materialise(wholeSentence());
+    const body = (plan.changeSet?.[1] as { body: string }).body;
+    expect(body).not.toContain("Where it's heading");
+  });
+
+  it('should write and frame a “Where it’s heading” section for the goal part alone', async () => {
+    const round = premiseStep.toRound(
+      output({
+        parts: [
+          ...output().parts,
+          { text: 'until the ledger itself is abolished.', kind: 'goal', alternatives: ['until the debt is paid in full.', 'until no one owes a year again.'] },
+        ],
+      }),
+      { previous: null, input: null, focus: null, ledger: [] },
+    ).options;
+    const selection: PremiseSelection = {
+      parts: round.parts.map(part => ({ optionId: part.id, text: part.text })),
+      sentence: round.parts.map(part => part.text).join(' '),
+      writerLine: WRITER_LINE,
+    };
+    const plan = await materialise(selection, round);
+    const body = (plan.changeSet?.[1] as { body: string }).body;
+    expect(body).toContain("## Where it's heading");
+    expect(body).toContain('No character knows, wants or works toward it');
+    expect(body).toContain('until the ledger itself is abolished.');
+  });
+
+  it('should resolve the goal part by partId when the author rewrote it in their own words', async () => {
+    const round = premiseStep.toRound(
+      output({
+        parts: [
+          ...output().parts,
+          { text: 'until the ledger itself is abolished.', kind: 'goal', alternatives: ['until the debt is paid in full.', 'until no one owes a year again.'] },
+        ],
+      }),
+      { previous: null, input: null, focus: null, ledger: [] },
+    ).options;
+    const goalPart = round.parts.find(part => part.kind === 'goal');
+    const selection: PremiseSelection = {
+      parts: round.parts.map(part => (part.id === goalPart?.id ? { partId: part.id, text: 'until every ledger in the city is burned.' } : { optionId: part.id, text: part.text })),
+      sentence: [...round.parts.slice(0, -1).map(part => part.text), 'until every ledger in the city is burned.'].join(' '),
+      writerLine: WRITER_LINE,
+    };
+    const plan = await materialise(selection, round);
+    const body = (plan.changeSet?.[1] as { body: string }).body;
+    expect(body).toContain('until every ledger in the city is burned.');
+  });
+
+  it('should remove an existing “Where it’s heading” section on a re-lock with no goal part', async () => {
+    const existing = [
+      '# Premise',
+      '',
+      'An earlier sentence.',
+      '',
+      '## Why',
+      '',
+      'Because.',
+      '',
+      '## What it means for the writer',
+      '',
+      'Something.',
+      '',
+      "## Where it's heading",
+      '',
+      'Where the book ends up, as the author states it — not the situation chapter one opens in.',
+      '',
+      'An old stated ending.',
+    ].join('\n');
+    const plan = await materialise(wholeSentence(), options(), existing);
+    const body = (plan.changeSet?.[1] as { body: string }).body;
+    expect(body).not.toContain("Where it's heading");
+    expect(body).not.toContain('An old stated ending.');
   });
 
   it('should take the author’s own words over the round’s', async () => {
