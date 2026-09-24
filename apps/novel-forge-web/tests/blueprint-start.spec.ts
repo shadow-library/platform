@@ -48,7 +48,7 @@ describe('restoreStartChips', () => {
       ]),
     ).toEqual([
       { optionId: 'c1', label: 'A ferry that only runs at dusk', kind: 'element' },
-      { label: 'Found family', kind: 'want' },
+      { localId: 'ledger:2', label: 'Found family', kind: 'want' },
       { optionId: 'c3', label: 'No chosen-one prophecy', kind: 'not' },
       { optionId: 'c4', label: 'Ending: the debt is finally paid', kind: 'later' },
     ]);
@@ -62,6 +62,17 @@ describe('restoreStartChips', () => {
 
   it('should ignore an entry from another topic', () => {
     expect(restoreStartChips([entry({ topic: 'start.steer' })])).toEqual([]);
+  });
+
+  it('should derive an author-added chip’s id from the ledger entry rather than minting one', () => {
+    expect(restoreStartChips([entry({ id: 'e-9', payload: { kind: 'element' } })])[0]?.localId).toBe('ledger:e-9');
+    expect(restoreStartChips([entry({ id: 'e-9', payload: { kind: 'element' } })])[0]?.localId).toBe(
+      restoreStartChips([entry({ id: 'e-9', payload: { kind: 'element' } })])[0]?.localId,
+    );
+  });
+
+  it('should not set a localId on a chip the round still offers by option id', () => {
+    expect(restoreStartChips([entry()])[0]).not.toHaveProperty('localId');
   });
 });
 

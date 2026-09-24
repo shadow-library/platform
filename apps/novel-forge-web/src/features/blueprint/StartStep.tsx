@@ -40,6 +40,7 @@ const RUNNING_LABEL = 'Reading your starting point…';
 const LEDGER_QUERY = { topics: `${START_TOPIC},${START_RULED_OUT_TOPIC},${START_LATER_TOPIC}` };
 const LATER_GROUP_LABEL = 'Later in the story';
 const ADD_CHIP_BUTTON_ID = 'start-chip-add';
+const START_TEXT_ID = 'start-text';
 const ANNOUNCEMENT_CLEAR_MS = 1_000;
 
 /** A chip carries its own identity from the moment it exists, so removing an earlier one never shifts what a later one refers to. */
@@ -59,13 +60,9 @@ function chipLabelText(chip: Pick<StartChip, 'label'>): string {
   return chip.label.trim() || 'Untitled chip';
 }
 
-/** Round-offered chips are identified by the option they answer; anything else keeps whatever id it already carries and is minted one only the first time it appears. */
+/** Every chip already has an id by the time it reaches here: its option, its ledger entry, or the add-chip handler. */
 function toDraftChips(list: StartChip[]): DraftChip[] {
-  return list.map(chip => {
-    const existing = (chip as Partial<DraftChip>).localId;
-    if (existing) return chip as DraftChip;
-    return { ...chip, localId: chip.optionId ? `opt:${chip.optionId}` : crypto.randomUUID() };
-  });
+  return list.map((chip, index) => ({ ...chip, localId: chip.localId ?? (chip.optionId ? `opt:${chip.optionId}` : `chip:${index}`) }));
 }
 
 /**
@@ -84,6 +81,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
   const [saved, setSaved] = useState<StartChip[] | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const pendingFocusRef = useRef<{ elementId: string; announce: string } | null>(null);
+  const announceParityRef = useRef(false);
 
   const startRound = useStartBlueprintRoundMutation(projectId, step.key);
   const cancelRound = useCancelBlueprintRoundMutation(projectId, step.key);
@@ -106,19 +104,17 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
     setDraft(EMPTY_STEER);
   }
 
-  // A chip that crosses between "Understood as" and "Later in the story" re-parents into a different <ul>, which drops focus
-  // from its kind picker; removing a chip drops focus entirely. Both leave a target and an announcement here, restored once
-  // the move has painted, so it works whether the target is an element that already existed or one that just appeared.
+  // Re-parenting a chip into a different <ul>, or removing it, drops focus; this restores it once the move has painted.
   useLayoutEffect(() => {
     const pending = pendingFocusRef.current;
     if (!pending) return;
     pendingFocusRef.current = null;
     document.getElementById(pending.elementId)?.focus();
-    setAnnouncement(pending.announce);
+    announceParityRef.current = !announceParityRef.current;
+    setAnnouncement(pending.announce + (announceParityRef.current ? '\u200B' : ''));
   }, [chips]);
 
-  // Cleared rather than left standing, so the same words said again — moving the same chip back and forth — are still
-  // read as a change instead of silently matching what the region already holds.
+  // Cleared after a pause so a stale announcement doesn't linger in the live region.
   useEffect(() => {
     if (!announcement) return;
     const timer = window.setTimeout(() => setAnnouncement(''), ANNOUNCEMENT_CLEAR_MS);
@@ -173,8 +169,9 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
     const group = removed.kind === 'later' ? later : opening;
     const position = group.findIndex(chip => chip.localId === identity);
     const neighbour = group[position + 1] ?? (position > 0 ? group[position - 1] : undefined);
+    const fallback = chips.length > 1 ? ADD_CHIP_BUTTON_ID : START_TEXT_ID;
     pendingFocusRef.current = {
-      elementId: neighbour ? chipInputId(neighbour.localId) : ADD_CHIP_BUTTON_ID,
+      elementId: neighbour ? chipInputId(neighbour.localId) : fallback,
       announce: `"${chipLabelText(removed)}" removed`,
     };
     setChips(current => current.filter(chip => chip.localId !== identity));
@@ -218,6 +215,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
     <>
       <section className={styles.card}>
         <Textarea
+          id={START_TEXT_ID}
           placeholder="e.g. a kid who collects debts for the city and finds something in a jar that belongs to him. I like when magic costs something real. Not a chosen one."
           value={text}
           onValueChange={setText}

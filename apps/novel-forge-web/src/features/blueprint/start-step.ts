@@ -33,6 +33,8 @@ export const START_CHIP_KIND_LABELS: Record<StartChipKind, string> = {
 export interface StartChip {
   /** The id the round offered it under; absent for a chip the author added. */
   optionId?: string;
+  /** A deterministic id for a chip restored from the ledger, mutually exclusive with `optionId`. */
+  localId?: string;
   label: string;
   kind: StartChipKind;
 }
@@ -73,7 +75,8 @@ export function restoreStartChips(entries: LedgerEntryResponse[]): StartChip[] {
     if (!RESTORED_TOPICS.includes(entry.topic)) return [];
     const payload = entry.payload as { kind?: unknown; optionId?: unknown } | null;
     const kind = isChipKind(payload?.kind) ? payload.kind : fallbackKind(entry.topic);
-    return [{ ...(typeof payload?.optionId === 'string' ? { optionId: payload.optionId } : {}), label: entry.statement, kind }];
+    const optionId = typeof payload?.optionId === 'string' ? payload.optionId : undefined;
+    return [{ ...(optionId ? { optionId } : { localId: `ledger:${entry.id}` }), label: entry.statement, kind }];
   });
 }
 
