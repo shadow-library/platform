@@ -35,10 +35,12 @@ Seven phases in a fixed order, grouped by altitude:
 ### Idea
 
 - **Starting point.** Whatever the author already imagines (a scene, a feeling, "like X but Y", a character, nothing yet) is read back as short chips so a misunderstanding
-  shows immediately. The corrected reading is saved as directions every later step reads. The author's own text is kept whole beside it: the chips summarise
-  it, and never stand in for it. The starting point may run to about ten thousand words, so an author can bring the concrete detail they already have. The box never
-  cuts text silently; an over-long starting point is refused with a live word count, not trimmed. A long starting text rides on top of a step's context budget rather
-  than crowding out what the step reads.
+  shows immediately, keeping the author's own timeline: what is in the story as it opens is read apart from anything the author places after it (a later turn, a reveal,
+  the ending, the end goal), so the reading never folds the far reaches of the book into its opening. The opening reading is saved as directions every later step reads;
+  later material is saved under its own ledger heading, apart from the generic backlog, so every step is told once where it belongs and the ending binds every step that
+  follows. The author's own text is kept whole beside it: the chips summarise it, and never stand in for it. The starting point may run to about ten thousand words, so an
+  author can bring the concrete detail they already have. The box never cuts text silently; an over-long starting point is refused with a live word count, not trimmed. A
+  long starting text rides on top of a step's context budget rather than crowding out what the step reads.
 - **Taste.** Either-or pairs shaped by the starting point, answerable with both, neither or "depends" plus a reason, and "a book you gave up on: why?" reasons. Taste
   becomes directions; dislikes become rejected entries. A pick records the axis the pair tests, with the scenes only as its reason, so a quick answer never hardens into
   plot. "Neither" rejects the two scenes, never the axis, and takes an optional line on what the author would rather read, kept as a direction: "not this example" must
@@ -51,7 +53,8 @@ Seven phases in a fixed order, grouped by altitude:
 ### Heart
 
 - **Theme and ending question.** The theme is the question under the plot; the ending question is what the reader waits the whole novel to learn. The coach says plainly why a
-  weak option is weak (for example a mystery that gets solved rather than a question that ends a novel) instead of hiding it.
+  weak option is weak (for example a mystery that gets solved rather than a question that ends a novel) instead of hiding it. When the author has stated their own ending,
+  every ending question offered is one that ending actually answers; an option that would need a different ending carries a caution rather than quietly rewriting it.
 - **Reader promise.** Up to two drivers (mystery, progression, romance, slice of life, war and adventure, political intrigue, found family), length, tone and editable
   promises to the reader. It is the last whole-novel decision and the one that tailors every later phase (see below).
 - **Title workshop.** Titles in several styles, each tied to the decision it came from; star, reject, steer with rules. It checks that a title fits a catalog card and that no
@@ -79,6 +82,8 @@ Seven phases in a fixed order, grouped by altitude:
 
 - The whole novel as movements, one per volume, with the ending question pinned, the protagonist's change across the movements and a reveal schedule. Movements are sketches;
   only volume one is detailed in the next phase.
+- The author's own later-placed events are binding on where they land: a "Later" item goes in whichever movement first reaches it — which may be movement one, once its
+  opening situation has passed — and an "Ending" item goes in the last movement, never earlier, because it is the author's own ending.
 - A reveal is a spoiler and is kept as one. Each one becomes a canon fact scheduled to the movement it is placed in, carrying the note the earlier chapters' writer is shown
   instead of it and the give-away phrases they may not use. The truth itself is never written onto a Story Bible page: the page carries where each reveal comes out and which
   fact holds it, the author reads the truth in the Notebook, and a chapter before it is told how to hold the secret rather than what it is.
@@ -134,6 +139,9 @@ The ledger (the author sees it as the Notebook) is the Blueprint's memory and th
 - Links address produced content by the keys change-set operations use (a page's section and slug, entity and fact keys, volume and arc keys, brief chapters), so a revert and
   re-apply keeps them, and inserting a chapter renumbers linked briefs with everything else.
 - Every Blueprint step's context includes the active ledger, and it is never evicted to fit a budget.
+- The author's own later-placed backlog (the starting point's "Later" and "Ending" chips) renders under its own heading, apart from the generic "Backlog — not yet" list,
+  because it carries a rule every step must follow rather than an idea merely deferred: design each where it belongs in the story, never into the opening, and never
+  contradict the author's stated ending.
 - The author's starting text is the one entry the shared ledger leaves out, because it is too long for every step. The steps that build premise and people (concepts,
   premise, heart, the engine pass and the volume-one pass) read it verbatim as a required section. Locked decisions and later directions win where they disagree with it.
 - Chapter packs carry the writer lines of active decisions as their own section, so a decision made in the Blueprint reaches the prose. The section is never evicted and has

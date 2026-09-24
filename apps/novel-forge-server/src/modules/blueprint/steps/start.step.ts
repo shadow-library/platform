@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { AppErrorCode } from '@server/classes';
 
-import { AUTHOR_BRIEF_TOPIC } from '../../ai/context/ledger-sections';
+import { AUTHOR_BRIEF_TOPIC, AUTHOR_TIMELINE_TOPIC } from '../../ai/context/ledger-sections';
 import { blueprintStartPrompt } from '../../ai/prompts/blueprint-start.prompt';
 import {
   type BlueprintStartOutput,
@@ -89,10 +89,17 @@ function briefEntry(input: unknown): PlannedLedgerEntry[] {
   return text ? [{ kind: 'direction', topic: AUTHOR_BRIEF_TOPIC, statement: text }] : [];
 }
 
+const CHIP_LEDGER_SHAPE: Record<StartChipKind, { kind: 'direction' | 'rejected' | 'backlog'; topic: string }> = {
+  element: { kind: 'direction', topic: START_TOPIC },
+  want: { kind: 'direction', topic: START_TOPIC },
+  later: { kind: 'backlog', topic: AUTHOR_TIMELINE_TOPIC },
+  not: { kind: 'rejected', topic: START_RULED_OUT_TOPIC },
+};
+
 function toEntry(chip: StartSelectionChip): PlannedLedgerEntry {
   const payload = { kind: chip.kind, ...(chip.optionId ? { optionId: chip.optionId } : {}) };
-  const ruledOut = chip.kind === 'not';
-  return { kind: ruledOut ? 'rejected' : 'direction', topic: ruledOut ? START_RULED_OUT_TOPIC : START_TOPIC, statement: chip.label.trim(), payload };
+  const { kind, topic } = CHIP_LEDGER_SHAPE[chip.kind];
+  return { kind, topic, statement: chip.label.trim(), payload };
 }
 
 export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInput, StartSelection> = {
@@ -100,7 +107,7 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
   key: 'start',
   phase: 'idea',
   required: false,
-  completionTopics: [START_TOPIC, START_RULED_OUT_TOPIC],
+  completionTopics: [START_TOPIC, START_RULED_OUT_TOPIC, AUTHOR_TIMELINE_TOPIC],
   nudges: ['Read it more literally', 'Look for the feeling', 'Fewer chips'],
   prompt: blueprintStartPrompt,
   optionsSchema: StartOptions,
@@ -140,8 +147,9 @@ export const startStep: ScreenStep<BlueprintStartOutput, StartOptions, StartInpu
     const answered = selection.chips.flatMap(chip => (chip.optionId ? [chip.optionId] : []));
     return Promise.resolve({
       entries: [...withoutKnownRejections(selection.chips.map(toEntry), ledger), ...briefEntry(round?.input ?? null)],
-      replaces: [START_TOPIC, AUTHOR_BRIEF_TOPIC],
+      replaces: [START_TOPIC, AUTHOR_TIMELINE_TOPIC, AUTHOR_BRIEF_TOPIC],
       retires: [...new Set([...offered, ...answered])],
+      relockKinds: ['backlog'],
     });
   },
 };

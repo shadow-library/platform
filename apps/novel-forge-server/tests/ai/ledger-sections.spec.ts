@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { authorBriefInput, blueprintBudget, blueprintSections } from '@modules/ai/context/blueprint-sections';
 import {
   AUTHOR_BRIEF_TOPIC,
+  AUTHOR_TIMELINE_TOPIC,
   type LedgerContextEntry,
   ledgerSection,
   renderLedger,
@@ -83,6 +84,27 @@ describe('renderLedger', () => {
 
     expect(rendered).toContain('### Author directions\n\n- [Idea · taste] Quiet dread over spectacle');
     expect(rendered).toContain('### Backlog — not yet\n\n- [Volume one · places] The drowned chapel — Not before chapter 20');
+  });
+
+  it('should render the author’s later-placed events under their own heading, apart from the generic backlog', () => {
+    const timeline = entry({ kind: 'backlog', topic: AUTHOR_TIMELINE_TOPIC, statement: 'Later: the war reaches the capital' });
+    const rendered = renderLedger([...ledger, timeline]);
+
+    expect(rendered).toContain(
+      [
+        "### The author's timeline — later in the story",
+        '',
+        "These are the author's own story events placed after the opening. Every one that is not the ending goes wherever in the story it first belongs, never in the opening situation — a last scene is part of the ending, not a separate later event. Whatever is the author's stated ending binds every step.",
+        '',
+        '- [Idea · start.later] Later: the war reaches the capital',
+      ].join('\n'),
+    );
+    const backlog = rendered.slice(rendered.indexOf('### Backlog — not yet'));
+    expect(backlog).not.toContain('the war reaches the capital');
+  });
+
+  it('should say nothing about the author’s timeline when there is none', () => {
+    expect(renderLedger(ledger)).not.toContain("The author's timeline");
   });
 
   it('should render rejected entries and passed-over alternatives only as a do-not-propose list', () => {

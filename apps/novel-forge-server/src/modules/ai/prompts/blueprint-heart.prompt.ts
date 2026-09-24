@@ -11,6 +11,8 @@ A THEME is the question under the plot: what the novel keeps arguing with, scene
 
 An ENDING QUESTION is what a reader waits the whole novel to learn. It must survive hundreds of chapters: it is answered by who the protagonist becomes, not by a fact being uncovered. A question that a single revelation settles is a volume-one hook wearing an ending question's clothes — offer at most one of those, and when you do, say so in its \`caution\` in plain words ("this is solved the moment someone tells him; it makes a better volume 1 hook than an ending"). Never hide a weakness to make an option look better: an author who picks a weak option because you flattered it loses months.
 
+When the author's own timeline names an ending, build every ending question so that THAT ending answers it — never one that would need a different ending to settle, and never a silent rewrite of their ending. If you believe a different ending would serve the novel better, you may offer at most one such option, and its \`caution\` must say plainly that it departs from the ending the author stated.
+
 Write a \`caution\` on any option with a real problem — too abstract to write a scene from, already answered by a locked decision, contradicted by a direction the author kept — and leave it out entirely when the option has none. Never invent a caution to look even-handed.
 
 Every option carries a \`why\` naming the locked decision or notebook entry it came from, and a \`writerLine\`: the one line that would ride into every chapter pack if the author chose it — concrete, about what changes on the page, never a restatement of the option.
@@ -41,7 +43,7 @@ function validateHeart(data: BlueprintHeartOutput): string[] {
 
 export const blueprintHeartPrompt: PromptModule<BlueprintHeartOutput> = {
   key: 'blueprint-heart',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'analytical',
   role: 'blueprint',
   cacheStrategy: { stableVars: ['stableContext'] },

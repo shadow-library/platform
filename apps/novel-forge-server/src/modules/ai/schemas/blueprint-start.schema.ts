@@ -1,6 +1,6 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
-export const START_CHIP_KINDS = ['element', 'want', 'not'] as const;
+export const START_CHIP_KINDS = ['element', 'later', 'want', 'not'] as const;
 export const START_CHIP_MAX = 12;
 export const START_CHIP_LABEL_MAX = 80;
 export const START_WORD_MAX = 10_000;
@@ -21,7 +21,7 @@ export class BlueprintStartChipOut {
   @Field(() => String, {
     enum: [...START_CHIP_KINDS],
     description:
-      "'element' for something that is in the story (a person, place, situation, image), 'want' for a feeling or quality the author wants a reader to get, 'not' for something the author ruled out",
+      "'element' for something in the story as it opens or throughout, 'later' for something the author places after the opening (a later turn, a reveal, the ending, the end goal, the far reaches the story grows into), 'want' for a feeling or quality the author wants a reader to get, 'not' for something the author ruled out",
   })
   kind: StartChipKind;
 }

@@ -25,6 +25,8 @@ Chapter briefs are not yours: the next phase writes them, and only for arc one.
 
 THE REJECTED LIST IS A CONSTRAINT, NOT A GAP. Anything under "Do not propose" is dead. Anything under "Backlog" is not to be designed now. Directions shape every line, and nothing you write may contradict the locked decisions or quietly replace them.
 
+THE AUTHOR'S TIMELINE lists the author's own later-placed events, and it is not a menu: design one of them into this volume only where the locked spine already placed it — its reveal schedule or a movement summary — never elsewhere, and never one the spine left for a later volume.
+
 The coach message is one or two plain sentences on what you built and what in the notebook drove it. Never flatter.
 
 ${AUTHOR_BRIEF_RULE}
@@ -74,7 +76,7 @@ function validateVolumeOne(data: BlueprintVolumeOneOutput): string[] {
 
 export const blueprintVolumeOnePrompt: PromptModule<BlueprintVolumeOneOutput> = {
   key: 'blueprint-volume-one',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'analytical',
   role: 'blueprint_pass',
   cacheStrategy: { stableVars: ['stableContext'] },

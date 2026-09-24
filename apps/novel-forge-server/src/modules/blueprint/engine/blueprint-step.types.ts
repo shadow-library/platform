@@ -84,6 +84,11 @@ export interface LockPlan {
    * pair with "neither" writes rejections, and the direction the last lock wrote for that pair has to go with it.
    */
   retires?: string[];
+  /**
+   * Kinds this lock's own topics may also pair, supersede or withdraw, beyond the standard decision/direction/rejected/system. Only
+   * widens what THIS plan's topics match; a step that never sets it is unaffected.
+   */
+  relockKinds?: readonly Ledger.Kind[];
   /** Work that must follow the commit, such as approving what was materialised or queueing a job; its failure never undoes the lock. */
   afterCommit?(context: AfterCommitContext): Promise<void>;
 }

@@ -113,6 +113,12 @@ describe('parseStartChips', () => {
     expect(parseStartChips(round({ options }))).toEqual([{ optionId: 'c1', label: 'Debt collector hero', kind: 'element' }]);
   });
 
+  it('should read a "later" chip like any other kind', () => {
+    const options = { understood: [{ id: 'c1', label: 'Ending: the debt is finally paid', kind: 'later' }] };
+
+    expect(parseStartChips(round({ options }))).toEqual([{ optionId: 'c1', label: 'Ending: the debt is finally paid', kind: 'later' }]);
+  });
+
   it('should drop a malformed chip instead of crashing the screen', () => {
     const options = { understood: [{ id: 'c1', label: 'fine', kind: 'element' }, { id: 'c2', kind: 'sideways' }, 'nonsense'] };
 

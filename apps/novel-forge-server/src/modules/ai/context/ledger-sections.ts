@@ -15,6 +15,11 @@ export const WRITER_LINES_BUDGET = 1_200;
 
 /** The author's starting text, kept whole. It is too long for every step, so the shared ledger leaves it to the steps that read it. */
 export const AUTHOR_BRIEF_TOPIC = 'start.brief';
+/** What the author places after the opening. Rendered as its own section, apart from the generic backlog, so its rule reaches every step. */
+export const AUTHOR_TIMELINE_TOPIC = 'start.later';
+
+const AUTHOR_TIMELINE_RULE =
+  "These are the author's own story events placed after the opening. Every one that is not the ending goes wherever in the story it first belongs, never in the opening situation — a last scene is part of the ending, not a separate later event. Whatever is the author's stated ending binds every step.";
 
 interface WriterLine {
   phase: Ledger.Phase | null;
@@ -65,6 +70,13 @@ function renderList(heading: string, lines: string[]): string | null {
   return lines.length === 0 ? null : `### ${heading}\n\n${lines.join('\n')}`;
 }
 
+/** The author's own later-placed events, kept apart from the generic backlog so every step is told, once, how to place them. */
+function renderTimeline(entries: LedgerContextEntry[]): string | null {
+  const lines = byPhase(entries.filter(entry => entry.kind === 'backlog' && entry.topic === AUTHOR_TIMELINE_TOPIC)).map(tagged);
+  if (lines.length === 0) return null;
+  return `### The author's timeline — later in the story\n\n${AUTHOR_TIMELINE_RULE}\n\n${lines.join('\n')}`;
+}
+
 /** Rejected ideas and the alternatives a decision passed over reach the model only as things never to offer again. */
 function doNotPropose(entries: LedgerContextEntry[]): string[] {
   const rejected = byPhase(entries.filter(entry => entry.kind === 'rejected')).map(entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`);
@@ -79,7 +91,8 @@ export function renderLedger(all: LedgerContextEntry[]): string {
   const blocks = [
     renderDecisions(entries.filter(entry => DECIDED_KINDS.has(entry.kind))),
     renderList('Author directions', byPhase(entries.filter(entry => entry.kind === 'direction')).map(tagged)),
-    renderList('Backlog — not yet', byPhase(entries.filter(entry => entry.kind === 'backlog')).map(tagged)),
+    renderTimeline(entries),
+    renderList('Backlog — not yet', byPhase(entries.filter(entry => entry.kind === 'backlog' && entry.topic !== AUTHOR_TIMELINE_TOPIC)).map(tagged)),
     renderList('Do not propose', doNotPropose(entries)),
   ].filter((block): block is string => block !== null);
   return blocks.length === 0 ? EMPTY_LEDGER : blocks.join('\n\n');

@@ -8,6 +8,8 @@ const system = `You are a novelist's coach drawing the shape of a whole novel wh
 
 THE SCOPE SECTION IS BINDING. It names the vocabulary this novel uses, how long it runs, and whether a reveal schedule is asked for. Follow it exactly.
 
+THE AUTHOR'S TIMELINE — LATER IN THE STORY is a separate section from the generic backlog, and it is binding on where things go. Every item there that is not the ending goes in whichever movement first reaches it — which may be movement one, once that movement's opening situation has passed. Whatever is the author's stated ending, however it is worded — a last scene is part of it, not a separate later event — goes in the LAST movement, never earlier, and no movement or reveal may contradict it. The generic "Backlog — not yet" list is different: those are ideas deferred, not story events with a place, and none of them are placed by this pass.
+
 MOVEMENTS. Give ${MOVEMENTS_MIN} to ${MOVEMENTS_MAX} movements, one per volume, in order, and make them add up to the length the scope section names.
 
 The spine is the argument between two things the notebook already settled, and both of them have to move.
@@ -56,7 +58,7 @@ function validateSpine(data: BlueprintSpineOutput): string[] {
 
 export const blueprintSpinePrompt: PromptModule<BlueprintSpineOutput> = {
   key: 'blueprint-spine',
-  version: '1.0.0',
+  version: '1.2.0',
   kind: 'analytical',
   role: 'blueprint_pass',
   cacheStrategy: { stableVars: ['stableContext'] },

@@ -28,6 +28,8 @@ THE REVEAL SCHEDULE IS BINDING IN ONE DIRECTION. A secret scheduled after this a
 
 THE REJECTED LIST IS A CONSTRAINT, NOT A GAP. Anything under "Do not propose" is dead, anything under "Backlog" is not to be written in, and nothing here may contradict a locked decision or quietly replace it.
 
+THE AUTHOR'S TIMELINE lists the author's own later-placed events; write one into this arc only where the locked spine and this arc's scope already placed it — never earlier, and never on your own initiative.
+
 The coach message is one or two plain sentences on the shape of the arc and what in the notebook drove it. Never flatter.
 
 Respond with ONLY one valid JSON object, nothing outside it and no markdown fences, of exactly this shape:
@@ -81,7 +83,7 @@ function validateBriefs(data: BlueprintBriefsOutput): string[] {
 
 export const blueprintBriefsPrompt: PromptModule<BlueprintBriefsOutput> = {
   key: 'blueprint-briefs',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   role: 'blueprint_pass',
   cacheStrategy: { stableVars: ['stableContext'] },

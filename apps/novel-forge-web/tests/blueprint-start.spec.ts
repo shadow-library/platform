@@ -38,22 +38,25 @@ function entry(overrides: Partial<LedgerEntryResponse> = {}): LedgerEntryRespons
 }
 
 describe('restoreStartChips', () => {
-  it('should read every saved chip back, ruled-out ones included', () => {
+  it('should read every saved chip back, ruled-out and later ones included', () => {
     expect(
       restoreStartChips([
         entry(),
         entry({ id: '2', topic: 'start', statement: 'Found family', payload: { kind: 'want' } }),
         entry({ id: '3', kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } }),
+        entry({ id: '4', kind: 'backlog', topic: 'start.later', statement: 'Ending: the debt is finally paid', payload: { kind: 'later', optionId: 'c4' } }),
       ]),
     ).toEqual([
       { optionId: 'c1', label: 'A ferry that only runs at dusk', kind: 'element' },
       { label: 'Found family', kind: 'want' },
       { optionId: 'c3', label: 'No chosen-one prophecy', kind: 'not' },
+      { optionId: 'c4', label: 'Ending: the debt is finally paid', kind: 'later' },
     ]);
   });
 
   it('should fall back to the topic when the payload says nothing useful', () => {
     expect(restoreStartChips([entry({ kind: 'rejected', topic: 'start.ruled_out', payload: null })])[0]?.kind).toBe('not');
+    expect(restoreStartChips([entry({ kind: 'backlog', topic: 'start.later', payload: null })])[0]?.kind).toBe('later');
     expect(restoreStartChips([entry({ payload: {} })])[0]?.kind).toBe('element');
   });
 
@@ -86,6 +89,11 @@ describe('mergeStartChips', () => {
 
   it('should not add a chip the reading already says', () => {
     expect(mergeStartChips(fromRound, [{ label: '  quiet dread  ', kind: 'want' }], false)).toEqual(fromRound);
+  });
+
+  it('should carry a later chip the round no longer offers back onto a fresh reading', () => {
+    const savedLater = [{ label: 'Ending: the debt is finally paid', kind: 'later' as const }];
+    expect(mergeStartChips(fromRound, savedLater, false)).toEqual([...fromRound, ...savedLater]);
   });
 });
 
@@ -130,5 +138,9 @@ describe('startTextStatus', () => {
 describe('ledgerTopicLabel', () => {
   it('should name the kept starting text for the author', () => {
     expect(ledgerTopicLabel('start.brief')).toBe('Your starting text');
+  });
+
+  it('should name the later-placed backlog topic for the author', () => {
+    expect(ledgerTopicLabel('start.later')).toBe('Later in the story');
   });
 });

@@ -151,7 +151,7 @@ describe('Blueprint context recipe', () => {
 });
 
 describe('reconcileLockEntries', () => {
-  const plan = (entries: { kind: 'direction' | 'rejected' | 'decision'; statement: string; payload?: unknown }[], replaces?: string[]) => ({
+  const plan = (entries: { kind: 'direction' | 'rejected' | 'decision' | 'backlog'; statement: string; payload?: unknown }[], replaces?: string[]) => ({
     entries: entries.map(entry => ({ topic: 'start', ...entry })),
     replaces,
   });
@@ -241,6 +241,21 @@ describe('reconcileLockEntries', () => {
     const other = ledgerEntry({ id: 9n, topic: 'start.extra' });
     const result = reconcileLockEntries({ ...step, completionTopics: ['start', 'start.extra'] }, plan([{ kind: 'direction', statement: 'A ferry town' }], ['start']), [other]);
     expect(result.withdraw).toEqual([]);
+  });
+
+  it('should reconcile a backlog entry only when the plan opts in with relockKinds, and leave every other step’s backlog alone by default', () => {
+    const kept = ledgerEntry({ id: 6n, kind: 'backlog', statement: 'Ending: the war is over', payload: { optionId: 'c9' } });
+    const dropped = ledgerEntry({ id: 7n, kind: 'backlog', statement: 'Later: a new king rises', payload: { optionId: 'c10' } });
+    const next = plan([{ kind: 'backlog', statement: 'Ending: the war is finally over', payload: { optionId: 'c9' } }]);
+
+    const untouched = reconcileLockEntries(step, next, [kept, dropped]);
+    expect(untouched.supersede).toEqual([]);
+    expect(untouched.withdraw).toEqual([]);
+    expect(untouched.append.map(entry => entry.statement)).toEqual(['Ending: the war is finally over']);
+
+    const opted = reconcileLockEntries(step, { ...next, relockKinds: ['backlog'] }, [kept, dropped]);
+    expect(opted.supersede.map(pair => [pair.previous.id, pair.next.statement])).toEqual([[6n, 'Ending: the war is finally over']]);
+    expect(opted.withdraw.map(entry => entry.id)).toEqual([7n]);
   });
 });
 

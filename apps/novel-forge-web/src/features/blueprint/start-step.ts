@@ -1,6 +1,6 @@
 import { type BlueprintRoundResponse, type LedgerEntryResponse } from '@/lib/apis';
 
-export const START_CHIP_KINDS = ['element', 'want', 'not'] as const;
+export const START_CHIP_KINDS = ['element', 'later', 'want', 'not'] as const;
 export type StartChipKind = (typeof START_CHIP_KINDS)[number];
 
 export const STARTING_TYPES = ['book', 'character', 'world', 'scene', 'nothing'] as const;
@@ -13,6 +13,7 @@ export const START_TEXT_MAX = 100_000;
 const START_NEAR_RATIO = 0.9;
 export const START_TOPIC = 'start';
 export const START_RULED_OUT_TOPIC = 'start.ruled_out';
+export const START_LATER_TOPIC = 'start.later';
 
 export const STARTING_TYPE_LABELS: Record<StartingType, string> = {
   book: 'A book I love',
@@ -24,6 +25,7 @@ export const STARTING_TYPE_LABELS: Record<StartingType, string> = {
 
 export const START_CHIP_KIND_LABELS: Record<StartChipKind, string> = {
   element: 'Element',
+  later: 'Later in the story',
   want: 'What I want',
   not: 'Not this',
 };
@@ -58,11 +60,19 @@ export function parseStartChips(round: BlueprintRoundResponse | null): StartChip
  * The chips already in the Notebook. One lock writes the step's whole answer, so a revisit that shows only the round's reading would
  * retire everything the author typed themselves — their chips are in no round's options and can come back from nowhere else.
  */
+const RESTORED_TOPICS: readonly string[] = [START_TOPIC, START_RULED_OUT_TOPIC, START_LATER_TOPIC];
+
+function fallbackKind(topic: string): StartChipKind {
+  if (topic === START_RULED_OUT_TOPIC) return 'not';
+  if (topic === START_LATER_TOPIC) return 'later';
+  return 'element';
+}
+
 export function restoreStartChips(entries: LedgerEntryResponse[]): StartChip[] {
   return entries.flatMap(entry => {
-    if (entry.topic !== START_TOPIC && entry.topic !== START_RULED_OUT_TOPIC) return [];
+    if (!RESTORED_TOPICS.includes(entry.topic)) return [];
     const payload = entry.payload as { kind?: unknown; optionId?: unknown } | null;
-    const kind = isChipKind(payload?.kind) ? payload.kind : entry.topic === START_RULED_OUT_TOPIC ? 'not' : 'element';
+    const kind = isChipKind(payload?.kind) ? payload.kind : fallbackKind(entry.topic);
     return [{ ...(typeof payload?.optionId === 'string' ? { optionId: payload.optionId } : {}), label: entry.statement, kind }];
   });
 }

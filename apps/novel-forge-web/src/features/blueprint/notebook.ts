@@ -74,6 +74,7 @@ const TOPIC_LABELS: Record<string, string> = {
   promise: 'Reader promise',
   start: 'Starting point',
   'start.brief': 'Your starting text',
+  'start.later': 'Later in the story',
   volume_one: 'Volume one',
 };
 

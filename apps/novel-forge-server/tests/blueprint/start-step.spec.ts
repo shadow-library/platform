@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
+import { AUTHOR_TIMELINE_TOPIC } from '@modules/ai/context/ledger-sections';
 import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { type BlueprintStartOutput, BlueprintStartSchema } from '@modules/ai/schemas/blueprint-start.schema';
 import { parseSchema } from '@modules/ai/schemas/validate';
 import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
+import { isStepDone } from '@modules/blueprint/stage/blueprint-stage';
 import { StartInput, StartOptions, StartSelection, startStep } from '@modules/blueprint/steps/start.step';
 import { type Project } from '@server/database';
 
@@ -33,6 +35,10 @@ describe('blueprint-start prompt', () => {
   it('should refuse a chip of an unknown kind or a missing coach message', () => {
     expect(parseSchema(BlueprintStartSchema, { ...modelOutput, understood: [{ label: 'A ferry', kind: 'theme' }] }).success).toBe(false);
     expect(parseSchema(BlueprintStartSchema, { understood: [] }).success).toBe(false);
+  });
+
+  it('should parse a "later" chip, however the author phrased it, with no required prefix', () => {
+    expect(parseSchema(BlueprintStartSchema, { understood: [{ label: 'The debt is finally paid', kind: 'later' }], coachMessage: 'Noted for later.' }).success).toBe(true);
   });
 });
 
@@ -70,8 +76,9 @@ describe('start step', () => {
       { kind: 'direction', topic: 'start', statement: 'Found family', payload: { kind: 'want' } },
       { kind: 'rejected', topic: 'start.ruled_out', statement: 'No chosen-one prophecy', payload: { kind: 'not', optionId: 'c3' } },
     ]);
-    expect(plan.replaces).toEqual(['start', 'start.brief']);
+    expect(plan.replaces).toEqual(['start', 'start.later', 'start.brief']);
     expect(plan.retires).toEqual(['c1', 'c3']);
+    expect(plan.relockKinds).toEqual(['backlog']);
   });
 
   it('should retire every chip the round offered, so one the author deleted outright goes too', async () => {
@@ -148,5 +155,118 @@ describe('start step', () => {
 
   it('should refuse a lock with no chips', () => {
     expect(parseSchema(StartSelection, { chips: [] }).success).toBe(false);
+  });
+});
+
+describe('start step — later chips', () => {
+  it('should lock a "later" chip as backlog on its own topic, and ask to reconcile it like a direction', async () => {
+    const selection = {
+      chips: [
+        { optionId: 'c1', label: 'Ending: the debt is finally paid', kind: 'later' as const },
+        { label: 'Found family', kind: 'want' as const },
+      ],
+    };
+    const plan = await startStep.materialise(selection, { round: null, ledger: [], project: {} as Project.Row, tx: {} as never });
+    expect(plan.entries).toContainEqual({
+      kind: 'backlog',
+      topic: AUTHOR_TIMELINE_TOPIC,
+      statement: 'Ending: the debt is finally paid',
+      payload: { kind: 'later', optionId: 'c1' },
+    });
+    expect(plan.replaces).toContain(AUTHOR_TIMELINE_TOPIC);
+    expect(plan.relockKinds).toEqual(['backlog']);
+  });
+
+  it('should retire a later chip the author dropped, and pair — never duplicate — one they kept unchanged', async () => {
+    const kept = ledgerEntry({
+      id: 40n,
+      kind: 'backlog',
+      topic: AUTHOR_TIMELINE_TOPIC,
+      stepKey: 'start',
+      statement: 'Ending: the debt is finally paid',
+      payload: { kind: 'later', optionId: 'c1' },
+    });
+    const dropped = ledgerEntry({
+      id: 41n,
+      kind: 'backlog',
+      topic: AUTHOR_TIMELINE_TOPIC,
+      stepKey: 'start',
+      statement: 'Later: the war reaches the capital',
+      payload: { kind: 'later', optionId: 'c2' },
+    });
+    const offered = {
+      understood: [
+        { id: 'c1', label: 'Ending: the debt is finally paid', kind: 'later' as const },
+        { id: 'c2', label: 'Later: the war reaches the capital', kind: 'later' as const },
+      ],
+    };
+    const selection = { chips: [{ optionId: 'c1', label: 'Ending: the debt is finally paid', kind: 'later' as const }] };
+    const plan = await startStep.materialise(selection, {
+      round: { round: 2, options: offered, input: null },
+      ledger: [kept, dropped],
+      project: {} as Project.Row,
+      tx: {} as never,
+    });
+
+    const reconciled = reconcileLockEntries(startStep, plan, [kept, dropped]);
+    expect(reconciled.supersede.map(pair => pair.previous.id)).toEqual([40n]);
+    expect(reconciled.withdraw.map(entry => entry.id)).toEqual([41n]);
+    expect(reconciled.append).toEqual([]);
+  });
+
+  it('should move a chip from backlog to a rejection when the author re-kinds it "not", retiring the old backlog entry', async () => {
+    const earlier = ledgerEntry({
+      id: 42n,
+      kind: 'backlog',
+      topic: AUTHOR_TIMELINE_TOPIC,
+      stepKey: 'start',
+      statement: 'Later: the war reaches the capital',
+      payload: { kind: 'later', optionId: 'c1' },
+    });
+    const offered = { understood: [{ id: 'c1', label: 'Later: the war reaches the capital', kind: 'later' as const }] };
+    const selection = { chips: [{ optionId: 'c1', label: 'No war at all', kind: 'not' as const }] };
+    const plan = await startStep.materialise(selection, { round: { round: 2, options: offered, input: null }, ledger: [earlier], project: {} as Project.Row, tx: {} as never });
+
+    const reconciled = reconcileLockEntries(startStep, plan, [earlier]);
+    expect(reconciled.withdraw.map(entry => entry.id)).toEqual([42n]);
+    expect(reconciled.append).toContainEqual(
+      expect.objectContaining({ kind: 'rejected', topic: 'start.ruled_out', statement: 'No war at all', payload: { kind: 'not', optionId: 'c1' } }),
+    );
+  });
+
+  it('should count the step done when the only chip the author locked is a later one', async () => {
+    const selection = { chips: [{ label: 'Ending: the debt is finally paid', kind: 'later' as const }] };
+    const plan = await startStep.materialise(selection, { round: null, ledger: [], project: {} as Project.Row, tx: {} as never });
+    const written = plan.entries.map(entry => ledgerEntry({ ...entry, stepKey: 'start' }));
+    expect(isStepDone(startStep, written)).toBe(true);
+  });
+
+  it('should pair an author-typed later chip (no optionId) by statement on re-lock, writing no duplicate', async () => {
+    const typed = ledgerEntry({
+      id: 43n,
+      kind: 'backlog',
+      topic: AUTHOR_TIMELINE_TOPIC,
+      stepKey: 'start',
+      statement: 'Ending: the last ledger is burned on the steps',
+      payload: { kind: 'later' },
+    });
+    const selection = { chips: [{ label: 'Ending: the last ledger is burned on the steps', kind: 'later' as const }] };
+    const plan = await startStep.materialise(selection, { round: null, ledger: [typed], project: {} as Project.Row, tx: {} as never });
+
+    const reconciled = reconcileLockEntries(startStep, plan, [typed]);
+    expect(reconciled.supersede.map(pair => [pair.previous.id, pair.next.statement])).toEqual([[43n, 'Ending: the last ledger is burned on the steps']]);
+    expect(reconciled.append).toEqual([]);
+    expect(reconciled.withdraw).toEqual([]);
+  });
+
+  it('should leave every other step’s backlog behaviour exactly as it was: untouched by a re-lock with no opt-in', () => {
+    const otherStepsBacklog = ledgerEntry({ id: 50n, kind: 'backlog', topic: 'world.rules', stepKey: 'world_rules' });
+    const result = reconcileLockEntries(
+      { key: 'world_rules', phase: 'world', completionTopics: ['world.rules'] },
+      { entries: [{ kind: 'decision', topic: 'world.rules', statement: 'Crossings cost memories' }], replaces: ['world.rules'] },
+      [otherStepsBacklog],
+    );
+    expect(result.withdraw).toEqual([]);
+    expect(result.append).toEqual([{ kind: 'decision', topic: 'world.rules', statement: 'Crossings cost memories', phase: 'world', decidedBy: 'author', stepKey: 'world_rules' }]);
   });
 });

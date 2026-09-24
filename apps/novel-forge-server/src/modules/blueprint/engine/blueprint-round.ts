@@ -177,8 +177,8 @@ export function lockedSliceMoved(step: AnyBlueprintStep, view: unknown, ledger: 
 }
 
 /**
- * What a lock has not already said. A rejection and a backlog item live outside the topics a lock replaces, because they survive every
- * later answer — which also means a re-lock that repeats one must not write it a second time.
+ * What a lock has not already said, for a kind most locks leave outside `replaces` (a permanent rejection; for most steps, backlog)
+ * so it survives every later answer — which also means a re-lock that repeats one must not write it a second time.
  */
 export function withoutKnownEntries(entries: PlannedLedgerEntry[], ledger: Ledger.Entry[], kind: Ledger.Kind): PlannedLedgerEntry[] {
   const said = (entry: Pick<Ledger.Entry, 'topic' | 'statement'>): string => `${entry.topic}|${entry.statement.trim().toLowerCase()}`;
@@ -235,17 +235,18 @@ function crossesOptions(previous: Ledger.Entry, next: NewLedgerEntry): boolean {
  * completion topics and every topic it writes, unless the plan narrows them). Each new entry supersedes an earlier one of the same topic,
  * kind and offered option (the same option first, then the same statement, then in order), so every topic keeps one history chain; leftovers
  * are appended or withdrawn. An entry that names an option is only withdrawn when the new answer speaks to its topic and kind at all, so a
- * lock that says nothing about a kind cannot silently retire it. What the author wrote directly, steering entries and backlog entries are
- * never touched.
+ * lock that says nothing about a kind cannot silently retire it. What the author wrote directly and steering entries are never touched;
+ * neither is a backlog entry, unless the plan opts it in with `relockKinds`.
  */
 export function reconcileLockEntries(
   step: Pick<AnyLockingStep, 'key' | 'phase' | 'completionTopics'>,
-  plan: Pick<LockPlan, 'entries' | 'replaces' | 'retires'>,
+  plan: Pick<LockPlan, 'entries' | 'replaces' | 'retires' | 'relockKinds'>,
   active: Ledger.Entry[],
 ): LedgerReconciliation {
   const next = plan.entries.map((entry): NewLedgerEntry => ({ ...entry, phase: entry.phase ?? step.phase, decidedBy: entry.decidedBy ?? 'author', stepKey: step.key }));
   const topics = new Set(plan.replaces ?? [...step.completionTopics, ...next.map(entry => entry.topic)]);
-  const replaceable = active.filter(entry => entry.stepKey === step.key && topics.has(entry.topic) && RELOCKED_KINDS.has(entry.kind));
+  const relockedKinds = plan.relockKinds?.length ? new Set([...RELOCKED_KINDS, ...plan.relockKinds]) : RELOCKED_KINDS;
+  const replaceable = active.filter(entry => entry.stepKey === step.key && topics.has(entry.topic) && relockedKinds.has(entry.kind));
 
   const pairs = new Map<NewLedgerEntry, Ledger.Entry>();
   const taken = new Set<Ledger.Entry>();
