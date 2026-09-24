@@ -1,10 +1,11 @@
 import { type BlueprintRoundResponse } from '@/lib/apis';
 
 import { type OptionVerdicts } from './round';
+import { overLimit } from './text-limit';
 
 export const CONCEPT_TITLE_MAX = 80;
-export const CONCEPT_LOGLINE_MAX = 280;
-export const CONCEPT_KEPT_WHY_MAX = 500;
+export const CONCEPT_OWN_LOGLINE_MAX = 2000;
+export const CONCEPT_KEPT_WHY_MAX = 1000;
 
 export interface ConceptCard {
   id: string;
@@ -92,4 +93,10 @@ export function conceptTally(cards: ConceptCard[], keptId: string | null, verdic
     kept: cards.some(card => card.id === keptId) ? 1 : 0,
     killed: cards.filter(card => verdicts[card.id]?.verdict === 'not').length,
   };
+}
+
+/** Whether anything the author wrote on this screen runs past what the server takes, so the lock is refused here rather than there. */
+export function conceptsOverLimit(edits: ConceptEdits, why: string): boolean {
+  if (overLimit(why, CONCEPT_KEPT_WHY_MAX)) return true;
+  return Object.values(edits).some(edit => overLimit(edit?.title, CONCEPT_TITLE_MAX) || overLimit(edit?.logline, CONCEPT_OWN_LOGLINE_MAX));
 }

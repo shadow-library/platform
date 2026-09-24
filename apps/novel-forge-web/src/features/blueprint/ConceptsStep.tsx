@@ -8,9 +8,10 @@ import { blueprintStepMeta, type StepScreenProps } from './blueprint-steps';
 import {
   buildConceptsSelection,
   CONCEPT_KEPT_WHY_MAX,
-  CONCEPT_LOGLINE_MAX,
+  CONCEPT_OWN_LOGLINE_MAX,
   CONCEPT_TITLE_MAX,
   type ConceptEdits,
+  conceptsOverLimit,
   conceptsRoundKey,
   conceptTally,
   editedCard,
@@ -18,9 +19,11 @@ import {
 } from './concepts-step';
 import { LockBar } from './LockBar';
 import { OptionCard } from './OptionCard';
+import { CharCount } from './CharCount';
 import { buildRoundBody, EMPTY_STEER, type OptionVerdicts, roundThread, type SteerDraft, stepPayload } from './round';
 import { RoundStatus } from './RoundStatus';
 import { SteerBox } from './SteerBox';
+import { overLimit } from './text-limit';
 import styles from './blueprint.module.css';
 
 const RUNNING_LABEL = 'Writing four novels you could write…';
@@ -58,6 +61,9 @@ export function ConceptsStep({ projectId, step, onLocked }: StepScreenProps): Re
   const tally = conceptTally(cards, keptId, verdicts);
   const selection = buildConceptsSelection(cards, keptId, edits, verdicts, why);
   const editingCard = cards.find(card => card.id === editing);
+  const editingEdit = edits[editing ?? ''];
+  const editingOver = overLimit(editingEdit?.title, CONCEPT_TITLE_MAX) || overLimit(editingEdit?.logline, CONCEPT_OWN_LOGLINE_MAX);
+  const tooLong = conceptsOverLimit(edits, why);
 
   const run = (): void => {
     startRound.mutate(buildRoundBody(draft, verdicts), { onSuccess: () => setDraft(EMPTY_STEER), onError: err => toast.danger(err.message) });
@@ -165,14 +171,18 @@ export function ConceptsStep({ projectId, step, onLocked }: StepScreenProps): Re
       {keptId != null && (
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>What are you keeping it for?</h2>
-          <p className={styles.cardLede}>One line. It is saved beside the concept, and it is what the premise is built to deliver.</p>
-          <Input
+          <p className={styles.cardLede}>It is saved beside the concept, and it is what the premise is built to deliver.</p>
+          <Textarea
             value={why}
             onValueChange={setWhy}
-            maxLength={CONCEPT_KEPT_WHY_MAX}
+            minRows={1}
+            maxRows={8}
+            autoGrow
             placeholder="e.g. the debt is personal and the magic has a price"
             aria-label="Why you kept it"
+            aria-invalid={overLimit(why, CONCEPT_KEPT_WHY_MAX) || undefined}
           />
+          <CharCount value={why} max={CONCEPT_KEPT_WHY_MAX} />
         </section>
       )}
 
@@ -192,10 +202,14 @@ export function ConceptsStep({ projectId, step, onLocked }: StepScreenProps): Re
       {cards.length > 0 && (
         <LockBar
           label={meta.lockLabel ?? 'Build a premise from what I kept'}
-          hint="The kept concept becomes a direction; every card you killed becomes a rejection with your reason."
+          hint={
+            tooLong
+              ? 'Something you wrote is over its limit. Shorten it to save.'
+              : 'The kept concept becomes a direction; every card you killed becomes a rejection with your reason.'
+          }
           onLock={lock}
           loading={lockStep.isPending}
-          disabled={selection == null || busy || lockStep.isPending}
+          disabled={selection == null || tooLong || busy || lockStep.isPending}
         />
       )}
 
@@ -211,18 +225,22 @@ export function ConceptsStep({ projectId, step, onLocked }: StepScreenProps): Re
                 aria-label="Title"
               />
               <Textarea
-                value={edits[editing ?? '']?.logline ?? editingCard?.logline ?? ''}
+                value={editingEdit?.logline ?? editingCard?.logline ?? ''}
                 onValueChange={logline => setEdits(current => ({ ...current, [editing ?? '']: { ...current[editing ?? ''], logline } }))}
-                maxLength={CONCEPT_LOGLINE_MAX}
                 minRows={3}
+                maxRows={16}
                 autoGrow
                 aria-label="Logline"
+                aria-invalid={overLimit(editingEdit?.logline, CONCEPT_OWN_LOGLINE_MAX) || undefined}
               />
+              <CharCount value={editingEdit?.logline ?? editingCard?.logline} max={CONCEPT_OWN_LOGLINE_MAX} />
             </div>
           </Dialog.Body>
           <Dialog.Footer>
             <Dialog.Close asChild>
-              <Button variant="primary">Done</Button>
+              <Button variant="primary" disabled={editingOver}>
+                Done
+              </Button>
             </Dialog.Close>
           </Dialog.Footer>
         </Dialog.Content>

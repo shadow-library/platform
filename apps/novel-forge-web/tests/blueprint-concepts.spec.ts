@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildConceptsSelection, conceptsRoundKey, conceptTally, editedCard, parseConceptCards } from '../src/features/blueprint/concepts-step';
+import {
+  buildConceptsSelection,
+  CONCEPT_KEPT_WHY_MAX,
+  CONCEPT_OWN_LOGLINE_MAX,
+  conceptsOverLimit,
+  conceptsRoundKey,
+  conceptTally,
+  editedCard,
+  parseConceptCards,
+} from '../src/features/blueprint/concepts-step';
 import { type OptionVerdicts } from '../src/features/blueprint/round';
+import { textLength } from '../src/features/blueprint/text-limit';
 import { type BlueprintRoundResponse } from '../src/lib/apis';
 
 function round(overrides: Partial<BlueprintRoundResponse> = {}): BlueprintRoundResponse {
@@ -96,5 +106,18 @@ describe('buildConceptsSelection', () => {
     expect(unchanged).toEqual({ kept: { optionId: 'c1' } });
     const edited = buildConceptsSelection(cards, 'c1', { c1: { logline: 'A clerk audits a year he never lived.' } }, {}, '');
     expect(edited).toEqual({ kept: { optionId: 'c1', logline: 'A clerk audits a year he never lived.' } });
+  });
+});
+
+describe('conceptsOverLimit', () => {
+  it('should count what is sent, trimmed and by code point', () => {
+    expect(textLength('  the sea sends a bill 🌊 ')).toBe(22);
+    expect(textLength(undefined)).toBe(0);
+  });
+
+  it('should hold the lock only while something the author wrote runs past its limit', () => {
+    expect(conceptsOverLimit({ c1: { logline: 'a'.repeat(CONCEPT_OWN_LOGLINE_MAX) } }, 'a'.repeat(CONCEPT_KEPT_WHY_MAX))).toBe(false);
+    expect(conceptsOverLimit({ c1: { logline: 'a'.repeat(CONCEPT_OWN_LOGLINE_MAX + 1) } }, '')).toBe(true);
+    expect(conceptsOverLimit({}, 'a'.repeat(CONCEPT_KEPT_WHY_MAX + 1))).toBe(true);
   });
 });

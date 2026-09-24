@@ -4,7 +4,8 @@ import { renderLedger } from '@modules/ai/context/ledger-sections';
 import { type BlueprintConceptsOutput } from '@modules/ai/schemas/blueprint-concepts.schema';
 import { reconcileLockEntries } from '@modules/blueprint/engine/blueprint-round';
 import { type MaterialiseContext } from '@modules/blueprint/engine/blueprint-step.types';
-import { CONCEPTS_KILLED_TOPIC, type ConceptsOptions, type ConceptsSelection, conceptsStep } from '@modules/blueprint/steps/concepts.step';
+import { parseSchema } from '@modules/ai/schemas/validate';
+import { ConceptCardOption, CONCEPTS_KILLED_TOPIC, type ConceptsOptions, ConceptsSelection, conceptsStep } from '@modules/blueprint/steps/concepts.step';
 
 import { ledgerEntry } from './blueprint-fixtures';
 
@@ -169,5 +170,20 @@ describe('conceptsStep re-lock', () => {
     expect(reconciled.supersede.map(pair => pair.previous.id)).toEqual([60n]);
     expect(reconciled.append.map(entry => entry.topic)).toEqual([CONCEPTS_KILLED_TOPIC]);
     expect(reconciled.withdraw).toHaveLength(0);
+  });
+});
+
+describe('concept limits', () => {
+  const card = { id: 'c1', title: 'The Tide Ledger', logline: 'x', engine: 'a debt that grows each tide', hook: 'The sea sends a bill.', fromAuthor: false };
+
+  it('should keep the coach’s card to one sentence but take the author’s own logline at paragraph length', () => {
+    expect(parseSchema(ConceptCardOption, { ...card, logline: 'a'.repeat(281) }).success).toBe(false);
+    expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', logline: 'a'.repeat(2000) } }).success).toBe(true);
+    expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', logline: 'a'.repeat(2001) } }).success).toBe(false);
+  });
+
+  it('should take a reason for keeping or killing a card of up to 1,000 characters', () => {
+    expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', why: 'a'.repeat(1000) }, killed: [{ optionId: 'c2', reason: 'b'.repeat(1000) }] }).success).toBe(true);
+    expect(parseSchema(ConceptsSelection, { kept: { optionId: 'c1', why: 'a'.repeat(1001) } }).success).toBe(false);
   });
 });

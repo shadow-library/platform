@@ -18,8 +18,10 @@ import { type PlannedLedgerEntry, type ScreenStep, type StepInputContext } from 
 export const CONCEPTS_TOPIC = 'concepts';
 /** Kills live apart from the kept card so a later lock can never replace them: a refusal the author gave a reason for is permanent. */
 export const CONCEPTS_KILLED_TOPIC = 'concepts.killed';
-export const CONCEPT_KILL_REASON_MAX = 500;
-export const CONCEPT_KEPT_WHY_MAX = 500;
+export const CONCEPT_KILL_REASON_MAX = 1000;
+export const CONCEPT_KEPT_WHY_MAX = 1000;
+/** The author's own logline is what the premise is built from, so it may run to a paragraph; the coach's card stays one sentence. */
+export const CONCEPT_OWN_LOGLINE_MAX = 2000;
 
 @Schema()
 export class ConceptCardOption {
@@ -56,7 +58,7 @@ export class ConceptKept {
   @Field({ optional: true, minLength: 1, maxLength: CONCEPT_TITLE_MAX, description: 'The title as the author edited it.' })
   title?: string;
 
-  @Field({ optional: true, minLength: 1, maxLength: CONCEPT_LOGLINE_MAX, description: 'The logline as the author edited it; it becomes the direction every later step reads.' })
+  @Field({ optional: true, minLength: 1, maxLength: CONCEPT_OWN_LOGLINE_MAX, description: 'The logline as the author edited it; it becomes the direction every later step reads.' })
   logline?: string;
 
   @Field({ optional: true, maxLength: CONCEPT_KEPT_WHY_MAX, description: 'What the author kept it for.' })
