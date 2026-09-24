@@ -286,12 +286,8 @@
 .steerRow {
   display: flex;
   gap: 8px;
-  align-items: center;
-  padding: 10px 12px;
-}
-
-.steerRow[data-multiline] {
   align-items: flex-end;
+  padding: 10px 12px;
 }
 
 .steerInput {

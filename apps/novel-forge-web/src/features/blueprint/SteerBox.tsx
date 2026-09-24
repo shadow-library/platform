@@ -1,5 +1,5 @@
 import { type KeyboardEvent, type ReactElement } from 'react';
-import { Button, Checkbox, Input, Textarea } from '@shadow-library/ui';
+import { Button, Checkbox, Textarea } from '@shadow-library/ui';
 
 import { type SteerDraft, type SteerMessage, toggleNudge } from './round';
 import styles from './blueprint.module.css';
@@ -17,12 +17,9 @@ export interface SteerBoxProps {
   running?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  /** A box that grows with what is typed, for a step whose steers run to paragraphs; Enter breaks a line and ⌘/Ctrl+Enter sends. */
-  multiline?: boolean;
 }
 
-const HINT = 'Applies to the next options. The coach sees the Notebook and this step’s last few messages.';
-const MULTILINE_HINT = '⌘/Ctrl+Enter to send.';
+const HINT = 'Applies to the next options. The coach sees the Notebook and this step’s last few messages. Shift+Enter for a new line.';
 
 /** The server's own limit on a steer, counted the same way, so a long one is refused here with a count rather than there with an error. */
 export const STEER_MAX = 2000;
@@ -38,18 +35,17 @@ export function SteerBox({
   running = false,
   disabled = false,
   placeholder = 'Say what the options are missing…',
-  multiline = false,
 }: SteerBoxProps): ReactElement {
   const locked = disabled || running;
   const length = [...draft.text.trim()].length;
   const tooLong = length > STEER_MAX;
   const canSubmit = !locked && !tooLong && (draft.text.trim().length > 0 || draft.nudges.length > 0);
   const setText = (text: string): void => onDraftChange({ ...draft, text });
-  const submitOnEnter = (event: KeyboardEvent<HTMLElement>): void => {
-    if (event.key !== 'Enter' || !canSubmit) return;
-    if (multiline && !(event.metaKey || event.ctrlKey)) return;
+  // Enter sends, as a one-line box always did; Shift+Enter breaks a line. An IME confirming a word also presses Enter, and must not send.
+  const submitOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    onSubmit();
+    if (canSubmit) onSubmit();
   };
 
   return (
@@ -80,39 +76,26 @@ export function SteerBox({
           ))}
         </div>
       )}
-      <div className={styles.steerRow} data-multiline={multiline || undefined}>
-        {multiline ? (
-          <Textarea
-            className={styles.steerInput}
-            placeholder={placeholder}
-            value={draft.text}
-            onValueChange={setText}
-            disabled={locked}
-            aria-label="Steer"
-            aria-invalid={tooLong || undefined}
-            minRows={2}
-            maxRows={10}
-            autoGrow
-            onKeyDown={submitOnEnter}
-          />
-        ) : (
-          <Input
-            className={styles.steerInput}
-            placeholder={placeholder}
-            value={draft.text}
-            onValueChange={setText}
-            disabled={locked}
-            aria-label="Steer"
-            aria-invalid={tooLong || undefined}
-            onKeyDown={submitOnEnter}
-          />
-        )}
+      <div className={styles.steerRow}>
+        <Textarea
+          className={styles.steerInput}
+          placeholder={placeholder}
+          value={draft.text}
+          onValueChange={setText}
+          disabled={locked}
+          aria-label="Steer"
+          aria-invalid={tooLong || undefined}
+          minRows={1}
+          maxRows={10}
+          autoGrow
+          onKeyDown={submitOnEnter}
+        />
         <Button variant="primary" loading={running} disabled={!canSubmit} onClick={onSubmit}>
           {submitLabel}
         </Button>
       </div>
       <div className={styles.steerFoot}>
-        <span className={styles.steerHint}>{multiline ? `${HINT} ${MULTILINE_HINT}` : HINT}</span>
+        <span className={styles.steerHint}>{HINT}</span>
         {length >= STEER_COUNT_FROM && (
           <span className={styles.steerCount} data-over={tooLong || undefined} aria-live="polite">
             {length.toLocaleString()} / {STEER_MAX.toLocaleString()}

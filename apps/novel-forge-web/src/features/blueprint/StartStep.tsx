@@ -204,7 +204,7 @@ export function StartStep({ projectId, step, onLocked }: StepScreenProps): React
       )}
 
       {round != null && (
-        <SteerBox multiline nudges={step.nudges} draft={draft} onDraftChange={setDraft} messages={roundThread(round)} onSubmit={run} submitLabel="Read it again" running={busy} />
+        <SteerBox nudges={step.nudges} draft={draft} onDraftChange={setDraft} messages={roundThread(round)} onSubmit={run} submitLabel="Read it again" running={busy} />
       )}
 
       {chips.length > 0 && (
