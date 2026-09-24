@@ -6,8 +6,8 @@ import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLi
 const LIBRARY_RESPONSE: LibraryListResponse = {
   items: [
     {
-      slug: 'omniscient-sovereigns',
-      title: 'Omniscient Sovereigns',
+      slug: 'thornwood-vale',
+      title: 'Thornwood Vale',
       genres: ['Fantasy', 'Supernatural'],
       status: 'live' as const,
       visibility: 'PUBLIC' as const,
@@ -27,7 +27,7 @@ const LIBRARY_RESPONSE: LibraryListResponse = {
 
 const PROGRESS_RESPONSE = {
   items: [
-    { novelSlug: 'omniscient-sovereigns', ordinal: 42, position: 63, furthestOrdinal: 47, updatedAt: '2026-07-10T21:14:03.000Z' },
+    { novelSlug: 'thornwood-vale', ordinal: 42, position: 63, furthestOrdinal: 47, updatedAt: '2026-07-10T21:14:03.000Z' },
     { novelSlug: 'starfall-requiem', ordinal: 3, position: 0, furthestOrdinal: 3, updatedAt: '2026-07-02T09:00:00.000Z' },
   ],
 };
@@ -35,11 +35,11 @@ const PROGRESS_RESPONSE = {
 describe('toLibraryEntry', () => {
   it('should normalize a lean server shelf item into the internal LibraryEntry model', () => {
     const entry = toLibraryEntry(LIBRARY_RESPONSE.items[0]!);
-    expect(entry.novelSlug).toBe('omniscient-sovereigns');
+    expect(entry.novelSlug).toBe('thornwood-vale');
     expect(entry.addedAt).toBe('2026-07-01T10:00:00.000Z');
     expect(entry.novel).toMatchObject({
-      slug: 'omniscient-sovereigns',
-      title: 'Omniscient Sovereigns',
+      slug: 'thornwood-vale',
+      title: 'Thornwood Vale',
       genres: ['Fantasy', 'Supernatural'],
       status: 'ongoing',
       author: 'Unknown author',
@@ -70,11 +70,11 @@ describe('toLibraryEntry', () => {
 
   it('should keep the richer local catalog snapshot while taking the server addedAt', () => {
     const local: LibraryEntry = {
-      novelSlug: 'omniscient-sovereigns',
+      novelSlug: 'thornwood-vale',
       addedAt: '2026-06-01T00:00:00.000Z',
       novel: {
-        slug: 'omniscient-sovereigns',
-        title: 'Omniscient Sovereigns',
+        slug: 'thornwood-vale',
+        title: 'Thornwood Vale',
         author: 'Shadow Novelist',
         genres: ['Fantasy', 'System', 'Romance'],
         tags: ['Reincarnation', 'Kingdom Building'],
@@ -96,8 +96,8 @@ describe('toLibraryEntry', () => {
 
 describe('toSummary', () => {
   const CATALOG_ITEM: ServerNovelSummary = {
-    slug: 'omniscient-sovereigns',
-    title: 'Omniscient Sovereigns',
+    slug: 'thornwood-vale',
+    title: 'Thornwood Vale',
     genres: ['Fantasy', 'Supernatural'],
     tags: ['Time Travel', 'Revenge'],
     status: 'live',
@@ -126,7 +126,7 @@ describe('toSummary', () => {
 describe('toReadingProgress', () => {
   it('should map a wrapped progress item onto the internal ReadingProgress model', () => {
     const entries = PROGRESS_RESPONSE.items.map(toReadingProgress);
-    expect(entries[0]).toEqual<ReadingProgress>({ novelSlug: 'omniscient-sovereigns', ordinal: 42, position: 63, updatedAt: '2026-07-10T21:14:03.000Z' });
+    expect(entries[0]).toEqual<ReadingProgress>({ novelSlug: 'thornwood-vale', ordinal: 42, position: 63, updatedAt: '2026-07-10T21:14:03.000Z' });
     expect(entries[1]?.position).toBe(0);
   });
 

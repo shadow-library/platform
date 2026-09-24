@@ -26,7 +26,7 @@ export namespace Illustration {
     origin: ReferenceOrigin;
     /** The auto-rule name that attached this reference, or `'attached'` for a client-chosen one. */
     reason: string;
-    /** Human-readable name of the image as it was when sent, e.g. "portrait of Alistair Ashford" — rendered into the reference manifest. */
+    /** Human-readable name of the image as it was when sent, e.g. "portrait of the protagonist" — rendered into the reference manifest. */
     label?: string;
     /** Display name of the pictured entity for portrait references — the only descriptor of a reference the image prompt carries. */
     name?: string;

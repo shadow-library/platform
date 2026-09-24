@@ -59,11 +59,11 @@ describe('progress mirror namespacing', () => {
 
   it('should clear only the target user’s mirror on sign-out', () => {
     saveProgress('starfall-requiem', 5, 40, 'usr_A');
-    saveProgress('omniscient-sovereigns', 2, 10, 'usr_B');
+    saveProgress('thornwood-vale', 2, 10, 'usr_B');
 
     clearProgressMirror('usr_A');
 
     expect(readProgressMap('usr_A')).toEqual({});
-    expect(getProgress('omniscient-sovereigns', 'usr_B')?.ordinal).toBe(2);
+    expect(getProgress('thornwood-vale', 'usr_B')?.ordinal).toBe(2);
   });
 });

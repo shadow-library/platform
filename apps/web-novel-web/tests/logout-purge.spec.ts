@@ -101,7 +101,7 @@ beforeEach(() => {
 describe('purgeOnLogout', () => {
   it('should delete the downloaded-content store and the gated-chapter cache while keeping the app shell', async () => {
     saveProgress('starfall-requiem', 5, 40, 'usr_A');
-    saveProgress('omniscient-sovereigns', 2, 10, 'usr_B');
+    saveProgress('thornwood-vale', 2, 10, 'usr_B');
 
     await purgeOnLogout(new QueryClient(), 'usr_A');
 
@@ -111,7 +111,7 @@ describe('purgeOnLogout', () => {
     expect(deletedCaches).not.toContain('webnovel-precache-v1');
     expect(deletedCaches).not.toContain('unrelated');
     expect(getProgress('starfall-requiem', 'usr_A')).toBeUndefined();
-    expect(getProgress('omniscient-sovereigns', 'usr_B')?.ordinal).toBe(2);
+    expect(getProgress('thornwood-vale', 'usr_B')?.ordinal).toBe(2);
   });
 });
 

@@ -34,7 +34,7 @@ const draft = (overrides: Partial<DraftReference> = {}): DraftReference => ({ so
 const options: ReferenceOptionsResponse = {
   capacity: 1,
   cover: { source: 'cover', label: 'the project cover', url: 'https://cdn.test/cover.png' },
-  portraits: [{ source: 'portrait', sourceId: 'alistair', label: 'portrait of Alistair', url: 'https://cdn.test/alistair.png', entityKey: 'alistair' }],
+  portraits: [{ source: 'portrait', sourceId: 'milo', label: 'portrait of Milo', url: 'https://cdn.test/milo.png', entityKey: 'milo' }],
   gallery: [],
   chapterImages: [{ source: 'chapter-image', sourceId: '12', label: 'chapter 3 scene image', url: 'https://cdn.test/c3.png', chapter: 3 }],
   candidates: [],
@@ -47,21 +47,21 @@ const startMeta = collectReferenceMeta(options);
 
 describe('planStartSlots', () => {
   it('should send the auto portrait when nothing is attached', () => {
-    const plan = planStartSlots(1, [], true, [portrait('alistair', 'Alistair')], startMeta);
+    const plan = planStartSlots(1, [], true, [portrait('milo', 'Milo')], startMeta);
 
     expect(plan).toMatchObject({ capacity: 1, attachedCount: 0, used: 1, overBy: 0, droppedAuto: [] });
-    expect(plan.sentAuto.map(reference => reference.sourceId)).toEqual(['alistair']);
+    expect(plan.sentAuto.map(reference => reference.sourceId)).toEqual(['milo']);
   });
 
   it('should drop auto suggestions when attached references take the free slots', () => {
-    const plan = planStartSlots(1, [draft()], true, [portrait('alistair', 'Alistair')], startMeta);
+    const plan = planStartSlots(1, [draft()], true, [portrait('milo', 'Milo')], startMeta);
 
     expect(plan).toMatchObject({ attachedCount: 1, used: 1, overBy: 0, sentAuto: [] });
-    expect(plan.droppedAuto.map(reference => reference.sourceId)).toEqual(['alistair']);
+    expect(plan.droppedAuto.map(reference => reference.sourceId)).toEqual(['milo']);
   });
 
   it('should not count an attached copy of an auto suggestion twice', () => {
-    const plan = planStartSlots(1, [draft({ source: 'portrait', sourceId: 'alistair' })], true, [portrait('alistair', 'Alistair')], startMeta);
+    const plan = planStartSlots(1, [draft({ source: 'portrait', sourceId: 'milo' })], true, [portrait('milo', 'Milo')], startMeta);
 
     expect(plan).toMatchObject({ attachedCount: 1, used: 1, overBy: 0, sentAuto: [], droppedAuto: [] });
   });
@@ -69,11 +69,11 @@ describe('planStartSlots', () => {
   it('should count one image attached through two sources once', () => {
     const shared = collectReferenceMeta({
       ...options,
-      candidates: [{ source: 'candidate', sourceId: '5', label: 'a selected illustration of Alistair', url: 'https://cdn.test/alistair.png', subjectType: 'entity' }],
+      candidates: [{ source: 'candidate', sourceId: '5', label: 'a selected illustration of Milo', url: 'https://cdn.test/milo.png', subjectType: 'entity' }],
     });
-    const drafts = [draft({ source: 'portrait', sourceId: 'alistair' }), draft({ source: 'candidate', sourceId: '5' })];
+    const drafts = [draft({ source: 'portrait', sourceId: 'milo' }), draft({ source: 'candidate', sourceId: '5' })];
 
-    expect(planStartSlots(1, drafts, true, [portrait('alistair', 'Alistair')], shared)).toMatchObject({ attachedCount: 1, used: 1, overBy: 0, sentAuto: [], droppedAuto: [] });
+    expect(planStartSlots(1, drafts, true, [portrait('milo', 'Milo')], shared)).toMatchObject({ attachedCount: 1, used: 1, overBy: 0, sentAuto: [], droppedAuto: [] });
   });
 
   it('should report how many attached references exceed capacity', () => {
@@ -83,7 +83,7 @@ describe('planStartSlots', () => {
   });
 
   it('should ignore the auto preview when automatic references are off', () => {
-    const plan = planStartSlots(3, [], false, [portrait('alistair', 'Alistair')], startMeta);
+    const plan = planStartSlots(3, [], false, [portrait('milo', 'Milo')], startMeta);
 
     expect(plan).toMatchObject({ used: 0, sentAuto: [], droppedAuto: [] });
   });
@@ -143,9 +143,9 @@ describe('planRefineSlots', () => {
   it('should count one new image attached through two sources once', () => {
     const shared = collectReferenceMeta({
       ...options,
-      candidates: [{ source: 'candidate', sourceId: '5', label: 'a selected illustration of Alistair', url: 'https://cdn.test/alistair.png', subjectType: 'entity' }],
+      candidates: [{ source: 'candidate', sourceId: '5', label: 'a selected illustration of Milo', url: 'https://cdn.test/milo.png', subjectType: 'entity' }],
     });
-    const drafts = [draft({ source: 'portrait', sourceId: 'alistair' }), draft({ source: 'candidate', sourceId: '5' })];
+    const drafts = [draft({ source: 'portrait', sourceId: 'milo' }), draft({ source: 'candidate', sourceId: '5' })];
     const plan = planRefineSlots({ capacity: 2, editSourceUrl, drafts, stored: [], meta: shared });
 
     expect(plan).toMatchObject({ freeSlots: 1, newCount: 1, canAdd: false, overBy: 0 });
@@ -164,7 +164,7 @@ describe('settledStartOptions', () => {
   const withAuto: ReferenceOptionsResponse = {
     ...options,
     capacity: 2,
-    autoPreview: [portrait('alistair', 'Alistair')],
+    autoPreview: [portrait('milo', 'Milo')],
     autoPreviewWarnings: [{ code: 'capacity-trimmed', source: 'portrait', sourceId: 'b', reason: 'no slot' }],
   };
 
@@ -195,9 +195,9 @@ describe('editSourceKeys', () => {
 });
 
 describe('visibleRoundWarnings', () => {
-  const trimmedAuto: ReferenceWarningResponse = { code: 'capacity-trimmed', source: 'portrait', sourceId: 'alistair', reason: 'no slot' };
+  const trimmedAuto: ReferenceWarningResponse = { code: 'capacity-trimmed', source: 'portrait', sourceId: 'milo', reason: 'no slot' };
   const trimmedAttached: ReferenceWarningResponse = { code: 'capacity-trimmed', source: 'gallery', sourceId: '7', reason: 'no slot' };
-  const missing: ReferenceWarningResponse = { code: 'missing-file', source: 'portrait', sourceId: 'alistair', reason: 'gone' };
+  const missing: ReferenceWarningResponse = { code: 'missing-file', source: 'portrait', sourceId: 'milo', reason: 'gone' };
   const stored = [{ source: 'gallery' as const, sourceId: '7', role: 'likeness' as const }];
 
   it('should hide auto capacity trims on refine and save when the edited image fills the only slot', () => {
@@ -255,7 +255,7 @@ describe('defaultRole', () => {
   it('should add a picked option once with its default role', () => {
     const once = addDraftReference([], options.portraits[0]!, 'entity');
 
-    expect(once).toEqual([{ source: 'portrait', sourceId: 'alistair', role: 'likeness', note: '' }]);
+    expect(once).toEqual([{ source: 'portrait', sourceId: 'milo', role: 'likeness', note: '' }]);
     expect(addDraftReference(once, options.portraits[0]!, 'entity')).toBe(once);
   });
 });
@@ -265,13 +265,13 @@ describe('describeReferenceWarning', () => {
   const warning = (overrides: Partial<ReferenceWarningResponse>): ReferenceWarningResponse => ({
     code: 'capacity-trimmed',
     source: 'portrait',
-    sourceId: 'alistair',
+    sourceId: 'milo',
     reason: 'the image model accepts at most 1 reference image(s)',
     ...overrides,
   });
 
   it('should name the trimmed image and the missing slot', () => {
-    expect(describeReferenceWarning(warning({}), meta)).toBe('Portrait of Alistair not sent: no free reference slot');
+    expect(describeReferenceWarning(warning({}), meta)).toBe('Portrait of Milo not sent: no free reference slot');
   });
 
   it('should mention a dropped note when an attachment merges with the edit source', () => {
