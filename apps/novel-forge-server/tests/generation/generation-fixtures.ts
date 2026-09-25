@@ -14,6 +14,8 @@ export interface DraftRow {
   status: 'draft' | 'final';
   staleReason: string | null;
   body: string;
+  isolated: boolean;
+  generator: 'standard' | 'unrestricted' | 'human';
   updatedAt: Date;
   xmin: string;
 }
@@ -60,6 +62,8 @@ export function draftRow(overrides: Partial<DraftRow> = {}): DraftRow {
     status: 'draft',
     staleReason: null,
     body: 'The keeper counts the ships.',
+    isolated: false,
+    generator: 'standard',
     updatedAt: new Date('2026-09-01T10:00:00.123Z'),
     xmin: '4711',
     ...overrides,
@@ -84,7 +88,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
     query: {
       drafts: { findFirst: async () => reads.shift() },
       briefs: { findFirst: async () => undefined },
-      projects: { findFirst: async () => ({ id: 1n }) },
+      projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard' }) },
       canonFacts: { findMany: async () => [] },
     },
     insert: (table: unknown) => ({

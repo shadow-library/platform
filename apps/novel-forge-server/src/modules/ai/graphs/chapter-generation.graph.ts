@@ -36,6 +36,7 @@ import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handl
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
+import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall, type UnrestrictedRouteDeps } from '../unrestricted-route';
 import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics } from './mechanical-check';
 import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
@@ -100,6 +101,16 @@ export type PersistDraftInput = Pick<
 export type JudgeFinding = JudgeOutput['findings'][number];
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
+
+export interface RunRouteDeps extends UnrestrictedRouteDeps {
+  runPolicy: (projectId: bigint, call: PolicyCall) => Promise<ForgeCallPolicy>;
+}
+
+// A raised run's prose is persisted as an isolated draft, so every later call that reads it stays on the unrestricted map whatever its own role resolves to.
+export async function routeRunCall(deps: RunRouteDeps, projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined, raised: boolean): Promise<CallRoute> {
+  if (raised) return resolveUnrestrictedRoute(deps, projectId, call, project);
+  return { policy: await deps.runPolicy(projectId, call), project };
+}
 
 export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistDraftInput): Promise<Generation.Draft> {
   const projectId = BigInt(state.projectId);
@@ -307,6 +318,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return (await resolver).forPack(call, CHAPTER_PACK_CONSUMERS);
   }
 
+  function routeFor(projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined, raised: boolean): Promise<CallRoute> {
+    return routeRunCall({ pluginPolicy, modelRouter, runPolicy: policyFor }, projectId, call, project, raised);
+  }
+
   async function assembleContext(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
     const call: PolicyCall = { role: 'generation', chapter: state.chapter };
@@ -363,9 +378,11 @@ export function createChapterGenerationGraph(services: GraphServices) {
     let raised = policy.raised;
     if (!title) {
       const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
-      const titlePolicy = await policyFor(projectId, { role: 'title', chapter: state.chapter });
-      raised ||= titlePolicy.raised;
-      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx, undefined, titlePolicy)) as { title: string };
+      const titleRoute = await routeFor(projectId, { role: 'title', chapter: state.chapter }, undefined, raised);
+      raised ||= titleRoute.policy.raised;
+      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx, titleRoute.project, titleRoute.policy)) as {
+        title: string;
+      };
       title = titleResult.title ?? '';
     }
 
@@ -401,7 +418,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const [projectRow, priorChapters] = await Promise.all([
       db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       db.query.chapters.findMany({
-        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, state.chapter)),
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), eq(schema.chapters.isolated, false), lt(schema.chapters.number, state.chapter)),
         orderBy: [desc(schema.chapters.number)],
         limit: MECHANICAL_PRIOR_WINDOW,
         columns: { content: true },
@@ -452,7 +469,12 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const tools = toolRegistry.forNode('judge', toolCtx);
     const rawTools = toolRegistry.getRaw('judge');
-    const judgePolicy = await policyFor(projectId, { role: 'judge', chapter: state.chapter });
+    const { policy: judgePolicy, project: judgeProject } = await routeFor(
+      projectId,
+      { role: 'judge', chapter: state.chapter },
+      projectRow as ProjectConfig | undefined,
+      state.writerClassRaised,
+    );
     const judgeTelemetry = {
       projectId,
       runId: state.runId || undefined,
@@ -461,7 +483,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       promptVersion: PROMPT_REGISTRY.judge.version,
       role: 'judge',
     };
-    const model = await modelRouter.chatFor('judge', judgeTelemetry, projectRow as ProjectConfig | undefined, judgePolicy);
+    const model = await modelRouter.chatFor('judge', judgeTelemetry, judgeProject, judgePolicy);
 
     const renderedContract = renderEndingContract(brief?.endingContract);
     const contractBlock = renderedContract
@@ -583,14 +605,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const findingsStr = writerFacingFindings(state, await loadWriterForbiddenFacts(db, projectId, state.chapter));
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: PROMPT_REGISTRY.fix.version, role: 'fix' };
 
-    const policy = await policyFor(projectId, { role: 'fix', chapter: state.chapter });
-    const result = (await modelRouter.structured(
-      PROMPT_REGISTRY.fix,
-      { contextPack: renderedPack, prose: state.prose, findings: findingsStr },
-      ctx,
-      projectRow as ProjectConfig | undefined,
-      policy,
-    )) as FixOutput;
+    const { policy, project } = await routeFor(projectId, { role: 'fix', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
+    const result = (await modelRouter.structured(PROMPT_REGISTRY.fix, { contextPack: renderedPack, prose: state.prose, findings: findingsStr }, ctx, project, policy)) as FixOutput;
 
     logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
 
@@ -655,23 +671,17 @@ export function createChapterGenerationGraph(services: GraphServices) {
       role: 'generation',
     };
 
-    const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
+    const { policy, project } = await routeFor(projectId, { role: 'generation', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },
       ctx,
-      projectRow as ProjectConfig | undefined,
+      project,
       policy,
     )) as { title: string; body: string; summary: string; state?: GenerationState };
-    const expansion = await expandShortDraft(
-      modelRouter,
-      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
-      ctx,
-      projectRow as ProjectConfig | undefined,
-      policy,
-    );
+    const expansion = await expandShortDraft(modelRouter, { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance }, ctx, project, policy);
     logger.debug('generation repairRewrite', {
       runId: state.runId,
       chapter: state.chapter,

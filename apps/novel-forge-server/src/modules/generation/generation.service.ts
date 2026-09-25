@@ -18,7 +18,7 @@ import {
   selectGenerationBatch,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
 
 import { renderBibleDigest } from '../ai/context/bible-docs';
 import { loadRevealGuard, sanitiseBriefReveals, type ScheduledReveal } from '../ai/context/canon-guard';
@@ -30,7 +30,7 @@ import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } f
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
-import { ModelRouterService } from '../ai/model-router.service';
+import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildOutlinePrompt, outlineWordTargetVars, PROMPT_REGISTRY } from '../ai/prompts';
 import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
 import { IndexingService } from '../ai/retrieval/indexing.service';
@@ -46,6 +46,7 @@ import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
+import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
 import { applyBriefReveals, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
@@ -868,7 +869,7 @@ export class GenerationService {
 
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'revision', chapter }, project);
+    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'revision', chapter }, project);
     const [pack, forbidden] = await Promise.all([this.contextAssembler.forChapter(projectId, chapter, { policy }), loadWriterForbiddenFacts(this.db, projectId, chapter)]);
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
@@ -881,7 +882,7 @@ export class GenerationService {
         feedback: scrubForWriter(body.note, forbidden),
       },
       ctx,
-      project as never,
+      routedProject,
       policy,
     )) as { title: string; body: string; summary: string; state?: GenerationState };
 
@@ -896,7 +897,7 @@ export class GenerationService {
           revision: sql`${schema.drafts.revision} + 1`,
           reviewStatus: 'needs_review',
           staleReason: null,
-          ...raisedContainment(policy),
+          ...(draft.isolated ? { isolated: true } : raisedContainment(policy)),
           updatedAt: new Date(),
         })
         .where(
@@ -945,11 +946,11 @@ export class GenerationService {
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'judge', chapter }, project);
+    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'judge', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
     const runId = `judge-${projectId}-${chapter}-${Date.now()}`;
     const telemetry = { projectId, runId, node: 'judge', promptKey: PROMPT_REGISTRY.judge.key, promptVersion: PROMPT_REGISTRY.judge.version, role: 'judge' };
-    const model = await this.modelRouter.chatFor('judge', telemetry, project as never, policy);
+    const model = await this.modelRouter.chatFor('judge', telemetry, routedProject, policy);
     const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });
     const rawTools = this.toolRegistry.getRaw('judge');
 
@@ -1305,7 +1306,12 @@ export class GenerationService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'generation', chapter }, { contentMode: 'unrestricted' });
+    const { policy, project: routedProject } = await resolveUnrestrictedRoute(
+      { pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter },
+      projectId,
+      { role: 'generation', chapter },
+      project as ProjectConfig | undefined,
+    );
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
     const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
@@ -1315,8 +1321,6 @@ export class GenerationService {
       ...(await loadWriterBrief(this.db, projectId, chapter, brief, forbidden)),
       ...generationWordTargetVars(resolveWordTarget(project)),
     };
-    const routedProject = { ...project, contentMode: 'unrestricted' } as never;
-
     const guidance = body.guidance ? scrubForWriter(body.guidance, forbidden) : '';
     const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, policy)) as {
       title: string;
@@ -1540,19 +1544,19 @@ export class GenerationService {
 
   async reviewChapter(projectId: bigint, chapter: number): Promise<{ disposition: string; note?: string; findings?: { severity: string; text: string }[] }> {
     const draft = await this.getDraft(projectId, chapter);
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'review', chapter });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'review', chapter }, project);
     const [pack, brief] = await Promise.all([
       this.contextAssembler.forChapter(projectId, chapter, { policy }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
     ]);
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.review.key, promptVersion: PROMPT_REGISTRY.review.version, role: PROMPT_REGISTRY.review.key };
     const review = (await this.modelRouter.structured(
       PROMPT_REGISTRY.review,
       { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', draftBody: draft.body },
       ctx,
-      project as never,
+      routedProject,
       policy,
     )) as {
       disposition: string;
@@ -1719,6 +1723,11 @@ export class GenerationService {
     const jobId = await this.jobService.enqueue(projectId, 'backfill', 'all');
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('backfill job dispatch failed', { err, jobId }));
     return { jobId, kind: 'backfill', status: 'pending', target: 'all' };
+  }
+
+  private async draftRoute(projectId: bigint, draft: { isolated: boolean }, call: RoutedCall, project: Project.Row | undefined): Promise<CallRoute> {
+    if (draft.isolated) return resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, project as ProjectConfig | undefined);
+    return { policy: await this.pluginPolicy.resolve(projectId, call, project), project: project as ProjectConfig | undefined };
   }
 
   private tryParseJson(raw: string): unknown {

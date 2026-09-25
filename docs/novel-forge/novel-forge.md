@@ -107,8 +107,10 @@
 
 - Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints, and the source-extraction graph all
   skip isolated chapters. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A downstream chapter sees an isolated predecessor only as summary plus
-  continuation state; finalizing an isolated draft requires both.
-- A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run.
+  continuation state; finalizing an isolated draft requires both. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
+  there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary.
+- A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
+  so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The

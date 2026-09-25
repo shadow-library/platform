@@ -313,6 +313,49 @@ describe('get_draft handler', () => {
     expect(result).toContain('3200');
   });
 
+  it('should wall off the prose of an isolated draft and keep its header and summary', async () => {
+    const draft = {
+      body: 'The lamplighter walks the sealed corridor.',
+      chapter: 5,
+      isolated: true,
+      reviewStatus: 'needs_review',
+      revision: 2,
+      status: 'draft',
+      summary: 'The lamplighter reaches the sealed door.',
+      title: 'The Sealed Corridor',
+      words: 2800,
+    };
+    const ctx = makeCtx({ drafts: { findFirst: mock(async () => draft) } });
+
+    const result = await rawTool('get_draft').handler({ chapter: 5 }, ctx);
+
+    expect(result).toContain('**Chapter 5**: The Sealed Corridor (draft, rev 2, review: needs_review)');
+    expect(result).toContain('Words: 2800');
+    expect(result).toContain('Summary: The lamplighter reaches the sealed door.');
+    expect(result).toContain('walled off');
+    expect(result).not.toContain(draft.body);
+  });
+
+  it('should return the prose of a draft that is not isolated', async () => {
+    const draft = {
+      body: 'The lamplighter walks the open quay.',
+      chapter: 4,
+      isolated: false,
+      reviewStatus: 'approved',
+      revision: 1,
+      status: 'draft',
+      summary: null,
+      title: null,
+      words: null,
+    };
+    const ctx = makeCtx({ drafts: { findFirst: mock(async () => draft) } });
+
+    const result = await rawTool('get_draft').handler({ chapter: 4 }, ctx);
+
+    expect(result).toContain(draft.body);
+    expect(result).not.toContain('walled off');
+  });
+
   it('degrades gracefully on a miss', async () => {
     const ctx = makeCtx();
 
