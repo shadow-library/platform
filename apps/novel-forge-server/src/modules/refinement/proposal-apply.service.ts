@@ -516,7 +516,8 @@ export class ProposalApplyService {
       constraintNote: fact.constraintNote ?? undefined,
       writerNote: fact.writerNote ?? '',
       terms: (fact.terms as string[] | null) ?? undefined,
-      revealChapter: fact.revealChapter ?? undefined,
+      // Always explicit: an omitted schedule would merge as "keep", leaving a reverted date in place.
+      revealChapter: fact.revealChapter,
     };
   }
 
@@ -934,7 +935,7 @@ export class ProposalApplyService {
       constraintNote: op.constraintNote ?? existing?.constraintNote ?? null,
       writerNote: op.writerNote === undefined ? (existing?.writerNote ?? null) : op.writerNote.trim() || null,
       terms: (op.terms ?? existing?.terms ?? null) as never,
-      revealChapter: op.revealChapter ?? existing?.revealChapter ?? null,
+      revealChapter: op.revealChapter === undefined ? (existing?.revealChapter ?? null) : op.revealChapter,
     };
 
     if (existing) {

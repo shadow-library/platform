@@ -70,7 +70,7 @@ import { readinessDisplay } from '@/lib/bible-readiness';
 import { type BibleSearch, type BibleView, parseBibleSearch } from '@/lib/bible-search';
 import { groupSecrets, isSecret, secretCountsBySubject, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, newEntryType, parseBibleTopic, stagesByDocument, TOPIC_LABEL } from '@/lib/bible-topics';
-import { emptyFactForm, factFormFromFact, type FactFormState, filterFacts, parseChapter, textToList } from '@/lib/canon-facts';
+import { emptyFactForm, factBodyFromForm, factFormFromFact, type FactFormState, filterFacts } from '@/lib/canon-facts';
 import { relativeTime } from '@/lib/format';
 
 export const Route = createFileRoute('/novels/$novelId/story-bible')({
@@ -285,15 +285,7 @@ function StoryBibleScreen(): React.JSX.Element {
   const submitFact = async (form: FactFormState, learner: FactLearner | undefined): Promise<void> => {
     if (!factDialog) return;
     const { mode, initial } = factDialog;
-    const body = {
-      factKey: mode === 'create' ? form.factKey.trim() : initial.factKey,
-      text: form.text.trim(),
-      subjects: textToList(form.subjects),
-      constraintNote: form.constraintNote.trim() || undefined,
-      writerNote: form.writerNote.trim(),
-      terms: textToList(form.terms),
-      revealChapter: parseChapter(form.revealChapter),
-    };
+    const body = factBodyFromForm(form, mode === 'create' ? form.factKey.trim() : initial.factKey);
     let saved: FactResponse;
     try {
       saved = await upsertFact.mutateAsync(body);

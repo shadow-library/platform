@@ -139,6 +139,7 @@ export interface EntityRemoveOp {
  * it; `constraintNote` is author-only, `writerNote` is the writer-safe instruction shown while the fact
  * is hidden (omitted keeps the current one, blank clears it), and `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
  * a fact enters the ledger through a brief's knowledgeContract and draft approval, nowhere else.
+ * `revealChapter` is the schedule, not the ledger: omitted keeps it, a number sets it (1 is open canon), explicit `null` undates the fact — hidden until a plan reveals it.
  */
 export interface FactUpsertOp {
   op: 'fact.upsert';
@@ -148,7 +149,7 @@ export interface FactUpsertOp {
   constraintNote?: string;
   writerNote?: string;
   terms?: string[];
-  revealChapter?: number;
+  revealChapter?: number | null;
 }
 
 export interface FactRemoveOp {
@@ -263,7 +264,7 @@ export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
 export type OpType = ChangeOp['op'];
 export type ActionType = ActionOp['op'];
 
-type FieldKind = 'string' | 'number' | 'string[]' | 'object' | 'object[]' | 'object|null';
+type FieldKind = 'string' | 'number' | 'number|null' | 'string[]' | 'object' | 'object[]' | 'object|null';
 interface OpSpec {
   required: Record<string, FieldKind>;
   optional: Record<string, FieldKind>;
@@ -326,7 +327,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
   'fact.upsert': {
     required: { factKey: 'string' },
-    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number' },
+    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number|null' },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
@@ -381,6 +382,7 @@ export function isActionOp(op: ChangeOp | OpType): boolean {
 function isKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'string') return typeof value === 'string';
   if (kind === 'number') return typeof value === 'number' && Number.isInteger(value);
+  if (kind === 'number|null') return value === null || (typeof value === 'number' && Number.isInteger(value));
   if (kind === 'string[]') return Array.isArray(value) && value.every(v => typeof v === 'string');
   if (kind === 'object[]') return Array.isArray(value) && value.every(v => typeof v === 'object' && v !== null && !Array.isArray(v));
   if (kind === 'object|null' && value === null) return true;
@@ -619,7 +621,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     ? `\nknowledgeContract, when present, must be exactly: {"pov": <non-empty array of entity keys>, "learns": <optional array of {"entityKey": <string>, "factKey": <string>}>} — pov bounds what the chapter may state; learns names the facts discovered on-page. A chapter that reveals nothing previously hidden omits the contract entirely; pass null to drop one the brief already carries.`
     : '';
   const factRules = ops.includes('fact.upsert')
-    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off.'
+    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — hidden until a plan reveals it.'
     : '';
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }

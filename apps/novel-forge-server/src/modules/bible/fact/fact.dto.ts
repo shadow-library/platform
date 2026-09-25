@@ -54,8 +54,13 @@ export class UpsertFactBody {
   @Field(() => [String], { optional: true })
   terms?: string[];
 
-  @Field(() => Integer, { optional: true, minimum: 1 })
-  revealChapter?: number;
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    minimum: 1,
+    description: 'Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it.',
+  })
+  revealChapter?: number | null;
 }
 
 @Schema()

@@ -1,4 +1,4 @@
-import { type FactResponse } from '@/lib/apis';
+import { type FactResponse, type UpsertFactVariables } from '@/lib/apis';
 
 export interface CanonFact {
   id: string;
@@ -99,5 +99,18 @@ export function factFormFromFact(fact: FactResponse): FactFormState {
     writerNote: fact.writerNote ?? '',
     terms: listToText(fact.terms),
     revealChapter: fact.revealChapter != null ? String(fact.revealChapter) : '',
+  };
+}
+
+/** The dialog is a full-form editor prefilled from the fact, so an emptied revealChapter means "no date", not "leave it alone" — it always sends null, never omits the field. */
+export function factBodyFromForm(form: FactFormState, factKey: string): UpsertFactVariables {
+  return {
+    factKey,
+    text: form.text.trim(),
+    subjects: textToList(form.subjects),
+    constraintNote: form.constraintNote.trim() || undefined,
+    writerNote: form.writerNote.trim(),
+    terms: textToList(form.terms),
+    revealChapter: parseChapter(form.revealChapter) ?? null,
   };
 }

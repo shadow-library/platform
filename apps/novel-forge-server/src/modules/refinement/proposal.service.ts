@@ -9,7 +9,7 @@ import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '
 
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
-import { findNegationEchoWarnings } from './proposal-warnings';
+import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 export interface ChangeItem {
@@ -83,7 +83,11 @@ export class ProposalService {
 
     const refs = changeSetRefs(input.changeSet);
     const baseline = await loadArtifactStates(executor, projectId, refs);
-    const warnings = input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet));
+    // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
+    const warnings = [
+      ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
+      ...(await this.revealClearWarnings(executor, projectId, input.changeSet)),
+    ];
 
     const [proposal] = await executor
       .insert(schema.refinementProposals)
@@ -115,6 +119,15 @@ export class ProposalService {
       return await findNegationEchoWarnings(executor, projectId, ops);
     } catch (err) {
       this.logger.warn('proposal review warnings failed — staging without them', { projectId, err });
+      return [];
+    }
+  }
+
+  private async revealClearWarnings(executor: DbExecutor, projectId: bigint, ops: ChangeOp[]): Promise<string[]> {
+    try {
+      return await findRevealClearWarnings(executor, projectId, ops);
+    } catch (err) {
+      this.logger.warn('proposal reveal-clear warnings failed — staging without them', { projectId, err });
       return [];
     }
   }
@@ -208,7 +221,7 @@ export class ProposalService {
 
     const ops = changeSet as ChangeOp[];
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
-    const warnings = await this.reviewWarnings(this.db, projectId, ops);
+    const warnings = [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))];
     const [updated] = await this.db
       .update(schema.refinementProposals)
       .set({ changeSet: ops, baseline, warnings: warnings.length > 0 ? warnings : null, updatedAt: new Date() })

@@ -5454,7 +5454,8 @@ export interface components {
       /** @description The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact */
       writerNote?: string;
       terms?: string[];
-      revealChapter?: number;
+      /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it. */
+      revealChapter?: number | null;
     };
     RevealFactBody: {
       entityKey: string;

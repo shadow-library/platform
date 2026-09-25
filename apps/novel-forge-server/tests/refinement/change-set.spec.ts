@@ -146,10 +146,16 @@ describe('epistemic ops', () => {
     expect(validateChangeSet(ops)).toEqual([]);
   });
 
+  it('should accept an explicit null revealChapter as distinct from omitting it', () => {
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', revealChapter: null }])).toEqual([]);
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1' }])).toEqual([]);
+  });
+
   it('should reject malformed fact ops', () => {
     expect(validateChangeSet([{ op: 'fact.upsert' }])[0]).toMatch(/required field 'factKey'/);
     expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', terms: 'bastard' }])[0]).toMatch(/invalid field 'terms'/);
     expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', revealChapter: 0 }])[0]).toMatch(/revealChapter must be >= 1/);
+    expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', revealChapter: 'soon' }])[0]).toMatch(/invalid field 'revealChapter' \(expected number\|null\)/);
     expect(validateChangeSet([{ op: 'fact.upsert', factKey: 'f1', source: 'brief_reveal' }])[0]).toMatch(/unexpected field 'source'/);
     expect(validateChangeSet([{ op: 'fact.remove', factKey: 'f1', entityKey: 'heir' }])[0]).toMatch(/unexpected field 'entityKey'/);
   });
@@ -169,9 +175,11 @@ describe('epistemic ops', () => {
   it('should render the fact and knowledge-contract vocabulary only for the scopes that allow them', () => {
     const rendered = renderOpVocabulary(['fact.upsert', 'fact.remove', 'brief.update']);
     expect(rendered).toContain('"op": "fact.upsert", "factKey": <string, required>');
+    expect(rendered).toContain('"revealChapter": <number|null, optional>');
     expect(rendered).toContain('"pov": <non-empty array of entity keys>');
     expect(rendered).toContain('NEVER in bible prose');
     expect(rendered).toContain('the reveal schedule IS the plot');
+    expect(rendered).toContain('pass null to undate the fact — hidden until a plan reveals it');
     expect(renderOpVocabulary(['volume.upsert'])).not.toContain('knowledgeContract');
     expect(renderOpVocabulary(['brief.update'])).not.toContain('spoiler ledger');
   });

@@ -4,6 +4,7 @@ import {
   type CanonFact,
   emptyFactForm,
   factAttachments,
+  factBodyFromForm,
   factFormFromFact,
   factHiddenFromWriter,
   factReveal,
@@ -169,6 +170,22 @@ describe('factFormFromFact', () => {
       terms: 'ledger, service corridor',
       revealChapter: '20',
     });
+  });
+});
+
+describe('factBodyFromForm', () => {
+  const form = { factKey: 'ledger_forgery', text: 'Boone forged the ledger.', subjects: 'detective_amara', constraintNote: '', writerNote: '', terms: '', revealChapter: '' };
+
+  it('should send null for an emptied revealChapter — the dialog is a full-form editor, so empty means no date', () => {
+    expect(factBodyFromForm(form, 'ledger_forgery').revealChapter).toBeNull();
+  });
+
+  it('should send the parsed chapter number for a filled revealChapter', () => {
+    expect(factBodyFromForm({ ...form, revealChapter: '20' }, 'ledger_forgery').revealChapter).toBe(20);
+  });
+
+  it('should use the factKey passed in, not the form field', () => {
+    expect(factBodyFromForm(form, 'renamed_key').factKey).toBe('renamed_key');
   });
 });
 

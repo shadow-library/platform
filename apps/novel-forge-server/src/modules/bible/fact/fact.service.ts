@@ -64,7 +64,7 @@ export class FactService {
       constraintNote: body.constraintNote ?? existing?.constraintNote ?? null,
       writerNote: body.writerNote === undefined ? (existing?.writerNote ?? null) : body.writerNote.trim() || null,
       terms: (body.terms ?? existing?.terms ?? null) as never,
-      revealChapter: body.revealChapter ?? existing?.revealChapter ?? null,
+      revealChapter: body.revealChapter === undefined ? (existing?.revealChapter ?? null) : body.revealChapter,
     };
 
     if (existing) {

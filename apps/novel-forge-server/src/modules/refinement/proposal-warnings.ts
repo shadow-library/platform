@@ -76,3 +76,29 @@ export async function findNegationEchoWarnings(db: DbExecutor, projectId: bigint
   if (!ops.some(isTextOp)) return [];
   return negationEchoWarnings(ops, await loadBaselineTexts(db, projectId, ops), options);
 }
+
+type FactUndateOp = Extract<ChangeOp, { op: 'fact.upsert' }>;
+
+function isFactUndateOp(op: ChangeOp): op is FactUndateOp {
+  return op.op === 'fact.upsert' && op.revealChapter === null;
+}
+
+/** One warning per fact.upsert that clears a reveal date the fact currently has — undating an unscheduled fact, or omitting the field, is silent by design. */
+export function revealClearWarnings(ops: readonly ChangeOp[], datedFacts: ReadonlyMap<string, number>): string[] {
+  return ops.filter(isFactUndateOp).flatMap(op => {
+    const dated = datedFacts.get(op.factKey);
+    if (dated === undefined) return [];
+    return [`fact:${op.factKey} is scheduled to reveal at chapter ${dated}; this clears that date and returns it to hidden until a plan reveals it — check that's intended.`];
+  });
+}
+
+export async function findRevealClearWarnings(db: DbExecutor, projectId: bigint, ops: readonly ChangeOp[]): Promise<string[]> {
+  const factKeys = ops.filter(isFactUndateOp).map(op => op.factKey);
+  if (factKeys.length === 0) return [];
+  const rows = await db.query.canonFacts.findMany({
+    columns: { factKey: true, revealChapter: true },
+    where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)),
+  });
+  const datedFacts = new Map(rows.flatMap(row => (row.revealChapter === null ? [] : [[row.factKey, row.revealChapter] as const])));
+  return revealClearWarnings(ops, datedFacts);
+}
