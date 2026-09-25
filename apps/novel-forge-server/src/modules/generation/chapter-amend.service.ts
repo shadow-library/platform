@@ -12,6 +12,8 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { renderChapterPayload } from '../publishing/publish-payload';
 import { type AmendChapterBody, type AmendChapterResponse } from './generation.dto';
 
+type AmendedDraftFields = Partial<Pick<Chapter.Row, 'title' | 'contentRating'>>;
+
 function countWords(text: string | null): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -66,7 +68,11 @@ export class ChapterAmendService {
         .returning();
       if (!amended) throw AppErrorCode.CHP_001.create();
 
-      await this.recordRevision(tx, projectId, chapterNumber, amended);
+      const draftFields: AmendedDraftFields = {
+        ...(body.title !== undefined && { title: amended.title }),
+        ...(body.contentRating !== undefined && { contentRating: amended.contentRating }),
+      };
+      await this.syncFinalDraft(tx, projectId, chapterNumber, amended, draftFields);
       const decision = await applyAmendRepublish(tx, projectId, chapterNumber, renderChapterPayload(amended));
       return { amended, decision };
     });
@@ -85,19 +91,17 @@ export class ChapterAmendService {
   }
 
   /**
-   * `draft_revisions` keys on `draftId`, and a finalized chapter's draft is `final` (or, for an
-   * imported novel, was never created) — so the history row attaches to that final draft without
-   * mutating it, which keeps `DRF_002`'s "a final draft is immutable" invariant intact. The revision
-   * number clears both the draft's own counter and the highest row already filed against it, so
-   * repeated amendments stay distinct under the `(draft_id, revision)` unique key.
+   * Every reader of a finalized chapter's prose that goes through its draft (the chapter reader and amend pre-fill, extract-to-bible, the manuscript, a resumed
+   * finalize) must see the amendment, so the final draft takes it under a new revision. Unrestricted fill and legacy rows can leave the finalized body with no
+   * history row, so it is snapshotted first; amendments filed before the draft followed them sit above its counter. Its judge verdict described the old prose, so it is cleared.
    */
-  private async recordRevision(tx: DbExecutor, projectId: bigint, chapterNumber: number, chapter: Chapter.Row): Promise<void> {
+  private async syncFinalDraft(tx: DbExecutor, projectId: bigint, chapterNumber: number, chapter: Chapter.Row, fields: AmendedDraftFields): Promise<void> {
     const draft = await tx.query.drafts.findFirst({
-      where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapterNumber)),
-      columns: { id: true, revision: true },
+      where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapterNumber), eq(schema.drafts.status, 'final')),
+      columns: { id: true, revision: true, body: true, summary: true, state: true, generator: true },
     });
     if (!draft) {
-      this.logger.warn('amend: no draft row to key prose history to, skipping the revision record', { projectId, chapter: chapterNumber });
+      this.logger.info('amend: no final draft to carry the amended prose, skipping the draft and its revision record', { projectId, chapter: chapterNumber });
       return;
     }
 
@@ -106,18 +110,30 @@ export class ChapterAmendService {
       orderBy: desc(schema.draftRevisions.revision),
       columns: { revision: true },
     });
+    const revision = Math.max(draft.revision, latest?.revision ?? 0) + 1;
+    const body = chapter.content ?? '';
 
     await tx
       .insert(schema.draftRevisions)
       .values({
         projectId,
         draftId: draft.id,
-        revision: Math.max(draft.revision, latest?.revision ?? 0) + 1,
-        source: 'amended',
-        body: chapter.content ?? '',
-        summary: chapter.summary,
+        revision: draft.revision,
+        source: draft.generator === 'human' ? 'imported' : 'generated',
+        body: draft.body,
+        summary: draft.summary,
+        state: draft.state,
       })
       .onConflictDoNothing();
+
+    const [synced] = await tx
+      .update(schema.drafts)
+      .set({ body, words: chapter.wordCount, revision, ...fields, judge: null, judgeNote: null, updatedAt: new Date() })
+      .where(and(eq(schema.drafts.id, draft.id), eq(schema.drafts.status, 'final'), eq(schema.drafts.revision, draft.revision)))
+      .returning({ id: schema.drafts.id });
+    if (!synced) throw AppErrorCode.DRF_013.create();
+
+    await tx.insert(schema.draftRevisions).values({ projectId, draftId: draft.id, revision, source: 'amended', body, summary: chapter.summary, state: draft.state });
   }
 
   /**

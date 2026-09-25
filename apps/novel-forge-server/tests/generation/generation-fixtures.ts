@@ -52,6 +52,7 @@ export interface GenerationDeps {
   modelRouter?: object;
   contextAssembler?: object;
   toolRegistry?: object;
+  proposalService?: object;
   chapterImages?: object;
   pluginPolicy?: object;
 }
@@ -176,7 +177,7 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     (deps.toolRegistry ?? absent) as never,
     absent,
     absent,
-    absent,
+    (deps.proposalService ?? absent) as never,
     (deps.chapterImages ?? absent) as never,
     (deps.pluginPolicy ?? absent) as never,
     absent,

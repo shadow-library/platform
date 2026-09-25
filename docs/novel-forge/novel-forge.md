@@ -114,7 +114,7 @@
   there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary and cannot rewrite its body.
 - A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
   so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
-- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
+- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, rewrites the chapter's final draft to match under a new `amended` revision (the replaced prose stays in its history, the judge verdict is cleared), and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
   drafter sees only open canon, facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`,

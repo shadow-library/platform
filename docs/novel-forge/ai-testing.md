@@ -1513,12 +1513,14 @@ own withdrawal slip and realizes the handwriting is hers."}`
 - **Run:** 1. Open a finalized chapter. 2. "Amend" → paste → confirm.
 - **Verify:** response `{chapter, wordCount, indexed, republished, publicationRevision?, suggestExtractToBible:
 true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `true`** — amend is the only
-  write past the lock and it never unlocks (`chapter-amend.service.ts:53,63`). A `draft_revisions` row with
-  `source='amended'` at `max(draft.revision, latest.revision)+1`. Re-embedding happens **after** the
+  write past the lock and it never unlocks. The replaced draft body is kept as a `draft_revisions` row at the
+  draft's current revision (unless one is already there); the `final` draft then takes the same `body`, `words` and
+  (when sent) `title` and rating, with `judge`/`judge_note` cleared, at `revision = max(draft.revision, latest.revision)+1`,
+  and a matching row `source='amended'`; a chapter with no final draft amends the chapter alone. Re-embedding happens **after** the
   transaction; on failure the chunks are dropped and `indexed:false` (fix with `POST /backfill`).
   Republish only when the reader payload hash moved. The UI then shows the "Canon was not re-derived" alert —
   **the bible, continuity and downstream chapters are untouched by design**; the follow-up is "Add to bible".
-- **Fails when:** `CHP_006` (chapter not finalized), `CHP_001`; log
+- **Fails when:** `CHP_006` (chapter not finalized), `CHP_001`, `DRF_013` (the final draft moved mid-amend; nothing is written); log
   `amend: could not drop the superseded chunks; the index still holds pre-amend prose` — retrieval will serve
   deleted prose until a backfill.
 - **Cost:** 0 model calls (embeddings only).
