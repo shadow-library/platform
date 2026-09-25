@@ -1319,8 +1319,11 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
   **Every descendant draft is marked stale** — `drafts.stale_reason = 'ancestor chapter N was revised'`
   for chapters > N (`markDescendantDraftsStale`). **Quality:** diff `GET /drafts/:n/revisions/:r` against the
   previous revision — the note's three asks must each be visible; a revision that only rewords is a failure.
-- **Fails when:** `DRF_002` on a finalized draft; `DRF_001`; revised body shorter than the floor (no expansion
-  pass runs on this path — `reviseDraft` does not call `expandShortDraft`).
+- **Fails when:** `DRF_002` on a finalized draft, including one finalized while the model call ran; `DRF_013`
+  when anything wrote to the draft during the call — an edit, regeneration, revise, judge, approval or stale
+  marking (the write is bound to the revision and row version, `xmin`, it read), and then no `user_feedback`
+  row is kept; `DRF_001`; revised body shorter than the floor (no expansion pass runs on this path — `reviseDraft`
+  does not call `expandShortDraft`).
 - **Cost:** 1 model call.
 
 #### Draft approval (and the deterministic reveal gate)

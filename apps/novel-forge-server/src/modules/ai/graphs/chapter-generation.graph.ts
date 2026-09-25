@@ -1,11 +1,11 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { and, desc, eq, lt, sql } from 'drizzle-orm';
-import { AppError, Logger } from '@shadow-library/common';
+import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
+import { Logger } from '@shadow-library/common';
 
-import { markDescendantDraftsStale } from '@server/common';
+import { markDescendantDraftsStale, refusedDraftWriteError } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase } from '@server/database';
+import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
@@ -93,9 +93,107 @@ const ChapterGenAnnotation = Annotation.Root({
 });
 
 type ChapterGenState = typeof ChapterGenAnnotation.State;
+export type PersistDraftInput = Pick<
+  ChapterGenState,
+  'projectId' | 'chapter' | 'volumeKey' | 'runId' | 'attempt' | 'repairMode' | 'writerClassRaised' | 'title' | 'prose' | 'summary' | 'continuationState'
+>;
 export type JudgeFinding = JudgeOutput['findings'][number];
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
+
+export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistDraftInput): Promise<Generation.Draft> {
+  const projectId = BigInt(state.projectId);
+  const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
+  const containment = raisedContainment({ raised: state.writerClassRaised });
+
+  // Upsert the draft and record its revision in one transaction: the revision log must never
+  // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
+  // node idempotent on checkpoint replay, but a real insert failure now rolls the draft back too.
+  return db.transaction(async tx => {
+    const previous = await tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) });
+    // Paths such as unrestricted fill, import and hand edits change the body without logging a revision; snapshot it so replacing it never loses prose.
+    if (previous) {
+      await tx
+        .insert(schema.draftRevisions)
+        .values({
+          projectId,
+          draftId: previous.id,
+          revision: previous.revision,
+          source: previous.generator === 'human' ? 'imported' : 'generated',
+          body: previous.body,
+          summary: previous.summary,
+          state: previous.state,
+        })
+        .onConflictDoNothing();
+      await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
+    }
+
+    const generator = containment.generator ?? 'standard';
+    const isolated = containment.isolated ?? false;
+    const [row] = await tx
+      .insert(schema.drafts)
+      .values({
+        projectId,
+        chapter: state.chapter,
+        title: state.title,
+        body: state.prose,
+        summary: state.summary,
+        state: state.continuationState as never,
+        volumeKey: state.volumeKey || null,
+        revision: 0,
+        reviewStatus: 'generating',
+        staleReason: null,
+        generator,
+        isolated,
+      })
+      .onConflictDoUpdate({
+        target: [schema.drafts.projectId, schema.drafts.chapter],
+        set: {
+          title: sql`EXCLUDED.title`,
+          body: sql`EXCLUDED.body`,
+          summary: sql`EXCLUDED.summary`,
+          state: sql`EXCLUDED.state`,
+          revision: sql`drafts.revision + 1`,
+          reviewStatus: 'generating',
+          staleReason: null,
+          generator,
+          isolated,
+          updatedAt: new Date(),
+        },
+        setWhere: ne(schema.drafts.status, 'final'),
+      })
+      .returning();
+
+    if (!row) throw await refusedDraftWriteError(tx, projectId, state.chapter);
+    // Later drafts were written against whatever this chapter held before, so new prose here leaves them resting on text that no longer exists.
+    await markDescendantDraftsStale(tx, projectId, state.chapter, `ancestor chapter ${state.chapter} was ${previous ? 'regenerated' : 'drafted'}`);
+
+    await tx
+      .insert(schema.draftRevisions)
+      .values({
+        projectId,
+        draftId: row.id,
+        revision: row.revision,
+        source,
+        body: state.prose,
+        summary: state.summary,
+        state: state.continuationState as never,
+        runId: state.runId || null,
+      })
+      .onConflictDoNothing();
+
+    return row;
+  });
+}
+
+export type DraftReview = Partial<Pick<Generation.Draft, 'judge' | 'judgeNote' | 'reviewStatus'>>;
+
+export async function setOpenDraftReview(db: Pick<PrimaryDatabase, 'update'>, draftId: string, review: DraftReview): Promise<void> {
+  await db
+    .update(schema.drafts)
+    .set({ ...review, updatedAt: new Date() })
+    .where(and(eq(schema.drafts.id, BigInt(draftId)), ne(schema.drafts.status, 'final')));
+}
 
 // `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so the `minWriterClass` guard runs against the lowest of the three classes.
 export const CHAPTER_PACK_CONSUMERS = ['generation', 'judge', 'fix'] as const;
@@ -292,88 +390,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
   }
 
   async function persistDraft(state: ChapterGenState) {
-    const projectId = BigInt(state.projectId);
-    const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
-    const containment = raisedContainment({ raised: state.writerClassRaised });
-
-    // Upsert the draft and record its revision in one transaction: the revision log must never
-    // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
-    // node idempotent on checkpoint replay, but a real insert failure now rolls the draft back too.
-    const draft = await db.transaction(async tx => {
-      const previous = await tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) });
-      // Paths such as unrestricted fill, import and hand edits change the body without logging a revision; snapshot it so replacing it never loses prose.
-      if (previous) {
-        await tx
-          .insert(schema.draftRevisions)
-          .values({
-            projectId,
-            draftId: previous.id,
-            revision: previous.revision,
-            source: previous.generator === 'human' ? 'imported' : 'generated',
-            body: previous.body,
-            summary: previous.summary,
-            state: previous.state,
-          })
-          .onConflictDoNothing();
-        await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
-      }
-
-      const generator = containment.generator ?? 'standard';
-      const isolated = containment.isolated ?? false;
-      const [row] = await tx
-        .insert(schema.drafts)
-        .values({
-          projectId,
-          chapter: state.chapter,
-          title: state.title,
-          body: state.prose,
-          summary: state.summary,
-          state: state.continuationState as never,
-          volumeKey: state.volumeKey || null,
-          revision: 0,
-          reviewStatus: 'generating',
-          staleReason: null,
-          generator,
-          isolated,
-        })
-        .onConflictDoUpdate({
-          target: [schema.drafts.projectId, schema.drafts.chapter],
-          set: {
-            title: sql`EXCLUDED.title`,
-            body: sql`EXCLUDED.body`,
-            summary: sql`EXCLUDED.summary`,
-            state: sql`EXCLUDED.state`,
-            revision: sql`drafts.revision + 1`,
-            reviewStatus: 'generating',
-            staleReason: null,
-            generator,
-            isolated,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-
-      if (!row) throw AppError.internal('[persistDraft] unexpected null result');
-      // Later drafts were written against whatever this chapter held before, so new prose here leaves them resting on text that no longer exists.
-      await markDescendantDraftsStale(tx, projectId, state.chapter, `ancestor chapter ${state.chapter} was ${previous ? 'regenerated' : 'drafted'}`);
-
-      await tx
-        .insert(schema.draftRevisions)
-        .values({
-          projectId,
-          draftId: row.id,
-          revision: row.revision,
-          source,
-          body: state.prose,
-          summary: state.summary,
-          state: state.continuationState as never,
-          runId: state.runId || null,
-        })
-        .onConflictDoNothing();
-
-      return row;
-    });
-
+    const draft = await persistGeneratedDraft(db, state);
     return { draftId: String(draft.id), nodeTrace: ['persistDraft'] };
   }
 
@@ -532,10 +549,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     if (state.draftId) {
       const reviewStatus = verdict === 'consistent' ? 'needs_review' : 'contradiction';
       const judgeNote = [...findings.map(f => `[${f.severity}] ${f.text}`), state.readabilityNote].filter(Boolean).join('\n');
-      await db
-        .update(schema.drafts)
-        .set({ judge: verdict, judgeNote: judgeNote || null, reviewStatus, updatedAt: new Date() })
-        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+      await setOpenDraftReview(db, state.draftId, { judge: verdict, judgeNote: judgeNote || null, reviewStatus });
     }
 
     return {
@@ -682,30 +696,21 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
   async function accept(state: ChapterGenState) {
     if (state.draftId) {
-      await db
-        .update(schema.drafts)
-        .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
-        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+      await setOpenDraftReview(db, state.draftId, { reviewStatus: 'needs_review' });
     }
     return { outcome: 'accepted', nodeTrace: ['accept'] };
   }
 
   async function acceptAsIs(state: ChapterGenState) {
     if (state.draftId) {
-      await db
-        .update(schema.drafts)
-        .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
-        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+      await setOpenDraftReview(db, state.draftId, { reviewStatus: 'contradiction' });
     }
     return { outcome: 'accepted_with_findings', nodeTrace: ['acceptAsIs'] };
   }
 
   async function awaitReview(state: ChapterGenState) {
     if (state.draftId) {
-      await db
-        .update(schema.drafts)
-        .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
-        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+      await setOpenDraftReview(db, state.draftId, { reviewStatus: 'contradiction' });
     }
     return { outcome: 'awaiting_review', nodeTrace: ['awaitReview'] };
   }

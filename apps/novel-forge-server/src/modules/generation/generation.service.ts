@@ -1,5 +1,5 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -12,6 +12,7 @@ import {
   declaredDraftFields,
   isFinalizable,
   markDescendantDraftsStale,
+  refusedDraftWriteError,
   renderBriefBody,
   renderSceneEvents,
   selectGenerationBatch,
@@ -840,9 +841,10 @@ export class GenerationService {
           staleReason: null,
           updatedAt: new Date(),
         },
+        setWhere: ne(schema.drafts.status, 'final'),
       })
       .returning();
-    if (!draft) throw AppErrorCode.DRF_001.create();
+    if (!draft) throw await refusedDraftWriteError(this.db, projectId, chapter);
 
     await this.db
       .insert(schema.draftRevisions)
@@ -857,13 +859,12 @@ export class GenerationService {
   async reviseDraft(projectId: bigint, chapter: number, body: ReviseDraftBody): Promise<Generation.Draft> {
     this.logger.info('reviseDraft: revising draft', { projectId, chapter });
     this.logger.debug('reviseDraft: feedback note', { projectId, chapter, note: body.note });
-    const draft = await this.getDraft(projectId, chapter);
+    const [draft] = await this.db
+      .select({ ...getTableColumns(schema.drafts), xmin: sql<string>`${schema.drafts}.xmin::text` })
+      .from(schema.drafts)
+      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)));
+    if (!draft) throw AppErrorCode.DRF_001.create();
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
-
-    const [feedback] = await this.db
-      .insert(schema.userFeedback)
-      .values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: 'revision_requested', note: body.note })
-      .returning();
 
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
@@ -884,46 +885,64 @@ export class GenerationService {
       policy,
     )) as { title: string; body: string; summary: string; state?: GenerationState };
 
-    const newRevision = draft.revision + 1;
-    const [updated] = await this.db
-      .update(schema.drafts)
-      .set({
-        title: revised.title,
-        body: revised.body,
-        summary: revised.summary,
-        state: revised.state as never,
-        revision: newRevision,
-        reviewStatus: 'needs_review',
-        staleReason: null,
-        ...raisedContainment(policy),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
-      .returning();
-    if (!updated) throw AppErrorCode.DRF_001.create();
+    return this.db.transaction(async tx => {
+      const [updated] = await tx
+        .update(schema.drafts)
+        .set({
+          title: revised.title,
+          body: revised.body,
+          summary: revised.summary,
+          state: revised.state as never,
+          revision: sql`${schema.drafts.revision} + 1`,
+          reviewStatus: 'needs_review',
+          staleReason: null,
+          ...raisedContainment(policy),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.drafts.id, draft.id),
+            eq(schema.drafts.revision, draft.revision),
+            ne(schema.drafts.status, 'final'),
+            // xmin moves on every committed update of the row, whether or not the writer touched updated_at, and carries no clock to mis-decode.
+            sql`${schema.drafts}.xmin::text = ${draft.xmin}`,
+          ),
+        )
+        .returning();
+      if (!updated) {
+        this.logger.warn('reviseDraft: draft changed during the model call — revision discarded', { projectId, chapter, baseRevision: draft.revision });
+        throw await refusedDraftWriteError(tx, projectId, chapter, 'conflict');
+      }
 
-    await this.db
-      .insert(schema.draftRevisions)
-      .values({
-        projectId,
-        draftId: draft.id,
-        revision: newRevision,
-        source: 'revised',
-        body: revised.body,
-        summary: revised.summary,
-        state: revised.state as never,
-        feedbackId: feedback?.id,
-      })
-      .onConflictDoNothing();
+      const [feedback] = await tx
+        .insert(schema.userFeedback)
+        .values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: 'revision_requested', note: body.note })
+        .returning({ id: schema.userFeedback.id });
 
-    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was revised`);
+      await tx
+        .insert(schema.draftRevisions)
+        .values({
+          projectId,
+          draftId: updated.id,
+          revision: updated.revision,
+          source: 'revised',
+          body: revised.body,
+          summary: revised.summary,
+          state: revised.state as never,
+          feedbackId: feedback?.id,
+        })
+        .onConflictDoNothing();
 
-    return updated;
+      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was revised`);
+
+      return updated;
+    });
   }
 
   async judgeDraft(projectId: bigint, chapter: number): Promise<JudgeResult> {
     this.logger.debug('judgeDraft: starting', { projectId, chapter });
     const draft = await this.getDraft(projectId, chapter);
+    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'judge', chapter }, project);
@@ -977,7 +996,7 @@ export class GenerationService {
         reviewStatus: verdict === 'consistent' ? 'needs_review' : 'contradiction',
         updatedAt: new Date(),
       })
-      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)));
+      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final')));
 
     return { verdict, findings };
   }
@@ -1016,8 +1035,9 @@ export class GenerationService {
       const [row] = await tx
         .update(schema.drafts)
         .set({ reviewStatus: 'approved', updatedAt: new Date() })
-        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
+        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'), isNull(schema.drafts.staleReason)))
         .returning();
+      if (!row) throw await refusedDraftWriteError(tx, projectId, chapter);
 
       // Approval is the deterministic reveal gate: the brief's
       // `learns` declarations become ledger rows in the same transaction as the approval itself.
@@ -1027,7 +1047,6 @@ export class GenerationService {
       return row;
     });
 
-    if (!updated) throw AppErrorCode.DRF_001.create();
     this.logger.info('draft approved', { projectId, chapter, reviewerId: options?.reviewerId });
     return updated;
   }
@@ -1064,9 +1083,9 @@ export class GenerationService {
     await this.db.transaction(async tx => {
       const deleted = await tx
         .delete(schema.drafts)
-        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
+        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final')))
         .returning({ id: schema.drafts.id });
-      if (deleted.length === 0) throw AppErrorCode.DRF_001.create();
+      if (deleted.length === 0) throw await refusedDraftWriteError(tx, projectId, chapter);
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
@@ -1108,9 +1127,10 @@ export class GenerationService {
           ...declared,
           updatedAt: new Date(),
         },
+        setWhere: ne(schema.drafts.status, 'final'),
       })
       .returning();
-    if (!draft) throw AppErrorCode.DRF_001.create();
+    if (!draft) throw await refusedDraftWriteError(this.db, projectId, chapter);
 
     await this.db
       .insert(schema.draftRevisions)

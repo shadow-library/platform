@@ -9,6 +9,7 @@ export * from './content-hash';
 export * from './data-transformers';
 export * from './draft-fields';
 export * from './draft-staleness';
+export * from './draft-write-guard';
 export * from './enum.dto';
 export * from './finalize-gate';
 export * from './open-canon';

@@ -90,6 +90,7 @@ export class AppErrorCode extends ServerErrorCode {
     'DRF_012',
     'Chapter {chapter} cannot be regenerated while chapter {blocker} is an unfinalized external chapter — fill and finalize it first',
   );
+  static readonly DRF_013 = AppErrorCode.conflict('DRF_013', 'This chapter changed while you were working on it. Reload it and try again.');
 
   /*!
    * Finalize Errors
