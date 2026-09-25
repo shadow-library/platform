@@ -44,6 +44,8 @@ export interface CreateProposalInput {
   warnings?: string[];
 }
 
+type ApproveDraftOp = Extract<ChangeOp, { op: 'action.approve_draft' }>;
+
 /**
  * Who a new proposal supersedes its own stale pending work for: a chat session, or — for a plugin, which
  * has no session and restages the same decision on every run — the plugin's own scope.
@@ -61,6 +63,29 @@ function supersessionOwner(input: CreateProposalInput): SQL | undefined {
 function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
   if (kind === 'plugin') return validatePluginChangeSet(changeSet);
   return validateChangeSet(changeSet, allowedOps, { ...options, blueprintLock: kind === 'blueprint' });
+}
+
+/**
+ * An approval binds to the draft revision current when it was staged — the prose the author could read beside the card — so a card
+ * applied after the prose changed is refused. A model never knows the revision, so staging overwrites whatever it sent; a hand edit
+ * keeps a revision it carries.
+ */
+async function stampApprovalRevisions(executor: DbExecutor, projectId: bigint, ops: ChangeOp[], keepSupplied: boolean): Promise<ChangeOp[]> {
+  const unstamped = (op: ChangeOp): op is ApproveDraftOp => op.op === 'action.approve_draft' && !(keepSupplied && typeof op.revision === 'number');
+  const chapters = [...new Set(ops.filter(unstamped).map(op => op.chapter))];
+  if (chapters.length === 0) return ops;
+
+  const drafts = await executor.query.drafts.findMany({
+    columns: { chapter: true, revision: true },
+    where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, chapters)),
+  });
+  const revisionByChapter = new Map(drafts.map(draft => [draft.chapter, draft.revision]));
+  return ops.map(op => {
+    if (!unstamped(op)) return op;
+    const { revision: _supplied, ...approval } = op;
+    const revision = revisionByChapter.get(op.chapter);
+    return revision === undefined ? approval : { ...approval, revision };
+  });
 }
 
 @Injectable()
@@ -81,7 +106,8 @@ export class ProposalService {
     const errors = validateOps(input.kind, input.changeSet, input.allowedOps, { entityMaterialization: input.entityMaterialization });
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const refs = changeSetRefs(input.changeSet);
+    const changeSet = await stampApprovalRevisions(executor, projectId, input.changeSet, false);
+    const refs = changeSetRefs(changeSet);
     const baseline = await loadArtifactStates(executor, projectId, refs);
     // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
     const warnings = [
@@ -99,7 +125,7 @@ export class ProposalService {
         scopeRef: input.scopeRef,
         kind: input.kind,
         summary: input.summary,
-        changeSet: input.changeSet,
+        changeSet,
         baseline,
         model: input.model,
         runId: input.runId,
@@ -219,7 +245,7 @@ export class ProposalService {
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const ops = changeSet as ChangeOp[];
+    const ops = await stampApprovalRevisions(this.db, projectId, changeSet as ChangeOp[], true);
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
     const warnings = [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))];
     const [updated] = await this.db

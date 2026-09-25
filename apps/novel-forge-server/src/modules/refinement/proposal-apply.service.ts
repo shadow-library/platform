@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -8,13 +8,16 @@ import {
   arcContentHash,
   briefContentHash,
   computeBibleDocHash,
+  markDescendantDraftsStale,
   PLAN_STALE_ARC_CHANGED,
   PLAN_STALE_RANGE_SHIFTED,
   PLAN_STALE_VOLUME_CHANGED,
+  refusedDraftWriteError,
+  revokeProvisionalReveals,
   volumeContentHash,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
@@ -93,6 +96,9 @@ interface BaselineMismatch {
 // shields a brief from reconciliation is the engine's to carry, never a field a model or author change-set can set.
 type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
 
+// The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
+type DraftRestoreOp = DraftUpdateOp & { isolated?: boolean; generator?: Project.ContentGenerator };
+
 interface ApplyContext {
   tx: PrimaryDatabase;
   projectId: bigint;
@@ -106,6 +112,13 @@ type TxResult =
   | { outcome: 'applied'; proposal: Refinement.Proposal; applied: AppliedArtifact[]; staleMarked: string[]; opResults: OpResult[] }
   | { outcome: 'declined'; proposal: Refinement.Proposal; opResults: OpResult[] }
   | { outcome: 'conflicted'; proposal: Refinement.Proposal };
+
+/** A draft the proposal's own content ops rewrote is approved at the revision they wrote — the prose the author reviewed in the proposal. */
+export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArtifact[]): ActionOp {
+  if (op.op !== 'action.approve_draft') return op;
+  const written = applied.find(artifact => artifact.artifactRef === `draft:${op.chapter}`);
+  return typeof written?.newRevision === 'number' ? { ...op, revision: written.newRevision } : op;
+}
 
 // Fields whose change invalidates the artifacts planned beneath the volume.
 const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
@@ -275,7 +288,7 @@ export class ProposalApplyService {
     if (result.outcome === 'declined') return { proposal: result.proposal, applied: [], staleMarked: [], opResults: result.opResults };
 
     const ops = result.proposal.changeSet as ChangeOp[];
-    const pendingActions = result.opResults.filter(r => r.status === 'pending').map(r => ({ index: r.index, op: ops[r.index] as ActionOp }));
+    const pendingActions = result.opResults.filter(r => r.status === 'pending').map(r => ({ index: r.index, op: bindApprovalRevision(ops[r.index] as ActionOp, result.applied) }));
     const { opResults, proposal } = await this.executeActions(projectId, result.proposal, result.opResults, pendingActions, options?.autoApplied ?? false);
 
     this.logger.info(`proposal ${proposalId} applied: ${result.applied.map(a => a.artifactRef).join(', ') || 'actions only'}`);
@@ -487,7 +500,16 @@ export class ProposalApplyService {
   private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp): Promise<ContentOp | null> {
     const draft = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
     if (!draft) return op.op === 'draft.update' ? { op: 'draft.remove', chapter: op.chapter } : null;
-    return { op: 'draft.update', chapter: op.chapter, title: draft.title ?? undefined, body: draft.body, summary: draft.summary ?? undefined };
+    const inverse: DraftRestoreOp = {
+      op: 'draft.update',
+      chapter: op.chapter,
+      title: draft.title ?? undefined,
+      body: draft.body,
+      summary: draft.summary ?? undefined,
+      isolated: draft.isolated,
+      generator: draft.generator,
+    };
+    return inverse;
   }
 
   private async inverseEntity(ctx: ApplyContext, op: EntityUpsertOp | EntityRemoveOp): Promise<ContentOp | null> {
@@ -847,7 +869,7 @@ export class ProposalApplyService {
    * draft or a chapter at/behind the story cursor is locked canon. Every edit lands as a
    * draft_revisions row (source chat_edited), so prose history survives independent of proposal revert.
    */
-  private async applyDraftUpdate(ctx: ApplyContext, op: DraftUpdateOp): Promise<void> {
+  private async applyDraftUpdate(ctx: ApplyContext, op: DraftRestoreOp): Promise<void> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_010.create();
@@ -855,31 +877,42 @@ export class ProposalApplyService {
     const existing = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.RFN_010.create();
     if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
+    if (existing?.isolated && op.body !== undefined && op.body !== existing.body) throw AppErrorCode.RFN_012.create();
 
     const merged = { title: op.title ?? existing?.title ?? null, body: op.body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
-    const revision = (existing?.revision ?? 0) + 1;
 
-    let draftId: bigint;
+    let written: { id: bigint; revision: number } | undefined;
     if (existing) {
-      await ctx.tx
+      [written] = await ctx.tx
         .update(schema.drafts)
-        .set({ ...merged, revision, reviewStatus: 'needs_review', updatedAt: new Date() })
-        .where(eq(schema.drafts.id, existing.id));
-      draftId = existing.id;
+        .set({ ...merged, revision: sql`${schema.drafts.revision} + 1`, reviewStatus: 'needs_review', staleReason: null, updatedAt: new Date() })
+        .where(and(eq(schema.drafts.id, existing.id), eq(schema.drafts.revision, existing.revision), ne(schema.drafts.status, 'final')))
+        .returning({ id: schema.drafts.id, revision: schema.drafts.revision });
+      if (!written) throw await refusedDraftWriteError(ctx.tx, ctx.projectId, op.chapter);
     } else {
-      const [created] = await ctx.tx
+      [written] = await ctx.tx
         .insert(schema.drafts)
-        .values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, status: 'draft', revision, reviewStatus: 'needs_review', generator: 'standard' })
-        .returning();
-      if (!created) throw AppErrorCode.DRF_001.create();
-      draftId = created.id;
+        .values({
+          projectId: ctx.projectId,
+          chapter: op.chapter,
+          ...merged,
+          status: 'draft',
+          revision: 1,
+          reviewStatus: 'needs_review',
+          generator: op.generator ?? 'standard',
+          isolated: op.isolated ?? false,
+        })
+        .returning({ id: schema.drafts.id, revision: schema.drafts.revision });
+      if (!written) throw AppErrorCode.DRF_001.create();
     }
 
     await ctx.tx
       .insert(schema.draftRevisions)
-      .values({ projectId: ctx.projectId, draftId, revision, source: 'chat_edited', body: merged.body, summary: merged.summary })
+      .values({ projectId: ctx.projectId, draftId: written.id, revision: written.revision, source: 'chat_edited', body: merged.body, summary: merged.summary })
       .onConflictDoNothing();
-    ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: revision });
+    await markDescendantDraftsStale(ctx.tx, ctx.projectId, op.chapter, `ancestor chapter ${op.chapter} was chat_edited`);
+    if (existing) await revokeProvisionalReveals(ctx.tx, ctx.projectId, op.chapter);
+    ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: written.revision });
   }
 
   private async applyDraftRemove(ctx: ApplyContext, op: DraftRemoveOp): Promise<void> {
@@ -887,7 +920,13 @@ export class ProposalApplyService {
     if (!existing) throw AppErrorCode.DRF_001.create();
     if (existing.status === 'final') throw AppErrorCode.RFN_010.create();
 
-    await ctx.tx.delete(schema.drafts).where(eq(schema.drafts.id, existing.id));
+    const removed = await ctx.tx
+      .delete(schema.drafts)
+      .where(and(eq(schema.drafts.id, existing.id), ne(schema.drafts.status, 'final')))
+      .returning({ id: schema.drafts.id });
+    if (removed.length === 0) throw await refusedDraftWriteError(ctx.tx, ctx.projectId, op.chapter);
+    await markDescendantDraftsStale(ctx.tx, ctx.projectId, op.chapter, `ancestor chapter ${op.chapter} was removed`);
+    await revokeProvisionalReveals(ctx.tx, ctx.projectId, op.chapter);
     ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: null });
   }
 

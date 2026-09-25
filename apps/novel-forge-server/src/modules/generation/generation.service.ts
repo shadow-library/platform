@@ -11,10 +11,12 @@ import {
   type BriefSceneInput,
   declaredDraftFields,
   isFinalizable,
+  ledgerBriefReveals,
   markDescendantDraftsStale,
   refusedDraftWriteError,
   renderBriefBody,
   renderSceneEvents,
+  revokeProvisionalReveals,
   selectGenerationBatch,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -47,7 +49,7 @@ import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
-import { applyBriefReveals, loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
+import { loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { redactJobForResponse } from '../jobs/job-response';
@@ -59,6 +61,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
 import {
+  type ApproveDraftBody,
   type CancelJobResponse,
   type CancelRunResponse,
   type ChapterSummarizeResponse,
@@ -816,45 +819,47 @@ export class GenerationService {
     const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
 
-    const [draft] = await this.db
-      .insert(schema.drafts)
-      .values({
-        projectId,
-        chapter,
-        title: body.title,
-        body: body.body,
-        summary: body.summary,
-        state: body.state as never,
-        status: 'draft',
-        reviewStatus: 'needs_review',
-        staleReason: null,
-        generator: 'human',
-      })
-      .onConflictDoUpdate({
-        target: [schema.drafts.projectId, schema.drafts.chapter],
-        set: {
+    return this.db.transaction(async tx => {
+      const [draft] = await tx
+        .insert(schema.drafts)
+        .values({
+          projectId,
+          chapter,
           title: body.title,
           body: body.body,
           summary: body.summary,
           state: body.state as never,
-          revision: sql`${schema.drafts.revision} + 1`,
+          status: 'draft',
           reviewStatus: 'needs_review',
           staleReason: null,
-          updatedAt: new Date(),
-        },
-        setWhere: ne(schema.drafts.status, 'final'),
-      })
-      .returning();
-    if (!draft) throw await refusedDraftWriteError(this.db, projectId, chapter);
+          generator: 'human',
+        })
+        .onConflictDoUpdate({
+          target: [schema.drafts.projectId, schema.drafts.chapter],
+          set: {
+            title: body.title,
+            body: body.body,
+            summary: body.summary,
+            state: body.state as never,
+            revision: sql`${schema.drafts.revision} + 1`,
+            reviewStatus: 'needs_review',
+            staleReason: null,
+            updatedAt: new Date(),
+          },
+          setWhere: ne(schema.drafts.status, 'final'),
+        })
+        .returning();
+      if (!draft) throw await refusedDraftWriteError(tx, projectId, chapter);
 
-    await this.db
-      .insert(schema.draftRevisions)
-      .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
-      .onConflictDoNothing();
+      await tx
+        .insert(schema.draftRevisions)
+        .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
+        .onConflictDoNothing();
+      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
+      await revokeProvisionalReveals(tx, projectId, chapter);
 
-    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
-
-    return draft;
+      return draft;
+    });
   }
 
   async reviseDraft(projectId: bigint, chapter: number, body: ReviseDraftBody): Promise<Generation.Draft> {
@@ -912,7 +917,7 @@ export class GenerationService {
         .returning();
       if (!updated) {
         this.logger.warn('reviseDraft: draft changed during the model call — revision discarded', { projectId, chapter, baseRevision: draft.revision });
-        throw await refusedDraftWriteError(tx, projectId, chapter, 'conflict');
+        throw await refusedDraftWriteError(tx, projectId, chapter);
       }
 
       const [feedback] = await tx
@@ -935,6 +940,7 @@ export class GenerationService {
         .onConflictDoNothing();
 
       await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was revised`);
+      await revokeProvisionalReveals(tx, projectId, chapter);
 
       return updated;
     });
@@ -989,15 +995,23 @@ export class GenerationService {
     }
     this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict, findings: findings.length });
 
-    await this.db
-      .update(schema.drafts)
-      .set({
-        judge: verdict,
-        judgeNote: findings.map(f => `[${f.severity}] ${f.text}`).join('\n') || null,
-        reviewStatus: verdict === 'consistent' ? 'needs_review' : 'contradiction',
-        updatedAt: new Date(),
-      })
-      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final')));
+    await this.db.transaction(async tx => {
+      const [judged] = await tx
+        .update(schema.drafts)
+        .set({
+          judge: verdict,
+          judgeNote: findings.map(f => `[${f.severity}] ${f.text}`).join('\n') || null,
+          reviewStatus: verdict === 'consistent' ? 'needs_review' : 'contradiction',
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.drafts.id, draft.id), eq(schema.drafts.revision, draft.revision), ne(schema.drafts.status, 'final')))
+        .returning({ id: schema.drafts.id });
+      if (!judged) {
+        this.logger.warn('judgeDraft: draft changed during the judge call — verdict discarded', { projectId, chapter, judgedRevision: draft.revision });
+        throw await refusedDraftWriteError(tx, projectId, chapter);
+      }
+      await revokeProvisionalReveals(tx, projectId, chapter);
+    });
 
     return { verdict, findings };
   }
@@ -1011,15 +1025,30 @@ export class GenerationService {
     return feedback;
   }
 
-  async approveDraft(projectId: bigint, chapter: number, options?: { reviewerId?: string; idempotencyKey?: string }): Promise<Generation.Draft> {
+  async approveDraft(projectId: bigint, chapter: number, body: ApproveDraftBody): Promise<Generation.Draft> {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     if (draft.staleReason) throw AppErrorCode.DRF_007.create();
+    if (draft.revision !== body.revision) throw AppErrorCode.DRF_013.create();
 
-    // Record the approval and flip the draft's review status in one transaction: a crash can never
-    // leave an approval logged without the draft approved, or the draft approved with no audit row.
+    // The approval, its audit row and the brief's reveals commit together, and only for the revision the author read.
     // `idempotencyKey` (unique) makes a retried approve a no-op instead of a duplicate approval row.
     const updated = await this.db.transaction(async tx => {
+      const [row] = await tx
+        .update(schema.drafts)
+        .set({ reviewStatus: 'approved', updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.drafts.id, draft.id),
+            eq(schema.drafts.revision, body.revision),
+            ne(schema.drafts.status, 'final'),
+            isNull(schema.drafts.staleReason),
+            ne(schema.drafts.reviewStatus, 'generating'),
+          ),
+        )
+        .returning();
+      if (!row) throw await refusedDraftWriteError(tx, projectId, chapter, 'stale_aware');
+
       await tx
         .insert(schema.userFeedback)
         .values({
@@ -1027,28 +1056,19 @@ export class GenerationService {
           artifactType: 'draft',
           artifactRef: String(chapter),
           disposition: 'approved',
-          reviewerId: options?.reviewerId ?? null,
-          idempotencyKey: options?.idempotencyKey ?? null,
+          reviewerId: body.reviewerId ?? null,
+          idempotencyKey: body.idempotencyKey ?? null,
           note: null,
         })
         .onConflictDoNothing({ target: schema.userFeedback.idempotencyKey });
 
-      const [row] = await tx
-        .update(schema.drafts)
-        .set({ reviewStatus: 'approved', updatedAt: new Date() })
-        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'), isNull(schema.drafts.staleReason)))
-        .returning();
-      if (!row) throw await refusedDraftWriteError(tx, projectId, chapter);
-
-      // Approval is the deterministic reveal gate: the brief's
-      // `learns` declarations become ledger rows in the same transaction as the approval itself.
-      const reveals = await applyBriefReveals(tx, projectId, chapter);
-      if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, applied: reveals.applied });
+      const reveals = await ledgerBriefReveals(tx, projectId, chapter);
+      if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, revision: row.revision, applied: reveals.applied });
 
       return row;
     });
 
-    this.logger.info('draft approved', { projectId, chapter, reviewerId: options?.reviewerId });
+    this.logger.info('draft approved', { projectId, chapter, revision: updated.revision, reviewerId: body.reviewerId });
     return updated;
   }
 
@@ -1087,6 +1107,7 @@ export class GenerationService {
         .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final')))
         .returning({ id: schema.drafts.id });
       if (deleted.length === 0) throw await refusedDraftWriteError(tx, projectId, chapter);
+      await revokeProvisionalReveals(tx, projectId, chapter);
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
@@ -1101,46 +1122,48 @@ export class GenerationService {
     if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
 
     const declared = declaredDraftFields(body);
-    const [draft] = await this.db
-      .insert(schema.drafts)
-      .values({
-        projectId,
-        chapter,
-        title: body.title,
-        body: body.prose,
-        summary: body.summary,
-        status: 'draft',
-        reviewStatus: 'needs_review',
-        staleReason: null,
-        generator: 'human',
-        ...declared,
-      })
-      .onConflictDoUpdate({
-        target: [schema.drafts.projectId, schema.drafts.chapter],
-        set: {
+    return this.db.transaction(async tx => {
+      const [draft] = await tx
+        .insert(schema.drafts)
+        .values({
+          projectId,
+          chapter,
           title: body.title,
           body: body.prose,
           summary: body.summary,
-          revision: sql`${schema.drafts.revision} + 1`,
+          status: 'draft',
           reviewStatus: 'needs_review',
           staleReason: null,
           generator: 'human',
           ...declared,
-          updatedAt: new Date(),
-        },
-        setWhere: ne(schema.drafts.status, 'final'),
-      })
-      .returning();
-    if (!draft) throw await refusedDraftWriteError(this.db, projectId, chapter);
+        })
+        .onConflictDoUpdate({
+          target: [schema.drafts.projectId, schema.drafts.chapter],
+          set: {
+            title: body.title,
+            body: body.prose,
+            summary: body.summary,
+            revision: sql`${schema.drafts.revision} + 1`,
+            reviewStatus: 'needs_review',
+            staleReason: null,
+            generator: 'human',
+            ...declared,
+            updatedAt: new Date(),
+          },
+          setWhere: ne(schema.drafts.status, 'final'),
+        })
+        .returning();
+      if (!draft) throw await refusedDraftWriteError(tx, projectId, chapter);
 
-    await this.db
-      .insert(schema.draftRevisions)
-      .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'imported', body: draft.body, summary: draft.summary })
-      .onConflictDoNothing();
+      await tx
+        .insert(schema.draftRevisions)
+        .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'imported', body: draft.body, summary: draft.summary })
+        .onConflictDoNothing();
+      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was imported`);
+      await revokeProvisionalReveals(tx, projectId, chapter);
 
-    await markDescendantDraftsStale(this.db, projectId, chapter, `ancestor chapter ${chapter} was imported`);
-
-    return draft;
+      return draft;
+    });
   }
 
   async finalize(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
@@ -1188,6 +1211,7 @@ export class GenerationService {
       projectId,
       chapter: draft.chapter,
       draftId: draft.id,
+      draftRevision: draft.revision,
       prose: draft.body,
       summary: draft.summary ?? '',
       title: draft.title ?? undefined,
@@ -1378,6 +1402,7 @@ export class GenerationService {
       }
 
       await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was regenerated`);
+      await revokeProvisionalReveals(tx, projectId, chapter);
 
       return row;
     });

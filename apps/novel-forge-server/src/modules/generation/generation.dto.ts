@@ -212,6 +212,9 @@ export class FeedbackBody {
 
 @Schema()
 export class ApproveDraftBody {
+  @Field(() => Integer, { description: 'The draft revision the author read. The approval is refused with DRF_013 when the draft has moved past it.' })
+  revision: number;
+
   @Field({ optional: true })
   reviewerId?: string;
 

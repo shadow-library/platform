@@ -57,8 +57,11 @@
 - **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements (sentence and paragraph length,
   reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
   readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
-- **Approval** is author-initiated and never auto-applied from chat, may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction; hand edits reset it.
-- **Finalize** runs strictly in order; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
+- **Approval** is author-initiated and never auto-applied from chat, binds to the draft revision the author read (a chat approval card to the one current when it
+  was staged), may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction. Any change to the draft's prose, a judge verdict, or an
+  earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest
+  approved or final chapter that claims it, and moves there when a later claim is revoked.
+- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
 - **Blueprint** (`blueprint.md`): each step runs rounds of options as jobs; locking a step appends decisions to the ledger and materialises their content through change-set
   ops applied as the author's action, with change history and revert. Every step sees the active ledger plus the step's last four messages, never full history.
@@ -108,7 +111,7 @@
 - Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints, and the source-extraction graph all
   skip isolated chapters. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A downstream chapter sees an isolated predecessor only as summary plus
   continuation state; finalizing an isolated draft requires both. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
-  there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary.
+  there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary and cannot rewrite its body.
 - A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
   so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.

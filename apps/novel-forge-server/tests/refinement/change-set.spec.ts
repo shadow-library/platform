@@ -233,3 +233,12 @@ describe('changeSetRefs', () => {
     expect(refs).toEqual(['fact:heir_is_illegitimate', 'fact:stale_secret']);
   });
 });
+
+describe('validateChangeSet draft containment', () => {
+  it.each([
+    ['isolated', { isolated: false }],
+    ['generator', { generator: 'standard' }],
+  ])('should refuse a draft.update that tries to set %s, which only the revert engine carries', (field, extra) => {
+    expect(validateChangeSet([{ op: 'draft.update', chapter: 4, body: 'The ferry leaves.', ...extra }])).toContain(`changeSet[0]: unexpected field '${field}'`);
+  });
+});

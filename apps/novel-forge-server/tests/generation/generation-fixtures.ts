@@ -28,21 +28,31 @@ export interface RecordedWrite {
   setWhere?: SQL;
 }
 
+export interface KnowledgeFixture {
+  learns: { entityKey: string; factKey: string }[];
+  facts: { id: bigint; factKey: string }[];
+  entities: { id: bigint; entityKey: string }[];
+}
+
 export interface FakeGenerationDbOptions {
   draftReads?: (DraftRow | undefined)[];
   draftWriteResult?: unknown[];
+  resetDescendants?: number[];
+  knowledge?: KnowledgeFixture;
 }
 
 export interface FakeGenerationDb {
   db: { transaction: (run: (tx: unknown) => Promise<unknown>) => Promise<unknown> };
   writes: RecordedWrite[];
   writesTo: (table: unknown, kind?: RecordedWrite['kind']) => RecordedWrite[];
+  outcome: () => 'committed' | 'rolled back' | undefined;
 }
 
 export interface GenerationDeps {
   modelRouter?: object;
   contextAssembler?: object;
   toolRegistry?: object;
+  chapterImages?: object;
   pluginPolicy?: object;
 }
 
@@ -70,11 +80,26 @@ export function draftRow(overrides: Partial<DraftRow> = {}): DraftRow {
   };
 }
 
+export function knowledgeFixture(): KnowledgeFixture {
+  return {
+    learns: [{ entityKey: 'keeper', factKey: 'hidden_tide' }],
+    facts: [{ id: 31n, factKey: 'hidden_tide' }],
+    entities: [{ id: 41n, entityKey: 'keeper' }],
+  };
+}
+
+function isApprovalReset(values: Record<string, unknown>): boolean {
+  return Object.keys(values).sort().join(',') === 'reviewStatus,updatedAt' && values['reviewStatus'] === 'needs_review';
+}
+
 export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGenerationDb {
   const reads = [...(options.draftReads ?? [])];
   const writes: RecordedWrite[] = [];
+  const knowledge = options.knowledge;
+  let outcome: 'committed' | 'rolled back' | undefined;
   const resultFor = async (table: unknown) => (table === schema.userFeedback ? [{ id: 7n }] : table === schema.drafts ? (options.draftWriteResult ?? []) : []);
   const awaitable = (table: unknown) => Object.assign(Promise.resolve(undefined), { returning: () => resultFor(table) });
+  const awaitableRows = (rows: unknown[]) => Object.assign(Promise.resolve(undefined), { returning: async () => rows });
 
   const db = {
     select: () => ({
@@ -87,9 +112,10 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
     }),
     query: {
       drafts: { findFirst: async () => reads.shift() },
-      briefs: { findFirst: async () => undefined },
+      briefs: { findFirst: async () => (knowledge ? { knowledgeContract: { pov: ['keeper'], learns: knowledge.learns } } : undefined) },
       projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard' }) },
-      canonFacts: { findMany: async () => [] },
+      canonFacts: { findMany: async () => knowledge?.facts ?? [] },
+      entities: { findMany: async () => knowledge?.entities ?? [] },
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
@@ -110,6 +136,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
       set: (values: Record<string, unknown>) => ({
         where: (where: SQL) => {
           writes.push({ table, kind: 'update', values, where });
+          if (table === schema.drafts && isApprovalReset(values)) return awaitableRows((options.resetDescendants ?? []).map(chapter => ({ chapter })));
           return awaitable(table);
         },
       }),
@@ -120,11 +147,20 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
         return awaitable(table);
       },
     }),
-    transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
+    transaction: async (run: (tx: unknown) => Promise<unknown>) => {
+      try {
+        const result = await run(db);
+        outcome = 'committed';
+        return result;
+      } catch (error) {
+        outcome = 'rolled back';
+        throw error;
+      }
+    },
   };
 
   const writesTo = (table: unknown, kind?: RecordedWrite['kind']) => writes.filter(write => write.table === table && (!kind || write.kind === kind));
-  return { db, writes, writesTo };
+  return { db, writes, writesTo, outcome: () => outcome };
 }
 
 export function makeGenerationService(db: object, deps: GenerationDeps = {}): GenerationService {
@@ -141,7 +177,7 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     absent,
     absent,
     absent,
-    absent,
+    (deps.chapterImages ?? absent) as never,
     (deps.pluginPolicy ?? absent) as never,
     absent,
   );

@@ -205,6 +205,7 @@ interface ReviseDraftAction {
 interface ApproveDraftAction {
   op: 'action.approve_draft';
   chapter: number;
+  revision?: number;
 }
 
 interface ApproveVolumePlanAction {
@@ -338,7 +339,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
   'action.judge_draft': { required: { chapter: 'number' }, optional: {} },
   'action.revise_draft': { required: { chapter: 'number', note: 'string' }, optional: {} },
-  'action.approve_draft': { required: { chapter: 'number' }, optional: {} },
+  'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number' } },
   'action.approve_volume_plan': { required: {}, optional: {} },
   'action.approve_arcs': { required: { volumeKey: 'string' }, optional: {} },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
@@ -626,12 +627,18 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }
 
+/** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them. */
+const SERVER_STAMPED_FIELDS: Partial<Record<ActionType, readonly string[]>> = { 'action.approve_draft': ['revision'] };
+
 /** Action shapes + what each one does — the pipeline half of the hub playbook. */
 export function renderActionVocabulary(actions: readonly ActionType[]): string {
   const lines = actions.map(action => {
     const spec = OP_SPECS[action];
+    const stamped = SERVER_STAMPED_FIELDS[action] ?? [];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
-    const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
+    const optional = Object.entries(spec.optional)
+      .filter(([key]) => !stamped.includes(key))
+      .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${action}"${[...required, ...optional].map(f => `, ${f}`).join('')}} — ${ACTION_PURPOSES[action]}`;
   });
   return `Action operations may appear in the same changeSet array; they run the pipeline instead of editing content. Use one only when the author asks for that work to happen:\n${lines.join('\n')}`;

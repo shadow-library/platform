@@ -4759,6 +4759,8 @@ export interface components {
       createdAt: string;
     };
     ApproveDraftBody: {
+      /** @description The draft revision the author read. The approval is refused with DRF_013 when the draft has moved past it. */
+      revision: number;
       reviewerId?: string;
       idempotencyKey?: string;
     };

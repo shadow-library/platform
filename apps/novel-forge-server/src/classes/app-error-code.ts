@@ -199,6 +199,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RFN_009 = AppErrorCode.badRequest('RFN_009', 'Finalize is never applied automatically — select the finalize step and apply it deliberately');
   static readonly RFN_010 = AppErrorCode.badRequest('RFN_010', 'Draft is final or the chapter is already finalized — prose cannot be modified');
   static readonly RFN_011 = AppErrorCode.badRequest('RFN_011', 'Invalid op selection — indexes must reference ops in the change-set and select at least one');
+  static readonly RFN_012 = AppErrorCode.badRequest(
+    'RFN_012',
+    'This chapter is isolated — chat cannot see its prose, so it cannot rewrite it. Edit the prose in the chapter editor.',
+  );
 
   /*!
    * Rebrand Errors

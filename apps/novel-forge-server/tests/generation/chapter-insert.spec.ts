@@ -34,6 +34,7 @@ function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[]) {
     select: () => ({ from: (table: unknown) => chain(table === schema.decisionLedgerEntries ? ledger : []) }),
     update: (table: unknown) => chain([], table === schema.decisionLedgerEntries ? values => ledgerUpdates.push(values) : undefined),
     insert: () => chain([{ chapter: 1, body: 'Ada meets the clerk.' }]),
+    delete: () => chain([]),
     transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
   };
   return { databaseService: { getPostgresClient: () => db }, ledgerUpdates };

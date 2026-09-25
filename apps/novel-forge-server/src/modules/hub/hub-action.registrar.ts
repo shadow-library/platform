@@ -1,6 +1,7 @@
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
@@ -81,8 +82,12 @@ export class HubActionRegistrar {
 
     registry.register('action.approve_draft', async (projectId, action) => {
       if (action.op !== 'action.approve_draft') throw AppError.internal('executor misrouted');
-      await this.generationService.approveDraft(projectId, action.chapter);
-      return { summary: `approved chapter ${action.chapter} draft` };
+      if (action.revision === undefined) {
+        await this.generationService.getDraft(projectId, action.chapter);
+        throw AppErrorCode.DRF_013.create();
+      }
+      await this.generationService.approveDraft(projectId, action.chapter, { revision: action.revision });
+      return { summary: `approved chapter ${action.chapter} draft at revision ${action.revision}` };
     });
 
     registry.register('action.approve_volume_plan', async projectId => {

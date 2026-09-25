@@ -1243,7 +1243,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   };
 
   const approve = (): void => {
-    approveDraft.mutate(chapter, { onSuccess: () => toast.success(`Chapter ${chapter} approved`), onError: err => toast.danger(err.message) });
+    approveDraft.mutate(draft, { onSuccess: () => toast.success(`Chapter ${chapter} approved`), onError: err => toast.danger(err.message) });
   };
 
   const runJudge = (): void => {

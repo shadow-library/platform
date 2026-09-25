@@ -181,7 +181,7 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
 
   const approve = (): void => {
     if (isContradiction || approveDraft.isPending) return;
-    approveDraft.mutate(draft.chapter, {
+    approveDraft.mutate(draft, {
       onSuccess: () => {
         toast.success(`Chapter ${draft.chapter} approved`);
         onSelect(nextId === undefined ? undefined : Number(nextId));

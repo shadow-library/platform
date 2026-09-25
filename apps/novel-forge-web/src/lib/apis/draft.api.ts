@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 import {
+  type ApproveDraftBody,
   type ContinuityProposalResponse,
   type DraftResponse,
   type DraftSummaryResponse,
@@ -101,11 +102,32 @@ export function useDeleteDraftMutation(projectId: string): UseMutationResult<und
   });
 }
 
-export function useApproveDraftMutation(projectId: string): UseMutationResult<DraftResponse, ApiError, number> {
+export type ApprovedDraft = Pick<DraftResponse, 'chapter' | 'revision'>;
+
+const DRAFT_MOVED_CODES: ReadonlySet<string> = new Set(['DRF_002', 'DRF_007', 'DRF_013']);
+
+export function approveDraftRequest(projectId: string, draft: ApprovedDraft): { path: string; body: ApproveDraftBody } {
+  return { path: `/projects/${projectId}/drafts/${draft.chapter}/approve`, body: { revision: draft.revision } };
+}
+
+/** The write was refused because the draft on screen is no longer the one the server holds. */
+export function draftMovedUnderneath(error: ApiError): boolean {
+  return DRAFT_MOVED_CODES.has(error.code);
+}
+
+function refetchMovedDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string, error: ApiError): void {
+  if (draftMovedUnderneath(error)) invalidateDraft(queryClient, projectId);
+}
+
+export function useApproveDraftMutation(projectId: string): UseMutationResult<DraftResponse, ApiError, ApprovedDraft> {
   const queryClient = useQueryClient();
-  return useMutation<DraftResponse, ApiError, number>({
-    mutationFn: n => APIRequest.post(`/projects/${projectId}/drafts/${n}/approve`).body({}).execute(),
+  return useMutation<DraftResponse, ApiError, ApprovedDraft>({
+    mutationFn: draft => {
+      const request = approveDraftRequest(projectId, draft);
+      return APIRequest.post(request.path).body(request.body).execute();
+    },
     onSuccess: () => invalidateDraft(queryClient, projectId),
+    onError: error => refetchMovedDraft(queryClient, projectId, error),
   });
 }
 
@@ -152,6 +174,7 @@ export function useJudgeDraftMutation(projectId: string, n: number): UseMutation
   return useMutation<JudgeResponse, ApiError, undefined>({
     mutationFn: () => APIRequest.post(`/projects/${projectId}/drafts/${n}/judge`).body({}).execute(),
     onSuccess: () => invalidateDraft(queryClient, projectId),
+    onError: error => refetchMovedDraft(queryClient, projectId, error),
   });
 }
 

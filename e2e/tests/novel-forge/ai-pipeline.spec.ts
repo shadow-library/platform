@@ -105,7 +105,9 @@ test.describe('novel-forge Haiku authoring pipeline', () => {
     expect(judge.status(), await judge.text()).toBe(200);
     expect((await judge.json()).verdict).toBeTruthy();
 
-    const approve = await aiPost(ctx, `/api/v1/projects/${projectId}/drafts/1/approve`, {});
+    const draft = await ctx.get(`/api/v1/projects/${projectId}/drafts/1`);
+    const { revision } = (await draft.json()) as { revision: number };
+    const approve = await aiPost(ctx, `/api/v1/projects/${projectId}/drafts/1/approve`, { revision });
     expect(approve.status()).toBe(200);
 
     const finalize = await aiPost(ctx, `/api/v1/projects/${projectId}/finalize`, { chapter: 1 });

@@ -59,6 +59,23 @@ describe('persistGeneratedDraft', () => {
     expect(setWhere.params).toEqual(['final']);
   });
 
+  it('should revoke the brief reveals an earlier approval of this chapter ledgered, once the new prose is written', async () => {
+    const run = setup([draftRow()], draftRow({ revision: 3 }));
+
+    await persistGeneratedDraft(run.db, INPUT);
+
+    const revoke = render(run.fake.writesTo(schema.characterKnowledge, 'delete')[0]?.where);
+    expect(revoke.sql).toBe('("character_knowledge"."project_id" = $1 and "character_knowledge"."source" = $2 and "character_knowledge"."learned_in_chapter" = $3)');
+    expect(revoke.params).toEqual([1n, 'brief', 4]);
+  });
+
+  it('should keep the ledger when the draft it would replace is final', async () => {
+    const run = setup([draftRow(), draftRow({ status: 'final' })]);
+
+    await expect(persistGeneratedDraft(run.db, INPUT)).rejects.toMatchObject({ code: 'DRF_002' });
+    expect(run.fake.writesTo(schema.characterKnowledge)).toEqual([]);
+  });
+
   it('should record the persisted revision against the run that wrote it', async () => {
     const run = setup([draftRow()], draftRow({ revision: 3 }));
 

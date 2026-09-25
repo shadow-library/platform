@@ -41,6 +41,7 @@ export interface ChapterFinalizationInput {
   projectId: bigint;
   chapter: number;
   draftId?: bigint;
+  draftRevision?: number;
   prose: string;
   summary: string;
   title?: string;
@@ -350,6 +351,7 @@ export class WorkflowRunService {
           projectId: String(input.projectId),
           chapter: input.chapter,
           draftId: input.draftId ? String(input.draftId) : null,
+          draftRevision: input.draftRevision ?? null,
           prose: input.prose,
           summary: input.summary,
           title: input.title ?? '',

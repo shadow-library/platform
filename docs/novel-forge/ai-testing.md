@@ -1332,15 +1332,21 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
   `POST /projects/:projectId/drafts/:n/approve`.
 - **Preconditions:** draft not `final` (`DRF_002`) and not stale (`DRF_007`). The UI disables the button while
   `review_status` is `contradiction` or `generating`.
-- **Input:** `{"idempotencyKey":"approve-ch1-attempt-1"}` (optional; `reviewerId` optional).
+- **Input:** `{"revision":2,"idempotencyKey":"approve-ch1-attempt-1"}` — `revision` (required) is the draft revision the
+  author read; `idempotencyKey` and `reviewerId` are optional.
 - **Run:** 1. Approve. 2. Re-POST with the _same_ `idempotencyKey`.
 - **Verify:** `drafts.review_status='approved'`; one `user_feedback` row `disposition='approved'` — the retry
   adds none (unique `idempotency_key`, `onConflictDoNothing`). **In the same transaction** the brief's
   `knowledgeContract.learns` become `character_knowledge` rows with `learned_in_chapter = n`, `source='brief'`
   (`bible/fact/knowledge-view.ts:176`); log `brief reveals ledgered`. Unknown entity/fact keys are skipped with
   the warn `brief reveals reference unknown keys — skipped` — check the **Story Bible**'s **All facts** tab for
-  the fact's knowledge list. No model call.
-- **Fails when:** `DRF_007` (regenerate first), `DRF_002`, `DRF_001`.
+  the fact's knowledge list. No model call. Then edit the draft (or revise, regenerate, judge it, or change an earlier
+  chapter): the `source='brief'` rows with `learned_in_chapter = n` are gone and the draft reads `needs_review`;
+  re-approving restores them. Finalizing keeps them. A pair another approved or final chapter's brief also declares is
+  re-ledgered at the earliest such chapter instead of disappearing.
+- **Fails when:** `DRF_013` when the draft is no longer at `revision` (no approval, audit or ledger row is written),
+  `DRF_007` (regenerate first), `DRF_002`, `DRF_001`. A chat approval card is bound to the revision current when it
+  was staged, so applying it after the prose changed fails the same way.
 
 #### Finalize + continuity write-back
 

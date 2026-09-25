@@ -1,20 +1,9 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
 
-import { isOpenCanon, revealTermPattern } from '@server/common';
-import { APP_NAME } from '@server/constants';
+import { isOpenCanon, type KnowledgeContract, parseKnowledgeContract, revealTermPattern } from '@server/common';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
-/** A brief's epistemic contract: who bounds the chapter, who learns what. */
-interface KnowledgeReveal {
-  entityKey: string;
-  factKey: string;
-}
-
-export interface KnowledgeContract {
-  pov: string[];
-  learns: KnowledgeReveal[];
-}
+export { type KnowledgeContract, parseKnowledgeContract } from '@server/common';
 
 /** The subset of a canon-fact row the pure view/scan functions need. */
 export interface FactLike {
@@ -40,9 +29,7 @@ export interface KnowledgeLeakIssue {
 }
 
 /** The narrow database surface the loaders need — satisfied by both the client and a transaction. */
-type KnowledgeDb = Pick<PrimaryDatabase, 'query' | 'insert'>;
-
-const logger = Logger.getLogger(APP_NAME, 'knowledge-view');
+type KnowledgeDb = Pick<PrimaryDatabase, 'query'>;
 
 // Terms shorter than this are too collision-prone to scan for.
 const MIN_TERM_LENGTH = 3;
@@ -58,21 +45,6 @@ function excerptAround(body: string, index: number, length: number): string {
   const start = Math.max(0, index - EXCERPT_RADIUS);
   const end = Math.min(body.length, index + length + EXCERPT_RADIUS);
   return `${start > 0 ? '…' : ''}${body.slice(start, end)}${end < body.length ? '…' : ''}`;
-}
-
-/** Parses a brief's stored `knowledgeContract`; null (feature off) unless it names at least one POV entity. */
-export function parseKnowledgeContract(raw: unknown): KnowledgeContract | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const contract = raw as { pov?: unknown; learns?: unknown };
-  const pov = Array.isArray(contract.pov) ? contract.pov.filter((key): key is string => typeof key === 'string' && key.length > 0) : [];
-  if (pov.length === 0) return null;
-  const learns = Array.isArray(contract.learns)
-    ? contract.learns.filter((entry): entry is KnowledgeReveal => {
-        const reveal = entry as Partial<KnowledgeReveal> | null;
-        return typeof reveal?.entityKey === 'string' && typeof reveal.factKey === 'string';
-      })
-    : [];
-  return { pov, learns };
 }
 
 /** Partitions the project's facts: ledgered before this chapter → known, contracted this chapter → reveals, everything else → hidden. */
@@ -311,40 +283,4 @@ export function scanKnowledgeLeaks(body: string, hidden: FactLike[]): KnowledgeL
     }
   }
   return issues;
-}
-
-/**
- * Applies a brief's `learns` declarations to the ledger at draft approval — the
- * deterministic alternative to AI extraction. Unknown entity/fact keys are logged and skipped:
- * approval is a human gate and a missed row is recoverable via the manual reveal endpoint.
- */
-export async function applyBriefReveals(db: KnowledgeDb, projectId: bigint, chapter: number): Promise<{ applied: number; skipped: string[] }> {
-  const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
-  const contract = parseKnowledgeContract(brief?.knowledgeContract);
-  if (!contract || contract.learns.length === 0) return { applied: 0, skipped: [] };
-
-  const factKeys = [...new Set(contract.learns.map(reveal => reveal.factKey))];
-  const entityKeys = [...new Set(contract.learns.map(reveal => reveal.entityKey))];
-  const [facts, entities] = await Promise.all([
-    db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)) }),
-    db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) }),
-  ]);
-  const factIdByKey = new Map(facts.map(fact => [fact.factKey, fact.id]));
-  const entityIdByKey = new Map(entities.map(entity => [entity.entityKey, entity.id]));
-
-  const skipped: string[] = [];
-  const rows: (typeof schema.characterKnowledge.$inferInsert)[] = [];
-  for (const reveal of contract.learns) {
-    const factId = factIdByKey.get(reveal.factKey);
-    const entityId = entityIdByKey.get(reveal.entityKey);
-    if (!factId || !entityId) {
-      skipped.push(`${reveal.entityKey}→${reveal.factKey}`);
-      continue;
-    }
-    rows.push({ projectId, factId, entityId, learnedInChapter: chapter, source: 'brief' });
-  }
-
-  if (rows.length > 0) await db.insert(schema.characterKnowledge).values(rows).onConflictDoNothing();
-  if (skipped.length > 0) logger.warn('brief reveals reference unknown keys — skipped', { projectId, chapter, skipped });
-  return { applied: rows.length, skipped };
 }

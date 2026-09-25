@@ -2,7 +2,8 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
-import { sanitizeMarkdown } from '@server/common';
+import { AppErrorCode } from '@server/classes';
+import { refusedDraftWriteError, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -31,6 +32,7 @@ const ChapterFinalizationAnnotation = Annotation.Root({
   chapter: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  draftRevision: Annotation<number | null>({ reducer: (_, n) => n, default: () => null }),
   prose: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
@@ -49,6 +51,84 @@ const logger = Logger.getLogger(APP_NAME, 'chapter-finalization.graph');
 // How long a continuity claim stays live before another run may steal it — long enough to outlast a slow
 // extraction, short enough that a worker killed mid-extraction does not brick the chapter until a human looks.
 const CONTINUITY_CLAIM_LEASE_MS = 5 * 60 * 1000;
+
+export interface CommitProseInput {
+  projectId: string;
+  chapter: number;
+  runId: string;
+  draftId: string | null;
+  draftRevision: number | null;
+  prose: string;
+  summary: string;
+  title: string;
+  generator: string;
+  isolated: boolean;
+}
+
+/**
+ * Writes the canonical chapter and marks its draft final in one transaction, bound to the draft revision finalize read and approved:
+ * a revise or edit landing in between refuses the commit, so the locked chapter never holds prose the final draft does not.
+ */
+export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseInput): Promise<void> {
+  const projectId = BigInt(state.projectId);
+  const content = sanitizeMarkdown(state.prose);
+  const title = sanitizeMarkdown(state.title) || null;
+  logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
+
+  await db.transaction(async tx => {
+    // `setWhere` makes a finalized chapter immutable at the write path — a locked row is never overwritten, only (re)inserted once.
+    await tx
+      .insert(schema.chapters)
+      .values({
+        projectId,
+        number: state.chapter,
+        title,
+        content,
+        summary: state.summary || null,
+        status: 'done',
+        generator: (state.generator as Project.ContentGenerator) || 'standard',
+        isolated: state.isolated,
+        wordCount: content.split(/\s+/).length,
+        locked: true,
+      })
+      .onConflictDoUpdate({
+        target: [schema.chapters.projectId, schema.chapters.number],
+        set: {
+          content: sql`EXCLUDED.content`,
+          summary: sql`EXCLUDED.summary`,
+          title: sql`EXCLUDED.title`,
+          status: sql`EXCLUDED.status`,
+          generator: sql`EXCLUDED.generator`,
+          isolated: sql`EXCLUDED.isolated`,
+          wordCount: sql`EXCLUDED.word_count`,
+          locked: true,
+          updatedAt: new Date(),
+        },
+        setWhere: ne(schema.chapters.locked, true),
+      });
+
+    if (!state.draftId) return;
+    if (state.draftRevision === null) throw AppError.internal(`[commitProse] Finalization of chapter ${state.chapter} carries no draft revision`);
+    const draftId = BigInt(state.draftId);
+    const [finalized] = await tx
+      .update(schema.drafts)
+      .set({ status: 'final', reviewStatus: 'final', updatedAt: new Date() })
+      .where(and(eq(schema.drafts.id, draftId), eq(schema.drafts.revision, state.draftRevision), eq(schema.drafts.reviewStatus, 'approved'), ne(schema.drafts.status, 'final')))
+      .returning({ id: schema.drafts.id });
+    if (finalized) return;
+
+    const current = await tx.query.drafts.findFirst({ columns: { status: true, revision: true }, where: eq(schema.drafts.id, draftId) });
+    if (current?.status === 'final' && current.revision === state.draftRevision) return;
+    logger.warn('finalization commitProse refused: the draft moved after finalize read it', {
+      runId: state.runId,
+      chapter: state.chapter,
+      readRevision: state.draftRevision,
+      currentRevision: current?.revision,
+    });
+    if (current && current.status !== 'final' && current.revision === state.draftRevision) throw AppErrorCode.DRF_004.create();
+    throw await refusedDraftWriteError(tx, projectId, state.chapter);
+  });
+}
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterFinalizationGraph(services: FinalizationServices) {
@@ -77,54 +157,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
   }
 
   async function commitProse(state: FinalizationState) {
-    const projectId = BigInt(state.projectId);
-    const content = sanitizeMarkdown(state.prose);
-    const title = sanitizeMarkdown(state.title) || null;
-    logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
-
-    // Commit the canonical chapter row and mark the draft final atomically: a crash must not leave a
-    // committed chapter with a non-final draft (or vice versa). Both happen or neither does.
-    await db.transaction(async tx => {
-      // Upsert chapter row (idempotent on projectId + number). `setWhere` makes a finalized chapter
-      // immutable at the write path — a locked row is never overwritten, only (re)inserted once.
-      await tx
-        .insert(schema.chapters)
-        .values({
-          projectId,
-          number: state.chapter,
-          title,
-          content,
-          summary: state.summary || null,
-          status: 'done',
-          generator: (state.generator as Project.ContentGenerator) || 'standard',
-          isolated: state.isolated,
-          wordCount: content.split(/\s+/).length,
-          locked: true,
-        })
-        .onConflictDoUpdate({
-          target: [schema.chapters.projectId, schema.chapters.number],
-          set: {
-            content: sql`EXCLUDED.content`,
-            summary: sql`EXCLUDED.summary`,
-            title: sql`EXCLUDED.title`,
-            status: sql`EXCLUDED.status`,
-            generator: sql`EXCLUDED.generator`,
-            isolated: sql`EXCLUDED.isolated`,
-            wordCount: sql`EXCLUDED.word_count`,
-            locked: true,
-            updatedAt: new Date(),
-          },
-          setWhere: ne(schema.chapters.locked, true),
-        });
-
-      if (state.draftId) {
-        await tx
-          .update(schema.drafts)
-          .set({ status: 'final', reviewStatus: 'final', updatedAt: new Date() })
-          .where(eq(schema.drafts.id, BigInt(state.draftId)));
-      }
-    });
-
+    await commitFinalProse(db, state);
     return { nodeTrace: ['commitProse'] };
   }
 

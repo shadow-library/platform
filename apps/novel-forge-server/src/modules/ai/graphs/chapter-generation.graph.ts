@@ -3,7 +3,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-import { markDescendantDraftsStale, refusedDraftWriteError } from '@server/common';
+import { markDescendantDraftsStale, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Generation, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -178,6 +178,7 @@ export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistD
     if (!row) throw await refusedDraftWriteError(tx, projectId, state.chapter);
     // Later drafts were written against whatever this chapter held before, so new prose here leaves them resting on text that no longer exists.
     await markDescendantDraftsStale(tx, projectId, state.chapter, `ancestor chapter ${state.chapter} was ${previous ? 'regenerated' : 'drafted'}`);
+    await revokeProvisionalReveals(tx, projectId, state.chapter);
 
     await tx
       .insert(schema.draftRevisions)
@@ -203,7 +204,7 @@ export async function setOpenDraftReview(db: Pick<PrimaryDatabase, 'update'>, dr
   await db
     .update(schema.drafts)
     .set({ ...review, updatedAt: new Date() })
-    .where(and(eq(schema.drafts.id, BigInt(draftId)), ne(schema.drafts.status, 'final')));
+    .where(and(eq(schema.drafts.id, BigInt(draftId)), ne(schema.drafts.status, 'final'), ne(schema.drafts.reviewStatus, 'approved')));
 }
 
 // `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so the `minWriterClass` guard runs against the lowest of the three classes.

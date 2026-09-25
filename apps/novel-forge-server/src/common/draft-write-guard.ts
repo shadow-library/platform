@@ -9,7 +9,7 @@ export type DraftReader = Pick<PrimaryDatabase, 'query'>;
 /** `stale_aware` answers a draft that went stale with DRF_007; `conflict` answers any change to a live draft with DRF_013. */
 export type DraftChangeReading = 'stale_aware' | 'conflict';
 
-export async function refusedDraftWriteError(db: DraftReader, projectId: bigint, chapter: number, reading: DraftChangeReading = 'stale_aware'): Promise<AppError> {
+export async function refusedDraftWriteError(db: DraftReader, projectId: bigint, chapter: number, reading: DraftChangeReading = 'conflict'): Promise<AppError> {
   const current = await db.query.drafts.findFirst({
     columns: { status: true, staleReason: true },
     where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)),
