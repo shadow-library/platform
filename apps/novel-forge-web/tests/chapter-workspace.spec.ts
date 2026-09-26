@@ -6,6 +6,7 @@ import {
   approveAsWrittenRefused,
   batchStopNotice,
   changedSinceApproval,
+  rowApprovedLabel,
   rowChangedSinceApproval,
   statusLabel,
   teachingGateRefusal,
@@ -94,15 +95,28 @@ describe('statusLabel', () => {
 });
 
 describe('rowChangedSinceApproval', () => {
-  it('should flag a row back in review after an approval', () => {
-    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', approvedRevision: 3 })).toBe(true);
+  it('should flag a row whose text moved past the approved revision', () => {
+    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', revision: 4, approvedRevision: 3 })).toBe(true);
   });
 
-  it('should leave approved, final, never-approved and planned rows alone', () => {
-    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'approved', approvedRevision: 3 })).toBe(false);
-    expect(rowChangedSinceApproval({ status: 'final', reviewStatus: 'final', approvedRevision: 3 })).toBe(false);
-    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', approvedRevision: null })).toBe(false);
+  it('should leave approved, final, unchanged, never-approved and planned rows alone', () => {
+    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'approved', revision: 3, approvedRevision: 3 })).toBe(false);
+    expect(rowChangedSinceApproval({ status: 'final', reviewStatus: 'final', revision: 4, approvedRevision: 3 })).toBe(false);
+    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', revision: 3, approvedRevision: 3 })).toBe(false);
+    expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', revision: 4, approvedRevision: null })).toBe(false);
     expect(rowChangedSinceApproval({})).toBe(false);
+  });
+});
+
+describe('rowApprovedLabel', () => {
+  it('should name the approved revision', () => {
+    expect(rowApprovedLabel({ status: 'draft', reviewStatus: 'approved', revision: 3, approvedRevision: 3 })).toBe('Approved · rev 3');
+  });
+
+  it('should say nothing for final, unapproved or planned rows', () => {
+    expect(rowApprovedLabel({ status: 'final', reviewStatus: 'final', revision: 3, approvedRevision: 3 })).toBeUndefined();
+    expect(rowApprovedLabel({ status: 'draft', reviewStatus: 'needs_review', revision: 2, approvedRevision: null })).toBeUndefined();
+    expect(rowApprovedLabel({})).toBeUndefined();
   });
 });
 

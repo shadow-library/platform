@@ -79,7 +79,14 @@ export function batchStopNotice(job: Pick<JobEnqueueResponse, 'stoppedAtExternal
   return undefined;
 }
 
-/** Rows carry no revision; a new revision is what puts an approved draft back to needs-review, so that plus an approval on record means it changed since. */
-export function rowChangedSinceApproval(row: Pick<ChapterRowResponse, 'status' | 'reviewStatus' | 'approvedRevision'>): boolean {
-  return row.status !== 'final' && row.reviewStatus === 'needs_review' && row.approvedRevision != null;
+type RowApproval = Pick<ChapterRowResponse, 'status' | 'reviewStatus' | 'revision' | 'approvedRevision'>;
+
+export function rowChangedSinceApproval(row: RowApproval): boolean {
+  if (row.status === 'final' || row.reviewStatus === 'approved' || row.approvedRevision == null || row.revision == null) return false;
+  return row.approvedRevision < row.revision;
+}
+
+export function rowApprovedLabel(row: RowApproval): string | undefined {
+  if (row.status === 'final' || row.reviewStatus !== 'approved' || row.approvedRevision == null) return undefined;
+  return `Approved · rev ${row.approvedRevision}`;
 }

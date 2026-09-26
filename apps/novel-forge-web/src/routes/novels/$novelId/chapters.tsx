@@ -72,6 +72,7 @@ import {
   useBriefQuery,
   useChapterImagesQuery,
   useChapterReviewsQuery,
+  useChapterRowMatches,
   useChapterRowsQuery,
   useDeleteChapterImageMutation,
   useDeleteDraftMutation,
@@ -82,8 +83,8 @@ import {
   useGenerateUnrestrictedMutation,
   useImportDraftMutation,
   useInsertChapterMutation,
-  useListChaptersQuery,
   useListEntitiesQuery,
+  useListPromisesQuery,
   useListVolumesQuery,
   useRunReviewMutation,
   useSaveSummaryMutation,
@@ -121,6 +122,7 @@ import {
   approveAsWrittenRefused,
   batchStopNotice,
   changedSinceApproval,
+  rowApprovedLabel,
   rowChangedSinceApproval,
   statusLabel,
   teachingGateRefusal,
@@ -142,6 +144,8 @@ interface ChapterListView {
   show?: ChapterShow;
   /** Entity key of the point-of-view character to filter by. */
   pov?: string;
+  /** Key of the plot thread to filter by. */
+  thread?: string;
   /** Prose search; while set, search hits replace the volume groups. */
   q?: string;
   /** Page of the search hits. */
@@ -166,6 +170,7 @@ export const Route = createFileRoute('/novels/$novelId/chapters')({
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
       show: isChapterShow(search.show) && search.show !== 'all' ? search.show : undefined,
       pov: typeof search.pov === 'string' && search.pov ? search.pov : undefined,
+      thread: typeof search.thread === 'string' && search.thread ? search.thread : undefined,
       q: q || undefined,
       page: Number.isInteger(page) && page > 1 ? page : undefined,
       pages: parseGroupPages(search.pages),
@@ -509,18 +514,18 @@ interface GroupRowsProps {
   allChapters: readonly number[];
   pageChapters: readonly number[];
   show: ChapterShow;
-  povChapters?: ReadonlySet<number>;
+  matches?: ReadonlySet<number>;
   renderRow: (row: ChapterRowResponse) => React.JSX.Element;
 }
 
-function GroupRows({ novelId, label, allChapters, pageChapters, show, povChapters, renderRow }: GroupRowsProps): React.JSX.Element {
+function GroupRows({ novelId, label, allChapters, pageChapters, show, matches, renderRow }: GroupRowsProps): React.JSX.Element {
   const pageRows = rowsWindow(allChapters, pageChapters);
   const rowsQuery = useChapterRowsQuery(novelId, { filter: 'all', ...(pageRows ?? { offset: 0, limit: 1 }) }, Boolean(pageRows));
   if (rowsQuery.isLoading) return <PaneLoader />;
   if (rowsQuery.error) return <PaneError error={rowsQuery.error} />;
 
   const onPage = new Set(pageChapters);
-  const rows = (rowsQuery.data?.items ?? []).filter(row => (rowsQuery.isPlaceholderData || onPage.has(row.chapter)) && rowVisible(row, show, povChapters));
+  const rows = (rowsQuery.data?.items ?? []).filter(row => (rowsQuery.isPlaceholderData || onPage.has(row.chapter)) && rowVisible(row, show, matches));
   if (rows.length === 0) return <VolumeNote>No chapters on this page match the filters.</VolumeNote>;
   return (
     <ul className={`${styles.listBody} ${styles.listBodyNested}`} aria-label={label} aria-busy={rowsQuery.isPlaceholderData || undefined}>
@@ -533,13 +538,14 @@ interface ChapterSearchResultsProps {
   novelId: string;
   query: string;
   pov?: string;
+  thread?: string;
   page: number;
   onPage: (page: number) => void;
   onOpen: (chapter: number) => void;
 }
 
-function ChapterSearchResults({ novelId, query, pov, page, onPage, onOpen }: ChapterSearchResultsProps): React.JSX.Element {
-  const searchQuery = useSearchChaptersQuery(novelId, { q: query, pov, limit: CHAPTER_PAGE_SIZE, offset: (page - 1) * CHAPTER_PAGE_SIZE });
+function ChapterSearchResults({ novelId, query, pov, thread, page, onPage, onOpen }: ChapterSearchResultsProps): React.JSX.Element {
+  const searchQuery = useSearchChaptersQuery(novelId, { q: query, pov, thread, limit: CHAPTER_PAGE_SIZE, offset: (page - 1) * CHAPTER_PAGE_SIZE });
   const hits = searchQuery.data?.items ?? [];
   const total = searchQuery.data?.total ?? 0;
   return (
@@ -595,11 +601,12 @@ interface ChapterListProps {
 }
 
 function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React.JSX.Element {
-  const { show = 'all', pov, q, page = 1, pages } = view;
+  const { show = 'all', pov, thread, q, page = 1, pages } = view;
   const summaryQuery = useChapterRowsQuery(novelId, SUMMARY_ROWS);
   const volumesQuery = useListVolumesQuery(novelId);
   const charactersQuery = useListEntitiesQuery(novelId, { type: 'character', limit: 500 });
-  const povQuery = useListChaptersQuery(novelId, { pov, limit: 500 }, Boolean(pov));
+  const threadsQuery = useListPromisesQuery(novelId, { kind: 'thread', limit: 100 });
+  const matches = useChapterRowMatches(novelId, { pov, thread });
   const generate = useGenerateMutation(novelId);
   const { activity, stop, stopping } = useGenerationActivity(novelId);
   const data = summaryQuery.data;
@@ -608,7 +615,7 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
   const volumes = useMemo(() => volumesQuery.data?.items ?? [], [volumesQuery.data?.items]);
   const groups = useMemo(() => groupChaptersByVolume(volumes, chapters), [volumes, chapters]);
   const povOptions = useMemo(() => (charactersQuery.data?.items ?? []).map(entity => ({ key: entity.entityKey, name: entity.name })), [charactersQuery.data?.items]);
-  const povChapters = useMemo(() => (pov && povQuery.data ? new Set(povQuery.data.items.map(chapter => chapter.number)) : undefined), [pov, povQuery.data]);
+  const threadOptions = useMemo(() => (threadsQuery.data?.items ?? []).map(promise => ({ key: promise.key, name: promise.label })), [threadsQuery.data?.items]);
   const nextBriefChapter = data?.nextBriefChapter ?? undefined;
   const nextManualChapter = data?.nextWritableChapter ?? 1;
   const contradiction = data?.contradiction ?? undefined;
@@ -651,7 +658,7 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
     }
     setHighlight({ chapter: target.chapter, focus: announce });
     setOpenGroups(previous => ({ ...previous, [target.groupKey]: true }));
-    const reset: ChapterListView = announce ? { q: undefined, page: undefined, show: undefined, pov: undefined } : {};
+    const reset: ChapterListView = announce ? { q: undefined, page: undefined, show: undefined, pov: undefined, thread: undefined } : {};
     onView({ ...reset, pages: { ...pages, [target.groupKey]: target.page } });
   };
 
@@ -830,7 +837,7 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
                 <GenerationStatus generation={generation} label="Rewriting" />
               ) : (
                 <StatusChip intent={changed ? 'warning' : meta.intent} dot>
-                  {changed ? 'Changed since approved' : meta.label}
+                  {changed ? 'Changed since approved' : (rowApprovedLabel(row) ?? meta.label)}
                 </StatusChip>
               )}
             </span>
@@ -874,6 +881,10 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
       >
         {group.chapters.length === 0 ? (
           <VolumeNote>{emptyVolumeNote(group, groups)}</VolumeNote>
+        ) : matches.error ? (
+          <PaneError error={matches.error} />
+        ) : matches.isLoading ? (
+          <PaneLoader />
         ) : (
           <GroupRows
             novelId={novelId}
@@ -881,16 +892,13 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
             allChapters={chapters}
             pageChapters={chaptersOnPage(group, groupPage)}
             show={show}
-            povChapters={povChapters}
+            matches={matches.chapters}
             renderRow={renderRow}
           />
         )}
       </VolumeSection>
     );
   };
-
-  const povNote = pov ? 'Point of view matches final chapters only — drafts and planned chapters are hidden while it’s set.' : undefined;
-  const status = jumpMessage ?? povNote;
 
   return (
     <div className={`nf-scroll ${styles.screenScroll}`}>
@@ -987,14 +995,17 @@ function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React
           povOptions={povOptions}
           pov={pov}
           onPov={next => onView({ pov: next })}
+          threadOptions={threadOptions}
+          thread={thread}
+          onThread={next => onView({ thread: next })}
           query={q}
           onSearch={next => onView({ q: next, page: undefined })}
           onJump={text => jump(text)}
         />
-        {status && <ChapterToolbarStatus>{status}</ChapterToolbarStatus>}
+        {jumpMessage && <ChapterToolbarStatus>{jumpMessage}</ChapterToolbarStatus>}
 
         {q ? (
-          <ChapterSearchResults novelId={novelId} query={q} pov={pov} page={page} onPage={next => onView({ page: next })} onOpen={onOpen} />
+          <ChapterSearchResults novelId={novelId} query={q} pov={pov} thread={thread} page={page} onPage={next => onView({ page: next })} onOpen={onOpen} />
         ) : (
           <QueryState
             isLoading={summaryQuery.isLoading || volumesQuery.isLoading}

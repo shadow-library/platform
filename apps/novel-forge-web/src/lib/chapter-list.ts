@@ -62,15 +62,15 @@ interface ShowableRow {
   status?: DraftStatus;
 }
 
-/** `povChapters` comes from `/source/chapters?pov=`, which only knows finalized chapters — a draft or planned row never matches it. */
-export function rowVisible(row: ShowableRow, show: ChapterShow, povChapters?: ReadonlySet<number>): boolean {
-  if (povChapters && !povChapters.has(row.chapter)) return false;
+/** `matches` is the set a point-of-view or thread filter keeps; absent while neither is set. */
+export function rowVisible(row: ShowableRow, show: ChapterShow, matches?: ReadonlySet<number>): boolean {
+  if (matches && !matches.has(row.chapter)) return false;
   if (show === 'all') return true;
   const final = row.kind === 'written' && row.status === 'final';
   return show === 'final' ? final : !final;
 }
 
-export type ChapterVolume = Pick<VolumeResponse, 'volumeKey' | 'ordinal' | 'title' | 'objective' | 'state' | 'firstChapter' | 'lastChapter' | 'wordCount'>;
+export type ChapterVolume = Pick<VolumeResponse, 'volumeKey' | 'ordinal' | 'title' | 'objective' | 'state' | 'planFirstChapter' | 'planLastChapter' | 'wordCount'>;
 
 export interface ChapterGroup {
   key: string;
@@ -83,12 +83,12 @@ export interface ChapterGroup {
 export const UNGROUPED_KEY = 'all';
 
 function rangeOf(group: ChapterGroup): { first: number; last: number } {
-  return { first: group.volume?.firstChapter ?? 0, last: group.volume?.lastChapter ?? 0 };
+  return { first: group.volume?.planFirstChapter ?? 0, last: group.volume?.planLastChapter ?? 0 };
 }
 
 /**
- * A volume only knows its finalized chapters, so drafts and planned chapters past every volume's range join the volume being written:
- * the active one, else the last one with chapters, else the first. A chapter in a gap between ranges stays with the volume before it.
+ * A volume's plan range covers every chapter it claims, drafted or only briefed. A chapter no volume claims joins the volume being
+ * written when it lies past every range — the active one, else the last with chapters, else the first — or the volume before its gap.
  */
 export function groupChaptersByVolume(volumes: readonly ChapterVolume[], chapters: readonly number[]): ChapterGroup[] {
   const sorted = [...chapters].sort((a, b) => a - b);
@@ -96,7 +96,7 @@ export function groupChaptersByVolume(volumes: readonly ChapterVolume[], chapter
   const [firstGroup] = groups;
   if (!firstGroup) return [{ key: UNGROUPED_KEY, chapters: sorted }];
 
-  const ranged = groups.filter(group => group.volume?.firstChapter != null);
+  const ranged = groups.filter(group => group.volume?.planFirstChapter != null);
   const highest = Math.max(0, ...ranged.map(group => rangeOf(group).last));
   const writing = groups.find(group => group.volume?.state === 'active') ?? ranged.at(-1) ?? firstGroup;
 

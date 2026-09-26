@@ -1,4 +1,14 @@
-import { keepPreviousData, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  type UseMutationResult,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import {
   type ApproveDraftBody,
@@ -53,6 +63,40 @@ export const chapterRowsQueryOptions = (projectId: string, params: ListChapterRo
 
 export function useChapterRowsQuery(projectId: string, params: ListChapterRowsQueryParams, enabled = true): UseQueryResult<ListChapterRowsResponse, ApiError> {
   return useQuery({ ...chapterRowsQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
+}
+
+const ROW_MATCH_PAGE = 100;
+
+export interface ChapterRowFilterParams {
+  pov?: string;
+  thread?: string;
+}
+
+export interface ChapterRowMatches {
+  /** Chapter numbers matching the filter; undefined while no filter is set or the matches are still loading. */
+  chapters?: ReadonlySet<number>;
+  isLoading: boolean;
+  error: ApiError | null;
+}
+
+/** Every chapter a point-of-view or thread filter keeps, gathered across `/chapter-rows` pages of the request maximum. */
+export function useChapterRowMatches(projectId: string, filter: ChapterRowFilterParams): ChapterRowMatches {
+  const active = Boolean(projectId) && Boolean(filter.pov || filter.thread);
+  const pageParams = (offset: number): ListChapterRowsQueryParams => ({ filter: 'all', pov: filter.pov, thread: filter.thread, limit: ROW_MATCH_PAGE, offset });
+  const first = useQuery({ ...chapterRowsQueryOptions(projectId, pageParams(0)), placeholderData: undefined, enabled: active });
+  const extraPages = Math.max(0, Math.ceil((first.data?.total ?? 0) / ROW_MATCH_PAGE) - 1);
+  const rest = useQueries({
+    queries: Array.from({ length: extraPages }, (_, index) => ({
+      ...chapterRowsQueryOptions(projectId, pageParams((index + 1) * ROW_MATCH_PAGE)),
+      placeholderData: undefined,
+      enabled: active,
+    })),
+  });
+  if (!active) return { isLoading: false, error: null };
+  const pages = [first, ...rest];
+  const error = pages.find(page => page.error)?.error ?? null;
+  if (pages.some(page => !page.data)) return { isLoading: !error, error };
+  return { chapters: new Set(pages.flatMap(page => page.data?.items.map(row => row.chapter) ?? [])), isLoading: false, error };
 }
 
 export function useDraftSummaryQuery(projectId: string, enabled = true): UseQueryResult<DraftSummaryResponse, ApiError> {

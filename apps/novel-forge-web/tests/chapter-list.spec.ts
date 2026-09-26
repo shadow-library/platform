@@ -34,15 +34,15 @@ import {
 } from '../src/lib/chapter-list';
 
 function volume(overrides: Partial<ChapterVolume> & Pick<ChapterVolume, 'volumeKey' | 'ordinal'>): ChapterVolume {
-  return { title: null, objective: null, state: 'not_started', firstChapter: null, lastChapter: null, wordCount: 0, ...overrides };
+  return { title: null, objective: null, state: 'not_started', planFirstChapter: null, planLastChapter: null, wordCount: 0, ...overrides };
 }
 
 const range = (from: number, to: number): number[] => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 const TIDE: ChapterVolume[] = [
   volume({ volumeKey: 'v3', ordinal: 3, title: 'A new bargain' }),
-  volume({ volumeKey: 'v1', ordinal: 1, title: 'The sea refuses', state: 'goal_met', firstChapter: 1, lastChapter: 38, wordCount: 118200 }),
-  volume({ volumeKey: 'v2', ordinal: 2, title: 'The payment', state: 'active', firstChapter: 39, lastChapter: 83, wordCount: 153200 }),
+  volume({ volumeKey: 'v1', ordinal: 1, title: 'The sea refuses', state: 'goal_met', planFirstChapter: 1, planLastChapter: 38, wordCount: 118200 }),
+  volume({ volumeKey: 'v2', ordinal: 2, title: 'The payment', state: 'active', planFirstChapter: 39, planLastChapter: 86, wordCount: 153200 }),
 ];
 
 describe('groupChaptersByVolume', () => {
@@ -55,11 +55,15 @@ describe('groupChaptersByVolume', () => {
     ]);
   });
 
-  it('should put drafts past every range in the active volume', () => {
+  it('should place every chapter by its volume’s plan range, drafts and briefs included', () => {
     const [first, second, third] = groupChaptersByVolume(TIDE, range(1, 86));
     expect(first?.chapters).toEqual(range(1, 38));
     expect(second?.chapters).toEqual(range(39, 86));
     expect(third?.chapters).toEqual([]);
+  });
+
+  it('should put a chapter no volume claims past every range in the active volume', () => {
+    expect(groupChaptersByVolume(TIDE, range(1, 88))[1]?.chapters.slice(-2)).toEqual([87, 88]);
   });
 
   it('should fall back to the last volume with chapters when none is active', () => {
@@ -67,15 +71,15 @@ describe('groupChaptersByVolume', () => {
     expect(groupChaptersByVolume(volumes, range(1, 90))[1]?.chapters.at(-1)).toBe(90);
   });
 
-  it('should give every chapter to the active volume before any is finalized', () => {
+  it('should give every unclaimed chapter to the active volume when no volume has a range', () => {
     const volumes = [volume({ volumeKey: 'a', ordinal: 0, state: 'active' }), volume({ volumeKey: 'b', ordinal: 1 })];
     expect(groupChaptersByVolume(volumes, [1, 2, 3]).map(group => group.chapters)).toEqual([[1, 2, 3], []]);
   });
 
   it('should keep a chapter in a gap between ranges with the volume before it', () => {
     const volumes = [
-      volume({ volumeKey: 'a', ordinal: 1, state: 'goal_met', firstChapter: 1, lastChapter: 10 }),
-      volume({ volumeKey: 'b', ordinal: 2, state: 'active', firstChapter: 13, lastChapter: 20 }),
+      volume({ volumeKey: 'a', ordinal: 1, state: 'goal_met', planFirstChapter: 1, planLastChapter: 10 }),
+      volume({ volumeKey: 'b', ordinal: 2, state: 'active', planFirstChapter: 13, planLastChapter: 20 }),
     ];
     expect(groupChaptersByVolume(volumes, range(1, 20))[0]?.chapters).toEqual(range(1, 12));
   });

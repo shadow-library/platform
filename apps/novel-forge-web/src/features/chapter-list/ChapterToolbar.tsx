@@ -6,22 +6,54 @@ import { type ChapterShow } from '@/lib/chapter-list';
 
 import styles from './ChapterToolbar.module.css';
 
-const ANYONE = 'all';
+// Radix Select refuses an empty value, so "no filter" needs a value no entity or thread key can take.
+const UNFILTERED = '*';
 
 const SHOW_LABEL: Record<ChapterShow, string> = { all: 'All', not_final: 'Not final', final: 'Final' };
 
-export interface PovOption {
+export interface FilterOption {
   key: string;
   name: string;
+}
+
+interface FilterSelectProps {
+  label: string;
+  anyLabel: string;
+  options: readonly FilterOption[];
+  value?: string;
+  onChange: (value: string | undefined) => void;
+}
+
+function FilterSelect({ label, anyLabel, options, value, onChange }: FilterSelectProps): React.JSX.Element | null {
+  const id = useId();
+  if (options.length === 0) return null;
+  return (
+    <span className={styles.field}>
+      <label htmlFor={id} className={styles.label}>
+        {label}
+      </label>
+      <Select triggerId={id} className={styles.select} value={value ?? UNFILTERED} onValueChange={next => onChange(next === UNFILTERED ? undefined : next)}>
+        <Select.Item value={UNFILTERED}>{anyLabel}</Select.Item>
+        {options.map(option => (
+          <Select.Item key={option.key} value={option.key}>
+            {option.name}
+          </Select.Item>
+        ))}
+      </Select>
+    </span>
+  );
 }
 
 export interface ChapterToolbarProps {
   show: ChapterShow;
   counts: Record<ChapterShow, number>;
   onShow: (show: ChapterShow) => void;
-  povOptions: readonly PovOption[];
+  povOptions: readonly FilterOption[];
   pov?: string;
   onPov: (pov: string | undefined) => void;
+  threadOptions: readonly FilterOption[];
+  thread?: string;
+  onThread: (thread: string | undefined) => void;
   query?: string;
   onSearch: (query: string | undefined) => void;
   onJump: (text: string) => void;
@@ -35,8 +67,8 @@ export function ChapterToolbarStatus({ children }: { children: React.ReactNode }
   );
 }
 
-export function ChapterToolbar({ show, counts, onShow, povOptions, pov, onPov, query, onSearch, onJump }: ChapterToolbarProps): React.JSX.Element {
-  const povId = useId();
+export function ChapterToolbar(props: ChapterToolbarProps): React.JSX.Element {
+  const { show, counts, onShow, povOptions, pov, onPov, threadOptions, thread, onThread, query, onSearch, onJump } = props;
   const searchId = useId();
   const jumpId = useId();
   const [searchText, setSearchText] = useState(query ?? '');
@@ -72,21 +104,8 @@ export function ChapterToolbar({ show, counts, onShow, povOptions, pov, onPov, q
           </SegmentedControl.Item>
         ))}
       </SegmentedControl>
-      {povOptions.length > 0 && (
-        <span className={styles.field}>
-          <label htmlFor={povId} className={styles.label}>
-            Point of view
-          </label>
-          <Select triggerId={povId} className={styles.select} value={pov ?? ANYONE} onValueChange={value => onPov(value === ANYONE ? undefined : value)}>
-            <Select.Item value={ANYONE}>Everyone</Select.Item>
-            {povOptions.map(option => (
-              <Select.Item key={option.key} value={option.key}>
-                {option.name}
-              </Select.Item>
-            ))}
-          </Select>
-        </span>
-      )}
+      <FilterSelect label="Point of view" anyLabel="Everyone" options={povOptions} value={pov} onChange={onPov} />
+      <FilterSelect label="Thread" anyLabel="Any" options={threadOptions} value={thread} onChange={onThread} />
       <form role="search" className={styles.search} onSubmit={submitSearch}>
         <label className="sr-only" htmlFor={searchId}>
           Search chapter text
