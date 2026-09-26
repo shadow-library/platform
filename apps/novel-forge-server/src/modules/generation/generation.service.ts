@@ -12,9 +12,12 @@ import {
   ledgerBriefReveals,
   markDescendantDraftsStale,
   nearestVolumeKey,
+  normalizeBriefScenes,
+  normalizeStringList,
   refusedDraftWriteError,
   revokeProvisionalReveals,
   selectGenerationBatch,
+  validateBriefScenes,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
@@ -230,6 +233,8 @@ export class GenerationService {
   }
 
   async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
+    const sceneErrors = body.scenes ? validateBriefScenes(body.scenes) : [];
+    if (sceneErrors.length > 0) throw AppErrorCode.BRF_004.create({ reason: sceneErrors.join('; ') });
     const edits: Partial<typeof schema.briefs.$inferInsert> = { body: body.body, densityRisk: null };
     const title = body.title?.trim();
     if (title) edits.title = title;
@@ -238,6 +243,11 @@ export class GenerationService {
     if (body.chapterPurpose !== undefined) edits.chapterPurpose = body.chapterPurpose.trim() || null;
     if (body.pov !== undefined) edits.pov = body.pov.trim() || null;
     if (body.guidance !== undefined) edits.guidance = body.guidance.trim() || null;
+    if (body.direction !== undefined) edits.direction = body.direction?.trim() || null;
+    if (body.contentMode !== undefined) edits.contentMode = body.contentMode;
+    if (body.scenes !== undefined) edits.scenes = body.scenes && normalizeBriefScenes(body.scenes);
+    if (body.claimedMilestones !== undefined) edits.claimedMilestones = body.claimedMilestones && normalizeStringList(body.claimedMilestones);
+    if (body.isEnding !== undefined) edits.isEnding = body.isEnding;
 
     const result = await this.db.transaction(async tx => {
       const [existing] = await tx

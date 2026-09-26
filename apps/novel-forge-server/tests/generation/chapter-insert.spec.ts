@@ -21,10 +21,11 @@ function chain(result: unknown, onSet?: (values: unknown) => void): Chain {
   }) as unknown as Chain;
 }
 
-function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Record<string, unknown>[] = []) {
+function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Record<string, unknown>[] = [], facts: { id: bigint; unlock: unknown }[] = []) {
   const briefs = planned.map(brief => ({ projectId: 1n, ...brief }));
   const ledgerUpdates: unknown[] = [];
   const updatedTables: unknown[] = [];
+  const updates: { table: unknown; values: Record<string, unknown> }[] = [];
   const insertedBriefs: Record<string, unknown>[] = [];
   const none = { findFirst: async () => undefined, findMany: async () => [] };
   const db = {
@@ -38,10 +39,13 @@ function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Re
       jobs: none,
       volumes: none,
     },
-    select: () => ({ from: (table: unknown) => chain(table === schema.decisionLedgerEntries ? ledger : []) }),
+    select: () => ({ from: (table: unknown) => chain(table === schema.decisionLedgerEntries ? ledger : table === schema.canonFacts ? facts : []) }),
     update: (table: unknown) => {
       updatedTables.push(table);
-      return chain([], table === schema.decisionLedgerEntries ? values => ledgerUpdates.push(values) : undefined);
+      return chain([], values => {
+        updates.push({ table, values: values as Record<string, unknown> });
+        if (table === schema.decisionLedgerEntries) ledgerUpdates.push(values);
+      });
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
@@ -52,7 +56,8 @@ function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Re
     delete: () => chain([]),
     transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
   };
-  return { databaseService: { getPostgresClient: () => db }, ledgerUpdates, updatedTables, insertedBriefs };
+  const shiftedFields = (table: unknown): string[] => [...new Set(updates.filter(update => update.table === table).flatMap(update => Object.keys(update.values)))];
+  return { databaseService: { getPostgresClient: () => db }, ledgerUpdates, updatedTables, insertedBriefs, updates, shiftedFields };
 }
 
 describe('ChapterInsertService.insertAfter', () => {
@@ -63,6 +68,32 @@ describe('ChapterInsertService.insertAfter', () => {
     await service.insertAfter(1n, 0, { briefOrigin: 'hand', briefBody: 'Ada meets the clerk.' });
 
     expect(ledgerUpdates).toEqual([{ links: { volumeKeys: ['vol_1'], briefChapters: [2, 3] } }]);
+  });
+
+  it('should shift the planned chapter of facts and milestones, and never a disclosed or reached chapter', async () => {
+    const { databaseService, shiftedFields } = fakeDatabase([], [{ chapter: 3, body: 'The toll doubles.', volumeKey: null }]);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+
+    await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
+
+    expect(shiftedFields(schema.canonFacts)).toEqual(expect.arrayContaining(['revealChapter', 'plannedChapter']));
+    expect(shiftedFields(schema.canonFacts)).not.toContain('disclosedInChapter');
+    expect(shiftedFields(schema.milestones)).toContain('plannedChapter');
+    expect(shiftedFields(schema.milestones)).not.toContain('reachedChapter');
+  });
+
+  it('should shift only the chapter terms above the insert point inside a fact unlock condition', async () => {
+    const facts = [
+      { id: 5n, unlock: { all: [{ milestone: 'ada_reads_ledger' }, { chapter: 4 }, { chapter: 2 }] } },
+      { id: 6n, unlock: { all: [{ chapter: 1 }, { ending: true }] } },
+    ];
+    const { databaseService, updates } = fakeDatabase([], [{ chapter: 3, body: 'The toll doubles.', volumeKey: null }], facts);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+
+    await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
+
+    const unlockWrites = updates.filter(update => update.table === schema.canonFacts && 'unlock' in update.values).map(update => update.values['unlock']);
+    expect(unlockWrites).toEqual([{ all: [{ milestone: 'ada_reads_ledger' }, { chapter: 5 }, { chapter: 2 }] }]);
   });
 
   it('should put the new chapter in the volume of the chapter it follows, and never touch a volume row', async () => {

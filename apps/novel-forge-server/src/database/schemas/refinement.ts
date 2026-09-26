@@ -2,7 +2,7 @@ import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
-import { projects } from './projects';
+import { contentMode, costTier, projects } from './projects';
 
 export namespace Refinement {
   export type ChatSession = InferSelectModel<typeof chatSessions>;
@@ -19,7 +19,7 @@ export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_docume
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);
 export const chatMessageRole = pgEnum('chat_message_role', ['user', 'assistant']);
 export const chatMode = pgEnum('chat_mode', ['manual', 'auto']);
-export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'chapter_extract', 'plugin']);
+export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'chapter_extract', 'plugin', 'chapter_plan', 'organise']);
 export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted']);
 
 export const chatSessions = pgTable(
@@ -40,6 +40,8 @@ export const chatSessions = pgTable(
     // provider/model without changing the project defaults; new sessions inherit the default.
     modelProvider: varchar('model_provider'),
     modelId: varchar('model_id'),
+    contentMode: contentMode('content_mode'),
+    costTier: costTier('cost_tier'),
     summary: text('summary'),
     summaryThroughOrdinal: integer('summary_through_ordinal').notNull().default(0),
     lastTurnAt: timestamp('last_turn_at'),
@@ -71,9 +73,11 @@ export const chatMessages = pgTable(
     modelProvider: varchar('model_provider'),
     modelId: varchar('model_id'),
     tokens: integer('tokens'),
+    appliedProposalId: bigint('applied_proposal_id', { mode: 'bigint' }).references(() => refinementProposals.id, { onDelete: 'set null' }),
+    suggestions: jsonb('suggestions').$type<string[]>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal)],
+  t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal), index('chat_messages_applied_proposal_id_idx').on(t.appliedProposalId)],
 );
 
 export const refinementProposals = pgTable(

@@ -5,7 +5,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { markDescendantDraftsStale, nearestVolumeKey, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
+import { markDescendantDraftsStale, nearestVolumeKey, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences, shiftFactUnlocks } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type PrimaryDatabase, schema } from '@server/database';
 
@@ -63,9 +63,12 @@ interface ShiftTarget {
  * - `chapter_publications.chapter`, `.published_ordinal` — frozen historical pointers; moving one moves a reader's URL.
  * - `projects.story_current_chapter` — a cursor over finalized prose, never above the frontier.
  * - `chapter_chunks.chapter`, `validation_reports.chapter` — written only from `done` chapters.
+ * - `canon_facts.disclosed_in_chapter`, `milestones.reached_chapter` — set only when their chapter is finalized, and insert is refused behind
+ *   the finalized frontier, so neither can hold a number above the insert point.
  * - every `ordinal` and `*_count` column — positions and counts, not chapter numbers.
  *
- * `decision_ledger_entries.links.briefChapters` is jsonb, not a column, and is shifted by `shiftLedgerBriefLinks` in the same transaction.
+ * `decision_ledger_entries.links.briefChapters` and the `{chapter: N}` terms of `canon_facts.unlock` are jsonb, not columns, and are shifted by
+ * `shiftLedgerBriefLinks` and `shiftFactUnlocks` in the same transaction.
  */
 const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.briefs, projectId: schema.briefs.projectId, column: schema.briefs.chapter, field: 'chapter', updatedAt: 'updatedAt' },
@@ -86,6 +89,8 @@ const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.firstChapter, field: 'firstChapter' },
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.lastChapter, field: 'lastChapter' },
   { table: schema.canonFacts, projectId: schema.canonFacts.projectId, column: schema.canonFacts.revealChapter, field: 'revealChapter', updatedAt: 'updatedAt' },
+  { table: schema.canonFacts, projectId: schema.canonFacts.projectId, column: schema.canonFacts.plannedChapter, field: 'plannedChapter' },
+  { table: schema.milestones, projectId: schema.milestones.projectId, column: schema.milestones.plannedChapter, field: 'plannedChapter', updatedAt: 'updatedAt' },
   { table: schema.characterKnowledge, projectId: schema.characterKnowledge.projectId, column: schema.characterKnowledge.learnedInChapter, field: 'learnedInChapter' },
   {
     table: schema.characterStates,
@@ -160,6 +165,7 @@ export class ChapterInsertService {
       for (const target of SHIFT_TARGETS) await this.parkAbove(tx, projectId, afterChapter, target);
       for (const target of SHIFT_TARGETS) await this.landParked(tx, projectId, target);
       await shiftLedgerBriefLinks(tx, projectId, afterChapter);
+      await shiftFactUnlocks(tx, projectId, afterChapter);
 
       for (const brief of shifted) await this.rewriteShiftedBrief(tx, projectId, afterChapter, brief);
 

@@ -1,4 +1,5 @@
-import { type Bible, type Generation } from '@server/database';
+import { validateBriefScenes, validateUnlockCondition } from '@server/common';
+import { type Bible, type BriefScene, type Generation, type Plan, type Project, type UnlockCondition } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
@@ -40,6 +41,7 @@ export interface VolumeUpsertOp {
   title?: string;
   objective?: string;
   body?: string;
+  state?: Plan.VolumeState;
 }
 
 export interface VolumeRemoveOp {
@@ -72,6 +74,12 @@ export interface BriefUpdateOp {
   endingContract?: EndingContract;
   /** Explicit `null` drops the chapter's contract — the only way to un-reveal without deleting the brief. */
   knowledgeContract?: KnowledgeContract | null;
+  direction?: string | null;
+  /** `null` returns the chapter to the project's content mode. */
+  contentMode?: Project.ContentMode | null;
+  scenes?: BriefScene[] | null;
+  claimedMilestones?: string[] | null;
+  isEnding?: boolean;
 }
 
 export interface BriefRemoveOp {
@@ -124,6 +132,8 @@ export interface FactUpsertOp {
   writerNote?: string;
   terms?: string[];
   revealChapter?: number | null;
+  unlock?: UnlockCondition | null;
+  allowedClues?: string[] | null;
 }
 
 export interface FactRemoveOp {
@@ -199,7 +209,7 @@ export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
 export type OpType = ChangeOp['op'];
 export type ActionType = ActionOp['op'];
 
-type FieldKind = 'string' | 'number' | 'number|null' | 'string[]' | 'object' | 'object[]' | 'object|null';
+type FieldKind = 'string' | 'string|null' | 'number' | 'number|null' | 'boolean' | 'string[]' | 'string[]|null' | 'object' | 'object[]' | 'object[]|null' | 'object|null';
 interface OpSpec {
   required: Record<string, FieldKind>;
   optional: Record<string, FieldKind>;
@@ -208,6 +218,8 @@ interface OpSpec {
 }
 
 const BRIEF_WRITE_MODES = ['standard', 'external'];
+const CONTENT_MODES = ['standard', 'unrestricted'];
+const VOLUME_STATES = ['not_started', 'active', 'goal_met'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
@@ -216,8 +228,8 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
   'volume.upsert': {
     required: { volumeKey: 'string' },
-    optional: { ordinal: 'number', title: 'string', objective: 'string', body: 'string' },
-    description: 'objective is the goal the volume works towards; body holds the notes on it.',
+    optional: { ordinal: 'number', title: 'string', objective: 'string', body: 'string', state: 'string' },
+    description: `objective is the goal the volume works towards; body holds the notes on it; state is one of: ${VOLUME_STATES.join(' | ')}.`,
   },
   'volume.remove': { required: { volumeKey: 'string' }, optional: {} },
   'brief.update': {
@@ -233,8 +245,13 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       readerValue: 'string[]',
       endingContract: 'object',
       knowledgeContract: 'object|null',
+      direction: 'string|null',
+      contentMode: 'string|null',
+      scenes: 'object[]|null',
+      claimedMilestones: 'string[]|null',
+      isEnding: 'boolean',
     },
-    description: `volumeKey names the volume whose goal the chapter serves; a new brief without one joins the volume of the nearest planned chapter before it. writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
+    description: `direction is the agreed direction for the chapter; contentMode (${CONTENT_MODES.join(' | ')}, null = the project's) decides how it is written; scenes are [{"summary": <string>, "pov": <entity key or null>}]; claimedMilestones are the milestone keys the chapter reaches; isEnding marks the planned final chapter. volumeKey names the volume whose goal the chapter serves; a new brief without one joins the volume of the nearest planned chapter before it. writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
@@ -246,7 +263,16 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
   'fact.upsert': {
     required: { factKey: 'string' },
-    optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number|null' },
+    optional: {
+      body: 'string',
+      subjects: 'string[]',
+      constraintNote: 'string',
+      writerNote: 'string',
+      terms: 'string[]',
+      revealChapter: 'number|null',
+      unlock: 'object|null',
+      allowedClues: 'string[]|null',
+    },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
   'action.generate_chapter': { required: { chapter: 'number' }, optional: {} },
@@ -290,12 +316,13 @@ export function isActionOp(op: ChangeOp | OpType): boolean {
 }
 
 function isKind(value: unknown, kind: FieldKind): boolean {
-  if (kind === 'string') return typeof value === 'string';
+  if (value === null && kind.endsWith('|null')) return true;
+  if (kind === 'string' || kind === 'string|null') return typeof value === 'string';
+  if (kind === 'boolean') return typeof value === 'boolean';
   if (kind === 'number') return typeof value === 'number' && Number.isInteger(value);
-  if (kind === 'number|null') return value === null || (typeof value === 'number' && Number.isInteger(value));
-  if (kind === 'string[]') return Array.isArray(value) && value.every(v => typeof v === 'string');
-  if (kind === 'object[]') return Array.isArray(value) && value.every(v => typeof v === 'object' && v !== null && !Array.isArray(v));
-  if (kind === 'object|null' && value === null) return true;
+  if (kind === 'number|null') return typeof value === 'number' && Number.isInteger(value);
+  if (kind === 'string[]' || kind === 'string[]|null') return Array.isArray(value) && value.every(v => typeof v === 'string');
+  if (kind === 'object[]' || kind === 'object[]|null') return Array.isArray(value) && value.every(v => typeof v === 'object' && v !== null && !Array.isArray(v));
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -441,7 +468,17 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
       errors.push(`${path}: writeMode must be one of ${BRIEF_WRITE_MODES.join(', ')}`);
     if (op === 'brief.update' && record['endingContract'] !== undefined) validateEndingContract(record['endingContract'], path, errors);
     if (op === 'brief.update' && record['knowledgeContract'] != null) validateKnowledgeContract(record['knowledgeContract'], path, errors);
+    if (op === 'brief.update' && typeof record['contentMode'] === 'string' && !CONTENT_MODES.includes(record['contentMode']))
+      errors.push(`${path}: contentMode must be one of ${CONTENT_MODES.join(', ')}`);
+    if (op === 'brief.update' && Array.isArray(record['scenes'])) errors.push(...validateBriefScenes(record['scenes']).map(error => `${path}: ${error}`));
+    if (op === 'brief.update' && Array.isArray(record['claimedMilestones']) && (record['claimedMilestones'] as unknown[]).some(key => typeof key !== 'string' || key.trim() === ''))
+      errors.push(`${path}: claimedMilestones must hold non-empty milestone keys`);
+    if (op === 'volume.upsert' && record['state'] !== undefined && !VOLUME_STATES.includes(record['state'] as string))
+      errors.push(`${path}: state must be one of ${VOLUME_STATES.join(', ')}`);
     if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
+    if (op === 'fact.upsert' && Array.isArray(record['allowedClues']) && (record['allowedClues'] as unknown[]).some(clue => typeof clue !== 'string' || clue.trim() === ''))
+      errors.push(`${path}: allowedClues must hold non-empty strings`);
+    if (op === 'fact.upsert' && isKind(record['unlock'], 'object')) errors.push(...validateUnlockCondition(record['unlock']).map(error => `${path}: ${error}`));
     if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
       errors.push(`${path}: draft.update must set at least one of title, body, summary`);
     }
@@ -454,7 +491,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
   return errors;
 }
 
-/** What a plugin may propose: what the novel contains, never its structure — a brief's volume is the book's shape, which only the author rearranges. */
+/** What a plugin may propose: what the novel contains, never its structure — a brief's volume, mode, milestones and ending are the book's shape, which only the author rearranges. */
 export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
   'entity.upsert',
   'entity.remove',
@@ -465,7 +502,7 @@ export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
   'brief.update',
 ];
 
-const BRIEF_PARENT_FIELDS = ['volumeKey'] as const;
+const BRIEF_STRUCTURE_FIELDS = ['volumeKey', 'contentMode', 'claimedMilestones', 'isEnding'] as const;
 
 /** The plugin allowlist enforced against the real `OP_SPECS`, because a plugin's emitted ops are untrusted input at runtime. */
 export function validatePluginChangeSet(value: unknown): string[] {
@@ -475,7 +512,7 @@ export function validatePluginChangeSet(value: unknown): string[] {
   value.forEach((item, index) => {
     if (!isKind(item, 'object')) return;
     const record = item as Record<string, unknown>;
-    const refused = record['op'] === 'brief.update' ? BRIEF_PARENT_FIELDS : [];
+    const refused = record['op'] === 'brief.update' ? BRIEF_STRUCTURE_FIELDS : [];
     for (const field of refused) {
       if (record[field] !== undefined) errors.push(`changeSet[${index}]: field '${field}' is not allowed for this scope`);
     }
@@ -505,7 +542,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     ? `\nknowledgeContract, when present, must be exactly: {"pov": <non-empty array of entity keys>, "learns": <optional array of {"entityKey": <string>, "factKey": <string>}>} — pov bounds what the chapter may state; learns names the facts discovered on-page. A chapter that reveals nothing previously hidden omits the contract entirely; pass null to drop one the brief already carries.`
     : '';
   const factRules = ops.includes('fact.upsert')
-    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — hidden until a plan reveals it.'
+    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — hidden until a plan reveals it. unlock, when present, is {"all": [<one of {"milestone": <key>} | {"volume": <key>} | {"chapter": <number>} | {"ending": true}>, ...]} — the fact may be revealed only once every term holds; allowedClues are observable effects the writer may show while the explanation stays hidden. Omit either to keep it; pass null to clear it.'
     : '';
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }

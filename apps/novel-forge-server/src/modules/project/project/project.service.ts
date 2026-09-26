@@ -28,6 +28,7 @@ import {
   type ProjectStatusResponse,
   type ProjectWordTarget,
   type ResetResponse,
+  STORY_FIELDS,
   type UpdateProjectBody,
 } from './project.dto';
 
@@ -198,6 +199,10 @@ export class ProjectService {
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
     if (update.title !== undefined) set.title = update.title.trim() || null;
     if (update.instructions !== undefined) set.instructions = writingInstructionAdditions(update.instructions);
+    for (const field of STORY_FIELDS) {
+      const value = update[field];
+      if (value !== undefined) set[field] = value?.trim() || null;
+    }
     // `wordTarget` is wire shape only — the row stores it as two columns, and `null` clears both back
     // to "use the application default".
     if (update.wordTarget !== undefined) {
@@ -239,6 +244,7 @@ export class ProjectService {
           title: source.title,
           instructions: writingInstructionAdditions(source.instructions),
           contentMode: body.contentMode ?? source.contentMode,
+          costTier: source.costTier,
           config: body.config ?? source.config ?? null,
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
           wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
@@ -326,6 +332,7 @@ export class ProjectService {
     }
 
     if (stage === 'generate' || stage === 'all') {
+      await this.releaseIdleAuthoringClaim(id);
       await this.db.delete(schema.drafts).where(eq(schema.drafts.projectId, id));
       tablesCleared.push('drafts');
       await this.db.delete(schema.briefs).where(eq(schema.briefs.projectId, id));
@@ -339,6 +346,21 @@ export class ProjectService {
 
     this.logger.info('project stage reset complete', { projectId: id, stage, tablesCleared });
     return { stage, tablesCleared };
+  }
+
+  /**
+   * A generate reset deletes the jobs an authoring claim may name, and the claim's job reference restricts that delete. A claim whose job is still
+   * pending or running is refused rather than cleared, since the job would keep writing drafts the reset just removed; any other claim is stale.
+   */
+  private async releaseIdleAuthoringClaim(projectId: bigint): Promise<void> {
+    await this.db.transaction(async tx => {
+      const [claim] = await tx.select().from(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, projectId)).for('update');
+      if (!claim) return;
+      const job = claim.jobId ? await tx.query.jobs.findFirst({ where: eq(schema.jobs.id, claim.jobId), columns: { status: true } }) : undefined;
+      if (job && (job.status === 'pending' || job.status === 'in_progress')) throw AppErrorCode.PRJ_011.create();
+      await tx.delete(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, projectId));
+      this.logger.info('reset released a stale authoring claim', { projectId, jobId: claim.jobId, kind: claim.kind });
+    });
   }
 
   async status(id: bigint): Promise<ProjectStatusResponse> {

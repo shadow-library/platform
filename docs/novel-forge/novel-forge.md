@@ -14,8 +14,11 @@
 - **Decision ledger (the Notebook)**: the author's decisions, directions, rejected ideas and backlog, append-only. An entry is superseded (a successor on the same topic)
   or withdrawn (with the author's reason), never edited in place; only the active set is read. A decision's writer line reaches the chapter writer, scrubbed of hidden
   facts; rejected ideas and the alternatives a decision passed over are the do-not-propose list.
-- **Volume and chapter brief.** A volume is a goal the story works towards (title, goal, notes); it holds no chapter range and needs no approval. A brief is the plan for
-  one chapter and names its volume; it carries context refs, an ending contract, an optional knowledge contract, and a write mode (`standard` or `external`).
+- **Volume and chapter brief.** A volume is a goal the story works towards (title, goal, notes, and a state: not started, active, goal met); it holds no chapter range
+  and needs no approval. A brief is the plan for one chapter and names its volume; it carries context refs, an ending contract, an optional knowledge contract, a write
+  mode (`standard` or `external`), and the chat-first plan: the agreed direction, scenes with their point of view, the milestones it claims, a content mode (null follows
+  the project's) and whether it is the planned ending.
+- **Milestone**: a stable story event (a rank reached, an event, a lesson learned from someone) that a plan claims and a finalized chapter reaches; fact unlock conditions name it.
 - **Draft vs chapter.** A draft is working prose with a human review loop; finalizing writes a locked chapter and advances the story cursor.
 - **Canon**: finalized chapters, bible (documents plus entities), trackers. Everything else is intent or working state, labeled as such in prompts.
 - **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter.
@@ -119,10 +122,13 @@
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
+- A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
+  decides whether it holds. A fact's `plannedChapter` is provisional; `disclosedInChapter` is set only when the disclosing chapter is finalized, NEVER by planning. The project's
+  `ending` is planner-only and MUST NEVER reach a writer pack or a publish payload.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
   and never while a generate job is active.
 - Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only, but a stale brief blocks generation and a stale draft cannot be approved.
-- A chapter's volume is the one its brief names. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
+- A chapter's volume is the one its brief names; an imported chapter keeps the volume its bundle placed it in. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
   planned chapter, after it). A volume a brief still names cannot be removed, so a change-set's volume removals (and a revert's) run after its other ops; a plan
   reset takes briefs out of the volumes it deletes.
 
@@ -139,9 +145,9 @@
 - To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X", "X is not…") unless the author asked for that rule, because a named idea
   re-primes every later writer. Proposals carry a deterministic check for text a change removed and then mentioned only under a negation: a chat turn gets one retry, and what
   survives is kept as a visible warning and never auto-applied.
-- Plugins MUST NEVER register routes, hold the database client, write domain tables, move a brief to another volume, or issue `action.*` ops; durable changes are
-  allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated context, NEVER core artifacts. A failing
-  plugin degrades its decision point and MUST NEVER fail a generation.
+- Plugins MUST NEVER register routes, hold the database client, write domain tables, change a brief's volume, content mode, claimed milestones or ending flag, or issue
+  `action.*` ops; durable changes are allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated
+  context, NEVER core artifacts. A failing plugin degrades its decision point and MUST NEVER fail a generation.
 
 ### Pipelines
 

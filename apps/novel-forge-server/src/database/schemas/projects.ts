@@ -62,11 +62,13 @@ export namespace Project {
   export type Kind = InferEnum<typeof projectKind>;
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
+  export type CostTier = InferEnum<typeof costTier>;
 }
 
 export const projectKind = pgEnum('project_kind', ['new_novel']);
 export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'unrestricted', 'human']);
+export const costTier = pgEnum('cost_tier', ['economy', 'balanced', 'performant']);
 
 export const projects = pgTable(
   'projects',
@@ -83,6 +85,7 @@ export const projects = pgTable(
     title: varchar('title', { length: 500 }),
     coverImagePath: varchar('cover_image_path'),
     contentMode: contentMode('content_mode').notNull().default('standard'),
+    costTier: costTier('cost_tier').notNull().default('balanced'),
     config: jsonb('config').$type<ProjectConfigData>(),
     /** Chapter scene-prose word-count floor; null means the generation pipeline's default band applies. Always set together with `wordTargetMax`. */
     wordTargetMin: integer('word_target_min'),
@@ -92,6 +95,13 @@ export const projects = pgTable(
     premise: text('premise'),
     themes: jsonb('themes'),
     instructions: text('instructions'),
+    theme: text('theme'),
+    endingQuestion: text('ending_question'),
+    /** The planned ending; only the planner reads it, never the chapter writer or publishing. */
+    ending: text('ending'),
+    readerPromise: text('reader_promise'),
+    protagonistKey: varchar('protagonist_key'),
+    opposition: text('opposition'),
     importedMeta: jsonb('imported_meta').$type<ImportedNovelMetaData>(),
     storyCurrentChapter: integer('story_current_chapter').default(0),
     createdAt: timestamp('created_at').notNull().defaultNow(),

@@ -9,6 +9,8 @@ import {
   computeBibleDocHash,
   markDescendantDraftsStale,
   nearestVolumeKey,
+  normalizeBriefScenes,
+  normalizeStringList,
   refusedDraftWriteError,
   revokeProvisionalReveals,
   volumeContentHash,
@@ -440,6 +442,7 @@ export class ProposalApplyService {
       title: volume.title ?? undefined,
       objective: volume.objective ?? undefined,
       body: volume.body ?? undefined,
+      state: volume.state,
     };
   }
 
@@ -461,6 +464,11 @@ export class ProposalApplyService {
       endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
       // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
       knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
+      direction: brief.direction,
+      contentMode: brief.contentMode,
+      scenes: brief.scenes,
+      claimedMilestones: brief.claimedMilestones,
+      isEnding: brief.isEnding,
     };
     return inverse;
   }
@@ -508,6 +516,8 @@ export class ProposalApplyService {
       terms: (fact.terms as string[] | null) ?? undefined,
       // Always explicit: an omitted schedule would merge as "keep", leaving a reverted date in place.
       revealChapter: fact.revealChapter,
+      unlock: fact.unlock,
+      allowedClues: fact.allowedClues,
     };
   }
 
@@ -605,6 +615,7 @@ export class ProposalApplyService {
       title: op.title ?? existing?.title ?? null,
       objective: op.objective ?? existing?.objective ?? null,
       body: op.body ?? existing?.body ?? null,
+      state: op.state ?? existing?.state ?? 'not_started',
     };
     const contentHash = volumeContentHash({ volumeKey: op.volumeKey, ...merged });
 
@@ -657,6 +668,11 @@ export class ProposalApplyService {
       readerValue: op.readerValue ?? existing?.readerValue ?? null,
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
       knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
+      direction: op.direction !== undefined ? op.direction?.trim() || null : (existing?.direction ?? null),
+      contentMode: op.contentMode !== undefined ? op.contentMode : (existing?.contentMode ?? null),
+      scenes: op.scenes !== undefined ? op.scenes && normalizeBriefScenes(op.scenes) : (existing?.scenes ?? null),
+      claimedMilestones: op.claimedMilestones !== undefined ? op.claimedMilestones && normalizeStringList(op.claimedMilestones) : (existing?.claimedMilestones ?? null),
+      isEnding: op.isEnding ?? existing?.isEnding ?? false,
     };
     const contentHash = briefContentHash({ ...existing, chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;
@@ -796,6 +812,8 @@ export class ProposalApplyService {
       writerNote: op.writerNote === undefined ? (existing?.writerNote ?? null) : op.writerNote.trim() || null,
       terms: (op.terms ?? existing?.terms ?? null) as never,
       revealChapter: op.revealChapter === undefined ? (existing?.revealChapter ?? null) : op.revealChapter,
+      unlock: op.unlock === undefined ? (existing?.unlock ?? null) : op.unlock,
+      allowedClues: op.allowedClues === undefined ? (existing?.allowedClues ?? null) : op.allowedClues && normalizeStringList(op.allowedClues),
     };
 
     if (existing) {

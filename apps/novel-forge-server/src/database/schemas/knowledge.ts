@@ -4,6 +4,13 @@ import { bigint, bigserial, index, integer, pgEnum, pgTable, primaryKey, text, t
 import { jsonb } from './jsonb';
 import { projects } from './projects';
 
+export type UnlockTerm = { milestone: string } | { volume: string } | { chapter: number } | { ending: true };
+
+/** A conjunction: the fact unlocks once every term holds. */
+export interface UnlockCondition {
+  all: UnlockTerm[];
+}
+
 export namespace Knowledge {
   export type Entity = InferSelectModel<typeof entities>;
   export type EntityImage = InferSelectModel<typeof entityImages>;
@@ -18,12 +25,19 @@ export namespace Knowledge {
   export type EntityOrigin = InferEnum<typeof entityOrigin>;
   export type EntityWikiVisibility = InferEnum<typeof entityWikiVisibility>;
   export type FactSource = InferEnum<typeof factSource>;
+  export type Milestone = InferSelectModel<typeof milestones>;
+  export type MilestoneKind = InferEnum<typeof milestoneKind>;
+  export type MilestoneState = InferEnum<typeof milestoneState>;
+  export type KnowledgeStatus = InferEnum<typeof knowledgeStatus>;
 }
 
 export const entityType = pgEnum('entity_type', ['character', 'faction', 'location', 'power_rule', 'item', 'concept']);
 export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import', 'seed', 'generated']);
 export const entitySignificance = pgEnum('entity_significance', ['major', 'minor']);
 export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'generated']);
+export const milestoneKind = pgEnum('milestone_kind', ['rank', 'event', 'learned_from', 'custom']);
+export const milestoneState = pgEnum('milestone_state', ['open', 'planned', 'reached']);
+export const knowledgeStatus = pgEnum('knowledge_status', ['provisional', 'committed']);
 
 // Author opt-out for the reader wiki: `default` projects the entity to the published wiki (spoiler-gated
 // per fragment), `hidden` withholds it entirely — a flipped-to-hidden entity is deleted from the reader
@@ -136,6 +150,13 @@ export const canonFacts = pgTable(
     writerNote: text('writer_note'),
     terms: jsonb('terms').$type<string[]>(),
     revealChapter: integer('reveal_chapter'),
+    unlock: jsonb('unlock').$type<UnlockCondition>(),
+    /** Provisional: the chapter whose plan currently schedules the reveal. */
+    plannedChapter: integer('planned_chapter'),
+    /** Set only when the disclosing chapter is finalized; planning never writes it. */
+    disclosedInChapter: integer('disclosed_in_chapter'),
+    /** Observable effects the writer may show while the explanation stays locked. */
+    allowedClues: jsonb('allowed_clues').$type<string[]>(),
     source: factSource('source').notNull().default('manual'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -160,9 +181,33 @@ export const characterKnowledge = pgTable(
     learnedInChapter: integer('learned_in_chapter').notNull(),
     source: factSource('source').notNull().default('manual'),
     note: text('note'),
+    status: knowledgeStatus('status').notNull().default('committed'),
+    /** The approved draft revision a provisional row is bound to. */
+    draftRevision: integer('draft_revision'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [primaryKey({ columns: [t.factId, t.entityId] }), index('character_knowledge_project_id_idx').on(t.projectId)],
+);
+
+export const milestones = pgTable(
+  'milestones',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    milestoneKey: varchar('milestone_key').notNull(),
+    label: varchar('label', { length: 500 }).notNull(),
+    subjectEntityKey: varchar('subject_entity_key'),
+    kind: milestoneKind('kind').notNull().default('custom'),
+    state: milestoneState('state').notNull().default('open'),
+    plannedChapter: integer('planned_chapter'),
+    reachedChapter: integer('reached_chapter'),
+    boundRevision: integer('bound_revision'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [unique('milestones_project_id_milestone_key_unique').on(t.projectId, t.milestoneKey)],
 );
 
 // Each character's current dynamic state as of the most recently finalized chapter — location, conditions,
@@ -218,6 +263,10 @@ export const canonFactsRelations = relations(canonFacts, ({ one, many }) => ({
 export const characterKnowledgeRelations = relations(characterKnowledge, ({ one }) => ({
   fact: one(canonFacts, { fields: [characterKnowledge.factId], references: [canonFacts.id] }),
   entity: one(entities, { fields: [characterKnowledge.entityId], references: [entities.id] }),
+}));
+
+export const milestonesRelations = relations(milestones, ({ one }) => ({
+  project: one(projects, { fields: [milestones.projectId], references: [projects.id] }),
 }));
 
 export const characterStatesRelations = relations(characterStates, ({ one }) => ({

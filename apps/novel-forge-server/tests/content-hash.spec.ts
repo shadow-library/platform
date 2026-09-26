@@ -15,6 +15,24 @@ describe('volumeContentHash', () => {
   });
 });
 
+describe('chat-first plan fields in content hashes', () => {
+  it('should hash a brief whose plan fields hold their defaults the same as one hashed before they existed', () => {
+    const planDefaults = { direction: null, contentMode: null, scenes: null, claimedMilestones: null, isEnding: false };
+    expect(briefContentHash({ chapter: 3, body: 'b', ...planDefaults })).toBe(briefContentHash({ chapter: 3, body: 'b' }));
+  });
+
+  it('should change a brief hash when any plan field leaves its default', () => {
+    const base = briefContentHash({ chapter: 3, body: 'b' });
+    const changed = [{ direction: 'd' }, { contentMode: 'unrestricted' }, { scenes: [] }, { claimedMilestones: ['m'] }, { isEnding: true }];
+    for (const fields of changed) expect(briefContentHash({ chapter: 3, body: 'b', ...fields })).not.toBe(base);
+  });
+
+  it('should hash a volume not yet started the same as one hashed before volumes had a state', () => {
+    expect(volumeContentHash({ volumeKey: 'v1', state: 'not_started' })).toBe(volumeContentHash({ volumeKey: 'v1' }));
+    expect(volumeContentHash({ volumeKey: 'v1', state: 'active' })).not.toBe(volumeContentHash({ volumeKey: 'v1' }));
+  });
+});
+
 describe('briefContentHash', () => {
   it('should hash only the contracted fields', () => {
     const base = briefContentHash({ chapter: 1, body: 'b' });

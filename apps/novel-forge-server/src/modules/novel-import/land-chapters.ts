@@ -4,6 +4,8 @@ import { type PrimaryDatabase, schema } from '@server/database';
 export interface LandedChapter {
   title: string;
   content: string;
+  /** Absent on payloads staged before chapters carried their volume. */
+  volumeKey?: string;
 }
 
 export interface LandChaptersOptions {
@@ -33,6 +35,7 @@ export async function landFinalChapters(db: PrimaryDatabase, projectId: bigint, 
         status: 'done' as const,
         generator: 'human' as const,
         locked: true,
+        volumeKey: chapter.volumeKey ?? null,
       })),
     );
   }

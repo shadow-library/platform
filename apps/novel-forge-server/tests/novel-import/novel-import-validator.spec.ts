@@ -32,9 +32,9 @@ describe('validateNovelBundle', () => {
     const result = validateNovelBundle(buildBundle());
     expect(result.issues).toEqual([]);
     expect(result.chapters).toEqual([
-      { number: 1, title: 'The Last Watch', content: 'Mira climbed the stair.' },
-      { number: 2, title: 'A Voice in the Foam', content: 'It answered.' },
-      { number: 3, title: 'The Debt', content: 'It wanted the lamp.' },
+      { number: 1, title: 'The Last Watch', content: 'Mira climbed the stair.', volumeOrdinal: 1 },
+      { number: 2, title: 'A Voice in the Foam', content: 'It answered.', volumeOrdinal: 1 },
+      { number: 3, title: 'The Debt', content: 'It wanted the lamp.', volumeOrdinal: 2 },
     ]);
   });
 

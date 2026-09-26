@@ -18,8 +18,12 @@ import { validateNovelBundle } from './novel-import.validator';
 // the bundle's chapter text and cover asset are ever staged, so the executor rereads them from here
 // rather than the request (which is long gone by the time the job runs).
 export interface ImportJobPayload {
-  chapters: { title: string; content: string }[];
+  chapters: { title: string; content: string; volumeKey: string }[];
   cover?: { mimeType: string; dataBase64: string };
+}
+
+function importedVolumeKey(ordinal: number): string {
+  return `volume_${ordinal}`;
 }
 
 function matchGenre(value: string): Genre | undefined {
@@ -83,13 +87,13 @@ export class NovelImportService {
       await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
       await tx.insert(schema.volumes).values(
         validation.volumes.map(volume => {
-          const values = { volumeKey: `volume_${volume.ordinal}`, ordinal: volume.ordinal, title: volume.title };
+          const values = { volumeKey: importedVolumeKey(volume.ordinal), ordinal: volume.ordinal, title: volume.title };
           return { projectId: project.id, ...values, contentHash: volumeContentHash(values) };
         }),
       );
 
       const payload: ImportJobPayload = {
-        chapters: validation.chapters.map(c => ({ title: c.title, content: c.content })),
+        chapters: validation.chapters.map(c => ({ title: c.title, content: c.content, volumeKey: importedVolumeKey(c.volumeOrdinal) })),
         cover: cover ? { mimeType: cover.mimeType, dataBase64: cover.dataBase64 } : undefined,
       };
 

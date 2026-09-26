@@ -4,8 +4,9 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { normalizeStringList, validateUnlockCondition } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
+import { type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
 
 import { type RevealFactBody, type UpsertFactBody } from './fact.dto';
 
@@ -15,10 +16,12 @@ interface KnowledgeEntry {
   learnedInChapter: number;
   source: Knowledge.FactSource;
   note: string | null;
+  status: Knowledge.KnowledgeStatus;
   createdAt: Date;
 }
 
-export interface FactWithKnowledge extends Knowledge.CanonFact {
+export interface FactWithKnowledge extends Omit<Knowledge.CanonFact, 'unlock'> {
+  unlock?: UnlockCondition;
   knowledge: KnowledgeEntry[];
 }
 
@@ -56,6 +59,8 @@ export class FactService {
 
   /** Hand-authoring upsert: creates the fact or edits it in place, merging omitted optional fields. */
   async upsert(projectId: bigint, factKey: string, body: UpsertFactBody): Promise<FactWithKnowledge> {
+    const unlockErrors = body.unlock ? validateUnlockCondition(body.unlock) : [];
+    if (unlockErrors.length > 0) throw AppErrorCode.FCT_005.create({ reason: unlockErrors.join('; ') });
     await this.assertProject(projectId);
     const existing = await this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) });
     const merged = {
@@ -65,6 +70,8 @@ export class FactService {
       writerNote: body.writerNote === undefined ? (existing?.writerNote ?? null) : body.writerNote.trim() || null,
       terms: (body.terms ?? existing?.terms ?? null) as never,
       revealChapter: body.revealChapter === undefined ? (existing?.revealChapter ?? null) : body.revealChapter,
+      unlock: body.unlock === undefined ? (existing?.unlock ?? null) : body.unlock,
+      allowedClues: body.allowedClues === undefined ? (existing?.allowedClues ?? null) : body.allowedClues && normalizeStringList(body.allowedClues),
     };
 
     if (existing) {
@@ -132,7 +139,7 @@ export class FactService {
   }
 
   private toFactWithKnowledge(fact: FactRowWithLedger): FactWithKnowledge {
-    const { knowledge, ...rest } = fact;
+    const { knowledge, unlock, ...rest } = fact;
     const entries = knowledge
       .map(row => ({
         entityKey: row.entity.entityKey,
@@ -140,9 +147,10 @@ export class FactService {
         learnedInChapter: row.learnedInChapter,
         source: row.source,
         note: row.note,
+        status: row.status,
         createdAt: row.createdAt,
       }))
       .sort((a, b) => a.learnedInChapter - b.learnedInChapter || a.entityKey.localeCompare(b.entityKey));
-    return { ...rest, knowledge: entries };
+    return { ...rest, unlock: unlock ?? undefined, knowledge: entries };
   }
 }

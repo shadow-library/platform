@@ -26,6 +26,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
+  static readonly PRJ_011 = AppErrorCode.conflict('PRJ_011', 'A chapter is being written or planned for this novel — cancel that job before resetting');
 
   /*!
    * Export Errors
@@ -49,6 +50,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BRF_001 = AppErrorCode.badRequest('BRF_001', 'No brief exists for the requested chapter(s) — outline the plan before generating');
   static readonly BRF_002 = AppErrorCode.badRequest('BRF_002', 'Brief is stale for chapter(s) {chapters} — refresh the outline or clear staleness before generating');
   static readonly BRF_003 = AppErrorCode.badRequest('BRF_003', 'Ending contract is incomplete — {fields} must not be empty');
+  static readonly BRF_004 = AppErrorCode.badRequest('BRF_004', 'Chapter plan scenes are malformed — {reason}');
 
   /*!
    * Draft Errors
@@ -193,6 +195,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_002 = AppErrorCode.badRequest('FCT_002', 'Unknown entity key referenced by the knowledge operation');
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
   static readonly FCT_004 = AppErrorCode.conflict('FCT_004', 'A canon fact with this key already exists in the project');
+  static readonly FCT_005 = AppErrorCode.badRequest('FCT_005', 'Unlock condition is malformed — {reason}');
 
   /*!
    * Decision Ledger Errors

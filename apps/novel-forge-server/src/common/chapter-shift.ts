@@ -26,7 +26,10 @@ export function shiftChapterMentions(text: string, afterChapter: number, delta =
   });
 }
 
-/** Walks a jsonb value and rewrites chapter references inside its strings; numbers carry no chapter semantics in any stored contract. */
+/**
+ * Walks a jsonb value and rewrites chapter references inside its strings; numbers carry no chapter semantics in the contracts it is applied to.
+ * A fact's `unlock` does hold bare chapter numbers, so it is shifted by `shiftFactUnlocks` instead, never through this walk.
+ */
 export function shiftChapterReferences<T>(value: T, afterChapter: number, delta = 1): T {
   if (typeof value === 'string') return shiftChapterMentions(value, afterChapter, delta) as T;
   if (Array.isArray(value)) return value.map(item => shiftChapterReferences(item, afterChapter, delta)) as T;

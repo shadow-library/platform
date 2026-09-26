@@ -25,7 +25,7 @@ interface GeneratePayload {
 // project — kept as a local shape (not imported from the novel-import module) exactly like every other
 // payload interface above, so JobExecutor never depends on the enqueuing feature module.
 interface ImportPayload {
-  chapters: { title: string; content: string }[];
+  chapters: { title: string; content: string; volumeKey?: string }[];
   cover?: { mimeType: string; dataBase64: string };
 }
 

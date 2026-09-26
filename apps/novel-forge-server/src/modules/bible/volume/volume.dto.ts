@@ -2,7 +2,8 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { SortByTime } from '@server/common';
+import { SortByTime, VolumeState } from '@server/common';
+import { type Plan } from '@server/database';
 
 @Schema()
 export class VolumeProjectParams {
@@ -46,6 +47,9 @@ export class VolumeResponse {
 
   @Field({ optional: true, nullable: true, description: "The author's notes on the volume." })
   body?: string | null;
+
+  @Field(() => VolumeState, { description: 'Where the story stands against the volume goal.' })
+  state: Plan.VolumeState;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

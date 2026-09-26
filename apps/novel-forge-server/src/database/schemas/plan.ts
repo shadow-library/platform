@@ -1,11 +1,14 @@
-import { InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, integer, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
+import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { projects } from './projects';
 
 export namespace Plan {
   export type Volume = InferSelectModel<typeof volumes>;
+  export type VolumeState = InferEnum<typeof volumeState>;
 }
+
+export const volumeState = pgEnum('volume_state', ['not_started', 'active', 'goal_met']);
 
 export const volumes = pgTable(
   'volumes',
@@ -19,6 +22,7 @@ export const volumes = pgTable(
     title: varchar('title', { length: 500 }),
     objective: text('objective'),
     body: text('body'),
+    state: volumeState('state').notNull().default('not_started'),
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     createdAt: timestamp('created_at').notNull().defaultNow(),

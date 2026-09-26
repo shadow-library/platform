@@ -86,7 +86,7 @@ describe('ProposalApplyService.apply inside a caller transaction', () => {
     await service.apply(7n, 300n, { tx: tx as never });
 
     const volumeUpdate = updates.find(update => 'objective' in update);
-    expect(Object.keys(volumeUpdate ?? {}).sort()).toEqual(['body', 'contentHash', 'objective', 'ordinal', 'revision', 'title', 'updatedAt']);
+    expect(Object.keys(volumeUpdate ?? {}).sort()).toEqual(['body', 'contentHash', 'objective', 'ordinal', 'revision', 'state', 'title', 'updatedAt']);
     expect(volumeUpdate).toMatchObject({ objective: 'Burn the ferry.', title: 'The Flood', revision: 3 });
   });
 

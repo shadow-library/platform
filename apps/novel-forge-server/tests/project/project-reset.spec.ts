@@ -54,3 +54,48 @@ describe('ProjectService.reset', () => {
     expect(rows(schema.briefs)[1]).toMatchObject({ revision: 1, contentHash: 'kept' });
   });
 });
+
+describe('ProjectService.reset — authoring claims', () => {
+  function fakeClaimProject(claim: Row | undefined, job: Row | undefined) {
+    const deleted: unknown[] = [];
+    const tx = {
+      select: () => ({ from: () => ({ where: () => ({ for: async () => (claim ? [claim] : []) }) }) }),
+      query: { jobs: { findFirst: async () => job } },
+      delete: (table: unknown) => ({ where: async () => void deleted.push(table) }),
+    };
+    const db = {
+      transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx),
+      delete: (table: unknown) => ({ where: async () => void deleted.push(table) }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+    };
+    const noop = {} as never;
+    return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop), deleted };
+  }
+
+  it('should refuse a generate reset while the claim is held by a pending or running job, deleting nothing', async () => {
+    for (const status of ['pending', 'in_progress']) {
+      const { service, deleted } = fakeClaimProject({ projectId: 7n, jobId: 'job-1', kind: 'generate' }, { status });
+
+      await expect(service.reset(7n, 'generate')).rejects.toMatchObject({ code: 'PRJ_011' });
+      expect(deleted).toEqual([]);
+    }
+  });
+
+  it('should release a claim whose job has ended before deleting the jobs it names', async () => {
+    const { service, deleted } = fakeClaimProject({ projectId: 7n, jobId: 'job-1', kind: 'generate' }, { status: 'failed' });
+
+    await service.reset(7n, 'generate');
+
+    expect(deleted[0]).toBe(schema.authoringClaims);
+    expect(deleted).toContain(schema.jobs);
+  });
+
+  it('should reset without touching claims when none is held', async () => {
+    const { service, deleted } = fakeClaimProject(undefined, undefined);
+
+    await service.reset(7n, 'generate');
+
+    expect(deleted).not.toContain(schema.authoringClaims);
+    expect(deleted).toContain(schema.jobs);
+  });
+});

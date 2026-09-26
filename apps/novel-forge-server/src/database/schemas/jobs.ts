@@ -10,9 +10,10 @@ export namespace Job {
   export type Kind = InferEnum<typeof jobKind>;
   export type Status = InferEnum<typeof jobStatus>;
   export type ValidationScope = InferEnum<typeof validationScope>;
+  export type AuthoringClaim = InferSelectModel<typeof authoringClaims>;
 }
 
-export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import']);
+export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter']);
 
@@ -55,10 +56,28 @@ export const validationReports = pgTable(
   t => [index('validation_reports_project_id_scope_chapter_idx').on(t.projectId, t.scope, t.chapter)],
 );
 
+export const authoringClaims = pgTable('authoring_claims', {
+  projectId: bigint('project_id', { mode: 'bigint' })
+    .primaryKey()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  // Restrict, not cascade: deleting a job must never silently free a claim another writer could then take while the job still runs.
+  jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'restrict' }),
+  kind: jobKind('kind').notNull(),
+  /** Fencing token of the holder; every write made under the claim, and its release, is conditioned on it. */
+  claimedBy: text('claimed_by'),
+  claimedAt: timestamp('claimed_at').notNull().defaultNow(),
+  heartbeatAt: timestamp('heartbeat_at').notNull().defaultNow(),
+});
+
 export const jobsRelations = relations(jobs, ({ one }) => ({
   project: one(projects, { fields: [jobs.projectId], references: [projects.id] }),
 }));
 
 export const validationReportsRelations = relations(validationReports, ({ one }) => ({
   project: one(projects, { fields: [validationReports.projectId], references: [projects.id] }),
+}));
+
+export const authoringClaimsRelations = relations(authoringClaims, ({ one }) => ({
+  project: one(projects, { fields: [authoringClaims.projectId], references: [projects.id] }),
+  job: one(jobs, { fields: [authoringClaims.jobId], references: [jobs.id] }),
 }));

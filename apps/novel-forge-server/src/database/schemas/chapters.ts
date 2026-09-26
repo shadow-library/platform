@@ -44,6 +44,7 @@ export const chapters = pgTable(
     // claim release are conditioned on it, so a run whose lease expired and was stolen can no longer write.
     continuityClaimedBy: text('continuity_claimed_by'),
     note: text('note'),
+    volumeKey: varchar('volume_key'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

@@ -3,7 +3,12 @@ import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, time
 import { type ContentRating } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
-import { contentGenerator, projects } from './projects';
+import { contentGenerator, contentMode, projects } from './projects';
+
+export interface BriefScene {
+  summary: string;
+  pov: string | null;
+}
 
 export namespace Generation {
   export type Draft = InferSelectModel<typeof drafts>;
@@ -96,6 +101,12 @@ export const briefs = pgTable(
     // The outliner's admission that the chapter's material cannot fill the length target; a hand edit clears it.
     densityRisk: text('density_risk'),
     guidance: text('guidance'),
+    direction: text('direction'),
+    /** Null follows the project's content mode. */
+    contentMode: contentMode('content_mode'),
+    scenes: jsonb('scenes').$type<BriefScene[]>(),
+    claimedMilestones: jsonb('claimed_milestones').$type<string[]>(),
+    isEnding: boolean('is_ending').notNull().default(false),
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     staleReason: varchar('stale_reason'),

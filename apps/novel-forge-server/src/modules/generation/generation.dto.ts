@@ -9,6 +9,7 @@ import {
   type ChapterRow,
   ChapterRowFilter,
   ChapterRowKind,
+  ContentMode,
   DarkContentRating,
   DraftReviewStatus,
   DraftRevisionSource,
@@ -21,7 +22,7 @@ import {
   ViolenceRating,
   WorkflowRunStatus,
 } from '@server/common';
-import { type Ai, type Generation, type Job } from '@server/database';
+import { type Ai, type Generation, type Job, type Project } from '@server/database';
 
 import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
 
@@ -100,6 +101,15 @@ export class SeedFromBriefBody {
   force?: boolean;
 }
 
+@Schema({ description: 'One scene of a chapter plan.' })
+export class BriefSceneSchema {
+  @Field({ minLength: 1 })
+  summary: string;
+
+  @Field({ optional: true, nullable: true, description: 'Entity key of the scene’s point-of-view character.' })
+  pov?: string | null;
+}
+
 @Schema()
 export class UpdateBriefBody {
   @Field({ optional: true })
@@ -122,6 +132,21 @@ export class UpdateBriefBody {
 
   @Field(() => KnowledgeContractSchema, { optional: true, description: 'Replacement knowledge contract. Omit to leave the existing contract unchanged.' })
   knowledgeContract?: KnowledgeContractSchema;
+
+  @Field({ optional: true, nullable: true, description: 'The agreed direction for the chapter. Omit to leave unchanged; null or blank clears it.' })
+  direction?: string | null;
+
+  @Field(() => ContentMode, { optional: true, nullable: true, description: "How the chapter is written. Omit to leave unchanged; null follows the project's content mode." })
+  contentMode?: Project.ContentMode | null;
+
+  @Field(() => [BriefSceneSchema], { optional: true, nullable: true, description: 'Replacement scene list. Omit to leave unchanged; null clears it.' })
+  scenes?: BriefSceneSchema[] | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'Milestone keys this chapter reaches. Omit to leave unchanged; null clears them.' })
+  claimedMilestones?: string[] | null;
+
+  @Field({ optional: true, description: 'Marks the chapter planned as the ending. Omit to leave unchanged.' })
+  isEnding?: boolean;
 }
 
 @Schema()
@@ -471,6 +496,21 @@ export class BriefResponse {
 
   @Field({ optional: true, nullable: true, description: "The author's standing guidance for this chapter's writer." })
   guidance?: string | null;
+
+  @Field({ optional: true, nullable: true, description: 'The agreed direction for the chapter.' })
+  direction?: string | null;
+
+  @Field(() => ContentMode, { optional: true, nullable: true, description: "How the chapter is written; null follows the project's content mode." })
+  contentMode?: Project.ContentMode | null;
+
+  @Field(() => [BriefSceneSchema], { optional: true, nullable: true })
+  scenes?: BriefSceneSchema[] | null;
+
+  @Field(() => [String], { optional: true, nullable: true, description: 'Milestone keys this chapter claims to reach.' })
+  claimedMilestones?: string[] | null;
+
+  @Field({ description: 'True for the chapter planned as the ending.' })
+  isEnding: boolean;
 
   @Field({ optional: true, nullable: true, description: 'Set when the plan changed under this brief; generation refuses a stale brief.' })
   staleReason?: string | null;

@@ -3,7 +3,7 @@ import { bigint, bigserial, customType, index, integer, numeric, pgEnum, pgTable
 
 import { drafts } from './generation';
 import { jsonb } from './jsonb';
-import { projects } from './projects';
+import { contentMode, costTier, projects } from './projects';
 
 export namespace Ai {
   export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
@@ -20,6 +20,7 @@ export namespace Ai {
   export type DraftRevisionSource = InferEnum<typeof draftRevisionSource>;
   export type UserFeedbackArtifactType = InferEnum<typeof userFeedbackArtifactType>;
   export type UserFeedbackDisposition = InferEnum<typeof userFeedbackDisposition>;
+  export type CostSource = InferEnum<typeof costSource>;
 }
 
 const EMBEDDING_DIM = 1024;
@@ -50,6 +51,7 @@ export const userFeedbackArtifactType = pgEnum('user_feedback_artifact_type', [
   'validation_report',
   'refinement_proposal',
 ]);
+export const costSource = pgEnum('cost_source', ['provider', 'gateway', 'estimate']);
 export const userFeedbackDisposition = pgEnum('user_feedback_disposition', ['revision_requested', 'approved', 'rejected', 'comment']);
 
 export const workflowRuns = pgTable(
@@ -94,6 +96,9 @@ export const modelCalls = pgTable(
     outputTokens: integer('output_tokens'),
     latencyMs: integer('latency_ms'),
     costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    costSource: costSource('cost_source'),
+    tier: costTier('tier'),
+    contentMode: contentMode('content_mode'),
     // Null both when the call sent no reasoning field and on rows written before effort was recorded.
     reasoningEffort: varchar('reasoning_effort'),
     attempt: smallint('attempt').notNull().default(0),

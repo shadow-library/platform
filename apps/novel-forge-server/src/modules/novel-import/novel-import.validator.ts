@@ -10,6 +10,7 @@ interface FlattenedChapter {
   number: number;
   title: string;
   content: string;
+  volumeOrdinal: number;
 }
 
 interface FlattenedVolume {
@@ -73,7 +74,7 @@ export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
   const chapters: FlattenedChapter[] = [];
   const volumes: FlattenedVolume[] = [];
   for (const volume of [...bundle.volumes].sort((a, b) => a.ordinal - b.ordinal)) {
-    for (const chapter of volume.chapters) chapters.push({ number: chapters.length + 1, title: chapter.title, content: chapter.content });
+    for (const chapter of volume.chapters) chapters.push({ number: chapters.length + 1, title: chapter.title, content: chapter.content, volumeOrdinal: volume.ordinal });
     volumes.push({ ordinal: volume.ordinal, title: volume.title?.trim() || null });
   }
 
