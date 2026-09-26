@@ -3033,6 +3033,16 @@ export interface components {
       summary: string;
       /** @description Entity key of the scene’s point-of-view character. */
       pov?: null | string;
+      /** @description What the point-of-view character wants in the scene. */
+      goal?: string;
+      /** @description Who or what stands in the way. */
+      obstacle?: string;
+      /** @description How things stand differently when the scene ends. */
+      turn?: string;
+      /** @description The on-page beats of the scene, in order. */
+      beats?: string[];
+      /** @description The share of the chapter length the scene fills, in words. */
+      estimatedWords?: number;
     };
     UpdateBriefBody: {
       title?: string;
@@ -3399,7 +3409,7 @@ export interface components {
       error?: null | {
         [key: string]: unknown;
       };
-      /** @description Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply. */
+      /** @description Advisory findings from deterministic checks on the proposal, such as a removal written as a negation; a chapter plan card also carries its pooling, point-of-view and density diagnostics, judged again on every edit. None blocks the proposal. Empty when none apply. */
       warnings: string[];
       /** Format: date-time */
       createdAt: string;
