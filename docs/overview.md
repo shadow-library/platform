@@ -9,7 +9,8 @@
 ## Products
 
 - **Identity** — the only place authentication and authorization live: OIDC provider, app sessions, step-up, M2M tokens, policy decisions, bots, admin for apps and roles.
-- **Novel Forge** — AI-assisted novel authoring (story bible, planning, chapter generation with judge/repair, review, continuity, import). Source of truth for novels.
+- **Novel Forge** — AI-assisted novel authoring around one chat: the Story Bible designed with the author, each chapter planned just before it is written, drafted by AI or by
+  hand, reviewed and finalized into canon, with secrets kept from the writer until they unlock. Source of truth for novels.
 - **Pulse** — notification service and operator console. Apps send by template key; Pulse renders, routes to a sender and logs the outcome (email via Resend is the only real provider today).
 - **Web Novel** — public reading platform (catalog, reader, library, spoiler-gated wikis, PWA). A serving copy of content pushed from Novel Forge; owns no identities but does own reader state (library, progress) and app sessions.
 - **Memoir** — personal gamified life-tracking (quests, hero progression, finance, AI insights). Offline-first PWA with client sync; notifies through Pulse.

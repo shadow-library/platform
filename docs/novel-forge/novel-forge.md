@@ -2,364 +2,394 @@
 
 ## Purpose
 
-- AI-assisted authoring workbench for long-form serialized web novels. An author (a project has one owner; bot-owned projects are shared with the owning organisation) develops an idea into a story bible and plan, has AI draft each
-  chapter, reviews it against canon, finalizes it into canon, and publishes it to the reader app `web-novel` (`docs/web-novel.md`).
-- `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every LLM call goes through OpenRouter; Ollama serves embeddings only.
-- `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. Projects are owned by a person or an organisation bot, which reaches only routes that admit it.
+- AI-assisted authoring workbench for long serialized web novels, built around one conversation. An author starts a novel from a title and optional notes, lands in a chat that
+  designs the Story Bible with them, plans each chapter just before it is written, has AI draft it (or writes it by hand), reviews it, finalizes it into canon and publishes it to
+  the reader app `web-novel` (`docs/web-novel.md`). A project has one owner; bot-owned projects are shared with the owning organisation.
+- `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every LLM call goes to an OpenRouter-compatible endpoint (OpenRouter or the host's AI CLI gateway);
+  Ollama serves embeddings only.
+- `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. The chat is every novel's home; Story Bible, Chapters, Review Queue, Illustrations, Publish, Usage
+  and Settings sit beside it, from one screen list. A link to a retired screen opens the novel's home.
 
 ## Concepts
 
-- **Every project is the author's own novel** (`kind` is always `new_novel`). A finished manuscript arrives through novel import and lands as locked, human-authored
-  chapters. `contentMode` (standard or unrestricted) is copied onto each new plan as its content mode; changing it never re-routes an existing chapter.
-- **Decision ledger (the Notebook)**: the author's decisions, directions, rejected ideas and backlog, append-only. An entry is superseded (a successor on the same topic)
-  or withdrawn (with the author's reason), never edited in place; only the active set is read. A decision's writer line reaches the chapter writer, scrubbed of hidden
-  facts; rejected ideas and the alternatives a decision passed over are the do-not-propose list.
-- **Volume and chapter brief.** A volume is a goal the story works towards (title, goal, notes, and a state: not started, active, goal met); it holds no chapter range
-  and needs no approval. A brief is the plan for one chapter and names its volume; it carries context refs, an ending contract, an optional knowledge contract, a write
-  mode (`standard` or `external`), and the chat-first plan: the agreed direction, scenes with their point of view, the milestones it claims, a content mode (null follows
-  the project's) and whether it is the planned ending.
-- **Milestone**: a stable story event (a rank reached, an event, a lesson learned from someone) that a plan claims and a finalized chapter reaches; fact unlock conditions name it.
-- **Draft vs chapter.** A draft is working prose with a human review loop; finalizing writes a locked chapter and advances the story cursor.
-- **Canon**: finalized chapters, bible (documents plus entities), trackers. Everything else is intent or working state, labeled as such in prompts.
-- **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter.
-- **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
-- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise and plugin output changes domain data (pipeline graphs write their own results directly).
+- **Every project is the author's own novel** (`kind` is always `new_novel`). A finished manuscript arrives through novel import as locked, human-authored final chapters.
+- **The story** (premise, ending, ending question, theme, reader promise, protagonist, opposition) says where the book is going. The ending, the ending question and later
+  volumes' goals are planner-only.
+- **Volume**: a goal the story works towards (title, goal, notes, state: not started, active, goal met). It holds no chapter count or range and needs no approval; its range and
+  word count are derived from the chapters that name it.
+- **Chapter plan** (a brief): the plan for one chapter, written just before it — direction, scenes each with a point of view, how it ends, the milestones it claims, its content
+  mode, the Story Bible pages the writer gets, a knowledge contract, whether it is the planned ending, and a write mode (`standard` or `external`).
+- **Canon**: finalized chapters, the Story Bible (pages plus entity records), canon facts and trackers. Everything else is intent or working state, labelled as such in prompts.
+- **Secret** (a canon fact): a truth the reader must not learn yet, held apart from Story Bible prose, with a writer note, optional allowed clues, give-away terms and an unlock
+  condition. A fact keeps four states apart: world truth, planned reveal, reader disclosure (`disclosedInChapter`), and character knowledge (`character_knowledge`, provisional or
+  committed).
+- **Milestone**: a stable story event (a rank reached, an event, a lesson learned from someone) that a plan claims and a finalized chapter reaches; unlock conditions name it.
+- **Promise**: a plot thread or mystery the reader is waiting for, with its opening, last advance, intended payoff (a chapter, a milestone, a volume or none) and status.
+- **Notebook** (the decision ledger): the author's decisions, directions, turned-down ideas and backlog, append-only; also the home of the author's notes and the progress
+  checklist under reserved topics.
+- **Draft vs chapter**: a draft is working prose; finalizing writes a locked chapter and advances the story cursor.
+- **Isolated chapter**: content walled off from indexes, retrieval, search and standard-route reads (`isolated`), independent of provenance (`generator`).
+- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, organise, audit, tidy-up, premise and plugin output changes domain data
+  (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
-- **Review queue**: one inbox — drafts needing review or in contradiction, plus pending continuity and refinement proposals (chat, audit, premise and plugin change-sets). Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
-- **Writing style**: the built-in plain web-novel style always reaches the writer, and a project's `instructions` are additions after it (point of view, tone, content limits)
-  that win where the two conflict. The default is never trimmed to fit; additions give up their tail instead. A copy of the current or an earlier default inside stored
-  instructions, verbatim or lightly edited, is dropped on read so the default never reaches the writer twice.
-
-## Capabilities
-
-- Bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume and chapter planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
-- Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, novel import, per-novel plugins, per-account AI quota.
-- Publishing (scheduling, access control, reconcile, spoiler-gated wiki).
+- **Writing style**: the built-in plain web-novel style always reaches the writer, and a project's `instructions` are additions after it that win where the two conflict. The
+  default is never trimmed to fit; additions give up their tail instead. A copy of the current or an earlier default inside stored instructions is dropped on read.
 
 ## Architecture
 
 - Jobs and most HTTP requests run through `WorkflowRunService` (one run row, `thread_id = run.id`) -> LangGraph graph -> nodes -> services and chains via `ModelRouterService`;
-  outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows; a duplicate
-  (project, kind, target) request returns the active job.
-- **One authoring job per project**, held in the database (`authoring_claims`), so it holds across replicas. Authoring jobs (generate, import, and the finalize/plan/organise
-  kinds) reserve the claim in the transaction that enqueues them, and a second is refused (`JOB_002`) rather than queued; finalize, unrestricted fill and insert hold it for
-  their synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches
-  authoring jobs left without a live claim, which is how a crashed worker's job recovers. Heartbeat, release and settle are conditioned on the holder's fencing token, but
-  draft writes themselves are not: a job that lost its claim may still land the chapter in flight, then stops at the next chapter and never settles as done.
-  Publish and reindex jobs take no claim.
-- **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op; the apply answers with its job and, when it opens one at queue
-  time, its run) and never runs the work inline. A job started from a chat carries its origin (session, message, card, op) in its payload from the transaction that
-  queues it, and a queue request that lands on the same active job leaves that origin alone and says so. Organise and plan retry once, on a model call that timed out,
-  was rate limited, met a 5xx or lost its connection after the router's own retries — never on a refusal the request caused (authentication, context length, other 4xx) — after a backoff
-  kept under half the claim TTL, with the claim re-reserved as the first attempt settles; a cancel that lands first settles the job as cancelled instead. A retry
-  never stages a second card: a job's card is staged under the job row's lock and one card per run is enforced by a unique index.
-- **Job events**: every transition of a job a chat started writes a `job_events` row in the same transaction (queued, started, step, retrying, done, failed,
-  cancelled), numbered by a per-session `seq` taken under the session row's lock, so `seq` follows commit order and a cursor never skips an event that commits late;
-  a failed event insert is logged and never undoes the transition. A transition is published on the project bus only after it commits. The session's job stream
-  (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays only the running jobs' events and
-  how each job settled in the last hour ended, and its cursor comes from the same snapshot as the job list. It is a stream per session rather than part of the turn
-  stream: a turn's stream ends with its reply, and actions start later, when the author accepts the card. A follower polls every two seconds while a job of the session is
-  running and every twenty while none is, so a job another replica starts is still seen; events of jobs settled over a week ago are swept at boot and daily.
-- Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. A model type (standard or
-  unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`; Balanced is the pre-tier map. A call resolves
-  the project's pin for its role, then the owner's account default (Balanced only), then the tier map. Standard Performant equals Balanced
-  for planning and chat, which already run on the strongest registered model. A chat reply takes its type and tier from the turn, then the chat,
-  then the project, and a chat pin outranks the project's pick; the turn's selection is recorded in its run input. There is no local chat-model path (embeddings are local,
-  via Ollama). AI quota is per owner and fails open on a database read error.
-- Retrieval: pgvector indexes of finalized prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
-- `novel-forge-web` navigation and guards derive from one screen list keyed by project kind. It never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`,
-  never default or bot-grantable) gates run inspection. It is an RBAC permission evaluated per organisation, not a scope, so the web reads it from `GET /api/v1/access`, never the
-  session; the `adminOnly` nav flag only hides the entry, and each admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.
+  planning, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows; a duplicate (project,
+  kind, target) request returns the active job.
+- **One authoring job per project**, held in the database (`authoring_claims`), so it holds across replicas. Authoring jobs (generate, import, organise, plan, finalize kinds)
+  reserve the claim in the transaction that enqueues them, and a second is refused (`JOB_002`) rather than queued; finalize, unrestricted fill and insert hold it for their
+  synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches authoring jobs
+  left without a live claim. Heartbeat, release and settle are conditioned on the holder's fencing token, but draft writes are not: a job that lost its claim may still land the
+  chapter in flight, then stops and never settles as done. Publish and reindex jobs take no claim.
+- **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op) and never runs the work inline. A job started from a chat carries its
+  origin (session, message, card, op) from the transaction that queues it. Organise and plan retry once on a transient model failure (timeout, rate limit, 5xx, lost connection
+  after the router's own retries), never on a refusal the request caused, after a backoff kept under half the claim TTL; a cancel that lands first settles the job as cancelled. A
+  retry never stages a second card: one card per run is enforced by a unique index.
+- **Job events**: every transition of a chat-started job writes a `job_events` row in the same transaction, numbered by a per-session `seq` taken under the session row's lock, so
+  `seq` follows commit order and a cursor never skips a late commit; a failed event insert never undoes the transition, and a transition is published only after it commits. The
+  session's job stream (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays the running jobs'
+  events and how jobs settled in the last hour. A follower polls so a job another replica starts is still seen; events of jobs settled over a week ago are swept.
+- **Model routing**: roles map to author-selectable groups, overridable per project; an unrestricted alternate map with an allowlist exists. A model type (standard or
+  unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`. A call resolves the project's pin for its role, then
+  the owner's account default (Balanced only), then the tier map. A chat reply takes its type and tier from the turn, then the chat, then the project, and a chat pin outranks the
+  project's pick. There is no local chat-model path.
+- **Usage and cost**: every model call records its tokens, its chapter when it has exactly one, and a cost frozen when written, with its source: `provider` (OpenRouter reported
+  it), `gateway` (the CLI gateway reported it) or `estimate` (registry list prices). Every source is shown as the real charge. Runs link to their parent run, so a chat turn's
+  figure includes its title and compaction calls; costs roll up per turn, chapter, run, job, project and account through one pricing path, so a legacy row is priced the same
+  everywhere and a call is never counted twice. The AI quota is a rolling window per owner, enforced before dispatch for requests and jobs alike, and fails open on a read error.
+- Retrieval: pgvector indexes of finalized, non-isolated prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
+- The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
+  default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
+  admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.
 
-## Flows
+## The chat
 
-- **Generation**: gates (a brief present and not stale, the chapter not final, every earlier chapter drafted or final, no unresolved contradiction elsewhere; a second generate request returns the active job) -> brief -> context pack -> draft ->
-  deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, volumes, briefs and drafts are
-  chat-hub-only); a contradiction verdict must carry a hard finding, and deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to
-  human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an
-  unfilled `external` slot. A hand-written draft counts toward the next-chapter frontier exactly like a generated one, including in an `external` slot before it is final.
-- **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements (sentence and paragraph length,
-  reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
-  readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
-- **Approval** is author-initiated and never auto-applied from chat, binds to the draft revision the author read (a chat approval card to the one current when it
-  was staged), may override a contradiction (recorded: every blocking finding still open on the latest judge review of that text becomes an `overridden` remedy "approved
-  by the author", and the response says how many), and in the same transaction replaces the chapter's ledger rows with the brief's `learns` as _provisional_
-  knowledge bound to that revision, so repeated approvals leave one set, bound to the latest. Any change to the draft's prose, an open blocking review finding, or an
-  earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest approved or final
-  chapter that claims it, and moves there when a later claim is revoked. A stale draft may be approved as written: the request names the stale reason the author saw,
-  only that reason is cleared, the override is recorded, and nothing later goes stale since the prose is unchanged; a draft stale because a reveal in its plan no
-  longer holds cannot be approved that way. A draft carries one stale reason — the earliest ancestor change, which replaces a reveal mark so fixing the plan cannot hide
-  it — so approving as written clears only that reason, even when a later ancestor has changed too.
-- **Chapter review**: judge, editorial, mechanics and readability reviews run on request against any chapter — generated, hand-written or final. The two model kinds run
-  as a `review` job; the generation run stores its last judge pass as a review of the revision it produced. The author answers each finding: dismiss (with a reason), "I'll fix
-  it myself", or override a blocking one; an answer can be withdrawn.
-- **Writing by hand**: a new draft starts only at the next writable chapter — the lowest with neither a draft nor finalized prose, one rule shared with generation, the chat
-  and chat draft ops — and never while a generate job targets it; "Write it myself" asks the server to start it rather than naming a chapter, and an existing draft stays
-  editable wherever it sits. A save names the draft, revision and save sequence it read (`baseDraftId`, `baseRevision`, `baseSaveSeq`, all three or none) and is refused
-  (`DRF_013`, answered with the draft as it stands) once another write moved on; a save naming no base is still accepted on an existing draft, and the editor always sends
-  one. No hand save lands while the AI is writing the chapter or a generate job targets it, and a save that loses a database deadlock is answered `DRF_013` for the
-  autosave to retry. An autosave folds into the revision it continues while that revision is the author's own hand edit, under
-  ten minutes old, never approved, reviewed or stale: it keeps one history row, and the cascade (later drafts stale, reveals revoked) still runs on every save. Reviews bind
-  to the save sequence as well as the revision, and approvals to the draft id too. `approvedRevision` keeps the last approved revision through later edits and finalize.
-- **Passage rewrite and versions**: "Ask for changes" on a selection runs the writer route (revise role, disclosure policy, writer snapshot as a `passage` attempt) and
-  stores a suggestion anchored to the draft id, revision, save sequence, UTF-16 offsets, a SHA-256 of the selected text and up to 32 characters either side, with the
-  containment the call ran under; nothing touches the draft until it is applied. The passage is fresh where its offsets still hold that text between that context, and
-  relocated only when text and context together occur exactly once elsewhere (a clean move is safe to apply); anything else — an edit in or around it, an ambiguous
-  copy — is stale and refused (`PSG_004`). Applying and restoring decide under the draft's row lock and write through the hand-save path as a new revision
-  (`passage_rewritten`, `restored` with the revision it brought back), so they never fold into an autosave, never rewrite history, and reset approval and mark later
-  drafts stale exactly as an edit does — restoring the approved revision needs approving again, and restoring text the draft already holds changes nothing. An
-  applied rewrite keeps the unrestricted containment it was written under, and one that brings in a locked secret the passage did not already give away is held as a
-  contradiction, judged by the disclosure policy at apply time. A final chapter refuses both (`PSG_006`, `VER_002`). These are author routes and read isolated prose
-  raw, as the draft itself does; every revision records whether it was isolated, for the model-bound readers that must wall it off, and restoring one keeps the draft
-  isolated. History is bounded to a draft's newest 50 revisions plus the approved one, and each draft keeps its newest 20 suggestions.
-- **Story Bible audit**: two passes stored as one report — coverage against the manifest (add / revise / remove) and a contradiction check comparing pages, entity
-  records, canon facts and the summaries of finalized, non-isolated chapters. It always runs as an `audit` job (the hub action, `POST /bible/audits` and the legacy
-  `POST /bible/audit` all queue it). Its changes wait on one card; the author keeps or skips each finding, and applying the card applies only what is kept.
-- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation, the latest validation
-  report holds an error for this chapter, the draft is stale, or a blocking finding is still open on its latest judge review. Readiness answers from the same checks. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
-  another), sets each revealed fact's `disclosedInChapter` unless an earlier chapter set it, and reaches the claimed milestones; a replay finds nothing left to do.
-  A writer at chapter N reads what its POV cast learned before N — committed, or provisional from an approved earlier draft — plus N's own reveals, pooled for the
-  whole chapter. Any change that revokes an approval (prose, what a plan teaches, reveal rule, deletion) marks every later draft stale; a plan edit that changes only
-  the milestones a chapter claims resets that chapter's approval alone. The AI does not write a chapter while an earlier chapter whose plan teaches something is
-  neither approved nor final (the author may still write it by hand; planning is not gated), and a batch ends at such a chapter. A chapter with no knowledge contract
-  discloses the dated facts that first become showable there, never open canon. The proposed "the reader knows; <POV> does not" section is off unless `KNOWLEDGE_READER_KNOWS_LABEL` is set. The continuity delta goes
-  through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted).
-- **Chat hub**: one conversation over the whole novel. Its context is the novel's durable state, not its text — the story (the ending, ending question and later
-  volumes' goals labelled planner-only), the Notebook, open promises, inventories by name and key, and where the story stands. The first model round is budgeted as a
-  whole request: the stable sections (plugin sections excepted, which always ride volatile) against a fixed allowance for history and message, so the cached
-  prefix holds as a conversation grows, and the optional volatile ones against what is actually sent; the pack never drops below a 6k floor, the handoff is always
-  kept, so a request near the history ceiling can run past the budget, and lookup rounds add on top. The author's own words render before, and outrank, any AI summary. Detail
-  comes through declared lookups (never native tool binding); a turn that reads the author's notes is held for review like one that reads a planner-only page. Manual
-  mode stages a proposal; auto applies it.
-- **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
-  scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
-  it, one generation job at a time, finalized chapters change only through amend — and replaces the prose in place. Whatever the draft held, however it was written, stays in
-  the revision history; its continuity review is dropped and later drafts are marked stale only when the new draft lands, keeping any more specific stale reason they carry.
-- **Plugins**: operator-loaded (off unless `plugins.dir` is set), per project, answering only five fixed decision points (canon augment, brief policy, call routing, context/prompt contribution).
+- **One conversation over the whole novel.** Its context is the novel's durable state, not its text: the story (planner-only parts labelled), the progress map, the Notebook,
+  inventories of Story Bible pages and entities by name and key, the chapter list, open promises, the last chapter's ending and the next chapter's plan, a compaction summary and
+  recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
+  history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
+- Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
+  character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page is held for review.
+- **Start**: a new novel is a title (never blank; the web names an untitled one) plus notes of at most 10,000 words, created with its first chat in one transaction. The progress
+  map ("Ready for chapter 1") is advice, never a gate; an item marked undecided or dismissed is recorded under a reserved Notebook topic that never reads as an author decision or
+  a do-not-propose rule.
+- A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.
+- A chat turn's model type applies to its reply only; the actions it starts inherit its tier and NEVER its model type. A turn's selection NEVER outlives the turn. A standard turn
+  NEVER receives replies or a summary an unrestricted model wrote (placeholders stand in; the author's own messages stay verbatim), and compaction's model type only rises: it
+  runs unrestricted when the novel, the chat, the turn, the prior summary or any folded reply is unrestricted.
 
-## Publish boundary
+### Write policy and the quote rule
 
-- One way, forge -> `web-novel-server`, over an identity M2M token. Reader library and progress stay reader-side; accounts are Identity's.
-- The forge owns the publication ledger, access control and slug; the reader holds a rebuildable projection keyed by the project id the forge sends as `sourceRef`, so renaming a slug
-  moves the row. Converge order: novel, access, chapters, wiki.
-- The ledger row is the outbox: failed pushes are retried, except stale, hash and slug conflicts, which wait for an explicit reconcile; `reconcile` diffs reader against ledger. Wiping the reader and reconverging MUST yield identical state.
-- The wiki is derived, never authored on the reader: entities and canon facts are projected into facets gated by `visibleFromOrdinal`. Hidden entities, never-revealed facts and
-  fragments of unpublished chapters are never sent. Every image is dated with the chapter it depicts (the latest final chapter unless the author names an earlier one,
-  never a later one) and reaches readers, caption included, only from that chapter; a portrait later than its entry stays the top-level `imageRef` under its own
-  `imageVisibleFromOrdinal`: a reader short of it gets the latest gallery image they have reached as the list thumbnail and no portrait on the entry page. A reader that does
-  not advertise the headline-gate capability gets that portrait in the gated gallery instead. Rows from before dating keep their old visibility. An entity is drawn from canon up to its chapter under that chapter's writer disclosure policy.
+- The author's words apply at once and can be undone; anything the AI invents is a card the author accepts or rejects. The server decides which, never the model: a model-declared
+  quote or origin never authorises a write on its own.
+- A chat op applies within the turn only when an auto-mode session sent it (new chats are auto; a manual session makes every op a card), "Just discussing" is off, no warning
+  holds the turn, its kind is allowlisted (Story Bible page, entity, fact, volume title or goal, an empty story field, a promise's label), no always-card rule holds, and its
+  `quote` supports it.
+- Always cards: removals and cleared fields; plans; prose; actions; planner-only and writer-excluded pages; replacing a filled story field; a secret's truth once it exists and
+  its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any time; a volume's order and notes; a promise's status, progress or reuse of a settled one.
+- A quote supports an op when at least three content words (character bigrams in scripts written without spaces) are found verbatim, whitespace-, case- and typography-normalised,
+  in the author's message of that turn, in a sentence stated rather than asked, hedged, negated before the quote or turned down after it; no word the op writes comes only from a
+  sentence the author asked or hedged; no field drops more than max(4, 25%) of the content words it held; and the whole op adds at most max(4, 25%) content words that are neither
+  in the author's stated sentences nor already in the record. A new record's identifying key counts as written content. An op naming a record only a card creates follows it to
+  the cards.
+- The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the applied block shows each written value beside its quote and undo stays one
+  click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a second, pending one;
+  a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
+- Undo lists what relies on the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed fact and
+  pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.
+- `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft. Action ops run after
+  the content transaction commits and stop at first failure.
+- Plan edits stay plan edits: a chat turn MUST NEVER rewrite prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose for that turn;
+  the toggle is the only permission, and only the latest non-final draft may be revised. A prose op without it costs the model one repair and is then withheld with a note,
+  together with the judging, approval or finalize that depended on it.
+- To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X") unless the author asked for that rule, because a named idea re-primes every
+  later writer. A deterministic check catches text a change removed and then mentioned under a negation: a chat turn gets one retry, and what survives is a visible warning, never
+  auto-applied.
 
-## Hard rules
+### Suggestions, idea ids and rejection scopes
 
-### Model, graph and context
+- Every content op carries a server-assigned idea id: a hash of its kind and declared fields with text normalised as quotes are, metadata left out, so the same change proposed
+  twice has the same id and a reworded one is a new idea. Actions carry none.
+- Turning down a card op records a Notebook rejection keyed by its idea with a scope: `never` (until the author withdraws it), `not_now` (while the volume active when it was
+  recorded stays active) or `not_this_version` (while every record the idea would change is exactly as it was). Rejecting the same idea again replaces the earlier scope.
+- A model-authored card whose idea is rejected in scope is dropped before staging, with every card that cannot stand without it. A card the author's own words back (just
+  discussing, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed rejections stop steering the model; similar ideas
+  are avoided only best-effort.
+- A rejection's label names the record only: a secret's truth, its tells and a planner-only page's body never appear in it, so it can ride in any prompt.
 
+### Notebook and notes
+
+- Entries are append-only: superseded by a successor on the same topic or withdrawn with a reason, never edited in place; only the active set is read. An author rewords a
+  decision or overrules a system entry into one; they never write a decision from nothing. The active ledger is required context and never evicted to fit a budget.
+- A decision's writer line reaches the chapter writer, scrubbed by the chapter's disclosure policy; rejected ideas and the alternatives a decision passed over reach models only
+  as things never to offer again.
+- The author's notes are stored whole under a reserved topic, read and written only through the notes store (one lock, one 10,000-word cap on every path). An author message of
+  600 words or more that the notes do not hold, and could take within the cap, is offered as notes; saving appends it as paragraphs of its own. Reserved topics (notes, progress,
+  idea rejections) are never written by the generic ledger routes.
+
+### Organise
+
+- Organising the notes is a chat action that runs as a job. Its output follows the quote rule with the notes standing in for the author's message: an entry applies at once "from
+  your notes" only when its quote is found in the notes, stated, and it adds little the paragraphs it cites do not say; in an auto-mode chat those entries apply as one revertible
+  proposal. Everything else — no quote, a quote not found or hedged, inferred sections, the model's own suggestions, what relies on a suggestion, the planner-only timeline and
+  open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card. A page mixing both is offered as its notes-backed sections, then the whole
+  page; a card keeping both halves is refused (`NTS_007`). A rule becomes a Notebook direction only when the author keeps it.
+- Each organise proposal carries its own record (`organise_record`) and records the organise decision from the writes actually applied, so the next run rewrites what organising
+  still owns in place. A write the author declined leaves the earlier claim at its ref. A rule or suggestion an earlier answer kept is taken out only when a later round offers it
+  again and the author declines it. If the card fails to save after the notes-backed part applied, the whole stage rolls back and the job retries.
+- Undoing an organise proposal puts the ledger back as that apply found it, leaving no "kept, then undone" trail in the Notebook; a row the author has since withdrawn or reworded
+  stays theirs. Undo is refused (`NTS_010`) while a later organise change builds on a row it wrote. A card without its record is refused (`NTS_009`). Starting organise is refused
+  (`NTS_004`) while an organise card is pending or a card staged before records existed stays applied; a round that stages while another card still waits supersedes it.
+- Every entry cites the notes paragraphs it draws on; the receipt lists the paragraphs nothing draws on as "not used yet", with the notes digest they refer to. Notes longer than
+  one pass's word limit are organised in several passes, each told what the passes before it wrote. On an unrestricted project, what the model inferred or suggested is held to
+  the hard line before it reaches a card.
+
+### Plan cards
+
+- Only the next writable chapter is planned: the lowest with neither a draft nor finalized prose, one rule shared with generation, hand writing and chat ops. Planning always
+  produces a card, never a direct write.
+- A plan starts from a direction the chat offered, from what the author says happens (which must be found in their own message, or it becomes a direction), or empty for the
+  author to fill; an empty plan is refused over an existing one. The recap surfaces two or three obligations: the previous chapter's hook, the most pressing promise, and what the
+  volume goal needs.
+- The planner (the `outline` role) proposes milestone claims; the reveal rule cuts every claim the plan may not make and every reveal whose unlock does not hold, from the
+  contract and from every text field, so a card never proposes what the author could not apply. A scene's point of view must be a character of the novel. The writer's knowledge
+  is pooled over the scenes' points of view for the whole chapter, and the card warns when they differ in what they know.
+- A plan never carries a content mode from the planner: the chapter keeps its own, or starts from the project's when the plan is created, until the author changes it on the card.
+  A replan sets every field explicitly, so nothing of the replaced plan survives. The body the writer reads is rendered from the scenes at apply.
+- The card shows typed diagnostics and a preview of what the writer would read; it names a secret by its title, never its truth. Scene density is diagnostic: a span too thin for
+  the word target is flagged (`densityRisk`), never padded, and a hand edit clears the flag.
+
+## Story model
+
+### Secrets and disclosure
+
+- Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in Story Bible prose or entity sheets, and canon facts are NEVER indexed.
+  The drafter sees only open canon, facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only
+  `constraintNote`; a hidden fact without a `writerNote` is withheld entirely. Only the judge sees the forbidden list.
+- Open canon is a fact scheduled from the first chapter, a rule the whole book obeys; a knowledge contract narrows what the POV cast privately knows and never withholds one. A
+  reveal scheduled later stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone.
+- A locked fact's allowed clues reach the writer unscrubbed, and a clue may not name its fact's give-away terms (checked when the clues or terms are written; an older clue that
+  still does is dropped from the writer's clues).
+- **Disclosure policy**: every string the chapter writer reads (generation, revision, repair, passage rewrite) passes one policy for that chapter, loaded once per run: locked
+  facts' text, author note, key and give-away terms, the ending and ending question (until the chapter planned as the ending) and later volumes' goals and notes are withheld
+  wherever copied — previous prose, summaries, continuation state, entity sheets, pages, cited refs, style, writer lines, the plan, feedback and findings. It is lexical: it
+  catches copies, not paraphrase, and a passage of one word, of two words under twelve characters, or under six characters in a script without spaces is caught only by give-away
+  terms. A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one. Planner and chat packs are not scrubbed.
+- Planner-only pages — the organised timeline (`project/timeline`) and open questions (`project/open-questions`) — are left out of the planner's citable catalog and the lore
+  index, never resolve into a writer pack whatever ref names them, and are dropped from planned refs. Their lines are withheld only from what copies authored canon (pages, entity
+  sheets, cited refs, plugin sections), because the chapter's own plan legitimately repeats them.
+- For the writer, a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an earlier chapter, a thread or mystery only once opened (one
+  with no opening chapter always), and the volume-plan and escalation-map pages never. A chapter-scoped `fact:` ref obeys the fact gate plus the plan's `mustNotResolve`, and
+  planner-written `fact:` refs are stripped before a plan is stored.
+- The project's `ending` is planner-only and MUST NEVER reach a writer pack before the chapter planned as the ending, nor a publish payload. At most one plan is the ending.
+
+### Reveal rule and milestones
+
+- A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
+  decides whether it holds. Milestones carry no order.
+- **Reveal rule**: a plan for chapter N MAY reveal a fact only when its dated reveal chapter is at most N and each unlock term holds, where a milestone counts as reached if a
+  finalized chapter at or before N reached it or this plan or an earlier one claims it, and the ending term holds from the chapter planned as the ending on. A fact with neither a
+  reveal chapter nor an unlock condition may not be revealed by any plan. The rule runs on every plan write (hand edit, proposal apply, revert, insert) against the plans as the
+  whole write leaves them. The writer pack mirrors it: a learn it would refuse reveals nothing.
+- A plan whose reveal stops holding because something it relied on changed is never silently rewritten: the plan and its unfinalized draft are marked stale, the draft's approval
+  and the reveals it ledgered are revoked, and approval and finalize refuse that chapter until the plan is fixed.
+- A milestone's state is derived, never authored: `planned` at the earliest chapter whose plan claims it, `open` when none does, `reached` only in the finalization commit of the
+  claiming chapter. Rewriting or regenerating that chapter's prose keeps the claim; only a plan change moves it. A milestone is claimed by one plan at most and cannot be removed
+  while a plan claims it or an unlock names it.
+- A plan at or behind the story cursor or the latest finalized chapter MUST NEVER change. Plan writes, fact writes that reconcile plans and the finalization commit take the
+  project plan lock first, so a claim cannot move between a rule check and what it guards.
+
+### Knowledge lifecycle
+
+- Reveals MUST be ledgered deterministically at draft approval, never extracted from model output. Approval replaces the chapter's ledger rows with the plan's `learns` as
+  provisional knowledge bound to that revision; finalize commits the rows bound to the committed revision, drops any bound to another, sets `disclosedInChapter` unless an earlier
+  chapter set it, and reaches the claimed milestones. `plannedChapter` is provisional; `disclosedInChapter` is NEVER set by planning.
+- A reveal several plans declare is ledgered at the earliest approved or final chapter that claims it, and moves when a later claim is revoked. What a POV character already knows
+  stays known whatever the condition.
+- A writer at chapter N reads what its POV cast learned before N — committed, or provisional from an approved earlier draft — plus N's own reveals, pooled for the whole chapter.
+  The AI does not write a chapter while an earlier chapter whose plan teaches something is neither approved nor final (hand writing and planning are not gated). The "the reader
+  knows; <POV> does not" section is off unless `KNOWLEDGE_READER_KNOWS_LABEL` is set.
+- Each character keeps a per-chapter event history ("how they changed"), written from what a chapter's finalize review kept.
+
+### Promises
+
+- A promise is built on the thread and mystery records. Its standing is derived, never stored, by one function shared by the plan recap and the promises list: overdue once an
+  authored payoff chapter has passed or its payoff volume has met its goal; due once its payoff milestone is reached or its payoff volume is the active one; otherwise not due. A
+  promise dormant on purpose is never an obligation; "quiet for a long time" is a reminder, not an error.
+- Continuity never overwrites a disposition the author set (dormant, dropped), and a chat op that changes a promise's status or progress is always a card. A promise never carries
+  a mystery's truth or its key.
+
+### Volumes
+
+- A chapter's volume is the one its plan names; an imported chapter keeps the volume its bundle placed it in. A new plan that names none, and an inserted chapter, join the volume
+  of the nearest planned chapter before it (or, ahead of every planned chapter, after it). A volume a plan still names cannot be removed (`VOL_002`), so a change-set's volume
+  removals run after its other ops.
+- State is server-owned. After any volume insert, if none is active, the lowest-ordinal not-started volume after every goal-met one becomes active, under the project lock. "Goal
+  met — start the next" is the author's click, never automatic: it completes only the currently active volume (two concurrent clicks complete one) and activates the next
+  not-started volume, or none.
+
+## Chapter lifecycle
+
+- Statuses run planned -> drafted (ready to read) -> approved (bound to a revision) -> final (locked). Only the next writable chapter can be planned, written or started by hand.
+- **Generation** gates: a plan present and not stale, the chapter not final, every earlier chapter drafted or final, no unresolved contradiction elsewhere, the authoring claim; a
+  second request returns the active job. Then plan -> context pack -> draft -> deterministic check -> judge -> route. The judge's contradiction verdict must carry a hard finding;
+  deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to human review, never acceptance. Repair patches then rewrites up to a cap,
+  then accepts with findings kept. A failed run stops the batch; batches truncate at an unfilled `external` slot. The last judge pass is stored as a review of the revision it
+  produced.
+- **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements reach it as evidence and never
+  trigger repair themselves; a readability-only miss never marks a contradiction, halts a batch or blocks the next chapter.
+- **Regenerate from plan**: after a plan edit, the author regenerates through the normal generation job with generate's gates, replacing the prose in place. Whatever the draft
+  held stays in its revision history; later drafts are marked stale only when the new draft lands.
+- **Writing by hand**: "Write it myself" asks the server to start the next writable chapter and never while a generate job targets it; an existing draft stays editable wherever
+  it sits. A save names the draft, revision and save sequence it read (all three or none) and is refused (`DRF_013`, answered with the draft as it stands) once another write
+  moved on. No hand save lands while the AI is writing the chapter. An autosave folds into the revision it continues only while that revision is the author's own hand edit, under
+  ten minutes old, never approved, reviewed or stale; the cascade (later drafts stale, reveals revoked) runs on every save. A plan is optional for a hand-written chapter.
+- Finalized prose (`chapters.locked`) MUST NEVER change except through amend. Every write to draft or chapter prose — generation, revision, chat apply, import, restore, passage
+  apply, job replay — carries a predicate on non-final status, so a delayed model call cannot overwrite a finalized draft. Proposals NEVER edit plans at or before the story
+  cursor or prose of a final draft.
+- A draft carries one stale reason — the earliest ancestor change, which replaces a reveal mark so fixing the plan cannot hide it. Any change that revokes an approval (prose,
+  what a plan teaches, reveal rule, deletion) marks every later draft stale; a plan edit that changes only a chapter's claimed milestones resets that chapter's approval alone.
+- **Approve** is the author's act, never auto-applied from chat, and binds to the draft id, revision and save sequence the author read (a chat approval card to the one current
+  when staged). It may override open blocking findings, only with the author's confirmation: each becomes an `overridden` remedy "approved by the author". A stale draft may be
+  approved as written: the request names the stale reason the author saw, only that reason is cleared, the override is recorded, and nothing later goes stale; a draft stale
+  because a reveal in its plan no longer holds cannot be approved that way. Any prose change, an open blocking finding or an earlier chapter's change resets approval and, until
+  final, revokes its reveals. `approvedRevision` keeps the last approved revision through later edits and finalize.
+- **Checks** (chapter reviews): judge, editorial, mechanics and readability reviews run on request against any chapter; the two model kinds run as a `review` job. A review is
+  bound to the revision and text hash it read and is stale as soon as either moves (computed on read); a remedy is refused on a stale review. A review never edits prose. The gate
+  reads only the latest judge review of the current text: an open blocking finding holds the draft as a contradiction and blocks the next chapter; dismissing or overriding
+  releases it only to `needs_review`; "I'll fix it myself" releases nothing. A continuity contradiction and any leak of a secret are blocking; plan and ending-contract shortfalls
+  are warnings, because a hand-writer may leave their plan on purpose. A dismissal is remembered for the same text. A check the judge left out is reported as not assessed, so "No
+  issue detected" cannot follow from an omission. Reviews of an isolated chapter are marked `isolated`.
+- **Review before finalize**: approval binds a finalize review to the exact revision, prose and plan approved, and a job reads the Story Bible updates out of that revision.
+  Consequential updates (rules, payoffs, knowledge, milestones in doubt, anything inferred) are answered one by one; routine ones as a batch, or kept automatically per category
+  when the author opted in. Keep, edit (the record it is about never changes) or skip (with a reason, never asked again). Re-approving the same revision, prose and plan keeps the
+  answers; anything else sends the review back to be prepared, carrying answers over only onto the same proposed change.
+- **Finalize** runs strictly in order and commits only the approved revision it read; it refuses when an earlier chapter needs re-validation, the latest validation report holds
+  an error for this chapter, the draft is stale, a blocking finding is open, the review no longer matches the prose (`FRV_004`), is still reading or failed, has unanswered items
+  (`FRV_005`), or leaves a claimed milestone unreached while the plan reveals something that needs it (`FRV_006`). Readiness answers from the same checks. The commit applies only
+  the kept items, recording each row's before and after, drops claims the review says the prose did not reach, and commits knowledge; a replay finds nothing left to do. A chapter
+  approved before reviews existed finalizes on the direct continuity path.
+- **Revert** of a finalize review puts back every row its kept set changed as one unit, only for the latest final chapter, refusing when any of those rows changed since
+  (`FRV_007`); it drops the milestones it reached and marks later drafts stale. Proposal apply and revert are separate: every apply captures inverse ops, and revert runs through
+  the same engine under a content-hash conflict guard.
+- **Amend** never unlocks and never touches the Story Bible; it rewrites the final draft to match under a new `amended` revision (the replaced prose stays in history, the judge
+  verdict is cleared) and republishes only when the reader-visible hash moves. The chapter PATCH/DELETE routes refuse a locked chapter.
+- **Insert** MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only after the last written
+  chapter (`CHP_009`) and only while it holds the authoring claim (`CHP_004`). The insert planner sanitises its own output against the reveal rule.
+
+### Passage rewrite and versions
+
+- "Ask for changes" on a selection runs on the chapter's writer route (revise role, disclosure policy, a writer snapshot as a `passage` attempt) and stores a suggestion anchored
+  to the draft id, revision, save sequence, UTF-16 offsets, a SHA-256 of the selected text and up to 32 characters either side, with the containment it ran under; nothing touches
+  the draft until it is applied.
+- The passage is fresh where its offsets still hold that text between that context, and relocated only when text and context together occur exactly once elsewhere; anything else
+  — an edit in or around it, an ambiguous copy — is stale and refused (`PSG_004`).
+- Applying and restoring decide under the draft's row lock and write through the hand-save path as a new revision (`passage_rewritten`, `restored`), so they never fold into an
+  autosave, never rewrite history, and reset approval and mark later drafts stale as an edit does. Restoring the approved revision needs approving again; restoring text the draft
+  already holds changes nothing. A final chapter refuses both (`PSG_006`, `VER_002`).
+- An applied rewrite keeps the unrestricted containment it was written under, and one that brings in a locked secret the passage did not already give away is held as a
+  contradiction, judged by the disclosure policy at apply time.
+- History is bounded to a draft's newest 50 revisions plus the approved one; each draft keeps its newest 20 suggestions.
+
+### Writer's context and snapshots
+
+- The drafter MUST see only the mandatory serial core plus refs its plan declared; broad canon access belongs to the planner (a catalog of citable refs) and the judge. Retrieval
+  runs only at planning time, in verification, chat lookups and search.
+- The writer's required material is reserved first and NEVER silently dropped: the plan (scenes, ending contract), the previous chapter's ending with the continuation state and
+  the last three summaries, the sheets of the POV cast and of the characters the plan cites (the first few required, the rest optional), what the POV cast knows, open canon, the
+  volume goal, a deterministic summary of each earlier volume, the style guide and the author's writer lines. Material that grows with the book is cut to its limit (the chapter's
+  own cast first, then open canon, then the latest learned) and recorded in the pack's omitted list, NEVER failing a chapter; the plan, its reveals and clues, the volume goal and
+  the writer lines are not cut, and a call that writes or revises fails with a message naming the section when one is over. Readers of the pack (judge, review, previews) take it
+  as it is. Optional material (cited pages, cast state, other sheets, plugin sections) fills what is left.
+- Every writer attempt (draft, repair, rewrite, revision, passage) stores a snapshot: the exact messages sent, what was kept back and why, the plan revision, the Story Bible
+  hash, the prompt version and the model route. The Writer's view reads the snapshot, never regenerates it from today's state, and walls off the messages of an attempt that was
+  isolated or whose chapter is isolated now. A snapshot write never fails the generation it captures; attempts are kept for the current revision and the two before it.
+
+## Content modes and isolation
+
+- A chapter's content mode is its plan's, copied from the project's when the plan is created (a plan with none routes standard; an isolated draft counts as unrestricted), so
+  changing the project's mode never re-routes an existing chapter. It MUST route every call on that chapter's prose — draft, title, judge, repair, revise, review, summary,
+  continuity, extraction — through the one role table in `chapter-route.ts`. An unrestricted chapter runs the normal writer -> judge -> repair graph on the unrestricted route, is
+  written isolated, and NEVER falls back to a standard model: an off-allowlist resolution refuses (`AI_003`).
+- Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A call whose writer class a plugin raised (or an unrestricted fill) writes `generator: unrestricted`
+  and `isolated: true`, sticky for the run. Draft and isolated content MUST NEVER be indexed, retrieved or searched.
+- **Read policy**: raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Author HTTP routes (the draft, its versions and compare,
+  passage suggestions) read it raw; every model-bound, chat, plugin, publish and search read goes through `isolation-read-policy.ts` and sees only what the author approved in the
+  bridge — never prose, free-text state, judge notes or review evidence, on any route. Every revision records whether it was isolated, and restoring one keeps the draft isolated.
+- **Bridge**: what a standard call may know about an isolated chapter is only the items its author approved against its current revision — a short non-graphic summary and
+  positions of roster characters (places of at most 60 characters) — never lines that cross the hard line. The summary is always asked, and positions one by one. Editing the
+  chapter invalidates the bridge until a new one is answered; undoing the chapter's Story Bible updates leaves the approved bridge standing, and a bridge is read again after an
+  amend.
+- Continuity and canon extraction of an isolated chapter run on the unrestricted route, told to describe non-graphically, with every quoted excerpt withheld and `sourceIsolated`
+  stamped; the result is staged for the author, never applied by finalize.
+- **Hard line**: every unrestricted call passes a deterministic screen (`hard-line.ts`) before it is sent and its output before it is kept. Author- and plan-supplied text and
+  what creative roles wrote are held to the full rule; background context and derived roles' output to a narrow list. A refusal is `AI_015` naming the record, never quoting it;
+  no model is called and nothing is saved; a streamed reply is released a screened sentence at a time. Every unrestricted request also carries a system line forbidding such
+  content. Standard calls are not screened.
+
+## Story Bible audit
+
+- Two passes stored as one report — coverage against the manifest and a contradiction check of pages, entity records, canon facts and the summaries of finalized, non-isolated
+  chapters — always run as an `audit` job. A report claims only what was read; isolated chapters are never read, not even their summaries.
+- Evidence cites only a source the audit read, and a quote only when three or more of its words are found there; a contradiction with no such quote is dropped, and one that does
+  not quote both sides is reported without a card.
+- The audit reads secrets but never stages a fix that adds a secret where the chapter writer reads it, nor one that changes a secret's reveal, unlock or give-away terms. Material
+  and baseline are read in one repeatable-read snapshot. The server enforces Keep and Skip: applying applies only what was kept, and a card with nothing kept is refused.
+
+## Proposals and pipelines
+
+- Chat, organise, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check. Every
+  apply MUST capture inverse ops; NEVER add an apply path that skips inverse capture.
 - Every model call MUST go through `ModelRouterService`; nodes and services NEVER build model clients, chains NEVER persist, retrieval NEVER calls a chat LLM.
-- Authoring calls (draft, revise, repair, builder, planners, outline) MUST have zero tools; write tools NEVER exist. Only verification (judge, validation) and chat-hub lookups use
-  the read-only tool registry, and `projectId` NEVER appears in a tool input schema.
+- Authoring calls (draft, revise, repair, planners, bible builder) MUST have zero tools; write tools NEVER exist. Only verification (judge, validation) and chat lookups use the
+  read-only tool registry, and `projectId` NEVER appears in a tool input schema.
 - Nothing user-visible MAY exist only in a checkpoint; domain tables win. Node effects MUST be idempotent. Graphs MUST run to a terminal state; NEVER pause one for human review.
 - Raw model output MUST be persisted before parsing; structured calls use the repair ladder; domain-invalid output NEVER enters the database as canon.
-- Context MUST be assembled once per run, token-budgeted, tier-labeled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay
-  byte-identical while canon is unchanged; chapter or source prose travels as a template variable, NEVER inside the pack.
-- An outlined brief MUST plan enough scenes to fill the project's word target, because the drafter dramatizes and never invents. A span too thin for its chapter
-  count is flagged on the brief (`densityRisk`) for the author to merge or enrich, NEVER padded at planning time; a hand edit clears the flag.
-- The drafter MUST see only the mandatory serial core plus refs its brief declared; broad canon access belongs to the outliner (a catalog of citable refs, each with a short description) and the judge. Retrieval
-  runs only at outline time, in verification and chat-hub tools, and in search.
-- The writer's required material is reserved in its budget before anything else and NEVER silently dropped: the plan (brief, scenes, ending contract), the previous
-  chapter's ending with the continuation state and the last three summaries, the sheets of the POV cast and of every character the plan cites, what the POV cast
-  knows, open canon, the goal of the chapter's volume, a deterministic summary of each earlier volume built from its finalized chapter summaries, the style guide and
-  the author's writer lines. Each has a limit. Material that grows with the book — story text, sheets, continuation state, open canon, known facts and behavioural
-  constraints — is cut to it (the chapter's own cast first, then open canon, then the latest learned) and NEVER fails a chapter; the plan, its reveals and clues, the
-  volume goal and the writer lines are not cut, and a call that writes or revises the chapter fails with a message naming the section and the overage when one is over
-  its limit or the required material is over the budget. Readers of the pack (judge, review, previews) take it as it is. Optional material — cited pages first, then
-  cast state, other entity sheets and plugin sections — fills what is left, and everything cut is recorded with its size in the stored pack's omitted list.
-- Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. Plugin policy digest MUST be in any
-  `llm_cache` key; only deterministic roles are cacheable, creative roles NEVER. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic
-  code over AI wherever code can decide.
-- A cost tier MUST change models, not reasoning effort (the gateway ignores per-request effort), and MUST never get cheaper from Economy to Performant. Every unrestricted
-  tier entry MUST sit on the allowlist, and an unrestricted chat reply MUST go through the unrestricted route, refusing rather than falling back to standard.
-- A chat turn's model type applies to its reply only; the actions it starts (write, review, audit, finalize — including their jobs and a later manual apply of its
-  proposal) inherit its tier and NEVER its model type. A turn's selection NEVER outlives the turn; a chat's own defaults change only through its model PATCH.
-  A standard turn NEVER receives replies or a summary the unrestricted model wrote (placeholders stand in), and chat compaction's model type only rises: it runs
-  unrestricted when the novel, the chat, the turn, the prior summary or any folded reply is unrestricted.
+- Context MUST be assembled once per run, token-budgeted, tier-labelled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay
+  byte-identical while canon is unchanged; chapter prose travels as a template variable, NEVER inside the pack.
+- Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. The plugin policy digest MUST be in any
+  `llm_cache` key; only deterministic roles are cacheable. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic code over AI wherever
+  code can decide.
+- A cost tier MUST change models, not reasoning effort (the gateway ignores per-request effort), and MUST never get cheaper from Economy to Performant. Every unrestricted tier
+  entry MUST sit on the allowlist.
+- Entity canon MUST exist as entity records, not cast narrated in a document.
+- **Plugins** are operator-loaded (off unless `plugins.dir` is set), per project, answering only fixed decision points (canon augment, brief policy, call routing, context/prompt
+  contribution). They MUST NEVER register routes, hold the database client, write domain tables, change a plan's volume, content mode, claimed milestones or ending flag, or issue
+  `action.*` ops; durable changes are allowlisted proposals. A failing plugin degrades its decision point and MUST NEVER fail a generation.
 
-### Canon, containment and knowledge
+## Publishing
 
-- Draft and isolated content MUST NEVER be indexed or retrieved. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. Continuity and canon extraction
-  route by containment: standard prose on the standard map, an isolated chapter on the unrestricted one, told to describe non-graphically, its result staged for the author
-  (finalize NEVER applies it, nor reopens one the author settled) with every quoted excerpt withheld and `sourceIsolated` stamped on it. A standard chapter sees an isolated
-  predecessor only as its summary plus its structured positions (roster keys and places of at most 60 characters; no last beat, conflict, feelings or established facts);
-  finalizing an isolated draft requires a summary and a state. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
-  there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary and cannot rewrite its body.
-- A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
-  so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
-- A chapter's content mode is its plan's (none is standard; an isolated draft counts as unrestricted) and MUST route every call on that chapter's prose through the one
-  role table in `chapter-route.ts`. An unrestricted chapter runs the normal writer → judge → repair graph on the unrestricted route, is written isolated, and NEVER falls back to
-  a standard model. Anything feeding a standard call (chat lookups, plugins, art, packs) reads an isolated chapter through `isolation-read-policy.ts`: never its prose, free-text
-  state or judge note.
-- Every unrestricted call MUST pass the deterministic hard line (`hard-line.ts`) before it is sent, and its output before it is kept. A prompt variable not explicitly listed
-  as background, what the author or plan supplied, and what a creative role (writing, repair, revision, chat) wrote are held to the full rule; background context and derived
-  roles' output (summaries, extraction, judging, compaction) to a narrow explicit list. A refusal is `AI_015` naming the record, never quoting it; no model is called, nothing
-  is saved (a refused chat message included), a streamed reply is released only a screened sentence at a time, and a refused request's `refused` model-call row carries the
-  rule and source refs. A refused compaction is skipped, never failing the turn. Every unrestricted request also carries a system line forbidding such content. Standard
-  calls are not screened; the standard model holds that line itself.
-- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, rewrites the chapter's final draft to match under a new `amended` revision (the replaced prose stays in its history, the judge verdict is cleared), and republishes only when the reader-visible hash moves; the chapter PATCH/DELETE routes refuse a locked chapter.
-  Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
-- Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
-  drafter sees only open canon, facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`,
-  and a hidden fact without a `writerNote` is withheld entirely; only the judge sees the forbidden list. Open canon is a fact scheduled from the first chapter, a rule the whole
-  book obeys rather than a truth anyone had to learn, so a brief's knowledge contract narrows what its POV cast privately knows and never withholds one; a reveal scheduled later
-  stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone. A chapter-scoped `fact:` ref obeys the same gate (plus
-  the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored. Two Story Bible addresses are reserved and planner-only, whoever
-  writes to them: the organised timeline (`project/timeline`) and the open questions (`project/open-questions`) say what happens later in the book, and no scheduled canon
-  fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, and the lore index, never resolve
-  into a writer pack whatever ref names them, and are dropped from outlined refs. The chat hub may read them, but only with review — the hub's inventory lists them
-  by address alone, and a turn that looks one up never auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
-  Every string the chapter writer reads (generation, revision and repair) passes one disclosure policy for that chapter, loaded once per run: the locked facts' text,
-  author note, key and give-away terms, the ending and ending question (until the chapter planned as the ending) and later volumes' goals and notes are withheld
-  wherever they were copied — previous prose, summaries, continuation state, entity sheets, Bible pages, cited refs and their headings, style, writer lines, the brief,
-  feedback, guidance and findings. The planner-only pages' lines are withheld only from what copies authored canon (pages, entity sheets, cited refs, plugin sections),
-  because their opening lines are what the chapter's own plan says. It is lexical: it catches copies, not paraphrase, and a passage of one word, of two words
-  under twelve characters, or under six characters in a script written without spaces, is caught only by give-away terms. For the writer a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an
-  earlier chapter, a thread or mystery only once opened (one with no opening chapter, made by hand or imported, always), and the volume-plan and escalation-map pages never. A locked fact's allowed clues reach the writer
-  unscrubbed, and a clue may not name its fact's give-away terms (checked when the clues or terms are written, so an older fact stays editable; one that
-  still does is dropped from the writer's clues). A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one.
-  Planner and chat packs are not scrubbed.
-  Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
-- A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
-  decides whether it holds. A fact's `plannedChapter` is provisional; `disclosedInChapter` is set only when the disclosing chapter is finalized, NEVER by planning. The project's
-  `ending` is planner-only and MUST NEVER reach a writer pack before the chapter planned as the ending, nor a publish payload.
-- **Reveal rule**: a plan for chapter N MAY learn a fact only when every requirement holds for that plan: its dated reveal chapter is at most N, and each unlock term
-  holds, where a milestone counts as reached if a finalized chapter at or before N reached it or this plan or an earlier one claims it, and the ending term holds
-  from the chapter planned as the ending on (an epilogue included). Milestones carry no order. An undated fact without a condition has no planned reveal, and no
-  plan may reveal it. The rule runs on every plan write (hand edit, proposal apply, revert, chapter insert; the insert planner sanitises its own output first)
-  against the plans as the whole write leaves them. A plan whose reveal stops holding because something it relied on changed is never silently rewritten: the plan
-  and its unfinalized draft are marked stale, the draft's approval and the reveals it ledgered are revoked, and approval and finalize refuse that chapter until the
-  plan is fixed; approval ledgers only the learns the rule allows. The writer pack mirrors the rule: a learn it would refuse reveals nothing, and a dated fact past
-  its chapter stays hidden while its unlock does not hold. What a POV character already knows stays known whatever the condition.
-- A plan at or behind the story cursor or the latest finalized chapter MUST NEVER change. Plan writes, fact writes that reconcile plans, and the finalization commit
-  take the project row lock first, so a claim cannot move between a rule check and what it guards.
-- A milestone's state is derived, never authored: `planned` at the earliest chapter whose plan claims it, `open` when none does, `reached` only in the finalization
-  commit of the chapter whose plan claims it, bound to the committed revision. Rewriting or regenerating that chapter's prose keeps the claim; only a plan change
-  moves it. A milestone is claimed by one plan at most and cannot be removed while a plan claims it or a fact's unlock names it. At most one plan is the ending.
-- Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only after the last written chapter
-  (a draft after the insert point refuses it with `CHP_009`; plans after it shift) and only while it holds the authoring claim (`CHP_004` otherwise).
-- Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only, but a stale brief blocks generation and a stale draft cannot be approved.
-- A chapter's volume is the one its brief names; an imported chapter keeps the volume its bundle placed it in. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
-  planned chapter, after it). A volume a brief still names cannot be removed, so a change-set's volume removals (and a revert's) run after its other ops; a plan
-  reset takes briefs out of the volumes it deletes.
-
-### Chapter review
-
-- A review is bound to the draft revision and the hash of the text it read; it is stale, and its findings describe older text, as soon as either moves. Staleness is computed on
-  read, never stored. A remedy is refused on a stale review.
-- A review NEVER edits prose; its only draft writes are the judge verdict and the gate below.
-- The gate reads only the latest judge review of the current text: an open blocking finding holds the draft as a contradiction (which resets an approval and revokes its reveals)
-  and blocks the next chapter. Dismissing or overriding releases the draft only to `needs_review`, never to approved; "I'll fix it myself" releases nothing. An answer to an
-  older review gates nothing.
-- Severity: a continuity contradiction and any leak of a secret (the deterministic give-away scan or the judge's own finding) are blocking. Plan and ending-contract shortfalls
-  are warnings in a review, because a hand-writer may leave their plan on purpose — so a review whose open findings are only warnings lifts a contradiction the generation run set.
-- A dismissal or override is remembered for the same text: a re-run carries it to the same finding and tells the model not to raise it again. The newest review that raised a
-  finding decides, so a withdrawn answer stops carrying.
-- A check the judge left out is never claimed: it is dropped from what was checked and reported as not assessed, so "No issue detected" cannot follow from an omission.
-- Reviews of an isolated or unrestricted chapter are marked `isolated`: their findings quote prose a standard model must not read.
-
-### Story Bible audit
-
-- A report claims only what was read: a pass that failed, a page read in part, an entry over budget, a finalized chapter without a summary and an isolated chapter
-  narrow "Checked: …"; facts and chapters are claimed only when the contradiction pass ran. A clean report says it found nothing and lists what it checked.
-- Isolated chapters are never read, not even their summaries; standard chapters are read by summary only, the most recent first when they run over budget.
-- Evidence cites only a source the audit read, and a quote only when three or more of its words are found there. A contradiction with no such quote is dropped; one
-  that does not quote both sides (two sources, or two non-overlapping passages of one) is reported without a card.
-- The audit is author-facing and reads secrets, but it never stages a fix that adds a secret where the chapter writer reads it (a page, an entity record, a fact's
-  writer note, allowed clues or a revealable fact's body), nor one that changes a secret's reveal, unlock or give-away terms; the finding says why. Only what the fix
-  adds to the record counts, so correcting a page that already names a secret is not held against it.
-- The material and the card's baseline are read in one repeatable-read snapshot, so an edit made while the audit ran conflicts at apply. Two findings changing one record
-  differently stage only the first. A cancelled audit stores nothing.
-- The server enforces Keep and Skip: applying an audit card with no selection applies what was kept, a selection must stay within it, a card with nothing kept is
-  refused, and a card a report points into cannot be edited. Skipping every finding discards the card; keeping one again restages it through the ordinary proposal
-  checks on the audit's baseline. A card applied, undone or conflicted settles the report.
-
-### Proposals and chat
-
-- Chat, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
-- Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
-- Starting organise (`action.organise_notes`) or plan (`action.plan_chapter`) is always a card, and each runs as a job. A plan's output is again a card, for the
-  next writable chapter only. Organise's output follows the quote rule with the notes standing in for the author's message: an entry is "from your notes"
-  only when its quote is found in the notes, stated, and it adds little the paragraphs it cites do not say; in an auto-mode chat those entries apply at once
-  as one revertible proposal. Everything else — no quote, a quote not found or hedged, inferred sections, the model's own suggestions, what relies on a
-  suggestion, the planner-only timeline and open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card. A page mixing
-  both is offered as its notes-backed sections, then the whole page; a card keeping both halves is refused (`NTS_007`). A rule becomes a Notebook direction
-  only when the author keeps its op; what applied at once is recorded as the app's (`decidedBy: system`), what the author kept on the card as theirs. A rule
-  or suggestion an earlier answer kept is taken out only when this round offers it again and the author declines it — its op says so on the card; one
-  this round does not offer stays as it was.
-- Each organise proposal carries its own record (`refinement_proposals.organise_record`) and, in the apply's transaction, records the organise decision from
-  the writes actually applied: a write the author declined leaves the earlier claim at its ref, so the next run rewrites what organising still owns in place
-  rather than beside it or freezing it. If the card fails to save after the notes-backed part applied, the whole stage rolls back and the job retries.
-- Undoing an organise proposal — including a card that kept only rules — puts the ledger back as that apply found it by deleting the rows it wrote and
-  making what it retired active again, so the Notebook's history keeps no "kept, then undone" trail; the proposal row keeps it (`organise_record.applied`).
-  A row the author has since withdrawn or reworded in the Notebook is theirs and stays, and what it replaced stays retired. Undo is refused (`NTS_010`)
-  only while a later organise change builds on a row it wrote.
-- A new card without its record is refused (`NTS_009`). Cards staged before records existed carry `{"legacy": true}` and record nothing, and starting
-  organise is refused (`NTS_004`) while an organise card is pending or such a legacy card is applied. A newer round supersedes an organise card still
-  waiting.
-- Every organise entry cites the notes paragraphs it draws on, numbered as `get_notes` numbers them: the paragraph a found quote sits in, and a cited one
-  only when it shares the entry's words. The receipt lists the paragraphs no quoted entry, timeline event or open question draws on as "not used yet", with
-  the notes digest they refer to. Notes longer than one pass's word limit are organised in several passes, one model call each, each told the reading,
-  records, pages and questions of the passes before; the round they merge into can hold more pages, records and events than one pass may write. On an
-  unrestricted project, what the model inferred or suggested is held to the hard line as supplied text before it reaches a card.
-- An author message of 600 words or more that the notes do not hold, and could take within their word limit, is offered as notes; saving it appends it to
-  the notes as paragraphs of its own through the notes store.
-- `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft (regenerating one is
-  the author's own request). Action ops run after the content transaction commits and stop at first failure.
-- **Quote rule**: a chat op applies within the turn only when an auto-mode session (the default for a new chat) sent it, its kind is allowlisted
-  (Story Bible page, entity, fact, volume title or goal, an empty story field), no always-card rule holds (removals and cleared fields, plans, prose,
-  actions, planner-only and writer-excluded pages, replacing a filled story field, a secret's truth once it exists, a secret's gating — writer note,
-  clues, unlock, reveal chapter — at any time, a volume's order, state or notes), and its `quote` supports it: at least three content words
-  (character bigrams in scripts written without spaces) found verbatim, whitespace-, case- and typography-normalised, in the author's message of
-  that turn; its sentence stated rather than asked, hedged, negated before the quote or turned down after it; no word the op writes coming only
-  from a sentence the author asked or hedged; no field dropping more than max(4, 25%) of the content words it held (a truncation); and the whole op
-  adding at most max(4, 25%) content words that are neither in the author's stated sentences nor already in the record. It must also name no record
-  only a card op creates, the author must not be "just discussing", and no warning may hold the turn. A model-declared quote or origin never
-  authorises a write on its own. The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the applied
-  block shows each written value beside its quote (T18) and undo stays one click away. The applied ops form one revertible proposal
-  (`chat_messages.applied_proposal_id`, linked the moment it commits), applied before the cards, which form a second, pending one
-  (`proposal_id`); a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait. Undo lists what relies on
-  the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed
-  fact and pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.
-- A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
-- Plan edits stay plan edits: a chat turn MUST NEVER rewrite a chapter's prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose
-  for that turn; otherwise it changes the brief and the author regenerates from it. The toggle is the only permission — wording may suggest turning it on, never grant it. A
-  prose op without it costs the model one repair and is then withheld with a note, together with the judging, approval or finalize that depended on it.
-- To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X", "X is not…") unless the author asked for that rule, because a named idea
-  re-primes every later writer. Proposals carry a deterministic check for text a change removed and then mentioned only under a negation: a chat turn gets one retry, and what
-  survives is kept as a visible warning and never auto-applied.
-- Plugins MUST NEVER register routes, hold the database client, write domain tables, change a brief's volume, content mode, claimed milestones or ending flag, or issue
-  `action.*` ops; durable changes are allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated
-  context, NEVER core artifacts. A failing plugin degrades its decision point and MUST NEVER fail a generation.
-
-### Pipelines
-
-- Generate stops at the first failed chapter.
-
-### Publishing
-
-- Content flows forge -> reader only. `publishedOrdinal` MUST be assigned once, NEVER re-derived from chapter numbers. Only locked, non-empty chapters publish, contiguously.
-- Every push MUST be idempotent (`contentHash`). No forge internals or unrevealed facts in a payload; a chapter payload admits only `contentRating` (the novel payload adds blurb, cover, genres, tags, status,
-  visibility and three rating dimensions), unrated is never sent as `none`, and a hash change MUST NOT move the digest of a chapter whose reader-visible content is unchanged.
-- A novel-level rating MUST NEVER fall below the highest published-chapter rating per dimension (the forge refuses, never raises). Publishing is NEVER automatic on approval (an amend reschedules an already-published chapter).
+- One way, forge -> `web-novel-server`, over an Identity M2M token. The forge owns the publication ledger, access control and slug; the reader holds a rebuildable projection
+  keyed by the project id sent as `sourceRef`. Converge order: novel, access, chapters, wiki. The ledger row is the outbox: failed pushes are retried, except stale, hash and slug
+  conflicts, which wait for an explicit reconcile. Wiping the reader and reconverging MUST yield identical state.
+- `publishedOrdinal` MUST be assigned once, NEVER re-derived from chapter numbers. Only locked, non-empty chapters publish, contiguously. Every push MUST be idempotent
+  (`contentHash`); no forge internals or unrevealed facts in a payload; unrated is never sent as `none`. A novel-level rating MUST NEVER fall below the highest published-chapter
+  rating per dimension (the forge refuses, never raises). Publishing is NEVER automatic on approval; an amend reschedules an already-published chapter.
+- The wiki is derived, never authored on the reader: entities and canon facts are projected into facets gated by `visibleFromOrdinal`. Hidden entities, never-revealed facts and
+  fragments of unpublished chapters are never sent.
+- **Portraits as of a chapter**: every new image is dated with the chapter it depicts (0 is before chapter 1; unstated means the latest final chapter). A generated image draws
+  from canon, so it may not pass the latest final chapter (`ILL_016`), and its references may not depict a later chapter than it does; an author-supplied image may name a later
+  chapter and stays withheld until that chapter publishes. Each image reaches readers, caption included, only from its chapter. Rows from before dating keep their old visibility.
+- A portrait later than its entry stays the top-level `imageRef` under its own `imageVisibleFromOrdinal`: a reader short of it gets the latest gallery image they have reached as
+  the list thumbnail and no portrait on the entry page. The forge sends that gate only to a reader that advertises the headline-gate capability; otherwise the portrait joins the
+  gated gallery. Capability and gate are part of drift detection, so an upgrade or rollback heals on the next converge, and a rolled-back reader hides a gated headline rather
+  than leaking it (`docs/architecture.md`, `docs/packages.md`).
 
 ## Non-goals
 
-- No auth beyond Identity, local chat models, graph interrupts, reader-side editing, reader-account access, or amend retraction.
+- No auth beyond Identity, local chat models, graph interrupts, reader-side editing, reader-account access, amend retraction, advance chapter planning or chapter counts per
+  volume, scene-by-scene writing with separate packages, or portraits of a future look.
 
 ## Open work
 
-- Bible audit does not flag spoiler prose already on a page outside `canon_facts`; it only refuses to stage text a fix adds that carries a secret, which it recognises by
-  give-away term, the truth quoted, or most of the truth's words in one sentence — a paraphrase in other words still passes.
+- The disclosure policy and the audit's secret check are lexical: a paraphrase of a secret in other words passes both, and the audit does not flag spoiler prose already on a page
+  outside `canon_facts`.
 - Cancellation is process-local: a cancel reaches only the replica running the work.
-- The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered
-  `DRF_013` until the cascade locks them in chapter order.
-- The isolated chapter's bridge is its summary until the reviewed, structured bridge lands; the hard line is a lexical screen, so it refuses conservatively and can be evaded by wording.
-- Policy P4-27 (conservative, for the owner to revisit): "sex" and "molest" pair with a minor on the author's own text, so a survivor's backstory written in plain words
-  in a plan, a note or a chat message on the unrestricted route is refused.
-- Chapter reviews of an isolated chapter quote its prose, and nothing redacts them for a standard call yet; that policy lands with the chat's review lookup.
+- The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered `DRF_013`
+  until the cascade locks them in chapter order.
+- The hard line is a lexical screen, so it refuses conservatively and can be evaded by wording. By a standing conservative policy, "sex" and "molest" paired with a minor on the
+  author's own text are refused, so a survivor's backstory written in plain words on the unrestricted route is refused.

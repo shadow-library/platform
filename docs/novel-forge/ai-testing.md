@@ -15,6 +15,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part 3: planning, generation          | Volumes, chapter plans, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
 | Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                        |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)          |
+| Part 6: the chat-first flow           | New novel and progress, organise, quote rule, rejections, plan cards, finalize review, passages, isolation, portraits |
 
 ## Recipe format
 
@@ -24,10 +25,12 @@ Each block gives: Entry (UI screen or route), Preconditions, Input (literal text
 
 Several features are reachable only through the API, and some observability is incomplete; each recipe says so where it matters. The most important:
 
-- Bible rebuild, premise enhancement, `POST /finalize` and `POST /validate` have no web caller.
-- The judge and repair loop is not reachable from the UI: the client never sends `autoFix`, which defaults to off.
-- `cost_usd` is recorded only for image calls, so every cost figure understates spend.
-- The admin scope `novel-forge:admin`, needed to read prompts and context packs, is missing from the role catalog.
+- Premise enhancement and `POST /validate` have no web caller; `POST /finalize` is called by the web only for a chapter
+  approved before finalize reviews existed (every other finalize goes through `…/drafts/:n/finalize-review/finalize`).
+- Manual chat sessions exist only through the API (`POST /chat/sessions {"mode":"manual"}`); the web creates auto sessions
+  and shows an old manual one a notice with **Switch to Auto**.
+- `novel-forge:admin` (role `NovelForgeAdmin`, never default or bot-grantable) is needed to read prompts, context packs
+  and raw model output; a platform role admin must assign it to you.
 
 The full list is in the "Findings" sections of each part.
 
@@ -322,26 +325,27 @@ Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `in
 
 **Always send `kind: "new_novel"`**; it is the only value the enum accepts.
 
-Then set the brief — it is a separate `PATCH`, not part of create:
+The bible builder (Part 2) reads the project brief, which neither create route writes — it is a separate `PATCH`:
 
 ```
 PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 ```
 
-(`project.dto.ts:201-202`). The Story Bible screen refuses to run without one
-(`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:204-207`).
+(`project.dto.ts`). The Story Bible screen's builder button refuses to run without one
+(`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx`, "Add a project brief in Settings before generating
+the bible").
 
-**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — a single "Start a new
-novel" form (working title + content mode) posts to `POST /api/v1/projects` with `kind: 'new_novel'` and
-opens straight into the Workspace chat (`projectHomeRoute()`, `/novels/$novelId/chat`); there is no second
-door — continuing an existing manuscript is the separate **Import novel** screen (Part 4). Screens are
-declared once in `apps/novel-forge-web/src/components/Layout/screens.tsx` (`PROJECT_SCREENS`) — there is only one project
-kind now, so the list is no longer filtered — and the visible labels are **Chat**, **Overview**, **Story Bible**,
-**Chapters**, **Review Queue**, **Illustrations**, **Workflow Runs** (admin-only, `adminOnly: true`), **Publish**,
-**Usage & charges**, **Project Settings**. Old links to the retired Blueprint and the other kinds' screens
-(`isRetiredScreen`) open the project's home. There is no standalone **Volumes & Arcs**
-screen and no standalone **Proposals** screen any more: continuity and refinement proposals are both a
-view inside **Review Queue** (`review.tsx`), and `/novels/$novelId/proposals` only redirects old links there.
+**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` ("Start a new novel": an optional
+working name — blank becomes "Untitled novel" — your notes up to 10,000 words, and the content mode) calls
+`POST /api/v1/projects/new-novel` (`new-novel.controller.ts`), not `POST /projects`. One transaction creates the
+project, stores the notes verbatim and opens an auto-mode chat; the response is `{projectId, sessionId}` and the web
+queues the opening message into that chat. The Part 6 recipes start here. Continuing an existing manuscript is the
+separate **Import novel** screen (Part 4). Screens are declared once in
+`apps/novel-forge-web/src/components/Layout/screens.tsx` (`PROJECT_SCREENS`), and the visible labels are **Chat**,
+**Overview**, **Story Bible**, **Chapters**, **Review Queue**, **Illustrations**, **Workflow Runs** (admin-only,
+`adminOnly: true`), **Publish**, **Usage & charges**, **Project Settings**. Old links to retired screens
+(`isRetiredScreen`) open the project's home. There is no standalone volumes screen and no standalone **Proposals**
+screen: continuity and refinement proposals are both a view inside **Review Queue** (`review.tsx`).
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
 built by `buildFinalBundle` at `e2e/tests/novel-forge/forge-helpers.ts:110`. Useful when you need chapters to
@@ -909,8 +913,8 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
   and the **Workflow Runs** screen — these are `@RequirePermission(ADMIN_PERMISSION, {highRisk:true})`
   (`generation.controller.ts:308,323,330`). Without it you cannot inspect the harness at all. See Part 5 §0.1 for
   how to actually get it granted.
-- Volumes have no screen of their own any more — they show inline on **Chapters** and are read-only over HTTP
-  (see "Volumes and chapter plans" below).
+- Volumes have no screen of their own — they group the **Chapters** list and are read-only over HTTP apart from
+  `POST /volumes/:volumeKey/goal-met` (see "Volumes and chapter plans" below and Part 6).
 - JSON payloads below are wrapped to fit the page. Rejoin the wrapped lines before sending — a break that
   falls inside a quoted string is not valid JSON.
 
@@ -928,7 +932,7 @@ doc alone, seed it with:
 
 Entity/fact keys below (`amara_veil`, `rook_calder`, `salt_assize`, fact `amara_is_the_pledge`) are
 **illustrative** — the bible builder coins its own. Read the real keys off the **Story Bible** screen's
-entity pages and **All facts** tab and substitute them, because an unknown key is skipped in silence rather than
+entity pages and **Secrets** tab and substitute them, because an unknown key is skipped in silence rather than
 rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — skipped` and ledgers nothing
 (`bible/fact/knowledge-view.ts:195-203`), and an unresolvable `requiredContext` ref is dropped the same way.
 
@@ -967,11 +971,12 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 
 #### Chapter generation (happy path)
 
-- **Entry:** **Chapters** screen → "Generate ch N"; `POST /projects/:projectId/generate` → **202**.
+- **Entry:** **Chapters** screen → the generate button (one chapter; its menu also offers the next five) or the chat's plan card
+  "Write chapter N" (Part 6); `POST /projects/:projectId/generate` → **202**.
 - **Preconditions:** no draft with `review_status='contradiction'` (else `DRF_003`); briefs exist (else `BRF_001`);
   no stale brief in the batch (else `BRF_002`). Volumes are not required and have no approval step.
-- **Input:** `{"limit": 1}` — what the UI sends. For the ladder use `{"limit":1,"autoFix":true,"maxFixes":3}`.
-- **Run:** 1. **Chapters** → "Generate ch 1". 2. Click the progress banner. 3. When it settles open the chapter.
+- **Input:** `{"limit":1,"autoFix":true}` — what the UI sends by default. For the ladder add `"maxFixes":3`.
+- **Run:** 1. **Chapters** → generate chapter 1. 2. Click the progress banner. 3. When it settles open the chapter.
 - **Verify:** `jobs` row `kind='generate'`, `target='1'`, payload `{chapters,autoFix,maxFixes,guidance}`.
   `workflow_runs` row `graph='chapter-generation'`; `node_trace` should read
   `assembleContext → draftChapter → persistDraft → mechanicalCheck → judge → accept → finish`.
@@ -981,29 +986,26 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   non-compliant (`:409`), so a weak judge model lands here on an otherwise clean chapter.
   `drafts`: `revision=0`, `generator='standard'`, `review_status='needs_review'`, `judge='consistent'`,
   `volume_key` set. `draft_revisions` gains `source='generated'` with the `run_id`.
-  **Workflow Runs** screen → the run → `generation@2.8.0`, `judge@2.4.0`, tokens in/out, tool calls, and
-  "Prompt anatomy" → "View full context" for the rendered pack (`runs.tsx:404,247,281`). `cost_usd` stays null
-  for text calls — only image calls record one. `GET /projects/:projectId/drafts/1/prompt` returns the same pack.
+  **Workflow Runs** screen → the run → `generation@2.9.0`, `judge@2.4.0`, tokens in/out, tool calls, and
+  "Prompt anatomy" → "View full context" for the rendered pack (`runs.tsx`). Each call's `cost_usd` carries its
+  `cost_source` (`provider`, `gateway` or `estimate`). `GET /projects/:projectId/drafts/1/prompt` returns the same pack.
   **Quality:** the draft must land the brief's `endingContract.hookType` on its last beat and must not open by
   recapping — read the last 5 lines against the brief's `handoffState`.
 - **Fails when:** `DRF_003` / `BRF_001` / `BRF_002`; a second call while a job is
   `pending|in_progress` silently returns the _existing_ job (`generation.service.ts:589`); job `last_error`
   `chapter N generation failed (run …)`.
-- **Re-running a chapter:** the batch is "briefs with no draft yet" — a chapter that already has a `drafts` row
-  is skipped and the run moves on to the next one (`generation.service.ts:607,610`). To regenerate chapter N,
-  `DELETE /projects/:projectId/drafts/:n` first (refused with `DRF_002` once the draft is `final`).
+- **Re-running a chapter:** `POST /projects/:projectId/chapters/:n/regenerate` (202) redrafts it from its current brief
+  through the same job and gates, replacing the prose in place; the old text stays in the revision history. It is
+  refused on a final chapter; a final chapter changes only through Amend.
 - **Cost:** ~2–3 calls (generation, 0–2 `chapter-expand@1.1.0` passes, judge, + `title@1.1.0` only if the
   writer returned no title).
 
 #### PROVOKING the judge / repair ladder
 
-- **Entry:** `POST /projects/:projectId/generate` with `autoFix`. **The UI never sends `autoFix`** — both
-  buttons post `{limit}` only (`chapters.tsx:471`; `limit` 1 for "Generate ch N", 5 for "Draft the next 5
-  chapters"), and no caller anywhere in `apps/novel-forge-web/src` sets `autoFix`, `maxFixes` or `guidance` on
-  this route. The graph defaults `autoFix` to `false` (`chapter-generation.graph.ts:45`, `maxFixes` to 3 at
-  `:46`) — so **the repair ladder is unreachable from the web app**. Send the body yourself, over the API, with
-  `projects:write` + `generation:run`; the three fields ride the `jobs.payload` into the graph
-  (`generation.service.ts:630` → `jobs/job.executor.ts:226,234`).
+- **Entry:** `POST /projects/:projectId/generate` with `autoFix`. The **Chapters** generate menu's **Advanced** →
+  "Judge + repair" checkbox (on by default) sends `{limit, autoFix}`; nothing in the web sends `maxFixes` or
+  `guidance`, so send those over the API with `projects:write` + `generation:run`. The graph's own default is
+  `autoFix: false` (`chapter-generation.graph.ts`); the fields ride the `jobs.payload` into the graph.
 - **Preconditions:** chapter 1 generated, approved and **finalized** (a `chapters` row with `status='done'`) —
   the boundary-echo check reads finalized chapters only (`chapter-generation.graph.ts:309-314`). Chapter 2 must
   have a brief and **no draft yet**; `DELETE /drafts/2` between attempts or the run skips to chapter 3.
@@ -1028,7 +1030,7 @@ verbatim — "…"`. It compares the last 60 words of the highest-numbered **fin
 mechanicalCheck → judge → …`; a patch whose `find` anchor is not unique falls through to `repairRewrite`
   (`routeAfterPatch`, `chapter-generation.graph.ts:264`). `model_calls` gains one `fix` row per patch attempt
   (`prompt_version` reads the live `fix.prompt.ts` version — `repairPatch` reads it off `PROMPT_REGISTRY.fix.version`
-  rather than a hardcoded string) and a second `generation@2.8.0` per rewrite. `drafts.revision` increments
+  rather than a hardcoded string) and a second `generation@2.9.0` per rewrite. `drafts.revision` increments
   once per persisted attempt; `draft_revisions.source` reads `patched` for a patch attempt and `rewritten`
   for a rewrite attempt — both nodes set `repairMode` to their own kind, so the node trace and the source
   column agree.
@@ -1072,7 +1074,7 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
 - **Run:** 1. **Review Queue** → pick the chapter. 2. Press `R`, paste the note, submit. 3. Toast `Chapter N revised — re-review the new draft`.
 - **Verify:** `user_feedback` row `artifact_type='draft'`, `disposition='revision_requested'` with the note;
   `drafts.revision` +1, `review_status` back to `needs_review`, `stale_reason=NULL`; `draft_revisions` row
-  `source='revised'` linked to that `feedback_id`. `model_calls`: `revision@1.4.0`.
+  `source='revised'` linked to that `feedback_id`. `model_calls`: `revision@1.5.0`.
   **Every descendant draft is marked stale** — `drafts.stale_reason = 'ancestor chapter N was revised'`
   for chapters > N (`markDescendantDraftsStale`). **Quality:** diff `GET /drafts/:n/revisions/:r` against the
   previous revision — the note's three asks must each be visible; a revision that only rewords is a failure.
@@ -1089,27 +1091,30 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
   `POST /projects/:projectId/drafts/:n/approve`.
 - **Preconditions:** draft not `final` (`DRF_002`) and not stale (`DRF_007`). The UI disables the button while
   `review_status` is `contradiction` or `generating`.
-- **Input:** `{"revision":2,"idempotencyKey":"approve-ch1-attempt-1"}` — `revision` (required) is the draft revision the
-  author read; `idempotencyKey` and `reviewerId` are optional.
+- **Input:** `{"revision":2,"saveSeq":0,"draftId":"<id>","idempotencyKey":"approve-ch1-attempt-1"}` — `revision`,
+  `saveSeq` and `draftId` (all required) are what the author read (`GET /drafts/:n`); `idempotencyKey`, `reviewerId`,
+  the three ratings and `keepStale` + `staleReason` (approve a stale draft as written) are optional.
 - **Run:** 1. Approve. 2. Re-POST with the _same_ `idempotencyKey`.
 - **Verify:** `drafts.review_status='approved'`; one `user_feedback` row `disposition='approved'` — the retry
   adds none (unique `idempotency_key`, `onConflictDoNothing`). **In the same transaction** the brief's
   `knowledgeContract.learns` become `character_knowledge` rows with `learned_in_chapter = n`, `source='brief'`
   (`bible/fact/knowledge-view.ts:176`); log `brief reveals ledgered`. Unknown entity/fact keys are skipped with
-  the warn `brief reveals reference unknown keys — skipped` — check the **Story Bible**'s **All facts** tab for
+  the warn `brief reveals reference unknown keys — skipped` — check the **Story Bible**'s **Secrets** tab for
   the fact's knowledge list. No model call. Then edit the draft (or revise, regenerate, judge it, or change an earlier
   chapter): the `source='brief'` rows with `learned_in_chapter = n` are gone and the draft reads `needs_review`;
   re-approving restores them. Finalizing keeps them. A pair another approved or final chapter's brief also declares is
-  re-ledgered at the earliest such chapter instead of disappearing.
-- **Fails when:** `DRF_013` when the draft is no longer at `revision` (no approval, audit or ledger row is written),
+  re-ledgered at the earliest such chapter instead of disappearing. The same transaction stages the chapter's
+  finalize review (`finalize_reviews`, `status='preparing'`) and queues a `finalize_review` job — Part 6 §6.
+- **Fails when:** `DRF_013` when the draft is no longer at `revision`, `saveSeq` or `draftId` (no approval, audit or ledger row is written),
   `DRF_007` (regenerate first), `DRF_002`, `DRF_001`. A chat approval card is bound to the revision current when it
   was staged, so applying it after the prose changed fails the same way.
 
 #### Finalize + continuity write-back
 
-- **Entry:** **API only — there is no UI caller.** The path appears in `apps/novel-forge-web/src` only inside
-  the generated client (`lib/apis/api-types.gen.ts:861` is its path key), never in a route or api module.
-  `POST /projects/:projectId/finalize`.
+- **Entry:** a chapter approved after finalize reviews landed finalizes through its review
+  (`POST …/drafts/:n/finalize-review/finalize`, Part 6 §6), which runs this same graph and applies only the kept
+  updates. `POST /projects/:projectId/finalize` is what the web calls for a chapter with no review at all (approved
+  before reviews existed); on a chapter that has a review it refuses exactly as the review route does (`FRV_*`).
 - **Preconditions:** the draft is `approved` (else `DRF_004`); chapter `n-1` already has a `final` draft (`FIN_001`); no earlier
   chapter with `chapters.needs_revalidation=true` (`FIN_002`); the latest `novel`-scope validation report has
   no `error` for this chapter (`FIN_003`); an isolated draft needs a non-blank summary **and** a non-empty
@@ -1125,7 +1130,7 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   leaves `continuity_applied=false` — that is by design, not a half-finalize
   (`chapter-finalization.graph.ts:162`). Canon written: `entities` (+`entity_appearances`), `plot_threads`,
   `mysteries`, `character_states`, `relationships`; `timeline`, `power` and `knowledgeChanges` are deliberately
-  never persisted. `model_calls` records the continuity call as `continuity@1.3.0`, matching
+  never persisted. `model_calls` records the continuity call as `continuity@1.4.0`, matching
   `ai/prompts/continuity.prompt.ts:16` — finalize and the `propose-continuity` route below both read the
   version off `PROMPT_REGISTRY.continuity.version` (`chapter-finalization.graph.ts:241`), so the two paths
   agree.
@@ -1154,7 +1159,7 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   A thread already advanced past this chapter is skipped (warn `thread already advanced past this chapter`).
 - **Fails when:** `CNT_001` (no pending proposal); an `appeared` entity key that does not exist is skipped with
   a warn rather than failing — check `entity_appearances` actually gained rows.
-- **Cost:** `propose-continuity` = 1 call (`continuity@1.3.0`); apply/discard = 0.
+- **Cost:** `propose-continuity` = 1 call (`continuity@1.4.0`); apply/discard = 0.
 
 #### Extraction to bible
 
@@ -1165,7 +1170,7 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
 - **Input:** no body.
 - **Run:** 1. Open the chapter. 2. "Add to bible". 3. Toast `Canon proposal drafted — review it on the
 Proposals page` (stale copy — there is no separate Proposals page any more; it means **Review Queue**'s
-Proposals view, `chapters.tsx:1253`). 4. **Review Queue** → Proposals → open → apply.
+  Proposals view, `chapters.tsx:1253`). 4. **Review Queue** → Proposals → open → apply.
 - **Verify:** `refinement.proposals` row `kind='chapter_extract'`, `scope_type='brief'`,
   `scope_ref='chapter:N'`, `allowed_ops` = `entity.upsert, entity.remove, bible_document.upsert,
 bible_document.remove`, `model` recorded. `model_calls`: `chapter-extract@1.0.0`, `role='extraction'`.
@@ -1224,7 +1229,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   `chapter_publications` is deliberately **not** shifted.
 - **Fails when:** `CHP_003` / `CHP_001` / `CHP_009` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
   `planner`).
-- **Cost:** 0 model calls for `hand`; 1 `outline@3.1.0` call for `planner`.
+- **Cost:** 0 model calls for `hand`; 1 `outline@3.2.0` call for `planner`.
 
 #### Unrestricted fill / `external` write mode
 
@@ -1251,7 +1256,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   `POST /chapters/:n/summarize` (returns `{summary,state}` **unpersisted**; save via `PUT /drafts/:n`, whose
   `body` field is required, so resend the prose alongside the summary or you will blank it), the UI's
   "Finalize is blocked until this chapter is summarized" alert; `CHP_007` if the draft has no prose.
-- **Cost:** 1–3 calls (generation + expansion) for unrestricted; 1 (`chapter-summarize@1.1.0`) for summarize;
+- **Cost:** 1–3 calls (generation + expansion) for unrestricted; 1 (`chapter-summarize@1.2.0`) for summarize;
   0 for import.
 
 #### Amend a finalized chapter
@@ -1278,7 +1283,7 @@ true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `
 #### Character-knowledge / canon-fact leak protection
 
 - **Entry:** `PUT /projects/:projectId/facts/:factKey` + a brief `knowledgeContract` + generation.
-  UI: **Story Bible**'s **All facts** tab.
+  UI: **Story Bible**'s **Secrets** tab.
 - **Preconditions:** the POV entity exists in `entities`; a brief at the chapter under test.
 - **Input:** 1. fact —
   `PUT /facts/amara_is_the_pledge` `{"text":"Amara's own childhood is the collateral on the Veil debt.",
@@ -1384,7 +1389,7 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
   `ordinal 1`; ordinals `1,3`; a whitespace-only `content`; `novel.cover` naming a missing asset; `mode: "source"`.
 - **Verify:** `projects`: `kind` `new_novel`, one contentless `<section>/default` `bible_documents` row per `bible_section` enum value, `name=title=novel.title`,
   `brief=synopsis`, `themes=tags`; `novel.genre` lands in `projects.imported_meta` only when it matches a platform genre (otherwise a response `warning`). One
-  `source`-status volume per bundle volume, carrying its title. `chapters`: rows numbered 1..N in flatten order, `status='done'`, `generator='human'`, `locked=true`,
+  volume per bundle volume, carrying its title; the lowest one becomes `active`, the rest `not_started` (`autoActivateVolume`). `chapters`: rows numbered 1..N in flatten order, `status='done'`, `generator='human'`, `locked=true`,
   `word_count` set. `jobs` row `kind='import'`, `target='import-P'`, `payload` compacted to `{chapters:N,hasCover:false}` once the job completes or is cancelled — a
   **failed** import never reaches the compaction, so the full bundle prose stays on the row. Invariant: `select count(*) from model_calls where project_id=P` is 0.
   Negatives return 400 with field paths `volumes` / `novel.cover` / `volumes[0].chapters[0].content` (the whitespace-only body clears the DTO's `minLength: 1` and is
@@ -1397,7 +1402,7 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
 ## Part 5: chat hub, illustrations, plugins, settings, quota, admin inspection
 
 Base: every route is under `/api/v1`. `$P` = project id, `$S` = chat session id, `$T` = bearer token. Short paths are relative to `apps/novel-forge-server/src/modules/`; anything outside that is given from the repository root.
-Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (chat+planning default), claude-sonnet-5 2/10 (review), gpt-5.6-luna 0.2/1.2 (helper), kimi-k3 3/15 (writing), claude-haiku-4.5 1/5. One hub turn is about 3-8k input tokens, so roughly $0.005-0.03.
+Cost basis: per-model prices are in `ai/models.ts` and the default model per group, type and tier in `ai/defaults.ts` (Standard Balanced: planning and chat `anthropic/claude-opus-5.5`, writing and review `anthropic/claude-sonnet-5`, helper `openai/gpt-5.6-luna`). Read the price of the model your turn actually resolved to before estimating.
 
 ---
 
@@ -1420,7 +1425,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 | `GET /runs/:id/context` (admin)                       | Pack summary plus `rendered`: the exact stable-then-volatile context text. 404 `CTX_001` if no pack is linked.                                                                                                                                                                                                                                                                                      |
 | `GET /runs/:id/calls/:callId` (admin)                 | Model-call row plus `rawOutput` (the raw text, stored before parsing) and `error`.                                                                                                                                                                                                                                                                                                                  |
 | `GET /context/preview?purpose=chat&scopeType=project` | View of a pack: `purpose`, `budgetTokens`, `usedTokens`, `sections`, `omitted[{key,reason}]` (reason `budget` or `unresolved`), `unresolvedRefs`, `renderedStable`, `renderedVolatile`, `rendered`. Purposes: `generation, outline, chat, premise, audit`. `chat` needs `scopeType` (else 400 `CHT_003`). Only `generation` is dry — every other purpose persists a `context_packs` row (see 6.10). |
-| `GET /cost`                                            | The full spend view: totals plus `byGroup`/`byRole`/`byModel`/`byCostSource`/`byTier`/`byContentMode` breakdowns, each with recorded and list-price-estimated `costUsd` — see 0.5.                                                                                                                                                                                                                  |
+| `GET /cost`                                           | The full spend view: totals plus `byGroup`/`byRole`/`byModel`/`byCostSource`/`byTier`/`byContentMode` breakdowns, each with recorded and list-price-estimated `costUsd` — see 0.5.                                                                                                                                                                                                                  |
 
 #### 0.3 What is NOT recorded
 
@@ -1474,15 +1479,15 @@ select purpose,budget_tokens,used_tokens,sections,omitted,unresolved_refs,left(r
 
 ### 1. Chat hub
 
-Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), node `chat-turn`, graph `chat-turn`.
+Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model), node `chat-turn`, graph `chat-turn`.
 
 - Session routes: `/projects/:p/chat/sessions...`. Non-streaming turn: `POST /chat/sessions/:s/messages`. Streaming turn: `POST /projects/:p/chats/:s/turn/stream` (note `chats`, not `chat/sessions`).
-- Sessions are always scope `project` (`chat.service.ts:205`); the request body has no scope field.
+- Sessions are always scope `project`; the request body has no scope field. A new session is `auto` unless the body says `{"mode":"manual"}` (`chat.service.ts`).
 - **Fixture used by blocks 1.1-1.9.** Create it once: `POST /projects {"name":"Tidewrights QA","kind":"new_novel"}`. Block 1.1 builds its canon.
 
 #### 1.1 Manual hub turn: materialise canon as a staged proposal
 
-- **Entry:** UI "Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`.
+- **Entry:** API only — the web has no Manual/Auto control and shows a manual session the notice "This chat is manual: even your own clear words come back as cards." with **Switch to Auto**. `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`. In a manual session every op is a card; Part 6 §3 covers the auto-mode quote rule.
 - **Preconditions:** empty new_novel project.
 - **Input** (`content`):
   > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes, each with the goal it works towards. Do not run generation.
@@ -1495,7 +1500,7 @@ Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), 
   - `proposal.changeSet` holds roughly 6 `entity.upsert`, 1 `fact.upsert` and 2 `volume.upsert`, each with `rationale`. There are no `action.*` ops despite "Do not run generation".
   - `proposal.baseline` has one entry per touched ref, each with `exists:false`.
   - `chat_messages` ordinals 1 (user) and 2 (assistant); `proposalId` is set on the assistant message; `chat_sessions.title` is auto-set within seconds. It comes from a separate `chat-title@1.0.0` run (role `title`, helper model) that appears only in `model_calls`. The first message must be at least 15 characters.
-  - Run: `GET /runs/<runId>` shows one `chat-refine@2.3.0` call, `attempt 0`, model `z-ai/glm-5.2`. The pack has purpose `chat_hub` with sections `premise`, `pipeline_status` and maybe `catalog`.
+  - Run: `GET /runs/<runId>` shows one `chat-refine@2.13.0` call, `attempt 0`, on the chat group's model for the turn's type and tier. The pack has purpose `chat_hub`; its sections are the novel's durable state (`story`, `notebook`, `progress`, `inventory`, `promises`, `handoff` and others from `context-assembler.service.ts` `forNovelChat`), never chapter prose.
   - **Quality:**
     - Each character record states a want, a wound and a speech habit, and Marrow and Ilse are not generic villains.
     - The secret appears ONLY in the `fact.upsert` body, with a POV-safe `constraintNote` and tell-tale `terms`. It is absent from entity bodies and bible prose.
@@ -1555,7 +1560,7 @@ Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), 
 
 #### 1.5 Action ops and one-way doors (`never auto-applied`)
 
-- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`, all of which the hub offers: generate_chapter, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, validate, finalize).
+- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`: generate_chapter, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, validate, finalize, organise_notes, plan_chapter, advance_volume). Organise, plan and write run as durable jobs (Part 6).
 - **Preconditions:** a pending proposal (any) from 1.1, or a fresh one from a cheap turn.
 - **Run** (deterministic; no model needed to stage):
   1. `PATCH /proposals/$X {"changeSet":[{"op":"entity.upsert","entityKey":"harbour-bell","type":"item","name":"Harbour Bell"},{"op":"action.finalize","upTo":1}]}`
@@ -1575,16 +1580,22 @@ Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), 
 
 #### 1.6 Auto mode
 
-- **Entry:** UI mode toggle "Auto" (hint "Auto — changes apply instantly, revertible from History"), or `PATCH /chat/sessions/$S {"mode":"auto"}`. Mode is switchable mid-chat.
+- **Entry:** every new chat, or `PATCH /chat/sessions/$S {"mode":"auto"}` (the web's **Switch to Auto**). Auto mode
+  does not apply everything: an op applies within the turn only under the quote rule (Part 6 §3); the rest are cards.
 - **Preconditions:** 1.1 canon applied.
-- **Input:** `Change Wren's speech habit: instead of counting things she hums the tide table. Update her record.`
+- **Input:** `Change Wren's speech habit: she hums the tide table instead of counting things. Update her record.`
 - **Run:** send it in an auto session; read the 201 body, `GET /changes`, and `GET /entities/<wren-key>`.
 - **Verify:**
-  - Response has `proposal.status='applied'`, `autoApplied:true`, `applied.applied[]` with `artifactRef:'entity:<key>'`. The `entities` row is updated in the same request. `GET /changes` lists it with `autoApplied:true` (UI chip "auto").
+  - An `entity.upsert` whose `quote` is found in the message lands in `appliedProposal` (`autoApplied:true`,
+    `status:'applied'`) with `applied.applied[]` naming `entity:<key>`; the assistant message carries
+    `appliedProposalId`. `GET /changes` lists it with `autoApplied:true`.
   - Only the changed fields are in the op (`notes` or `body`). Untouched fields are unchanged in DB.
-  - **Failure downgrade.** If the canon moved since context assembly, `applyNote` carries the error message and the proposal is `conflicted` (`chat.service.ts:503`; its comment wrongly says "pending"). Reproducing it needs a race — auto staging and applying are one request, so use two tabs or a slow model — and may take several tries.
-  - One-way doors: if the model includes `action.finalize`, auto apply lands the other ops and returns the door's `note` in `applyNote`, with that op `declined`. Model-dependent; the deterministic path is 1.5.
-- **Fails when:** `applied` is missing on an auto turn with a proposal (auto-apply threw: read `applyNote`), or the turn returns 500 (auto-apply must never fail the turn).
+  - Anything the quote does not cover (an invented detail, a question, a removal) is in `proposal` as a pending card.
+  - **Failure downgrade.** If applying fails (a baseline conflict, a refused write) `applyNote` says why and every op
+    comes back as a card.
+  - One-way doors: `action.*` ops are always cards, never applied within a turn. Model-dependent; the deterministic
+    path is 1.5.
+- **Fails when:** an op without a found quote is applied, or the turn returns 500 (applying must never fail the turn).
 
 #### 1.7 Revert, rollback, change history
 
@@ -1878,14 +1889,197 @@ export default function createPlugin() {
 
 ### 6. Code/doc mismatches and broken or unreachable behaviour
 
-1. **Tool-loop calls are never recorded.** `ai/tools/tool-loop.ts` invokes the model with no telemetry callback, so every judge and window-validation call made through `chatFor` + `runToolLoop` writes no `model_calls` row. `GET /cost`, the quota's spend window and the Runs view all leave that spend out.
+1. **Tool-loop calls are recorded only with a telemetry context.** `ModelRouterService.chatFor` binds the telemetry callback only when its caller passes a `TelemetryContext`; a `runToolLoop` over a client built without one writes no `model_calls` row, and `GET /cost`, the quota's spend window and the Runs view leave that spend out. Check the judge's calls appear in `model_calls` before trusting a cost figure.
 2. **`model_calls.status` enum is mostly dead.** `parse_error`, `repaired`, `refused` and `timeout` are never written (enum at `src/database/schemas/ai.ts:42`). The Runs UI "repaired" chip can never show; a repaired call is an `attempt=1` row with `ok`.
-3. **Recorded cost does not say where it came from.** A text row's `cost_usd` is the provider figure or a write-time list-price estimate, indistinguishable after the fact, so `GET /cost` can only flag as estimated the rows it prices itself.
+3. **Every recorded cost counts as the real charge.** `model_calls.cost_source` says where a figure came from (`provider`, `gateway`, or `estimate` from list prices at write time; null on older rows), and `GET /cost` breaks spend down by it, but the totals add every source alike (`ai/quota.ts` `classifyCostSource`).
 4. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
 5. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
-6. **Unused error codes.** `CHT_004`, `CHT_005` and `AI_003` are never thrown anywhere in the server, though the web app still maps `AI_003` to failure copy. Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
+6. **Unused error codes.** `CHT_004` and `CHT_005` are never thrown anywhere in the server (`AI_003` is: an unrestricted call that resolves off the allowlist refuses with it, `ai/unrestricted-route.ts`). Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
 7. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
-8. **Auto-apply conflict leaves `conflicted`, not `pending`.** The `autoApply` doc comment says pending (`chat.service.ts:503`); the conflict status flip commits inside `apply`, so the reloaded proposal is `conflicted`.
-9. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
-10. **Stale comments.** `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
-11. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).
+8. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
+9. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).
+
+---
+
+## Part 6: the chat-first flow
+
+The path an author takes today: a title and notes, a chat that organises them into the Story Bible, one chapter planned
+and written at a time, reviewed before it is finalized. Every route is under `/api/v1/projects/$P` unless it says
+otherwise; `$S` is the chat session. Prompt versions are whatever `PROMPT_REGISTRY` (`ai/prompts/index.ts`) lists: read
+them off `model_calls` rather than trusting a number here. Cost and admin inspection work as in Part 5 §0.
+
+### 1. New novel and the progress map
+
+- **Entry:** Projects → "Start a new novel"; `POST /api/v1/projects/new-novel {"title","notes"?,"contentMode"?}`.
+- **Input:** a title and 800–1,500 words of your own notes about the book (the Part 3 sample idea, expanded).
+- **Verify:** 201 `{projectId, sessionId}`; the session is `mode='auto'`. `GET /notes` returns the notes verbatim.
+  `GET /progress` lists the checklist items (`premise`, `protagonist`, `opposition`, `theme`, `reader_promise`,
+  `ending`, `first_volume_goal`, `next_chapter_planned`, …) as `open` or `answered`. `PUT /progress/theme
+{"status":"undecided"}` answers an item as settled with no value, `{"status":"dismissed"}` hides it, and
+  `DELETE /progress/theme` clears the override. The checklist is advice: nothing refuses planning or writing
+  because an item is open. An override is a ledger entry on topic `progress.<key>` and never shows among the
+  Notebook's decisions or its do-not-propose list.
+- **Fails when:** `PRJ_014` blank title; `PRJ_012` notes over 10,000 words (also on `PUT /notes`); `PRJ_013` unknown
+  checklist key.
+
+### 2. Organise notes (a chat action)
+
+- **Entry:** ask the chat to organise your notes; it offers an `action.organise_notes` card. Accepting it queues a job
+  (`jobs.kind='organise'`, graph `notes-organise`); follow it with `GET /chat/sessions/$S/jobs` or the SSE
+  `…/jobs/stream`.
+- **Preconditions:** at least 600 words of notes (`NTS_003`); no organise card still pending (`NTS_004`).
+- **Verify:**
+  - Entries whose quote is found in the notes, stated rather than hedged, apply at once as one revertible proposal:
+    the transcript's "Added to your Story Bible — from your notes · Undo" block shows each written value beside
+    its quote. Everything else (no quote, inferred sections, the model's own suggestions, the planner-only
+    timeline `project/timeline` and open questions `project/open-questions`, removals, rules) waits on one card.
+  - Each entry cites notes paragraphs; the receipt lists "not used yet: N paragraphs (…)", the paragraphs nothing
+    drew on. Check that list against your notes by hand: a fact in neither the Story Bible nor that list was lost.
+  - `refinement_proposals.organise_record` is set on each organise proposal; a second run rewrites what organising
+    owns in place rather than beside it.
+  - Undo of the applied block (`POST /proposals/:id/revert`) puts the Notebook back as it was; it is refused with
+    `NTS_010` while a later organise change builds on it.
+  - **Quality:** nothing the notes place late in the book appears as current; the ending lands only in planner-only
+    pages; a suggestion is labelled as one.
+- **Save as notes:** send one chat message of 600+ words that the notes do not hold. Your message then carries
+  `offersNotes`; `POST /notes/from-message {"sessionId","messageId"}` appends it as paragraphs of its own
+  (`NTS_006` under 600 words, `NTS_005` not your message).
+
+### 3. A chat turn under the quote rule
+
+- **Entry:** any auto session. `POST /chat/sessions/$S/messages {"content","justDiscussing"?,"proseEdits"?}`.
+- **Input A (stated):** `Marrow Vance runs the ferry at night and owes the Guild forty silver.`
+- **Input B (hedged):** `Maybe Marrow runs the ferry at night? Not sure yet.`
+- **Input C:** Input A again with `"justDiscussing": true` (the composer's **Just discussing** toggle).
+- **Verify:**
+  - A: the entity op lands in `appliedProposal` with its `quote`; the assistant message carries `appliedProposalId`.
+    Anything the model added beyond your words (a new trait, a rank) is in `proposal` as a card. The web block
+    shows each written value beside its quote.
+  - B and C: nothing applies; every op is a card.
+  - Removals, plans, prose, actions, planner-only pages, replacing a filled story field, a secret's truth or its
+    gating, a volume's order or notes, and a promise's status or progress are always cards whatever the quote
+    (`refinement/write-policy.ts`, `ALWAYS_CARD` and `alwaysCardRule`).
+  - Undo impact: `GET /proposals/:id/undo-impact` lists `dependents` (plans, drafts, knowledge and pending
+    suggestions that rely on the change) and `finalUnaffected` before you revert.
+- **Fails when:** an op applies on a quote from a question or a hedged sentence, or with no found quote.
+
+### 4. Turning down a suggestion
+
+- **Entry:** API — the web's **Not this** declines a card op but does not call this route yet;
+  `POST /proposals/:id/ops/:opIndex/reject {"scope","why"?}` with scope
+  `never`, `not_now` or `not_this_version`.
+- **Run:** reject one suggested entity with `never`; then ask the chat for the same idea again.
+- **Verify:** a Notebook entry `kind='rejected'` on topic `idea.<ideaId>` with its `rejection_scope`. The same op (same
+  kind and fields, text normalised) is dropped from later turns' cards, together with anything that leaned on it; an
+  op your own words back is never dropped. `not_now` lapses when the active volume changes; `not_this_version` lapses
+  when a record the idea would change is edited. Rejecting the same idea again replaces the scope rather than adding
+  an entry.
+- **Fails when:** `LDG_006` no such op; `LDG_007` an action op; `LDG_008` `not_this_version` on an op that names no
+  record.
+
+### 5. Plan the next chapter, then write it
+
+- **Entry:** the chat's plan start (pick a suggested direction, "I know what happens", "Write the plan myself"
+  for an empty plan, or "Write it myself"); the card op `action.plan_chapter {chapter?, direction?, intent?, empty?}` queues a `plan` job (graph
+  `chapter-plan`, prompt `chapter-plan`) that stages a `chapter_plan` card holding one `brief.update`.
+- **Verify:**
+  - The card is for the next writable chapter only (`PLN_006` otherwise; `PLN_007` for an empty plan over an existing
+    one).
+  - Obligations recap: the previous chapter's hook, the most pressing promise (overdue before due before the one
+    quiet longest; one dormant on purpose never), the active volume's goal.
+  - Every scene names a point of view that is a character (a `pov` diagnostic otherwise); scene POVs that know
+    different secrets raise a `pooling` diagnostic, since the writer gets their knowledge for the whole chapter.
+  - Milestone claims and reveals obey the reveal rule: a reveal whose unlock does not hold is cut from the contract
+    and every text field before the card is shown; a hand edit that adds one is refused (`PLN_001`, `PLN_003`).
+  - `GET /proposals/:id/writer-preview` shows what the writer would read: `included`, `unresolved`, `kept` (held back
+    and why), and the secrets the card `unlocks` or `relocks` against the stored plan.
+  - "Write chapter N" saves your card edits (`PATCH /proposals/:id`), applies the card, then calls `POST /generate`;
+    if writing fails to start, the card says the plan was saved.
+- **Fails when:** `PLN_008` the story moved on while the card waited; `PLN_009` a plan job already running.
+
+### 6. Review before finalize
+
+- **Entry:** Chapter workspace → Approve → Finalize. Routes: `GET /drafts/:n/finalize-review`,
+  `POST …/finalize-review/prepare`, `POST …/finalize-review/items/:itemId/decision {"decision","reason"?}` (`kept`,
+  `edited` with the inline edit, or `skipped`), `POST …/finalize-review/keep-routine`, `POST …/finalize-review/finalize`,
+  `POST …/finalize-review/revert`, and `PUT /finalize-review/settings {"autoKeep":[…]}`.
+- **Run:** approve chapter 1 (Part 3), wait for the `finalize_review` job, answer every item, finalize.
+- **Verify:**
+  - The items are read from the approved revision by a `continuity` call. Consequential ones (rules, payoffs,
+    knowledge, milestones in doubt, anything inferred, low-confidence changes) are asked one by one; routine ones
+    (appearances, positions) as a batch; categories in `autoKeep` (`entity`, `appearance`, `character_state`,
+    `relationship`, `promise`, `knowledge`, `milestone`, `summary`) are kept at once.
+  - Finalize applies only the kept and edited items, logging each row before and after, and reaches only the claimed
+    milestones you kept; a claimed milestone you skip is dropped from the plan.
+  - Editing the prose after approval makes the review stale (`FRV_004`) until you approve again.
+  - Revert puts every row the kept set changed back and marks later drafts stale; it works only on the latest final
+    chapter (`FRV_012`) and is refused if one of those rows changed since (`FRV_007`).
+- **Fails when:** `FRV_002` still preparing; `FRV_003` reading failed (prepare again); `FRV_005` items unanswered;
+  `FRV_006` a skipped milestone that a reveal in this plan needs; `FRV_010` a skip with no reason.
+
+### 7. Passage rewrite and versions
+
+- **Entry:** Chapter workspace → select a passage → "Ask for changes"; `POST /drafts/:n/passage-suggestions
+{"baseDraftId","baseRevision","baseSaveSeq","start","end","passageHash","request"}` (UTF-16 offsets, SHA-256 hex of the
+  selected text), then `…/:suggestionId/apply` (the same three base fields) or `…/dismiss`.
+- **Verify:**
+  - A `passage-rewrite` call on the chapter's writer route, captured as a `writer_snapshots` row with role `passage`.
+    The draft does not change until you apply.
+  - The suggestion's `location.freshness` is `fresh` as made; `relocated` after you move the passage cleanly (its
+    text and the 32 characters either side occur exactly once); `stale` after an edit in or around it, and applying
+    is then `PSG_004`.
+  - Applying writes a new revision (`passage_rewritten`), resets approval and marks later drafts stale. A rewrite that
+    brings a locked secret's give-away terms into the passage is held as a contradiction (`leakLines` lists them).
+  - Versions: `GET /drafts/:n/versions`, `…/versions/compare?from=&to=`; `POST …/versions/:r/restore` (base fields)
+    writes a new `restored` revision, and history is never rewritten.
+- **Fails when:** `PSG_003` the selection no longer matches; `PSG_006` / `VER_002` on a final chapter (use Amend).
+
+### 8. Writer's view
+
+- **Entry:** Chapter workspace → Writer's view; `GET /chapters/:n/writer-snapshots`, `…/:snapshotId`.
+- **Verify:** one row per writer attempt (`draft`, `repair`, `rewrite`, `revise`, `passage`) holding the exact messages,
+  `keptBack`, plan revision, prompt key and version and the model route as they were at the time, never rebuilt from
+  today's state. Attempts of the current revision and the two before it are kept. On an isolated chapter the
+  messages read "Prose: walled off" and `bibleHash` is null.
+
+### 9. An unrestricted chapter and its bridge
+
+- **Entry:** set the plan card's content to Unrestricted, write the chapter, approve it.
+- **Verify:**
+  - Every call on that chapter's prose runs on the unrestricted route (`model_calls.content_mode`); the draft is
+    `isolated=true` and excluded from `GET /search` and `GET /source/chapters/search`.
+  - The finalize review asks the bridge summary and each position one by one. Until you answer them the chat's
+    `get_draft` returns only the chapter's header and a later standard chapter reads no summary of it; afterwards
+    both read the approved summary and positions only (`GET /drafts/:n/bridge` shows exactly that).
+  - Editing the chapter's text drops the bridge until one is approved against the new revision. After an amend of a
+    final isolated chapter, `POST /drafts/:n/bridge/prepare` reads it again (`BRG_002` if not final, `BRG_001` if not
+    isolated). Reverting the chapter's Story Bible updates keeps the bridge.
+  - Input that crosses the hard line is refused before any call with `AI_015`, naming the record.
+
+### 10. Portraits as of a chapter and the wiki gate
+
+- **Entry:** Illustrations, or a character's portrait → "as of chapter N"; `POST /illustrations {…,"depictsChapter":N}`;
+  uploads through `POST /entities/:key/image` or `…/images` with `depictsChapter`; re-date with `PATCH …/image` or
+  `…/images/:imageId`.
+- **Verify:** a generated portrait is drawn from canon as of N and refused past the latest final chapter (`ILL_016`);
+  `ILL_017` for a subject that is not an entity; `ILL_018` for a reference image dated later than N. An upload may name
+  a later chapter and is withheld until it. With no chapter given, an image is dated at the latest final chapter.
+- **Publish:** a portrait dated later than its entry's first sighting reaches Web Novel under its own
+  `imageVisibleFromOrdinal` when the reader advertises the headline-gate capability, and otherwise joins the gated
+  gallery; a reader short of that chapter sees no portrait on the entry page.
+
+### 11. Promises, volumes and usage
+
+- **Promises:** `GET /promises?kind=&status=` lists threads and mysteries with `due`: `overdue` (a chapter window
+  passed, or the payoff volume's goal is met), `due` (the payoff milestone reached, or the payoff volume active),
+  otherwise `not_due`. Set a payoff with a `promise.set_payoff` card; `dormant: true` takes it out of the obligations
+  recap.
+- **Volume goal met:** `POST /volumes/:volumeKey/goal-met` on the active volume marks it `goal_met` and activates the
+  next `not_started` one (`VOL_003` if it is not active). The chat's `action.advance_volume` card does the same and is
+  never applied within a turn (`VOL_004` on a blanket apply).
+- **Usage and cost:** `GET /cost` (the project, with `byCostSource`, `byTier`, `byContentMode`), `GET /chapters/:n/cost`,
+  `GET /runs/:runId/usage`, `GET /api/v1/ai/usage` (every novel you own) and each assistant message's `costUsd`. Every
+  figure adds recorded costs of every source (`provider`, `gateway`, `estimate`) as the charge.
+- **Chat lookups:** ask "what did chapter 3 cost?" and "what did the checks find in chapter 3?". The run's
+  `tool_calls` show `get_usage` (no prompt or answer content) and `get_review`; on an isolated chapter `get_review`
+  returns findings without their evidence.
