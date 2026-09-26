@@ -1,24 +1,5 @@
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose =
-  | 'generation'
-  | 'revision'
-  | 'validation'
-  | 'outline'
-  | 'chat'
-  | 'chat_hub'
-  | 'arc_plan'
-  | 'premise'
-  | 'audit'
-  | 'rebrand_seed'
-  | 'rebrand'
-  | 'reforge_outline'
-  | 'reforge'
-  | 'reforge_analysis'
-  | 'reforge_transform'
-  | 'translate_seed'
-  | 'translate'
-  | 'illustration'
-  | 'blueprint';
+export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'illustration' | 'blueprint';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -84,20 +65,6 @@ const SECTION_LABELS: Record<string, string> = {
   prev_hook: '## PREVIOUS VOLUME HANDOFF',
   next_volume: '## NEXT VOLUME OBJECTIVE',
   changed_since: '## CHANGED SINCE THIS CONVERSATION STARTED',
-  world_notes: '## WORLD NOTES',
-  directives: '## DIRECTIVES',
-  instructions: '## AUTHOR INSTRUCTIONS',
-  target_length: '## TARGET LENGTH',
-  glossary_slice: '## GLOSSARY',
-  style_notes: '## STYLE NOTES',
-  term_policy: '## TERM POLICY',
-  carry_state: '## CARRY STATE',
-  signal_digest: '## DETERMINISTIC SIGNALS',
-  cut_ledger: '## CUT LEDGER — THIS MATERIAL IS GONE',
-  discovered_cuts: '## CUTS DISCOVERED WHILE WRITING',
-  plan_span: '## PLAN SPAN',
-  bridge: '## BRIDGE ACROSS THE CUT',
-  entity_roster: '## ENTITY ROSTER',
   world_facts: '## WORLD FACTS',
   known_facts: '## KNOWN FACTS (POV CAST)',
   chapter_reveals: '## REVEALED THIS CHAPTER',

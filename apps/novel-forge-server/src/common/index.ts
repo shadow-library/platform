@@ -22,5 +22,4 @@ export * from './publish-token';
 export * from './reader-promise';
 export * from './reveal-term';
 export * from './sanitize-content';
-export * from './seed-sample';
 export * from './term-text';

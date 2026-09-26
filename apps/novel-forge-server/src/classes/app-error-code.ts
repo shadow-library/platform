@@ -26,10 +26,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_003 = AppErrorCode.badRequest('PRJ_003', 'Operation not valid for this project kind');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
-  static readonly PRJ_005 = AppErrorCode.badRequest('PRJ_005', 'Curated projects are created by ingest or promotion');
-  static readonly PRJ_006 = AppErrorCode.badRequest('PRJ_006', 'originalLanguage is required for a translation project and cannot be set on any other kind');
-  static readonly PRJ_007 = AppErrorCode.conflict('PRJ_007', 'Cannot switch to curated while {count} chapter(s) are not finalized — finalize every translated chapter first');
-  static readonly PRJ_008 = AppErrorCode.badRequest('PRJ_008', 'Workflow switch not allowed — only curated to new_novel and translation to curated are supported');
+  static readonly PRJ_005 = AppErrorCode.badRequest('PRJ_005', 'Curated projects are created by ingest');
+  static readonly PRJ_008 = AppErrorCode.badRequest('PRJ_008', 'Workflow switch not allowed — only curated to new_novel is supported');
   static readonly PRJ_009 = AppErrorCode.badRequest('PRJ_009', 'Only original-novel or source projects run the authoring pipeline');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
 
@@ -203,43 +201,6 @@ export class AppErrorCode extends ServerErrorCode {
     'RFN_012',
     'This chapter is isolated — chat cannot see its prose, so it cannot rewrite it. Edit the prose in the chapter editor.',
   );
-
-  /*!
-   * Rebrand Errors
-   */
-  static readonly RBR_001 = AppErrorCode.notFound('RBR_001', 'Rebrand is not configured for this project');
-  static readonly RBR_002 = AppErrorCode.notFound('RBR_002', 'Converted chapter not found');
-  static readonly RBR_003 = AppErrorCode.badRequest('RBR_003', 'Rebrand is only available for source projects');
-
-  /*!
-   * Reforge Errors
-   */
-  static readonly REF_001 = AppErrorCode.notFound('REF_001', 'Reforge is not configured for this project');
-  static readonly REF_002 = AppErrorCode.notFound('REF_002', 'Reforged chapter not found');
-  static readonly REF_003 = AppErrorCode.badRequest('REF_003', 'Reforge is only available for source projects');
-  static readonly REF_004 = AppErrorCode.notFound('REF_004', 'No analysis has been run for this project');
-  static readonly REF_005 = AppErrorCode.badRequest('REF_005', 'Transform requires an approved plan');
-  static readonly REF_006 = AppErrorCode.badRequest('REF_006', 'Plan is invalid — spans must partition every source chapter exactly once');
-  static readonly REF_007 = AppErrorCode.notFound('REF_007', 'Output chapter not found');
-  static readonly REF_008 = AppErrorCode.badRequest('REF_008', 'Transform mode requires fidelity: loose');
-  static readonly REF_009 = AppErrorCode.badRequest('REF_009', 'Promotion requires an approved plan with no failed outputs');
-  static readonly REF_010 = AppErrorCode.conflict('REF_010', 'Plan was superseded by a newer revision');
-
-  /*!
-   * Translation Errors
-   */
-  static readonly TRN_001 = AppErrorCode.notFound('TRN_001', 'Translation is not configured for this project');
-  static readonly TRN_002 = AppErrorCode.notFound('TRN_002', 'Translated chapter not found');
-  static readonly TRN_003 = AppErrorCode.badRequest('TRN_003', 'Translation is only available for translation projects');
-  static readonly TRN_004 = AppErrorCode.conflict('TRN_004', 'Chapter is finalized — reopen it before changing the translation');
-  static readonly TRN_005 = AppErrorCode.badRequest('TRN_005', 'Finalize blocked: {count} glossary terms used by this chapter are still awaiting review');
-  static readonly TRN_006 = AppErrorCode.conflict('TRN_006', 'Finalize blocked: the glossary changed since this chapter was translated — re-run the chapter');
-  static readonly TRN_007 = AppErrorCode.notFound('TRN_007', 'Glossary term not found');
-  static readonly TRN_008 = AppErrorCode.badRequest('TRN_008', 'Chapter has no translation to edit or finalize');
-  static readonly TRN_009 = AppErrorCode.conflict('TRN_009', 'A glossary term with this source text already exists');
-  static readonly TRN_010 = AppErrorCode.conflict('TRN_010', 'Originals must be contiguous — add chapter N only after chapter N-1 exists');
-  static readonly TRN_011 = AppErrorCode.conflict('TRN_011', 'Finalize blocked: the original changed since this chapter was translated — re-run the chapter');
-  static readonly TRN_012 = AppErrorCode.notFound('TRN_012', 'Original chapter not found');
 
   /*!
    * Context Errors

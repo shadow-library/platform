@@ -32,8 +32,7 @@ export function decideAmendRepublish(ledger: AmendLedgerRow | null, contentHash:
 }
 
 /**
- * Applies that decision to the ledger. Shared by every path that rewrites finalized prose in place —
- * the amend endpoint and the translation finalize — so the two can never drift on what a republish means.
+ * Applies that decision to the ledger.
  *
  * `publishedOrdinal` is absent from the set clause on purpose: it is the reader's URL, frozen the moment
  * the chapter first published.

@@ -6,13 +6,7 @@ import { JobsModule } from '../jobs/jobs.module';
 import { PlanningModule } from '../planning/planning.module';
 import { PublishingController } from '../publishing/publishing.controller';
 import { PublishingModule } from '../publishing/publishing.module';
-import { RebrandController } from '../rebrand/rebrand.controller';
-import { RebrandModule } from '../rebrand/rebrand.module';
-import { ReforgeController } from '../reforge/reforge.controller';
-import { ReforgeModule } from '../reforge/reforge.module';
 import { SourceModule } from '../source/source.module';
-import { TranslationController } from '../translation/translation.controller';
-import { TranslationModule } from '../translation/translation.module';
 import { PipelineController } from './pipeline.controller';
 
 /**
@@ -20,12 +14,11 @@ import { PipelineController } from './pipeline.controller';
  *
  * Intentionally separate from SourceModule and JobsModule to avoid circular
  * dependencies: SourceModule has no JobsModule dependency; JobsModule imports
- * SourceModule (for RecombineService in JobExecutor) and RebrandModule (for
- * RebrandService in the rebrand job) — so their controllers live here.
+ * SourceModule (for RecombineService in JobExecutor) — so their controllers live here.
  */
 @Module({
   /** `FastifyModule` for `ContextService`: the publishing controller reads the session's active organisation off the principal. */
-  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, TranslationModule, PublishingModule, FastifyModule],
-  controllers: [PipelineController, RebrandController, ReforgeController, TranslationController, PublishingController],
+  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, PublishingModule, FastifyModule],
+  controllers: [PipelineController, PublishingController],
 })
 export class PipelineModule {}

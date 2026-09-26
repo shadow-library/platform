@@ -8,7 +8,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { ActorService } from '@modules/actor';
 
-export type IngestAction = 'novel.upsert' | 'chapter.push' | 'cover.set' | 'original.push' | 'originals.manifest';
+export type IngestAction = 'novel.upsert' | 'chapter.push' | 'cover.set';
 
 export type IngestOutcome = 'created' | 'exists' | 'landed' | 'noop' | 'applied' | 'not_found' | 'out_of_order' | 'conflict' | 'error';
 

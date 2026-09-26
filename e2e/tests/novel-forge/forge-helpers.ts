@@ -63,7 +63,6 @@ export const HAIKU_TEXT_ROLES = [
   'chat',
   'title',
   'compact',
-  'translate',
 ] as const;
 
 /** Every LLM goes through OpenRouter, so a model is its OpenRouter `vendor/model` slug; anything off `MODEL_REGISTRY` is refused with AI_002. */

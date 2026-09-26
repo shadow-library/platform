@@ -381,7 +381,7 @@ export class ReferenceOptionsResponse {
   autoPreviewWarnings: ReferenceWarningResponse[];
 }
 
-@Schema({ description: "Newest first. Setting a project cover by upload, ingest, import or promotion opens an 'uploaded' cover illustration on it." })
+@Schema({ description: "Newest first. Setting a project cover by upload, ingest or import opens an 'uploaded' cover illustration on it." })
 export class ListIllustrationsResponse {
   @Field(() => [IllustrationResponse])
   items: IllustrationResponse[];

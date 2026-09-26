@@ -13,7 +13,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                            |
 | Part 2: Blueprint to lore bible       | The Blueprint (the guided design flow), premise enhancement, bible builder, readiness, audit, one end-to-end sample            |
 | Part 3: planning, generation          | Volume and arc planning, briefs, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
-| Part 4: manuscript pipelines          | Novel import, extraction, recombine, rebrand, reforge (chapter and transform), translation, curated ingest                     |
+| Part 4: manuscript pipelines          | Novel import, extraction, recombine, curated ingest                                                                            |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)                   |
 
 ## Recipe format
@@ -317,14 +317,11 @@ default maps — the quickest way to see what is selectable.
 
 `POST /api/v1/projects` — `src/modules/project/project/project.controller.ts:29` (201, `ProjectResponse`).
 
-Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`,
-`originalLanguage`.
+Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`.
 
-- `kind` enum: `source | new_novel | translation | curated` (`src/database/schemas/projects.ts:69`).
+- `kind` enum: `source | new_novel | curated` (`src/database/schemas/projects.ts:69`).
   `curated` is refused with `PRJ_005` (`project.service.ts:103`) — it only arrives via ingest.
 - `contentMode`: `standard | unrestricted` (`projects.ts:74`).
-- `originalLanguage` is required for `translation` and rejected otherwise — the check is exclusive-or, so setting
-  it on any other kind is also a `PRJ_006` (`project.service.ts:34-36,104`).
 - A `new_novel` create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
   no `contentHash`, which is how the plan importer tells them from authored docs
   (`src/modules/plan-import/plan-import.service.ts:114-120`).
@@ -344,13 +341,12 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 
 **UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — every door posts to
 `POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project and opens the Blueprint; "I know the
-novel" creates the same project and leaves you on Overview; "Translate a novel" posts `kind:'translation'`; "Import a
+novel" creates the same project and leaves you on Overview; "Import a
 plan" creates a `new_novel` project and opens Import Plan. Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
 project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Import Plan
 (deprecated)**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
-Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**. The `translation`, `source`,
-`rebrand`, `reforge` and `transform` screens never appear on a `new_novel` project (`AUTHORING` is
+Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**. The `source` screen never appears on a `new_novel` project (`AUTHORING` is
 `['new_novel', 'source']`, `:28`).
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
@@ -591,15 +587,15 @@ Coverage ignores `src/modules/ai/prompts/**` and `src/modules/ai/schemas/**` and
 
 #### `tests/ai/ai-smoke.ts` — the only live-model tool
 
-Gated on `AI_SMOKE_SPEND` (`:17,33-42`): a bare `bun run ai:smoke` prints the model list and estimated cost and
-exits 0 without spending. With the var set it exits 1 if `ai.openrouter.api.key` is missing (`:44-47`).
+Gated on `AI_SMOKE_SPEND` (`:14,30-39`): a bare `bun run ai:smoke` prints the model list and estimated cost and
+exits 0 without spending. With the var set it exits 1 if `ai.openrouter.api.key` is missing (`:41-44`).
 
-It builds a real `ModelRouterService` with stub telemetry/DB/quota (`:56-65`) and makes **7 live calls** —
-`ROLES` at `:18` is `['bible','title','judge','generation','translate','translate','audit']`, so on the production
-defaults that is glm-5.2, gpt-5.6-luna, claude-sonnet-5, kimi-k3, kimi-k3 ×2, claude-sonnet-5. Estimated at 1,500
-in / 700 out per call (`:21-31`), roughly **$0.07** total. Assertions are shape-only: the foundation rung checks
-`typeof result.body === 'string' && result.body.length > 10` (`:84`); the judge rung feeds an obvious canon
-contradiction but accepts **either** verdict (`:108`).
+It builds a real `ModelRouterService` with stub telemetry/DB/quota (`:53-62`) and makes **4 live calls** —
+`ROLES` at `:15` is `['bible','title','judge','generation']`, so on the production
+defaults that is claude-opus-5.5, gpt-5.6-luna, claude-sonnet-5 ×2. Estimated at 1,500
+in / 700 out per call (`:18-28`), roughly **$0.04** total. Assertions are shape-only: the foundation rung checks
+`typeof result.body === 'string' && result.body.length > 10` (`:81`); the judge rung feeds an obvious canon
+contradiction but accepts **either** verdict (`:105`).
 
 **Proves:** the models are reachable and return schema-conformant structured output through the repair ladder.
 **Does not prove:** that any answer is correct or good.
@@ -635,7 +631,7 @@ ladder — is bypassed.
 fail-closed judge routing; bible-builder persistence and atomicity; manifest floors and readiness arithmetic;
 the prose-metric and process-invariant maths.
 
-**Proven for ~$0.07** (`AI_SMOKE_SPEND=1 bun run ai:smoke`): the seven production models are reachable and return
+**Proven for ~$0.04** (`AI_SMOKE_SPEND=1 bun run ai:smoke`): the production models behind four roles are reachable and return
 schema-conformant output.
 
 **Proven by nothing in the repo:** bible content quality; that a real model clears the entity floors; that real
@@ -654,7 +650,7 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `STORAGE_DRIVER` default `local`, `STORAGE_IMAGE_DIR=./images` | the driver is `s3` (Garage) in `.env.example:46`, and the key is `STORAGE_LOCAL_DIR` (`:58`); `STORAGE_IMAGE_DIR` no longer exists                                                                                                                                                         |
 | the env table is the whole list                                | it omits `AI_LLM_TIMEOUT_MS`, `AI_LLM_MAX_RETRIES`, `AI_LLM_BACKOFF_MS`, `AI_QUOTA_*`, `PROJECTS_MAX_PER_OWNER`, `PUBLISHING_AUTO_PUSH`, `GENERATION_RECONCILIATION_CADENCE`, `PLUGINS_DIR` (all in `bootstrap.ts:50-64`), and every `AUTH_*` var — without which the server does not boot |
-| "five LangGraph workflows"                                     | there are now ten graphs in `src/modules/ai/graphs/` — the five listed plus chapter-rebrand, chapter-reforge, chapter-translation, span-transform and mechanical-check                                                                                                                     |
+| "five LangGraph workflows"                                     | there are now six graphs in `src/modules/ai/graphs/` — the five listed plus mechanical-check                                                                                                                                                                                               |
 | route table                                                    | routes have moved: the bible document route is `GET/PUT /projects/:id/bible/:section/:slug` (`bible-document.controller.ts:23,32`), volumes approve is `POST /projects/:id/volumes/approve` (`volume.controller.ts:17`), and many screens' routes did not exist then                       |
 | `.env.example:13` "Run `bun run db:migrate`"                   | there is no `db:migrate` script in `apps/novel-forge-server/package.json`; use `bun run db apps/novel-forge-server migrate` from the root                                                                                                                                                  |
 
@@ -676,7 +672,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
   `novel-forge:projects:read`, plus `novel-forge:projects:write` + `novel-forge:generation:run` on anything that
   spends a model call.
 - `projectId` is a numeric string. Blueprint routes require `kind = 'new_novel'` (`BPR_003`); the authoring
-  pipeline behind them refuses a `translation` or `curated` project with `PRJ_009` (`assertAuthoringProject`).
+  pipeline behind them refuses a `curated` project with `PRJ_009` (`assertAuthoringProject`).
   There is no project status any more — a project is authorable from the moment it is created.
 - Observability for every recipe (one place): **Workflow Runs** screen (`/novels/$novelId/runs`, needs the
   `novel-forge:admin` scope) or `GET /api/v1/projects/{projectId}/runs` (not admin-gated), `GET …/runs/{runId}`,
@@ -825,7 +821,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
 
 - **Entry:** **Story Bible** screen → **Generate story bible** (shown **only in the empty state**, i.e. when the project
   has zero entities); `POST /api/v1/projects/{projectId}/seed-from-brief`.
-- **Preconditions:** `status='active'` and a `kind` other than `translation`/`curated`. The API reads the brief from
+- **Preconditions:** `status='active'` and a `kind` other than `curated`. The API reads the brief from
   the **body only** and never touches `projects.brief`; the web button is what requires a non-empty `projects.brief`,
   and neither project creation nor a Blueprint lock writes it — set it in **Project Settings → “Premise / brief”**
   first (see Findings).
@@ -1052,7 +1048,7 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 ### Shared preconditions (continue the project Part 2 built)
 
-- A project of `kind: 'new_novel'` (`POST /projects` → `{name, kind:"new_novel"}`). `translation`/`curated` kinds
+- A project of `kind: 'new_novel'` (`POST /projects` → `{name, kind:"new_novel"}`). `curated` projects
   are refused with `PRJ_009` (`common/authoring-project.ts`). `kind: 'source'` also runs this pipeline.
 - A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
   Blueprint materialised, or what the bible builder wrote.
@@ -1103,7 +1099,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   three _different_ statements — a payoff that restates the objective, or a conflict that is just "she must
   survive", is the harness under-performing. `cast` should name entity keys that actually exist in `entities`.
 - **Fails when:** empty `volumes[]` (weak model read a blank skeleton — `generation.service.ts:203-213`
-  is the fallback that should prevent it); `PRJ_009` on a translation/curated project;
+  is the fallback that should prevent it); `PRJ_009` on a curated project;
   log line `plan: volumes upserted` with a count below `volumeCount`.
 - **Cost:** 1 model call.
 
@@ -1351,9 +1347,7 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
 #### Finalize + continuity write-back
 
 - **Entry:** **API only — there is no UI caller.** The path appears in `apps/novel-forge-web/src` only inside
-  the generated client (`lib/apis/api-types.gen.ts:861` is its path key), never in a route or api module. Do
-  not confuse it with the translation pipeline's own
-  `/projects/:id/translation/chapters/:chapter/finalize`, which _is_ called (`lib/apis/translation.api.ts:228`).
+  the generated client (`lib/apis/api-types.gen.ts:861` is its path key), never in a route or api module.
   `POST /projects/:projectId/finalize`.
 - **Preconditions:** the draft is `approved` (else `DRF_004`); chapter `n-1` already has a `final` draft (`FIN_001`); no earlier
   chapter with `chapters.needs_revalidation=true` (`FIN_002`); the latest `novel`-scope validation report has
@@ -1586,13 +1580,12 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
 
 ---
 
-## Part 4: manuscript pipelines (source, rebrand, reforge, translation)
+## Part 4: manuscript pipelines (source, curated)
 
-Scope: novel import, source extraction, consolidation, skeleton, recombine, rebrand, reforge (chapter + transform), translation, curated ingest.
+Scope: novel import, source extraction, consolidation, skeleton, recombine, curated ingest.
 Code read under `apps/novel-forge-server/src/modules/...` and `apps/novel-forge-web/src/...`.
 Nothing here has been run against a live server or a model, so every AI-output expectation is a prediction from code. The deterministic parts were run
-locally: S1/S2/S4 pass `ImportNovelBody` + `validateNovelBundle`, S3 passes `OriginalChapterBody`, the ingest bodies pass `IngestNovelBody`/`IngestChapterBody` and the recipe-2.8 plan body passes
-`ReforgePlanSpansBody` + `validateTransformPlan`; `parseTitleParts`/`buildGroupingPlan` were run on S2, `computeAnalysisSignals` on S1, and `deriveOutputNumbering` on the plan body.
+locally: S1/S2/S4 pass `ImportNovelBody` + `validateNovelBundle`, the ingest bodies pass `IngestNovelBody`/`IngestChapterBody`; `parseTitleParts`/`buildGroupingPlan` were run on S2.
 Legend: **[AI]** = a model call, **[det]** = deterministic code (a bug there is a code bug, not a model bug). `P` = projectId. API base `http://localhost:8080`. Run endpoints need session auth, or a bot
 key carrying `novel-forge:projects:read` (class-level on every project controller) plus `novel-forge:projects:write` and `novel-forge:generation:run`; the run-detail endpoints additionally need
 `novel-forge:admin`.
@@ -1606,22 +1599,15 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
   `select graph,target,status,outcome,node_trace from workflow_runs where project_id=P order by started_at;`
   `select run_id,node,role,model,prompt_key,prompt_version,status,attempt,input_tokens,cached_input_tokens,output_tokens,latency_ms,cost_usd from model_calls where project_id=P order by id;`
   `model_calls.raw_output` is the model's literal answer: read it for every quality check below.
-- Default routing (`ai/defaults.ts:85-88`): `rebrand|reforge|translate` -> writing group `moonshotai/kimi-k3`; `extraction|skeleton|plan` -> planning `z-ai/glm-5.2`; `judge|audit` -> review `anthropic/claude-sonnet-5`. An Unrestricted-tier account uses a different map (`:101-104`: writing `x-ai/grok-4.6`, review `deepseek/deepseek-v4-pro`), and account/project overrides win, so read `model_calls.model` before judging a result.
-- **Silent cache**: roles `judge, validation, continuity, extraction, review, audit, compact` are served from `llm_cache` on an identical request (`model-router.service.ts:67,368`) and write NO `model_calls` row. A re-run on unchanged text costs nothing and looks like "no AI happened". To force a fresh call change the input or delete the `llm_cache` row. Creative roles (rebrand, reforge, translate, recombine) are never cached.
-- Prose paragraphs must be separated by a blank line (`\n\n`); translation segmenting and paragraph-drift checks depend on it.
+- Default routing (`ai/defaults.ts:85-88`): `extraction|skeleton|plan` -> planning `z-ai/glm-5.2`; `judge|audit` -> review `anthropic/claude-sonnet-5`. An Unrestricted-tier account uses a different map (`:101-104`: writing `x-ai/grok-4.6`, review `deepseek/deepseek-v4-pro`), and account/project overrides win, so read `model_calls.model` before judging a result.
+- **Silent cache**: roles `judge, validation, continuity, extraction, review, audit, compact` are served from `llm_cache` on an identical request (`model-router.service.ts:67,368`) and write NO `model_calls` row. A re-run on unchanged text costs nothing and looks like "no AI happened". To force a fresh call change the input or delete the `llm_cache` row. Creative roles (recombine) are never cached.
 
 **Defects found in code (they change what "pass" means; confirm at runtime)**
 
-- D1 **Source extraction cannot run.** `ai/prompts/extraction.prompt.ts:16` template needs `{contextPack}` and `{chapterNumber}`; `ai/graphs/source-extraction.graph.ts:73-78` passes only `chapterProse` and `entityRoster`, so LangChain's `formatMessages` throws `Missing value for input variable contextPack`. The throw happens in `buildMessages` (`model-router.service.ts:350,581`), which runs before the `llm_cache` probe (`:368`) and before any model call, so expect run `failed`, zero `model_calls`, job `failed` on chapter 1. `tests/ai/prompts.spec.ts` renders the templates of ~20 prompts but never `extraction`, which is how this survives CI. It also starves Skeleton and the rebrand seed pack (empty entities/world facts).
+- D1 **Source extraction cannot run.** `ai/prompts/extraction.prompt.ts:16` template needs `{contextPack}` and `{chapterNumber}`; `ai/graphs/source-extraction.graph.ts:73-78` passes only `chapterProse` and `entityRoster`, so LangChain's `formatMessages` throws `Missing value for input variable contextPack`. The throw happens in `buildMessages` (`model-router.service.ts:350,581`), which runs before the `llm_cache` probe (`:368`) and before any model call, so expect run `failed`, zero `model_calls`, job `failed` on chapter 1. `tests/ai/prompts.spec.ts` renders the templates of ~20 prompts but never `extraction`, which is how this survives CI. It also starves Skeleton (empty entities/world facts).
 - D2 `POST /consolidate` promotes relationships from `relationship_observations` (`consolidate.service.ts:47-81`), and nothing in `apps/novel-forge-server/src` ever inserts into that table (`chapter-insert.service.ts:85` only shifts its chapter numbers), so `relationshipsPromoted` is always 0. Consolidate is not AI.
-- D3 The UI config cards overwrite `settings` wholesale: the Rebrand card sends exactly `{bannedExtra,auditEnabled}` (`rebrand.tsx:79`), the Reforge card sends `{judgeEnabled}` plus `targetWords` only when the field parses to a positive integer (`reforge.tsx:83`); `updateConfig` assigns the object as-is (`rebrand.service.ts:85`, `reforge.service.ts:95`). Saving in the UI silently drops `maxRepairs`, `termPacks`, `analysisWindow`, `targetCompression`, `maxSpanSourceChapters`. Set those via API after any UI save. The Transform screen has no control for them at all (they appear in the web app only in `api-types.gen.ts`).
-- D4 Chapter-mode reforge judge is blind to author instructions. `reforge-judge` says "a beat the AUTHOR INSTRUCTIONS declared removed is NOT missing", but `chapter-reforge.graph.ts:270-282` passes only `outline, worldNotes, glossarySlice, fidelityRule, writtenProse`, and the outline the judge scores against is built from a pack of world notes + glossary slice only (`:164-171` -> `context-assembler.service.ts:1122-1132`), so instructions never reach it either. Only `write` sees them. Predicted: any instruction that removes a beat yields `missing_beat` -> repair -> `attention`. Probe R-1 in recipe 2.7.
-- D5 Analysis aborts when `windowsFailed > 0.1 * windows` (`reforge-analysis.service.ts:62,201`): with fewer than 10 windows a single failed window kills the whole analysis.
 - D6 Import limits: a `final` import stores `novel.genre` in `projects.imported_meta` only when it matches a platform genre, and seeds one `source`-status volume per bundle volume carrying its title; a `source` import stores no volumes, and both cases come back as `warnings` on the response rather than being dropped silently. A `source` import always auto-recombines with `useAi: true` (`job.executor.ts:538-544` -> `recombine.service.ts:102-108`), so you cannot import a raw ladder and inspect it un-merged.
-- D7 Transform enqueues target `reforge-${P}` (`reforge.controller.ts:188`), the same kind and target as chapter-mode start (`:67`), and `enqueue` dedupes onto any `pending|in_progress` row for that `(project, kind, target)` (`job.service.ts:58-67`); a running chapter-mode job makes `POST /reforge/transform` return that active job and discard the `{stage:'transform'}` payload.
-- D8 Transform contract quirk: every output chapter of a span is rendered the span's whole `keptBeats` list as "the contract this chapter owes the reader" (`span-transform.graph.ts:89-101`, DTO says "Beats every output chapter of this span owes"), so a `keep`/`condense` span with N>1 outputs asks each output to cover all beats. Use one-chapter spans, or `merge`.
 - D9 Skeleton logs `runId: 'skeleton'` (`planning/skeleton.service.ts:55`): no `workflow_runs` row, invisible on Workflow Runs; its `model_calls.run_id` is the literal string `skeleton`, shared by every project.
-- D10 Doc/code: `novel-forge.md:122` states "Pipelines flag and continue per chapter" as an invariant, but that holds only for rebrand, reforge and translation — `runExtract` throws on the first failed chapter (`job.executor.ts:264`), and the comment introducing rebrand's behaviour calls flag-and-continue "a deliberate divergence from runGenerate/runExtract's throw" (`:312-314`). Either the invariant needs scoping or extract needs to stop throwing. Web Source Pipeline shows Consolidate "done" iff `planApproved` (`source.tsx:185`), unrelated to consolidation. `ExtractBody.rearm` is declared (`pipeline.dto.ts:17`) and read nowhere.
 
 ### 1. Sample manuscripts (original, written for these tests)
 
@@ -1631,7 +1617,6 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
 - nationalism beat (ch 2, Zhao Feng excludes "outsiders"); copy-edit plants: wrong speaker (ch 2 `said Zhao Feng`), misspelling `Lin Xaio` (ch 4);
 - ch 4 near-duplicates ch 3 (repeated duel); ch 5 is a recap monologue with no dialogue and no new names (stall);
 - cast for extraction: Lin Xiao (ch 1-5), Zhao Feng (2-5), Master Gu (1,2,5), Elder Bai (1,3 only), Stonebridge Town (2 only).
-  `computeAnalysisSignals` run on S1 gives metrics `{chapterCount 5, medianWords 130, madWords 13, repetitionRatio 0.4, staticRatio 0.2, arcBoundaryCount 0, deadThreadCount 0}` and candidates `sig-1 repetition 3-4 (sev 2, conf 0.69)` and `sig-2 pacing_stall 5-5 (sev 2, conf 0.4)`; no `dropped_thread` is reachable at this size (needs a 40-chapter gap and 8 mentions). Chapter word counts are 143 / 130 / 115 / 92 / 132.
   Save as `s1.json`, import with `POST /api/v1/import` body `{"bundle": <s1.json>}` (validated: the bundle passes `ImportNovelBody` and `validateNovelBundle` with no issues, flattening to chapters 1-5):
 
 ```json
@@ -1730,28 +1715,6 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
     }
   ]
 }
-```
-
-**S3 translation originals** (`originalLanguage: "zh"`; each `{title, content}` passes `OriginalChapterBody`). Probes: glossary terms (沈砚, 老柯, 雾港, 无火灯, 夜灯会, 灯正), honorific `沈师兄`, digit runs `12` and `300` (number-drift scan), 8/10/6 quote marks in chapters 1/2/3 (dialogue-drift arms at >= 4, `fidelity-scan.ts:21`), 5/4/5 paragraphs (zh paragraph-drift band 0.6-1.6, length band 1.2-3.2, `script-profile.ts` `ZH_PROFILE`), hanzi numerals `三百年 / 三百枚 / 三条` (see the false-positive probe in recipe 2.9). For each item, `chapter` goes in the URL of `PUT /api/v1/projects/:T/translation/originals/:chapter` and `{title, content}` is the body:
-
-```json
-[
-  {
-    "chapter": 1,
-    "title": "第一章 无火之灯",
-    "content": "雾港的雨下了七天七夜。沈砚蹲在修灯铺的门槛上，看着街对面那盏不肯熄灭的灯。\n\n那盏灯没有火，也没有油。老柯说它叫“无火灯”，是夜灯会三百年前留下的东西，谁也不知道它靠什么亮着。\n\n“别看了。”老柯端着一碗冷茶从里屋走出来，“看久了，它会认得你。”\n\n沈砚没有回答。他数过，这盏灯今夜比昨夜亮了三分，而他口袋里只剩下12枚铜钱。\n\n“认得我，也比饿死强。”他低声说。"
-  },
-  {
-    "chapter": 2,
-    "title": "第二章 夜灯会的来客",
-    "content": "第七天傍晚，一个撑黑伞的女人推开了修灯铺的门。她自称是夜灯会的灯正，姓林。\n\n“沈师兄，”她竟然这样称呼沈砚，“会里有人说，你能看见无火灯的影子。”\n\n沈砚愣了一下：“我只是个修灯的。”\n\n林灯正把一枚铜牌放在柜台上，上面刻着300这个数字。“这是你师父当年欠会里的债，”她说，“三百枚里，他只还了一半。”"
-  },
-  {
-    "chapter": 3,
-    "title": "第三章 灯正的规矩",
-    "content": "林灯正说，夜灯会有三条规矩：不问灯的来历，不碰灯的芯，不在雨夜点灯。\n\n沈砚数了数，昨夜他三条全犯了。\n\n“那我会被赶出雾港吗？”他问。\n\n“不会，”林灯正合上黑伞，“会被带走。无火灯选中的人，从来没有第二条路。”\n\n老柯在里屋摔碎了茶碗。"
-  }
-]
 ```
 
 **S4 finished English novel** (2 chapters; passes `ImportNovelBody` and `validateNovelBundle`). `final`-mode import bundle:
@@ -1854,8 +1817,8 @@ Curated-ingest bodies (`PUT /api/v1/ingest/novels/test:001` gets `novel`; `PUT .
 
 #### 2.5 Recombine (title-parsing ladder + AI boundary resolution)
 
-- **Entry:** `POST /api/v1/projects/:P/recombine` `{"dryRun"?, "useAi"?}` (200 sync; `source` only, else `PRJ_003`). No UI screen (recombine appears in the web app only in `api-types.gen.ts`); it also runs inside import(source), rebrand, chapter-reforge and analysis jobs via `autoRecombine`, which always passes `useAi: true` and swallows errors (log `autoRecombine skipped`).
-- **Preconditions:** none, but it refuses once derived data exists (summary, appearances, beats, chunks, briefs, conversions, reforges, translations, drafts) with `SRC_003`.
+- **Entry:** `POST /api/v1/projects/:P/recombine` `{"dryRun"?, "useAi"?}` (200 sync; `source` only, else `PRJ_003`). No UI screen (recombine appears in the web app only in `api-types.gen.ts`); it also runs inside import(source) jobs via `autoRecombine`, which always passes `useAi: true` and swallows errors (log `autoRecombine skipped`).
+- **Preconditions:** none, but it refuses once derived data exists (summary, appearances, beats, chunks, briefs, drafts) with `SRC_003`.
 - **Input:** S2. **[det]** ladder (`title-parts.ts`): `(1/2)` part-of-total, `- Part 2`, `Chapter N:` prefix, bare repeat, untitled-short. **[AI]** only for the 3 ambiguous boundaries: 1 call, `recombine@1.0.0`, role `skeleton`, graph `recombine`/target `boundaries`, never cached.
 - **Run:** 1. Import S2 (D6: merge is applied by the import job). 2. `GET /api/v1/projects/:P/source/chapters`. 3. `POST /recombine {"dryRun":true}` (no AI). 4. `POST /recombine {"dryRun":true,"useAi":true}` for a second opinion. 5. Run extraction (or set any `chapters.summary`), then `POST /recombine {}` again.
 - **Verify:** 5 chapters after import **if the model merges 5 and 8**: titles `Ash Gate`, `The Salt Road`, `The Lantern Fair`, `The Cold Well`, `The Cold Well` (the deterministic ladder alone stops at 7, and every merge beyond that is the model's); ch 1 `merged_from = [{number:1,title:"Chapter 1: Ash Gate (1/2)",words:45},{number:2,...}]` (`recombine.service.ts:217`); content = parts joined by `\n\n` (`:216`, so the mid-sentence cut in "toward the / crowd" stays as a paragraph break, a visible seam); numbers contiguous 1..5. `model_calls`: exactly 1 row `recombine@1.0.0`; `raw_output` is `{"decisions":[{"afterChapter":5,"verdict":"merge"},{"afterChapter":7,...},{"afterChapter":8,...}]}` in pre-renumber numbers. Step 3 returns `applied:false, before:5, after:5` with `ambiguous=[{afterNumber:4,reason:'bare_repeat'}]` (the boundary the AI left split, renumbered); step 4 may report `after:4` without applying it. Step 5 returns 400 `SRC_003`. A clean S1 import must produce no `recombine` call.
@@ -1863,129 +1826,15 @@ Curated-ingest bodies (`PUT /api/v1/ingest/novels/test:001` gets `novel`; `PUT .
 - **Fails when:** verdicts for boundaries not asked are ignored (invariant: the model only joins, never splits); AI failure silently falls back to the deterministic plan (warn `AI boundary resolution failed`), leaving 7 chapters; `SRC_002` on an empty project.
 - **Cost:** 1 call, ~600 tokens.
 
-#### 2.6 Rebrand (glossary seed, convert, residue scan, audit, repair, flag-and-continue)
+#### 2.6 Curated ingest (deterministic, not AI)
 
-- **Entry:** UI **Rebrand** (`/novels/$novelId/rebrand`, source projects only — a non-source project is redirected to the overview): cards "Conversion directives" ("Additional scenes (optional)", "Extra banned terms", "AI audit every chapter", "Save config") and "Pipeline", "Start rebrand" (reads "Running…" while a job is active), a chapter row whose "Read" action opens the drawer (Converted / Original) alongside "Convert"/"Re-run", and "Download manuscript". API: `PUT /api/v1/projects/:P/rebrand/config` (200), `POST /rebrand {"force"?,"limit"?}` (202), `GET /rebrand`, `/rebrand/glossary`, `/rebrand/chapters`, `/rebrand/chapters/:chapter`, `POST /rebrand/chapters/:chapter` (202, single re-run, forces), `GET /rebrand/manuscript`.
-- **Preconditions:** S1 source project. Extraction not required (the seed pack then has no entities/world facts, see D1).
-- **Input:** S1. Config for the happy path: `PUT /rebrand/config {"settings":{"auditEnabled":true,"maxRepairs":1,"termPacks":["east-asian"],"bannedExtra":[]}}` (API only, D3).
-- **Run (6a happy path):** 1. `POST /rebrand {}`. 2. Watch phases recombining -> glossary -> converting. 3. Verify. **(6b forced repair, cheap):** `PUT /rebrand/config {"settings":{"bannedExtra":["the"],"maxRepairs":1}}` then `POST /rebrand/chapters/2`; then `maxRepairs:0` and re-run (no repair), then `maxRepairs:2`. Restore `bannedExtra:[]`. **(6c flag-and-continue):** import S1 plus a 6th chapter `{"title":"Chapter 6: The Bell","content":"The bell rang twice. Nobody answered."}`; the convert schema's `body` has `minLength: 100` (`ai/schemas/rebrand.schema.ts:69`), so the model must pad a 37-character chapter or the run fails — and rebrand is the pipeline that genuinely flags and continues (`job.executor.ts:312-314`).
-- **Verify (6a):** `rebrands.status='done'`, `world_notes` >= 200 chars (the schema's own floor, `rebrand.schema.ts:27`) naming an invented replacement for every real reference in S1 (China/Middle Kingdom/Huaxia, Japan, Korea) and reusing none. `rebrand_glossary`: seeded rows `created_chapter=0` for Lin Xiao, Zhao Feng, Master Gu, Elder Bai, Azure Cloud Sect, Jade Serpent Pill, Iron Kettle Inn, Stonebridge Town plus `country`/`culture` entries; later rows `created_chapter>=1`; the glossary only grows and no `replacement` ever changes between runs. `chapter_conversions`: 5 rows, `status` `converted|attention`, `issues` null when `converted`, `revision=1`, `title` converted. Leak invariant (must be empty): `select chapter from chapter_conversions where project_id=P and status='converted' and (body ~* '(china|chinese|huaxia|han dynasty|middle kingdom|japan|korea|lin xiao|zhao feng|azure cloud|iron kettle)' or body ~ '仙');` (a `converted` row is by definition scan-clean, so any hit is a scan bug). Calls: 1x `rebrand-glossary@1.0.0` (role `rebrand`), then per chapter `rebrand-convert@1.1.0` (role `rebrand`, node `convert`) + `rebrand-audit@1.0.0` (role `audit`): 11 calls. `workflow_runs.node_trace` happy = `[loadChapter, assembleContext, convert, residueScan, audit, persistConversion, mergeGlossary, finish]`. Chapter >= 2 packs (`/runs/:id/context`): `world_notes` (stable), `glossary_slice`, and `prev_ending` taken from the previous CONVERTED body (must show invented names, not Lin Xiao). `cached_input_tokens > 0` from ch 2 on if the provider reports caching. Re-`POST /rebrand {}` converts nothing new and never re-seeds (`world_notes` set). No endpoint clears `world_notes` — `PUT /rebrand/config` writes only `directives` and `settings` — so forcing a fresh seed means nulling the column by SQL.
-- **Verify (6b):** ch 2 ends `attention`, `issues=[{source:'residue',type:'banned_term',detail:'real-world term "the" must not appear',...}]`; `node_trace` gains `prepareRepair, convert, residueScan, audit` once (twice with `maxRepairs:2`, none with `0`); `model_calls.node` shows `convert, audit, repair, audit`; the repair call's prompt carries `Repair notes: 1. [banned_term] ...`. **(6c):** row `status='failed', body=''`, `issues=[{source:'run',type:'run_failed'}]`, other chapters unaffected, `GET /rebrand/manuscript` lists `failedChapters:[6]` with a `<!-- WARNING -->` banner, UI chip "1 failed".
-- **Quality check:** all 5 beats per chapter survive (ch 1: broken sword mocked, father vanished, pill left, Elder Bai's warning; ch 2: Zhao Feng demands the pill and names the inn; ch 3: shard cuts sabre; ch 4 repeat kept as is; ch 5 recap). The ch 2 nationalism beat is rewritten as an in-world faction contempt, not deleted and not left as national language. Same replacement for Lin Xiao and "the father of Lin Xiao" in every chapter. Light copy-edit: word count within +/-15% of source, `fixes` lists exactly the two plants (wrong speaker ch 2, `Lin Xaio` ch 4) and nothing invented. `仙` re-rendered, not kept.
-- **Fails when:** `RBR_003` (non-source); job `failed` "Rebrand glossary is not seeded" (`worldNotes` empty because the seed call failed); `AI_001`; many `attention` rows with `source:'audit'` issues about style (the audit is told to ignore style, so that is a prompt failure); UI Save config wiped `maxRepairs` (D3).
-- **Cost:** 11 calls for S1; 6b costs 4 calls per run.
-
-#### 2.7 Reforge, chapter mode
-
-- **Entry:** UI **Reforge** (`/novels/$novelId/reforge`): "Re-authoring instructions" card ("Author instructions (optional)", "Fidelity" Preserve/Close/Loose, "Target words per chapter (optional)", "AI fidelity judge every chapter", "Save config"), "Start reforge", a chapter row whose "Read" action opens the drawer (Reforged / Source) alongside "Reforge"/"Re-run". API: `PUT /api/v1/projects/:P/reforge/config` (200), `POST /reforge` (202), `GET /reforge`, `/reforge/chapters[/:chapter]`, `POST /reforge/chapters/:chapter` (202), `GET /reforge/manuscript`. Source projects only (`REF_003`).
-- **Preconditions:** fresh S1 project. If rebrand already ran, its `world_notes`, glossary, `bannedExtra` and `termPacks` are reused (no second seed call); otherwise the job seeds them with 1 extra call.
-- **Input:** S1 with `PUT /reforge/config {"mode":"chapter","fidelity":"close","instructions":"Tighten the prose; keep every named beat.","settings":{"judgeEnabled":true,"maxRepairs":1,"targetWords":120}}`.
-- **Run:** 1. `POST /reforge {}`. 2. Verify. 3. Fidelity sweep on one chapter: set `preserve`, `close`, `loose`, each `POST /reforge/chapters/3`. 4. Probe R-1: `PUT /reforge/config {"instructions":"Delete the ending of chapter 3 where Zhao Feng flees swearing revenge."}` then `POST /reforge/chapters/3`.
-- **Verify:** per chapter graph nodes `loadChapter, outlineContext, generateOutline, writeContext, write, residueScan, judge, persistReforge, mergeGlossary, finish` (+ `prepareRepair, write` on a dirty pass, up to `maxRepairs`); calls `reforge-outline` (role `reforge`), `reforge-write` (role `reforge`), `reforge-judge@1.1.0` (role `judge`) = 3 per chapter (+2 per repair, +1 seed): 16 for S1. `chapter_reforges`: 5 rows `reforged|attention`, `source_beats` (outline: 4-6 beats with purpose, entities, dialogue anchors), `fidelity` `{verdict, coveredBeats, totalBeats, missingBeats}`, `word_count`, `issues`. Invariant: `reforged` implies `coveredBeats = totalBeats` and no residue hit; `attention` rows keep their body. At `loose` the judge is told reordering is fine (`renderReforgeFidelityRule`); at `preserve|close` a reorder should be flagged.
-- **Quality check:** same plot, characters and dialogue meaning as S1, with better prose (compare ch 4's flat sentences); no invented beat; renames follow the glossary; `changes` lists real removals only; ch 3 at `loose` may compress, at `preserve` should be close in length.
-- **Probe R-1 result (predicted, D4):** ch 3 `attention` with `issues=[{source:'fidelity',type:'missing_beat',...}]` for the removed ending even though the author asked for it. If the judge passes it, note that as luck, not design.
-- **Fails when:** `REF_003`; `Rename bible is not seeded` in a run error; `glossary_leftover` residue flags; D3 (UI Save wiped `maxRepairs`).
-
-#### 2.8 Reforge, transform mode (analysis, plan approval, N:M write, cut ledger, promote)
-
-- **Entry:** UI **Transform** (`/novels/$novelId/transform`). While the project is in chapter mode the screen shows only a "This project is in chapter mode" card with a "Switch to transform mode" button; the tabs **Analysis** ("Run analysis" / "Re-run analysis"), **Plan** ("Draft plan" / "Re-draft from analysis", "Save as new revision", "Approve plan"), **Transform** ("Start transform" plus an "Output limit" input), **Cuts** and **Promote** ("Promote") appear only once `reforge.mode === 'transform'`. API under `/api/v1/projects/:P/reforge`: `PUT /config`, `POST /analyze`, `GET /analysis[/report|/findings]`, `POST /plan`, `GET /plan`, `PUT /plan/spans`, `POST /plan/approve`, `POST /transform`, `GET /outputs[/:outputChapter]`, `POST /outputs/:outputChapter`, `GET /cuts`, `POST /promote`, `GET /manuscript` (the `POST`s return 202, the rest 200; `POST /promote` needs `projects:write` but not `generation:run`).
-- **Preconditions:** fresh S1 project (5 chapters). Config (API only): `PUT /reforge/config {"mode":"transform","settings":{"analysisWindow":2,"maxSpanSourceChapters":6,"targetCompression":0.6}}`; mode `transform` forces `fidelity:'loose'` (sending another value gives `REF_008`).
-- **T1 Analysis [AI]:** `POST /reforge/analyze` -> 3 windows (1-2, 3-4, 5) then synthesis: 3x `reforge-analyze-window@1.0.0` + 1x `reforge-synthesize@1.0.0` (role `extraction`, planning group, cacheable). Verify `reforge_analyses`: `status='done'`, `windows_failed=0`, `chapters_analyzed=5`, `metrics.repetitionRatio=0.4`; `reforge_chapter_cards` 5 rows with `movement` (expect ch 1-3 `advances`, ch 4 `sidesteps|stalls`, ch 5 `stalls`); `reforge_findings` includes `repetition 3-4` and `pacing_stall 5-5` (the two candidates `computeAnalysisSignals` produces on S1) with `detected_by` `both` when the model cites the `signalRef`, else `signal`. `GET /analysis/report` names the chapters and says ch 4 repeats ch 3 and ch 5 is recap; it must not discuss prose quality; window 2's cards must not re-introduce the pill as new (carry state works). D5: any failed window aborts.
-- **T2 Plan draft [AI]:** `POST /reforge/plan` -> 1 call `reforge-plan@1.0.0` (role `plan`), status `draft` (never auto-approved). Judge the model's own plan: spans cover chapters 1-5 exactly once, ch 4 dropped or condensed, `keptBeats` concrete, `continuityNotes` present after any drop, `findingIds` cite the two findings. `REF_006` = an invalid plan (job fails; the plan brief states the chapter count).
-- **T3 Deterministic plan (removes model variance):** `PUT /reforge/plan/spans` with the body below (`baseRevision` = the drafted revision). Expect `revision` +1, previous plan `superseded`. Negatives: a gap (`toChapter:1` on span 1) -> 400 `REF_006`; stale `baseRevision` -> 409 `REF_010`.
-  The body below passes `ReforgePlanSpansBody` and `validateTransformPlan(spans,{chapterCount:5})` returns no errors; `deriveOutputNumbering` gives `outputChapterCount: 3` with span 1 -> output 1, span 2 -> output 2, span 3 (drop) -> none, span 4 -> output 3. With `toChapter:1` on span 1 the validator returns `spans must partition the source: span 2 starts at 3, but span 1 ends at 1`.
-
-```json
-{
-  "baseRevision": 1,
-  "spans": [
-    {
-      "ordinal": 1,
-      "fromChapter": 1,
-      "toChapter": 2,
-      "action": "merge",
-      "targetChapters": 1,
-      "arcLabel": "Broken Sword",
-      "rationale": "Chapters 1 and 2 are setup that reads better as one opening.",
-      "keptBeats": [
-        "Lin Xiao kneels at the sect gate holding his father's broken sword and is mocked by the guards",
-        "An unknown benefactor leaves a Jade Serpent Pill at his door and Elder Bai warns him someone wants him alive",
-        "Zhao Feng demands the pill and challenges Lin Xiao to a duel at the Iron Kettle Inn in three days"
-      ],
-      "cutThreads": []
-    },
-    {
-      "ordinal": 2,
-      "fromChapter": 3,
-      "toChapter": 3,
-      "action": "keep",
-      "targetChapters": 1,
-      "arcLabel": "Broken Sword",
-      "rationale": "The first duel is the payoff of the opening and stays intact.",
-      "keptBeats": [
-        "The glued sword shatters on the first parry",
-        "Lin Xiao swallows the Jade Serpent Pill and the shard cuts Zhao Feng's sabre in half",
-        "Elder Bai says the pill was meant for this and Zhao Feng flees swearing revenge"
-      ],
-      "cutThreads": []
-    },
-    {
-      "ordinal": 3,
-      "fromChapter": 4,
-      "toChapter": 4,
-      "action": "drop",
-      "targetChapters": 0,
-      "arcLabel": "Duel Rematch",
-      "rationale": "A near-verbatim repeat of the first duel that adds nothing.",
-      "keptBeats": [],
-      "cutThreads": ["Iron Kettle Inn"]
-    },
-    {
-      "ordinal": 4,
-      "fromChapter": 5,
-      "toChapter": 5,
-      "action": "keep",
-      "targetChapters": 1,
-      "arcLabel": "Aftermath",
-      "rationale": "The reflective close is kept but cannot lean on the cut rematch.",
-      "keptBeats": ["Master Gu sits alone and weighs the broken sword, the pill and Zhao Feng's revenge", "The lantern burns down as the sect settles into an uneasy week"],
-      "cutThreads": [],
-      "continuityNotes": "Zhao Feng has been beaten once and is gone; Lin Xiao holds the pill's power; nobody speaks of the inn again."
-    }
-  ]
-}
-```
-
-- **T4 Approve [det]:** `POST /reforge/plan/approve {"baseRevision":<rev>}` -> `reforge_plans.status='approved'`, `output_chapter_count=3`; `GET /reforge/cuts` shows 2 seeded rows: `duel-rematch` (kind `arc`, disposition `cut`) and `iron-kettle-inn` (kind `subplot`, `cut`), both `effective_from_output=3`; `reforge_plan_spans.bridge_directive` set on span 4 ("The source chapters 4-4 (Duel Rematch) are cut. The reader never saw them ..."), built without a model call. Approving twice is a no-op; editing after approval writes a new draft revision (approved plans are never mutated); `POST /transform` before approval -> `REF_005`.
-- **T5 Write [AI]:** `POST /reforge/transform {}` (target `reforge-P`, D7). Seeds the rename bible first if absent (1 call), then per output the `span-transform` graph: `loadSpan, transformContext, write, residueScan, cutScan, judge, (prepareRepair, write), persistOutput, mergeGlossary, appendCuts, finish`; prompts `reforge-transform-write@1.0.0` (role `reforge`) and `reforge-transform-judge@1.0.0` (role `judge`); max 1 repair, hard-coded in `routeAfterTransformJudge` (`span-transform.graph.ts:82`), `settings.maxRepairs` is ignored. 1 + 3x2 (+2 per repair) = 7+ calls. Verify `reforge_outputs`: 3 rows (outputs 1..3 = spans 1,2,4; output 1 has `from_chapter=1,to_chapter=2`, i.e. 2:1), `status written|attention`, `plan_beats` = the span's `keptBeats`, `fidelity.coveredBeats = totalBeats`, `word_count` well under the source span (this is condensation).
-- **Cut ledger checks:** output 3 must not contain `Iron Kettle Inn` or `Duel Rematch` (`select body ilike '%iron kettle%' from reforge_outputs where output_chapter=3` = false when `written`); S1 ch 5 names the inn twice, so this is the pressure test. A literal hit becomes `issues=[{source:'cut',type:'resurfaced_cut',cutKey:'iron-kettle-inn'}]`, one repair, else `attention`. Outputs 1-2 may name the inn (ban starts at 3). `cutDelta` entries the writer reports are appended with `effective_from_output = n+1`; re-running `POST /reforge/outputs/3` never rewrites existing ledger rows (append-only, `onConflictDoNothing`). Quality: output 3 opens across the seam ("Zhao Feng is gone", time passed) without recapping the rematch; kept beats all land; no Elder Bai / inn callbacks.
-- **T6 Promote [det]:** before all outputs exist -> 400 `REF_009` (`written`/`expected` counts). Then `POST /reforge/promote {"title":"Azure Ash (transformed)","seedVolumes":true}` -> new `projects` row `kind='curated'`, `source_project_id=P`; `chapters` 3 rows `locked=true, generator='human', status='done'` with the output bodies; `volumes` 2 rows from `arcLabel` runs (`vol-1` "Broken Sword" 1-2, `vol-2` "Aftermath" 3-3, dropped span skipped); `reforge_plans.promoted_project_id` set; a second promote returns `alreadyPromoted` and creates no second project. No `model_calls` for promote. `GET /reforge/manuscript` renders the 3 outputs.
-- **Fails when:** `windows_failed` abort (D5); `REF_006`; `Rename bible is not seeded` (`loadSpan`); outputs stuck `attention` with `missing_kept_beat` because a span kept beats the output cannot hold (D8); UI Save config wiped analysis settings (D3).
-- **Cost:** analysis 4 calls, plan 1, transform 7+, roughly 15 calls; promote 0.
-
-#### 2.9 Translation (paste + bot ingest, glossary lifecycle, translate, fidelity checks, finalize)
-
-- **Entry:** UI **Translation** (`/novels/$novelId/translation`): "Add chapter" (paste original), primary button "Start translation" -> "Continue translating" -> "Translate remaining", segmented tabs **Chapters** / **Terminology** (sub-views "Review queue · N", "Glossary · N", "Not terms · N", "Approve these N", "Add term"), per-chapter "Translate"/"Re-run", "Finalize", "Reopen", Original / English / Side by side view; "Setup" card ("Style notes", "Fidelity audit per chapter", "Pause after seeding", "Honorifics", "Segment size"). API under `/api/v1/projects/:T/translation`: `PUT /config`, `PUT|GET|DELETE /originals/:chapter`, `GET /chapters[/:chapter]`, `GET|POST /glossary` (+ `/glossary/:id` PATCH, `/glossary/:id/approve`, `/reject`, `/glossary/decisions`), `POST /chapters/:chapter/finalize` and `/reopen` (both chapter-scoped — there is no top-level `/translation/finalize`), `GET /manuscript`. Project kind `translation` only (`TRN_003`). Bot ingest: `PUT /api/v1/ingest/projects/:T/originals/:chapter` and `GET .../originals` (needs `novel-forge:curate`).
-- **Preconditions:** `POST /api/v1/projects {"name":"TR sample","kind":"translation","originalLanguage":"zh"}` (201; omitting `originalLanguage` on a `translation` kind gives `PRJ_006`). UI: home "New novel" dialog titled "Start a new novel" -> segment "Translate a novel" -> "Original language"; the modal only ever creates `new_novel` or `translation`, so `source` projects can only be created by import (`NewNovelModal.tsx:43-49`). Settings via API: `PUT /translation/config {"settings":{"maxRepairs":1,"segmentTokens":200,"honorifics":"keep","pauseAfterSeed":true}}` (200 tokens forces 2 segments per chapter).
-- **Run:** 1. Paste S3 ch 1-3 via `PUT /translation/originals/{1,2,3}` (201 created; same body again 204; changed body 200 + `source_stale`). Negatives: English text in ch 1 -> field error `content` "does not look like zh"; ch 5 when 3 is last -> `TRN_010`. 2. `POST /translation {}`: **[AI]** seed `translate-seed@1.0.0` (role `translate`), then the job pauses. 3. Review terms; approve all but one, edit one target, reject one, add one manual term. 4. `POST /translation {}` again: per chapter graph `loadChapter, assembleContext, segment, translateSegment x2, join, fidelityScan, audit, (prepareRepair, translateSegment), persistTranslation, mergeGlossary, finish` (`translate-chapter@1.0.0` role `translate`, `translate-audit@1.0.0` role `audit`). 5. Finalize each chapter. 6. Staleness: `PATCH /translation/glossary/:id {"target":"..."}` on an applied term.
-- **Verify:** after step 2: `translations.phase='review'`, job `done`, `style_notes` non-empty (decides voice, name order, honorifics, punctuation), `translation_glossary` rows `status='suggested', origin='seed', created_chapter=0` (expect 沈砚, 老柯, 雾港, 无火灯, 夜灯会, 灯正), 0 `chapter_translations`. After step 3: statuses `approved/rejected`, edited row `revision=2`, manual row `origin='manual', status='approved'`; reject bumps nothing. After step 4: `chapter_translations` 3 rows `translated|attention`, `applied_terms` = `{termId: revision}`, `segments` length 2, `body` paragraphs match the original count within [0.6,1.6]; `mergeGlossary` adds `origin='discovered'` `suggested` rows. Deterministic scan (`fidelity-scan.ts`) issue types: `source_script_residue`, `glossary_violation`, `number_drift`, `paragraph_drift`, `dialogue_drift`, `length_band` (zh band 1.2-3.2). Finalize gates: pending (`suggested`) applied term -> 400 `TRN_005`; stale glossary -> 409 `TRN_006`; changed original -> 409 `TRN_011`; finalized edit -> `TRN_004`. A discovered term in ch 1 lands in ch 2's slice as provisional, so ch 2 cannot finalize until reviewed (TRN_005). Finalize copies `body` to `chapters.content`, sets `locked=true`, `word_count`, `chapter_translations.status='finalized'`. Step 6: rows containing that id get `glossary_stale=true`; `POST /translation {"stale":true}` re-runs only those; a finalized chapter is never a target (reopen first). Invariant: nothing reaches `chapters.content` except finalize.
-- **Quality check:** (a) `沈砚` rendered identically in every chapter and equal to the approved target; `无火灯` never varies. (b) digits `12` and `300` survive; false-positive probe: if the translator writes `300` for `三百年` the scan flags `number_drift` with `unexpected number(s) not in the original: 300` and burns a repair pass (`normalizeDigits` maps only full-width digits to ASCII, so hanzi numerals can never match). Record how often it happens. (c) no omission/addition: read ch 3's 3 rules against the original. (d) `沈师兄` follows `honorifics` (keep: "Shen shixiong"; translate: "Senior Brother Shen"). (e) English quote count within 25% of the original's (`DIALOGUE_DRIFT_THRESHOLD`; the scan counts all zh quote marks on the source side and `“ ” "` on the translation side). (f) `translate-audit` flags only real omission/meaning shifts, no style critique. (g) prose reads native, not word-for-word.
-- **Fails when:** job `failed` "Translation is not seeded" (`style_notes` empty); `TRN_003` on a wrong kind; audit false positives keep chapters at `attention`; `lastError` stamped on a good row (only the error is stamped; body and revision are preserved on a failed re-run).
-- **Cost:** seed 1, then 2 segment calls + 1 audit per chapter (+2 per repair): about 10 calls for 3 chapters.
-
-#### 2.10 Curated ingest (deterministic, not AI)
-
-- **Entry:** `PUT /api/v1/ingest/novels/:sourceRef` (201 created / 200 existing), `PUT .../chapters/:sourceOrdinal` (201, 204 when nothing landed), `POST .../cover` (204), `GET .../manifest` (200) — sourceRef e.g. `test:001`. Needs permission `novel-forge:curate` (session, or bot key `sl_bot_...`). No interactive web UI; the only reference is an informational hint on the Translation screen describing the originals-ingest door.
+- **Entry:** `PUT /api/v1/ingest/novels/:sourceRef` (201 created / 200 existing), `PUT .../chapters/:sourceOrdinal` (201, 204 when nothing landed), `POST .../cover` (204), `GET .../manifest` (200) — sourceRef e.g. `test:001`. Needs permission `novel-forge:curate` (session, or bot key `sl_bot_...`). No interactive web UI.
 - **Preconditions:** a caller holding `novel-forge:curate`. Curated projects cannot be created via `POST /projects` (`PRJ_005`).
 - **Input:** S4 ingest bodies (chapter bodies also accept `authorNote`).
 - **Run:** 1. PUT novel (201, then again 200 with `created:false`). 2. PUT ordinals 1, 2. 3. Re-push ordinal 1 unchanged. 4. Re-push ordinal 1 with different text. 5. PUT ordinal 4. 6. GET manifest.
 - **Verify:** `projects.kind='curated'`, `source_ref='test:001'`; `chapters` `locked=true, generator='human', status='done'`, `source_ordinal` 1..2, `content_hash` = `chapterContentHash({title,content})`; step 3 -> 204 no-op; step 4 -> 409 `ING_003`; step 5 -> 409 `ING_002` (no gaps); manifest lists `{sourceOrdinal, contentHash}` only; `ingest_audit_log` has a row per call (`landed|noop|created|...`). Invariant: `select count(*) from model_calls where project_id=P` is 0.
 - **Quality check:** none (deterministic).
 - **Fails when:** `IAM_002` missing permission; `ING_001` foreign or unknown sourceRef (answered like absent); 409s above.
-
-### 3. Harness-vs-baseline probes (cheap, same manuscript)
-
-Take S1 chapter 2 and run it through (a) recipe 2.6 and (b) a single well-written prompt of your own (any model) with the same world notes. Compare with the leak query and by hand: replacement consistency, beat preservation, `fixes` recall on the two plants, nationalism handling, and edited-word ratio. Record what the pipeline adds beyond a single good prompt: (1) residue scan catching lowercase leftovers a model missed (plant `huaxia banner` in a repaired output to see it), (2) repair rate per chapter, (3) audit-only catches (`source:'audit'` issues the scan could not see), (4) glossary continuity across chapters (`prev_ending`, discovered names), (5) cost: calls and tokens per accepted chapter versus one baseline call. If (1)-(4) are empty on S1, the orchestration is mostly overhead for this manuscript.
 
 ---
 

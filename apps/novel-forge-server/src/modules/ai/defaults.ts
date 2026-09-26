@@ -5,9 +5,6 @@ export type AiRole =
   | 'generation'
   | 'judge'
   | 'fix'
-  | 'rebrand'
-  | 'reforge'
-  | 'translate'
   | 'outline'
   | 'revision'
   | 'title'
@@ -44,9 +41,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   generation: 'writing',
   revision: 'writing',
   fix: 'writing',
-  rebrand: 'writing',
-  reforge: 'writing',
-  translate: 'writing',
   premise: 'planning',
   plan: 'planning',
   arc: 'planning',

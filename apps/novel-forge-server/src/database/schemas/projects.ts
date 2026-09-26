@@ -1,5 +1,5 @@
-import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
@@ -34,7 +34,6 @@ interface ProjectModelOverridesData {
   arc?: ProjectModelRefData;
   embedding?: ProjectModelRefData;
   image?: ProjectModelRefData;
-  translate?: ProjectModelRefData;
 }
 
 export interface ProjectConfigData {
@@ -72,7 +71,7 @@ export namespace Project {
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
 
-export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'translation', 'curated']);
+export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'curated']);
 export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'unrestricted', 'human']);
 
@@ -91,8 +90,6 @@ export const projects = pgTable(
     title: varchar('title', { length: 500 }),
     coverImagePath: varchar('cover_image_path'),
     contentMode: contentMode('content_mode').notNull().default('standard'),
-    /** BCP-47 tag of the prose in `chapters.original_content`; null means the project has no original-language side. */
-    originalLanguage: varchar('original_language', { length: 16 }),
     config: jsonb('config').$type<ProjectConfigData>(),
     /** Chapter scene-prose word-count floor; null means the generation pipeline's default band applies. Always set together with `wordTargetMax`. */
     wordTargetMin: integer('word_target_min'),
@@ -106,7 +103,6 @@ export const projects = pgTable(
     sourceRef: varchar('source_ref', { length: 64 }),
     originalAuthor: varchar('original_author', { length: 256 }),
     importedMeta: jsonb('imported_meta').$type<ImportedNovelMetaData>(),
-    sourceProjectId: bigint('source_project_id', { mode: 'bigint' }).references((): AnyPgColumn => projects.id, { onDelete: 'set null' }),
     storyCurrentChapter: integer('story_current_chapter').default(0),
     storyCurrentVolumeKey: varchar('story_current_volume_key'),
     skeletonCharacterArcs: jsonb('skeleton_character_arcs'),
@@ -128,7 +124,3 @@ export const projects = pgTable(
     ),
   ],
 );
-
-export const projectRelations = relations(projects, ({ one }) => ({
-  sourceProject: one(projects, { fields: [projects.sourceProjectId], references: [projects.id], relationName: 'sourceProject' }),
-}));

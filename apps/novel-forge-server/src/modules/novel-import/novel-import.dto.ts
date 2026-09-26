@@ -1,7 +1,7 @@
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 
 // A hand-authored bundle picks one of two outcomes: `source` lands the
-// chapters as raw source material feeding the existing extract/consolidate/rebrand/reforge pipeline;
+// chapters as raw source material feeding the existing extract/consolidate pipeline;
 // `final` lands them as the finished, immediately publishable novel.
 const NOVEL_IMPORT_MODES = ['final', 'source'] as const;
 const NovelImportMode = EnumType.create('NovelImportMode', [...NOVEL_IMPORT_MODES]);

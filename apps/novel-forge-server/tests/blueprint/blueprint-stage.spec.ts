@@ -237,7 +237,7 @@ describe('BlueprintStageService.progress', () => {
   it('should report null for every kind but an original novel, without reading anything', async () => {
     const { service, db } = fakeStageService([]);
 
-    expect(await service.progress({ id: 7n, kind: 'translation' })).toBeNull();
+    expect(await service.progress({ id: 7n, kind: 'curated' })).toBeNull();
     expect(await service.progress({ id: 7n, kind: 'source' })).toBeNull();
     expect(db.select).not.toHaveBeenCalled();
     expect(db.query.decisionLedgerEntries.findMany).not.toHaveBeenCalled();

@@ -28,8 +28,8 @@ function countWords(text: string): number {
 
 /**
  * Lands a finished manuscript as chapters numbered contiguously from `startNumber`. Shared by the
- * novel-import executor, the reforge promote stage and the curated-ingest push so all three are
- * indistinguishable afterwards: same statuses, same locking, same numbering, one definition.
+ * novel-import executor and the curated-ingest push so both are indistinguishable afterwards: same
+ * statuses, same locking, same numbering, one definition.
  */
 export async function landFinalChapters(db: PrimaryDatabase, projectId: bigint, chapters: LandedChapter[], options: LandChaptersOptions = {}): Promise<number> {
   const isFinal = (options.mode ?? 'final') === 'final';

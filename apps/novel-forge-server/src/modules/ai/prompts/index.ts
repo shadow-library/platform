@@ -40,25 +40,11 @@ import { newNovelPrompt } from './new-novel.prompt';
 import { outlinePrompt } from './outline.prompt';
 import { planPrompt } from './plan.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
-import { rebrandAuditPrompt } from './rebrand-audit.prompt';
-import { rebrandConvertPrompt } from './rebrand-convert.prompt';
-import { rebrandGlossaryPrompt } from './rebrand-glossary.prompt';
 import { recombinePrompt } from './recombine.prompt';
-import { reforgeAnalyzeWindowPrompt } from './reforge-analyze-window.prompt';
-import { reforgeJudgePrompt } from './reforge-judge.prompt';
-import { reforgeOutlinePrompt } from './reforge-outline.prompt';
-import { reforgePlanPrompt } from './reforge-plan.prompt';
-import { reforgeSynthesizePrompt } from './reforge-synthesize.prompt';
-import { reforgeTransformJudgePrompt } from './reforge-transform-judge.prompt';
-import { reforgeTransformWritePrompt } from './reforge-transform-write.prompt';
-import { reforgeWritePrompt } from './reforge-write.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
 import { titlePrompt } from './title.prompt';
-import { translateAuditPrompt } from './translate-audit.prompt';
-import { translateChapterPrompt } from './translate-chapter.prompt';
-import { translateSeedPrompt } from './translate-seed.prompt';
 import { type PromptKey, type PromptModule } from './types';
 import { validationPrompt } from './validation.prompt';
 
@@ -93,21 +79,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
-  'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,
-  'rebrand-convert': rebrandConvertPrompt as PromptModule<unknown>,
-  'rebrand-audit': rebrandAuditPrompt as PromptModule<unknown>,
-  'reforge-outline': reforgeOutlinePrompt as PromptModule<unknown>,
-  'reforge-write': reforgeWritePrompt as PromptModule<unknown>,
-  'reforge-judge': reforgeJudgePrompt as PromptModule<unknown>,
-  'reforge-analyze-window': reforgeAnalyzeWindowPrompt as PromptModule<unknown>,
-  'reforge-synthesize': reforgeSynthesizePrompt as PromptModule<unknown>,
-  'reforge-plan': reforgePlanPrompt as PromptModule<unknown>,
-  'reforge-transform-write': reforgeTransformWritePrompt as PromptModule<unknown>,
-  'reforge-transform-judge': reforgeTransformJudgePrompt as PromptModule<unknown>,
   recombine: recombinePrompt as PromptModule<unknown>,
-  'translate-seed': translateSeedPrompt as PromptModule<unknown>,
-  'translate-chapter': translateChapterPrompt as PromptModule<unknown>,
-  'translate-audit': translateAuditPrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,
@@ -133,5 +105,3 @@ export * from './scope-playbooks';
 export { buildChatRefinePrompt, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
 export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
-export { renderReforgeFidelityGuidance } from './reforge-write.prompt';
-export { renderReforgeFidelityRule } from './reforge-judge.prompt';

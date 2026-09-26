@@ -18,8 +18,7 @@ describe('assertAuthoringProject', () => {
     expect(gate('source')).toBe('allowed');
   });
 
-  it('should refuse a translation or curated project', () => {
-    expect(gate('translation')).toBe('PRJ_009');
+  it('should refuse a curated project', () => {
     expect(gate('curated')).toBe('PRJ_009');
   });
 });

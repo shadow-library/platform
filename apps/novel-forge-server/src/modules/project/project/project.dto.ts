@@ -52,14 +52,6 @@ export class CreateProjectBody {
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 
-  @Field({
-    optional: true,
-    maxLength: 16,
-    pattern: '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$',
-    description: 'BCP 47 language tag of the original prose (for example `zh` or `pt-BR`); required for a `translation` project and rejected for any other kind.',
-  })
-  originalLanguage?: string;
-
   @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words).' })
   wordTarget?: ProjectWordTarget;
 }
@@ -135,9 +127,6 @@ export class ProjectModelOverrides {
 
   @Field(() => ProjectModelRef, { optional: true })
   image?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  translate?: ProjectModelRef;
 }
 
 @Schema()
@@ -175,9 +164,6 @@ export class ProjectResponse {
 
   @Field(() => ContentMode)
   contentMode: Project.ContentMode;
-
-  @Field({ optional: true, nullable: true, description: 'BCP 47 language tag of the original prose; set only on a `translation` project.' })
-  originalLanguage?: string | null;
 
   // Non-nullable on purpose: class-schema turns a nullable class-ref into `type: [undefined, 'null']`,
   // which the response serialiser rejects. Fresh projects store `config = null`, so the service maps
@@ -254,21 +240,12 @@ export class UpdateProjectBody {
   })
   instructions?: string | null;
 
-  @Field({
-    optional: true,
-    nullable: true,
-    maxLength: 16,
-    pattern: '^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$',
-    description: 'BCP 47 language tag of the original prose; accepted only on a `translation` project, and only `null` on any other kind.',
-  })
-  originalLanguage?: string | null;
-
   @Field(() => ProjectWordTarget, { optional: true, nullable: true, description: 'Chapter word-count target; send `null` to restore the application default (1,800–2,600 words).' })
   wordTarget?: ProjectWordTarget | null;
 
   @Field(() => ProjectKind, {
     optional: true,
-    description: 'Switches the project workflow. Only `curated` to `new_novel` and `translation` to `curated` are accepted.',
+    description: 'Switches the project workflow. Only `curated` to `new_novel` is accepted.',
   })
   kind?: Project.Kind;
 }

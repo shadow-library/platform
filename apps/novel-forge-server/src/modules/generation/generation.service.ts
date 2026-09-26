@@ -176,25 +176,16 @@ export const PLAN_BIBLE_DOC_TOKENS = 4_000;
  * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
  */
 const AUTHOR_FACING_GRAPHS = [
-  'translate-seed',
-  'rebrand-glossary',
   'recombine',
   'chat-turn',
   'premise-enhance',
   'bible-audit',
   'arc-plan',
   'illustration',
-  'reforge-plan',
-  'reforge-analyze-window',
-  'reforge-synthesize',
   'chapter-generation',
   'chapter-finalization',
   'bible-builder',
   'source-extraction',
-  'chapter-rebrand',
-  'chapter-reforge',
-  'chapter-translation',
-  'span-transform',
   'novel-validation',
 ] as const;
 

@@ -20,10 +20,6 @@ import { ToolRegistryService } from '../tools/tool-registry.service';
 import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
 import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
-import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-rebrand.graph';
-import { createChapterReforgeGraph, type ReforgeGraphServices } from './chapter-reforge.graph';
-import { createChapterTranslationGraph, type TranslationGraphServices } from './chapter-translation.graph';
-import { createSpanTransformGraph, type SpanTransformServices } from './span-transform.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
 
@@ -61,31 +57,6 @@ export interface BibleBuilderInput {
 export interface SourceExtractionInput {
   projectId: bigint;
   chapter: number;
-  jobId?: string;
-}
-
-export interface RebrandChapterInput {
-  projectId: bigint;
-  chapter: number;
-  jobId?: string;
-}
-
-export interface ReforgeChapterInput {
-  projectId: bigint;
-  chapter: number;
-  jobId?: string;
-}
-
-export interface TranslationChapterInput {
-  projectId: bigint;
-  chapter: number;
-  jobId?: string;
-}
-
-export interface SpanTransformInput {
-  projectId: bigint;
-  planId: bigint;
-  outputChapter: number;
   jobId?: string;
 }
 
@@ -132,12 +103,6 @@ interface GraphOutcome {
 // DatabaseModule is configured from rather than Config.get (which returns undefined until the module
 // registers the key lazily on first connect — a wrong-DB fallback risk here).
 const DB_URL = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
-
-// Each segment of a chapter is its own superstep and every repair pass replays the flagged ones, so the
-// LangGraph default of 25 aborts any real chapter mid-translation — and an abort here loses a fully
-// translated chapter as a failed run. This covers segments x (MAX_REPAIRS_CEILING + 1) + the fixed nodes
-// up to a 32-segment chapter, i.e. ~57k source tokens at the default 1,800-token segment size.
-const TRANSLATION_RECURSION_LIMIT = 150;
 
 // jsonb columns serialise via JSON.stringify, which throws on bigint. Every workflow input carries
 // bigint identifiers (projectId, draftId), so coerce them to strings before the row is persisted.
@@ -389,60 +354,6 @@ export class WorkflowRunService {
 
       const finalState = rawState as unknown as { nodeTrace?: string[] };
       return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
-    });
-  }
-
-  async runChapterRebrand(input: RebrandChapterInput): Promise<WorkflowRunResult> {
-    const runId = await this.createRun(input.projectId, 'chapter-rebrand', `chapter-${input.chapter}`, input, input.jobId);
-
-    return this.runGraph(runId, 'runChapterRebrand', async () => {
-      const graph = createChapterRebrandGraph(this.graphServices as RebrandGraphServices);
-      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
-      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
-
-      return { outcome: finalState.outcome ?? 'converted', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
-    });
-  }
-
-  async runChapterReforge(input: ReforgeChapterInput): Promise<WorkflowRunResult> {
-    const runId = await this.createRun(input.projectId, 'chapter-reforge', `chapter-${input.chapter}`, input, input.jobId);
-
-    return this.runGraph(runId, 'runChapterReforge', async () => {
-      const graph = createChapterReforgeGraph(this.graphServices as ReforgeGraphServices);
-      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
-      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
-
-      return { outcome: finalState.outcome ?? 'reforged', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
-    });
-  }
-
-  async runChapterTranslation(input: TranslationChapterInput): Promise<WorkflowRunResult> {
-    const runId = await this.createRun(input.projectId, 'chapter-translation', `chapter-${input.chapter}`, input, input.jobId);
-
-    return this.runGraph(runId, 'runChapterTranslation', async () => {
-      const graph = createChapterTranslationGraph(this.graphServices as TranslationGraphServices);
-      const rawState = await graph.invoke(
-        { projectId: String(input.projectId), chapter: input.chapter, runId },
-        { configurable: { thread_id: runId }, recursionLimit: TRANSLATION_RECURSION_LIMIT },
-      );
-      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
-
-      return { outcome: finalState.outcome ?? 'translated', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
-    });
-  }
-
-  async runSpanTransform(input: SpanTransformInput): Promise<WorkflowRunResult> {
-    const runId = await this.createRun(input.projectId, 'span-transform', `output-${input.outputChapter}`, input, input.jobId);
-
-    return this.runGraph(runId, 'runSpanTransform', async () => {
-      const graph = createSpanTransformGraph(this.graphServices as SpanTransformServices);
-      const rawState = await graph.invoke(
-        { projectId: String(input.projectId), planId: String(input.planId), outputChapter: input.outputChapter, runId },
-        { configurable: { thread_id: runId } },
-      );
-      const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
-
-      return { outcome: finalState.outcome ?? 'written', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
     });
   }
 

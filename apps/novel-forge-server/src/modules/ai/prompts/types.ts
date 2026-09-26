@@ -35,24 +35,10 @@ export type PromptKey =
   | 'chat-title'
   | 'arc-plan'
   | 'chapter-extract'
-  | 'rebrand-glossary'
-  | 'rebrand-convert'
-  | 'rebrand-audit'
   | 'blueprint-briefs'
   | 'blueprint-voice'
   | 'blueprint-check'
-  | 'reforge-outline'
-  | 'reforge-write'
-  | 'reforge-judge'
-  | 'reforge-analyze-window'
-  | 'reforge-synthesize'
-  | 'reforge-plan'
-  | 'reforge-transform-write'
-  | 'reforge-transform-judge'
   | 'recombine'
-  | 'translate-seed'
-  | 'translate-chapter'
-  | 'translate-audit'
   | 'illustration-compose'
   | 'appearance-describe'
   | 'blueprint-start'
@@ -67,9 +53,6 @@ export type PromptKey =
   | 'blueprint-engine'
   | 'blueprint-spine'
   | 'blueprint-volume-one';
-
-/** Mirrors the `reforge_fidelity` enum — how much latitude the re-author has against the source. */
-export type ReforgeFidelityLevel = 'preserve' | 'close' | 'loose';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

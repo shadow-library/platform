@@ -4,14 +4,13 @@
 
 - AI-assisted authoring workbench for long-form serialized web novels. An author (a project has one owner; bot-owned projects are shared with the owning organisation) develops an idea into a story bible and plan, has AI draft each
   chapter, reviews it against canon, finalizes it into canon, and publishes it to the reader app `web-novel` (`docs/web-novel.md`).
-- Also processes existing manuscripts: adapt (rebrand), re-author (reforge), restructure (transform), translate.
 - `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every LLM call goes through OpenRouter; Ollama serves embeddings only.
 - `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. Projects are owned by a person or an organisation bot, which reaches only routes that admit it.
 
 ## Concepts
 
-- **Project `kind` is the workflow.** `new_novel` original authoring; `source` imported English manuscript being adapted; `translation` original-language novel translated to
-  English; `curated` finished English manuscript held for publishing (never created directly; minted by curated ingest or reforge promote, and also reachable by the translation-to-curated workflow switch and by cloning).
+- **Project `kind` is the workflow.** `new_novel` original authoring; `source` imported English manuscript being adapted; `curated` finished English manuscript held for
+  publishing (never created directly; minted by curated ingest, and also reachable by cloning).
   A project's `kind` can change via workflow switch, clone or reset; `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
 - **Blueprint and Workspace** (`blueprint.md`): a new novel is a project from the first click. It opens in the Blueprint, a guided top-down design flow whose decisions live in
   an append-only decision ledger and materialise as ordinary pages, entities, facts, volumes, arcs and briefs; a gate switches the same project into the Workspace, where
@@ -33,7 +32,7 @@
 
 - Blueprint design (idea to arc one briefs), bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
 - Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, curated ingest, per-novel plugins, per-account AI quota.
-- Source pipeline (extract, consolidate, skeleton, recombine, rebrand, reforge, transform), translation, and publishing (scheduling, access control, reconcile, spoiler-gated wiki).
+- Source pipeline (extract, consolidate, skeleton, recombine) and publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 
 ## Architecture
 
@@ -70,11 +69,6 @@
   scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
   it, one generation job at a time, finalized chapters change only through amend — and replaces the prose in place. Whatever the draft held, however it was written, stays in
   the revision history; its continuity review is dropped and later drafts are marked stale only when the new draft lands, keeping any more specific stale reason they carry.
-- **Rebrand** (source only; runs recombine first, best-effort, merging translator-split parts): glossary seed, then per chapter convert -> deterministic residue scan -> audit -> at most
-  one repair by default (`settings.maxRepairs`), else flagged. Output lives beside untouched source rows; the glossary only grows.
-- **Reforge** (source only): reuses the rebrand glossary. `chapter` mode rewrites each chapter under a fidelity judge (beat coverage, naming consistency and real-world residue; never taste). `transform` mode: analysis ->
-  human-approved plan of source spans (keep, condense, merge, drop) -> N:M output chapters with a cut ledger -> promote into a new `curated` project.
-- **Translation**: originals arrive by paste or bot ingest; a reviewed glossary; serial chapter translation with fidelity checks; finalize copies English into locked chapters.
 - **Plugins**: operator-loaded (off unless `plugins.dir` is set), per project, answering only five fixed decision points (canon augment, brief policy, call routing, context/prompt contribution).
 - **Curated ingest**: an organisation bot creates `curated` projects and pushes chapters by source reference.
 
@@ -152,25 +146,21 @@
   allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated context, NEVER core artifacts. A failing
   plugin degrades its decision point and MUST NEVER fail a generation.
 
-### Transform and pipelines
+### Pipelines
 
-- A transform write MUST NEVER invent structure: the approved plan is the only authority for output chapters; no write runs against an unapproved or superseded plan; plans are
-  never auto-approved. Cut material MUST stay cut: the ledger is append-only, rendered into every later output chapter as a risk-ranked, token-budgeted slice, and a resurfaced cut is a judge issue.
-- Rebrand, reforge, recombine MUST refuse non-`source` projects; translation refuses non-`translation`; generation, planning and outlining refuse `translation` and `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
-- Rebrand, reforge and translation flag and continue per chapter (extract and generate stop at the first failed chapter); a failed run NEVER overwrites a good translation row, and a finalized translation is never a target. Phase and resume state MUST be
-  derived from data, never advisory status columns.
-- Translation glossary is pipeline data, not canon; nothing reaches `chapters.content` except through finalize, which refuses on pending terms, stale glossary or changed original.
+- Recombine MUST refuse non-`source` projects; generation, planning and outlining refuse `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
+- Extract and generate stop at the first failed chapter.
 
 ### Publishing
 
 - Content flows forge -> reader only. `publishedOrdinal` MUST be assigned once, NEVER re-derived from chapter numbers. Only locked, non-empty chapters publish, contiguously.
 - Every push MUST be idempotent (`contentHash`). No forge internals or unrevealed facts in a payload; a chapter payload admits only `contentRating` (the novel payload adds blurb, cover, genres, tags, status,
   visibility and three rating dimensions), unrated is never sent as `none`, and a hash change MUST NOT move the digest of a chapter whose reader-visible content is unchanged.
-- A novel-level rating MUST NEVER fall below the highest published-chapter rating per dimension (the forge refuses, never raises). Publishing is NEVER automatic on approval (an amend or translation finalize reschedules an already-published chapter).
+- A novel-level rating MUST NEVER fall below the highest published-chapter rating per dimension (the forge refuses, never raises). Publishing is NEVER automatic on approval (an amend reschedules an already-published chapter).
 
 ## Non-goals
 
-- No auth beyond Identity, local chat models, graph interrupts, reader-side editing, reader-account access, auto span reordering or plan approval, partial promotion, or amend retraction.
+- No auth beyond Identity, local chat models, graph interrupts, reader-side editing, reader-account access, or amend retraction.
 
 ## Open work
 

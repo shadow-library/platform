@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -34,10 +34,10 @@ import {
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 
-const WORKFLOW_SWITCHES: Partial<Record<Project.Kind, Project.Kind[]>> = { curated: ['new_novel'], translation: ['curated'] };
+const WORKFLOW_SWITCHES: Partial<Record<Project.Kind, Project.Kind[]>> = { curated: ['new_novel'] };
 
-function assertLanguageMatchesKind(kind: Project.Kind, language: string | null | undefined): void {
-  if ((kind === 'translation') !== (language != null)) throw AppErrorCode.PRJ_006.create();
+function assertWorkflowSwitch(from: Project.Kind, to: Project.Kind): void {
+  if (!WORKFLOW_SWITCHES[from]?.includes(to)) throw AppErrorCode.PRJ_008.create();
 }
 
 @Injectable()
@@ -106,7 +106,6 @@ export class ProjectService {
   async create(body: CreateProjectBody): Promise<Project.Presented> {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
     if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
-    assertLanguageMatchesKind(body.kind, body.originalLanguage);
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
@@ -120,7 +119,6 @@ export class ProjectService {
         title: body.title,
         instructions: writingInstructionAdditions(body.instructions),
         contentMode: body.contentMode,
-        originalLanguage: body.originalLanguage,
         wordTargetMin: body.wordTarget?.min,
         wordTargetMax: body.wordTarget?.max,
       })
@@ -205,29 +203,6 @@ export class ProjectService {
     return this.present(result);
   }
 
-  private async assertWorkflowSwitch(tx: PrimaryDatabase, project: Project.Row, kind: Project.Kind): Promise<void> {
-    if (!WORKFLOW_SWITCHES[project.kind]?.includes(kind)) throw AppErrorCode.PRJ_008.create();
-    if (project.kind !== 'translation') return;
-
-    const [row] = await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(schema.chapters)
-      .leftJoin(
-        schema.chapterTranslations,
-        and(eq(schema.chapterTranslations.projectId, schema.chapters.projectId), eq(schema.chapterTranslations.chapter, schema.chapters.number)),
-      )
-      .where(
-        and(
-          eq(schema.chapters.projectId, project.id),
-          isNotNull(schema.chapters.originalContent),
-          or(isNull(schema.chapterTranslations.id), ne(schema.chapterTranslations.status, 'finalized')),
-        ),
-      );
-
-    const count = row?.count ?? 0;
-    if (count > 0) throw AppErrorCode.PRJ_007.create({ count });
-  }
-
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
     this.assertConfigModelsAllowed(update.config);
     this.assertWordTargetValid(update.wordTarget);
@@ -248,8 +223,7 @@ export class ProjectService {
       if (!project) throw AppErrorCode.PRJ_001.create();
 
       const switchTo = update.kind && update.kind !== project.kind ? update.kind : undefined;
-      if (switchTo) await this.assertWorkflowSwitch(tx, project, switchTo);
-      if (update.originalLanguage !== undefined) assertLanguageMatchesKind(switchTo ?? project.kind, update.originalLanguage);
+      if (switchTo) assertWorkflowSwitch(project.kind, switchTo);
 
       const [result] = await tx
         .update(schema.projects)
@@ -294,7 +268,6 @@ export class ProjectService {
           kind: source.kind,
           title: source.title,
           instructions: writingInstructionAdditions(source.instructions),
-          originalLanguage: source.originalLanguage,
           contentMode: body.contentMode ?? source.contentMode,
           config: body.config ?? source.config ?? null,
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,

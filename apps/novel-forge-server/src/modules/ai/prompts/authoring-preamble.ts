@@ -17,9 +17,9 @@ const VOICE_AND_CANON_RULES = `- Maintain established character voice and speech
 // Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
 // but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any
 // prose exists. Used by the bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts.
-// Only reforge-write, reforge-transform-write, and rebrand-convert — separate re-authoring pipelines — keep
-// the full version. generation.prompt.ts uses neither constant; its craft rules come entirely from the
-// context pack's `writing_style` section.
+// The sample-prose prompts (blueprint-voice, blueprint-premise-preview) keep the full version.
+// generation.prompt.ts uses neither constant; its craft rules come entirely from the context pack's
+// `writing_style` section.
 export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
 ${VOICE_AND_CANON_RULES}`;
