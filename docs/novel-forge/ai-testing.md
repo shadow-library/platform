@@ -518,6 +518,8 @@ ollama pull qwen3-embedding:8b   # then keep ollama running on :11434
 
 ### 11. Existing automated tests and eval scripts — what they do and do not prove
 
+The model-backed evaluation suites live in `scripts/evals/novel-forge/` (its `README.md` says how to run them); they need `NF_EVAL_TOKEN`.
+
 #### Commands
 
 From `apps/novel-forge-server` (`package.json:7-16`) — these are the one exception to "every command runs from the
@@ -1965,8 +1967,8 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 
 ### 4. Turning down a suggestion
 
-- **Entry:** API — the web's **Not this** declines a card op but does not call this route yet;
-  `POST /proposals/:id/ops/:opIndex/reject {"scope","why"?}` with scope
+- **Entry:** the chat's decline on a suggestion card (Never, Not now, Not this version; an action card's "Don't run it"
+  records nothing), or `POST /proposals/:id/ops/:opIndex/reject {"scope","why"?}` with scope
   `never`, `not_now` or `not_this_version`.
 - **Run:** reject one suggested entity with `never`; then ask the chat for the same idea again.
 - **Verify:** a Notebook entry `kind='rejected'` on topic `idea.<ideaId>` with its `rejection_scope`. The same op (same

@@ -116,6 +116,8 @@
   twice has the same id and a reworded one is a new idea. Actions carry none.
 - Turning down a card op records a Notebook rejection keyed by its idea with a scope: `never` (until the author withdraws it), `not_now` (while the volume active when it was
   recorded stays active) or `not_this_version` (while every record the idea would change is exactly as it was). Rejecting the same idea again replaces the earlier scope.
+- The chat's decline on a suggestion card goes through that route with the author's scope. Declining an action suggestion ("Don't run it") records nothing, since an action
+  offers no idea. A finalize the chat cannot run points the author to the chapter's finalize review.
 - A model-authored card whose idea is rejected in scope is dropped before staging, with every card that cannot stand without it. A card the author's own words back (just
   discussing, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed rejections stop steering the model; similar ideas
   are avoided only best-effort.
@@ -179,6 +181,10 @@
   wherever copied — previous prose, summaries, continuation state, entity sheets, pages, cited refs, style, writer lines, the plan, feedback and findings. It is lexical: it
   catches copies, not paraphrase, and a passage of one word, of two words under twelve characters, or under six characters in a script without spaces is caught only by give-away
   terms. A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one. Planner and chat packs are not scrubbed.
+- Plugin system messages reach the writer beside the pack rather than in it, and pass the same scrub at every writer call.
+- Reader-facing art (a cover, a chapter's subject, an entity drawn as of a chapter) reads under the art disclosure policy of the chapter it is drawn as of — the latest final
+  chapter for a cover — which is that chapter's writer policy with the ending and the ending question always withheld. Reference labels, notes and names and the vision
+  description are scrubbed before both the compose call and the image call; the author's own per-image instructions are not, by the author's choice.
 - Planner-only pages — the organised timeline (`project/timeline`) and open questions (`project/open-questions`) — are left out of the planner's citable catalog and the lore
   index, never resolve into a writer pack whatever ref names them, and are dropped from planned refs. Their lines are withheld only from what copies authored canon (pages, entity
   sheets, cited refs, plugin sections), because the chapter's own plan legitimately repeats them.
@@ -220,6 +226,7 @@
 - A promise is built on the thread and mystery records. Its standing is derived, never stored, by one function shared by the plan recap and the promises list: overdue once an
   authored payoff chapter has passed or its payoff volume has met its goal; due once its payoff milestone is reached or its payoff volume is the active one; otherwise not due. A
   promise dormant on purpose is never an obligation; "quiet for a long time" is a reminder, not an error.
+- The promises list can be ordered by standing (`sort=due`: overdue, then due, then not due).
 - Continuity never overwrites a disposition the author set (dormant, dropped), and a chat op that changes a promise's status or progress is always a card. A promise never carries
   a mystery's truth or its key.
 
@@ -251,6 +258,8 @@
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend. Every write to draft or chapter prose — generation, revision, chat apply, import, restore, passage
   apply, job replay — carries a predicate on non-final status, so a delayed model call cannot overwrite a finalized draft. Proposals NEVER edit plans at or before the story
   cursor or prose of a final draft.
+- Prose is stored with LF line endings on every write path, so a body's line count and every hash taken over it are platform-independent. A scheduled or failed publication
+  whose ledgered hash predates that normalisation is repaired once at boot, and only when its chapter has not been edited since.
 - A draft carries one stale reason — the earliest ancestor change, which replaces a reveal mark so fixing the plan cannot hide it. Any change that revokes an approval (prose,
   what a plan teaches, reveal rule, deletion) marks every later draft stale; a plan edit that changes only a chapter's claimed milestones resets that chapter's approval alone.
 - **Approve** is the author's act, never auto-applied from chat, and binds to the draft id, revision and save sequence the author read (a chat approval card to the one current
@@ -274,7 +283,8 @@
   the kept items, recording each row's before and after, drops claims the review says the prose did not reach, and commits knowledge; a replay finds nothing left to do. A chapter
   approved before reviews existed finalizes on the direct continuity path.
 - **Revert** of a finalize review puts back every row its kept set changed as one unit, only for the latest final chapter, refusing when any of those rows changed since
-  (`FRV_007`); it drops the milestones it reached and marks later drafts stale. Proposal apply and revert are separate: every apply captures inverse ops, and revert runs through
+  (`FRV_007`) or when it would un-reach a milestone one of the chapter's reveals depends on (`FRV_013`); otherwise it drops the milestones it reached and marks later
+  drafts stale. Proposal apply and revert are separate: every apply captures inverse ops, and revert runs through
   the same engine under a content-hash conflict guard.
 - **Amend** never unlocks and never touches the Story Bible; it rewrites the final draft to match under a new `amended` revision (the replaced prose stays in history, the judge
   verdict is cleared) and republishes only when the reader-visible hash moves. The chapter PATCH/DELETE routes refuse a locked chapter.
