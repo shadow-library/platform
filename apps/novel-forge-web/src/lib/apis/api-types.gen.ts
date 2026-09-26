@@ -2079,6 +2079,23 @@ export interface paths {
     patch: operations['patch_api_v1_projects_projectId_entities_entityKey'];
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/timeline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Timeline */
+    get: operations['get_api_v1_projects_projectId_entities_entityKey_timeline'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/entities/{entityKey}/image': {
     parameters: {
       query?: never;
@@ -5006,6 +5023,31 @@ export interface components {
       offset: number;
       items: components['schemas']['EntityResponse'][];
     };
+    TimelineResponse: {
+      events: components['schemas']['CharacterEventResponse'][];
+    };
+    CharacterEventResponse: {
+      id: string;
+      chapter: number;
+      kind: components['schemas']['CharacterEventKind'];
+      /** @description Distinguishes multiple events of the same kind in one chapter, e.g. a relationship's target and kind; empty for a kind that is already one-per-chapter. */
+      detailKey?: string;
+      /** @description The changed field's shape before this chapter — null when this is the first record of it, or when it was backfilled and no earlier history is known. */
+      before?: null | Record<string, never>;
+      /** @description The changed field's shape as of this chapter. */
+      after?: null | Record<string, never>;
+      source: components['schemas']['CharacterEventSource'];
+      /** @description Provisional events belong to an approval not yet finalized; committed ones are canon. */
+      status: components['schemas']['KnowledgeStatus'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    CharacterEventKind: 'state' | 'appearance' | 'relationship';
+    /** @enum {string} */
+    CharacterEventSource: 'continuity' | 'backfill' | 'manual';
+    /** @enum {string} */
+    KnowledgeStatus: 'provisional' | 'committed';
     UpdateEntityBody: {
       name?: string;
       significance?: components['schemas']['EntitySignificance'];
@@ -5156,8 +5198,6 @@ export interface components {
     };
     /** @enum {string} */
     FactSource: 'brief' | 'manual' | 'import' | 'seed' | 'generated';
-    /** @enum {string} */
-    KnowledgeStatus: 'provisional' | 'committed';
     UpsertFactBody: {
       text: string;
       subjects?: string[];
@@ -12028,6 +12068,47 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_entities_entityKey_timeline: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TimelineResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_entities_entityKey_image: {
     parameters: {
       query?: never;
@@ -14226,6 +14307,11 @@ export type EntityOrigin = components['schemas']['EntityOrigin'];
 export type EntityResponse = components['schemas']['EntityResponse'];
 export type EntityImageResponse = components['schemas']['EntityImageResponse'];
 export type ListEntityResponse = components['schemas']['ListEntityResponse'];
+export type TimelineResponse = components['schemas']['TimelineResponse'];
+export type CharacterEventResponse = components['schemas']['CharacterEventResponse'];
+export type CharacterEventKind = components['schemas']['CharacterEventKind'];
+export type CharacterEventSource = components['schemas']['CharacterEventSource'];
+export type KnowledgeStatus = components['schemas']['KnowledgeStatus'];
 export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
 export type UploadImageBody = components['schemas']['UploadImageBody'];
 export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
@@ -14242,7 +14328,6 @@ export type UnlockConditionSchema = components['schemas']['UnlockConditionSchema
 export type UnlockTermSchema = components['schemas']['UnlockTermSchema'];
 export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryResponse'];
 export type FactSource = components['schemas']['FactSource'];
-export type KnowledgeStatus = components['schemas']['KnowledgeStatus'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type ListMilestonesResponse = components['schemas']['ListMilestonesResponse'];
@@ -14393,6 +14478,7 @@ export type ListReferenceOptionsPathParams = Exclude<paths['/api/v1/projects/{pr
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;
+export type GetTimelinePathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}/timeline']['get']['parameters']['path'], undefined>;
 export type ListVolumesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['query'], undefined>;
 export type ListVolumesPathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['path'], undefined>;
 export type GetVolumePathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes/{volumeKey}']['get']['parameters']['path'], undefined>;
