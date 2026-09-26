@@ -1,18 +1,22 @@
-import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { type QueryClient, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { toast } from '@shadow-library/ui';
 
 import {
   type ApplyBibleTidyBody,
   type ApplyProposalResponse,
+  type AuditFindingDecisionBody,
+  type BibleAuditReportResponse,
   type BibleDocResponse,
   type BibleReadinessResponse,
   type BibleSection,
   type BibleTidyPreviewResponse,
+  type ListBibleAuditsResponse,
   type ListBibleDocResponse,
   type RevertProposalResponse,
   type UpsertBibleDocBody,
 } from './api-types.gen';
-import { ApiError, APIRequest } from './transport';
+import { livePolling } from './live-polling';
+import { ApiError, APIRequest, type PollingOptions } from './transport';
 
 /**
  * Story Bible documents, addressed by section + slug. A missing document is a
@@ -23,6 +27,8 @@ const bibleKeys = {
   doc: (projectId: string, section: BibleSection, slug: string) => ['projects', projectId, 'bible', section, slug] as const,
   readiness: (projectId: string) => ['projects', projectId, 'bible', 'readiness'] as const,
   tidy: (projectId: string) => ['projects', projectId, 'bible', 'tidy'] as const,
+  audits: (projectId: string) => ['projects', projectId, 'bible', 'audits'] as const,
+  auditReport: (projectId: string, reportId: string) => [...bibleKeys.audits(projectId), reportId] as const,
 };
 
 export function useListBibleDocsQuery(projectId: string, enabled = true): UseQueryResult<ListBibleDocResponse, ApiError> {
@@ -90,5 +96,49 @@ export function useUndoBibleTidyMutation(projectId: string): UseMutationResult<R
       toast.success('Tidy-up undone');
     },
     onError: err => toast.danger(`Could not undo the tidy-up: ${err.message}`),
+  });
+}
+
+/** Past audits, newest first, up to the most recent 50 (the server's own limit). */
+export function useListAuditsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListBibleAuditsResponse>): UseQueryResult<ListBibleAuditsResponse, ApiError> {
+  return useQuery<ListBibleAuditsResponse, ApiError>({
+    queryKey: bibleKeys.audits(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/bible/audits`).execute(),
+    enabled: enabled && Boolean(projectId),
+    refetchInterval: livePolling(projectId, opts?.refetchInterval),
+  });
+}
+
+export function useAuditReportQuery(projectId: string, reportId: string | undefined, enabled = true): UseQueryResult<BibleAuditReportResponse, ApiError> {
+  return useQuery<BibleAuditReportResponse, ApiError>({
+    queryKey: bibleKeys.auditReport(projectId, reportId ?? ''),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/bible/audits/${reportId}`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(reportId),
+  });
+}
+
+/** Primes a report's cache entry straight from a source that already carries it in full (the audits list, a decision response) — no extra fetch. */
+export function seedAuditReport(queryClient: QueryClient, projectId: string, report: BibleAuditReportResponse): void {
+  queryClient.setQueryData(bibleKeys.auditReport(projectId, report.id), report);
+}
+
+export function invalidateAudits(queryClient: QueryClient, projectId: string): void {
+  void queryClient.invalidateQueries({ queryKey: bibleKeys.audits(projectId) });
+}
+
+export interface DecideAuditFindingVariables {
+  reportId: string;
+  findingId: string;
+  body: AuditFindingDecisionBody;
+}
+
+export function useDecideAuditFindingMutation(projectId: string): UseMutationResult<BibleAuditReportResponse, ApiError, DecideAuditFindingVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<BibleAuditReportResponse, ApiError, DecideAuditFindingVariables>({
+    mutationFn: ({ reportId, findingId, body }) => APIRequest.post(`/projects/${projectId}/bible/audits/${reportId}/findings/${findingId}/decision`).body(body).execute(),
+    onSuccess: report => {
+      seedAuditReport(queryClient, projectId, report);
+      invalidateAudits(queryClient, projectId);
+    },
   });
 }

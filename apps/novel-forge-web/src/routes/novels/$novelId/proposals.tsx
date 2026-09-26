@@ -3,7 +3,16 @@ import { Fragment, useState } from 'react';
 import { Alert, Button, Checkbox, ConfirmDialog, toast } from '@shadow-library/ui';
 
 import { type ChipIntent, DetailPage, ItemPager, type ItemPagerJump, Markdown, RegenerateAppliedBriefs, StatusChip } from '@/components/nf';
-import { type ProposalResponse, useAiModelsQuery, useApplyProposalMutation, useDiscardProposalMutation, useListPluginsQuery, useRevertProposalMutation } from '@/lib/apis';
+import {
+  type ProposalResponse,
+  useAiModelsQuery,
+  useApplyProposalMutation,
+  useDiscardProposalMutation,
+  useListAuditsQuery,
+  useListPluginsQuery,
+  useRevertProposalMutation,
+} from '@/lib/apis';
+import { auditOpKept, findAuditReportByProposal } from '@/lib/bible-audit';
 import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { relativeTime } from '@/lib/format';
 import { modelLabel } from '@/lib/model-defaults';
@@ -147,6 +156,11 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
   const revert = useRevertProposalMutation(novelId);
   const disposition = proposalDisposition(proposal);
   const deciding = disposition.kind === 'decide';
+  const isAudit = proposal.kind === 'bible_audit';
+  // The audit's own results dialog is where Keep/Skip are chosen; the report backing this card (found by
+  // proposal id, since the list already carries it) says which ops that left kept.
+  const auditsQuery = useListAuditsQuery(novelId, isAudit);
+  const auditReport = isAudit ? findAuditReportByProposal(auditsQuery.data, proposal.id) : undefined;
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
@@ -172,6 +186,22 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
   // Applying leaves op results on this very proposal — the only record of which ops landed — so the
   // author stays on it, unlike a discard, which has nothing left to read.
   const doApply = (): void => {
+    // An audit card's selection was already decided in the results dialog and is locked in server-side
+    // under the report row; sending no `opIndexes` here is what applies exactly what was kept.
+    if (isAudit) {
+      apply.mutate(
+        { proposalId: proposal.id },
+        {
+          onSuccess: r => {
+            const failed = r.opResults.filter(o => o.status === 'failed');
+            if (failed.length > 0) toast.danger(`Applied with ${failed.length} failed action(s) — see the op results`);
+            else toast.success('Applied to canon');
+          },
+          onError: err => toast.danger(err.message),
+        },
+      );
+      return;
+    }
     const selected = selectedOpIndexes(proposal.changeSet.length, declined);
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
@@ -234,7 +264,10 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
               {disposition.kind === 'decide' && (
                 <div className={styles.decision}>
                   <Button variant="primary" fullWidth loading={apply.isPending} onClick={doApply}>
-                    {applyButtonLabel(proposal.changeSet.length, declined.size)}
+                    {applyButtonLabel(
+                      proposal.changeSet.length,
+                      isAudit ? proposal.changeSet.length - (auditReport?.selection.length ?? proposal.changeSet.length) : declined.size,
+                    )}
                   </Button>
                   <Button variant="secondary" fullWidth loading={discard.isPending} onClick={() => setConfirmDiscard(true)}>
                     Discard
@@ -304,15 +337,21 @@ export function ProposalDetail({ novelId, proposal, total, filter, ids, jump, on
 
         <div className={`nf-eyebrow ${styles.changeSetLabel}`}>
           Proposed change-set · {proposal.changeSet.length} op{proposal.changeSet.length === 1 ? '' : 's'}
-          {deciding && ' · untick to decline'}
+          {deciding && (isAudit ? ' · choose in the audit results' : ' · untick to decline')}
         </div>
         <div className={styles.changeSet}>
           {proposal.changeSet.map((op, i) => {
             const result = opResults.find(r => r.index === i);
+            const kept = isAudit ? auditOpKept(auditReport, i) : !declined.has(i);
             return (
-              <div key={i} className={styles.opRow} data-declined={declined.has(i)}>
+              <div key={i} className={styles.opRow} data-declined={!kept}>
                 <div className={styles.opHead}>
-                  {deciding && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggleOp(i)} aria-label={`include ${opLabel(op)}`} />}
+                  {deciding &&
+                    (isAudit ? (
+                      <Checkbox checked={kept} disabled aria-label={`${kept ? 'kept' : 'skipped'} in the audit: ${opLabel(op)}`} />
+                    ) : (
+                      <Checkbox checked={kept} onCheckedChange={() => toggleOp(i)} aria-label={`include ${opLabel(op)}`} />
+                    ))}
                   <span className={styles.opLabel}>{opLabel(op)}</span>
                   {String(op.op).startsWith('action.') && <StatusChip intent="info">action</StatusChip>}
                   <div className={styles.spacer} />

@@ -1,12 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useId, useMemo, useState } from 'react';
 import { Alert, Button, Dialog, Input, Select, Tabs, toast, useMediaQuery } from '@shadow-library/ui';
 
-import { LockIcon, SearchIcon, SparkIcon } from '@/components/icons';
+import { ClockIcon, LockIcon, SearchIcon, SparkIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { BibleHealth, BibleReadiness, EmptyState, PaneLoader } from '@/components/nf';
 import { BibleTidyDialog } from '@/components/nf/BibleTidyDialog';
 import {
+  AuditDialog,
+  AuditHistoryDrawer,
   emptyEntityForm,
   EntityDialog,
   type EntityDialogState,
@@ -23,7 +26,9 @@ import {
   SecretDetail,
   SecretRow,
   SecretsList,
+  type StartedAudit,
   TopicList,
+  useAuditPoll,
   useTabsFit,
 } from '@/features/story-bible';
 import styles from '@/features/story-bible/StoryBible.module.css';
@@ -33,6 +38,7 @@ import {
   type FactResponse,
   listEntitiesQueryOptions,
   listFactsQueryOptions,
+  seedAuditReport,
   type UpdateEntityBody,
   useAuditBibleMutation,
   useBibleReadinessQuery,
@@ -122,6 +128,19 @@ function StoryBibleScreen(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<EntryKindFilter>('all');
   const [tidying, setTidying] = useState(false);
+  const queryClient = useQueryClient();
+  const [auditJob, setAuditJob] = useState<StartedAudit | undefined>();
+  const [auditReportId, setAuditReportId] = useState<string | undefined>();
+  const [auditHistoryOpen, setAuditHistoryOpen] = useState(false);
+  const auditRunning = useAuditPoll(
+    novelId,
+    auditJob,
+    reportId => {
+      setAuditJob(undefined);
+      setAuditReportId(reportId);
+    },
+    () => setAuditJob(undefined),
+  );
   const [entityDialog, setEntityDialog] = useState<EntityDialogState | null>(null);
   const [deleteEntityTarget, setDeleteEntityTarget] = useState<EntityResponse | undefined>();
   const [factDialog, setFactDialog] = useState<FactDialogState | null>(null);
@@ -143,6 +162,7 @@ function StoryBibleScreen(): React.JSX.Element {
   const secretTotal = secretGroups.planned.length + secretGroups.unplanned.length;
   const entityByKey = useMemo(() => new Map(entities.map(entity => [entity.entityKey, entity])), [entities]);
   const names = useMemo(() => new Map(entities.map(entity => [entity.entityKey, entity.name])), [entities]);
+  const docTitles = useMemo(() => new Map(docs.map(doc => [docAddress(doc), doc.title])), [docs]);
   const entryById = useMemo(() => new Map(entries.map(entry => [entry.id, entry])), [entries]);
   const factByKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
   const covers = useMemo(() => topicsByDocument(readiness.data?.roles), [readiness.data]);
@@ -190,7 +210,10 @@ function StoryBibleScreen(): React.JSX.Element {
 
   const runAudit = (): void => {
     audit.mutate(undefined, {
-      onSuccess: () => toast.success('Auditing the bible — it reads every document and can take a few minutes. Findings arrive as a proposal to review.'),
+      onSuccess: result => {
+        setAuditJob({ jobId: result.jobId, runId: result.runId });
+        toast.success('Auditing the bible — it reads every document and can take a few minutes.');
+      },
       onError: err => toast.danger(err.message),
     });
   };
@@ -608,7 +631,10 @@ function StoryBibleScreen(): React.JSX.Element {
             value={query}
             onValueChange={setQuery}
           />
-          <Button variant="secondary" loading={audit.isPending} onClick={runAudit} className={styles.auditButton}>
+          <Button variant="ghost" prefix={<ClockIcon size={14} />} onClick={() => setAuditHistoryOpen(true)} className={styles.auditHistoryButton}>
+            Audit history
+          </Button>
+          <Button variant="secondary" loading={audit.isPending || auditRunning} onClick={runAudit} className={styles.auditButton}>
             Run bible audit
           </Button>
           <Button variant="primary" className={styles.newButton} onClick={() => setEntityDialog({ mode: 'create', initial: emptyEntityForm(newEntryType(activeTopic)) })}>
@@ -671,6 +697,18 @@ function StoryBibleScreen(): React.JSX.Element {
       </Dialog>
 
       <BibleTidyDialog novelId={novelId} open={tidying} onOpenChange={setTidying} />
+
+      <AuditDialog novelId={novelId} reportId={auditReportId} names={names} docTitles={docTitles} onOpenChange={next => !next && setAuditReportId(undefined)} />
+      <AuditHistoryDrawer
+        novelId={novelId}
+        open={auditHistoryOpen}
+        onOpenChange={setAuditHistoryOpen}
+        onSelect={report => {
+          seedAuditReport(queryClient, novelId, report);
+          setAuditReportId(report.id);
+          setAuditHistoryOpen(false);
+        }}
+      />
     </div>
   );
 }

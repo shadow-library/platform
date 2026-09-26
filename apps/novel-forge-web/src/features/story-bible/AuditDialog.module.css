@@ -1,0 +1,170 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px;
+}
+
+.placeholder {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finding {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+}
+
+.finding[data-group='contradiction'] {
+  border-color: var(--sh-warning-border);
+}
+
+.findingMain {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.findingHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.findingTitle {
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.findingText {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidenceRef {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.withheld {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.decision {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.decisionReason {
+  min-width: 140px;
+}
+
+.note {
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.historyBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyRow {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--sh-radius-md);
+  border: var(--sh-border-width) solid transparent;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.historyRow:hover {
+  background: var(--sh-bg-hover);
+}
+
+.historySummary {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.historyMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+@media (max-width: 760px) {
+  .finding {
+    flex-wrap: wrap;
+  }
+
+  .findingMain {
+    flex-basis: 100%;
+  }
+
+  .decision {
+    flex-basis: 100%;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+
+  .note {
+    flex-basis: 100%;
+  }
+}
