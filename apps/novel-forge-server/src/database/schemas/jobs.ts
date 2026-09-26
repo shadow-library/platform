@@ -13,7 +13,7 @@ export namespace Job {
   export type AuthoringClaim = InferSelectModel<typeof authoringClaims>;
 }
 
-export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan']);
+export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter']);
 

@@ -69,12 +69,16 @@
   reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
   readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
 - **Approval** is author-initiated and never auto-applied from chat, binds to the draft revision the author read (a chat approval card to the one current when it
-  was staged), may override a contradiction (recorded), and in the same transaction replaces the chapter's ledger rows with the brief's `learns` as _provisional_
-  knowledge bound to that revision, so repeated approvals leave one set, bound to the latest. Any change to the draft's prose, a judge verdict, or an earlier chapter's
-  change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest approved or final
+  was staged), may override a contradiction (recorded: every blocking finding still open on the latest judge review of that text becomes an `overridden` remedy "approved
+  by the author", and the response says how many), and in the same transaction replaces the chapter's ledger rows with the brief's `learns` as _provisional_
+  knowledge bound to that revision, so repeated approvals leave one set, bound to the latest. Any change to the draft's prose, an open blocking review finding, or an
+  earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest approved or final
   chapter that claims it, and moves there when a later claim is revoked. A stale draft may be approved as written: the request names the stale reason the author saw,
   only that reason is cleared, the override is recorded, and nothing later goes stale since the prose is unchanged; a draft stale because a reveal in its plan no
   longer holds cannot be approved that way.
+- **Chapter review**: judge, editorial, mechanics and readability reviews run on request against any chapter — generated, hand-written or final. The two model kinds run
+  as a `review` job; the generation run stores its last judge pass as a review of the revision it produced. The author answers each finding: dismiss (with a reason), "I'll fix
+  it myself", or override a blocking one; an answer can be withdrawn.
 - **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation
   report holds an error for this chapter. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
   another), sets each revealed fact's `disclosedInChapter` unless an earlier chapter set it, and reaches the claimed milestones; a replay finds nothing left to do.
@@ -192,6 +196,21 @@
 - A chapter's volume is the one its brief names; an imported chapter keeps the volume its bundle placed it in. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
   planned chapter, after it). A volume a brief still names cannot be removed, so a change-set's volume removals (and a revert's) run after its other ops; a plan
   reset takes briefs out of the volumes it deletes.
+
+### Chapter review
+
+- A review is bound to the draft revision and the hash of the text it read; it is stale, and its findings describe older text, as soon as either moves. Staleness is computed on
+  read, never stored. A remedy is refused on a stale review.
+- A review NEVER edits prose; its only draft writes are the judge verdict and the gate below.
+- The gate reads only the latest judge review of the current text: an open blocking finding holds the draft as a contradiction (which resets an approval and revokes its reveals)
+  and blocks the next chapter. Dismissing or overriding releases the draft only to `needs_review`, never to approved; "I'll fix it myself" releases nothing. An answer to an
+  older review gates nothing.
+- Severity: a continuity contradiction and any leak of a secret (the deterministic give-away scan or the judge's own finding) are blocking. Plan and ending-contract shortfalls
+  are warnings in a review, because a hand-writer may leave their plan on purpose — so a review whose open findings are only warnings lifts a contradiction the generation run set.
+- A dismissal or override is remembered for the same text: a re-run carries it to the same finding and tells the model not to raise it again. The newest review that raised a
+  finding decides, so a withdrawn answer stops carrying.
+- A check the judge left out is never claimed: it is dropped from what was checked and reported as not assessed, so "No issue detected" cannot follow from an omission.
+- Reviews of an isolated or unrestricted chapter are marked `isolated`: their findings quote prose a standard model must not read.
 
 ### Proposals and chat
 

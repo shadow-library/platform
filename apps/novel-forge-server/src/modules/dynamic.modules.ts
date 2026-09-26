@@ -29,6 +29,7 @@ import { PluginProposalModule, PluginsModule } from '@modules/plugins';
 import { ProjectModule } from '@modules/project';
 import { PublishingHttpModule } from '@modules/publishing/publishing-http.module';
 import { RefinementModule } from '@modules/refinement';
+import { ReviewModule } from '@modules/review';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
 
 /**
@@ -63,6 +64,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     ProjectModule,
     PublishingHttpModule,
     RefinementModule,
+    ReviewModule,
     BibleModule,
   ],
   host: Config.get('server.host'),

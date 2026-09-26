@@ -5,7 +5,7 @@ import { setOpenDraftReview } from '@modules/ai/graphs/chapter-generation.graph'
 import { type GenerationService } from '@modules/generation/generation.service';
 import { schema } from '@server/database';
 
-import { type DraftRow, draftRow, fakeGenerationDb, makeGenerationService, type RecordedWrite, render } from './generation-fixtures';
+import { draftRow, fakeGenerationDb, makeGenerationService, type RecordedWrite, render } from './generation-fixtures';
 
 interface GuardCase {
   name: string;
@@ -71,51 +71,6 @@ describe('GenerationService.approveDraft', () => {
     const fake = fakeGenerationDb({ draftReads: [draftRow(), draftRow()] });
 
     await expect(makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_013' });
-  });
-});
-
-describe('GenerationService.judgeDraft', () => {
-  function judgeService(draft = draftRow(), draftReads: DraftRow[] = []) {
-    const fake = fakeGenerationDb({ draftReads: [draft, ...draftReads], draftWriteResult: draftReads.length > 0 ? [] : [draft] });
-    let modelCalls = 0;
-    const model = { invoke: async () => ({ _getType: () => 'ai', content: '{"verdict":"consistent","findings":[]}' }) };
-    const service = makeGenerationService(fake.db, {
-      modelRouter: {
-        chatFor: async () => {
-          modelCalls++;
-          return model;
-        },
-      },
-      contextAssembler: { forChapter: async () => ({ rendered: '' }) },
-      pluginPolicy: { resolve: async () => ({ raised: false }) },
-      toolRegistry: { forNode: () => [], getRaw: () => [] },
-    });
-    return { fake, service, modelCalls: () => modelCalls };
-  }
-
-  it('should refuse a final draft before calling the model', async () => {
-    const { service, modelCalls } = judgeService(draftRow({ status: 'final' }));
-
-    await expect(service.judgeDraft(1n, 4)).rejects.toMatchObject({ code: 'DRF_002' });
-    expect(modelCalls()).toBe(0);
-  });
-
-  it('should only record the verdict on the non-final revision it judged', async () => {
-    const { fake, service } = judgeService();
-
-    await service.judgeDraft(1n, 4);
-
-    const where = render(fake.writesTo(schema.drafts, 'update')[0]?.where);
-    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."status" <> $3)');
-    expect(where.params).toEqual([11n, 2, 'final']);
-  });
-
-  it('should discard a verdict about a revision the draft moved past during the call', async () => {
-    const { fake, service } = judgeService(draftRow(), [draftRow({ revision: 3 })]);
-
-    await expect(service.judgeDraft(1n, 4)).rejects.toMatchObject({ code: 'DRF_013' });
-    expect(fake.writesTo(schema.characterKnowledge)).toEqual([]);
-    expect(fake.outcome()).toBe('rolled back');
   });
 });
 

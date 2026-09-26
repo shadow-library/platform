@@ -29,6 +29,7 @@ const TABLES = {
   drafts: schema.drafts,
   entities: schema.entities,
   characterKnowledge: schema.characterKnowledge,
+  chapterReviews: schema.chapterReviews,
 } as const;
 
 type TableName = keyof typeof TABLES;

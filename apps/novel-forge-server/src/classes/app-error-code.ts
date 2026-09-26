@@ -248,6 +248,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly NTS_002 = AppErrorCode.badRequest('NTS_002', 'Option "{optionId}" is not one the organised notes offered');
 
   /*!
+   * Chapter Review Errors
+   */
+  static readonly REV_001 = AppErrorCode.notFound('REV_001', 'Review not found');
+  static readonly REV_002 = AppErrorCode.notFound('REV_002', 'That finding is not part of this review');
+  static readonly REV_003 = AppErrorCode.conflict('REV_003', 'The chapter changed after this review — review the current text again before answering its findings');
+  static readonly REV_004 = AppErrorCode.badRequest('REV_004', 'Say why you are dismissing this finding');
+  static readonly REV_005 = AppErrorCode.badRequest('REV_005', 'Only a blocking finding can be overridden');
+  static readonly REV_006 = AppErrorCode.badRequest('REV_006', 'Chapter {chapter} has no prose to review yet');
+  static readonly REV_007 = AppErrorCode.conflict('REV_007', 'Chapter {chapter} is still being written — review it once the draft is ready');
+
+  /*!
    * Publishing Errors
    */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import { AIMessage } from '@langchain/core/messages';
 
 import { PRODUCTION_DEFAULTS, type ResolvedModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { AppErrorCode } from '@server/classes';
@@ -36,11 +35,7 @@ function setup({ draft, raised = false, unrestrictedModel, overCaps = false }: S
       resolveFor,
       structured: async (module: { role?: string; key: string }, _input: unknown, _ctx: unknown, project?: RoutedCall['project'], policy?: RoutedCall['policy']) => {
         modelCalls.push({ role: module.role ?? module.key, project, policy });
-        return module.key === 'review' ? { disposition: 'accept' } : REVISED;
-      },
-      chatFor: async (role: string, _ctx: unknown, project?: RoutedCall['project'], policy?: RoutedCall['policy']) => {
-        modelCalls.push({ role, project, policy });
-        return { invoke: async () => new AIMessage('{"verdict":"consistent","findings":[]}') };
+        return REVISED;
       },
     },
     contextAssembler: {
@@ -49,7 +44,6 @@ function setup({ draft, raised = false, unrestrictedModel, overCaps = false }: S
         return { rendered: '' };
       },
     },
-    toolRegistry: { forNode: () => [], getRaw: () => [] },
     pluginPolicy: {
       resolve: async (_projectId: bigint, _call: unknown, baseline?: { contentMode?: string | null }) => {
         policyBaselines.push(baseline?.contentMode);
@@ -109,68 +103,7 @@ describe('GenerationService.reviseDraft containment', () => {
   });
 });
 
-describe('GenerationService.judgeDraft containment', () => {
-  it('should judge an isolated draft on the unrestricted route', async () => {
-    const run = setup({ draft: draftRow(ISOLATED) });
-
-    await run.service.judgeDraft(1n, 4);
-
-    expect(run.modelCalls).toEqual([
-      { role: 'judge', project: expect.objectContaining({ contentMode: 'unrestricted' }), policy: expect.objectContaining({ writerClass: 'permissive' }) },
-    ]);
-  });
-
-  it('should refuse to judge an isolated draft when the unrestricted route resolves off the allowlist', async () => {
-    const run = setup({ draft: draftRow(ISOLATED), unrestrictedModel: PRODUCTION_DEFAULTS.judge });
-
-    await expect(run.service.judgeDraft(1n, 4)).rejects.toMatchObject({ code: 'AI_003' });
-    expect(run.modelCalls).toEqual([]);
-  });
-
-  it('should judge a standard draft on the project route', async () => {
-    const run = setup({ draft: draftRow() });
-
-    await run.service.judgeDraft(1n, 4);
-
-    expect(run.modelCalls).toEqual([
-      { role: 'judge', project: expect.objectContaining({ contentMode: 'standard' }), policy: expect.objectContaining({ writerClass: 'standard' }) },
-    ]);
-  });
-});
-
-describe('GenerationService.reviewChapter containment', () => {
-  it('should review an isolated draft on the unrestricted route', async () => {
-    const run = setup({ draft: draftRow(ISOLATED) });
-
-    await run.service.reviewChapter(1n, 4);
-
-    expect(run.modelCalls).toEqual([
-      { role: 'review', project: expect.objectContaining({ contentMode: 'unrestricted' }), policy: expect.objectContaining({ writerClass: 'permissive' }) },
-    ]);
-  });
-
-  it('should review a standard draft on the project route', async () => {
-    const run = setup({ draft: draftRow() });
-
-    await run.service.reviewChapter(1n, 4);
-
-    expect(run.modelCalls).toEqual([
-      { role: 'review', project: expect.objectContaining({ contentMode: 'standard' }), policy: expect.objectContaining({ writerClass: 'standard' }) },
-    ]);
-  });
-});
-
 describe('GenerationService — required writer material over its limits', () => {
-  it('should judge and review from the pack as it is, without failing', async () => {
-    const judged = setup({ draft: draftRow(), overCaps: true });
-    const reviewed = setup({ draft: draftRow(), overCaps: true });
-
-    await judged.service.judgeDraft(1n, 4);
-    await reviewed.service.reviewChapter(1n, 4);
-
-    expect([...judged.modelCalls, ...reviewed.modelCalls].map(call => call.role)).toEqual(['judge', 'review']);
-  });
-
   it('should refuse a revision, which writes from the pack, with the readable failure', async () => {
     const run = setup({ draft: draftRow(), overCaps: true });
 

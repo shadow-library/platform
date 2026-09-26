@@ -9,6 +9,9 @@ export class ReviewFinding {
 
   @Field({ minLength: 1, description: 'specific finding with location if possible' })
   text: string;
+
+  @Field({ optional: true, description: 'the passage the finding rests on, quoted verbatim from the draft; omit when the finding is about something missing' })
+  evidence?: string;
 }
 
 @Schema()

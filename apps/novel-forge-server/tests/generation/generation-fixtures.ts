@@ -43,6 +43,8 @@ export interface FakeGenerationDbOptions {
   knowledge?: KnowledgeFixture;
   /** Chapters that already have a draft, as the next-chapter gate reads them; chapters 1–3 by default, so chapter 4 is writable. */
   written?: number[];
+  /** The chapter's latest judge review, as an approval reads it. */
+  latestJudgeReview?: unknown;
 }
 
 export interface FakeGenerationDb {
@@ -55,7 +57,6 @@ export interface FakeGenerationDb {
 export interface GenerationDeps {
   modelRouter?: object;
   contextAssembler?: object;
-  toolRegistry?: object;
   proposalService?: object;
   chapterImages?: object;
   pluginPolicy?: object;
@@ -129,6 +130,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
       volumes: { findMany: async () => [] },
       bibleDocuments: { findMany: async () => [] },
       chapters: { findFirst: async () => undefined, findMany: async () => [] },
+      chapterReviews: { findFirst: async () => options.latestJudgeReview },
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
@@ -186,7 +188,6 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     absent,
     absent,
     absent,
-    (deps.toolRegistry ?? absent) as never,
     absent,
     absent,
     (deps.proposalService ?? absent) as never,

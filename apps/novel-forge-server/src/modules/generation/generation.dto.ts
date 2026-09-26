@@ -450,6 +450,12 @@ export class DraftResponse {
   @Field({ optional: true, nullable: true })
   judgeNote?: string | null;
 
+  @Field(() => Integer, {
+    optional: true,
+    description: 'Set by an approval: how many blocking review findings still open on the approved text the approval recorded as overridden ("approved by the author").',
+  })
+  overriddenFindings?: number;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
@@ -962,6 +968,7 @@ export const AUTHOR_FACING_GRAPHS = [
   'illustration',
   'chapter-generation',
   'chapter-finalization',
+  'chapter-review',
   'bible-builder',
   'novel-validation',
 ] as const;

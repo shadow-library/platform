@@ -195,7 +195,13 @@ export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigin
   return new Set(facts.filter(fact => forbidden.has(fact.factKey) || !visible.has(fact.factKey)).map(fact => fact.factKey));
 }
 
-async function writerVisibleFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[], contract: KnowledgeContract | null): Promise<Set<string>> {
+export async function writerVisibleFactKeys(
+  db: KnowledgeDb,
+  projectId: bigint,
+  chapter: number,
+  facts: Knowledge.CanonFact[],
+  contract: KnowledgeContract | null,
+): Promise<Set<string>> {
   if (contract) {
     const view = await loadKnowledgeView(db, projectId, chapter, contract);
     return new Set([...view.known, ...view.reveals, ...view.readerKnows].map(fact => fact.factKey));

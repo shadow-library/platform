@@ -144,7 +144,8 @@ export class WorkflowRunService {
   // Create a workflow_run row, or reuse the one left behind by a crashed prior attempt of the same
   // job/target. Reusing its id (used as the checkpoint thread_id) is what lets a retried job resume
   // from the last completed graph node instead of re-executing — and re-calling — the LLM.
-  private async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string, parentRunId?: string): Promise<string> {
+  /** A run opened under a job is resumed, not duplicated, by that job's later `runChain` on the same graph and target. */
+  async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string, parentRunId?: string): Promise<string> {
     if (jobId) {
       const existing = await this.db.query.workflowRuns.findFirst({
         where: and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.graph, graph), eq(schema.workflowRuns.target, target), eq(schema.workflowRuns.status, 'running')),
@@ -196,6 +197,19 @@ export class WorkflowRunService {
       .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
     if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
+  }
+
+  /** Settles the runs a job opened that are still running after the job itself settled — a run opened for a job that never reached it. */
+  async settleJobRuns(jobId: string, status: 'completed' | 'failed' | 'cancelled', err?: unknown): Promise<void> {
+    const live = await this.db
+      .select({ id: schema.workflowRuns.id })
+      .from(schema.workflowRuns)
+      .where(and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.status, 'running')));
+    for (const { id } of live) {
+      if (status === 'failed') await this.failRun(id, err ?? AppError.internal('the job settled before its run finished'));
+      else if (status === 'cancelled') await this.cancelRun(id);
+      else await this.completeRun(id, 'completed', 'completed', []);
+    }
   }
 
   // Terminal and non-retrying: the run keeps whatever it already persisted.

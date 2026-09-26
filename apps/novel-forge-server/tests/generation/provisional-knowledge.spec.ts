@@ -29,7 +29,6 @@ function serviceOver(options: FakeGenerationDbOptions) {
       chatFor: async () => ({ invoke: async () => new AIMessage('{"verdict":"consistent","findings":[]}') }),
     },
     contextAssembler: { forChapter: async () => ({ rendered: '', renderedStable: '', renderedVolatile: '' }) },
-    toolRegistry: { forNode: () => [], getRaw: () => [] },
     chapterImages: { onChapterDeleted: async () => undefined },
     pluginPolicy: { resolve: async () => ({ writerClass: 'permissive', raised: false }) },
   });
@@ -129,7 +128,6 @@ describe('provisional brief reveals', () => {
     ['an import', service => service.importDraft(1n, 4, { title: PROSE.title, prose: PROSE.body, summary: PROSE.summary }), [draftRow()]],
     ['a revision', service => service.reviseDraft(1n, 4, { note: 'Slow the count down.' }), [draftRow()]],
     ['a deletion', service => service.deleteDraft(1n, 4), [draftRow()]],
-    ['a judge verdict', service => service.judgeDraft(1n, 4), [draftRow()]],
     ['an unrestricted fill', service => service.generateUnrestricted(1n, 4, {}), [draftRow()]],
   ];
 

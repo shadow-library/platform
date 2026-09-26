@@ -27,7 +27,6 @@ function service(seed: PlanSeed) {
     noop,
     noop,
     noop,
-    noop,
     new FakeAuthoringClaims().asService(),
   );
   return { ...tables, generation };

@@ -12,7 +12,6 @@ import {
   CancelRunResponse,
   ChapterCostResponse,
   ChapterParams,
-  ChapterReviewResponse,
   ChapterSummarizeResponse,
   ContinuityProposalResponse,
   DraftResponse,
@@ -25,7 +24,6 @@ import {
   ImportDraftBody,
   JobEnqueueResponse,
   JobParams,
-  JudgeResponse,
   ListBriefSummaryResponse,
   ListDraftResponse,
   ListDraftRevisionResponse,
@@ -155,14 +153,6 @@ export class GenerationController {
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/drafts/:n/judge')
-  @RespondFor(200, JudgeResponse)
-  judgeDraft(@Params() params: ChapterParams): Promise<JudgeResponse> {
-    return this.generationService.judgeDraft(params.projectId, params.n);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/feedback')
   @RespondFor(201, UserFeedbackResponse)
   @HttpStatus(201)
@@ -284,14 +274,6 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunResponse)
   validateContinuity(@Params() params: ProjectParams): Promise<WorkflowRunResponse> {
     return this.generationService.validate(params.projectId);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/chapters/:n/review')
-  @RespondFor(200, ChapterReviewResponse)
-  reviewChapter(@Params() params: ChapterParams): Promise<ChapterReviewResponse> {
-    return this.generationService.reviewChapter(params.projectId, params.n);
   }
 
   @Get('/review-queue')

@@ -1,6 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -49,11 +46,7 @@ import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema'
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
-import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
-import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
-import { runToolLoop } from '../ai/tools/tool-loop';
-import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeCallUsage, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
@@ -67,6 +60,7 @@ import { PluginPolicyService, raisedContainment } from '../plugins/plugin-policy
 import { PluginProposalService } from '../plugins/plugin-proposal.service';
 import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
+import { overrideOpenBlockingOnApproval } from '../review/review-records';
 import { ChapterImageService } from './chapter-image.service';
 import {
   type ApproveDraftBody,
@@ -107,10 +101,7 @@ export interface RunContextPackSummary {
   sections: RunContextSectionSummary[];
 }
 
-export interface JudgeResult {
-  verdict: string;
-  findings: { severity: string; text: string }[];
-}
+export type ApprovedDraft = Generation.Draft & { overriddenFindings: number };
 
 export interface ReviewQueueResult {
   drafts: Generation.Draft[];
@@ -190,7 +181,6 @@ export class GenerationService {
     private readonly telemetry: TelemetryHandler,
     private readonly retrievalService: RetrievalService,
     private readonly indexingService: IndexingService,
-    private readonly toolRegistry: ToolRegistryService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
     private readonly proposalService: ProposalService,
@@ -569,78 +559,6 @@ export class GenerationService {
     });
   }
 
-  async judgeDraft(projectId: bigint, chapter: number): Promise<JudgeResult> {
-    this.logger.debug('judgeDraft: starting', { projectId, chapter });
-    const draft = await this.getDraft(projectId, chapter);
-    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-
-    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'judge', chapter }, project);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
-    // A fresh id per invocation, not shared across judge calls on the same chapter — a shared id would
-    // merge unrelated invocations' tool_calls (not FK-tied to workflow_runs, so any unique string works).
-    const runId = randomUUID();
-    const telemetry = { projectId, runId, node: 'judge', promptKey: PROMPT_REGISTRY.judge.key, promptVersion: PROMPT_REGISTRY.judge.version, role: 'judge', chapter };
-    const model = await this.modelRouter.chatFor('judge', telemetry, routedProject, policy);
-    const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });
-    const rawTools = this.toolRegistry.getRaw('judge');
-
-    const judgeSystemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
-    const judgeHumanMsg = new HumanMessage(`${pack.rendered}\n\nDraft chapter ${chapter}:\n${draft.body}`);
-    const messages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), judgeSystemMsg, judgeHumanMsg];
-
-    const runJudgeModel = async (): Promise<JudgeOutput | null> => {
-      const { messages: resultMessages } = await runToolLoop(
-        model,
-        tools,
-        rawTools,
-        messages,
-        { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId },
-        this.db,
-        { maxRounds: 4 },
-      );
-      const lastAi = [...resultMessages].reverse().find(m => m._getType() === 'ai');
-      const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
-      const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
-      return parsed.success ? parsed.data : null;
-    };
-
-    let judgeOutput = await runJudgeModel();
-    if (!judgeOutput) {
-      this.logger.warn('judgeDraft: judge output failed to parse — retrying once', { projectId, chapter });
-      judgeOutput = await runJudgeModel();
-    }
-
-    const evaluationFailed = !judgeOutput;
-    const verdict = judgeOutput?.verdict ?? 'evaluation_failed';
-    const findings = [...(judgeOutput?.findings ?? [])];
-    if (evaluationFailed) {
-      this.logger.warn('judgeDraft: judge output unparseable after retry — routing to human review', { projectId, chapter });
-      findings.push({ severity: 'hard', text: 'judge output unparseable' });
-    }
-    this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict, findings: findings.length });
-
-    await this.db.transaction(async tx => {
-      const [judged] = await tx
-        .update(schema.drafts)
-        .set({
-          judge: verdict,
-          judgeNote: findings.map(f => `[${f.severity}] ${f.text}`).join('\n') || null,
-          reviewStatus: verdict === 'consistent' ? 'needs_review' : 'contradiction',
-          updatedAt: new Date(),
-        })
-        .where(and(eq(schema.drafts.id, draft.id), eq(schema.drafts.revision, draft.revision), ne(schema.drafts.status, 'final')))
-        .returning({ id: schema.drafts.id });
-      if (!judged) {
-        this.logger.warn('judgeDraft: draft changed during the judge call — verdict discarded', { projectId, chapter, judgedRevision: draft.revision });
-        throw await refusedDraftWriteError(tx, projectId, chapter);
-      }
-      await revokeProvisionalReveals(tx, projectId, chapter);
-    });
-
-    return { verdict, findings };
-  }
-
   async feedbackDraft(projectId: bigint, chapter: number, body: FeedbackBody): Promise<Ai.UserFeedback> {
     const [feedback] = await this.db
       .insert(schema.userFeedback)
@@ -650,7 +568,7 @@ export class GenerationService {
     return feedback;
   }
 
-  async approveDraft(projectId: bigint, chapter: number, body: ApproveDraftBody): Promise<Generation.Draft> {
+  async approveDraft(projectId: bigint, chapter: number, body: ApproveDraftBody): Promise<ApprovedDraft> {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     const keptStale = draft.staleReason && body.keepStale ? draft.staleReason : null;
@@ -695,10 +613,10 @@ export class GenerationService {
       const reveals = await ledgerBriefReveals(tx, projectId, chapter, row.revision);
       if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, revision: row.revision, applied: reveals.applied });
 
-      return row;
+      return { ...row, overriddenFindings: await overrideOpenBlockingOnApproval(tx, row) };
     });
 
-    this.logger.info('draft approved', { projectId, chapter, revision: updated.revision, reviewerId: body.reviewerId });
+    this.logger.info('draft approved', { projectId, chapter, revision: updated.revision, reviewerId: body.reviewerId, overriddenFindings: updated.overriddenFindings });
     return updated;
   }
 
@@ -742,6 +660,7 @@ export class GenerationService {
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
+      await tx.delete(schema.chapterReviews).where(and(eq(schema.chapterReviews.projectId, projectId), eq(schema.chapterReviews.chapter, chapter)));
     });
 
     // Scene images live outside the draft transaction (they touch disk).
@@ -1159,30 +1078,6 @@ export class GenerationService {
     return this.workflowRunService.runNovelValidation({ projectId });
   }
 
-  async reviewChapter(projectId: bigint, chapter: number): Promise<{ disposition: string; note?: string; findings?: { severity: string; text: string }[] }> {
-    const draft = await this.getDraft(projectId, chapter);
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'review', chapter }, project);
-    const [pack, brief] = await Promise.all([
-      this.contextAssembler.forChapter(projectId, chapter, { policy }),
-      this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
-    ]);
-
-    const ctx = { projectId, chapter, promptKey: PROMPT_REGISTRY.review.key, promptVersion: PROMPT_REGISTRY.review.version, role: PROMPT_REGISTRY.review.key };
-    const review = (await this.modelRouter.structured(
-      PROMPT_REGISTRY.review,
-      { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', draftBody: draft.body },
-      ctx,
-      routedProject,
-      policy,
-    )) as {
-      disposition: string;
-      note?: string;
-      findings?: { severity: string; text: string }[];
-    };
-    return review;
-  }
-
   async getReviewQueue(projectId: bigint): Promise<ReviewQueueResult> {
     const [drafts, proposals] = await Promise.all([
       this.db.query.drafts.findMany({
@@ -1435,30 +1330,5 @@ export class GenerationService {
   private async draftRoute(projectId: bigint, draft: { isolated: boolean }, call: RoutedCall, project: Project.Row | undefined): Promise<CallRoute> {
     if (draft.isolated) return resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, project as ProjectConfig | undefined);
     return { policy: await this.pluginPolicy.resolve(projectId, call, project), project: project as ProjectConfig | undefined };
-  }
-
-  private tryParseJson(raw: string): unknown {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      let depth = 0;
-      let start = -1;
-      for (let i = 0; i < raw.length; i++) {
-        if (raw[i] === '{') {
-          if (depth === 0) start = i;
-          depth++;
-        } else if (raw[i] === '}') {
-          depth--;
-          if (depth === 0 && start !== -1) {
-            try {
-              return JSON.parse(raw.slice(start, i + 1));
-            } catch {
-              start = -1;
-            }
-          }
-        }
-      }
-      return null;
-    }
   }
 }

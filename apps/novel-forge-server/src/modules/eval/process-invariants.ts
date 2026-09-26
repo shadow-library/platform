@@ -4,7 +4,7 @@
 //
 // What each check verifies:
 // - Fail-open judge acceptances: `chapter-generation.graph.ts`'s judge() node and
-//   `generation.service.ts`'s judgeDraft() both set `verdict = judgeResult?.verdict ?? 'evaluation_failed'`
+//   `chapter-review.service.ts`'s ChapterReviewService judge both set `verdict = judgeResult?.verdict ?? 'evaluation_failed'`
 //   — a draft's `judge` column can only read 'consistent' when the judge output parsed successfully, and
 //   `evaluation_failed` always routes to `reviewStatus: 'contradiction'` (never a clean accept) via
 //   `routeAfterJudge` returning 'awaitReview'. The only way an `evaluation_failed` draft reaches

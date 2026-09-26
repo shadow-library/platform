@@ -191,6 +191,10 @@ export class JobService {
       .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
     if (cancelledPending) {
       this.logger.info('job cancelled before dispatch', { jobId });
+      await this.db
+        .update(schema.workflowRuns)
+        .set({ status: 'cancelled', outcome: 'cancelled', endedAt: new Date() })
+        .where(and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.status, 'running')));
       if (isAuthoringJob(cancelledPending.kind)) await this.claims.releaseReservation(jobId);
       this.announce(jobId, cancelledPending);
       return { status: 'cancelled', outcome: 'cancelled' };

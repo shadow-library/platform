@@ -22,6 +22,7 @@ import {
 import { loadWriterDisclosurePolicy, type WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../../eval/deterministic-metrics';
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
+import { recordGenerationJudge } from '../../review/review-records';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
 import { loadWriterBrief } from '../context/writer-brief';
@@ -293,7 +294,7 @@ function writerFacingFindings(state: Pick<ChapterGenState, 'findings' | 'knowled
   return [others, render(leaks)].filter(Boolean).join('\n');
 }
 
-function parseJudgeOutput(raw: string): JudgeOutput | null {
+export function parseJudgeOutput(raw: string): JudgeOutput | null {
   const fromJson = parseSchema<JudgeOutput>(JudgeSchema, tryParseJson(raw));
   if (fromJson.success) return fromJson.data;
   for (const candidate of extractJsonCandidates(raw)) {
@@ -752,7 +753,14 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     return { outcome: 'awaiting_review', nodeTrace: ['awaitReview'] };
   }
 
-  function finish(state: ChapterGenState) {
+  // Every path that ends a run passes here, so this stores the terminal judge pass only; a review record failing must not fail the chapter.
+  async function finish(state: ChapterGenState) {
+    if (state.draftId) {
+      const record = { projectId: BigInt(state.projectId), chapter: state.chapter, draftId: BigInt(state.draftId), runId: state.runId, body: state.prose };
+      await recordGenerationJudge(db, { ...record, pass: { verdict: state.verdict, findings: state.findings } }).catch(err =>
+        logger.warn('generation judge pass not recorded as a review', { err, runId: state.runId, chapter: state.chapter }),
+      );
+    }
     return { outcome: state.outcome, nodeTrace: ['finish'] };
   }
 

@@ -36,8 +36,12 @@ interface ImportPayload {
 // whole of a model call after the author hit stop; the boundary checks alone only catch it between steps.
 const CANCEL_POLL_MS = 1000;
 
+const BUILT_IN_KINDS: ReadonlySet<Job.Kind> = new Set(['generate', 'backfill', 'publish', 'import']);
+
 const CLAIM_REFUSED_MESSAGE = 'Another chapter was being written, planned or finalized for this novel, so this job did not start';
 const CLAIM_LOST_MESSAGE = 'This job stopped responding and another job took over the novel, so its result was not kept as finished';
+
+export type JobHandler = (job: Job.Row) => Promise<void>;
 
 type SettleOutcome = { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'cancelled' };
 
@@ -52,6 +56,7 @@ export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
   private readonly db: PrimaryDatabase;
   private readonly cancelWatches = new Map<string, JobWatch>();
+  private readonly handlers = new Map<Job.Kind, JobHandler>();
 
   constructor(
     private readonly jobService: JobService,
@@ -66,12 +71,18 @@ export class JobExecutor {
   }
 
   // On boot, drain any jobs left pending — including ones just reset from in_progress by crash recovery.
-  // Without this a crashed job would sit pending forever with no one to pick it up.
-  async onModuleInit(): Promise<void> {
+  // Without this a crashed job would sit pending forever with no one to pick it up. It waits for application ready, after every
+  // module's init, so the job kinds other modules register have their handlers by then.
+  async onApplicationReady(): Promise<void> {
     const pending = await this.jobService.findPending();
     if (pending.length === 0) return;
     this.logger.info(`Dispatching ${pending.length} pending job(s) on boot`);
     for (const job of pending) this.dispatch(job.id).catch(err => this.logger.error('Boot dispatch failed', { err, jobId: job.id }));
+  }
+
+  /** Lets a module above this one run its own job kind, since this module cannot depend on it. */
+  registerHandler(kind: Job.Kind, handler: JobHandler): void {
+    this.handlers.set(kind, handler);
   }
 
   async dispatch(jobId: string): Promise<void> {
@@ -86,6 +97,12 @@ export class JobExecutor {
     // LLM calls); an in_progress job is already owned by another dispatch.
     if (job.status !== 'pending') {
       this.logger.warn('dispatch: skipping non-pending job', { jobId, status: job.status });
+      return;
+    }
+
+    // Left pending rather than failed: a handler missing here is a wiring fault, and the next dispatch after it is fixed runs the job.
+    if (!BUILT_IN_KINDS.has(job.kind) && !this.handlers.has(job.kind)) {
+      this.logger.error('dispatch: no handler is registered for this job kind — leaving the job pending', { jobId, kind: job.kind });
       return;
     }
 
@@ -152,6 +169,7 @@ export class JobExecutor {
     };
     if (!token) await write();
     else if (!(await this.claims.settle(job.projectId, token, write))) return this.settleLostClaim(job, outcome);
+    if (outcome.status !== 'done') await this.workflowRunService.settleJobRuns(job.id, outcome.status, outcome.status === 'failed' ? outcome.cause : undefined);
     if (outcome.status === 'cancelled') this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
   }
 
@@ -226,8 +244,11 @@ export class JobExecutor {
         return this.runPublish(job);
       case 'import':
         return this.runImport(job);
-      default:
-        throw AppError.internal(`Unsupported job kind: ${job.kind}`);
+      default: {
+        const handler = this.handlers.get(job.kind);
+        if (!handler) throw AppError.internal(`Unsupported job kind: ${job.kind}`);
+        return handler(job);
+      }
     }
   }
 

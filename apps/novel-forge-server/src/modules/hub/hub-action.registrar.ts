@@ -8,6 +8,7 @@ import { type Refinement } from '@server/database';
 import { GenerationService } from '../generation/generation.service';
 import { type ActionExecutionContext, type ActionExecutionResult, ActionExecutorRegistry, ProposalApplyService } from '../refinement';
 import { RefineService } from '../refinement/refine.service';
+import { ChapterReviewService } from '../review/chapter-review.service';
 
 /**
  * Wires every chat action to the service that performs it. Lives outside the
@@ -23,6 +24,7 @@ export class HubActionRegistrar {
     private readonly generationService: GenerationService,
     private readonly refineService: RefineService,
     private readonly proposalApplyService: ProposalApplyService,
+    private readonly reviewService: ChapterReviewService,
   ) {}
 
   onModuleInit(): void {
@@ -48,8 +50,8 @@ export class HubActionRegistrar {
 
     registry.register('action.judge_draft', async (projectId, action) => {
       if (action.op !== 'action.judge_draft') throw AppError.internal('executor misrouted');
-      const result = await this.generationService.judgeDraft(projectId, action.chapter);
-      return { summary: `judge verdict on chapter ${action.chapter}: ${result.verdict} (${result.findings.length} finding(s))` };
+      const review = await this.reviewService.run(projectId, action.chapter, { kind: 'judge' });
+      return { summary: `judge verdict on chapter ${action.chapter} revision ${review.draftRevision ?? 'final'}: ${review.verdict} (${review.findings.length} finding(s))` };
     });
 
     registry.register('action.revise_draft', async (projectId, action) => {
@@ -71,8 +73,8 @@ export class HubActionRegistrar {
     registry.register('action.validate', async (projectId, action) => {
       if (action.op !== 'action.validate') throw AppError.internal('executor misrouted');
       if (action.scope === 'chapter' && action.chapter !== undefined) {
-        const review = await this.generationService.reviewChapter(projectId, action.chapter);
-        return { summary: `chapter ${action.chapter} review: ${review.disposition}` };
+        const review = await this.reviewService.run(projectId, action.chapter, { kind: 'editorial' });
+        return { summary: `chapter ${action.chapter} review: ${review.verdict} (${review.findings.length} finding(s))` };
       }
       const run = await this.generationService.validate(projectId);
       return { summary: `novel validation ${run.status}: ${run.outcome}`, runId: run.runId };

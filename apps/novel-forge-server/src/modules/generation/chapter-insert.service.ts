@@ -93,6 +93,7 @@ const SHIFT_TARGETS: ShiftTarget[] = [
     updatedAt: 'updatedAt',
   },
   { table: schema.contextPacks, projectId: schema.contextPacks.projectId, column: schema.contextPacks.chapter, field: 'chapter' },
+  { table: schema.chapterReviews, projectId: schema.chapterReviews.projectId, column: schema.chapterReviews.chapter, field: 'chapter' },
   { table: schema.entities, projectId: schema.entities.projectId, column: schema.entities.firstSeenChapter, field: 'firstSeenChapter', updatedAt: 'updatedAt' },
   { table: schema.entityRelationships, projectId: schema.entityRelationships.projectId, column: schema.entityRelationships.chapter, field: 'chapter' },
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.chapter, field: 'chapter' },

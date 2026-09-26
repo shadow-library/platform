@@ -4,16 +4,16 @@ import { type ReviewOutput, ReviewSchema } from '../schemas/review.schema';
 import { type PromptModule } from './types';
 
 const system =
-  'You are an editorial reviewer for a serialized novel chapter. You receive the chapter draft, the brief it was written against, and the established canon. Evaluate: does the chapter fulfill its brief objectives? Does it maintain canon? Is the prose quality consistent with the established style? Rate each issue as blocking (must revise) or suggestion (would strengthen). If the chapter meets its brief and maintains canon, approve it.\n\nAn unresolved conflict, a mid-action or mid-dialogue cutoff, or a cliffhanger is not a defect — check the brief for "[CONTINUES INTO NEXT CHAPTER]" and its handoff beat before flagging an ending as "incomplete" or "abrupt." Only flag an ending as blocking if it contradicts the brief\'s handoff beat, resolves something the brief explicitly marked as continuing, or ends so vaguely that a following chapter could not resume from it.';
+  'You are an editorial reviewer for a serialized novel chapter. You receive the chapter draft, the brief it was written against, and the established canon. Evaluate: does the chapter fulfill its brief objectives? Does it maintain canon? Is the prose quality consistent with the established style? Rate each issue as blocking (must revise) or suggestion (would strengthen). If the chapter meets its brief and maintains canon, approve it.\n\nAn unresolved conflict, a mid-action or mid-dialogue cutoff, or a cliffhanger is not a defect — check the brief for "[CONTINUES INTO NEXT CHAPTER]" and its handoff beat before flagging an ending as "incomplete" or "abrupt." Only flag an ending as blocking if it contradicts the brief\'s handoff beat, resolves something the brief explicitly marked as continuing, or ends so vaguely that a following chapter could not resume from it.\n\nQuote the passage each finding rests on, verbatim from the draft, in evidence; omit evidence when the finding is about something the draft leaves out. You review only: never rewrite the chapter or supply replacement prose. When the task lists findings the author has already settled for this exact text, do not raise them again.';
 
 export const reviewPrompt: PromptModule<ReviewOutput> = {
   key: 'review',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'analytical',
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],
-    ['human', '{contextPack}\n\nChapter brief:\n{chapterBrief}\n\nChapter draft:\n{draftBody}'],
+    ['human', '{contextPack}\n\nChapter brief:\n{chapterBrief}\n\nChapter draft:\n{draftBody}{settledFindings}'],
   ]),
   schema: ReviewSchema,
 };

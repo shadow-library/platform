@@ -353,8 +353,10 @@ export class ProjectService {
       await clearLedgerBriefLinks(this.db, id);
       await this.db.delete(schema.continuityProposals).where(eq(schema.continuityProposals.projectId, id));
       tablesCleared.push('continuityProposals');
-      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), inArray(schema.jobs.kind, ['generate', 'finalize', 'backfill'])));
-      tablesCleared.push('jobs(generate/finalize/backfill)');
+      await this.db.delete(schema.chapterReviews).where(eq(schema.chapterReviews.projectId, id));
+      tablesCleared.push('chapterReviews');
+      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), inArray(schema.jobs.kind, ['generate', 'finalize', 'backfill', 'review'])));
+      tablesCleared.push('jobs(generate/finalize/backfill/review)');
     }
 
     this.logger.info('project stage reset complete', { projectId: id, stage, tablesCleared });
