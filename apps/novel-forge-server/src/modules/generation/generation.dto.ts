@@ -1060,45 +1060,6 @@ export class ListWorkflowRunResponse {
   items: WorkflowRunDetailResponse[];
 }
 
-@Schema({ description: 'Model call counts keyed by AI role.', patternProperties: { '^[a-z_]+$': Integer } })
-export class RoleCallCounts {}
-
-@Schema()
-export class RoleUsage {
-  @Field({ description: "An AI role identifier, including scoped roles such as 'bible:plot'." })
-  role: string;
-
-  @Field(() => Integer)
-  calls: number;
-
-  @Field(() => Integer)
-  inputTokens: number;
-
-  @Field(() => Integer)
-  outputTokens: number;
-
-  @Field()
-  costUsd: number;
-}
-
-@Schema()
-export class AiUsageResponse {
-  @Field(() => Integer)
-  totalInputTokens: number;
-
-  @Field(() => Integer)
-  totalOutputTokens: number;
-
-  @Field()
-  totalCostUsd: number;
-
-  @Field(() => RoleCallCounts)
-  callsPerRole: RoleCallCounts;
-
-  @Field(() => [RoleUsage], { description: 'Per-role usage sorted by total token count in descending order.' })
-  roles: RoleUsage[];
-}
-
 @Schema()
 export class SearchHitResponse {
   @Field()

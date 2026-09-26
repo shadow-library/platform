@@ -1,4 +1,12 @@
+import { type Ai } from '@server/database';
+
 import { MODEL_MAP } from './models';
+
+export interface GatewayInfo {
+  servedBy?: string;
+  servedModel?: string;
+  openrouter: boolean;
+}
 
 export interface WindowUsageRow {
   model: string;
@@ -36,6 +44,13 @@ export function estimateCallCostUsd(model: string, inputTokens: number, outputTo
   const inputPrice = entry.inputPricePerMToken ?? 0;
   const outputPrice = entry.outputPricePerMToken ?? 0;
   return (inputTokens / 1_000_000) * inputPrice + (outputTokens / 1_000_000) * outputPrice;
+}
+
+// Labels where a reported cost came from; the owner's decision is that every source is shown as the real charge regardless.
+export function classifyCostSource(providerCostUsd: number | undefined, gateway: GatewayInfo | undefined): Ai.CostSource {
+  if (providerCostUsd === undefined) return 'estimate';
+  if (!gateway || gateway.openrouter) return 'provider';
+  return 'gateway';
 }
 
 // A row's `recordedCostUsd` (provider-reported or frozen-at-write-time estimate, for any call kind)

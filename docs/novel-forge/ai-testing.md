@@ -403,7 +403,7 @@ API (all three require `ADMIN_PERMISSION`, `highRisk` — `generation.controller
 - `GET /api/v1/projects/:id/runs/:runId/context` — the assembled pack plus `rendered`, the exact text supplied
   (`generation.dto.ts:716-720`).
 - `GET /api/v1/projects/:id/runs/:runId/calls/:callId` — adds **`rawOutput`** and `error` (`generation.dto.ts:722-729`).
-- `GET /api/v1/projects/:id/ai-usage` and `GET /api/v1/projects/:id/cost`.
+- `GET /api/v1/projects/:id/cost` — spend by group/role/model plus `byCostSource`/`byTier`/`byContentMode` breakdowns.
 
 DB, when you are not an admin:
 
@@ -1317,7 +1317,7 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
 #### Harness observability (use for every block above)
 
 - **Entry:** **Workflow Runs** screen (admin-only); `GET /runs`, `GET /runs/:runId`,
-  `GET /runs/:runId/context`, `GET /runs/:runId/calls/:callId`, `GET /ai-usage`,
+  `GET /runs/:runId/context`, `GET /runs/:runId/calls/:callId`, `GET /cost`,
   `GET /context/preview?purpose=generation&chapter=3`.
 - **Verify:** `GET /runs` lists only the 20 latest author-facing graphs (an allowlist —
   `generation.service.ts:125`); the detail carries `modelCalls[]` (`promptKey@promptVersion`, `role`,
@@ -1405,7 +1405,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 #### 0.1 Access
 
 - **Gate.** `GET /projects/:p/runs/:runId`, `/runs/:runId/context` and `/runs/:runId/calls/:callId` carry `@RequirePermission('novel-forge:admin', { highRisk: true })` (`generation/generation.controller.ts:308,323,330`). The PDP check runs in the caller's org (`packages/auth/src/module/auth-guard.ts`). A non-admin gets 403 `IAM_002` (`apps/novel-forge-server/tests/generation/run-admin-gate.spec.ts`).
-- **Ungated.** `GET /projects/:p/runs` (latest 20 author-facing runs), `GET /projects/:p/ai-usage`, `GET /projects/:p/context/preview` and `GET /projects/:p/drafts/:n/prompt`. The preview route's `@BotPermission('novel-forge:generation:run')` binds bot tokens only; a user session needs nothing beyond the controller's `novel-forge:projects:read` floor.
+- **Ungated.** `GET /projects/:p/runs` (latest 20 author-facing runs), `GET /projects/:p/cost`, `GET /projects/:p/context/preview` and `GET /projects/:p/drafts/:n/prompt`. The preview route's `@BotPermission('novel-forge:generation:run')` binds bot tokens only; a user session needs nothing beyond the controller's `novel-forge:projects:read` floor.
 - **UI.** "Workflow Runs" (`/novels/$novelId/runs`) does not read OIDC session scopes — a browser session only ever carries those, never the per-organisation RBAC permission the admin routes check, so the gate asks instead: `GET /api/v1/access` (`auth/access.controller.ts`) puts the same `novel-forge:admin` PDP question to identity that `@RequirePermission` does, and `resolveIsAdmin`/`useIsAdmin` (`apps/novel-forge-web/src/lib/session.ts`) read the answer. The nav entry hides without it (`screens.tsx`'s `adminOnly`), and the route's own `beforeLoad` gates independently (`runs.tsx`) — so the nav and the server can never disagree about who is an admin.
 - **How to actually get the grant.** `novel-forge:admin` is a PDP permission (`apps/novel-forge-server/src/constants.ts:12`) that **is** grantable: `NOVEL_FORGE_ROLE_CATALOG` (`auth/role-catalog.constants.ts`) declares both the permission and the `NovelForgeAdmin` role (deliberately not default, not bot-grantable — a platform role admin assigns it to a person), and identity's own seed for this app mirrors both (`apps/identity-server/src/modules/bootstrap/ecosystem-seed.constants.ts:151,161-164`) with `grantToBootstrapAdmin: true`, so the bootstrap admin persona (`admin@shadow-apps.com`, §3) already holds it out of the box. For anyone else, a platform role admin assigns `NovelForgeAdmin` through identity's `POST /api/v1/admin/role-assignments`, in the organisation the session acts in — an operator action, not a code change.
 - **Fallback with no admin grant.** Query the DB directly (0.7).
@@ -1419,7 +1419,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 | `GET /runs/:id/context` (admin)                       | Pack summary plus `rendered`: the exact stable-then-volatile context text. 404 `CTX_001` if no pack is linked.                                                                                                                                                                                                                                                                                      |
 | `GET /runs/:id/calls/:callId` (admin)                 | Model-call row plus `rawOutput` (the raw text, stored before parsing) and `error`.                                                                                                                                                                                                                                                                                                                  |
 | `GET /context/preview?purpose=chat&scopeType=project` | View of a pack: `purpose`, `budgetTokens`, `usedTokens`, `sections`, `omitted[{key,reason}]` (reason `budget` or `unresolved`), `unresolvedRefs`, `renderedStable`, `renderedVolatile`, `rendered`. Purposes: `generation, outline, chat, premise, audit`. `chat` needs `scopeType` (else 400 `CHT_003`). Only `generation` is dry — every other purpose persists a `context_packs` row (see 6.10). |
-| `GET /ai-usage`                                       | Per-role calls, tokens and recorded `costUsd`. `GET /cost` is the full spend view — see 0.5.                                                                                                                                                                                                                                                                                                        |
+| `GET /cost`                                            | The full spend view: totals plus `byGroup`/`byRole`/`byModel`/`byCostSource`/`byTier`/`byContentMode` breakdowns, each with recorded and list-price-estimated `costUsd` — see 0.5.                                                                                                                                                                                                                  |
 
 #### 0.3 What is NOT recorded
 

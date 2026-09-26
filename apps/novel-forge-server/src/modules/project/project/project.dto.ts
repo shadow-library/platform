@@ -399,4 +399,13 @@ export class CostResponse {
 
   @Field(() => [CostBreakdownItem], { description: 'By model, highest spend first.' })
   byModel: CostBreakdownItem[];
+
+  @Field(() => [CostBreakdownItem], { description: "By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first." })
+  byCostSource: CostBreakdownItem[];
+
+  @Field(() => [CostBreakdownItem], { description: "By the project's cost tier at call time — 'economy', 'balanced', or 'performant' — highest spend first." })
+  byTier: CostBreakdownItem[];
+
+  @Field(() => [CostBreakdownItem], { description: "By content mode at call time — 'standard' or 'unrestricted' — highest spend first." })
+  byContentMode: CostBreakdownItem[];
 }

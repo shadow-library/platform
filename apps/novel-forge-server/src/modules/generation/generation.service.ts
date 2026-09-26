@@ -1,5 +1,5 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -97,22 +97,6 @@ export interface JudgeResult {
 export interface ReviewQueueResult {
   drafts: Generation.Draft[];
   proposals: Generation.ContinuityProposal[];
-}
-
-interface RoleUsageResult {
-  role: string;
-  calls: number;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-}
-
-export interface AiUsageResult {
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCostUsd: number;
-  callsPerRole: Record<string, number>;
-  roles: RoleUsageResult[];
 }
 
 export type PresentedRun = Omit<Ai.WorkflowRun, 'nodeTrace'> & RunTrace;
@@ -1227,41 +1211,6 @@ export class GenerationService {
     if (!summary) throw AppErrorCode.CTX_001.create();
     const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(summary.id)) });
     return { ...summary, rendered: pack?.rendered ?? '' };
-  }
-
-  async getAiUsage(projectId: bigint): Promise<AiUsageResult> {
-    const rows = await this.db
-      .select({
-        role: schema.modelCalls.role,
-        count: sql<number>`count(*)::int`,
-        inputTokens: sum(schema.modelCalls.inputTokens),
-        outputTokens: sum(schema.modelCalls.outputTokens),
-        costUsd: sum(schema.modelCalls.costUsd),
-      })
-      .from(schema.modelCalls)
-      .where(eq(schema.modelCalls.projectId, projectId))
-      .groupBy(schema.modelCalls.role);
-
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    let totalCostUsd = 0;
-    const callsPerRole: Record<string, number> = {};
-    const roles: RoleUsageResult[] = [];
-
-    for (const row of rows) {
-      const inputTokens = Number(row.inputTokens ?? 0);
-      const outputTokens = Number(row.outputTokens ?? 0);
-      const costUsd = Number(row.costUsd ?? 0);
-      callsPerRole[row.role] = row.count;
-      roles.push({ role: row.role, calls: row.count, inputTokens, outputTokens, costUsd });
-      totalInputTokens += inputTokens;
-      totalOutputTokens += outputTokens;
-      totalCostUsd += costUsd;
-    }
-
-    roles.sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
-
-    return { totalInputTokens, totalOutputTokens, totalCostUsd, callsPerRole, roles };
   }
 
   async search(projectId: bigint, query: { q: string; index?: string; k?: number }): Promise<SearchResult> {

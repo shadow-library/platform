@@ -413,6 +413,10 @@ export class ProjectService {
         role: calls.role,
         model: calls.model,
         window,
+        status: calls.status,
+        costSource: calls.costSource,
+        tier: calls.tier,
+        contentMode: calls.contentMode,
         calls: sql<number>`count(*)::int`,
         inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
         outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
@@ -422,7 +426,7 @@ export class ProjectService {
       })
       .from(calls)
       .where(eq(calls.projectId, projectId))
-      .groupBy(calls.role, calls.model, window);
+      .groupBy(calls.role, calls.model, window, calls.status, calls.costSource, calls.tier, calls.contentMode);
     return summarizeCost(rows);
   }
 }

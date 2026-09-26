@@ -6,12 +6,12 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema } from '@server/database';
+import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
 import { type ReasoningEffort } from './models';
-import { estimateCallCostUsd } from './quota';
+import { classifyCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
 
 export interface TelemetryContext {
   projectId: bigint;
@@ -32,6 +32,8 @@ interface PendingCall {
   reasoningEffort?: ReasoningEffort;
   plugins?: PluginStamp[];
   policyDigest?: string;
+  tier?: Project.CostTier;
+  contentMode?: Project.ContentMode;
 }
 
 export interface TokenUsage {
@@ -46,6 +48,10 @@ const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens'];
 const OUTPUT_KEYS = ['output_tokens', 'completion_tokens', 'completionTokens'];
 const CACHE_READ_KEYS = ['cache_read', 'cached_tokens', 'cache_read_input_tokens'];
 const CACHE_CREATION_KEYS = ['cache_creation', 'cache_creation_input_tokens', 'cache_creation_tokens'];
+
+function pickEnumValue<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+}
 
 // `minimum` is what separates a reported count from a missing one: @langchain/core's
 // `mergeUsageMetadata` zero-fills every field it merges across stream chunks, while @langchain/openai
@@ -103,6 +109,26 @@ export function extractProviderCost(output: LLMResult): number | undefined {
   return typeof cost === 'number' && Number.isFinite(cost) ? cost : undefined;
 }
 
+function parseGatewayInfo(raw: UsageBag): GatewayInfo | undefined {
+  if (typeof raw?.['openrouter'] !== 'boolean') return undefined;
+  const servedBy = typeof raw['served_by'] === 'string' ? raw['served_by'] : undefined;
+  const servedModel = typeof raw['served_model'] === 'string' ? raw['served_model'] : undefined;
+  return { servedBy, servedModel, openrouter: raw['openrouter'] };
+}
+
+// Non-streaming: the gateway response's top-level `gateway` object rides on the same `__raw_response`
+// escape hatch as `extractProviderCost`. Streaming: the gateway sends `gateway` only on its final,
+// choice-less SSE frame, which @langchain/openai 1.5.5's streaming loop discards before it ever reaches
+// `additional_kwargs` — `GatewayChatOpenAI` (`./gateway-chat-openai.ts`) is what recovers it, stamping it
+// onto the one synthetic usage chunk the loop still emits, so `response_metadata.gateway` is the fallback
+// this checks for a streamed call, the same way `extractProviderCost` falls back to `response_metadata.usage`.
+export function extractGatewayInfo(output: LLMResult): GatewayInfo | undefined {
+  const generation = output.generations?.[0]?.[0] as { message?: { additional_kwargs?: Record<string, unknown>; response_metadata?: Record<string, unknown> } } | undefined;
+  const rawResponse = generation?.message?.additional_kwargs?.['__raw_response'] as { gateway?: UsageBag } | undefined;
+  const responseMetadataGateway = generation?.message?.response_metadata?.['gateway'] as UsageBag;
+  return parseGatewayInfo(rawResponse?.gateway ?? responseMetadataGateway);
+}
+
 @Injectable()
 export class TelemetryHandler extends BaseCallbackHandler {
   name = 'novel-forge-telemetry';
@@ -133,6 +159,11 @@ export class TelemetryHandler extends BaseCallbackHandler {
     // Not every provider reports token usage, so the prompt is measured up front and used as a
     // fallback estimate when the provider stays silent.
     const promptTokensEstimate = countTokens(prompts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join('\n'));
+
+    // `costTier`/`contentMode` ride the invoke config's `metadata` alongside `nfTelemetry` rather than inside
+    // it, set by the routing layer that resolved them; read defensively since not every call sets them.
+    const tier = pickEnumValue(metadata?.['costTier'], schema.costTier.enumValues);
+    const contentMode = pickEnumValue(metadata?.['contentMode'], schema.contentMode.enumValues);
 
     const nf = metadata?.['nfTelemetry'] as
       | (TelemetryContext & {
@@ -169,6 +200,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
         reasoningEffort,
         plugins,
         policyDigest,
+        tier,
+        contentMode,
       });
       return;
     }
@@ -182,6 +215,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
       model: 'unknown',
       attempt: 0,
       promptTokensEstimate,
+      tier,
+      contentMode,
     });
   }
 
@@ -194,9 +229,12 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const generation = output.generations?.[0]?.[0];
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
     const { inputTokens, cachedInputTokens, outputTokens } = extractTokenUsage(output, call.promptTokensEstimate, rawOutput);
+    const providerCostUsd = extractProviderCost(output);
+    const gateway = extractGatewayInfo(output);
+    const costSource = classifyCostSource(providerCostUsd, gateway);
     // The provider figure is authoritative when it reported one; otherwise fall back to the same
     // per-million-token price table the AI-quota spend guard already estimates from.
-    const costUsd = extractProviderCost(output) ?? estimateCallCostUsd(call.model, inputTokens, outputTokens);
+    const costUsd = providerCostUsd ?? estimateCallCostUsd(call.model, inputTokens, outputTokens);
 
     this.logger.debug('LLM call completed', {
       runId,
@@ -207,6 +245,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
       cachedInputTokens,
       outputTokens,
       costUsd,
+      costSource,
+      servedBy: gateway?.servedBy,
       attempt: call.attempt,
     });
 
@@ -228,6 +268,9 @@ export class TelemetryHandler extends BaseCallbackHandler {
         cachedInputTokens,
         outputTokens,
         costUsd: String(costUsd),
+        costSource,
+        tier: call.tier ?? null,
+        contentMode: call.contentMode ?? null,
         latencyMs,
         attempt: call.attempt,
         rawOutput,
@@ -258,6 +301,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
         reasoningEffort: call.reasoningEffort ?? null,
+        tier: call.tier ?? null,
+        contentMode: call.contentMode ?? null,
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',

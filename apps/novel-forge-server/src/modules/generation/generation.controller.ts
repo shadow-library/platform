@@ -6,7 +6,6 @@ import { ADMIN_PERMISSION, GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, 
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
 import {
-  AiUsageResponse,
   ApproveDraftBody,
   BriefResponse,
   CancelJobResponse,
@@ -332,12 +331,6 @@ export class GenerationController {
   @RespondFor(200, RunModelCallDetailResponse)
   getRunCall(@Params() params: RunCallParams): Promise<RunModelCallDetailResponse> {
     return this.generationService.getRunCall(params.projectId, params.runId, params.callId);
-  }
-
-  @Get('/ai-usage')
-  @RespondFor(200, AiUsageResponse)
-  getAiUsage(@Params() params: ProjectParams): Promise<AiUsageResponse> {
-    return this.generationService.getAiUsage(params.projectId);
   }
 
   @BotPermission(GENERATION_RUN_PERMISSION)
