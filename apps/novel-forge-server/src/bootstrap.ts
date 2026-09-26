@@ -32,9 +32,6 @@ declare module '@shadow-library/common' {
 
     'publishing.auto-push': boolean;
 
-    /** Finalized chapters within an arc between automatic re-outlines of the arc's remaining chapters. */
-    'generation.reconciliation.cadence': number;
-
     /** Directory whose direct children are plugin packages, each named for its plugin id. Empty or unset loads no plugins. */
     'plugins.dir': string;
   }
@@ -58,7 +55,5 @@ Config.load('ai.langsmith.api.key');
 Config.load('projects.max-per-owner', { defaultValue: '100', validateType: 'number' });
 
 Config.load('publishing.auto-push', { validateType: 'boolean', defaultValue: 'true' });
-
-Config.load('generation.reconciliation.cadence', { defaultValue: '5', validateType: 'number' });
 
 Config.load('plugins.dir', { defaultValue: '' });

@@ -344,22 +344,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     const currentChapter = project?.storyCurrentChapter ?? 0;
 
     if (state.chapter > currentChapter) {
-      const updateData: Record<string, unknown> = { storyCurrentChapter: state.chapter, updatedAt: new Date() };
-
-      const volume = await db.query.volumes.findFirst({
-        where: and(
-          eq(schema.volumes.projectId, projectId),
-          sql`${schema.volumes.startChapter} <= ${state.chapter}`,
-          sql`(${schema.volumes.endChapter} IS NULL OR ${schema.volumes.endChapter} >= ${state.chapter})`,
-        ),
-        orderBy: schema.volumes.ordinal,
-      });
-      if (volume) updateData.storyCurrentVolumeKey = volume.volumeKey;
-
-      await db
-        .update(schema.projects)
-        .set(updateData as never)
-        .where(eq(schema.projects.id, projectId));
+      await db.update(schema.projects).set({ storyCurrentChapter: state.chapter, updatedAt: new Date() }).where(eq(schema.projects.id, projectId));
       logger.debug('finalization advanceCursor', { runId: state.runId, chapter: state.chapter, previousCurrent: currentChapter });
     }
 

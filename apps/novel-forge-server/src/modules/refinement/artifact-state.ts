@@ -13,7 +13,6 @@ interface ParsedRefs {
   premise: boolean;
   docs: { section: Bible.Section; slug: string; ref: string }[];
   volumeKeys: string[];
-  arcKeys: string[];
   chapters: number[];
   drafts: number[];
   entityKeys: string[];
@@ -23,14 +22,13 @@ interface ParsedRefs {
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
       const [section = '', ...rest] = ref.slice(4).split('/');
       parsed.docs.push({ section: section as Bible.Section, slug: rest.join('/'), ref });
     } else if (ref.startsWith('volume:')) parsed.volumeKeys.push(ref.slice(7));
-    else if (ref.startsWith('arc:')) parsed.arcKeys.push(ref.slice(4));
     else if (ref.startsWith('chapter:')) parsed.chapters.push(Number(ref.slice(8)));
     else if (ref.startsWith('draft:')) parsed.drafts.push(Number(ref.slice(6)));
     else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
@@ -77,11 +75,6 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
   if (parsed.volumeKeys.length > 0) {
     const rows = await db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) });
     for (const row of rows) states[`volume:${row.volumeKey}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
-  }
-
-  if (parsed.arcKeys.length > 0) {
-    const rows = await db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), inArray(schema.arcs.arcKey, parsed.arcKeys)) });
-    for (const row of rows) states[`arc:${row.arcKey}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
   }
 
   if (parsed.chapters.length > 0) {

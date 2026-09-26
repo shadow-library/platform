@@ -19,8 +19,7 @@ export const getBriefTool: RegisteredTool = {
     if (!brief) return `Brief not found for chapter ${parsed.chapter}`;
 
     const lines: string[] = [`**Chapter ${brief.chapter}**: ${brief.title ?? '(untitled)'} (rev ${brief.revision}, ${brief.writeMode})`];
-    if (brief.handEdited) lines.push('Hand-edited: this brief will not be overwritten by arc reconciliation.');
-    lines.push(`Volume: ${brief.volumeKey ?? '?'} / Arc: ${brief.arcKey ?? '?'} / POV: ${brief.pov ?? '?'}`);
+    lines.push(`Volume: ${brief.volumeKey ?? '?'} / POV: ${brief.pov ?? '?'}`);
     if (brief.chapterPurpose) lines.push(`Purpose: ${brief.chapterPurpose}`);
     lines.push(brief.body);
     if (brief.contextRefs && brief.contextRefs.length > 0) lines.push(`Context refs: ${brief.contextRefs.join(', ')}`);

@@ -10,7 +10,6 @@ export namespace Knowledge {
   export type EntityAlias = InferSelectModel<typeof entityAliases>;
   export type EntityRelationship = InferSelectModel<typeof entityRelationships>;
   export type EntityAppearance = InferSelectModel<typeof entityAppearances>;
-  export type RelationshipObservation = InferSelectModel<typeof relationshipObservations>;
   export type CanonFact = InferSelectModel<typeof canonFacts>;
   export type CharacterKnowledge = InferSelectModel<typeof characterKnowledge>;
   export type CharacterState = InferSelectModel<typeof characterStates>;
@@ -121,21 +120,6 @@ export const entityAppearances = pgTable(
   t => [primaryKey({ columns: [t.entityId, t.chapter] })],
 );
 
-export const relationshipObservations = pgTable(
-  'relationship_observations',
-  {
-    entityId: bigint('entity_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => entities.id, { onDelete: 'cascade' }),
-    projectId: bigint('project_id', { mode: 'bigint' }).notNull(),
-    targetKey: varchar('target_key').notNull(),
-    kind: varchar('kind').notNull(),
-    chapter: integer('chapter').notNull(),
-    note: text('note'),
-  },
-  t => [primaryKey({ columns: [t.entityId, t.targetKey, t.kind, t.chapter] })],
-);
-
 // Spoiler-grade canon lives here, never in bible prose or entity sheets: the drafter only ever sees a fact's `text` once the POV cast has ledgered it.
 // While hidden, the drafter sees `writerNote` alone (nothing when it is null); `constraintNote` is author-only and `terms` feeds the deterministic leak scan.
 export const canonFacts = pgTable(
@@ -208,7 +192,6 @@ export const entitiesRelations = relations(entities, ({ one, many }) => ({
   aliases: many(entityAliases),
   relationships: many(entityRelationships),
   appearances: many(entityAppearances),
-  observations: many(relationshipObservations),
 }));
 
 export const entityImagesRelations = relations(entityImages, ({ one }) => ({
@@ -225,10 +208,6 @@ export const entityRelationshipsRelations = relations(entityRelationships, ({ on
 
 export const entityAppearancesRelations = relations(entityAppearances, ({ one }) => ({
   entity: one(entities, { fields: [entityAppearances.entityId], references: [entities.id] }),
-}));
-
-export const relationshipObservationsRelations = relations(relationshipObservations, ({ one }) => ({
-  entity: one(entities, { fields: [relationshipObservations.entityId], references: [entities.id] }),
 }));
 
 export const canonFactsRelations = relations(canonFacts, ({ one, many }) => ({

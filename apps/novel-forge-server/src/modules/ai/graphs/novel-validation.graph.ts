@@ -31,7 +31,7 @@ export interface ValidationServices {
   checkpointer: BaseCheckpointSaver;
 }
 
-interface WindowSpec {
+export interface WindowSpec {
   from: number;
   to: number;
 }
@@ -56,8 +56,18 @@ const NovelValidationAnnotation = Annotation.Root({
 
 type ValidationState = typeof NovelValidationAnnotation.State;
 
-const DEFAULT_WINDOW_SIZE = 20;
+const WINDOW_CHAPTERS = 20;
 const logger = Logger.getLogger(APP_NAME, 'novel-validation.graph');
+
+/** Fixed windows from the first finalized chapter to the last; `chapters` is ascending. */
+export function validationWindows(chapters: readonly number[]): WindowSpec[] {
+  const first = chapters[0];
+  const last = chapters.at(-1);
+  if (first === undefined || last === undefined) return [];
+  const windows: WindowSpec[] = [];
+  for (let from = first; from <= last; from += WINDOW_CHAPTERS) windows.push({ from, to: Math.min(from + WINDOW_CHAPTERS - 1, last) });
+  return windows;
+}
 
 function tryParseValidation(raw: string): ValidationOutput | null {
   try {
@@ -86,27 +96,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       columns: { number: true },
     });
 
-    if (chapterRows.length === 0) return { windows: [], nodeTrace: ['planWindows'] };
-
-    const volumeRows = await db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal });
-
-    const windows: WindowSpec[] = [];
-    const chapterNums = chapterRows.map(c => c.number);
-    const minCh = chapterNums[0] ?? 1;
-    const maxCh = chapterNums[chapterNums.length - 1] ?? 1;
-
-    if (volumeRows.length > 0) {
-      for (const vol of volumeRows) {
-        const from = vol.startChapter ?? minCh;
-        const to = vol.endChapter ?? maxCh;
-        if (from <= maxCh) windows.push({ from, to: Math.min(to, maxCh) });
-      }
-    } else {
-      // Default: slide by DEFAULT_WINDOW_SIZE.
-      for (let from = minCh; from <= maxCh; from += DEFAULT_WINDOW_SIZE) {
-        windows.push({ from, to: Math.min(from + DEFAULT_WINDOW_SIZE - 1, maxCh) });
-      }
-    }
+    const windows = validationWindows(chapterRows.map(c => c.number));
 
     logger.debug('validation planWindows', { runId: state.runId, chapters: chapterRows.length, windows: windows.length });
     return { windows, nodeTrace: ['planWindows'] };

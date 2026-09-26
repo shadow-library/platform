@@ -13,10 +13,7 @@ import {
   FixSchema,
   IllustrationComposeSchema,
   JudgeSchema,
-  PlanSchema,
-  validateArcCoverage,
   validateOutlineCoverage,
-  validatePlanContiguity,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
 import { resolveWordTarget, WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
@@ -152,30 +149,6 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('PlanSchema', () => {
-    it('rejects non-contiguous chapter spans', () => {
-      const vols = [
-        { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
-        { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 7, endChapter: 12 },
-      ];
-      const parsed = parseSchema(PlanSchema, vols);
-      expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(false);
-    });
-
-    it('accepts contiguous volumes', () => {
-      const vols = [
-        { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
-        { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 6, endChapter: 12 },
-      ];
-      const parsed = parseSchema(PlanSchema, vols);
-      expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(true);
-    });
-
-    it('rejects an empty plan so the repair ladder retries instead of persisting zero volumes', () => {
-      expect(validatePlanContiguity([])).toEqual(['plan must contain at least one volume']);
-    });
-  });
-
   describe('refinement prompt modules', () => {
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
       const messages = await PROMPT_REGISTRY['chat-refine'].template.formatMessages({
@@ -196,7 +169,7 @@ describe('Prompt modules', () => {
     });
 
     it('should tell every prompt that edits canon, plans, briefs or prose to remove by deleting', () => {
-      for (const key of ['chat-refine', 'premise-enhance', 'bible-audit', 'arc-plan', 'plan', 'outline', 'fix', 'revision'] as const) {
+      for (const key of ['chat-refine', 'premise-enhance', 'bible-audit', 'outline', 'fix', 'revision'] as const) {
         expect(PROMPT_REGISTRY[key].system).toContain(EDIT_BY_DELETION);
       }
     });
@@ -251,8 +224,10 @@ describe('Prompt modules', () => {
     it('binds the read-before-overwrite rule on every record-overwriting op', () => {
       const hub = HUB_INSTRUCTIONS;
       expect(hub).toContain('Chat context is an index, not the text');
-      for (const op of ['bible_document.upsert', 'volume.upsert', 'arc.upsert', 'brief.update', 'draft.update']) expect(hub).toContain(op);
-      for (const tool of ['get_bible_document', 'get_volume', 'get_arc', 'get_brief', 'get_draft']) expect(hub).toContain(tool);
+      for (const op of ['bible_document.upsert', 'volume.upsert', 'brief.update', 'draft.update']) expect(hub).toContain(op);
+      for (const tool of ['get_bible_document', 'get_volume', 'get_brief', 'get_draft']) expect(hub).toContain(tool);
+      expect(hub).not.toContain('arc.upsert');
+      expect(hub).not.toContain('get_arc');
       expect(hub).toContain('Lookups and a changeSet never share a response');
     });
 
@@ -268,26 +243,6 @@ describe('Prompt modules', () => {
     it('validates chat-refine output shape', () => {
       expect(parseSchema(ChatRefineSchema, { reply: 'thoughts on pacing' }).success).toBe(true);
       expect(parseSchema(ChatRefineSchema, { changeSet: [] }).success).toBe(false);
-    });
-
-    it('arc coverage validator enforces contiguity and exact range', () => {
-      const arc = (arcKey: string, chapterStart: number, chapterEnd: number) => ({
-        arcKey,
-        title: 't',
-        objective: 'o',
-        escalation: 'e',
-        payoff: 'p',
-        hook: 'h',
-        chapterStart,
-        chapterEnd,
-        cast: [],
-        body: 'b',
-        ideas: [],
-      });
-      expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 6, 12)], 1, 12)).toEqual([]);
-      expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 7, 12)], 1, 12)[0]).toMatch(/must start at chapter 6/);
-      expect(validateArcCoverage([arc('a1', 2, 12)], 1, 12)[0]).toMatch(/must start at chapter 1/);
-      expect(validateArcCoverage([arc('a1', 1, 11)], 1, 12)[0]).toMatch(/must end at chapter 12/);
     });
   });
 

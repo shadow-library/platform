@@ -41,7 +41,6 @@ export interface BibleReadinessInput {
   entities: readonly ReadinessEntity[];
   facts: readonly ReadinessFact[];
   volumes: readonly ReadinessVolume[];
-  arcCount: number;
 }
 
 export interface BibleReadinessDimension {
@@ -103,11 +102,11 @@ const RECORD_COVERAGE: Partial<Record<BibleStage, RecordCoverage>> = {
     },
   },
   volumes: {
-    hint: () => 'volume records with objectives',
+    hint: () => 'volume records with goals',
     coveredBy: input => {
       const planned = input.volumes.filter(volume => hasText(volume.objective)).length;
       if (planned === 0) return null;
-      return `${plural(planned, 'volume')} with objectives and ${plural(input.arcCount, 'arc')}`;
+      return `${plural(planned, 'volume')} with goals`;
     },
   },
 };

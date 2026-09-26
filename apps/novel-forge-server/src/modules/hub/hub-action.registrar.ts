@@ -5,8 +5,6 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
-import { ArcService } from '../bible/arc/arc.service';
-import { VolumeService } from '../bible/volume/volume.service';
 import { GenerationService } from '../generation/generation.service';
 import { type ActionExecutionContext, type ActionExecutionResult, ActionExecutorRegistry, ProposalApplyService } from '../refinement';
 import { RefineService } from '../refinement/refine.service';
@@ -24,36 +22,16 @@ export class HubActionRegistrar {
     private readonly registry: ActionExecutorRegistry,
     private readonly generationService: GenerationService,
     private readonly refineService: RefineService,
-    private readonly volumeService: VolumeService,
-    private readonly arcService: ArcService,
     private readonly proposalApplyService: ProposalApplyService,
   ) {}
 
   onModuleInit(): void {
     const registry = this.registry;
 
-    registry.register('action.generate_chapters', async (projectId, action) => {
-      if (action.op !== 'action.generate_chapters') throw AppError.internal('executor misrouted');
-      const job = await this.generationService.generate(projectId, { limit: action.count });
-      return { summary: `enqueued generation of ${action.count} chapter(s)`, jobId: job.jobId };
-    });
-
-    registry.register('action.plan_volumes', async (projectId, action) => {
-      if (action.op !== 'action.plan_volumes') throw AppError.internal('executor misrouted');
-      const result = await this.generationService.plan(projectId, { volumeCount: action.volumeCount, chaptersPerVolume: action.chaptersPerVolume });
-      return { summary: `planned ${result.volumes.length} volume(s)` };
-    });
-
-    registry.register('action.plan_arcs', async (projectId, action, ctx) => {
-      if (action.op !== 'action.plan_arcs') throw AppError.internal('executor misrouted');
-      const result = await this.refineService.planArcs(projectId, action.volumeKey, { arcCount: action.arcCount });
-      return this.settleChainProposal(projectId, result.proposal, result.runId, `planned arcs for ${action.volumeKey}`, ctx);
-    });
-
-    registry.register('action.outline_arc', async (projectId, action) => {
-      if (action.op !== 'action.outline_arc') throw AppError.internal('executor misrouted');
-      const result = await this.generationService.outlineArc(projectId, action.arcKey, {});
-      return { summary: `outlined ${result.briefs.length} brief(s) for ${action.arcKey}` };
+    registry.register('action.generate_chapter', async (projectId, action) => {
+      if (action.op !== 'action.generate_chapter') throw AppError.internal('executor misrouted');
+      const job = await this.generationService.generateChapter(projectId, action.chapter);
+      return { summary: `enqueued generation of chapter ${action.chapter}`, jobId: job.jobId };
     });
 
     registry.register('action.audit_bible', async (projectId, _action, ctx) => {
@@ -88,17 +66,6 @@ export class HubActionRegistrar {
       }
       await this.generationService.approveDraft(projectId, action.chapter, { revision: action.revision });
       return { summary: `approved chapter ${action.chapter} draft at revision ${action.revision}` };
-    });
-
-    registry.register('action.approve_volume_plan', async projectId => {
-      await this.volumeService.approve(projectId);
-      return { summary: 'approved the volume plan' };
-    });
-
-    registry.register('action.approve_arcs', async (projectId, action) => {
-      if (action.op !== 'action.approve_arcs') throw AppError.internal('executor misrouted');
-      await this.arcService.approve(projectId, action.volumeKey);
-      return { summary: `approved arcs of ${action.volumeKey}` };
     });
 
     registry.register('action.validate', async (projectId, action) => {

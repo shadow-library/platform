@@ -239,7 +239,6 @@ export class ChatService {
     switch (scopeType) {
       case 'project':
       case 'novel':
-      case 'volume_plan':
         return null;
       case 'bible_document': {
         const [section = '', ...rest] = value.split('/');
@@ -255,16 +254,10 @@ export class ChatService {
         if (!doc) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
-      case 'volume':
-      case 'arc_plan': {
+      case 'volume': {
         const volume =
           scopeRef?.startsWith('volume:') && (await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, value)) }));
         if (!volume) throw AppErrorCode.CHT_003.create();
-        return scopeRef as string;
-      }
-      case 'arc': {
-        const arc = scopeRef?.startsWith('arc:') && (await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, value)) }));
-        if (!arc) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
       case 'brief': {

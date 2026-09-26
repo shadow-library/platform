@@ -24,7 +24,6 @@ export class AppErrorCode extends ServerErrorCode {
    * Project Errors
    */
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
-  static readonly PRJ_003 = AppErrorCode.badRequest('PRJ_003', 'Operation not valid for this project kind');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
 
@@ -43,13 +42,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHP_006 = AppErrorCode.badRequest('CHP_006', 'Chapter is not finalized canon — amend is only available once the chapter is finalized');
   static readonly CHP_007 = AppErrorCode.badRequest('CHP_007', 'Draft has no prose yet — import or generate the chapter before summarizing it');
   static readonly CHP_008 = AppErrorCode.conflict('CHP_008', 'Chapter is locked — finalized prose changes only through amend');
-
-  /*!
-   * Planning Errors
-   */
-  static readonly PLN_001 = AppErrorCode.badRequest('PLN_001', 'Volume plan is not approved — approve all volumes before generating');
-  static readonly PLN_002 = AppErrorCode.badRequest('PLN_002', 'Every volume needs a target chapter count (or an explicit chapter range) before the plan can be approved');
-  static readonly PLN_003 = AppErrorCode.badRequest('PLN_003', 'Volume plan approval is never applied automatically — select the approval step and apply it deliberately');
 
   /*!
    * Brief Errors
@@ -71,12 +63,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_008 = AppErrorCode.badRequest('DRF_008', 'Chapter is isolated — continuity proposals and bible extraction are unavailable for isolated chapters');
   static readonly DRF_009 = AppErrorCode.badRequest('DRF_009', 'Draft approval is never applied automatically — select the approval step and apply it deliberately');
   static readonly DRF_010 = AppErrorCode.conflict('DRF_010', 'A generation job is already running for this project — wait for it to finish before regenerating a chapter');
-  static readonly DRF_011 = AppErrorCode.badRequest('DRF_011', 'Chapter {chapter} cannot be regenerated before chapter {blocker} is drafted — chapters are generated in order');
+  static readonly DRF_011 = AppErrorCode.badRequest('DRF_011', 'Chapter {chapter} cannot be generated before chapter {blocker} is drafted — chapters are generated in order');
   static readonly DRF_012 = AppErrorCode.badRequest(
     'DRF_012',
     'Chapter {chapter} cannot be regenerated while chapter {blocker} is an unfinalized external chapter — fill and finalize it first',
   );
   static readonly DRF_013 = AppErrorCode.conflict('DRF_013', 'This chapter changed while you were working on it. Reload it and try again.');
+  static readonly DRF_014 = AppErrorCode.badRequest('DRF_014', 'Chapter generation is never applied automatically — select the generation step and apply it deliberately');
+  static readonly DRF_015 = AppErrorCode.conflict('DRF_015', 'Chapter {chapter} already has a draft — regenerate it from the chapter itself');
 
   /*!
    * Finalize Errors
@@ -138,6 +132,7 @@ export class AppErrorCode extends ServerErrorCode {
    * Volume Errors
    */
   static readonly VOL_001 = AppErrorCode.notFound('VOL_001', 'Volume not found');
+  static readonly VOL_002 = AppErrorCode.conflict('VOL_002', 'Volume is still assigned to the plan for chapter {chapter} — move or remove the chapter plans in it first');
 
   /*!
    * Bible Document Errors
@@ -149,15 +144,6 @@ export class AppErrorCode extends ServerErrorCode {
    * Job Errors
    */
   static readonly JOB_001 = AppErrorCode.notFound('JOB_001', 'Job not found');
-
-  /*!
-   * Arc Errors
-   */
-  static readonly ARC_001 = AppErrorCode.notFound('ARC_001', 'Arc not found');
-  static readonly ARC_002 = AppErrorCode.badRequest('ARC_002', 'Arcs must be contiguous, non-overlapping, and exactly cover the volume chapter range');
-  static readonly ARC_003 = AppErrorCode.badRequest('ARC_003', 'Volume plan is not approved or is missing target chapter counts — approve volumes before planning arcs');
-  static readonly ARC_004 = AppErrorCode.badRequest('ARC_004', 'Arcs are not approved — approve all arcs of the volume before outlining');
-  static readonly ARC_005 = AppErrorCode.badRequest('ARC_005', 'Arc approval is never applied automatically — select the approval step and apply it deliberately');
 
   /*!
    * Chat Errors
@@ -207,13 +193,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_002 = AppErrorCode.badRequest('FCT_002', 'Unknown entity key referenced by the knowledge operation');
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
   static readonly FCT_004 = AppErrorCode.conflict('FCT_004', 'A canon fact with this key already exists in the project');
-
-  /*!
-   * Plan Import Errors
-   */
-  static readonly IMP_001 = AppErrorCode.conflict('IMP_001', 'Project already contains plan data for a collection in this bundle — pass overwrite to replace it');
-  static readonly IMP_002 = AppErrorCode.badRequest('IMP_002', 'Unsupported bundle format or version');
-  static readonly IMP_003 = AppErrorCode.badRequest('IMP_003', 'Overwrite is not allowed once drafts or chapters exist — edit the plan in the app instead');
 
   /*!
    * Decision Ledger Errors

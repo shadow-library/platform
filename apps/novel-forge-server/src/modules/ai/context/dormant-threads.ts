@@ -1,7 +1,6 @@
 import { type Story } from '@server/database';
 
-// Chapters since a thread was last touched by continuity extraction before arc planning should flag
-// it — long enough that ordinary pacing (a thread resting a chapter or two) never trips it.
+// Chapters since a thread was last touched by continuity extraction before it is flagged dormant — long enough that ordinary pacing (a thread resting a chapter or two) never trips it.
 export const DORMANT_THREAD_THRESHOLD_CHAPTERS = 6;
 
 type DormantThreadKind = 'thread' | 'mystery';
@@ -42,7 +41,7 @@ function evaluate(kind: DormantThreadKind, candidates: DormantCandidate[], curre
 /**
  * Flags open, non-`intentionallyOpen` threads/mysteries that either haven't been advanced by
  * continuity extraction in `DORMANT_THREAD_THRESHOLD_CHAPTERS` chapters ("dormant") or have passed
- * an authored `payoffWindow` while still open ("overdue") — so arc planning can deliberately address
+ * an authored `payoffWindow` while still open ("overdue") — so planning can deliberately address
  * them instead of letting them silently rot for the rest of the story.
  */
 export function computeDormantThreads(threads: Story.PlotThread[], mysteries: Story.Mystery[], currentChapter: number): DormantThreadEntry[] {
@@ -67,7 +66,7 @@ export function computeDormantThreads(threads: Story.PlotThread[], mysteries: St
   return [...evaluate('thread', threadCandidates, currentChapter), ...evaluate('mystery', mysteryCandidates, currentChapter)];
 }
 
-/** Renders `computeDormantThreads`' output for the arc-planning pack; '' when nothing is dormant. */
+/** Renders `computeDormantThreads`' output for a planning pack; '' when nothing is dormant. */
 export function renderDormantThreads(entries: DormantThreadEntry[]): string {
   if (entries.length === 0) return '';
   const lines = entries.map(e => {

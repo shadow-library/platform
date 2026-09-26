@@ -1,30 +1,25 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import {
   briefContentHash,
-  type BriefSceneInput,
   declaredDraftFields,
   isFinalizable,
   ledgerBriefReveals,
   markDescendantDraftsStale,
+  nearestVolumeKey,
   refusedDraftWriteError,
-  renderBriefBody,
-  renderSceneEvents,
   revokeProvisionalReveals,
   selectGenerationBatch,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
+import { type Ai, type Generation, type Job, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
 
-import { renderBibleDigest } from '../ai/context/bible-docs';
-import { loadRevealGuard, sanitiseBriefReveals, type ScheduledReveal } from '../ai/context/canon-guard';
-import { ContextAssembler, OUTLINE_BUDGET } from '../ai/context/context-assembler.service';
-import { planningBibleText } from '../ai/context/organised-timeline';
+import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { loadWriterBrief } from '../ai/context/writer-brief';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
@@ -32,24 +27,21 @@ import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { buildOutlinePrompt, outlineWordTargetVars, PROMPT_REGISTRY } from '../ai/prompts';
+import { PROMPT_REGISTRY } from '../ai/prompts';
 import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
-import { type EpitomeOutput } from '../ai/schemas/epitome.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
-import { type OutlineOutput } from '../ai/schemas/outline.schema';
 import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
 import { loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
-import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
@@ -69,9 +61,6 @@ import {
   type GenerateBody,
   type GenerateUnrestrictedBody,
   type ImportDraftBody,
-  type OutlineArcBody,
-  type OutlineBody,
-  type PlanBody,
   type ReviseDraftBody,
   type SeedFromBriefBody,
   type UpdateBriefBody,
@@ -160,12 +149,9 @@ export interface JobEnqueueResult {
   target: string;
   /** Set when an unfilled external-write slot truncated the batch before its limit. */
   stoppedAtExternalChapter?: number;
+  /** Set when a chapter with neither a draft nor finalized prose truncated the batch before its limit. */
+  stoppedAtUnwrittenChapter?: number;
 }
-
-// The volume plan is one call whose only other inputs are the skeleton and the brief, so it can afford most of a bible: a
-// premise or plot document runs a few thousand tokens and stays whole, while no single document can starve the rest.
-export const PLAN_BIBLE_BUDGET = 24_000;
-export const PLAN_BIBLE_DOC_TOKENS = 4_000;
 
 /**
  * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
@@ -178,20 +164,12 @@ const AUTHOR_FACING_GRAPHS = [
   'chat-turn',
   'premise-enhance',
   'bible-audit',
-  'arc-plan',
   'illustration',
   'chapter-generation',
   'chapter-finalization',
   'bible-builder',
   'novel-validation',
 ] as const;
-
-/**
- * Whole-book `outline()` is the legacy planning path — arc-scoped `outlineArc` (gated on approved
- * arcs) is the intended production path per the planning hierarchy. This cap keeps an omitted or
- * oversized `count` from silently planning the entire unwritten novel in one model call.
- */
-export const MAX_WHOLE_BOOK_OUTLINE_SPAN = 25;
 
 @Injectable()
 export class GenerationService {
@@ -229,331 +207,6 @@ export class GenerationService {
     if (!project) throw AppErrorCode.PRJ_001.create();
   }
 
-  async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
-    const [project, bibleDocs, ledger] = await Promise.all([
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
-      this.contextAssembler.activeLedger(projectId),
-    ]);
-    if (!project) throw AppErrorCode.PRJ_001.create();
-
-    // A novel with no skeleton is the norm; a blank "Novel skeleton:" line makes weak models
-    // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.
-    const derived = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
-    const skeleton = body.skeleton ?? (derived || 'No skeleton available — derive the character arcs and escalation curve from the brief.');
-
-    // Same fallback pattern as `skeleton` above — an explicit placeholder rather than a silently empty var, so a
-    // weak model doesn't misread a blank "Bible:" section as "no canon exists" when it just hasn't been built yet.
-    const bibleText = planningBibleText(bibleDocs, ledger, docs => {
-      const digest = renderBibleDigest(docs, { totalTokens: PLAN_BIBLE_BUDGET, perDocTokens: PLAN_BIBLE_DOC_TOKENS });
-      if (digest.omitted.length > 0) this.logger.info('plan: bible documents left out for budget', { projectId, omitted: digest.omitted, truncated: digest.truncated });
-      return digest.text;
-    });
-    const bibleDocsText = bibleText || '(no bible written yet)';
-
-    this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
-    const { result: volumeSpecs } = await this.workflowRunService.runChain(projectId, 'plan', 'volumes', body, async runId => {
-      const ctx = { projectId, runId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
-      const planOutput = await this.modelRouter.structured(
-        PROMPT_REGISTRY.plan,
-        { skeleton, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume, projectBrief: project.brief ?? '', bibleDocs: bibleDocsText },
-        ctx,
-        project as never,
-      );
-
-      return planOutput as {
-        volumeKey: string;
-        ordinal: number;
-        title: string;
-        objective: string;
-        conflict: string;
-        payoff: string;
-        startChapter: number;
-        endChapter: number;
-        cast?: string[];
-      }[];
-    });
-
-    const upserted = await Promise.all(
-      volumeSpecs.map(v =>
-        this.db
-          .insert(schema.volumes)
-          .values({
-            projectId,
-            volumeKey: v.volumeKey,
-            ordinal: v.ordinal,
-            title: v.title,
-            objective: v.objective,
-            conflict: v.conflict,
-            payoff: v.payoff,
-            startChapter: v.startChapter,
-            endChapter: v.endChapter,
-            targetChapterCount: v.endChapter - v.startChapter + 1,
-            cast: v.cast as never,
-            status: 'draft',
-          })
-          .onConflictDoUpdate({
-            target: [schema.volumes.projectId, schema.volumes.volumeKey],
-            set: {
-              ordinal: v.ordinal,
-              title: v.title,
-              objective: v.objective,
-              conflict: v.conflict,
-              payoff: v.payoff,
-              startChapter: v.startChapter,
-              endChapter: v.endChapter,
-              targetChapterCount: v.endChapter - v.startChapter + 1,
-              cast: v.cast as never,
-              status: 'draft',
-              updatedAt: new Date(),
-            },
-          })
-          .returning()
-          .then(rows => rows[0]),
-      ),
-    );
-
-    this.logger.info('plan: volumes upserted', { projectId, volumes: upserted.filter(Boolean).length });
-    return { volumes: upserted.filter((v): v is Plan.Volume => v != null) };
-  }
-
-  approvePlan(projectId: bigint): Promise<{ volumesApproved: number; approved: boolean }> {
-    return approveVolumePlan(this.db, projectId);
-  }
-
-  async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertProjectExists(projectId);
-    const volumes = await this.db.query.volumes.findMany({
-      where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')),
-      orderBy: asc(schema.volumes.ordinal),
-    });
-
-    const start = body.start ?? 1;
-    const requestedCount = body.count ?? volumes.reduce((acc, v) => acc + ((v.endChapter ?? 0) - (v.startChapter ?? 0) + 1), 0);
-    const count = Math.min(requestedCount, MAX_WHOLE_BOOK_OUTLINE_SPAN);
-    if (requestedCount > MAX_WHOLE_BOOK_OUTLINE_SPAN) {
-      this.logger.warn('outline: requested span exceeds the whole-book outline cap — clamping', { projectId, requestedCount, cap: MAX_WHOLE_BOOK_OUTLINE_SPAN });
-    }
-    const end = start + count - 1;
-
-    const relevantVolumes = volumes.filter(v => v.startChapter !== null && v.endChapter !== null && v.endChapter >= start && v.startChapter <= end);
-    if (relevantVolumes.length === 0) {
-      this.logger.debug('outline: no volumes overlap the requested range — nothing to outline', { projectId, start, end });
-      return { briefs: [] };
-    }
-    this.logger.info('outline: generating briefs', { projectId, start, end, volumes: relevantVolumes.length });
-    const focusEntityKeys = relevantVolumes.flatMap(v => (Array.isArray(v.cast) ? v.cast.filter((key): key is string => typeof key === 'string') : []));
-    const [catalog, guard, project] = await Promise.all([
-      this.contextAssembler.catalog(projectId, { focusEntityKeys, documents: true, maxTokens: OUTLINE_BUDGET, span: { start, end } }),
-      loadRevealGuard(this.db, projectId, { start, end }),
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { wordTargetMin: true, wordTargetMax: true } }),
-    ]);
-    const wordTarget = resolveWordTarget(project);
-
-    const volumePlan = relevantVolumes
-      .map(
-        v =>
-          `## ${v.title ?? v.volumeKey} (${v.volumeKey})\nChs ${v.startChapter}–${v.endChapter}\nObjective: ${v.objective ?? ''}\nConflict: ${v.conflict ?? ''}\nPayoff: ${v.payoff ?? ''}`,
-      )
-      .join('\n\n');
-
-    const prompt = buildOutlinePrompt(start, end, wordTarget, guard.advised);
-    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const vars = { catalog, volumePlan, startChapter: start, endChapter: end, extraContext: body.context ?? '', ...outlineWordTargetVars(wordTarget) };
-    const rawOutline = await this.modelRouter.structured(prompt, vars, ctx);
-    const outlineOutput = this.withheldEarlyReveals(projectId, rawOutline, guard.all);
-
-    const chapters = outlineOutput as unknown as {
-      chapter: number;
-      volumeKey: string;
-      title: string;
-      objective: string;
-      scenes: BriefSceneInput[];
-      requiredContext: string[];
-      pov?: string;
-      continuesIntoNextChapter?: boolean;
-      startsFromPreviousChapter?: boolean;
-      handoffBeat?: string;
-      endingContract?: Record<string, unknown>;
-      knowledgeContract?: Record<string, unknown>;
-      chapterPurpose?: string;
-      readerValue?: string[];
-      repetitionRisks?: string[];
-      densityRisk?: string;
-    }[];
-
-    await this.dropUnresolvedContextRefs(projectId, chapters);
-
-    const { chapters: protectedChapters, briefs: preservedBriefs } = await this.protectedBriefsInRange(projectId, start, end);
-    const upserted = await Promise.all(
-      chapters.map(c => {
-        if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
-
-        const briefBody = renderBriefBody({ ...c, events: renderSceneEvents(c.scenes) });
-        const values = {
-          volumeKey: c.volumeKey,
-          title: c.title,
-          body: briefBody,
-          contextRefs: c.requiredContext as never,
-          pov: c.pov ?? null,
-          endingContract: c.endingContract,
-          knowledgeContract: c.knowledgeContract ?? null,
-          chapterPurpose: c.chapterPurpose ?? null,
-          readerValue: c.readerValue ?? null,
-          repetitionRisks: c.repetitionRisks ?? null,
-          densityRisk: c.densityRisk?.trim() || null,
-          guidance: null,
-          staleReason: null,
-          handEdited: false,
-        };
-        return this.db
-          .insert(schema.briefs)
-          .values({ projectId, chapter: c.chapter, ...values })
-          .onConflictDoUpdate({ target: [schema.briefs.projectId, schema.briefs.chapter], set: { ...values, updatedAt: new Date() } })
-          .returning()
-          .then(rows => rows[0]);
-      }),
-    );
-
-    if (protectedChapters.size > 0) this.logger.info('outline: preserved protected briefs', { projectId, chapters: [...protectedChapters] });
-    this.logger.info('outline: briefs upserted', { projectId, briefs: upserted.filter(Boolean).length });
-    const briefs = upserted.filter(Boolean) as Generation.Brief[];
-    await this.stagePluginBriefPolicy(projectId, briefs);
-    return { briefs };
-  }
-
-  /**
-   * Arc-scoped outlining: briefs for exactly the arc's chapter range, with
-   * the arc's escalation/hook and the next arc's intent in view so ending contracts chain across the
-   * boundary. Gated on the whole volume's arcs being approved.
-   */
-  async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertProjectExists(projectId);
-    const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
-    if (!arc) throw AppErrorCode.ARC_001.create();
-    if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
-
-    const latestFinalized = await this.db.query.chapters.findFirst({
-      where: and(
-        eq(schema.chapters.projectId, projectId),
-        eq(schema.chapters.status, 'done'),
-        gte(schema.chapters.number, arc.chapterStart),
-        lte(schema.chapters.number, arc.chapterEnd),
-      ),
-      orderBy: desc(schema.chapters.number),
-      columns: { number: true },
-    });
-    // Reconciliation re-outlines mid-arc, so the pack must be assembled as of what has actually been
-    // written inside the arc — anchoring on chapterStart would hide every chapter the arc already spent.
-    const asOfChapter = latestFinalized ? latestFinalized.number + 1 : arc.chapterStart;
-
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: asOfChapter });
-    const span = { start: arc.chapterStart, end: arc.chapterEnd };
-    const [contextPack, siblings, project, guard] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, asOfChapter, { policy, span }),
-      this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      loadRevealGuard(this.db, projectId, span),
-    ]);
-    if (siblings.some(a => a.status !== 'approved')) throw AppErrorCode.ARC_004.create();
-    this.logger.info('outlineArc: generating briefs for arc', { projectId, arcKey, chapterStart: arc.chapterStart, chapterEnd: arc.chapterEnd });
-
-    const nextArc = siblings.find(a => a.ordinal > arc.ordinal);
-    const catalog = contextPack.rendered;
-    // The volume objective/conflict/payoff is already covered by forOutline's `volume_objective`
-    // section above, so it is deliberately left out of this arc-specific block to avoid duplication.
-    const volumePlan = [
-      `## Arc: ${arc.title ?? arc.arcKey} (${arc.arcKey})\nChs ${arc.chapterStart}–${arc.chapterEnd}\nObjective: ${arc.objective ?? ''}\nEscalation: ${arc.escalation ?? ''}\nPayoff: ${arc.payoff ?? ''}\nArc hook (the final chapter's handoff): ${arc.hook ?? ''}`,
-      nextArc ? `## Next arc intent (contracts must chain into it): ${nextArc.objective ?? ''} (opens at ch ${nextArc.chapterStart ?? '?'})` : '',
-      arc.body ? `## Arc material\n${arc.body}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-
-    const wordTarget = resolveWordTarget(project);
-    const prompt = buildOutlinePrompt(arc.chapterStart, arc.chapterEnd, wordTarget, guard.advised);
-    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const rawOutline = await this.modelRouter.structured(
-      prompt,
-      { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '', ...outlineWordTargetVars(wordTarget) },
-      ctx,
-      project as never,
-      policy,
-    );
-    const outlineOutput = this.withheldEarlyReveals(projectId, rawOutline, guard.all);
-
-    const chapters = (
-      outlineOutput as unknown as {
-        chapter: number;
-        volumeKey: string;
-        title: string;
-        objective: string;
-        scenes: BriefSceneInput[];
-        requiredContext: string[];
-        pov?: string;
-        endingContract?: Record<string, unknown>;
-        knowledgeContract?: Record<string, unknown>;
-        chapterPurpose?: string;
-        readerValue?: string[];
-        repetitionRisks?: string[];
-        densityRisk?: string;
-      }[]
-    ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
-
-    await this.dropUnresolvedContextRefs(projectId, chapters);
-
-    const { chapters: protectedChapters, briefs: preservedBriefs } = await this.protectedBriefsInRange(projectId, arc.chapterStart, arc.chapterEnd);
-    const upserted = await Promise.all(
-      chapters.map(c => {
-        if (protectedChapters.has(c.chapter)) return Promise.resolve(preservedBriefs.get(c.chapter));
-
-        const briefBody = renderBriefBody({ ...c, events: renderSceneEvents(c.scenes) });
-        const values = {
-          volumeKey: arc.volumeKey,
-          arcKey,
-          title: c.title,
-          body: briefBody,
-          contextRefs: c.requiredContext as never,
-          pov: c.pov ?? null,
-          endingContract: c.endingContract,
-          knowledgeContract: c.knowledgeContract ?? null,
-          chapterPurpose: c.chapterPurpose ?? null,
-          readerValue: c.readerValue ?? null,
-          repetitionRisks: c.repetitionRisks ?? null,
-          densityRisk: c.densityRisk?.trim() || null,
-          guidance: null,
-          staleReason: null,
-          handEdited: false,
-        };
-        return this.db
-          .insert(schema.briefs)
-          .values({ projectId, chapter: c.chapter, ...values })
-          .onConflictDoUpdate({ target: [schema.briefs.projectId, schema.briefs.chapter], set: { ...values, updatedAt: new Date() } })
-          .returning()
-          .then(rows => rows[0]);
-      }),
-    );
-
-    if (protectedChapters.size > 0) this.logger.info('outlineArc: preserved protected briefs', { projectId, arcKey, chapters: [...protectedChapters] });
-    const briefs = upserted.filter(Boolean) as Generation.Brief[];
-    await this.stagePluginBriefPolicy(projectId, briefs);
-    return { briefs };
-  }
-
-  private withheldEarlyReveals(projectId: bigint, outline: OutlineOutput, reveals: readonly ScheduledReveal[]): OutlineOutput {
-    const { briefs, sanitised } = sanitiseBriefReveals(outline, reveals);
-    if (sanitised.length > 0) this.logger.warn('outline: sanitised briefs that surfaced facts before their reveal chapter', { projectId, sanitised });
-    return briefs;
-  }
-
-  private async stagePluginBriefPolicy(projectId: bigint, briefs: Generation.Brief[]): Promise<void> {
-    const proposal = await this.pluginProposals.stageBriefPolicy(projectId, briefs).catch(err => {
-      this.logger.warn('brief policy staging failed', { projectId, err });
-      return undefined;
-    });
-    if (proposal) this.logger.info('brief policy staged a proposal', { projectId, proposalId: proposal.id });
-  }
-
   private async stagePluginCanon(projectId: bigint): Promise<void> {
     const staged = await this.pluginProposals.augmentEnabled(projectId).catch(err => {
       this.logger.warn('canon augmentation staging failed', { projectId, err });
@@ -562,56 +215,10 @@ export class GenerationService {
     if (staged.length > 0) this.logger.info('canon augmentation staged proposals', { projectId, proposalIds: staged.map(proposal => proposal.id) });
   }
 
-  /**
-   * Chapters a re-outline must never overwrite: a human authored the brief, the chapter is already
-   * written canon, or prose has been drafted against the brief as it stands — rewriting the plan under
-   * an existing draft leaves the two disagreeing with nothing to reconcile them. The briefs map carries
-   * the rows as they stand so callers still see current state — a finalized chapter may have no brief
-   * row at all, hence the separate chapter set.
-   */
-  private async protectedBriefsInRange(projectId: bigint, chapterStart: number, chapterEnd: number): Promise<{ chapters: Set<number>; briefs: Map<number, Generation.Brief> }> {
-    const [existing, finalized, drafted] = await Promise.all([
-      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, chapterStart), lte(schema.briefs.chapter, chapterEnd)) }),
-      this.db.query.chapters.findMany({
-        where: and(
-          eq(schema.chapters.projectId, projectId),
-          eq(schema.chapters.status, 'done'),
-          gte(schema.chapters.number, chapterStart),
-          lte(schema.chapters.number, chapterEnd),
-        ),
-        columns: { number: true },
-      }),
-      this.db.query.drafts.findMany({
-        where: and(eq(schema.drafts.projectId, projectId), gte(schema.drafts.chapter, chapterStart), lte(schema.drafts.chapter, chapterEnd)),
-        columns: { chapter: true },
-      }),
-    ]);
-
-    const chapters = new Set(finalized.map(c => c.number));
-    for (const draft of drafted) chapters.add(draft.chapter);
-    for (const brief of existing) if (brief.handEdited) chapters.add(brief.chapter);
-    return { chapters, briefs: new Map(existing.filter(b => chapters.has(b.chapter)).map(b => [b.chapter, b])) };
-  }
-
-  /** Repairs outliner briefs in place rather than failing the outline call over one bad ref. */
-  private async dropUnresolvedContextRefs(projectId: bigint, briefs: { chapter: number; requiredContext: string[] }[]): Promise<void> {
-    await Promise.all(
-      briefs.map(async brief => {
-        if (brief.requiredContext.length === 0) return;
-        const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, brief.requiredContext);
-        if (dropped.length === 0) return;
-        brief.requiredContext = kept;
-        this.logger.warn('outline: dropped context refs', { projectId, chapter: brief.chapter, dropped });
-      }),
-    );
-  }
-
-  listBriefs(
-    projectId: bigint,
-  ): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'densityRisk' | 'writeMode' | 'insertedAt' | 'updatedAt'>[]> {
+  listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'title' | 'staleReason' | 'densityRisk' | 'writeMode' | 'insertedAt' | 'updatedAt'>[]> {
     return this.db.query.briefs.findMany({
       where: eq(schema.briefs.projectId, projectId),
-      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, densityRisk: true, writeMode: true, insertedAt: true, updatedAt: true },
+      columns: { chapter: true, volumeKey: true, title: true, staleReason: true, densityRisk: true, writeMode: true, insertedAt: true, updatedAt: true },
       orderBy: asc(schema.briefs.chapter),
     });
   }
@@ -639,10 +246,11 @@ export class GenerationService {
         .where(and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)))
         .for('update');
       const revision = (existing?.revision ?? 0) + 1;
-      const contentHash = briefContentHash({ ...existing, chapter, ...edits });
+      const volumeKey = existing ? existing.volumeKey : await nearestVolumeKey(tx, projectId, chapter);
+      const contentHash = briefContentHash({ ...existing, chapter, volumeKey, ...edits });
       const [upserted] = await tx
         .insert(schema.briefs)
-        .values({ knowledgeContract: null, ...edits, projectId, chapter, body: body.body, revision, contentHash, handEdited: true })
+        .values({ knowledgeContract: null, ...edits, projectId, chapter, volumeKey, body: body.body, revision, contentHash, handEdited: true })
         .onConflictDoUpdate({
           target: [schema.briefs.projectId, schema.briefs.chapter],
           set: { ...edits, revision, contentHash, handEdited: true, updatedAt: new Date() },
@@ -657,9 +265,6 @@ export class GenerationService {
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
     await this.assertProjectExists(projectId);
     const limit = body.limit ?? 1;
-
-    const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
-    if (approvedVolumes.length === 0) throw AppErrorCode.PLN_001.create();
 
     // Ordering guard: never run two generation streams at once. Overlapping streams both pick "the next
     // chapter" and persist drafts out of order (the cause of chapters landing as 9,10,11 with 1–8 missing).
@@ -676,9 +281,9 @@ export class GenerationService {
     if (contradiction) throw AppErrorCode.DRF_003.create();
 
     // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet,
-    // truncated at the first unfilled external-write slot (see `selectGenerationBatch`). Because each chapter
-    // is drafted before the next begins, generation only advances once the previous chapter is done — no gaps,
-    // no skipping ahead.
+    // truncated at the first unfilled external-write slot or at a chapter with no prose (see `selectGenerationBatch`).
+    // Because each chapter is drafted before the next begins, generation only advances once the previous chapter is
+    // done — no gaps, no skipping ahead.
     const allBriefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
     const existingDrafts = await this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
     const finalizedChapters = await this.db.query.chapters.findMany({
@@ -688,18 +293,26 @@ export class GenerationService {
     const started = new Set(existingDrafts.map(d => d.chapter));
     const finalized = new Set(finalizedChapters.map(c => c.number));
 
-    const { chapters, stoppedAtExternalChapter } = selectGenerationBatch(allBriefs, started, finalized, limit);
+    const { chapters, stoppedAtExternalChapter, stoppedAtUnwrittenChapter, blockedChapter } = selectGenerationBatch(allBriefs, started, finalized, limit);
     if (chapters.length === 0 && allBriefs.length === 0) throw AppErrorCode.BRF_001.create();
+    if (chapters.length === 0 && stoppedAtUnwrittenChapter !== undefined) {
+      throw AppErrorCode.DRF_011.create({ chapter: String(blockedChapter), blocker: String(stoppedAtUnwrittenChapter) });
+    }
 
     const briefByChapter = new Map(allBriefs.map(brief => [brief.chapter, brief]));
     const staleChapters = chapters.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
     if (staleChapters.length > 0) throw AppErrorCode.BRF_002.create({ chapters: staleChapters.join(', ') });
 
-    await this.assertCoveringArcsApproved(projectId, chapters, approvedVolumes);
-
-    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter });
+    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter, stoppedAtUnwrittenChapter });
     const job = await this.enqueueGeneration(projectId, chapters, body);
-    return { ...job, stoppedAtExternalChapter };
+    return { ...job, stoppedAtExternalChapter, stoppedAtUnwrittenChapter };
+  }
+
+  /** Drafts one planned chapter that has no draft yet; replacing an existing draft stays with {@link regenerateChapter}, which the author starts. */
+  async generateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
+    const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)), columns: { id: true } });
+    if (draft) throw AppErrorCode.DRF_015.create({ chapter: String(chapter) });
+    return this.regenerateChapter(projectId, chapter);
   }
 
   /**
@@ -711,8 +324,7 @@ export class GenerationService {
   async regenerateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
     await this.assertProjectExists(projectId);
 
-    const [approvedVolumes, brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
-      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) }),
+    const [brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)), columns: { status: true } }),
       this.db.query.jobs.findFirst({
@@ -728,7 +340,6 @@ export class GenerationService {
       this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } }),
     ]);
 
-    if (approvedVolumes.length === 0) throw AppErrorCode.PLN_001.create();
     if (!brief) throw AppErrorCode.BRF_001.create();
     if (brief.staleReason) throw AppErrorCode.BRF_002.create({ chapters: String(chapter) });
     if (draft?.status === 'final') throw AppErrorCode.CHP_008.create();
@@ -737,28 +348,15 @@ export class GenerationService {
 
     const earlierDrafts = new Set(existingDrafts.map(d => d.chapter).filter(n => n !== chapter));
     const finalized = new Set(finalizedChapters.map(c => c.number));
-    const { chapters, stoppedAtExternalChapter } = selectGenerationBatch(allBriefs, earlierDrafts, finalized, 1);
+    if (finalized.has(chapter)) throw AppErrorCode.CHP_008.create();
+    const { chapters, stoppedAtExternalChapter, stoppedAtUnwrittenChapter } = selectGenerationBatch(allBriefs, earlierDrafts, finalized, 1);
     if (stoppedAtExternalChapter !== undefined) throw AppErrorCode.DRF_012.create({ chapter: String(chapter), blocker: String(stoppedAtExternalChapter) });
+    if (stoppedAtUnwrittenChapter !== undefined) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(stoppedAtUnwrittenChapter) });
     const [next] = chapters;
     if (next !== chapter) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(next) });
 
-    await this.assertCoveringArcsApproved(projectId, chapters, approvedVolumes);
-
     this.logger.info('regenerate: enqueueing chapter', { projectId, chapter, hadDraft: Boolean(draft) });
     return this.enqueueGeneration(projectId, chapters, { autoFix: true });
-  }
-
-  /** When a chapter's volume has arcs, the covering arc must be approved; arc-less volumes (e.g. source-imported ones) keep the volume-scoped path. */
-  private async assertCoveringArcsApproved(projectId: bigint, chapters: readonly number[], approvedVolumes: readonly Plan.Volume[]): Promise<void> {
-    const arcs = await this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
-    for (const chapter of arcs.length > 0 ? chapters : []) {
-      const volume = approvedVolumes.find(v => v.startChapter !== null && v.endChapter !== null && chapter >= v.startChapter && chapter <= v.endChapter);
-      if (!volume) continue;
-      const volumeArcs = arcs.filter(a => a.volumeKey === volume.volumeKey);
-      if (volumeArcs.length === 0) continue;
-      const covering = volumeArcs.find(a => a.chapterStart !== null && a.chapterEnd !== null && chapter >= a.chapterStart && chapter <= a.chapterEnd);
-      if (!covering || covering.status !== 'approved') throw AppErrorCode.ARC_004.create();
-    }
   }
 
   private async enqueueGeneration(projectId: bigint, chapters: number[], options: Pick<GenerateBody, 'autoFix' | 'maxFixes' | 'guidance'>): Promise<JobEnqueueResult> {
@@ -1079,7 +677,7 @@ export class GenerationService {
   /**
    * Deletes one drafted chapter and leaves a hole at that number. Later chapters are deliberately not
    * renumbered: a draft's prose is written against the brief at the same chapter number, and briefs
-   * (plus the arc ranges and knowledge contracts keyed off them) are not shifted, so closing the gap
+   * (plus the knowledge contracts keyed off them) are not shifted, so closing the gap
    * would silently pair every later draft with someone else's brief.
    */
   async deleteDraft(projectId: bigint, chapter: number): Promise<void> {
@@ -1193,7 +791,7 @@ export class GenerationService {
     const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
     if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw AppErrorCode.FIN_003.create();
 
-    const result = await this.workflowRunService.runChapterFinalization({
+    return this.workflowRunService.runChapterFinalization({
       projectId,
       chapter: draft.chapter,
       draftId: draft.id,
@@ -1205,12 +803,6 @@ export class GenerationService {
       generator: draft.generator,
       isolated: draft.isolated,
     });
-
-    if (result.status !== 'completed') return result;
-
-    await this.maybeReconcileArc(projectId, draft.chapter);
-    await this.maybeWriteVolumeEpitome(projectId, draft.chapter);
-    return result;
   }
 
   /**
@@ -1228,83 +820,6 @@ export class GenerationService {
     // Isolated chapters bypass continuity extraction entirely, so their flag never turns true.
     if (!chapterRow.continuityApplied && !isolated) return false;
     return (project?.storyCurrentChapter ?? 0) >= chapter;
-  }
-
-  /**
-   * Re-outlines the *remaining* chapters of the arc the just-finalized chapter belongs to, every
-   * `generation.reconciliation.cadence` finalized chapters or as soon as a remaining brief is marked
-   * stale. Best-effort: a failed reconciliation must never fail the finalization that triggered it.
-   */
-  private async maybeReconcileArc(projectId: bigint, chapter: number): Promise<void> {
-    const arc = await this.db.query.arcs.findFirst({
-      where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.status, 'approved'), lte(schema.arcs.chapterStart, chapter), gte(schema.arcs.chapterEnd, chapter)),
-    });
-    if (!arc || arc.chapterStart === null || arc.chapterEnd === null) return;
-    if (chapter >= arc.chapterEnd) return;
-
-    // Finalization is strictly sequential (the FIN_001 gate above), so position within the arc is the count.
-    const finalizedInArc = chapter - arc.chapterStart + 1;
-    const cadence = Config.get('generation.reconciliation.cadence');
-    const cadenceReached = cadence > 0 && finalizedInArc % cadence === 0;
-
-    let reason = 'cadence';
-    if (!cadenceReached) {
-      const stale = await this.db.query.briefs.findFirst({
-        where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.chapter, chapter), lte(schema.briefs.chapter, arc.chapterEnd), isNotNull(schema.briefs.staleReason)),
-      });
-      if (!stale) return;
-      reason = 'stale';
-    }
-
-    this.logger.info('finalize: reconciling arc briefs', { projectId, arcKey: arc.arcKey, chapter, finalizedInArc, cadence, reason });
-    await this.outlineArc(projectId, arc.arcKey, {}).catch(err => this.logger.warn('finalize: arc reconciliation failed', { projectId, arcKey: arc.arcKey, chapter, err }));
-  }
-
-  /**
-   * Distils a volume into `volumes.epitome` the one time its last chapter finalizes, so the outliner's
-   * serial memory stays O(volumes) instead of O(chapters). Best-effort: a failed epitome must never fail
-   * the finalization that triggered it, and an epitome already on the row is never rewritten.
-   */
-  private async maybeWriteVolumeEpitome(projectId: bigint, chapter: number): Promise<void> {
-    const volume = await this.db.query.volumes.findFirst({
-      where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.status, 'approved'), eq(schema.volumes.endChapter, chapter)),
-    });
-    if (!volume || volume.startChapter === null || volume.endChapter === null || volume.epitome !== null) return;
-
-    const chapters = await this.db.query.chapters.findMany({
-      where: and(
-        eq(schema.chapters.projectId, projectId),
-        eq(schema.chapters.status, 'done'),
-        gte(schema.chapters.number, volume.startChapter),
-        lte(schema.chapters.number, volume.endChapter),
-      ),
-      orderBy: asc(schema.chapters.number),
-    });
-    const chapterSummaries = chapters
-      .filter(c => c.summary)
-      .map(c => `Ch ${c.number}: ${c.summary}`)
-      .join('\n');
-    if (!chapterSummaries) {
-      this.logger.warn('finalize: skipping volume epitome — no chapter summaries in range', { projectId, volumeKey: volume.volumeKey, chapter });
-      return;
-    }
-
-    const volumePlan = `## ${volume.title ?? volume.volumeKey} (${volume.volumeKey})\nObjective: ${volume.objective ?? ''}\nConflict: ${volume.conflict ?? ''}\nPayoff: ${volume.payoff ?? ''}`;
-    const prompt = PROMPT_REGISTRY.epitome;
-    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-
-    this.logger.info('finalize: writing volume epitome', { projectId, volumeKey: volume.volumeKey, chapter, summaries: chapters.length });
-    await this.modelRouter
-      .structured(prompt, { volumePlan, chapterSummaries, startChapter: volume.startChapter, endChapter: volume.endChapter }, ctx)
-      .then(output => {
-        const epitome = (output as EpitomeOutput).epitome?.trim();
-        if (!epitome) throw new Error('epitome prompt returned an empty epitome');
-        return this.db
-          .update(schema.volumes)
-          .set({ epitome, updatedAt: new Date() })
-          .where(and(eq(schema.volumes.id, volume.id), isNull(schema.volumes.epitome)));
-      })
-      .catch(err => this.logger.warn('finalize: volume epitome failed', { projectId, volumeKey: volume.volumeKey, chapter, err }));
   }
 
   async generateUnrestricted(projectId: bigint, chapter: number, body: GenerateUnrestrictedBody): Promise<Generation.Draft> {

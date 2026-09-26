@@ -10,7 +10,7 @@ const outputSchema = z.string();
 
 export const getVolumeTool: RegisteredTool = {
   allowedNodes: ['chat-hub'],
-  description: 'Retrieve the full volume record by volume key: title, objective, conflict, payoff, chapter range, cast and body. Use before proposing volume.upsert.',
+  description: 'Retrieve the full volume record by volume key: title, goal and notes. Use before proposing volume.upsert.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);
     const volume = await ctx.db.query.volumes.findFirst({
@@ -18,13 +18,8 @@ export const getVolumeTool: RegisteredTool = {
     });
     if (!volume) return `Volume not found: ${parsed.volumeKey}`;
 
-    const lines: string[] = [`**${volume.volumeKey}**: ${volume.title ?? '(untitled)'} (${volume.status}, ordinal ${volume.ordinal})`];
-    lines.push(`Chapters: ${volume.startChapter ?? '?'}–${volume.endChapter ?? '?'}${volume.targetChapterCount ? ` (target ${volume.targetChapterCount})` : ''}`);
-    if (volume.objective) lines.push(`Objective: ${volume.objective}`);
-    if (volume.conflict) lines.push(`Conflict: ${volume.conflict}`);
-    if (volume.payoff) lines.push(`Payoff: ${volume.payoff}`);
-    if (volume.cast && volume.cast.length > 0) lines.push(`Cast: ${volume.cast.join(', ')}`);
-    if (volume.epitome) lines.push(`Epitome: ${volume.epitome}`);
+    const lines: string[] = [`**${volume.volumeKey}**: ${volume.title ?? '(untitled)'} (ordinal ${volume.ordinal})`];
+    if (volume.objective) lines.push(`Goal: ${volume.objective}`);
     if (volume.body) lines.push(volume.body);
     return lines.join('\n');
   },

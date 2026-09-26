@@ -15,11 +15,11 @@ export namespace Refinement {
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;
 }
 
-export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief']);
+export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume', 'brief']);
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);
 export const chatMessageRole = pgEnum('chat_message_role', ['user', 'assistant']);
 export const chatMode = pgEnum('chat_mode', ['manual', 'auto']);
-export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract', 'plugin']);
+export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'chapter_extract', 'plugin']);
 export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted']);
 
 export const chatSessions = pgTable(

@@ -19,7 +19,7 @@ function fullDocs(body = PROSE) {
 }
 
 function score(input: Partial<BibleReadinessInput>): BibleReadinessReport {
-  return scoreBibleReadiness({ docs: [], entities: [], facts: [], volumes: [], arcCount: 0, ...input });
+  return scoreBibleReadiness({ docs: [], entities: [], facts: [], volumes: [], ...input });
 }
 
 function records(prefix: string, type: ReadinessEntity['type'], count: number, significance: ReadinessEntity['significance'] = 'minor'): ReadinessEntity[] {
@@ -198,7 +198,7 @@ describe('scoreBibleReadiness', () => {
         { factKey: 'unscheduled', subjects: ['lead_0'], revealChapter: null },
       ];
 
-      const report = score({ docs, entities, facts, volumes, arcCount: 72 });
+      const report = score({ docs, entities, facts, volumes });
 
       expect(report.readyToDraft).toBe(true);
       expect(report.blockingGaps).toEqual([]);
@@ -207,7 +207,7 @@ describe('scoreBibleReadiness', () => {
       expect(coveredBy['power']).toEqual(['power/rules-and-limits', 'power/progression-ladder', 'power/classes-and-abilities']);
       expect(coveredBy['factionsAndLocations']).toEqual(['world/factions', 'world/geography-and-travel', '6 faction records and 12 location records']);
       expect(coveredBy['characters']).toEqual(['21 character records']);
-      expect(coveredBy['volumes']).toEqual(['12 volumes with objectives and 72 arcs']);
+      expect(coveredBy['volumes']).toEqual(['12 volumes with goals']);
     });
 
     it('should match a role by document title when the slug says nothing', () => {
@@ -237,12 +237,12 @@ describe('scoreBibleReadiness', () => {
       expect(cast?.covered).toBe(true);
     });
 
-    it('should not count volumes without objectives as a volume plan', () => {
+    it('should not count volumes without goals as a volume plan', () => {
       const volumes = [
         { volumeKey: 'v1', objective: '  ' },
         { volumeKey: 'v2', objective: null },
       ];
-      expect(score({ volumes, arcCount: 4 }).roles.find(role => role.stage === 'volumes')?.covered).toBe(false);
+      expect(score({ volumes }).roles.find(role => role.stage === 'volumes')?.covered).toBe(false);
     });
 
     it('should require a faction among the records that cover factions and locations', () => {
@@ -277,7 +277,7 @@ describe('scoreBibleReadiness', () => {
       const gaps = report.blockingGaps.join('\n');
       for (const chapter of BIBLE_MANIFEST) expect(gaps).toContain(`${chapter.role.label} is missing — write ${chapter.section}/${chapter.slug}`);
       expect(gaps).toContain('at least 3 character records, not all of them minor');
-      expect(gaps).toContain('volume records with objectives');
+      expect(gaps).toContain('volume records with goals');
     });
   });
 });

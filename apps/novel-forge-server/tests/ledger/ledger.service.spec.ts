@@ -141,7 +141,7 @@ describe('LedgerService.linkEntry', () => {
   it('should answer an unknown entry with not found', async () => {
     const { service } = fakeLedger({ locked: [] });
 
-    await expect(service.linkEntry(7n, 2n, { arcKeys: ['arc_1'] })).rejects.toMatchObject({ code: 'LDG_001' });
+    await expect(service.linkEntry(7n, 2n, { volumeKeys: ['volume_1'] })).rejects.toMatchObject({ code: 'LDG_001' });
   });
 });
 

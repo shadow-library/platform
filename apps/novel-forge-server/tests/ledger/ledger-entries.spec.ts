@@ -44,14 +44,14 @@ describe('mergeLedgerLinks', () => {
           { section: 'plot', slug: 'spine' },
         ],
         entityKeys: ['keeper', 'clerk'],
-        arcKeys: ['arc_1'],
+        volumeKeys: ['volume_1'],
         briefChapters: [2, 4],
       },
     );
 
     expect(merged).toEqual({
       entityKeys: ['keeper', 'clerk'],
-      arcKeys: ['arc_1'],
+      volumeKeys: ['volume_1'],
       bibleDocuments: [
         { section: 'world', slug: 'tides' },
         { section: 'plot', slug: 'spine' },
@@ -67,7 +67,7 @@ describe('mergeLedgerLinks', () => {
 
 describe('shiftLinkedBriefChapters', () => {
   it('should move only the brief chapters after the insert point', () => {
-    expect(shiftLinkedBriefChapters({ arcKeys: ['arc_1'], briefChapters: [1, 3, 4] }, 3)).toEqual({ arcKeys: ['arc_1'], briefChapters: [1, 3, 5] });
+    expect(shiftLinkedBriefChapters({ volumeKeys: ['volume_1'], briefChapters: [1, 3, 4] }, 3)).toEqual({ volumeKeys: ['volume_1'], briefChapters: [1, 3, 5] });
   });
 });
 
@@ -98,13 +98,13 @@ describe('shiftLedgerBriefLinks', () => {
   it('should lock the linked rows and rewrite only those whose chapters move', async () => {
     const { tx, lock, updates } = fakeTx([
       { id: 1n, links: { briefChapters: [1, 2] } },
-      { id: 2n, links: { arcKeys: ['arc_1'], briefChapters: [4, 6] } },
+      { id: 2n, links: { volumeKeys: ['volume_1'], briefChapters: [4, 6] } },
     ]);
 
     await shiftLedgerBriefLinks(tx as never, 7n, 3);
 
     expect(lock).toHaveBeenCalledWith('update');
-    expect(updates).toEqual([{ links: { arcKeys: ['arc_1'], briefChapters: [5, 7] } }]);
+    expect(updates).toEqual([{ links: { volumeKeys: ['volume_1'], briefChapters: [5, 7] } }]);
   });
 
   it('should shift superseded and withdrawn entries too, so their history keeps pointing at the right briefs', async () => {

@@ -15,8 +15,6 @@ interface FlattenedChapter {
 interface FlattenedVolume {
   ordinal: number;
   title: string | null;
-  startChapter: number;
-  endChapter: number;
 }
 
 export interface BundleValidation {
@@ -46,8 +44,7 @@ function estimateDecodedBytes(base64: string): number {
 /**
  * Cross-item invariants the DTO layer cannot express: volume ordinal contiguity/uniqueness, a cover
  * that names a real asset, duplicate asset names, empty-content guards beyond AJV's `minLength`, and a
- * total-size sanity check. Issues abort the import before any DB write, exactly like
- * `validatePlanBundle`. `chapters` is always returned (even alongside issues) as the flattened,
+ * total-size sanity check. Issues abort the import before any DB write. `chapters` is always returned (even alongside issues) as the flattened,
  * globally-numbered chapter list the import service and job payload consume on success.
  */
 export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
@@ -76,9 +73,8 @@ export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
   const chapters: FlattenedChapter[] = [];
   const volumes: FlattenedVolume[] = [];
   for (const volume of [...bundle.volumes].sort((a, b) => a.ordinal - b.ordinal)) {
-    const startChapter = chapters.length + 1;
     for (const chapter of volume.chapters) chapters.push({ number: chapters.length + 1, title: chapter.title, content: chapter.content });
-    volumes.push({ ordinal: volume.ordinal, title: volume.title?.trim() || null, startChapter, endChapter: chapters.length });
+    volumes.push({ ordinal: volume.ordinal, title: volume.title?.trim() || null });
   }
 
   const textBytes = chapters.reduce((sum, c) => sum + Buffer.byteLength(c.content, 'utf8'), 0);

@@ -50,7 +50,6 @@ export const HAIKU_TEXT_ROLES = [
   'fix',
   'premise',
   'plan',
-  'arc',
   'outline',
   'bible',
   'extraction',

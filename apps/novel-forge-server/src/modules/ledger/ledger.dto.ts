@@ -132,9 +132,6 @@ export class LedgerLinksResponse {
   @Field(() => [String], { optional: true })
   volumeKeys?: string[];
 
-  @Field(() => [String], { optional: true })
-  arcKeys?: string[];
-
   @Field(() => [Integer], { optional: true })
   briefChapters?: number[];
 }

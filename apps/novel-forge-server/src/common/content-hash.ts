@@ -14,12 +14,10 @@ export function computeBibleDocHash(frontmatter: unknown, body: unknown): string
 
 // The field lists below are the hashing contract for proposal baselines: every writer of these rows
 // (apply engine, CRUD services, planners) must hash the same fields or conflict detection misfires.
-const VOLUME_HASH_FIELDS = ['volumeKey', 'ordinal', 'title', 'objective', 'conflict', 'payoff', 'targetChapterCount', 'cast', 'body', 'startChapter', 'endChapter'] as const;
-const ARC_HASH_FIELDS = ['arcKey', 'volumeKey', 'ordinal', 'title', 'objective', 'escalation', 'payoff', 'hook', 'chapterStart', 'chapterEnd', 'cast', 'body'] as const;
+const VOLUME_HASH_FIELDS = ['volumeKey', 'ordinal', 'title', 'objective', 'body'] as const;
 const BRIEF_HASH_FIELDS = [
   'chapter',
   'volumeKey',
-  'arcKey',
   'title',
   'body',
   'contextRefs',
@@ -38,10 +36,6 @@ function pickAndHash(record: Record<string, unknown>, fields: readonly string[])
 
 export function volumeContentHash(volume: Record<string, unknown>): string {
   return pickAndHash(volume, VOLUME_HASH_FIELDS);
-}
-
-export function arcContentHash(arc: Record<string, unknown>): string {
-  return pickAndHash(arc, ARC_HASH_FIELDS);
 }
 
 export function briefContentHash(brief: Record<string, unknown>): string {

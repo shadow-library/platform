@@ -8,6 +8,5 @@ import { ChapterService } from './chapter.service';
   imports: [DatabaseModule],
   controllers: [ChapterController],
   providers: [ChapterService],
-  exports: [ChapterService],
 })
 export class ChapterModule {}

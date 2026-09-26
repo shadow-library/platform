@@ -14,7 +14,6 @@ function makeDbStub() {
       briefs: { findFirst: noRow },
       chapters: { findFirst: noRow, findMany: noRows },
       volumes: { findFirst: noRow, findMany: noRows },
-      arcs: { findFirst: noRow, findMany: noRows },
       drafts: { findFirst: noRow },
       entities: { findMany: noRows },
       worldFacts: { findMany: noRows },

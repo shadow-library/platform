@@ -1,6 +1,6 @@
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { type Genre } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
 import { ownerKind } from './owner';
@@ -30,7 +30,6 @@ interface ProjectModelOverridesData {
   audit?: ProjectModelRefData;
   chat?: ProjectModelRefData;
   compact?: ProjectModelRefData;
-  arc?: ProjectModelRefData;
   embedding?: ProjectModelRefData;
   image?: ProjectModelRefData;
 }
@@ -39,15 +38,11 @@ export interface ProjectConfigData {
   models?: ProjectModelOverridesData;
 }
 
-// The catalog vocabulary a novel-import bundle carried in (its genre, when it matches the platform list), kept in
-// `projects.importedMeta`. It is a suggestion for the publish step, never applied to the project itself: once
-// landed, the forge is source of truth, and the reader-facing values live on the publication.
+// The genre a novel-import bundle carried in, when it matches the platform list, kept in `projects.importedMeta`. It is
+// a suggestion for the publish step, never applied to the project itself: once landed, the forge is source of truth,
+// and the reader-facing values live on the publication.
 export interface ImportedNovelMetaData {
   genres?: Genre[];
-  tags?: Tag[];
-  sexualContent?: SexualContentLevel;
-  violence?: ViolenceLevel;
-  darkContent?: DarkContentLevel;
 }
 
 export namespace Project {
@@ -99,9 +94,6 @@ export const projects = pgTable(
     instructions: text('instructions'),
     importedMeta: jsonb('imported_meta').$type<ImportedNovelMetaData>(),
     storyCurrentChapter: integer('story_current_chapter').default(0),
-    storyCurrentVolumeKey: varchar('story_current_volume_key'),
-    skeletonCharacterArcs: jsonb('skeleton_character_arcs'),
-    skeletonPowerCurve: text('skeleton_power_curve'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

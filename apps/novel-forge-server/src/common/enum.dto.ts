@@ -14,7 +14,6 @@ export const EntityType = EnumType.create('EntityType', schema.entityType.enumVa
 export const EntitySignificance = EnumType.create('EntitySignificance', schema.entitySignificance.enumValues);
 export const EntityOrigin = EnumType.create('EntityOrigin', schema.entityOrigin.enumValues);
 export const FactSource = EnumType.create('FactSource', schema.factSource.enumValues);
-export const PlanStatus = EnumType.create('PlanStatus', schema.planStatus.enumValues);
 export const ThreadStatus = EnumType.create('ThreadStatus', schema.threadStatus.enumValues);
 export const MysteryStatus = EnumType.create('MysteryStatus', schema.mysteryStatus.enumValues);
 export const DraftStatus = EnumType.create('DraftStatus', schema.draftStatus.enumValues);

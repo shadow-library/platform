@@ -39,37 +39,12 @@ export interface VolumeUpsertOp {
   ordinal?: number;
   title?: string;
   objective?: string;
-  conflict?: string;
-  payoff?: string;
-  targetChapterCount?: number;
-  cast?: string[];
   body?: string;
 }
 
 export interface VolumeRemoveOp {
   op: 'volume.remove';
   volumeKey: string;
-}
-
-export interface ArcUpsertOp {
-  op: 'arc.upsert';
-  arcKey: string;
-  volumeKey: string;
-  ordinal?: number;
-  title?: string;
-  objective?: string;
-  escalation?: string;
-  payoff?: string;
-  hook?: string;
-  chapterStart?: number;
-  chapterEnd?: number;
-  cast?: string[];
-  body?: string;
-}
-
-export interface ArcRemoveOp {
-  op: 'arc.remove';
-  arcKey: string;
 }
 
 interface KnowledgeReveal {
@@ -88,8 +63,8 @@ export interface BriefUpdateOp {
   title?: string;
   body?: string;
   writeMode?: Generation.BriefWriteMode;
-  volumeKey?: string;
-  arcKey?: string;
+  /** An explicit `null` comes only from a captured inverse, so a revert takes a brief back out of a volume the proposal put it in; `OP_SPECS` refuses it from anyone else. */
+  volumeKey?: string | null;
   contextRefs?: string[];
   pov?: string;
   chapterPurpose?: string;
@@ -159,26 +134,9 @@ export interface FactRemoveOp {
 // Action ops drive the pipeline through existing service code. They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
-interface GenerateChaptersAction {
-  op: 'action.generate_chapters';
-  count: number;
-}
-
-interface PlanVolumesAction {
-  op: 'action.plan_volumes';
-  volumeCount: number;
-  chaptersPerVolume: number;
-}
-
-interface PlanArcsAction {
-  op: 'action.plan_arcs';
-  volumeKey: string;
-  arcCount?: number;
-}
-
-interface OutlineArcAction {
-  op: 'action.outline_arc';
-  arcKey: string;
+interface GenerateChapterAction {
+  op: 'action.generate_chapter';
+  chapter: number;
 }
 
 interface AuditBibleAction {
@@ -207,15 +165,6 @@ interface ApproveDraftAction {
   revision?: number;
 }
 
-interface ApproveVolumePlanAction {
-  op: 'action.approve_volume_plan';
-}
-
-interface ApproveArcsAction {
-  op: 'action.approve_arcs';
-  volumeKey: string;
-}
-
 interface ValidateAction {
   op: 'action.validate';
   scope: 'novel' | 'chapter';
@@ -233,8 +182,6 @@ export type ContentOp =
   | BibleDocumentRemoveOp
   | VolumeUpsertOp
   | VolumeRemoveOp
-  | ArcUpsertOp
-  | ArcRemoveOp
   | BriefUpdateOp
   | BriefRemoveOp
   | DraftUpdateOp
@@ -245,19 +192,7 @@ export type ContentOp =
   | FactRemoveOp;
 
 export type ActionOp =
-  | GenerateChaptersAction
-  | PlanVolumesAction
-  | PlanArcsAction
-  | OutlineArcAction
-  | AuditBibleAction
-  | EnhancePremiseAction
-  | JudgeDraftAction
-  | ReviseDraftAction
-  | ApproveDraftAction
-  | ApproveVolumePlanAction
-  | ApproveArcsAction
-  | ValidateAction
-  | FinalizeAction;
+  GenerateChapterAction | AuditBibleAction | EnhancePremiseAction | JudgeDraftAction | ReviseDraftAction | ApproveDraftAction | ValidateAction | FinalizeAction;
 
 /** Rationale is metadata about the change, not part of it: it reaches the author beside the op and is stripped before any applier sees it, so `ContentOp` — the shape inverses are captured as — deliberately lacks it. */
 export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
@@ -281,25 +216,10 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
   'volume.upsert': {
     required: { volumeKey: 'string' },
-    optional: { ordinal: 'number', title: 'string', objective: 'string', conflict: 'string', payoff: 'string', targetChapterCount: 'number', cast: 'string[]', body: 'string' },
+    optional: { ordinal: 'number', title: 'string', objective: 'string', body: 'string' },
+    description: 'objective is the goal the volume works towards; body holds the notes on it.',
   },
   'volume.remove': { required: { volumeKey: 'string' }, optional: {} },
-  'arc.upsert': {
-    required: { arcKey: 'string', volumeKey: 'string' },
-    optional: {
-      ordinal: 'number',
-      title: 'string',
-      objective: 'string',
-      escalation: 'string',
-      payoff: 'string',
-      hook: 'string',
-      chapterStart: 'number',
-      chapterEnd: 'number',
-      cast: 'string[]',
-      body: 'string',
-    },
-  },
-  'arc.remove': { required: { arcKey: 'string' }, optional: {} },
   'brief.update': {
     required: { chapter: 'number' },
     optional: {
@@ -307,7 +227,6 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       body: 'string',
       writeMode: 'string',
       volumeKey: 'string',
-      arcKey: 'string',
       contextRefs: 'string[]',
       pov: 'string',
       chapterPurpose: 'string',
@@ -315,7 +234,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       endingContract: 'object',
       knowledgeContract: 'object|null',
     },
-    description: `writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
+    description: `volumeKey names the volume whose goal the chapter serves; a new brief without one joins the volume of the nearest planned chapter before it. writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
@@ -330,17 +249,12 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
     optional: { body: 'string', subjects: 'string[]', constraintNote: 'string', writerNote: 'string', terms: 'string[]', revealChapter: 'number|null' },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
-  'action.generate_chapters': { required: { count: 'number' }, optional: {} },
-  'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
-  'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
-  'action.outline_arc': { required: { arcKey: 'string' }, optional: {} },
+  'action.generate_chapter': { required: { chapter: 'number' }, optional: {} },
   'action.audit_bible': { required: {}, optional: {} },
   'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
   'action.judge_draft': { required: { chapter: 'number' }, optional: {} },
   'action.revise_draft': { required: { chapter: 'number', note: 'string' }, optional: {} },
   'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number' } },
-  'action.approve_volume_plan': { required: {}, optional: {} },
-  'action.approve_arcs': { required: { volumeKey: 'string' }, optional: {} },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
 };
@@ -358,17 +272,13 @@ const VALIDATION_SCOPES = ['novel', 'chapter'];
 // What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
 // guessing from the name.
 const ACTION_PURPOSES: Record<ActionType, string> = {
-  'action.generate_chapters': 'enqueue prose generation for the next `count` chapters (drafted, judged, and queued for review)',
-  'action.plan_volumes': 'generate or regenerate the multi-volume story plan from the premise and bible',
-  'action.plan_arcs': 'run the arc planner for one volume — stages an arc-plan proposal covering its chapter range',
-  'action.outline_arc': 'outline chapter briefs for every chapter of an approved arc',
+  'action.generate_chapter':
+    'draft one planned chapter from its plan (drafted, judged, and queued for review) — chapters are written in order, so it must be the next one without a draft; never auto-applied',
   'action.audit_bible': 'audit the story bible for missing/pointless documents — stages a bible-audit proposal',
   'action.enhance_premise': 'evaluate and strengthen the premise as a web novel — stages a premise proposal',
   'action.judge_draft': 'run the continuity judge on one chapter draft',
   'action.revise_draft': 'revise one chapter draft using `note` as the revision feedback',
   'action.approve_draft': 'approve one reviewed chapter draft',
-  'action.approve_volume_plan': 'approve the volume plan (locks volume chapter ranges)',
-  'action.approve_arcs': 'approve all arcs of one volume (unlocks outlining)',
   'action.validate': 'run continuity validation over the novel or one chapter',
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
 };
@@ -532,14 +442,11 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'brief.update' && record['endingContract'] !== undefined) validateEndingContract(record['endingContract'], path, errors);
     if (op === 'brief.update' && record['knowledgeContract'] != null) validateKnowledgeContract(record['knowledgeContract'], path, errors);
     if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
-    if (op === 'arc.upsert' && typeof record['chapterStart'] === 'number' && typeof record['chapterEnd'] === 'number' && record['chapterStart'] > record['chapterEnd']) {
-      errors.push(`${path}: chapterStart must be <= chapterEnd`);
-    }
     if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
       errors.push(`${path}: draft.update must set at least one of title, body, summary`);
     }
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
-    if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
+    if (op === 'action.generate_chapter' && typeof record['chapter'] === 'number' && record['chapter'] < 1) errors.push(`${path}: chapter must be >= 1`);
   });
 
   if (errors.length === 0 && options?.entityMaterialization !== false) errors.push(...validateEntityMaterialization(value, allowedOps));
@@ -547,11 +454,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
   return errors;
 }
 
-/**
- * What a plugin may propose: what the novel contains, never its structure. An arc's
- * narrative fields place a beat at a chapter; its chapter range, ordinal, and volume — and a brief's arc and
- * volume — are the book's skeleton, which only an explicit author action rearranges.
- */
+/** What a plugin may propose: what the novel contains, never its structure — a brief's volume is the book's shape, which only the author rearranges. */
 export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
   'entity.upsert',
   'entity.remove',
@@ -560,11 +463,9 @@ export const PLUGIN_ALLOWED_OPS: readonly OpType[] = [
   'bible_document.upsert',
   'bible_document.remove',
   'brief.update',
-  'arc.upsert',
 ];
 
-const ARC_SKELETON_FIELDS = ['ordinal', 'chapterStart', 'chapterEnd'] as const;
-const BRIEF_PARENT_FIELDS = ['volumeKey', 'arcKey'] as const;
+const BRIEF_PARENT_FIELDS = ['volumeKey'] as const;
 
 /** The plugin allowlist enforced against the real `OP_SPECS`, because a plugin's emitted ops are untrusted input at runtime. */
 export function validatePluginChangeSet(value: unknown): string[] {
@@ -574,7 +475,7 @@ export function validatePluginChangeSet(value: unknown): string[] {
   value.forEach((item, index) => {
     if (!isKind(item, 'object')) return;
     const record = item as Record<string, unknown>;
-    const refused = record['op'] === 'arc.upsert' ? ARC_SKELETON_FIELDS : record['op'] === 'brief.update' ? BRIEF_PARENT_FIELDS : [];
+    const refused = record['op'] === 'brief.update' ? BRIEF_PARENT_FIELDS : [];
     for (const field of refused) {
       if (record[field] !== undefined) errors.push(`changeSet[${index}]: field '${field}' is not allowed for this scope`);
     }
@@ -633,7 +534,6 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'premise.update') return ['premise'];
     if (op.op === 'bible_document.upsert' || op.op === 'bible_document.remove') return [`doc:${op.section}/${op.slug}`];
     if (op.op === 'volume.upsert' || op.op === 'volume.remove') return [`volume:${op.volumeKey}`];
-    if (op.op === 'arc.upsert' || op.op === 'arc.remove') return [`arc:${op.arcKey}`];
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];

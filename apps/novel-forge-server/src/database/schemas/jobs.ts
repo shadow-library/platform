@@ -6,7 +6,6 @@ import { projects } from './projects';
 
 export namespace Job {
   export type Row = InferSelectModel<typeof jobs>;
-  export type ExtractionRun = InferSelectModel<typeof extractionRuns>;
   export type ValidationReport = InferSelectModel<typeof validationReports>;
   export type Kind = InferEnum<typeof jobKind>;
   export type Status = InferEnum<typeof jobStatus>;
@@ -37,21 +36,6 @@ export const jobs = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   t => [unique('jobs_project_id_kind_target_unique').on(t.projectId, t.kind, t.target), index('jobs_project_id_kind_status_idx').on(t.projectId, t.kind, t.status)],
-);
-
-export const extractionRuns = pgTable(
-  'extraction_runs',
-  {
-    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-    projectId: bigint('project_id', { mode: 'bigint' }).notNull(),
-    chapter: integer('chapter'),
-    role: varchar('role'),
-    model: varchar('model'),
-    status: varchar('status'),
-    rawJson: jsonb('raw_json'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-  },
-  t => [index('extraction_runs_project_id_chapter_idx').on(t.projectId, t.chapter)],
 );
 
 export const validationReports = pgTable(

@@ -7,7 +7,7 @@ import { type LedgerFilter } from './ledger.types';
 
 type FilterableEntry = Pick<Ledger.Entry, 'kind' | 'topic'>;
 
-const LINK_KEY_LISTS = ['entityKeys', 'factKeys', 'volumeKeys', 'arcKeys'] as const;
+const LINK_KEY_LISTS = ['entityKeys', 'factKeys', 'volumeKeys'] as const;
 
 export function loadActiveLedger(db: Pick<DbExecutor, 'query'>, projectId: bigint): Promise<Ledger.Entry[]> {
   const table = schema.decisionLedgerEntries;

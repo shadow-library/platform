@@ -47,6 +47,39 @@ describe('selectGenerationBatch', () => {
   it('should return an empty batch for a project with no briefs', () => {
     expect(selectGenerationBatch([], new Set(), new Set(), 20)).toEqual({ chapters: [] });
   });
+
+  it('should refuse to skip ahead to a planned chapter over chapters with neither a plan nor prose', () => {
+    expect(selectGenerationBatch([standard(1), standard(2), standard(3), standard(12)], new Set([1, 2, 3]), new Set([1, 2, 3]), 5)).toEqual({
+      chapters: [],
+      stoppedAtUnwrittenChapter: 4,
+      blockedChapter: 12,
+    });
+  });
+
+  it('should truncate a batch at the gap after the chapters it can reach', () => {
+    expect(selectGenerationBatch([standard(1), standard(2), standard(5)], new Set(), new Set(), 5)).toEqual({ chapters: [1, 2], stoppedAtUnwrittenChapter: 3, blockedChapter: 5 });
+  });
+
+  it('should stop at a hole further back than the chapter before, such as empty chapters ahead of an imported draft', () => {
+    expect(selectGenerationBatch([standard(11)], new Set([1, 2, 3, 10]), new Set([1, 2, 3]), 5)).toEqual({
+      chapters: [],
+      stoppedAtUnwrittenChapter: 4,
+      blockedChapter: 11,
+    });
+  });
+
+  it('should fill the hole in order and carry on past a draft that already sits beyond it', () => {
+    const briefs = [4, 5, 6, 7, 8, 9, 11].map(standard);
+    expect(selectGenerationBatch(briefs, new Set([1, 2, 3, 10]), new Set([1, 2, 3]), 10)).toEqual({ chapters: [4, 5, 6, 7, 8, 9, 11] });
+  });
+
+  it('should continue an imported novel whose finalized chapters carry no plans', () => {
+    expect(selectGenerationBatch([standard(41), standard(42)], new Set(), new Set(Array.from({ length: 40 }, (_, i) => i + 1)), 5)).toEqual({ chapters: [41, 42] });
+  });
+
+  it('should never generate a finalized chapter that has no draft', () => {
+    expect(selectGenerationBatch([standard(1), standard(2)], new Set(), new Set([1]), 5)).toEqual({ chapters: [2] });
+  });
 });
 
 describe('toContentRating', () => {

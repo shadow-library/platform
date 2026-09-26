@@ -16,8 +16,8 @@ import { aiAvailable, aiSkipReason, createProject, deleteProjectQuietly, HAIKU_M
 /**
  * Declaring the constants
  *
- * One compact end-to-end authoring arc on a fresh Haiku-pinned project: seed → plan → approve → outline →
- * generate → judge → approve → finalize, keeping the total AI calls small (~8). Serial and generously
+ * One compact end-to-end authoring run on a fresh Haiku-pinned project: seed → hand-written chapter plan →
+ * generate → judge → approve → finalize, keeping the total AI calls small (~6). Serial and generously
  * timed, because the dev gateway serialises AI work at concurrency 1 with a 5-minute per-call ceiling. The
  * whole describe skips unless live AI is opted into and the gateway probe succeeds. A closing check reads the
  * `model_calls` ledger straight from the DB to prove every call actually used the pinned Haiku model.
@@ -26,6 +26,7 @@ import { aiAvailable, aiSkipReason, createProject, deleteProjectQuietly, HAIKU_M
 test.describe.configure({ mode: 'serial' });
 
 const BRIEF = 'A lighthouse keeper discovers the light summons sea spirits. Short cozy fantasy.';
+const CHAPTER_ONE_PLAN = 'The keeper lights the lamp on a storm night and sees a figure walking on the waves toward the rocks.';
 
 /** A CSRF-authenticated POST with a 10-minute timeout — long enough for a synchronous Haiku authoring call. */
 async function aiPost(ctx: APIRequestContext, url: string, data?: unknown): Promise<APIResponse> {
@@ -70,22 +71,12 @@ test.describe('novel-forge Haiku authoring pipeline', () => {
     expect((await entities.json()).items.length).toBeGreaterThan(0);
   });
 
-  test('should plan volumes and approve them', async () => {
-    const plan = await aiPost(ctx, `/api/v1/projects/${projectId}/plan`, { volumeCount: 1, chaptersPerVolume: 2 });
+  test('should take a hand-written plan for chapter one', async () => {
+    const plan = await mutate(ctx, 'put', `/api/v1/projects/${projectId}/briefs/1`, { data: { title: 'The Walker on the Waves', body: CHAPTER_ONE_PLAN } });
     expect(plan.status(), await plan.text()).toBe(200);
-    expect((await plan.json()).volumes.length).toBeGreaterThan(0);
-
-    const approve = await aiPost(ctx, `/api/v1/projects/${projectId}/volumes/approve`);
-    expect(approve.status()).toBe(200);
-    expect((await approve.json()).approved).toBe(true);
-  });
-
-  test('should outline chapter briefs', async () => {
-    const outline = await aiPost(ctx, `/api/v1/projects/${projectId}/outline`, { count: 1, start: 1 });
-    expect(outline.status(), await outline.text()).toBe(200);
 
     const briefs = await ctx.get(`/api/v1/projects/${projectId}/briefs`);
-    expect((await briefs.json()).items.length).toBeGreaterThan(0);
+    expect((await briefs.json()).items.map((item: { chapter: number }) => item.chapter)).toEqual([1]);
   });
 
   test('should generate a chapter draft with real prose', async () => {

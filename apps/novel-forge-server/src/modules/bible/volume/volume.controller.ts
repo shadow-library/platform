@@ -1,10 +1,10 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
+import { Get, HttpController, Params, Query, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
-import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
+import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
-import { ApprovePlanResponse, CreateVolumeBody, ListVolumeResponse, ListVolumesQuery, UpdateVolumeBody, VolumeKeyParams, VolumeProjectParams, VolumeResponse } from './volume.dto';
+import { ListVolumeResponse, ListVolumesQuery, VolumeKeyParams, VolumeProjectParams, VolumeResponse } from './volume.dto';
 import { VolumeService } from './volume.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
@@ -12,20 +12,6 @@ import { VolumeService } from './volume.service';
 @HttpController('/api/v1/projects/:projectId/volumes')
 export class VolumeController {
   constructor(private readonly volumeService: VolumeService) {}
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Post('/approve')
-  @RespondFor(200, ApprovePlanResponse)
-  approveVolumes(@Params() params: VolumeProjectParams): Promise<ApprovePlanResponse> {
-    return this.volumeService.approve(params.projectId);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Post()
-  @RespondFor(201, VolumeResponse)
-  createVolume(@Params() params: VolumeProjectParams, @Body() body: CreateVolumeBody): Promise<VolumeResponse> {
-    return this.volumeService.create(params.projectId, body);
-  }
 
   @Get()
   @RespondFor(200, ListVolumeResponse)
@@ -39,19 +25,5 @@ export class VolumeController {
     const volume = await this.volumeService.get(params.projectId, params.volumeKey);
     if (!volume) throw AppErrorCode.VOL_001.create();
     return volume;
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Patch('/:volumeKey')
-  @RespondFor(200, VolumeResponse)
-  updateVolume(@Params() params: VolumeKeyParams, @Body() body: UpdateVolumeBody): Promise<VolumeResponse> {
-    return this.volumeService.update(params.projectId, params.volumeKey, body);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Delete('/:volumeKey')
-  @HttpStatus(204)
-  deleteVolume(@Params() params: VolumeKeyParams): Promise<void> {
-    return this.volumeService.delete(params.projectId, params.volumeKey);
   }
 }

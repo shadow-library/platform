@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ARC_PLAN_TIMELINE_TOKENS, ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
@@ -128,7 +128,6 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     briefs: { findFirst: mock(async () => null) },
     chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-    arcs: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     entities: { findFirst: mock(async () => null), findMany: mock(async () => []) },
     worldFacts: { findMany: mock(async () => []) },
@@ -459,49 +458,6 @@ describe('ContextAssembler.forChapter — established state carry', () => {
   });
 });
 
-describe('ContextAssembler.forArcPlanning — the organised timeline', () => {
-  const timeline = { section: 'project', slug: 'timeline', frontmatter: null, body: '# Timeline\n\n## Later\n\n- The ferryman takes the throne' };
-  const organised = {
-    kind: 'decision',
-    topic: 'organise',
-    statement: 'Organised.',
-    links: { bibleDocuments: [{ section: 'project', slug: 'timeline' }] },
-    payload: { notesDigest: '00000000' },
-  };
-
-  it('should give an arc planner the author’s organised timeline whole, rule first', async () => {
-    const assembler = makeAssembler({
-      query: { bibleDocuments: { findMany: mock(async () => [timeline]) }, decisionLedgerEntries: { findMany: mock(async () => [organised]) } },
-    });
-    const pack = await assembler.forArcPlanning(1n, 'volume_2');
-    const section = pack.sections.find(candidate => candidate.key === 'organised_timeline');
-
-    expect(section?.required).toBe(true);
-    expect(section?.rendered).toContain('happens where it is placed and never in the opening');
-    expect(section?.rendered).toContain('- The ferryman takes the throne');
-  });
-
-  it('should cap the timeline at its own ceiling, since the author may add sections of their own to the page', async () => {
-    const long = { ...timeline, body: `# Timeline\n\n## Later\n\n${Array.from({ length: 4_000 }, (_, index) => `- Event ${index} happens.`).join('\n\n')}` };
-    const assembler = makeAssembler({
-      query: { bibleDocuments: { findMany: mock(async () => [long]) }, decisionLedgerEntries: { findMany: mock(async () => [organised]) } },
-    });
-    const pack = await assembler.forArcPlanning(1n, 'volume_2', { budgetTokens: 1_000_000 });
-    const section = pack.sections.find(candidate => candidate.key === 'organised_timeline');
-
-    expect(section?.truncated).toBe(true);
-    expect(section?.tokens).toBeLessThanOrEqual(ARC_PLAN_TIMELINE_TOKENS + 50);
-    expect(section?.rendered).toContain('- Event 0 happens.');
-  });
-
-  it('should leave the timeline out until an organise lock has written it', async () => {
-    const assembler = makeAssembler({ query: { bibleDocuments: { findMany: mock(async () => [timeline]) } } });
-    const pack = await assembler.forArcPlanning(1n, 'volume_2');
-    expect(pack.sections.some(candidate => candidate.key === 'organised_timeline')).toBe(false);
-    expect(pack.rendered).not.toContain('takes the throne');
-  });
-});
-
 describe('ContextAssembler.forChatTurn — planner-only pages', () => {
   it('should list the organised timeline by address alone, so its content reaches a chat turn only through a lookup', async () => {
     const bibleDocuments = [
@@ -538,7 +494,6 @@ describe('ContextAssembler — writer-pack scrub', () => {
 
   interface ScrubFixture {
     brief?: Record<string, unknown>;
-    arc?: Record<string, unknown>;
     volume?: Record<string, unknown>;
     drafts?: Record<string, unknown>[];
     prevChapter?: Record<string, unknown>;
@@ -549,7 +504,7 @@ describe('ContextAssembler — writer-pack scrub', () => {
   }
 
   function scrubDb(fixture: ScrubFixture) {
-    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Brief body.', contextRefs: [], pov: null, arcKey: null, ...fixture.brief };
+    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Brief body.', contextRefs: [], pov: null, volumeKey: null, ...fixture.brief };
     const drafts = fixture.drafts ?? [];
     return {
       query: {
@@ -557,7 +512,6 @@ describe('ContextAssembler — writer-pack scrub', () => {
         briefs: { findFirst: mock(async () => brief) },
         chapters: { findFirst: mock(async () => fixture.prevChapter ?? null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => fixture.volume ?? null), findMany: mock(async () => (fixture.volume ? [fixture.volume] : [])) },
-        arcs: { findFirst: mock(async () => fixture.arc ?? null), findMany: mock(async () => (fixture.arc ? [fixture.arc] : [])) },
         drafts: { findFirst: mock(async () => drafts.find(draft => draft.chapter === 4) ?? null), findMany: mock(async () => drafts) },
         entities: { findFirst: mock(async () => ferryman), findMany: mock(async () => [ferryman]) },
         characterStates: { findMany: mock(async () => fixture.characterStates ?? []) },
@@ -672,66 +626,57 @@ describe('ContextAssembler — writer-pack scrub', () => {
     expect(continuation).not.toContain('ferryman_heir');
   });
 
-  it('should withhold a reveal term from the arc and volume objectives before the reveal chapter', async () => {
-    const arc = {
-      arcKey: 'arc_river',
-      volumeKey: 'vol_1',
-      objective: `The ferryman claims the ${TERM}.`,
-      escalation: 'The flood rises.',
-      hook: `A crown surfaces from the ${TERM}.`,
-    };
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: 'The wardens close the locks.' };
-    const pack = await makeAssembler(scrubDb({ brief: { arcKey: 'arc_river' }, arc, volume })).forChapter(1n, 5, { dryRun: true });
+  it('should withhold a reveal term from the volume goal before the reveal chapter', async () => {
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const pack = await makeAssembler(scrubDb({ brief: { volumeKey: 'vol_1' }, volume })).forChapter(1n, 5, { dryRun: true });
 
-    expect(sectionOf(pack, 'arc_objective')).toContain('The ferryman claims the [withheld].');
-    expect(sectionOf(pack, 'arc_objective')).toContain('A crown surfaces from the [withheld].');
     expect(sectionOf(pack, 'volume_objective')).toContain('Win back the [withheld].');
     expect(pack.rendered).not.toContain(TERM);
   });
 
-  it('should let the reveal chapter read the arc objective in full', async () => {
-    const arc = { arcKey: 'arc_river', volumeKey: 'vol_1', objective: `The ferryman claims the ${TERM}.`, escalation: null, hook: null };
-    const pack = await makeAssembler(scrubDb({ brief: { chapter: 12, arcKey: 'arc_river' }, arc })).forChapter(1n, 12, { dryRun: true });
+  it('should let the reveal chapter read the volume goal in full', async () => {
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const pack = await makeAssembler(scrubDb({ brief: { chapter: 12, volumeKey: 'vol_1' }, volume })).forChapter(1n, 12, { dryRun: true });
 
-    expect(sectionOf(pack, 'arc_objective')).toContain(`The ferryman claims the ${TERM}.`);
+    expect(sectionOf(pack, 'volume_objective')).toContain(`Win back the ${TERM}.`);
   });
 
-  it('should withhold a reveal term from arc and volume refs for the writer but not for the planner', async () => {
-    const arc = {
-      arcKey: 'arc_later',
-      volumeKey: 'vol_1',
-      title: `Return to the ${TERM}`,
-      status: 'approved',
-      chapterStart: 9,
-      chapterEnd: 14,
-      objective: `Crown the heir of the ${TERM}.`,
-    };
-    const volume = { volumeKey: 'vol_1', title: 'The River', status: 'approved', objective: `Win back the ${TERM}.`, startChapter: 1, endChapter: 20 };
-    const assembler = makeAssembler(scrubDb({ arc, volume }));
+  it('should withhold a reveal term from a volume ref for the writer but not for the planner', async () => {
+    const volume = { volumeKey: 'vol_1', title: 'The River', objective: `Win back the ${TERM}.` };
+    const assembler = makeAssembler(scrubDb({ volume }));
 
-    const { resolved: writer } = await assembler.resolveRefs(1n, ['arc:arc_later', 'volume:vol_1'], 5);
-    expect(writer.map(section => section.rendered).join('\n')).not.toContain(TERM);
-    expect(writer[0]?.rendered).toContain('ARC: Return to the [withheld]');
-    expect(writer[0]?.rendered).toContain('Objective: Crown the heir of the [withheld].');
-    expect(writer[1]?.rendered).toContain('Objective: Win back the [withheld].');
+    const { resolved: writer } = await assembler.resolveRefs(1n, ['volume:vol_1'], 5);
+    expect(writer[0]?.rendered).toContain('Goal: Win back the [withheld].');
+    expect(writer[0]?.rendered).not.toContain(TERM);
 
-    const { resolved: planner } = await assembler.resolveRefs(1n, ['arc:arc_later', 'volume:vol_1']);
-    expect(planner[0]?.rendered).toContain(`Objective: Crown the heir of the ${TERM}.`);
-    expect(planner[1]?.rendered).toContain(`Objective: Win back the ${TERM}.`);
+    const { resolved: planner } = await assembler.resolveRefs(1n, ['volume:vol_1']);
+    expect(planner[0]?.rendered).toContain(`Goal: Win back the ${TERM}.`);
   });
 
   it('should leave the planner outline pack unscrubbed', async () => {
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: HIDDEN_TEXT, payoff: null };
-    const pack = await makeAssembler(scrubDb({ volume })).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}. ${HIDDEN_TEXT}` };
+    const pack = await makeAssembler(scrubDb({ brief: { volumeKey: 'vol_1' }, volume })).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
 
     expect(sectionOf(pack, 'volume_objective')).toContain(`Win back the ${TERM}.`);
     expect(sectionOf(pack, 'volume_objective')).toContain(HIDDEN_TEXT);
   });
 
+  it('should plan an inserted chapter under exactly the volume its caller resolved', async () => {
+    const volume = { volumeKey: 'vol_1', objective: 'Win back the ferry.' };
+    const fixture = scrubDb({ brief: { volumeKey: 'vol_1' }, volume });
+
+    const unassigned = await makeAssembler(fixture).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true, insertAfter: 4, volumeKey: null } as never);
+    expect(unassigned.sections.some(section => section.key === 'volume_objective')).toBe(false);
+    expect(fixture.query.briefs.findFirst).not.toHaveBeenCalled();
+
+    const assigned = await makeAssembler(fixture).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true, insertAfter: 4, volumeKey: 'vol_1' } as never);
+    expect(sectionOf(assigned, 'volume_objective')).toContain('Win back the ferry.');
+  });
+
   it('should scrub the revision pack brief, volume objective and carried state keys and label a stale predecessor', async () => {
     const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { [HIDDEN_TEXT]: 'yes' }, staleReason: 'ancestor chapter 3 was regenerated' }];
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.`, conflict: null };
-    const fixture = scrubDb({ brief: { body: `Hint that ${HIDDEN_TEXT}.` }, drafts, volume });
+    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const fixture = scrubDb({ brief: { body: `Hint that ${HIDDEN_TEXT}.`, volumeKey: 'vol_1' }, drafts, volume });
     const pack = await makeAssembler(fixture).forRevision(1n, 5, 0n, { dryRun: true } as never);
 
     expect(sectionOf(pack, 'brief')).toContain('Hint that [withheld].');
@@ -832,67 +777,50 @@ describe('ContextAssembler.forChapter — no brief', () => {
   });
 });
 
-describe('ContextAssembler.forChapter — arc_objective', () => {
-  it('includes the arc_objective section when the brief has a covering arc', async () => {
-    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: [], arcKey: 'arc1' };
-    const arc = { arcKey: 'arc1', volumeKey: 'v1', objective: 'Topple the treaty.', escalation: 'The spy is exposed.', hook: 'A ship burns in the harbor.' };
-    const dbOverrides = {
-      query: {
-        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
-        briefs: { findFirst: mock(async () => brief) },
-        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        entities: { findMany: mock(async () => []) },
-        worldFacts: { findMany: mock(async () => []) },
-        plotThreads: { findMany: mock(async () => []) },
-        mysteries: { findMany: mock(async () => []) },
-        contextPacks: { findFirst: mock(async () => null) },
-        userFeedback: { findMany: mock(async () => []) },
+describe('ContextAssembler.forChapter — volume goal', () => {
+  function overrides(brief: Record<string, unknown>) {
+    const volumes = { findFirst: mock(async () => ({ volumeKey: 'v1', ordinal: 1, objective: 'Topple the treaty.' })), findMany: mock(async () => []) };
+    return {
+      volumes,
+      db: {
+        query: {
+          projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+          briefs: { findFirst: mock(async () => ({ id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: [], ...brief })) },
+          chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+          volumes,
+          drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+          entities: { findMany: mock(async () => []) },
+          worldFacts: { findMany: mock(async () => []) },
+          plotThreads: { findMany: mock(async () => []) },
+          mysteries: { findMany: mock(async () => []) },
+          contextPacks: { findFirst: mock(async () => null) },
+          userFeedback: { findMany: mock(async () => []) },
+        },
       },
     };
+  }
 
-    const assembler = makeAssembler(dbOverrides);
-    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+  it('should give the writer the goal of the volume the brief names', async () => {
+    const { db } = overrides({ volumeKey: 'v1' });
+    const pack = await makeAssembler(db).forChapter(1n, 5, { dryRun: true });
 
-    const arcSection = pack.sections.find(s => s.key === 'arc_objective');
-    expect(arcSection).toBeDefined();
-    expect(arcSection?.rendered).toContain('Topple the treaty.');
-    expect(arcSection?.rendered).toContain('The spy is exposed.');
-    expect(arcSection?.rendered).toContain('A ship burns in the harbor.');
-    expect(arcSection?.sourceRefs).toEqual(['arc:arc1']);
+    const section = pack.sections.find(s => s.key === 'volume_objective');
+    expect(section?.rendered).toContain('Topple the treaty.');
+    expect(section?.sourceRefs).toEqual(['volume:v1']);
   });
 
-  it('omits the arc_objective section when the brief has no covering arc (arc-less volume)', async () => {
-    const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: [], arcKey: null };
-    const dbOverrides = {
-      query: {
-        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
-        briefs: { findFirst: mock(async () => brief) },
-        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        entities: { findMany: mock(async () => []) },
-        worldFacts: { findMany: mock(async () => []) },
-        plotThreads: { findMany: mock(async () => []) },
-        mysteries: { findMany: mock(async () => []) },
-        contextPacks: { findFirst: mock(async () => null) },
-        userFeedback: { findMany: mock(async () => []) },
-      },
-    };
+  it('should leave the volume goal out when the brief names no volume, without looking one up', async () => {
+    const { db, volumes } = overrides({ volumeKey: null });
+    const pack = await makeAssembler(db).forChapter(1n, 5, { dryRun: true });
 
-    const assembler = makeAssembler(dbOverrides);
-    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
-
-    expect(pack.sections.some(s => s.key === 'arc_objective')).toBe(false);
+    expect(pack.sections.some(s => s.key === 'volume_objective')).toBe(false);
+    expect(volumes.findFirst).not.toHaveBeenCalled();
   });
 });
 
 describe('ContextAssembler.forChapter — stable/volatile split', () => {
-  const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: ['entity:mira'], arcKey: 'arc1' };
-  const arc = { arcKey: 'arc1', volumeKey: 'v1', objective: 'ARC_OBJECTIVE_MARKER', escalation: '', hook: '' };
-  const volume = { volumeKey: 'v1', ordinal: 1, objective: 'VOLUME_OBJECTIVE_MARKER', conflict: '' };
+  const brief = { id: 1n, projectId: 1n, chapter: 5, body: 'Chapter body.', contextRefs: ['entity:mira'], volumeKey: 'v1' };
+  const volume = { volumeKey: 'v1', ordinal: 1, objective: 'VOLUME_OBJECTIVE_MARKER' };
   const entity = { entityKey: 'mira', name: 'Mira', type: 'character', status: 'active', origin: 'extracted', body: 'ENTITY_CARD_MARKER', notes: null, aliases: [] };
 
   function overrides(prevContent: string) {
@@ -905,7 +833,6 @@ describe('ContextAssembler.forChapter — stable/volatile split', () => {
           findMany: mock(async () => [{ number: 4, summary: 'MEMORY_MARKER' }]),
         },
         volumes: { findFirst: mock(async () => volume), findMany: mock(async () => []) },
-        arcs: { findFirst: mock(async () => arc), findMany: mock(async () => []) },
         drafts: { findFirst: mock(async () => ({ state: { lastBeat: 'CONTINUATION_MARKER' } })), findMany: mock(async () => []) },
         entities: { findMany: mock(async () => [entity]) },
         worldFacts: { findMany: mock(async () => []) },
@@ -917,14 +844,13 @@ describe('ContextAssembler.forChapter — stable/volatile split', () => {
     };
   }
 
-  it('marks the volume/arc objectives, writing style, and canon cards stable and the per-chapter sections volatile', async () => {
+  it('should mark the volume goal, writing style, and canon cards stable and the per-chapter sections volatile', async () => {
     const assembler = makeAssembler(overrides('PREV_ENDING_MARKER'));
     const pack = await assembler.forChapter(1n, 5, { dryRun: true, budgetTokens: 1_000_000 });
 
     const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
     expect(segments).toMatchObject({
       volume_objective: 'stable',
-      arc_objective: 'stable',
       writing_style: 'stable',
       'ref:entity:mira': 'stable',
       prev_ending: 'volatile',
@@ -932,7 +858,7 @@ describe('ContextAssembler.forChapter — stable/volatile split', () => {
       memory: 'volatile',
     });
 
-    for (const marker of ['VOLUME_OBJECTIVE_MARKER', 'ARC_OBJECTIVE_MARKER', 'WRITING_STYLE_MARKER', 'ENTITY_CARD_MARKER']) {
+    for (const marker of ['VOLUME_OBJECTIVE_MARKER', 'WRITING_STYLE_MARKER', 'ENTITY_CARD_MARKER']) {
       expect(pack.renderedStable).toContain(marker);
       expect(pack.renderedVolatile).not.toContain(marker);
     }

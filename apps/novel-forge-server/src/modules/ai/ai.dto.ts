@@ -78,7 +78,7 @@ export class AccountModelDefaults {
   @Field(() => AccountModelRef, { optional: true, description: 'Chapter prose: drafts, revisions and repairs.' })
   writing?: AccountModelRef;
 
-  @Field(() => AccountModelRef, { optional: true, description: 'Premise, plan, arcs, outlines, bible and extraction.' })
+  @Field(() => AccountModelRef, { optional: true, description: 'Premise, chapter plans, bible and extraction.' })
   planning?: AccountModelRef;
 
   @Field(() => AccountModelRef, { optional: true, description: 'Continuity judge, validation and editorial review.' })

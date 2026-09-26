@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, renderOpVocabulary, validateChangeSet } from '@modules/refinement';
+import {
+  ACTION_TYPES,
+  type ChangeOp,
+  changeSetRefs,
+  isActionOp,
+  renderActionVocabulary,
+  renderOpVocabulary,
+  validateChangeSet,
+  validatePluginChangeSet,
+} from '@modules/refinement';
 
 const validOps: ChangeOp[] = [
   { op: 'premise.update', premise: 'a cultivator returns from death', themes: ['revenge'] },
   { op: 'bible_document.upsert', section: 'project', slug: 'reader-promise', body: 'weekly power-ups' },
-  { op: 'volume.upsert', volumeKey: 'vol_1', objective: 'survive the sect trials', targetChapterCount: 12 },
-  { op: 'arc.upsert', arcKey: 'vol_1_arc_1', volumeKey: 'vol_1', chapterStart: 1, chapterEnd: 6 },
+  { op: 'volume.upsert', volumeKey: 'vol_1', objective: 'survive the sect trials' },
   {
     op: 'brief.update',
     chapter: 3,
@@ -30,7 +38,7 @@ describe('validateChangeSet', () => {
   });
 
   it('should reject missing required fields and wrong types', () => {
-    expect(validateChangeSet([{ op: 'arc.upsert', arcKey: 'a1' }])[0]).toMatch(/required field 'volumeKey'/);
+    expect(validateChangeSet([{ op: 'volume.upsert', title: 'Ascent' }])[0]).toMatch(/required field 'volumeKey'/);
     expect(validateChangeSet([{ op: 'brief.update', chapter: 'three' }])[0]).toMatch(/required field 'chapter'/);
     expect(validateChangeSet([{ op: 'premise.update', themes: 'revenge' }])[0]).toMatch(/invalid field 'themes'/);
   });
@@ -46,11 +54,10 @@ describe('validateChangeSet', () => {
     }
   });
 
-  it('should validate ending contracts and arc chapter ranges', () => {
+  it('should validate ending contracts and bible sections', () => {
     expect(
       validateChangeSet([{ op: 'brief.update', chapter: 1, endingContract: { hookType: 'happy_end', emotionalBeat: 'joy', openQuestion: 'x', handoffState: 'y' } }])[0],
     ).toMatch(/hookType/);
-    expect(validateChangeSet([{ op: 'arc.upsert', arcKey: 'a1', volumeKey: 'v1', chapterStart: 9, chapterEnd: 3 }])[0]).toMatch(/chapterStart must be <= chapterEnd/);
     expect(validateChangeSet([{ op: 'bible_document.remove', section: 'poetry', slug: 'x' }])[0]).toMatch(/section must be one of/);
   });
 
@@ -95,8 +102,7 @@ describe('hub ops and actions', () => {
     const ops: ChangeOp[] = [
       { op: 'draft.update', chapter: 4, body: 'rewritten prose' },
       { op: 'brief.remove', chapter: 9 },
-      { op: 'action.generate_chapters', count: 5 },
-      { op: 'action.plan_arcs', volumeKey: 'vol_1', arcCount: 2 },
+      { op: 'action.generate_chapter', chapter: 5 },
       { op: 'action.revise_draft', chapter: 4, note: 'tighten the pacing' },
       { op: 'action.validate', scope: 'chapter', chapter: 4 },
       { op: 'action.finalize', upTo: 3 },
@@ -106,7 +112,7 @@ describe('hub ops and actions', () => {
 
   it('should reject malformed hub ops', () => {
     expect(validateChangeSet([{ op: 'draft.update', chapter: 4 }])[0]).toMatch(/at least one of title, body, summary/);
-    expect(validateChangeSet([{ op: 'action.generate_chapters', count: 0 }])[0]).toMatch(/count must be >= 1/);
+    expect(validateChangeSet([{ op: 'action.generate_chapter', chapter: 0 }])[0]).toMatch(/chapter must be >= 1/);
     expect(validateChangeSet([{ op: 'action.validate', scope: 'volume' }])[0]).toMatch(/scope must be one of novel, chapter/);
     expect(validateChangeSet([{ op: 'action.revise_draft', chapter: 4 }])[0]).toMatch(/required field 'note'/);
     expect(validateChangeSet([{ op: 'action.audit_bible', target: 'all' }])[0]).toMatch(/unexpected field 'target'/);
@@ -185,7 +191,7 @@ describe('the rationale every op may carry', () => {
     const ops: ChangeOp[] = [
       { op: 'premise.update', premise: 'sharper', rationale: 'the pitch buried the hook' },
       { op: 'brief.update', chapter: 3, body: 'a brief', rationale: 'the chapter had no brief' },
-      { op: 'action.generate_chapters', count: 2, rationale: 'the queue had run dry' },
+      { op: 'action.generate_chapter', chapter: 2, rationale: 'the plan is ready' },
     ];
     expect(validateChangeSet(ops)).toEqual([]);
     expect(validateChangeSet([{ op: 'brief.update', chapter: 3, rationale: 'why' }], ['brief.update'])).toEqual([]);
@@ -206,14 +212,14 @@ describe('the rationale every op may carry', () => {
 describe('changeSetRefs', () => {
   it('should derive deduplicated artifact refs', () => {
     const refs = changeSetRefs([...validOps, { op: 'volume.remove', volumeKey: 'vol_1' }]);
-    expect(refs).toEqual(['premise', 'doc:project/reader-promise', 'volume:vol_1', 'arc:vol_1_arc_1', 'chapter:3']);
+    expect(refs).toEqual(['premise', 'doc:project/reader-promise', 'volume:vol_1', 'chapter:3']);
   });
 
   it('should map draft ops to draft: refs and actions to none', () => {
     const refs = changeSetRefs([
       { op: 'draft.update', chapter: 4, body: 'x' },
       { op: 'brief.remove', chapter: 9 },
-      { op: 'action.generate_chapters', count: 5 },
+      { op: 'action.generate_chapter', chapter: 5 },
       { op: 'action.audit_bible' },
     ]);
     expect(refs).toEqual(['draft:4', 'chapter:9']);
@@ -235,5 +241,33 @@ describe('validateChangeSet draft containment', () => {
     ['generator', { generator: 'standard' }],
   ])('should refuse a draft.update that tries to set %s, which only the revert engine carries', (field, extra) => {
     expect(validateChangeSet([{ op: 'draft.update', chapter: 4, body: 'The ferry leaves.', ...extra }])).toContain(`changeSet[0]: unexpected field '${field}'`);
+  });
+});
+
+describe('removed planning vocabulary', () => {
+  it.each([
+    [{ op: 'arc.upsert', arcKey: 'a1', volumeKey: 'v1' }],
+    [{ op: 'arc.remove', arcKey: 'a1' }],
+    [{ op: 'action.plan_volumes', volumeCount: 2, chaptersPerVolume: 10 }],
+    [{ op: 'action.plan_arcs', volumeKey: 'v1' }],
+    [{ op: 'action.outline_arc', arcKey: 'a1' }],
+    [{ op: 'action.approve_volume_plan' }],
+    [{ op: 'action.approve_arcs', volumeKey: 'v1' }],
+    [{ op: 'action.generate_chapters', count: 2 }],
+  ])('should refuse %o as an unknown op', op => {
+    expect(validateChangeSet([op])[0]).toMatch(/unknown op/);
+  });
+
+  it.each(['conflict', 'payoff', 'targetChapterCount', 'cast', 'startChapter'])('should refuse a volume.upsert that sets %s, since a volume is only a goal', field => {
+    expect(validateChangeSet([{ op: 'volume.upsert', volumeKey: 'v1', [field]: 1 }])).toContain(`changeSet[0]: unexpected field '${field}'`);
+  });
+
+  it('should refuse an arc key on a brief', () => {
+    expect(validateChangeSet([{ op: 'brief.update', chapter: 3, arcKey: 'a1' }])).toContain("changeSet[0]: unexpected field 'arcKey'");
+  });
+
+  it('should keep a plugin from moving a brief to another volume', () => {
+    expect(validatePluginChangeSet([{ op: 'brief.update', chapter: 3, volumeKey: 'v2' }])).toContain("changeSet[0]: field 'volumeKey' is not allowed for this scope");
+    expect(validatePluginChangeSet([{ op: 'brief.update', chapter: 3, body: 'x' }])).toEqual([]);
   });
 });

@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 
-import { and, between, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { nearestVolumeKey } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -28,11 +29,9 @@ import { writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
-import { type BibleDocRow, cutToTokens, isPlannerOnlyBibleDoc, renderBibleDigest } from './bible-docs';
+import { type BibleDocRow, isPlannerOnlyBibleDoc } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
-import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
-import { ORGANISED_TIMELINE_SECTION, organisedTimelineText } from './organised-timeline';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -57,10 +56,12 @@ export interface PackOptions extends PackPolicyOptions {
 }
 
 export interface OutlinePackOptions extends PackOptions {
-  /** The chapters the outline call plans; without it the reveal schedule covers the arc, else the volume, around the chapter. */
+  /** The chapters the outline call plans; without it the reveal schedule covers the chapter alone. */
   span?: ChapterSpan;
   /** Planning a chapter to be inserted after this one: reveal chapters are rendered as they will read once it commits. */
   insertAfter?: number;
+  /** The volume the planned chapter belongs to, when the caller has already resolved it; otherwise the nearest plan decides. */
+  volumeKey?: string | null;
 }
 
 export interface ChapterPackOptions extends PackOptions {
@@ -86,18 +87,8 @@ const PLANNER_ONLY_INVENTORY_NOTE = '(planner-only: says what happens later in t
 export const CHAT_HUB_BUDGET = 20_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
-// Planning packs carry the whole catalog — every canon fact and a description per entity — plus, for arc planning, the governing
-// bible documents, which take what the rest leaves up to their own cap. Both calls run once per arc or volume, not per chapter.
+// A planning pack carries the whole catalog — every canon fact and a description per entity.
 export const OUTLINE_BUDGET = 32_000;
-export const ARC_PLAN_BUDGET = 32_000;
-export const ARC_PLAN_BIBLE_BUDGET = 8_000;
-export const ARC_PLAN_BIBLE_DOC_TOKENS = 2_500;
-export const ARC_PLAN_TIMELINE_TOKENS = 6_000;
-// The catalog's ceiling leaves the documents at least this much, so a long serial's catalog cannot squeeze them out entirely.
-export const ARC_PLAN_BIBLE_FLOOR = 4_000;
-// Held back for the uncached dormant-thread section, so the cached sections are sized from cached content alone and their cut
-// points — and with them the provider cache prefix — do not move when a thread goes dormant.
-export const ARC_PLAN_UNCACHED_RESERVE = 1_500;
 // Token counts of a section's parts and of the rendered whole differ by a few tokens; the margin keeps a sized section inside the budget.
 const SIZED_SECTION_MARGIN = 32;
 export const PREMISE_BUDGET = 8_000;
@@ -205,7 +196,6 @@ interface ResolvedRefRows {
   mysteryMap: Map<string, typeof schema.mysteries.$inferSelect>;
   chapterMap: Map<number, typeof schema.chapters.$inferSelect>;
   volumeMap: Map<string, schema.Plan.Volume>;
-  arcMap: Map<string, ArcRow>;
   bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
   factMap: Map<string, CanonFactRow>;
   hiddenFactKeys: ReadonlySet<string> | null;
@@ -226,35 +216,6 @@ function matchWorldFacts(rows: WorldFactRow[], value: string): { facts: WorldFac
   return byKey.length > 0 ? { facts: byKey, byKey: true } : null;
 }
 
-type ArcRow = typeof schema.arcs.$inferSelect;
-type ArcTiming = 'written' | 'current' | 'upcoming';
-
-// Without a chapter to measure against, only a source arc is known to be on the page already; anything
-// else is treated as upcoming, the reading that can never hand the drafter an ending early.
-function arcTiming(arc: ArcRow, chapter?: number): ArcTiming {
-  if (arc.status === 'source') return 'written';
-  if (chapter === undefined || arc.chapterStart == null || arc.chapterEnd == null) return 'upcoming';
-  if (arc.chapterEnd < chapter) return 'written';
-  return arc.chapterStart <= chapter ? 'current' : 'upcoming';
-}
-
-// Payoff is the arc's ending: it reaches the drafter only once written. The current arc gets what the
-// arc-objective section gives it, and an upcoming arc only its objective and cast.
-function renderArcRef(arc: ArcRow, chapter?: number): string {
-  const timing = arcTiming(arc, chapter);
-  const cast = arc.cast && arc.cast.length > 0 ? `Cast: ${arc.cast.join(', ')}` : '';
-  return [
-    `**${arc.title ?? arc.arcKey}** (${arc.arcKey}, ${arc.status}, chs ${arc.chapterStart ?? '?'}–${arc.chapterEnd ?? '?'}, ${timing})`,
-    arc.objective ? `Objective: ${arc.objective}` : '',
-    timing !== 'upcoming' && arc.escalation ? `Escalation: ${arc.escalation}` : '',
-    timing === 'written' && arc.payoff ? `Payoff: ${arc.payoff}` : '',
-    timing !== 'upcoming' && arc.hook ? `Hook: ${arc.hook}` : '',
-    cast,
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
 function makeRefSection(ref: string, label: string, content: string, tier: ContextTier, truncated = false): ContextSection {
   const rendered = renderLabeledSection(label, content);
   return { key: `ref:${ref}`, tier, segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [ref], rendered };
@@ -271,16 +232,6 @@ function sumTokens(sections: ContextSection[]): number {
 /** The content a section may hold when the section itself, heading included, must fit in `available`. */
 function sizedSectionCeiling(key: string, available: number): number {
   return Math.max(0, available - countTokens(renderSection(key, '')) - SIZED_SECTION_MARGIN);
-}
-
-function outlineSpan(chapter: number, arc?: Pick<schema.Plan.Arc, 'chapterStart' | 'chapterEnd'>, volume?: Pick<schema.Plan.Volume, 'startChapter' | 'endChapter'>): ChapterSpan {
-  if (arc?.chapterStart != null && arc.chapterEnd != null) return { start: arc.chapterStart, end: arc.chapterEnd };
-  if (volume?.startChapter != null && volume.endChapter != null) return { start: volume.startChapter, end: volume.endChapter };
-  return { start: chapter, end: chapter };
-}
-
-function castKeys(cast: unknown): string[] {
-  return Array.isArray(cast) ? cast.filter((key): key is string => typeof key === 'string') : [];
 }
 
 /** A planner-only page is listed by address alone: the chat can look it up, and a turn that does is held for the author's review. */
@@ -405,7 +356,7 @@ export class ContextAssembler {
     return this.catalogService.render(projectId, options);
   }
 
-  /** `chapter` is the chapter the refs are resolved for; it decides which arc payoffs are already on the page, and makes the sections writer-safe for it. */
+  /** `chapter` is the chapter the refs are resolved for; it makes the sections writer-safe for it. */
   async resolveRefs(projectId: bigint, refs: string[], chapter?: number): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
     const forbidden = chapter !== undefined && refs.length > 0 ? await loadWriterForbiddenFacts(this.db, projectId, chapter) : [];
     return this.resolveRefsFor(projectId, refs, chapter, forbidden);
@@ -424,7 +375,6 @@ export class ContextAssembler {
     const mysteryKeys: string[] = [];
     const chapterNumbers: number[] = [];
     const volumeKeys: string[] = [];
-    const arcKeys: string[] = [];
     const bibleDocRefs: { section: string; slug: string }[] = [];
     const factKeys: string[] = [];
 
@@ -452,9 +402,6 @@ export class ContextAssembler {
         case 'volume':
           volumeKeys.push(value);
           break;
-        case 'arc':
-          arcKeys.push(value);
-          break;
         case 'bible_doc': {
           const slashIdx = value.indexOf('/');
           bibleDocRefs.push({ section: slashIdx === -1 ? value : value.slice(0, slashIdx), slug: slashIdx === -1 ? '' : value.slice(slashIdx + 1) });
@@ -467,7 +414,7 @@ export class ContextAssembler {
     }
 
     const worldFactLookup = [...new Set(worldFactValues)];
-    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows, arcRows, bibleDocRows, factRows] = await Promise.all([
+    const [entitiesRows, worldFactRows, threadRows, mysteryRows, chapterRows, volumeRows, bibleDocRows, factRows] = await Promise.all([
       entityKeys.length > 0
         ? this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)), with: { aliases: true } })
         : [],
@@ -483,7 +430,6 @@ export class ContextAssembler {
       mysteryKeys.length > 0 ? this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
       chapterNumbers.length > 0 ? this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapterNumbers)) }) : [],
       volumeKeys.length > 0 ? this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) }) : [],
-      arcKeys.length > 0 ? this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), inArray(schema.arcs.arcKey, arcKeys)) }) : [],
       bibleDocRefs.length > 0
         ? this.db.query.bibleDocuments.findMany({
             where: and(
@@ -501,7 +447,6 @@ export class ContextAssembler {
     const mysteryMap = new Map(mysteryRows.map(m => [m.mysteryKey, m]));
     const chapterMap = new Map(chapterRows.map(c => [c.number, c]));
     const volumeMap = new Map(volumeRows.map(v => [v.volumeKey, v]));
-    const arcMap = new Map(arcRows.map(a => [a.arcKey, a]));
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
     const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows) : null;
@@ -514,7 +459,7 @@ export class ContextAssembler {
       const prefix = colon === -1 ? '' : ref.slice(0, colon);
       const value = ref.slice(colon + 1);
       if (prefix === 'fact' && hiddenFactKeys?.has(value) && !factMap.get(value)?.writerNote?.trim()) continue;
-      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, arcMap, bibleDocMap, factMap, hiddenFactKeys, forbidden };
+      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, forbidden };
       const section = this.resolveRef(ref, prefix, value, chapter, rows);
       if (section) resolved.push(section);
       else unresolved.push(ref);
@@ -574,15 +519,13 @@ export class ContextAssembler {
       case 'volume': {
         const volume = rows.volumeMap.get(value);
         if (!volume) return null;
-        const tier: ContextTier = volume.status === 'source' ? 'canonical' : 'approved_intent';
-        const content = `**${volume.title ?? volume.volumeKey}** (${volume.status})\nObjective: ${volume.objective ?? ''}\nChs ${volume.startChapter ?? '?'}–${volume.endChapter ?? '?'}`;
-        return makeRefSection(ref, scrubPlanForWriter(`VOLUME: ${volume.title ?? volume.volumeKey}`, rows.forbidden), scrubPlanForWriter(content, rows.forbidden), tier);
-      }
-      case 'arc': {
-        const arc = rows.arcMap.get(value);
-        if (!arc) return null;
-        const tier: ContextTier = arc.status === 'source' ? 'canonical' : 'approved_intent';
-        return makeRefSection(ref, scrubPlanForWriter(`ARC: ${arc.title ?? arc.arcKey}`, rows.forbidden), scrubPlanForWriter(renderArcRef(arc, chapter), rows.forbidden), tier);
+        const content = `**${volume.title ?? volume.volumeKey}**\nGoal: ${volume.objective ?? ''}`;
+        return makeRefSection(
+          ref,
+          scrubPlanForWriter(`VOLUME: ${volume.title ?? volume.volumeKey}`, rows.forbidden),
+          scrubPlanForWriter(content, rows.forbidden),
+          'approved_intent',
+        );
       }
       case 'bible_doc': {
         const doc = rows.bibleDocMap.get(value.includes('/') ? value : `${value}/`);
@@ -606,18 +549,10 @@ export class ContextAssembler {
   async forChapter(projectId: bigint, chapter: number, opts?: ChapterPackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
-    const [project, brief, prevChapter, currentVolume, recentChapters, recentDrafts, prevDraft] = await Promise.all([
+    const [project, brief, prevChapter, recentChapters, recentDrafts, prevDraft] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter - 1)) }),
-      this.db.query.volumes.findFirst({
-        where: and(
-          eq(schema.volumes.projectId, projectId),
-          lte(schema.volumes.startChapter, chapter),
-          or(sql`${schema.volumes.endChapter} >= ${chapter}`, isNull(schema.volumes.endChapter)),
-        ),
-        orderBy: schema.volumes.ordinal,
-      }),
       this.db.query.chapters.findMany({
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
@@ -634,10 +569,12 @@ export class ContextAssembler {
       }),
     ]);
 
-    const [forbidden, ledger] = await Promise.all([loadWriterForbiddenFacts(this.db, projectId, chapter), loadActiveLedger(this.db, projectId)]);
+    const [forbidden, ledger, currentVolume] = await Promise.all([
+      loadWriterForbiddenFacts(this.db, projectId, chapter),
+      loadActiveLedger(this.db, projectId),
+      this.volumeByKey(projectId, brief?.volumeKey),
+    ]);
     const prevStale = staleDraftPrefix(prevDraft);
-
-    const currentArc = brief?.arcKey ? await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, brief.arcKey)) }) : undefined;
 
     const sections: ContextSection[] = [];
 
@@ -669,14 +606,9 @@ export class ContextAssembler {
     const prevState = prevDraft?.state;
     if (prevState != null) sections.push(makeSection('continuation_state', `${prevStale}${renderCarriedState(prevState, forbidden)}`, 'working', [`chapter:${chapter - 1}`]));
 
-    if (currentVolume) {
-      const content = scrubPlanForWriter([currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n'), forbidden);
+    if (currentVolume?.objective) {
+      const content = scrubPlanForWriter(currentVolume.objective, forbidden);
       sections.push(asStable(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`])));
-    }
-
-    if (currentArc) {
-      const content = scrubPlanForWriter([currentArc.objective, currentArc.escalation, currentArc.hook].filter(Boolean).join('\n'), forbidden);
-      if (content) sections.push(asStable(makeSection('arc_objective', content, 'approved_intent', [`arc:${currentArc.arcKey}`])));
     }
 
     // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as their writer
@@ -737,8 +669,7 @@ export class ContextAssembler {
     // and the outliner does not always remember to list it in contextRefs at all.
     const resolvedEntitySections = refSections.filter(s => s.key.startsWith('ref:entity:'));
     const entityRefSections = povSection ? [povSection, ...resolvedEntitySections.filter(s => s.key !== povSection.key)] : resolvedEntitySections;
-    const hasArcObjective = sections.some(s => s.key === 'arc_objective');
-    const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:') && !(hasArcObjective && s.key === `ref:arc:${currentArc?.arcKey}`));
+    const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
     const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX).map(asStable);
     const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX).map(asStable);
 
@@ -833,56 +764,36 @@ export class ContextAssembler {
   async forOutline(projectId: bigint, chapter: number, opts?: OutlinePackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? OUTLINE_BUDGET;
 
-    const [currentVolume, recentChapters, prevVolumes, currentArc] = await Promise.all([
-      this.db.query.volumes.findFirst({
-        where: and(
-          eq(schema.volumes.projectId, projectId),
-          lte(schema.volumes.startChapter, chapter),
-          or(sql`${schema.volumes.endChapter} >= ${chapter}`, isNull(schema.volumes.endChapter)),
-        ),
-        orderBy: schema.volumes.ordinal,
-      }),
+    const [currentVolume, recentChapters] = await Promise.all([
+      (opts?.volumeKey !== undefined ? Promise.resolve(opts.volumeKey) : nearestVolumeKey(this.db, projectId, opts?.insertAfter ?? chapter)).then(volumeKey =>
+        this.volumeByKey(projectId, volumeKey),
+      ),
       this.db.query.chapters.findMany({
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
         limit: 3,
       }),
-      this.db.query.volumes.findMany({
-        where: and(eq(schema.volumes.projectId, projectId), sql`${schema.volumes.endChapter} < ${chapter}`),
-        orderBy: schema.volumes.ordinal,
-      }),
-      this.db.query.arcs.findFirst({
-        where: and(eq(schema.arcs.projectId, projectId), lte(schema.arcs.chapterStart, chapter), gte(schema.arcs.chapterEnd, chapter)),
-        orderBy: schema.arcs.ordinal,
-      }),
     ]);
 
     const sections: ContextSection[] = [];
 
-    if (currentVolume) {
-      const parts = [currentVolume.objective, currentVolume.conflict, currentVolume.payoff].filter(Boolean);
-      sections.push({ ...makeSection('volume_objective', parts.join('\n'), 'approved_intent', [`volume:${currentVolume.volumeKey}`]), required: true });
+    if (currentVolume?.objective) {
+      sections.push({ ...makeSection('volume_objective', currentVolume.objective, 'approved_intent', [`volume:${currentVolume.volumeKey}`]), required: true });
     }
 
-    const memoryParts: string[] = [];
-    for (const v of prevVolumes) {
-      if (v.epitome) memoryParts.push(`Vol ${v.ordinal} (${v.title ?? v.volumeKey}): ${v.epitome}`);
-    }
     const recentLines = recentChapters
       .slice()
       .reverse()
       .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
-    memoryParts.push(...recentLines);
-    if (memoryParts.length > 0) {
-      sections.push({ ...makeSection('memory', memoryParts.join('\n'), 'canonical', []), required: true });
+    if (recentLines.length > 0) {
+      sections.push({ ...makeSection('memory', recentLines.join('\n'), 'canonical', []), required: true });
     }
 
     // The outliner may only cite what the catalog lists, so retrieval gives way to it under budget pressure; the catalog's ceiling is
     // what the other required sections leave, so none of them can be crowded out.
-    const focusEntityKeys = [...castKeys(currentArc?.cast), ...castKeys(currentVolume?.cast)];
     const maxTokens = sizedSectionCeiling('catalog', budgetTokens - sumTokens(sections));
-    const span = opts?.span ?? outlineSpan(chapter, currentArc, currentVolume);
-    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys, documents: true, maxTokens, span, insertAfter: opts?.insertAfter });
+    const span = opts?.span ?? { start: chapter, end: chapter };
+    const catalogText = await this.catalogService.render(projectId, { documents: true, maxTokens, span, insertAfter: opts?.insertAfter });
     if (catalogText) sections.push({ ...makeSection('catalog', catalogText, 'canonical', []), required: true });
 
     if (this.retrievalService) {
@@ -909,18 +820,10 @@ export class ContextAssembler {
   async forRevision(projectId: bigint, chapter: number, feedbackId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
-    const [project, brief, prevChapter, currentVolume, recentChapters, prevDraft, currentDraft, feedbackRows] = await Promise.all([
+    const [project, brief, prevChapter, recentChapters, prevDraft, currentDraft, feedbackRows] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter - 1)) }),
-      this.db.query.volumes.findFirst({
-        where: and(
-          eq(schema.volumes.projectId, projectId),
-          lte(schema.volumes.startChapter, chapter),
-          or(sql`${schema.volumes.endChapter} >= ${chapter}`, isNull(schema.volumes.endChapter)),
-        ),
-        orderBy: schema.volumes.ordinal,
-      }),
       this.db.query.chapters.findMany({
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
@@ -937,7 +840,7 @@ export class ContextAssembler {
 
     void feedbackId; // Used for audit context, not for filtering here.
     const sections: ContextSection[] = [];
-    const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
+    const [forbidden, currentVolume] = await Promise.all([loadWriterForbiddenFacts(this.db, projectId, chapter), this.volumeByKey(projectId, brief?.volumeKey)]);
 
     if (prevChapter) {
       const isIsolated = prevChapter.isolated;
@@ -955,8 +858,8 @@ export class ContextAssembler {
       sections.push(makeSection('continuation_state', `${staleDraftPrefix(prevDraft)}${renderCarriedState(prevState, forbidden)}`, 'working', [`chapter:${chapter - 1}`]));
 
     if (brief) sections.push(makeSection('brief', scrubPlanForWriter(brief.body, forbidden), 'approved_intent', [`chapter:${chapter}`]));
-    if (currentVolume) {
-      const content = scrubPlanForWriter([currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n'), forbidden);
+    if (currentVolume?.objective) {
+      const content = scrubPlanForWriter(currentVolume.objective, forbidden);
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
     }
 
@@ -1055,11 +958,10 @@ export class ContextAssembler {
    * prompt messages so provider caching can extend across turns.
    */
   async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const [project, docs, volumes, arcs, catalogText] = await Promise.all([
+    const [project, docs, volumes, catalogText] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-      this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId), orderBy: [schema.arcs.volumeKey, schema.arcs.ordinal] }),
       this.catalogService.render(projectId, { descriptors: 'compact' }),
     ]);
 
@@ -1067,10 +969,6 @@ export class ContextAssembler {
     if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
     if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(inventoryLine).join('\n'), 'canonical', [])));
     if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
-    if (arcs.length > 0) {
-      const lines = arcs.map(a => `${a.arcKey} [${a.volumeKey}] (chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'}, ${a.status}): ${a.title ?? a.objective ?? ''}`);
-      sections.push(asStable(makeSection('arc_inventory', lines.join('\n'), 'approved_intent', [])));
-    }
     if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
     sections.push(makeSection('pipeline_status', await this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0), 'working', []));
 
@@ -1084,9 +982,8 @@ export class ContextAssembler {
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
   private async renderPipelineStatus(projectId: bigint, storyCurrentChapter: number): Promise<string> {
-    const [drafts, staleArcs, staleBriefs, pendingProposals, openJobs] = await Promise.all([
+    const [drafts, staleBriefs, pendingProposals, openJobs] = await Promise.all([
       this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: schema.drafts.chapter }),
-      this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), isNotNull(schema.arcs.staleReason)) }),
       this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.staleReason)) }),
       this.db.$count(schema.refinementProposals, and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'))),
       this.db.$count(schema.jobs, and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ['pending', 'in_progress']))),
@@ -1101,78 +998,10 @@ export class ContextAssembler {
       `Story cursor (last finalized chapter): ${storyCurrentChapter}`,
       drafts.length > 0 ? `Drafts: ${[...byReview.entries()].map(([status, chapters]) => `${status} [${chapters.join(', ')}]`).join('; ')}` : 'Drafts: none yet',
     ];
-    if (staleArcs.length > 0) lines.push(`Stale arcs: ${staleArcs.map(a => `${a.arcKey} (${a.staleReason})`).join(', ')}`);
     if (staleBriefs.length > 0) lines.push(`Stale briefs: chapters ${staleBriefs.map(b => b.chapter).join(', ')}`);
     if (pendingProposals > 0) lines.push(`Pending proposals awaiting review: ${pendingProposals}`);
     if (openJobs > 0) lines.push(`Jobs running or queued: ${openJobs}`);
     return lines.join('\n');
-  }
-
-  /** Pack for the arc-plan chain: the volume, its neighbours' handoffs, premise, skeleton, catalog. */
-  async forArcPlanning(projectId: bigint, volumeKey: string, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = opts?.budgetTokens ?? ARC_PLAN_BUDGET;
-
-    const [project, volumes, openThreads, openMysteries, documents, ledger] = await Promise.all([
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-      this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
-      this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')) }),
-      this.db.query.bibleDocuments.findMany({
-        columns: { section: true, slug: true, frontmatter: true, body: true },
-        where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.section, ['project', 'plot', 'world', 'power'])),
-      }),
-      loadActiveLedger(this.db, projectId),
-    ]);
-    const volume = volumes.find(v => v.volumeKey === volumeKey);
-    const prevVolume = volume ? volumes.filter(v => v.ordinal < volume.ordinal).at(-1) : undefined;
-    const nextVolume = volume ? volumes.find(v => v.ordinal > volume.ordinal) : undefined;
-    const prevLastArc = prevVolume
-      ? await this.db.query.arcs
-          .findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, prevVolume.volumeKey)), orderBy: schema.arcs.ordinal })
-          .then(arcs => arcs.at(-1))
-      : undefined;
-
-    const sections: ContextSection[] = [];
-    if (volume) sections.push(asStable(makeSection('volume', this.renderVolumeFull(volume), 'approved_intent', [`volume:${volume.volumeKey}`])));
-    if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-    if (prevLastArc?.hook) sections.push(asStable(makeSection('prev_hook', `${prevLastArc.arcKey}: ${prevLastArc.hook}`, 'approved_intent', [`arc:${prevLastArc.arcKey}`])));
-    if (nextVolume?.objective) sections.push(asStable(makeSection('next_volume', nextVolume.objective, 'approved_intent', [`volume:${nextVolume.volumeKey}`])));
-    if (project?.skeletonCharacterArcs || project?.skeletonPowerCurve) {
-      const skeleton = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
-      sections.push(asStable(makeSection('skeleton', skeleton, 'canonical', [])));
-    }
-    // The author's later events reach the planner whatever the budget: the spine placed them across the book, and an arc that forgets them
-    // re-plots it. The page is capped all the same, since the author may add sections of their own to it.
-    const timeline = organisedTimelineText(documents, ledger);
-    if (timeline) {
-      const cut = cutToTokens(timeline, ARC_PLAN_TIMELINE_TOKENS);
-      sections.push({ ...asStable(makeSection(ORGANISED_TIMELINE_SECTION, cut.text, 'approved_intent', [])), required: true, truncated: cut.truncated });
-    }
-
-    const cachedBudget = budgetTokens - ARC_PLAN_UNCACHED_RESERVE;
-    const catalogCeiling = sizedSectionCeiling('catalog', cachedBudget - sumTokens(sections) - ARC_PLAN_BIBLE_FLOOR);
-    const span = volume?.startChapter != null && volume.endChapter != null ? { start: volume.startChapter, end: volume.endChapter } : undefined;
-    const catalogText = await this.catalogService.render(projectId, { focusEntityKeys: castKeys(volume?.cast), maxTokens: catalogCeiling, span });
-    if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-
-    const bibleSection = this.planningBibleSection(projectId, documents, cachedBudget - sumTokens(sections));
-    if (bibleSection) sections.push(bibleSection);
-
-    const dormantText = renderDormantThreads(computeDormantThreads(openThreads, openMysteries, project?.storyCurrentChapter ?? 0));
-    if (dormantText) sections.push(makeSection('dormant_threads', dormantText, 'working', []));
-
-    return this.finalize(projectId, 'arc_plan', null, sections, [], budgetTokens, opts);
-  }
-
-  // Sized to what the rest of the pack leaves, so the documents are cut rather than the whole section dropped by the budget.
-  private planningBibleSection(projectId: bigint, documents: BibleDocRow[], available: number): ContextSection | null {
-    const totalTokens = Math.min(ARC_PLAN_BIBLE_BUDGET, sizedSectionCeiling('bible_documents', available));
-    if (totalTokens <= 0) return null;
-    const digest = renderBibleDigest(documents, { totalTokens, perDocTokens: ARC_PLAN_BIBLE_DOC_TOKENS, coreOnly: true });
-    if (!digest.text) return null;
-    if (digest.omitted.length > 0) this.logger.info('arc planning pack left out bible documents', { projectId, omitted: digest.omitted, truncated: digest.truncated });
-    const section = asStable(makeSection('bible_documents', digest.text, 'canonical', []));
-    return { ...section, truncated: digest.truncated.length > 0 || digest.omitted.length > 0 };
   }
 
   /** Pack for premise enhancement; the bible audit reuses it with a fuller document inventory. */
@@ -1298,15 +1127,13 @@ export class ContextAssembler {
   }
 
   private async changedSince(projectId: bigint, since: Date): Promise<string[]> {
-    const [volumes, arcs, briefs, docs] = await Promise.all([
+    const [volumes, briefs, docs] = await Promise.all([
       this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), sql`${schema.volumes.updatedAt} > ${since}`) }),
-      this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), sql`${schema.arcs.updatedAt} > ${since}`) }),
       this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), sql`${schema.briefs.updatedAt} > ${since}`) }),
       this.db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), sql`${schema.bibleDocuments.updatedAt} > ${since}`) }),
     ]);
     return [
       ...volumes.map(v => `volume:${v.volumeKey} is now at revision ${v.revision}`),
-      ...arcs.map(a => `arc:${a.arcKey} is now at revision ${a.revision}`),
       ...briefs.map(b => `chapter:${b.chapter} brief is now at revision ${b.revision}`),
       ...docs.map(d => `doc:${d.section}/${d.slug} is now at revision ${d.revision}`),
     ];
@@ -1319,20 +1146,12 @@ export class ContextAssembler {
   }
 
   private renderVolumeLine(v: schema.Plan.Volume): string {
-    return `Vol ${v.ordinal} ${v.volumeKey} (${v.status}, chs ${v.startChapter ?? '?'}–${v.endChapter ?? '?'}, target ${v.targetChapterCount ?? '?'}): ${v.title ?? ''} — ${v.epitome ?? v.objective ?? ''}`;
+    return `Vol ${v.ordinal} ${v.volumeKey}: ${v.title ?? ''} — ${v.objective ?? ''}`;
   }
 
-  private renderVolumeFull(v: schema.Plan.Volume): string {
-    return [
-      `**${v.title ?? v.volumeKey}** (${v.volumeKey}, ${v.status}, ordinal ${v.ordinal}, chs ${v.startChapter ?? '?'}–${v.endChapter ?? '?'}, target ${v.targetChapterCount ?? '?'})`,
-      `Objective: ${v.objective ?? ''}`,
-      `Conflict: ${v.conflict ?? ''}`,
-      `Payoff: ${v.payoff ?? ''}`,
-      Array.isArray(v.cast) && v.cast.length > 0 ? `Cast: ${(v.cast as string[]).join(', ')}` : '',
-      v.body ?? '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+  private async volumeByKey(projectId: bigint, volumeKey: string | null | undefined): Promise<schema.Plan.Volume | undefined> {
+    if (!volumeKey) return undefined;
+    return this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) });
   }
 
   private async finalize(

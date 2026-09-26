@@ -4,7 +4,10 @@ import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 
-async function fakeTransaction(changeSet: ChangeOp[], options: { kind?: string; volumes?: Record<string, unknown>[]; facts?: Record<string, unknown>[] } = {}) {
+async function fakeTransaction(
+  changeSet: ChangeOp[],
+  options: { kind?: string; volumes?: Record<string, unknown>[]; facts?: Record<string, unknown>[]; plannedChapter?: number } = {},
+) {
   const updates: Record<string, unknown>[] = [];
   const deleted: unknown[] = [];
   const project = { id: 7n, premise: 'A ferryman carries the living.', brief: null, themes: null, instructions: null };
@@ -14,7 +17,7 @@ async function fakeTransaction(changeSet: ChangeOp[], options: { kind?: string; 
     query: {
       projects: { findFirst: mock(async () => project) },
       volumes: { findFirst: mock(async () => volumes[0]), findMany: mock(async () => volumes) },
-      arcs: { findMany: mock(async () => []) },
+      briefs: { findFirst: mock(async () => (options.plannedChapter === undefined ? undefined : { chapter: options.plannedChapter })) },
       canonFacts: { findFirst: mock(async () => facts[0]), findMany: mock(async () => facts) },
     },
     delete: () => ({ where: async (condition: unknown) => void deleted.push(condition) }),
@@ -44,7 +47,7 @@ async function fakeTransaction(changeSet: ChangeOp[], options: { kind?: string; 
   return { service, tx, db, updates, deleted };
 }
 
-const approvedVolume = { id: 1n, projectId: 7n, volumeKey: 'volume_4', ordinal: 4, status: 'approved', revision: 2, contentHash: 'v4', startChapter: 1, endChapter: 10 };
+const volume = { id: 1n, projectId: 7n, volumeKey: 'volume_4', ordinal: 4, title: 'The Flood', objective: 'Reach the far bank.', body: null, revision: 2, contentHash: 'v4' };
 
 describe('ProposalApplyService.apply inside a caller transaction', () => {
   it('should apply content ops on the caller’s transaction without opening its own', async () => {
@@ -58,11 +61,33 @@ describe('ProposalApplyService.apply inside a caller transaction', () => {
     expect(result.applied).toEqual([{ artifactRef: 'premise', newRevision: null }]);
   });
 
-  it('should refuse to remove an approved volume', async () => {
-    const { service, tx, deleted } = await fakeTransaction([{ op: 'volume.remove', volumeKey: 'volume_4' }], { kind: 'chat', volumes: [approvedVolume] });
+  it('should refuse to remove a volume a chapter plan still belongs to', async () => {
+    const { service, tx, deleted } = await fakeTransaction([{ op: 'volume.remove', volumeKey: 'volume_4' }], { volumes: [volume], plannedChapter: 3 });
 
-    await expect(service.apply(7n, 300n, { tx: tx as never })).rejects.toMatchObject({ code: 'RFN_004' });
+    await expect(service.apply(7n, 300n, { tx: tx as never })).rejects.toMatchObject({ code: 'VOL_002' });
     expect(deleted).toEqual([]);
+  });
+
+  it('should remove a volume no chapter plan belongs to, and stage an inverse that restores its goal', async () => {
+    const { service, tx, deleted } = await fakeTransaction([{ op: 'volume.remove', volumeKey: 'volume_4' }], { volumes: [volume] });
+
+    const result = await service.apply(7n, 300n, { tx: tx as never });
+
+    expect(deleted).toHaveLength(1);
+    expect(result.applied).toEqual([{ artifactRef: 'volume:volume_4', newRevision: null }]);
+    expect(JSON.parse(JSON.stringify(result.proposal.inverseOps))).toEqual([
+      { op: 'volume.upsert', volumeKey: 'volume_4', ordinal: 4, title: 'The Flood', objective: 'Reach the far bank.' },
+    ]);
+  });
+
+  it('should write only the goal fields of a volume', async () => {
+    const { service, tx, updates } = await fakeTransaction([{ op: 'volume.upsert', volumeKey: 'volume_4', objective: 'Burn the ferry.' }], { volumes: [volume] });
+
+    await service.apply(7n, 300n, { tx: tx as never });
+
+    const volumeUpdate = updates.find(update => 'objective' in update);
+    expect(Object.keys(volumeUpdate ?? {}).sort()).toEqual(['body', 'contentHash', 'objective', 'ordinal', 'revision', 'title', 'updatedAt']);
+    expect(volumeUpdate).toMatchObject({ objective: 'Burn the ferry.', title: 'The Flood', revision: 3 });
   });
 
   it('should refuse an action op, which can only run after a commit', async () => {

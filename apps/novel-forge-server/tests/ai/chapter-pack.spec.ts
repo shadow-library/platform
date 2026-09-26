@@ -43,45 +43,7 @@ const worldFacts = [
   { category: 'weather', key: 'fog_season', value: 'Fog holds the bay for a month each autumn.' },
 ];
 
-interface ArcFixture {
-  arcKey: string;
-  title: string;
-  status: string;
-  objective: string | null;
-  escalation: string | null;
-  payoff: string | null;
-  hook: string | null;
-  chapterStart: number;
-  chapterEnd: number;
-  cast: string[];
-}
-
-const arcs: ArcFixture[] = [
-  {
-    arcKey: 'arc_opening',
-    title: 'Low Water',
-    status: 'approved',
-    objective: 'Get the boat afloat.',
-    escalation: null,
-    payoff: null,
-    hook: null,
-    chapterStart: 1,
-    chapterEnd: 4,
-    cast: [],
-  },
-  {
-    arcKey: 'arc_tides',
-    title: 'The Turning Tide',
-    status: 'approved',
-    objective: 'ARC_REF_OBJECTIVE',
-    escalation: 'The guild calls the debt.',
-    payoff: 'The boat is sold.',
-    hook: 'A stranger buys it.',
-    chapterStart: 5,
-    chapterEnd: 9,
-    cast: ['wren', 'tobin'],
-  },
-];
+const volume = { volumeKey: 'volume_tides', ordinal: 2, title: 'The Turning Tide', objective: 'VOLUME_REF_OBJECTIVE' };
 
 const bibleDocs = [
   { section: 'world', slug: 'harbor', body: 'BIBLE_HARBOR_MARKER The harbor is tidal and shallow.' },
@@ -92,9 +54,9 @@ const baseRefs = [
   'entity:wren',
   'entity:tobin',
   'entity:harbor_guild',
-  'arc:arc_tides',
+  'volume:volume_tides',
+  'volume:volume_missing',
   'arc:arc_opening',
-  'arc:arc_missing',
   'world_fact:harbor_customs',
   'world_fact:fog_season',
   'world_fact:weather/fog_season',
@@ -105,14 +67,13 @@ const baseRefs = [
 interface FixtureOptions {
   contextRefs?: string[];
   instructions?: string;
-  currentArc?: ArcFixture;
   extraEntities?: (typeof guild)[];
   ledger?: Record<string, unknown>[];
 }
 
 function chapterOneDb(options: FixtureOptions = {}) {
-  const { contextRefs = baseRefs, instructions = 'WRITING_STYLE_MARKER Write close third person.', currentArc = arcs[0], extraEntities = [], ledger = [] } = options;
-  const brief = { chapter: 1, body: 'Wren counts crates.', contextRefs, pov: 'wren', arcKey: 'arc_opening', knowledgeContract: { pov: ['wren'], learns: [] } };
+  const { contextRefs = baseRefs, instructions = 'WRITING_STYLE_MARKER Write close third person.', extraEntities = [], ledger = [] } = options;
+  const brief = { chapter: 1, body: 'Wren counts crates.', contextRefs, pov: 'wren', volumeKey: null, knowledgeContract: { pov: ['wren'], learns: [] } };
   const entities = [wren, tobin, guild, ...extraEntities];
   return {
     insert: mock(() => ({ values: mock(() => ({ onConflictDoNothing: mock(() => ({ returning: mock(async () => []) })) })) })),
@@ -120,8 +81,7 @@ function chapterOneDb(options: FixtureOptions = {}) {
       projects: { findFirst: mock(async () => ({ id: 1n, instructions })) },
       briefs: { findFirst: mock(async () => brief) },
       chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-      volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-      arcs: { findFirst: mock(async () => currentArc), findMany: mock(async () => [currentArc, ...arcs.slice(1)]) },
+      volumes: { findFirst: mock(async () => null), findMany: mock(async () => [volume]) },
       drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
       entities: { findFirst: mock(async () => wren), findMany: mock(async () => entities) },
       worldFacts: { findMany: mock(async () => worldFacts) },
@@ -182,26 +142,19 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
 
     expect(pack.rendered).not.toMatch(/## REF:/);
     expect(pack.rendered).toContain('## CHARACTER: Tobin Reyes');
-    expect(pack.rendered).toContain('## ARC: The Turning Tide');
+    expect(pack.rendered).toContain('## VOLUME: The Turning Tide');
     expect(pack.rendered).toContain('## WORLD FACTS: harbor_customs');
     expect(pack.rendered).toContain('## BIBLE: world/harbor');
   });
 
-  it('should resolve arc refs and skip the one already carried by the arc objective', async () => {
+  it('should resolve a volume ref to its goal and leave an arc ref unresolved', async () => {
     const pack = await makeAssembler(chapterOneDb()).forChapter(1n, 1, { dryRun: true });
 
-    const arc = pack.sections.find(s => s.key === 'ref:arc:arc_tides');
-    expect(arc?.rendered).toContain('ARC_REF_OBJECTIVE');
-    expect(arc?.rendered).toContain('Cast: wren, tobin');
-    expect(arc?.rendered).toContain('upcoming');
-    expect(arc?.rendered).not.toContain('Payoff:');
-    expect(arc?.rendered).not.toContain('The boat is sold.');
-    expect(arc?.rendered).not.toContain('The guild calls the debt.');
-    expect(arc?.tier).toBe('approved_intent');
-    expect(pack.sections.some(s => s.key === 'ref:arc:arc_opening')).toBe(false);
-    expect(pack.sections.some(s => s.key === 'arc_objective')).toBe(true);
-    expect(pack.unresolvedRefs).toContain('arc:arc_missing');
-    expect(pack.unresolvedRefs).not.toContain('arc:arc_opening');
+    const section = pack.sections.find(s => s.key === 'ref:volume:volume_tides');
+    expect(section?.rendered).toContain('Goal: VOLUME_REF_OBJECTIVE');
+    expect(section?.tier).toBe('approved_intent');
+    expect(pack.unresolvedRefs).toContain('volume:volume_missing');
+    expect(pack.unresolvedRefs).toContain('arc:arc_opening');
   });
 
   it('should resolve world_fact refs by category, by key, and by category/key', async () => {
@@ -234,43 +187,9 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
 
   it('should resolve a ref listed twice only once', async () => {
     const assembler = makeAssembler(chapterOneDb());
-    const { resolved } = await assembler.resolveRefs(1n, ['arc:arc_tides', 'arc:arc_tides']);
+    const { resolved } = await assembler.resolveRefs(1n, ['volume:volume_tides', 'volume:volume_tides']);
 
-    expect(resolved.map(s => s.key)).toEqual(['ref:arc:arc_tides']);
-  });
-
-  it('should include an arc payoff once the arc is written', async () => {
-    const assembler = makeAssembler(chapterOneDb());
-
-    const { resolved } = await assembler.resolveRefs(1n, ['arc:arc_tides'], 12);
-    expect(resolved[0]?.rendered).toContain('Payoff: The boat is sold.');
-    expect(resolved[0]?.rendered).toContain('Escalation: The guild calls the debt.');
-
-    const { resolved: current } = await assembler.resolveRefs(1n, ['arc:arc_tides'], 7);
-    expect(current[0]?.rendered).toContain('Escalation: The guild calls the debt.');
-    expect(current[0]?.rendered).not.toContain('Payoff:');
-
-    const { resolved: undated } = await assembler.resolveRefs(1n, ['arc:arc_tides']);
-    expect(undated[0]?.rendered).not.toContain('Payoff:');
-  });
-
-  it('should treat a source arc as written even without a chapter', async () => {
-    const sourceArc = { ...arcs[1]!, status: 'source' };
-    const db = chapterOneDb();
-    db.query.arcs.findMany = mock(async () => [sourceArc]);
-
-    const { resolved } = await makeAssembler(db).resolveRefs(1n, ['arc:arc_tides']);
-    expect(resolved[0]?.rendered).toContain('Payoff: The boat is sold.');
-    expect(resolved[0]?.tier).toBe('canonical');
-  });
-
-  it('should not leak the current arc payoff when the arc objective section is empty', async () => {
-    const bare = { ...arcs[0]!, objective: null, payoff: 'CURRENT_ARC_PAYOFF' };
-    const pack = await makeAssembler(chapterOneDb({ currentArc: bare })).forChapter(1n, 1, { dryRun: true });
-
-    expect(pack.sections.some(s => s.key === 'arc_objective')).toBe(false);
-    expect(pack.sections.find(s => s.key === 'ref:arc:arc_opening')?.rendered).toContain('current');
-    expect(pack.rendered).not.toContain('CURRENT_ARC_PAYOFF');
+    expect(resolved.map(s => s.key)).toEqual(['ref:volume:volume_tides']);
   });
 
   it('should cap oversized project additions so they cannot claim the whole budget, keeping the default whole', async () => {
@@ -310,7 +229,7 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     expect(calls).toHaveLength(1);
     const [message, payload] = calls[0] as [string, { unresolvedRefs: string[]; omitted: string[] }];
     expect(message).toBe('chapter pack dropped context');
-    expect(payload.unresolvedRefs).toEqual(expect.arrayContaining(['arc:arc_missing', 'world_fact:harbor_customs/missing', 'nocolon', 'unknown:thing']));
+    expect(payload.unresolvedRefs).toEqual(expect.arrayContaining(['volume:volume_missing', 'world_fact:harbor_customs/missing', 'nocolon', 'unknown:thing']));
     expect(payload.omitted).toContain('ref:bible_doc:world/ledger');
     for (const key of routine) expect(payload.omitted).not.toContain(key);
   });

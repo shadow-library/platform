@@ -38,6 +38,15 @@ describe('validateNovelBundle', () => {
     ]);
   });
 
+  it('should seed each volume with its title alone, in ordinal order, since a volume carries no chapter range', () => {
+    const bundle = buildBundle();
+    bundle.volumes.reverse();
+    expect(validateNovelBundle(bundle).volumes).toEqual([
+      { ordinal: 1, title: 'The Quiet Coast' },
+      { ordinal: 2, title: 'What the Tide Keeps' },
+    ]);
+  });
+
   it('should derive numbering by ordinal, not by array order', () => {
     const bundle = buildBundle();
     bundle.volumes.reverse(); // volume ordinal 2 now listed first in the array

@@ -84,7 +84,6 @@ export const briefs = pgTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     chapter: integer('chapter').notNull(),
     volumeKey: varchar('volume_key'),
-    arcKey: varchar('arc_key'),
     title: varchar('title'),
     body: text('body').notNull(),
     contextRefs: jsonb('context_refs').$type<string[]>(),
@@ -100,18 +99,17 @@ export const briefs = pgTable(
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     staleReason: varchar('stale_reason'),
-    // Set by the human edit paths; arc reconciliation refuses to overwrite a brief carrying it.
     handEdited: boolean('hand_edited').notNull().default(false),
     // Planning-time declaration, independent of the runtime `isolated` containment flag on chapters/drafts — a
     // brief can be marked `external` before any prose exists. `'external'` tells the primary writer's batch
     // loop to skip this slot; it is filled by generate-unrestricted or drafts/:n/import instead.
     writeMode: briefWriteMode('write_mode').notNull().default('standard'),
-    // Non-null marks a brief created by the insert operation rather than by an outline pass.
+    // Non-null marks a brief created by the insert operation rather than by a planning pass.
     insertedAt: timestamp('inserted_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('briefs_project_id_chapter_unique').on(t.projectId, t.chapter), index('briefs_project_id_arc_key_idx').on(t.projectId, t.arcKey)],
+  t => [unique('briefs_project_id_chapter_unique').on(t.projectId, t.chapter)],
 );
 
 export const continuityProposals = pgTable(

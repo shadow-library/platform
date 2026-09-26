@@ -8,7 +8,6 @@ function makeCtx(overrides: Record<string, { findFirst: ReturnType<typeof mock> 
     chapter: 1,
     db: {
       query: {
-        arcs: { findFirst: mock(async () => undefined) },
         bibleDocuments: { findFirst: mock(async () => undefined) },
         briefs: { findFirst: mock(async () => undefined) },
         drafts: { findFirst: mock(async () => undefined) },
@@ -36,14 +35,15 @@ function rawTool(name: string) {
 }
 
 describe('ToolRegistryService.forNode chat-hub', () => {
-  it('includes all five artifact-read tools on chat-hub and none on judge', () => {
+  it('includes all four artifact-read tools on chat-hub and none on judge', () => {
     const hubNames = registry.forNode('chat-hub', makeCtx()).map(t => t.name);
     const judgeNames = registry.forNode('judge', makeCtx()).map(t => t.name);
 
-    for (const name of ['get_bible_document', 'get_volume', 'get_arc', 'get_brief', 'get_draft']) {
+    for (const name of ['get_bible_document', 'get_volume', 'get_brief', 'get_draft']) {
       expect(hubNames).toContain(name);
       expect(judgeNames).not.toContain(name);
     }
+    expect(hubNames).not.toContain('get_arc');
   });
 });
 
@@ -85,29 +85,12 @@ describe('get_bible_document handler', () => {
 
 describe('get_volume handler', () => {
   it('returns the full volume record on a hit', async () => {
-    const volume = {
-      body: 'Volume prose plan.',
-      cast: ['hero', 'sidekick'],
-      conflict: 'The war begins.',
-      endChapter: 20,
-      epitome: 'The opening war.',
-      objective: 'Introduce the war.',
-      ordinal: 1,
-      payoff: 'The city falls.',
-      startChapter: 1,
-      status: 'approved',
-      targetChapterCount: 20,
-      title: 'The Opening War',
-      volumeKey: 'v1',
-    };
+    const volume = { body: 'Volume notes.', objective: 'Introduce the war.', ordinal: 1, title: 'The Opening War', volumeKey: 'v1' };
     const ctx = makeCtx({ volumes: { findFirst: mock(async () => volume) } });
 
     const result = await rawTool('get_volume').handler({ volumeKey: 'v1' }, ctx);
 
-    expect(result).toContain('v1');
-    expect(result).toContain('The Opening War');
-    expect(result).toContain('1–20');
-    expect(result).toContain('hero, sidekick');
+    expect(result).toBe('**v1**: The Opening War (ordinal 1)\nGoal: Introduce the war.\nVolume notes.');
   });
 
   it('degrades gracefully on a miss', async () => {
@@ -122,21 +105,7 @@ describe('get_volume handler', () => {
     const longBody = 'C'.repeat(20000);
     const ctx = makeCtx({
       volumes: {
-        findFirst: mock(async () => ({
-          body: longBody,
-          cast: null,
-          conflict: null,
-          endChapter: 20,
-          epitome: null,
-          objective: null,
-          ordinal: 1,
-          payoff: null,
-          startChapter: 1,
-          status: 'approved',
-          targetChapterCount: null,
-          title: 'Big Volume',
-          volumeKey: 'v1',
-        })),
+        findFirst: mock(async () => ({ body: longBody, objective: null, ordinal: 1, title: 'Big Volume', volumeKey: 'v1' })),
       },
     });
 
@@ -151,78 +120,9 @@ describe('get_volume handler', () => {
   });
 });
 
-describe('get_arc handler', () => {
-  it('returns the full arc record with its chapter span on a hit', async () => {
-    const arc = {
-      arcKey: 'a1',
-      body: null,
-      cast: ['hero'],
-      chapterEnd: 10,
-      chapterStart: 1,
-      escalation: 'Stakes rise.',
-      hook: 'A stranger arrives.',
-      objective: 'Set the stage.',
-      ordinal: 1,
-      payoff: 'The reveal.',
-      status: 'draft',
-      title: 'Arrival',
-      volumeKey: 'v1',
-    };
-    const ctx = makeCtx({ arcs: { findFirst: mock(async () => arc) } });
-
-    const result = await rawTool('get_arc').handler({ arcKey: 'a1' }, ctx);
-
-    expect(result).toContain('a1');
-    expect(result).toContain('Arrival');
-    expect(result).toContain('1–10');
-    expect(result).toContain('Set the stage.');
-  });
-
-  it('degrades gracefully on a miss', async () => {
-    const ctx = makeCtx();
-
-    const result = await rawTool('get_arc').handler({ arcKey: 'nonexistent' }, ctx);
-
-    expect(result).toBe('Arc not found: nonexistent');
-  });
-
-  it('truncates a long body to tokensBudget * 4 characters via the forNode wrapper', async () => {
-    const longBody = 'D'.repeat(20000);
-    const ctx = makeCtx({
-      arcs: {
-        findFirst: mock(async () => ({
-          arcKey: 'a1',
-          body: longBody,
-          cast: null,
-          chapterEnd: 10,
-          chapterStart: 1,
-          escalation: null,
-          hook: null,
-          objective: null,
-          ordinal: 1,
-          payoff: null,
-          status: 'draft',
-          title: 'Big Arc',
-          volumeKey: 'v1',
-        })),
-      },
-    });
-
-    const tools = registry.forNode('chat-hub', ctx);
-    const tool = tools.find(t => t.name === 'get_arc');
-    if (!tool) throw new Error('get_arc not found');
-    const result = await tool.invoke({ arcKey: 'a1' });
-    const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-
-    expect(resultStr.length).toBeLessThanOrEqual(2000 * 4 + 20);
-    expect(resultStr).toContain('[truncated]');
-  });
-});
-
 describe('get_brief handler', () => {
   it('returns the full brief including ending and knowledge contracts on a hit', async () => {
     const brief = {
-      arcKey: 'a1',
       body: 'Chapter beats go here.',
       chapter: 5,
       chapterPurpose: 'Land the twist.',
@@ -261,7 +161,6 @@ describe('get_brief handler', () => {
     const ctx = makeCtx({
       briefs: {
         findFirst: mock(async () => ({
-          arcKey: 'a1',
           body: longBody,
           chapter: 5,
           chapterPurpose: null,

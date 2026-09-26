@@ -166,8 +166,8 @@ function printTextReport(args: Args, report: ProcessInvariantsReport): void {
 
   console.log('Stale/briefless generations rejected (must be 100%):');
   console.log('  NOT measurable from stored data — a rejected generate() call throws BRF_001/BRF_002 and');
-  console.log("  persists nothing recording the rejection. Verified instead by tests/bible/arc.spec.ts's");
-  console.log('  existing BRF_001/BRF_002 tests (P0-04). This script deliberately does not claim coverage here.');
+  console.log('  persists nothing recording the rejection. Verified instead by tests/generation/generation-gate.spec.ts');
+  console.log('  (BRF_001/BRF_002). This script deliberately does not claim coverage here.');
 }
 
 main().catch(err => {

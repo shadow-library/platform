@@ -254,7 +254,7 @@ export class WorkflowRunService {
 
   /**
    * Runs a plain (non-graph, non-checkpointed) chain under workflow_runs bookkeeping — the rule-11
-   * seam for the refinement chains (chat-turn, premise-enhance, bible-audit, arc-plan): every turn
+   * seam for the refinement chains (chat-turn, premise-enhance, bible-audit): every turn
    * gets a fresh runId that correlates its model_calls and context pack, and failures land in the
    * same audit trail as graph runs.
    */

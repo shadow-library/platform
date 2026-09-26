@@ -115,9 +115,6 @@ export class ProjectModelOverrides {
   compact?: ProjectModelRef;
 
   @Field(() => ProjectModelRef, { optional: true })
-  arc?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
   embedding?: ProjectModelRef;
 
   @Field(() => ProjectModelRef, { optional: true })
@@ -274,8 +271,8 @@ export class ProjectStatusResponse {
   @Field(() => Integer, { optional: true })
   chaptersTotal?: number;
 
-  @Field(() => Integer, { optional: true })
-  chaptersExtracted?: number;
+  @Field(() => Integer, { optional: true, description: 'Chapters finalized into canon.' })
+  chaptersFinal?: number;
 
   @Field(() => Integer, { optional: true })
   draftsTotal?: number;
@@ -283,16 +280,13 @@ export class ProjectStatusResponse {
   @Field(() => Integer, { optional: true })
   draftsFinal?: number;
 
-  @Field({ optional: true })
-  planApproved?: boolean;
-
   @Field(() => Integer, { optional: true })
   volumesTotal?: number;
 }
 
 @Schema()
 export class ResetBody {
-  @Field(() => String, { enum: ['extract', 'plan', 'generate', 'all'] })
+  @Field(() => String, { enum: ['knowledge', 'plan', 'generate', 'all'] })
   stage: string;
 }
 

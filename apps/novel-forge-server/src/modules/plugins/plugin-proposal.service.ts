@@ -1,13 +1,11 @@
-import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type Generation, type Refinement } from '@server/database';
 
-import { type ArcUpsertOp, type ChangeOp, PLUGIN_ALLOWED_OPS, validatePluginChangeSet } from '../refinement/change-set';
+import { type ChangeOp, PLUGIN_ALLOWED_OPS, validatePluginChangeSet } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { PluginHost } from './plugin-host.service';
 import { type ActivePlugin, PluginPolicyService } from './plugin-policy.service';
@@ -15,7 +13,7 @@ import { PluginService } from './plugin.service';
 import { type BriefSummary, type DecisionPoint } from './plugin.types';
 
 function toSummary(brief: Generation.Brief): BriefSummary {
-  return { chapter: brief.chapter, title: brief.title ?? '', body: brief.body, volumeKey: brief.volumeKey, arcKey: brief.arcKey, writeMode: brief.writeMode };
+  return { chapter: brief.chapter, title: brief.title ?? '', body: brief.body, volumeKey: brief.volumeKey, writeMode: brief.writeMode };
 }
 
 /**
@@ -25,17 +23,13 @@ function toSummary(brief: Generation.Brief): BriefSummary {
 @Injectable()
 export class PluginProposalService {
   private readonly logger = Logger.getLogger(APP_NAME, PluginProposalService.name);
-  private readonly db: PrimaryDatabase;
 
   constructor(
-    databaseService: DatabaseService,
     private readonly pluginHost: PluginHost,
     private readonly pluginService: PluginService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly proposalService: ProposalService,
-  ) {
-    this.db = databaseService.getPostgresClient() as PrimaryDatabase;
-  }
+  ) {}
 
   async augment(projectId: bigint, pluginId: string): Promise<Refinement.Proposal | undefined> {
     if (!this.pluginHost.get(pluginId)) throw AppErrorCode.PLG_001.create();
@@ -97,31 +91,7 @@ export class PluginProposalService {
     const errors = validatePluginChangeSet(ops);
     if (errors[0]) throw AppErrorCode.PLG_005.create({ reason: errors[0] });
 
-    const changeSet = ops as ChangeOp[];
-    await this.assertNoArcReparenting(projectId, changeSet);
-    return this.proposalService.create(projectId, { scopeType: 'project', scopeRef, kind: 'plugin', summary, changeSet, allowedOps: PLUGIN_ALLOWED_OPS });
-  }
-
-  /** `volumeKey` is required on `arc.upsert`, so only a *change* to an existing arc's volume is the structural move that is refused. */
-  private async assertNoArcReparenting(projectId: bigint, changeSet: ChangeOp[]): Promise<void> {
-    const upserts = changeSet.filter((op): op is ArcUpsertOp => op.op === 'arc.upsert');
-    if (upserts.length === 0) return;
-
-    const existing = await this.db.query.arcs.findMany({
-      where: and(
-        eq(schema.arcs.projectId, projectId),
-        inArray(
-          schema.arcs.arcKey,
-          upserts.map(op => op.arcKey),
-        ),
-      ),
-      columns: { arcKey: true, volumeKey: true },
-    });
-
-    for (const op of upserts) {
-      const arc = existing.find(row => row.arcKey === op.arcKey);
-      if (arc && arc.volumeKey !== op.volumeKey) throw AppErrorCode.PLG_005.create({ reason: `changeSet: arc '${op.arcKey}' may not be moved to another volume` });
-    }
+    return this.proposalService.create(projectId, { scopeType: 'project', scopeRef, kind: 'plugin', summary, changeSet: ops as ChangeOp[], allowedOps: PLUGIN_ALLOWED_OPS });
   }
 
   /** A misbehaving plugin degrades its own decision point and never fails the run it was called from. */

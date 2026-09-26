@@ -17,7 +17,7 @@ import { countTokens } from './token-budget';
 // continuity than old ones, and a project's core cast rarely exceeds a couple hundred named entities.
 const CATALOG_CHAPTER_CAP = 50;
 const CATALOG_ENTITY_CAP = 150;
-// A planner reads an entity through its descriptor, so the focus cast and the major entities get a real description while the
+// A planner reads an entity through its descriptor, so the major entities get a real description while the
 // entity section stays within its budget; every other entity keeps a short one. 600 characters is two or three sentences.
 export const RICH_DESCRIPTOR_CHARS = 600;
 export const SHORT_DESCRIPTOR_CHARS = 100;
@@ -26,8 +26,6 @@ export const CATALOG_DOCUMENT_BUDGET = 3_000;
 const DOCUMENT_EXCERPT_CHARS = 160;
 
 export interface CatalogOptions {
-  /** Entity keys the caller is planning around — the volume's or arc's cast — ranked first and described first. */
-  focusEntityKeys?: readonly string[];
   /** Lists the citable bible documents; only a surface that turns catalog entries into context refs needs them. */
   documents?: boolean;
   /** `compact` gives every entity the short descriptor, for a surface that can look an entity up instead. */
@@ -71,13 +69,8 @@ function byKey(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-// The first mention wins, so a caller listing the arc cast before the volume cast ranks the arc cast first.
-function rankEntities(entities: EntityRow[], focusKeys: readonly string[]): EntityRow[] {
-  const focus = new Map<string, number>();
-  focusKeys.forEach((key, index) => {
-    if (!focus.has(key)) focus.set(key, index);
-  });
-  const rank = (entity: EntityRow): number => focus.get(entity.entityKey) ?? focusKeys.length + (entity.significance === 'major' ? 0 : 1);
+function rankEntities(entities: EntityRow[]): EntityRow[] {
+  const rank = (entity: EntityRow): number => (entity.significance === 'major' ? 0 : 1);
   return [...entities].sort((left, right) => rank(left) - rank(right) || byKey(left.entityKey, right.entityKey));
 }
 
@@ -163,7 +156,7 @@ export class CatalogService {
   }
 
   // Renders every canon fact including still-hidden ones, in full. Safe only because this catalog
-  // reaches planning contexts (outline, arc planning, chat hub) and never `forChapter`, the
+  // reaches planning contexts (outline, chat hub) and never `forChapter`, the
   // prose-writing pack — the outliner cannot schedule a reveal it is not allowed to read.
   // Every section is sorted in memory with a key as the last tiebreak: the catalog sits in cached prefixes, so row order must never move it.
   async render(projectId: bigint, options: CatalogOptions = {}): Promise<string> {
@@ -210,13 +203,10 @@ export class CatalogService {
 
     const volumeLines = [...volumes]
       .sort((left, right) => left.ordinal - right.ordinal || byKey(left.volumeKey, right.volumeKey))
-      .map(v => {
-        const range = v.startChapter != null ? `ch ${v.startChapter}-${v.endChapter != null ? v.endChapter : '?'}` : 'ch ?-?';
-        return `v${String(v.ordinal).padStart(2, '0')} — ${v.title ?? v.volumeKey} (${range})`;
-      });
+      .map(v => `v${String(v.ordinal).padStart(2, '0')} — ${v.title ?? v.volumeKey}`);
     part('volumes', 'VOLUMES:', volumeLines, 'volumes');
 
-    const rankedEntities = rankEntities(entities, options.focusEntityKeys ?? []);
+    const rankedEntities = rankEntities(entities);
     const entityLines = renderEntityLines(rankedEntities.slice(0, CATALOG_ENTITY_CAP), options.descriptors);
     part('entities', 'ENTITIES:', entityLines, 'minor entities', Math.max(0, rankedEntities.length - CATALOG_ENTITY_CAP));
 

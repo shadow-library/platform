@@ -5,8 +5,6 @@ import { type Ledger } from '@server/database';
 import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
 import { type BibleDocRow, ORGANISED_TIMELINE_DOC } from './bible-docs';
 
-export const ORGANISED_TIMELINE_SECTION = 'organised_timeline';
-
 /** Whether the organised timeline was organised from the notes as they stand, or from an earlier version of them. */
 export type OrganisedTimelineState = 'current' | 'stale';
 
@@ -20,13 +18,12 @@ const RULES: Record<OrganisedTimelineState, string> = {
   current: [
     "The author's own timeline, organised from their notes as they stand and checked by them.",
     `It binds where things happen: ${BANDS}.`,
-    'Where it and the starting point\'s "later in the story" items disagree, this timeline wins.',
     "The ending is the author's own, and every step keeps to it.",
   ].join(' '),
   stale: [
     "The author's timeline, organised from an earlier version of their notes.",
     `It still binds where things happen: ${BANDS}.`,
-    'Where it disagrees with the author\'s own words or with the starting point\'s "later in the story" items, those win: the notes have changed since.',
+    "Where it disagrees with the author's own words, those win: the notes have changed since.",
     "The ending is the author's own, and every step keeps to it.",
   ].join(' '),
 };
@@ -56,15 +53,4 @@ export function organisedTimelineText(docs: readonly Pick<BibleDocRow, 'section'
   const state = organisedTimelineState(ledger);
   const body = docs.find(isOrganisedTimelineDoc)?.body?.trim();
   return state && body ? renderOrganisedTimeline(body, state) : null;
-}
-
-/**
- * The Story Bible as a whole-book planner reads it: the organised timeline whole and first, because it binds where every later event
- * lands, then the digest of every other page, which a budget may cut.
- */
-export function planningBibleText(docs: readonly BibleDocRow[], ledger: Parameters<typeof organisedTimelineState>[0], digest: (docs: readonly BibleDocRow[]) => string): string {
-  const timeline = organisedTimelineText(docs, ledger);
-  const rest = digest(timeline ? docs.filter(doc => !isOrganisedTimelineDoc(doc)) : docs);
-  const heading = `### ${ORGANISED_TIMELINE_DOC.section}/${ORGANISED_TIMELINE_DOC.slug} — the author's organised timeline`;
-  return [timeline ? `${heading}\n${timeline}` : '', rest].filter(Boolean).join('\n\n');
 }

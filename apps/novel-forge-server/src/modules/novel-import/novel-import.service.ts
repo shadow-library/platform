@@ -83,15 +83,8 @@ export class NovelImportService {
       await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
       await tx.insert(schema.volumes).values(
         validation.volumes.map(volume => {
-          const values = {
-            volumeKey: `volume_${volume.ordinal}`,
-            ordinal: volume.ordinal,
-            title: volume.title,
-            startChapter: volume.startChapter,
-            endChapter: volume.endChapter,
-            targetChapterCount: volume.endChapter - volume.startChapter + 1,
-          };
-          return { projectId: project.id, ...values, status: 'source' as const, contentHash: volumeContentHash(values) };
+          const values = { volumeKey: `volume_${volume.ordinal}`, ordinal: volume.ordinal, title: volume.title };
+          return { projectId: project.id, ...values, contentHash: volumeContentHash(values) };
         }),
       );
 

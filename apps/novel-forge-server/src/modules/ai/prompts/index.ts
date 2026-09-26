@@ -1,5 +1,4 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
-import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
@@ -15,7 +14,6 @@ import { chatCompactPrompt } from './chat-compact.prompt';
 import { chatTitlePrompt } from './chat-title.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
-import { epitomePrompt } from './epitome.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
 import { illustrationComposePrompt } from './illustration-compose.prompt';
@@ -23,7 +21,6 @@ import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
 import { notesOrganisePrompt } from './notes-organise.prompt';
 import { outlinePrompt } from './outline.prompt';
-import { planPrompt } from './plan.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
@@ -41,11 +38,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   revision: revisionPrompt as PromptModule<unknown>,
   continuity: continuityPrompt as PromptModule<unknown>,
   'chapter-summarize': chapterSummarizePrompt as PromptModule<unknown>,
-  epitome: epitomePrompt as PromptModule<unknown>,
   validation: validationPrompt as PromptModule<unknown>,
   review: reviewPrompt as PromptModule<unknown>,
   'new-novel': newNovelPrompt as PromptModule<unknown>,
-  plan: planPrompt as PromptModule<unknown>,
   'bible:foundation': foundationPrompt as PromptModule<unknown>,
   'bible:world': worldPrompt as PromptModule<unknown>,
   'bible:power': powerPrompt as PromptModule<unknown>,
@@ -58,7 +53,6 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
-  'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
@@ -69,5 +63,4 @@ export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
-export { buildArcPlanPrompt } from './arc-plan.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';

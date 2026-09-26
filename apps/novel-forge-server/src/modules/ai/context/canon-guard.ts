@@ -66,18 +66,6 @@ interface PlannedBrief {
   knowledgeContract?: { learns?: { factKey: string }[] };
 }
 
-interface PlannedArc {
-  arcKey: string;
-  chapterEnd: number;
-  title?: string;
-  objective?: string;
-  escalation?: string;
-  payoff?: string;
-  hook?: string;
-  body?: string;
-  ideas?: string[];
-}
-
 const REVEAL_SCHEDULE_BUDGET = 1_200;
 const HARD_LIMIT_BUDGET = 1_500;
 const HARD_LIMIT_CHARS = 400;
@@ -232,28 +220,6 @@ export function findBriefRevealViolations(briefs: readonly PlannedBrief[], revea
   return violations;
 }
 
-/** An arc may carry a reveal only when its range reaches the reveal chapter. */
-export function findArcRevealViolations(arcs: readonly PlannedArc[], reveals: readonly ScheduledReveal[]): RevealViolation[] {
-  const violations: RevealViolation[] = [];
-  for (const arc of arcs) {
-    const fields: [string, string | undefined][] = [
-      ['title', arc.title],
-      ['objective', arc.objective],
-      ['escalation', arc.escalation],
-      ['payoff', arc.payoff],
-      ['hook', arc.hook],
-      ['body', arc.body],
-      ...(arc.ideas ?? []).map((idea, index): [string, string] => [`ideas[${index}]`, idea]),
-    ];
-    for (const reveal of reveals) {
-      if (reveal.revealChapter <= arc.chapterEnd) continue;
-      const field = firstMentioningField(fields, reveal);
-      if (field) violations.push({ subject: `arc ${arc.arcKey}`, field, factKey: reveal.factKey, revealChapter: reveal.revealChapter });
-    }
-  }
-  return violations;
-}
-
 // A sentence runs to its closing punctuation (plus any closing quote or bracket) or to the end of the text.
 const SENTENCE = /[^.!?]+(?:[.!?]+["'”’)\]]*|$)\s*|[.!?]+\s*/gu;
 
@@ -363,23 +329,4 @@ export function sanitiseBriefReveals<T extends PlannedBrief>(briefs: readonly T[
     });
   });
   return { briefs: safe, sanitised };
-}
-
-export function sanitiseArcReveals<T extends PlannedArc>(arcs: readonly T[], reveals: readonly ScheduledReveal[]): { arcs: T[]; sanitised: RevealViolation[] } {
-  const sanitised: RevealViolation[] = [];
-  const safe = arcs.map(arc => {
-    const state: Sanitiser = { subject: `arc ${arc.arcKey}`, reveals: reveals.filter(reveal => reveal.revealChapter > arc.chapterEnd), sanitised };
-    if (state.reveals.length === 0) return arc;
-    return withKnownKeys({
-      ...arc,
-      title: sanitiseOptional(arc.title, 'title', state),
-      objective: sanitiseOptional(arc.objective, 'objective', state),
-      escalation: sanitiseOptional(arc.escalation, 'escalation', state),
-      payoff: sanitiseOptional(arc.payoff, 'payoff', state),
-      hook: sanitiseOptional(arc.hook, 'hook', state),
-      body: sanitiseOptional(arc.body, 'body', state),
-      ideas: arc.ideas === undefined ? undefined : sanitiseList(arc.ideas, 'ideas', state),
-    });
-  });
-  return { arcs: safe, sanitised };
 }

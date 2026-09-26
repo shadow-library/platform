@@ -1,5 +1,5 @@
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'illustration';
+export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'premise' | 'audit' | 'illustration';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -43,7 +43,6 @@ const SECTION_LABELS: Record<string, string> = {
   continuation_state: '## CONTINUATION STATE',
   brief: '## CHAPTER BRIEF',
   volume_objective: '## VOLUME OBJECTIVE',
-  arc_objective: '## ARC OBJECTIVE',
   character_state: '## CHARACTER STATE (CURRENT)',
   relationships: '## CHARACTER RELATIONSHIPS (CURRENT)',
   memory: '## RECENT SUMMARIES',
@@ -56,14 +55,7 @@ const SECTION_LABELS: Record<string, string> = {
   bible_documents: '## BIBLE DOCUMENTS',
   document: '## DOCUMENT',
   volume_plan: '## VOLUME PLAN',
-  volume: '## VOLUME',
-  arc: '## ARC',
-  arcs: '## ARCS',
-  sibling_hooks: '## SIBLING ARC HOOKS',
   briefs_list: '## CHAPTER BRIEFS',
-  skeleton: '## CHARACTER ARCS & POWER CURVE',
-  prev_hook: '## PREVIOUS VOLUME HANDOFF',
-  next_volume: '## NEXT VOLUME OBJECTIVE',
   changed_since: '## CHANGED SINCE THIS CONVERSATION STARTED',
   world_facts: '## WORLD FACTS',
   known_facts: '## KNOWN FACTS (POV CAST)',
@@ -74,7 +66,6 @@ const SECTION_LABELS: Record<string, string> = {
   cast_appearance: '## CAST APPEARANCE',
   ledger: '## DECISION LEDGER',
   author_brief: "## THE AUTHOR'S OWN WORDS",
-  organised_timeline: "## THE AUTHOR'S ORGANISED TIMELINE",
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
 };
 

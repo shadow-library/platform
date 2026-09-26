@@ -281,7 +281,7 @@ describe('ModelRouterService.buildClient reasoning', () => {
   });
 
   it('should omit reasoning for an optional model with no effort scale', () => {
-    const client = router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' }, { role: 'epitome' }) as ChatOpenAI;
+    const client = router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' }, { role: 'title' }) as ChatOpenAI;
     expect(client.modelKwargs).toEqual({});
   });
 });

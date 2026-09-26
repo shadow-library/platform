@@ -14,13 +14,13 @@
 - **Decision ledger (the Notebook)**: the author's decisions, directions, rejected ideas and backlog, append-only. An entry is superseded (a successor on the same topic)
   or withdrawn (with the author's reason), never edited in place; only the active set is read. A decision's writer line reaches the chapter writer, scrubbed of hidden
   facts; rejected ideas and the alternatives a decision passed over are the do-not-propose list.
-- **Volume -> arc -> chapter brief.** Approval derives chapter ranges from volume target counts. Arcs partition a volume exactly and are optional. A brief carries context refs,
-  an ending contract, an optional knowledge contract, and a write mode (`standard` or `external`).
+- **Volume and chapter brief.** A volume is a goal the story works towards (title, goal, notes); it holds no chapter range and needs no approval. A brief is the plan for
+  one chapter and names its volume; it carries context refs, an ending contract, an optional knowledge contract, and a write mode (`standard` or `external`).
 - **Draft vs chapter.** A draft is working prose with a human review loop; finalizing writes a locked chapter and advances the story cursor.
 - **Canon**: finalized chapters, bible (documents plus entities), trackers. Everything else is intent or working state, labeled as such in prompts.
 - **Canon facts and character knowledge**: `canon_facts` hold spoiler-grade truths; the `character_knowledge` ledger records who learned which fact in which chapter.
 - **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
-- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise, arc-plan and plugin output changes domain data (pipeline graphs write their own results directly).
+- **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
 - **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
 - **Writing style**: the built-in plain web-novel style always reaches the writer, and a project's `instructions` are additions after it (point of view, tone, content limits)
@@ -29,14 +29,14 @@
 
 ## Capabilities
 
-- Bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
-- Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, per-novel plugins, per-account AI quota.
+- Bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume and chapter planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
+- Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, novel import, per-novel plugins, per-account AI quota.
 - Publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 
 ## Architecture
 
 - Jobs and most HTTP requests run through `WorkflowRunService` (one run row, `thread_id = run.id`) -> LangGraph graph -> nodes -> services and chains via `ModelRouterService`;
-  plan, outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows dispatched under
+  outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows dispatched under
   a per-replica, per-project lock; a duplicate (project, kind, target) request returns the active job.
 - Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. There is no local chat-model path
   (embeddings are local, via Ollama). AI quota is per owner and fails open on a database read error.
@@ -47,8 +47,8 @@
 
 ## Flows
 
-- **Generation**: gates (volumes and arcs approved, briefs present and not stale, no unresolved contradiction; a second generate request returns the active job) -> brief -> context pack -> draft ->
-  deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, arcs, briefs and drafts are
+- **Generation**: gates (a brief present and not stale, the chapter not final, every earlier chapter drafted or final, no unresolved contradiction elsewhere; a second generate request returns the active job) -> brief -> context pack -> draft ->
+  deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, volumes, briefs and drafts are
   chat-hub-only); a contradiction verdict must carry a hard finding, and deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to
   human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an
   unfilled `external` slot.
@@ -60,7 +60,7 @@
   earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest
   approved or final chapter that claims it, and moves there when a later claim is revoked.
 - **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
-  through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
+  through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted).
 - **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
 - **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
   scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
@@ -114,23 +114,24 @@
   the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored. Two Story Bible addresses are reserved and planner-only, whoever
   writes to them: the organised timeline (`project/timeline`) and the open questions (`project/open-questions`) say what happens later in the book, and no scheduled canon
   fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, and the lore index, never resolve
-  into a writer pack whatever ref names them, and are dropped from outlined refs. They are read by the volume and arc planners;
-  the chat hub may read them too, but only with review — the hub's inventory lists them by address alone, and a turn that looks one up never
-  auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
+  into a writer pack whatever ref names them, and are dropped from outlined refs. The chat hub may read them, but only with review — the hub's inventory lists them
+  by address alone, and a turn that looks one up never auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
   and never while a generate job is active.
-- Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only: it never demotes an approved plan artifact, but a stale brief
-  blocks generation and a stale draft cannot be approved.
+- Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only, but a stale brief blocks generation and a stale draft cannot be approved.
+- A chapter's volume is the one its brief names. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
+  planned chapter, after it). A volume a brief still names cannot be removed, so a change-set's volume removals (and a revert's) run after its other ops; a plan
+  reset takes briefs out of the volumes it deletes.
 
 ### Proposals and chat
 
-- Chat, audit, premise, arc-plan and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
+- Chat, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
-- `action.finalize`, `action.approve_draft`, `action.approve_volume_plan` and `action.approve_arcs` MUST NEVER be auto-applied. Action ops run after the
-  content transaction commits and stop at first failure.
+- `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft (regenerating one is
+  the author's own request). Action ops run after the content transaction commits and stop at first failure.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
 - Plan edits stay plan edits: a chat turn MUST NEVER rewrite a chapter's prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose
   for that turn; otherwise it changes the brief and the author regenerates from it. The toggle is the only permission — wording may suggest turning it on, never grant it. A
@@ -138,7 +139,7 @@
 - To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X", "X is not…") unless the author asked for that rule, because a named idea
   re-primes every later writer. Proposals carry a deterministic check for text a change removed and then mentioned only under a negation: a chat turn gets one retry, and what
   survives is kept as a visible warning and never auto-applied.
-- Plugins MUST NEVER register routes, hold the database client, write domain tables, move chapter ranges/ordinals/parentage, or issue `action.*` ops; durable changes are
+- Plugins MUST NEVER register routes, hold the database client, write domain tables, move a brief to another volume, or issue `action.*` ops; durable changes are
   allowlisted proposals. Material a safe model would refuse stays in plugin storage and reaches only permissive-class calls via gated context, NEVER core artifacts. A failing
   plugin degrades its decision point and MUST NEVER fail a generation.
 

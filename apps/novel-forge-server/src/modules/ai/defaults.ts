@@ -9,7 +9,6 @@ export type AiRole =
   | 'revision'
   | 'title'
   | 'continuity'
-  | 'epitome'
   | 'validation'
   | 'review'
   | 'plan'
@@ -18,7 +17,6 @@ export type AiRole =
   | 'audit'
   | 'chat'
   | 'compact'
-  | 'arc'
   | 'embedding'
   | 'illustration'
   | 'image'
@@ -40,7 +38,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   fix: 'writing',
   premise: 'planning',
   plan: 'planning',
-  arc: 'planning',
   outline: 'planning',
   bible: 'planning',
   extraction: 'planning',
@@ -52,7 +49,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   chat: 'chat',
   title: 'helper',
   compact: 'helper',
-  epitome: 'helper',
   // Composing an image prompt from canon is short mechanical structuring, not authoring or review.
   illustration: 'helper',
   image: 'image',
@@ -120,7 +116,7 @@ function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<A
 export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
 
 // How hard each group is allowed to think. Hidden reasoning tokens bill as output, so the mechanical
-// helper roles (title, compact, epitome) ask for none at all; every other authoring group buys the
+// helper roles (title, compact) ask for none at all; every other authoring group buys the
 // cheapest tier its model offers rather than the provider default — except `planning`, pinned to medium
 // for Opus.
 export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {

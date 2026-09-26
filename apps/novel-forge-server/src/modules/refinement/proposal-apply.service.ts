@@ -1,17 +1,14 @@
-import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import {
-  arcContentHash,
   briefContentHash,
   computeBibleDocHash,
   markDescendantDraftsStale,
-  PLAN_STALE_ARC_CHANGED,
-  PLAN_STALE_RANGE_SHIFTED,
-  PLAN_STALE_VOLUME_CHANGED,
+  nearestVolumeKey,
   refusedDraftWriteError,
   revokeProvisionalReveals,
   volumeContentHash,
@@ -24,8 +21,6 @@ import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
 import {
   type ActionOp,
-  type ArcRemoveOp,
-  type ArcUpsertOp,
   type BibleDocumentRemoveOp,
   type BibleDocumentUpsertOp,
   type BriefRemoveOp,
@@ -92,8 +87,8 @@ interface BaselineMismatch {
   actual: ArtifactState;
 }
 
-// Captured on the inverse and restored on revert, but deliberately absent from `OP_SPECS`: the flag that
-// shields a brief from reconciliation is the engine's to carry, never a field a model or author change-set can set.
+// Captured on the inverse and restored on revert, but deliberately absent from `OP_SPECS`: whether a human wrote the brief
+// is the engine's to record, never a field a model or author change-set can set.
 type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
 
 // The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
@@ -118,9 +113,6 @@ export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArti
   return typeof written?.newRevision === 'number' ? { ...op, revision: written.newRevision } : op;
 }
 
-// Fields whose change invalidates the artifacts planned beneath the volume.
-const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChapterCount'] as const;
-
 /**
  * The one-way doors: finalize locks prose, so it is not covered by the revert guarantee. An auto-mode
  * turn declines them and applies the rest of its change-set — throwing would discard a whole turn's work
@@ -130,17 +122,24 @@ const VOLUME_STRUCTURAL_FIELDS = ['objective', 'conflict', 'payoff', 'targetChap
 const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
   'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never applied automatically — select the finalize step and apply it deliberately.' },
   'action.approve_draft': { code: AppErrorCode.DRF_009, note: 'Draft approval is never applied automatically — select the approval step and apply it deliberately.' },
-  'action.approve_volume_plan': {
-    code: AppErrorCode.PLN_003,
-    note: 'Volume plan approval is never applied automatically — select the approval step and apply it deliberately.',
+  'action.generate_chapter': {
+    code: AppErrorCode.DRF_014,
+    note: 'Chapter generation is never applied automatically — select the generation step and apply it deliberately.',
   },
-  'action.approve_arcs': { code: AppErrorCode.ARC_005, note: 'Arc approval is never applied automatically — select the approval step and apply it deliberately.' },
 };
 
 /** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */
 export function declinedOpNote(opResults: OpResult[]): string | undefined {
   const notes = [...new Set(opResults.flatMap(result => (result.note ? [result.note] : [])))];
   return notes.length > 0 ? notes.join(' ') : undefined;
+}
+
+/**
+ * A volume can be removed only once no brief names it, and a change-set may list the brief that leaves it after the removal — as may the
+ * inverse of one that listed the new volume after the brief moving into it. Removals therefore run last, every other op in its listed order.
+ */
+export function volumeRemovalsLast<T extends { op: string }>(ops: readonly T[]): T[] {
+  return [...ops.filter(op => op.op !== 'volume.remove'), ...ops.filter(op => op.op === 'volume.remove')];
 }
 
 /** The one gate between an op and the artifact it edits: `rationale` explains the change to the author and is never stored beside the content it describes. */
@@ -240,7 +239,7 @@ export class ProposalApplyService {
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
       const inverseOps: ContentOp[] = [];
-      for (const { op } of contentOps) {
+      for (const op of volumeRemovalsLast(contentOps.map(entry => entry.op))) {
         const inverse = await this.captureInverse(ctx, op);
         await this.applyOp(ctx, op);
         if (inverse) inverseOps.unshift(inverse);
@@ -391,9 +390,6 @@ export class ProposalApplyService {
       case 'volume.upsert':
       case 'volume.remove':
         return this.inverseVolume(ctx, op);
-      case 'arc.upsert':
-      case 'arc.remove':
-        return this.inverseArc(ctx, op);
       case 'brief.update':
       case 'brief.remove':
         return this.inverseBrief(ctx, op);
@@ -443,31 +439,7 @@ export class ProposalApplyService {
       ordinal: volume.ordinal,
       title: volume.title ?? undefined,
       objective: volume.objective ?? undefined,
-      conflict: volume.conflict ?? undefined,
-      payoff: volume.payoff ?? undefined,
-      targetChapterCount: volume.targetChapterCount ?? undefined,
-      cast: (volume.cast as string[] | null) ?? undefined,
       body: volume.body ?? undefined,
-    };
-  }
-
-  private async inverseArc(ctx: ApplyContext, op: ArcUpsertOp | ArcRemoveOp): Promise<ContentOp | null> {
-    const arc = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
-    if (!arc) return op.op === 'arc.upsert' ? { op: 'arc.remove', arcKey: op.arcKey } : null;
-    return {
-      op: 'arc.upsert',
-      arcKey: op.arcKey,
-      volumeKey: arc.volumeKey,
-      ordinal: arc.ordinal,
-      title: arc.title ?? undefined,
-      objective: arc.objective ?? undefined,
-      escalation: arc.escalation ?? undefined,
-      payoff: arc.payoff ?? undefined,
-      hook: arc.hook ?? undefined,
-      chapterStart: arc.chapterStart ?? undefined,
-      chapterEnd: arc.chapterEnd ?? undefined,
-      cast: (arc.cast as string[] | null) ?? undefined,
-      body: arc.body ?? undefined,
     };
   }
 
@@ -479,8 +451,7 @@ export class ProposalApplyService {
       chapter: op.chapter,
       title: brief.title ?? undefined,
       body: brief.body,
-      volumeKey: brief.volumeKey ?? undefined,
-      arcKey: brief.arcKey ?? undefined,
+      volumeKey: brief.volumeKey,
       writeMode: brief.writeMode,
       handEdited: brief.handEdited,
       contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
@@ -553,10 +524,6 @@ export class ProposalApplyService {
         return this.applyVolumeUpsert(ctx, op);
       case 'volume.remove':
         return this.applyVolumeRemove(ctx, op);
-      case 'arc.upsert':
-        return this.applyArcUpsert(ctx, op);
-      case 'arc.remove':
-        return this.applyArcRemove(ctx, op);
       case 'brief.update':
         return this.applyBriefUpdate(ctx, op);
       case 'brief.remove':
@@ -637,13 +604,9 @@ export class ProposalApplyService {
       ordinal: op.ordinal ?? existing?.ordinal ?? 0,
       title: op.title ?? existing?.title ?? null,
       objective: op.objective ?? existing?.objective ?? null,
-      conflict: op.conflict ?? existing?.conflict ?? null,
-      payoff: op.payoff ?? existing?.payoff ?? null,
-      targetChapterCount: op.targetChapterCount ?? existing?.targetChapterCount ?? null,
-      cast: op.cast ?? existing?.cast ?? null,
       body: op.body ?? existing?.body ?? null,
     };
-    const contentHash = volumeContentHash({ volumeKey: op.volumeKey, ...merged, startChapter: existing?.startChapter ?? null, endChapter: existing?.endChapter ?? null });
+    const contentHash = volumeContentHash({ volumeKey: op.volumeKey, ...merged });
 
     let revision: number;
     if (existing) {
@@ -657,156 +620,19 @@ export class ProposalApplyService {
       await ctx.tx.insert(schema.volumes).values({ projectId: ctx.projectId, volumeKey: op.volumeKey, ...merged, revision, contentHash });
     }
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: revision });
-
-    const structuralChange = existing !== undefined && VOLUME_STRUCTURAL_FIELDS.some(field => op[field] !== undefined && op[field] !== existing[field]);
-    if (structuralChange) await this.markArcsStale(ctx, [op.volumeKey], PLAN_STALE_VOLUME_CHANGED);
-
-    const countChanged = op.targetChapterCount !== undefined && op.targetChapterCount !== existing?.targetChapterCount;
-    if (countChanged && existing?.status === 'approved') {
-      const shifted = await this.recomputeVolumeRanges(ctx);
-      await this.markArcsStale(
-        ctx,
-        shifted.filter(key => key !== op.volumeKey),
-        PLAN_STALE_RANGE_SHIFTED,
-      );
-    }
-  }
-
-  /**
-   * Recomputes approved-plan volume ranges as cumulative `targetChapterCount` sums in ordinal order.
-   * Volumes missing a count stop the walk — their ranges are settled at the next approve.
-   * Returns the volumeKeys whose range actually moved.
-   */
-  private async recomputeVolumeRanges(ctx: ApplyContext): Promise<string[]> {
-    const volumes = await ctx.tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, ctx.projectId), orderBy: asc(schema.volumes.ordinal) });
-
-    const shifted: string[] = [];
-    let nextStart = 1;
-    for (const volume of volumes) {
-      if (volume.targetChapterCount === null) break;
-      const startChapter = nextStart;
-      const endChapter = nextStart + volume.targetChapterCount - 1;
-      nextStart = endChapter + 1;
-      if (volume.startChapter === startChapter && volume.endChapter === endChapter) continue;
-
-      const contentHash = volumeContentHash({ ...volume, startChapter, endChapter } as Record<string, unknown>);
-      await ctx.tx
-        .update(schema.volumes)
-        .set({ startChapter, endChapter, revision: volume.revision + 1, contentHash, updatedAt: new Date() })
-        .where(eq(schema.volumes.id, volume.id));
-      shifted.push(volume.volumeKey);
-    }
-    return shifted;
-  }
-
-  private async markArcsStale(ctx: ApplyContext, volumeKeys: string[], reason: string): Promise<void> {
-    if (volumeKeys.length === 0) return;
-    const stale = await ctx.tx
-      .update(schema.arcs)
-      .set({ staleReason: reason, updatedAt: new Date() })
-      .where(and(eq(schema.arcs.projectId, ctx.projectId), inArray(schema.arcs.volumeKey, volumeKeys)))
-      .returning();
-    ctx.staleMarked.push(...stale.map(arc => `arc:${arc.arcKey}`));
-  }
-
-  private async applyArcUpsert(ctx: ApplyContext, op: ArcUpsertOp): Promise<void> {
-    const existing = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
-
-    const merged = {
-      volumeKey: op.volumeKey,
-      ordinal: op.ordinal ?? existing?.ordinal ?? 0,
-      title: op.title ?? existing?.title ?? null,
-      objective: op.objective ?? existing?.objective ?? null,
-      escalation: op.escalation ?? existing?.escalation ?? null,
-      payoff: op.payoff ?? existing?.payoff ?? null,
-      hook: op.hook ?? existing?.hook ?? null,
-      chapterStart: op.chapterStart ?? existing?.chapterStart ?? null,
-      chapterEnd: op.chapterEnd ?? existing?.chapterEnd ?? null,
-      cast: op.cast ? await this.entityKeyCast(ctx, op.arcKey, op.cast) : (existing?.cast ?? null),
-      body: op.body ?? existing?.body ?? null,
-    };
-
-    const volume = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
-    if (!volume) throw AppErrorCode.VOL_001.create();
-    const withinVolume =
-      volume.startChapter === null ||
-      volume.endChapter === null ||
-      merged.chapterStart === null ||
-      merged.chapterEnd === null ||
-      (merged.chapterStart >= volume.startChapter && merged.chapterEnd <= volume.endChapter);
-    if (!withinVolume) throw AppErrorCode.ARC_002.create();
-
-    const contentHash = arcContentHash({ arcKey: op.arcKey, ...merged });
-    let revision: number;
-    if (existing) {
-      revision = existing.revision + 1;
-      await ctx.tx
-        .update(schema.arcs)
-        .set({ ...merged, revision, contentHash, updatedAt: new Date() })
-        .where(eq(schema.arcs.id, existing.id));
-    } else {
-      revision = 1;
-      await ctx.tx.insert(schema.arcs).values({ projectId: ctx.projectId, arcKey: op.arcKey, ...merged, revision, contentHash });
-    }
-    ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: revision });
-
-    if (existing && merged.chapterStart !== null && merged.chapterEnd !== null) {
-      const stale = await ctx.tx
-        .update(schema.briefs)
-        .set({ staleReason: PLAN_STALE_ARC_CHANGED, updatedAt: new Date() })
-        .where(and(eq(schema.briefs.projectId, ctx.projectId), gte(schema.briefs.chapter, merged.chapterStart), lte(schema.briefs.chapter, merged.chapterEnd)))
-        .returning();
-      ctx.staleMarked.push(...stale.map(brief => `chapter:${brief.chapter}`));
-    }
-  }
-
-  /**
-   * An arc cast names entities, and the planner has filled it with fact keys and display names before. Entries that are not an entity
-   * key are dropped rather than failing the arc; a key differing only in case is corrected to the stored one, unless it could be several.
-   */
-  private async entityKeyCast(ctx: ApplyContext, arcKey: string, cast: string[]): Promise<string[]> {
-    if (cast.length === 0) return [];
-    const lowered = [...new Set(cast.map(entry => entry.trim().toLowerCase()))];
-    const rows = await ctx.tx.query.entities.findMany({
-      columns: { entityKey: true },
-      where: and(eq(schema.entities.projectId, ctx.projectId), inArray(sql<string>`lower(${schema.entities.entityKey})`, lowered)),
-    });
-    const keys = new Set(rows.map(row => row.entityKey));
-    const byLowered = new Map<string, string[]>();
-    for (const { entityKey } of rows) byLowered.set(entityKey.toLowerCase(), [...(byLowered.get(entityKey.toLowerCase()) ?? []), entityKey]);
-
-    const kept: string[] = [];
-    const dropped: string[] = [];
-    const ambiguous: string[] = [];
-    for (const entry of cast) {
-      const trimmed = entry.trim();
-      const candidates = keys.has(trimmed) ? [trimmed] : (byLowered.get(trimmed.toLowerCase()) ?? []);
-      if (candidates.length > 1) ambiguous.push(entry);
-      else if (candidates[0] === undefined) dropped.push(entry);
-      else if (!kept.includes(candidates[0])) kept.push(candidates[0]);
-    }
-    if (dropped.length > 0 || ambiguous.length > 0) {
-      this.logger.warn('apply: dropped arc cast entries that are not entity keys', { projectId: ctx.projectId, arcKey, dropped, ambiguous });
-    }
-    return kept;
   }
 
   private async applyVolumeRemove(ctx: ApplyContext, op: VolumeRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
     if (!existing) throw AppErrorCode.VOL_001.create();
-    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
+    const planned = await ctx.tx.query.briefs.findFirst({
+      where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.volumeKey, op.volumeKey)),
+      columns: { chapter: true },
+    });
+    if (planned) throw AppErrorCode.VOL_002.create({ chapter: String(planned.chapter) });
 
     await ctx.tx.delete(schema.volumes).where(eq(schema.volumes.id, existing.id));
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: null });
-  }
-
-  private async applyArcRemove(ctx: ApplyContext, op: ArcRemoveOp): Promise<void> {
-    const existing = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
-    if (!existing) throw AppErrorCode.ARC_001.create();
-    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
-
-    await ctx.tx.delete(schema.arcs).where(eq(schema.arcs.id, existing.id));
-    ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: null });
   }
 
   private async applyBriefUpdate(ctx: ApplyContext, op: BriefRestoreOp): Promise<void> {
@@ -824,8 +650,7 @@ export class ProposalApplyService {
       title: op.title ?? existing?.title ?? null,
       body: op.body ?? existing?.body ?? '',
       writeMode: op.writeMode ?? existing?.writeMode ?? 'standard',
-      volumeKey: op.volumeKey ?? existing?.volumeKey ?? null,
-      arcKey: op.arcKey ?? existing?.arcKey ?? null,
+      volumeKey: op.volumeKey !== undefined ? op.volumeKey : existing ? existing.volumeKey : await nearestVolumeKey(ctx.tx, ctx.projectId, op.chapter),
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
       pov: op.pov ?? existing?.pov ?? null,
       chapterPurpose: op.chapterPurpose ?? existing?.chapterPurpose ?? null,
@@ -1035,7 +860,7 @@ export class ProposalApplyService {
       if (mismatches.length > 0) return { outcome: 'conflicted' as const, mismatches };
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
-      for (const op of inverseOps) await this.applyOp(ctx, op);
+      for (const op of volumeRemovalsLast(inverseOps)) await this.applyOp(ctx, op);
 
       const [reverted] = await tx
         .update(schema.refinementProposals)

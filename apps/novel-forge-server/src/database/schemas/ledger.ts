@@ -27,7 +27,6 @@ export namespace Ledger {
     entityKeys?: string[];
     factKeys?: string[];
     volumeKeys?: string[];
-    arcKeys?: string[];
     briefChapters?: number[];
   }
 }

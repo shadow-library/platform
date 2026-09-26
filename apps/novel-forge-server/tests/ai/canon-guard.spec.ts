@@ -1,21 +1,19 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  findArcRevealViolations,
   findBriefRevealViolations,
   isLimitCategory,
   renderHardLimits,
   renderRevealSchedule,
   renderRevealViolation,
   revealGuard,
-  sanitiseArcReveals,
   sanitiseBriefReveals,
   type ScheduledReveal,
   scheduledReveals,
   shiftRevealsForInsert,
 } from '@modules/ai/context/canon-guard';
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { buildArcPlanPrompt, buildOutlinePrompt } from '@modules/ai/prompts';
+import { buildOutlinePrompt } from '@modules/ai/prompts';
 import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 
 const bellRinger: ScheduledReveal = {
@@ -48,23 +46,6 @@ function brief(chapter: number, overrides: Record<string, unknown> = {}) {
     },
     chapterPurpose: 'Strands Wren between two factions.',
     readerValue: ['goal_or_plan_change'],
-    ...overrides,
-  };
-}
-
-function arc(arcKey: string, chapterStart: number, chapterEnd: number, overrides: Record<string, unknown> = {}) {
-  return {
-    arcKey,
-    title: 'The Toll Road',
-    objective: 'Wren earns passage.',
-    escalation: 'The wardens close ranks.',
-    payoff: 'Wren reaches the abbey.',
-    hook: 'The abbey gate is already open.',
-    chapterStart,
-    chapterEnd,
-    cast: [],
-    body: 'Marsh politics.',
-    ideas: [],
     ...overrides,
   };
 }
@@ -213,14 +194,6 @@ describe('findBriefRevealViolations', () => {
   });
 });
 
-describe('findArcRevealViolations', () => {
-  it('should flag an arc that surfaces a fact revealed after it ends, but not the arc that contains the reveal', () => {
-    const arcs = [arc('arc_one', 1, 8, { ideas: ['a sermon about the cracked bell'] }), arc('arc_two', 9, 14, { payoff: 'Orrin Vale is unmasked.' })];
-
-    expect(findArcRevealViolations(arcs, [bellRinger])).toEqual([{ subject: 'arc arc_one', field: 'ideas[0]', factKey: 'bell_ringer_is_heir', revealChapter: 12 }]);
-  });
-});
-
 describe('sanitiseBriefReveals', () => {
   const leaky = [
     brief(4, {
@@ -322,23 +295,6 @@ describe('sanitiseBriefReveals', () => {
   });
 });
 
-describe('sanitiseArcReveals', () => {
-  it('should rewrite an early arc to zero violations and leave its chapter range alone', () => {
-    const arcs = [
-      arc('arc_one', 1, 8, { hook: 'Orrin Vale steps out of the bell tower.', ideas: ['a sermon about the cracked bell', 'a flooded road'] }),
-      arc('arc_two', 9, 14, { payoff: 'Orrin Vale is unmasked.' }),
-    ];
-
-    const { arcs: safe, sanitised } = sanitiseArcReveals(arcs, [bellRinger]);
-
-    expect(findArcRevealViolations(safe, [bellRinger])).toEqual([]);
-    expect(safe[0]).toMatchObject({ chapterStart: 1, chapterEnd: 8, hook: 'The bell ringer is more than he seems.', ideas: ['a flooded road'] });
-    expect(safe[1]).toBe(arcs[1]);
-    expect(buildArcPlanPrompt(1, 14).postValidate?.({ arcs: safe } as never)).toEqual([]);
-    expect(sanitised.map(({ field }) => field)).toEqual(['hook', 'ideas[0]']);
-  });
-});
-
 describe('planning prompt gates', () => {
   it('should keep coverage blocking and make an early reveal advisory in the outline prompt', () => {
     const prompt = buildOutlinePrompt(4, 5, resolveWordTarget(), [bellRinger]);
@@ -347,16 +303,6 @@ describe('planning prompt gates', () => {
     expect(prompt.postValidate?.(briefs)).toEqual(['chapter 5 is missing from the outline']);
     expect(prompt.advise?.(briefs)).toEqual([
       'chapter 4 title names a REVEAL SCHEDULE term of bell_ringer_is_heir, whose reveal is scheduled for chapter 12 — keep it out until then',
-    ]);
-  });
-
-  it('should keep coverage blocking and make an early reveal advisory in the arc-plan prompt', () => {
-    const prompt = buildArcPlanPrompt(1, 8, [bellRinger]);
-    const output = { arcs: [arc('arc_one', 1, 8, { hook: 'Orrin Vale steps out of the bell tower.' })] } as never;
-
-    expect(prompt.postValidate?.(output)).toEqual([]);
-    expect(prompt.advise?.(output)).toEqual([
-      'arc arc_one hook names a REVEAL SCHEDULE term of bell_ringer_is_heir, whose reveal is scheduled for chapter 12 — keep it out until then',
     ]);
   });
 });

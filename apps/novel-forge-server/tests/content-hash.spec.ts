@@ -1,25 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
-import { arcContentHash, briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
+import { briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
 
 describe('volumeContentHash', () => {
   it('should hash only the contracted fields', () => {
     const base = volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Ascent' });
     expect(base).toMatch(/^[0-9a-f]{64}$/);
-    expect(volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Ascent', draftNotes: 'ignored' })).toBe(base);
+    expect(volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Ascent', draftNotes: 'ignored', revision: 7 })).toBe(base);
     expect(volumeContentHash({ volumeKey: 'v1', ordinal: 1, title: 'Descent' })).not.toBe(base);
   });
 
   it('should treat an absent field and an explicit null identically', () => {
     expect(volumeContentHash({ volumeKey: 'v1' })).toBe(volumeContentHash({ volumeKey: 'v1', objective: null }));
-  });
-});
-
-describe('arcContentHash', () => {
-  it('should hash only the contracted fields', () => {
-    const base = arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Trial' });
-    expect(base).toBe(arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Trial', revision: 7 }));
-    expect(base).not.toBe(arcContentHash({ arcKey: 'a1', volumeKey: 'v1', title: 'The Retreat' }));
   });
 });
 

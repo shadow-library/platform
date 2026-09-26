@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { bibleDocExcerpt, bibleDocLabel, type BibleDocRow, clipAtBoundary, rankBibleDocs, renderBibleDigest } from '@modules/ai/context/bible-docs';
-import { countTokens } from '@modules/ai/context/token-budget';
-
-const paragraphs = (subject: string, count: number): string =>
-  Array.from({ length: count }, (_, i) => `Paragraph ${i}. ${`${subject} is measured by the lock gauge at every change of the tide. `.repeat(10)}`).join('\n\n');
+import { bibleDocExcerpt, bibleDocLabel, type BibleDocRow, clipAtBoundary, rankBibleDocs } from '@modules/ai/context/bible-docs';
 
 function doc(section: BibleDocRow['section'], slug: string, body: string | null, frontmatter: Record<string, unknown> | null = null): BibleDocRow {
   return { section, slug, body, frontmatter };
@@ -70,56 +66,5 @@ describe('rankBibleDocs', () => {
       'lore/songs',
       'ai/drafting',
     ]);
-  });
-});
-
-describe('renderBibleDigest', () => {
-  it('should keep every short document whole and skip empty ones', () => {
-    const digest = renderBibleDigest([doc('world', 'canal', 'CANAL_MARKER The canal runs north.'), doc('plot', 'blank', '   \n  '), doc('plot', 'none', null)], {
-      totalTokens: 2_000,
-      perDocTokens: 1_000,
-    });
-    expect(digest.text).toContain('### bible_doc:world/canal — Canal\nCANAL_MARKER The canal runs north.');
-    expect(digest.text).not.toContain('blank');
-    expect(digest.truncated).toEqual([]);
-    expect(digest.omitted).toEqual([]);
-  });
-
-  it('should stay within its budget, cutting long documents and handing a short one’s unused share to the rest', () => {
-    const docs = [doc('world', 'short', 'SHORT_MARKER One line.'), doc('plot', 'long-a', paragraphs('The ferry', 30)), doc('power', 'long-b', paragraphs('The gauge', 30))];
-    const digest = renderBibleDigest(docs, { totalTokens: 3_000, perDocTokens: 2_500 });
-
-    expect(countTokens(digest.text)).toBeLessThanOrEqual(3_000);
-    expect(countTokens(digest.text)).toBeGreaterThan(2_500);
-    expect(digest.text).toContain('SHORT_MARKER');
-    expect(digest.truncated.sort()).toEqual(['bible_doc:plot/long-a', 'bible_doc:power/long-b']);
-    expect(digest.text).toContain('[…cut to fit]');
-  });
-
-  it('should drop the lowest-priority documents rather than shrink every document below a readable size', () => {
-    const docs = Array.from({ length: 12 }, (_, i) => doc('world', `place-${String(i).padStart(2, '0')}`, paragraphs(`Place ${i}`, 10)));
-    const digest = renderBibleDigest([...docs, doc('project', 'premise', paragraphs('The premise', 10))], { totalTokens: 1_500, perDocTokens: 1_000 });
-
-    expect(digest.text.startsWith('### bible_doc:project/premise')).toBe(true);
-    expect(digest.omitted.length).toBeGreaterThan(0);
-    expect(digest.omitted.at(-1)).toBe('bible_doc:world/place-11');
-    expect(countTokens(digest.text)).toBeLessThanOrEqual(1_500);
-  });
-
-  it('should leave out every non-core document when asked for the core only', () => {
-    const digest = renderBibleDigest([doc('lore', 'songs', 'LORE_MARKER'), doc('world', 'canal', 'WORLD_MARKER')], { totalTokens: 2_000, perDocTokens: 1_000, coreOnly: true });
-    expect(digest.text).toContain('WORLD_MARKER');
-    expect(digest.text).not.toContain('LORE_MARKER');
-  });
-
-  it('should give non-core documents only what the core documents leave', () => {
-    const digest = renderBibleDigest([doc('lore', 'songs', paragraphs('The song', 30)), doc('plot', 'main-line', paragraphs('The plot', 30))], {
-      totalTokens: 2_000,
-      perDocTokens: 1_800,
-    });
-    const plotAt = digest.text.indexOf('bible_doc:plot/main-line');
-    const loreAt = digest.text.indexOf('bible_doc:lore/songs');
-    expect(plotAt).toBe(4);
-    expect(loreAt === -1 || countTokens(digest.text.slice(loreAt)) < countTokens(digest.text.slice(plotAt, loreAt))).toBe(true);
   });
 });

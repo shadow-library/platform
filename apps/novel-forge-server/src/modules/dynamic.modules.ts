@@ -25,7 +25,6 @@ import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
 import { LedgerModule } from '@modules/ledger';
 import { NovelImportModule } from '@modules/novel-import';
-import { PlanImportModule } from '@modules/plan-import';
 import { PluginProposalModule, PluginsModule } from '@modules/plugins';
 import { ProjectModule } from '@modules/project';
 import { PublishingHttpModule } from '@modules/publishing/publishing-http.module';
@@ -59,7 +58,6 @@ export const HttpRouteModule = FastifyModule.forRoot({
     JobsModule,
     LedgerModule,
     NovelImportModule,
-    PlanImportModule,
     PluginsModule,
     PluginProposalModule,
     ProjectModule,

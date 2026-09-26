@@ -1,11 +1,9 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
-import { jsonb } from './jsonb';
 import { projects } from './projects';
 
 export namespace Story {
-  export type Beat = InferSelectModel<typeof beats>;
   export type PlotThread = InferSelectModel<typeof plotThreads>;
   export type WorldFact = InferSelectModel<typeof worldFacts>;
   export type Mystery = InferSelectModel<typeof mysteries>;
@@ -15,25 +13,6 @@ export namespace Story {
 
 export const threadStatus = pgEnum('thread_status', ['open', 'closed']);
 export const mysteryStatus = pgEnum('mystery_status', ['open', 'resolved']);
-
-export const beats = pgTable(
-  'beats',
-  {
-    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-    projectId: bigint('project_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => projects.id, { onDelete: 'cascade' }),
-    beatKey: varchar('beat_key').notNull(),
-    chapter: integer('chapter').notNull(),
-    beatType: varchar('beat_type'),
-    summary: text('summary'),
-    entities: jsonb('entities'),
-    opensThreads: jsonb('opens_threads'),
-    closesThreads: jsonb('closes_threads'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-  },
-  t => [unique('beats_project_id_beat_key_unique').on(t.projectId, t.beatKey), index('beats_project_id_chapter_idx').on(t.projectId, t.chapter)],
-);
 
 export const plotThreads = pgTable(
   'plot_threads',
@@ -52,8 +31,7 @@ export const plotThreads = pgTable(
     // The most recent chapter whose continuity extraction named this thread — distinct from
     // openedChapter/closedChapter, which only mark the endpoints. Drives dormant-thread detection.
     lastAdvancedChapter: integer('last_advanced_chapter'),
-    // A single target chapter the thread is expected to pay off by. No automated writer yet — purely
-    // additive for future outliner/arc-plan authoring; the dormant-thread report uses it when present.
+    // A single target chapter the thread is expected to pay off by. No automated writer yet; the dormant-thread report uses it when present.
     payoffWindow: integer('payoff_window'),
     // Marked by the outliner/continuity-extraction as a deliberate running thread, not an oversight —
     // novel-validation must not flag it as an unresolved-thread issue while this is true.
@@ -109,10 +87,6 @@ export const mysteries = pgTable(
   },
   t => [unique('mysteries_project_id_mystery_key_unique').on(t.projectId, t.mysteryKey)],
 );
-
-export const beatsRelations = relations(beats, ({ one }) => ({
-  project: one(projects, { fields: [beats.projectId], references: [projects.id] }),
-}));
 
 export const plotThreadsRelations = relations(plotThreads, ({ one }) => ({
   project: one(projects, { fields: [plotThreads.projectId], references: [projects.id] }),

@@ -82,75 +82,8 @@ export class AuditBibleResponse {
 }
 
 @Schema()
-export class PlanArcsParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field()
-  volumeKey: string;
-}
-
-@Schema()
-export class PlanArcsBody {
-  @Field(() => Integer, { optional: true, minimum: 1, maximum: 20 })
-  arcCount?: number;
-
-  @Field({ optional: true, maxLength: 5000 })
-  guidance?: string;
-}
-
-@Schema()
-export class PlannedArcItem {
-  @Field()
-  arcKey: string;
-
-  @Field()
-  title: string;
-
-  @Field()
-  objective: string;
-
-  @Field()
-  escalation: string;
-
-  @Field()
-  payoff: string;
-
-  @Field()
-  hook: string;
-
-  @Field(() => Integer)
-  chapterStart: number;
-
-  @Field(() => Integer)
-  chapterEnd: number;
-
-  @Field(() => [String])
-  cast: string[];
-
-  @Field()
-  body: string;
-
-  @Field(() => [String])
-  ideas: string[];
-}
-
-@Schema()
-export class PlanArcsResponse {
-  @Field(() => ProposalResponse)
-  proposal: ProposalResponse;
-
-  @Field(() => [PlannedArcItem])
-  arcs: PlannedArcItem[];
-
-  @Field()
-  runId: string;
-}
-
-@Schema()
 export class ContextPreviewQuery {
-  @Field({ enum: ['generation', 'outline', 'chat', 'arc_plan', 'premise', 'audit'] })
+  @Field({ enum: ['generation', 'outline', 'chat', 'premise', 'audit'] })
   purpose: string;
 
   @Field(() => Integer, { optional: true, minimum: 1, description: 'required for generation/outline' })
@@ -158,9 +91,6 @@ export class ContextPreviewQuery {
 
   @Field({ optional: true, enum: chatScope.enumValues, description: 'chat scope type' })
   scopeType?: string;
-
-  @Field({ optional: true, description: 'volume for arc_plan previews' })
-  volumeKey?: string;
 }
 
 @Schema()

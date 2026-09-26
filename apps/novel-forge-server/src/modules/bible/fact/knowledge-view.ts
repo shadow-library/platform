@@ -256,7 +256,7 @@ export function scrubForWriter(text: string, forbidden: FactLike[]): string {
   return [scrubbed.trim(), ...safe].filter(Boolean).join('\n');
 }
 
-/** For plan text — briefs, volumes and arcs can name a reveal's give-away terms without its text — so the terms are withheld as well. */
+/** For plan text — briefs and volumes can name a reveal's give-away terms without its text — so the terms are withheld as well. */
 export function scrubPlanForWriter(text: string, forbidden: FactLike[]): string {
   const patterns = forbidden
     .flatMap(fact => fact.terms ?? [])

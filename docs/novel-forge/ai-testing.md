@@ -8,13 +8,13 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 2. Run recipes in order within a part. Later recipes assume the project state earlier ones create; each block names its preconditions.
 3. "The harness" means the AI orchestration around the models: prompts, context packs, LangGraph graphs, judge and repair, and model routing.
 
-| Part                                  | Features                                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                            |
-| Part 2: lore bible                    | Premise enhancement, bible builder, readiness, audit, proposal-only writes, one end-to-end sample                              |
-| Part 3: planning, generation          | Volume and arc planning, briefs, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
-| Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                                 |
-| Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)                   |
+| Part                                  | Features                                                                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                   |
+| Part 2: lore bible                    | Premise enhancement, bible builder, readiness, audit, proposal-only writes, one end-to-end sample                     |
+| Part 3: planning, generation          | Volumes, chapter plans, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
+| Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                        |
+| Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)          |
 
 ## Recipe format
 
@@ -81,7 +81,7 @@ Two viable setups:
 
 | Process       | Command (cwd)                               | Port | Evidence                                                                                           |
 | ------------- | ------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
-| server        | `cd apps/novel-forge-server && bun run dev` | 8080 | `apps/novel-forge-server/package.json:8` (`bun run --watch src/main.ts`); `src/bootstrap.ts:43-44` |
+| server        | `cd apps/novel-forge-server && bun run dev` | 8080 | `apps/novel-forge-server/package.json:8` (`bun run --watch src/main.ts`); `src/bootstrap.ts:40-41` |
 | server health | —                                           | 8081 | `packages/modules/src/http-core/http-core.constants.ts:29` — but see below                         |
 | web           | `cd apps/novel-forge-web && bun run dev`    | 3000 | `apps/novel-forge-web/vite.config.ts:24`                                                           |
 
@@ -245,38 +245,37 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 `config.service.ts` come from `@shadow-library/common`, and the `STORAGE_*` and `DATABASE_*` keys from
 `@shadow-library/modules` — none of those appear in `bootstrap.ts`.
 
-| Env var                             | Default                                          | Declared                                    | What it changes                                                                                                                                    |
-| ----------------------------------- | ------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                          | `development`                                    | `config.service.ts:96`                      | the real dev switch: gates OpenAPI, the health port, and the `LOG_LEVEL` default                                                                   |
-| `APP_STAGE`                         | `prod`                                           | `packages/common/.../config.service.ts:105` | changes nothing here — its only reader is `Config.isProductionDeployment()` (`:333-334`), which no `novel-forge-server` or `packages/*` path calls |
-| `LOG_LEVEL`                         | `debug` when `NODE_ENV=development`, else `info` | `config.service.ts:107`                     | **keep it `debug`** — the full prompt input and raw output only ride on debug (§7)                                                                 |
-| `SERVER_PORT` / `SERVER_HOST`       | `8080` / `0.0.0.0`                               | `bootstrap.ts:43-44`                        |                                                                                                                                                    |
-| `DATABASE_POSTGRES_URL`             | `…@localhost:7070/novel_forge` in the example    | `.env.example:14`                           | pgvector required; `src/migrate.ts:15` falls back to the same DSN without the port                                                                 |
-| `AI_OPENROUTER_API_KEY`             | —                                                | `bootstrap.ts:46`                           | **every** chat and image model; absent → `AI_006`                                                                                                  |
-| `AI_OPENROUTER_API_URL`             | `https://openrouter.ai/api/v1`                   | `bootstrap.ts:47`                           | point at any OpenAI-compatible gateway                                                                                                             |
-| `AI_OLLAMA_HOST`                    | `http://localhost:11434`                         | `bootstrap.ts:48`                           | embeddings only                                                                                                                                    |
-| `AI_EMBEDDING_MODEL`                | `qwen3-embedding:8b`                             | `bootstrap.ts:49`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap                                                                                |
-| `AI_LLM_TIMEOUT_MS`                 | `300000`                                         | `bootstrap.ts:50`                           | per-call budget (`model-router.service.ts:186`)                                                                                                    |
-| `AI_LLM_MAX_RETRIES`                | `2`                                              | `bootstrap.ts:51`                           | **transport** retries only → 3 attempts (`model-router.service.ts:609-630`)                                                                        |
-| `AI_LLM_BACKOFF_MS`                 | `500`                                            | `bootstrap.ts:52`                           | exponential                                                                                                                                        |
-| `AI_QUOTA_WINDOW_MS`                | `3600000`                                        | `bootstrap.ts:53`                           | rolling window, per project owner                                                                                                                  |
-| `AI_QUOTA_MAX_CALLS`                | `1000`                                           | `bootstrap.ts:54`                           | **set `0`** locally                                                                                                                                |
-| `AI_QUOTA_MAX_COST_USD`             | `50`                                             | `bootstrap.ts:55`                           | **set `0`** locally                                                                                                                                |
-| `AI_LANGSMITH_API_KEY`              | —                                                | `bootstrap.ts:56`                           | **does nothing** — loaded but read nowhere in `apps/` or `packages/`, and LangChain ignores the `AI_` prefix (§7)                                  |
-| `LANGSMITH_TRACING`                 | `false`                                          | `.env.example:41`                           | LangChain's own switch — pair it with LangChain's own `LANGSMITH_API_KEY` (§7)                                                                     |
-| `PROJECTS_MAX_PER_OWNER`            | `100`                                            | `bootstrap.ts:58`                           | `0` disables; breach → `PRJ_004`                                                                                                                   |
-| `PUBLISHING_AUTO_PUSH`              | `true`                                           | `bootstrap.ts:60`                           | **set `false`** with no reader service                                                                                                             |
-| `GENERATION_RECONCILIATION_CADENCE` | `5`                                              | `bootstrap.ts:62`                           | finalized chapters between automatic arc re-outlines                                                                                               |
-| `PLUGINS_DIR`                       | `''`                                             | `bootstrap.ts:64`                           | **leave empty** (§9)                                                                                                                               |
-| `STORAGE_DRIVER`                    | `s3` in the example                              | `.env.example:46`                           | **set `local`** off-cluster; declared by `StorageModule`, not `bootstrap.ts`                                                                       |
-| `STORAGE_LOCAL_DIR`                 | `./storage-data`                                 | `.env.example:58`                           |                                                                                                                                                    |
-| `STORAGE_PUBLIC_ORIGIN`             | —                                                | `.env.example:47`                           | the origin image URLs are resolved against                                                                                                         |
+| Env var                       | Default                                          | Declared                                    | What it changes                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                    | `development`                                    | `config.service.ts:96`                      | the real dev switch: gates OpenAPI, the health port, and the `LOG_LEVEL` default                                                                   |
+| `APP_STAGE`                   | `prod`                                           | `packages/common/.../config.service.ts:105` | changes nothing here — its only reader is `Config.isProductionDeployment()` (`:333-334`), which no `novel-forge-server` or `packages/*` path calls |
+| `LOG_LEVEL`                   | `debug` when `NODE_ENV=development`, else `info` | `config.service.ts:107`                     | **keep it `debug`** — the full prompt input and raw output only ride on debug (§7)                                                                 |
+| `SERVER_PORT` / `SERVER_HOST` | `8080` / `0.0.0.0`                               | `bootstrap.ts:40-41`                        |                                                                                                                                                    |
+| `DATABASE_POSTGRES_URL`       | `…@localhost:7070/novel_forge` in the example    | `.env.example:14`                           | pgvector required; `src/migrate.ts:15` falls back to the same DSN without the port                                                                 |
+| `AI_OPENROUTER_API_KEY`       | —                                                | `bootstrap.ts:43`                           | **every** chat and image model; absent → `AI_006`                                                                                                  |
+| `AI_OPENROUTER_API_URL`       | `https://openrouter.ai/api/v1`                   | `bootstrap.ts:44`                           | point at any OpenAI-compatible gateway                                                                                                             |
+| `AI_OLLAMA_HOST`              | `http://localhost:11434`                         | `bootstrap.ts:45`                           | embeddings only                                                                                                                                    |
+| `AI_EMBEDDING_MODEL`          | `qwen3-embedding:8b`                             | `bootstrap.ts:46`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap                                                                                |
+| `AI_LLM_TIMEOUT_MS`           | `300000`                                         | `bootstrap.ts:47`                           | per-call budget (`model-router.service.ts:186`)                                                                                                    |
+| `AI_LLM_MAX_RETRIES`          | `2`                                              | `bootstrap.ts:48`                           | **transport** retries only → 3 attempts (`model-router.service.ts:609-630`)                                                                        |
+| `AI_LLM_BACKOFF_MS`           | `500`                                            | `bootstrap.ts:49`                           | exponential                                                                                                                                        |
+| `AI_QUOTA_WINDOW_MS`          | `3600000`                                        | `bootstrap.ts:50`                           | rolling window, per project owner                                                                                                                  |
+| `AI_QUOTA_MAX_CALLS`          | `1000`                                           | `bootstrap.ts:51`                           | **set `0`** locally                                                                                                                                |
+| `AI_QUOTA_MAX_COST_USD`       | `50`                                             | `bootstrap.ts:52`                           | **set `0`** locally                                                                                                                                |
+| `AI_LANGSMITH_API_KEY`        | —                                                | `bootstrap.ts:53`                           | **does nothing** — loaded but read nowhere in `apps/` or `packages/`, and LangChain ignores the `AI_` prefix (§7)                                  |
+| `LANGSMITH_TRACING`           | `false`                                          | `.env.example:41`                           | LangChain's own switch — pair it with LangChain's own `LANGSMITH_API_KEY` (§7)                                                                     |
+| `PROJECTS_MAX_PER_OWNER`      | `100`                                            | `bootstrap.ts:55`                           | `0` disables; breach → `PRJ_004`                                                                                                                   |
+| `PUBLISHING_AUTO_PUSH`        | `true`                                           | `bootstrap.ts:57`                           | **set `false`** with no reader service                                                                                                             |
+| `PLUGINS_DIR`                 | `''`                                             | `bootstrap.ts:59`                           | **leave empty** (§9)                                                                                                                               |
+| `STORAGE_DRIVER`              | `s3` in the example                              | `.env.example:46`                           | **set `local`** off-cluster; declared by `StorageModule`, not `bootstrap.ts`                                                                       |
+| `STORAGE_LOCAL_DIR`           | `./storage-data`                                 | `.env.example:58`                           |                                                                                                                                                    |
+| `STORAGE_PUBLIC_ORIGIN`       | —                                                | `.env.example:47`                           | the origin image URLs are resolved against                                                                                                         |
 
 #### Model groups and defaults — there is no env var for these
 
 Model selection is **code + database**, not environment.
 
-- Roles → groups: `src/modules/ai/defaults.ts:42-72`. `bible`, `plan`, `outline`, `arc`, `premise`,
+- Roles → groups: `src/modules/ai/defaults.ts`. `bible`, `plan`, `outline`, `premise`,
   `extraction` all map to **`planning`**.
 - Production group defaults (`defaults.ts:85-95`):
   `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
@@ -319,9 +318,7 @@ Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `in
 
 - `kind` has one value, `new_novel` (`src/database/schemas/projects.ts`).
 - `contentMode`: `standard | unrestricted` (`projects.ts`).
-- A create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
-  no `contentHash`, which is how the plan importer tells them from authored docs
-  (`src/modules/plan-import/plan-import.service.ts:114-120`).
+- A create also inserts blank placeholder bible documents (`project.service.ts`); they carry no `contentHash`.
 
 **Always send `kind: "new_novel"`**; it is the only value the enum accepts.
 
@@ -336,11 +333,9 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 
 **UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — every door posts to
 `POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project; "I know the
-novel" creates the same project and leaves you on Overview; "Import a
-plan" creates a `new_novel` project and opens Import Plan. Screens are declared once in
+novel" creates the same project and leaves you on Overview. Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
-project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Import Plan
-(deprecated)**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
+project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
 Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**.
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
@@ -418,7 +413,7 @@ raw_output, error`. `raw_output` is persisted for every successful call
 documents as plain prompt variables (`src/modules/ai/graphs/bible-builder.graph.ts:183-245`). So **a bible run has
 no `context_packs` row** and `GET /runs/:runId/context` is empty for it. That is expected, not a bug.
 
-LangSmith: **`AI_LANGSMITH_API_KEY` does not work.** `bootstrap.ts:56` loads `ai.langsmith.api.key` into the
+LangSmith: **`AI_LANGSMITH_API_KEY` does not work.** `bootstrap.ts:53` loads `ai.langsmith.api.key` into the
 config cache, and nothing in `apps/` or `packages/` ever reads it back; LangChain reads its own unprefixed
 `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` from the process env. To get traces, export those two directly
 alongside the server. Leave `AI_LANGSMITH_API_KEY` alone and do not conclude tracing is broken when it produces
@@ -436,7 +431,7 @@ This is the part the README does not cover and where the obvious move is wrong.
 | Re-run the bible builder over an existing bible | `POST /api/v1/projects/:id/seed-from-brief` with `{"brief":"…","force":true}`                               | `generation.dto.ts:105-112`; skip-check at `bible-builder.graph.ts:73-81` |
 | Clear drafts/briefs only                        | `POST /api/v1/projects/:id/reset {"stage":"generate"}`                                                      | `project.service.ts:376-385`                                              |
 | Clear volumes                                   | `…/reset {"stage":"plan"}`                                                                                  | `project.service.ts:369-374`                                              |
-| Clear entities/world facts                      | `…/reset {"stage":"extract"}`                                                                               | `project.service.ts:352-367`                                              |
+| Clear entities/world facts                      | `…/reset {"stage":"knowledge"}`                                                                             | `project.service.ts:352-367`                                              |
 | Wipe the DB                                     | `DROP DATABASE novel_forge; CREATE DATABASE novel_forge;` then `bun run db apps/novel-forge-server migrate` | no endpoint or script exists                                              |
 
 **Two traps:**
@@ -640,13 +635,13 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 
 ### Where the old README is wrong
 
-| README said                                                    | Actually                                                                                                                                                                                                                                                                                   |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `STORAGE_DRIVER` default `local`, `STORAGE_IMAGE_DIR=./images` | the driver is `s3` (Garage) in `.env.example:46`, and the key is `STORAGE_LOCAL_DIR` (`:58`); `STORAGE_IMAGE_DIR` no longer exists                                                                                                                                                         |
-| the env table is the whole list                                | it omits `AI_LLM_TIMEOUT_MS`, `AI_LLM_MAX_RETRIES`, `AI_LLM_BACKOFF_MS`, `AI_QUOTA_*`, `PROJECTS_MAX_PER_OWNER`, `PUBLISHING_AUTO_PUSH`, `GENERATION_RECONCILIATION_CADENCE`, `PLUGINS_DIR` (all in `bootstrap.ts:50-64`), and every `AUTH_*` var — without which the server does not boot |
-| "five LangGraph workflows"                                     | there are now six graphs in `src/modules/ai/graphs/` — the five listed plus mechanical-check                                                                                                                                                                                               |
-| route table                                                    | routes have moved: the bible document route is `GET/PUT /projects/:id/bible/:section/:slug` (`bible-document.controller.ts:23,32`), volumes approve is `POST /projects/:id/volumes/approve` (`volume.controller.ts:17`), and many screens' routes did not exist then                       |
-| `.env.example:13` "Run `bun run db:migrate`"                   | there is no `db:migrate` script in `apps/novel-forge-server/package.json`; use `bun run db apps/novel-forge-server migrate` from the root                                                                                                                                                  |
+| README said                                                    | Actually                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STORAGE_DRIVER` default `local`, `STORAGE_IMAGE_DIR=./images` | the driver is `s3` (Garage) in `.env.example:46`, and the key is `STORAGE_LOCAL_DIR` (`:58`); `STORAGE_IMAGE_DIR` no longer exists                                                                                                                          |
+| the env table is the whole list                                | it omits `AI_LLM_TIMEOUT_MS`, `AI_LLM_MAX_RETRIES`, `AI_LLM_BACKOFF_MS`, `AI_QUOTA_*`, `PROJECTS_MAX_PER_OWNER`, `PUBLISHING_AUTO_PUSH`, `PLUGINS_DIR` (all in `bootstrap.ts:47-59`), and every `AUTH_*` var — without which the server does not boot       |
+| "five LangGraph workflows"                                     | there are now six graphs in `src/modules/ai/graphs/` — the five listed plus mechanical-check                                                                                                                                                                |
+| route table                                                    | routes have moved: the bible document route is `GET/PUT /projects/:id/bible/:section/:slug` (`bible-document.controller.ts:23,32`), volumes are read-only over HTTP (`GET /projects/:id/volumes[/:volumeKey]`), and many screens' routes did not exist then |
+| `.env.example:13` "Run `bun run db:migrate`"                   | there is no `db:migrate` script in `apps/novel-forge-server/package.json`; use `bun run db apps/novel-forge-server migrate` from the root                                                                                                                   |
 
 ---
 
@@ -797,7 +792,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Verify:** `refinement_proposals.status` goes `pending → applied` (the other terminal values are `conflicted` when
   a baseline moved, `superseded`, `reverted` and `discarded`). The domain write and the status change are one
   transaction with a baseline conflict check —
-  audit / premise / arc-plan / chat output must **never** appear in `bible_documents`, `entities` or `canon_facts`
+  audit / premise / chat output must **never** appear in `bible_documents`, `entities` or `canon_facts`
   without a corresponding applied proposal. `bible_documents.revision` and `content_hash` move on every upsert that changes the body — an upsert
   whose `content_hash` is unchanged is a no-op and leaves the revision alone. Direct author edits stay available:
   `PUT /api/v1/projects/{projectId}/bible/{section}/{slug}`, `PATCH …/entities/{entityKey}`,
@@ -925,118 +920,29 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 
 ---
 
-#### Volume planning
+#### Volumes and chapter plans
 
-- **Entry:** **Volumes & Arcs** screen → "Generate volumes" dialog; `POST /projects/:projectId/plan`.
-- **Preconditions:** bible documents exist (Part 2). No volumes needed — this creates them.
-- **Input:** `{"volumeCount": 2, "chaptersPerVolume": 4}` (UI dialog defaults are 3 × 8; keep it at 2 × 4 so
-  the whole chain below is 8 chapters). Optional `skeleton` overrides the derived one; omit it.
-- **Run:** 1. Open **Volumes & Arcs**. 2. "Generate volumes" → Volumes 2, Chapters per volume 4 → submit. 3. Toast reads `Planned 2 volumes`.
-- **Verify:** `volumes` gains 2 rows, `volumes.status='draft'`,
-  `volumes.volume_key` / `ordinal` / `title` / `objective` / `conflict` / `payoff` / `start_chapter` /
-  `end_chapter` / `target_chapter_count` all non-null. The ranges are the model's own — `target_chapter_count`
-  is derived as `endChapter - startChapter + 1` (`generation.service.ts:250`) and only the approve step below
-  makes them contiguous, so a plan of 1–4 / 5–8 is the expected shape but not enforced here.
-  `model_calls` gains one row `prompt_key='plan'`, `prompt_version='1.2.0'`, `role='plan'`
-  (`ai/prompts/plan.prompt.ts:16`) with `run_id` **null** — planning is a bare model call, not a graph, so
-  it never appears on **Workflow Runs**. **Quality:** each volume's `objective`, `conflict` and `payoff` must be
-  three _different_ statements — a payoff that restates the objective, or a conflict that is just "she must
-  survive", is the harness under-performing. `cast` should name entity keys that actually exist in `entities`.
-- **Fails when:** empty `volumes[]` (weak model read a blank skeleton — `generation.service.ts:203-213`
-  is the fallback that should prevent it);
-  log line `plan: volumes upserted` with a count below `volumeCount`.
-- **Cost:** 1 model call.
+- **Entry:** the chat hub (`POST /projects/:projectId/chat/...`), staging `volume.upsert` and `brief.update` ops, or
+  `PUT /projects/:projectId/briefs/:n` for one chapter (next recipe). Volumes have no planner and no approval
+  step, and are read-only over HTTP.
+- **Preconditions:** bible documents exist (Part 2).
+- **Input (chat):** "Two volumes: the first ends when Amara gets into the ledger house, the second when she steals the
+  slip back. Plan chapter 1: Amara copies the day's withdrawals and finds her own name crossed out."
+- **Verify:** the proposal carries `volume.upsert` ops with `volumeKey`, `ordinal`, `title` and `objective` (the goal)
+  only — `conflict`, `payoff`, `targetChapterCount`, `cast` and chapter ranges are refused as unexpected fields —
+  and a `brief.update` for chapter 1 naming its `volumeKey`. After apply: `volumes` rows hold no range or status;
+  `briefs.volume_key` decides which volume goal the chapter writer sees (`volume_objective` section).
+  **Quality:** each volume goal is one concrete end state, not a mood.
+- **Fails when:** a `volume.remove` for a volume a brief still names → `VOL_002`.
 
-#### Volume plan approval (lays out chapter ranges)
-
-- **Entry:** **Volumes & Arcs** → "Approve plan" (shown while any volume is `draft`);
-  `POST /projects/:projectId/approve` — or the identical `POST /projects/:projectId/volumes/approve`.
-- **Preconditions:** volume planning above.
-- **Input:** no body.
-- **Run:** 1. Click "Approve plan". 2. Toast `Volume plan approved`.
-- **Verify:** response `{"volumesApproved":2,"approved":true}`. `volumes.status='approved'` for all non-`source`
-  rows; `start_chapter`/`end_chapter` recomputed as **cumulative sums of `target_chapter_count` in ordinal
-  order** starting at 1 (`bible/volume/volume.approve.ts:33-44`) — so ranges are 1–4, 5–8 with no gap and no
-  overlap even if the model's own ranges disagreed. `volumes.revision` +1 and `content_hash` changes.
-  `GET /projects/:projectId/status` → `planApproved: true`. No model call is made.
-- **Fails when:** `PLN_002` — a volume has neither a `target_chapter_count` nor an explicit range;
-  `approved:false` with `volumesApproved:0` when every volume is `status='source'` (imported novel).
-- **Note:** the two routes share `approveVolumePlan`, so they cannot drift.
-
-#### Arc planning (arc_plan proposal)
-
-- **Entry:** **Volumes & Arcs** → open a volume → "Generate arcs" (the button reads "Re-plan arcs" once the
-  volume already has arcs — `volumes.tsx:289`); `POST /projects/:projectId/volumes/:volumeKey/arcs/plan`.
-- **Preconditions:** every volume `status ≠ 'draft'` **and** this volume has both chapter bounds, else
-  `ARC_003` (`refine.service.ts:179-180`).
-- **Input:** `{"arcCount": 2, "guidance": "Arc 1 is Amara inside the ledger house learning how a withdrawal is
-written; arc 2 is the theft attempt at the Salt Assize. Do not resolve who signed her pledge."}`
-- **Run:** 1. Open volume `vol_1`. 2. "Generate arcs". 3. Toast: `Arc plan proposed — review and apply it from
-Proposals`. 4. Go to **Proposals**, open the `arc_plan` proposal, apply it
-  (`POST /projects/:projectId/proposals/:proposalId/apply`).
-- **Verify:** response carries `proposal`, `arcs[]`, `runId`. **Nothing is written to `arcs` until the proposal
-  is applied** — that is the design (`refine.service.ts:218`). `refinement.proposals` row: `kind='arc_plan'`,
-  `scope_type='arc_plan'`, `scope_ref='volume:vol_1'`, `allowed_ops` = `arc.upsert, arc.remove`.
-  `model_calls`: `prompt_key='arc-plan'`, `prompt_version='1.0.0'`, `role='arc'`. After apply: `arcs` rows
-  with `chapter_start`/`chapter_end` that **exactly partition** 1–4, `status='draft'`, `revision=1`.
-  **Quality:** each arc's `escalation` must be a raise over the previous arc's, and `hook` must be a concrete
-  handoff beat ("the slip is gone from the drawer"), not a mood. `body` should carry the `Ideas:` block.
-- **Fails when:** `ARC_003` (plan not approved); `ARC_002` on apply when the arcs leave the volume range
-  (`proposal-apply.service.ts:776`); arcs that overlap or leave a gap — visible immediately at the approve step.
-- **Cost:** 1 model call.
-
-#### Arc approval
-
-- **Entry:** **Volumes & Arcs** → volume → "Approve arcs";
-  `POST /projects/:projectId/volumes/:volumeKey/arcs/approve`.
-- **Preconditions:** volume `status='approved'` with both bounds; arcs applied from the proposal.
-- **Input:** no body.
-- **Run:** 1. Click "Approve arcs". 2. Toast `N arcs approved`.
-- **Verify:** `arcs.status='approved'`, `arcs.stale_reason=NULL` for every arc of the volume. The coverage
-  invariant is checked first (`arc.service.ts:109-118`): ordered by `ordinal`, `chapterStart` must equal the
-  previous `chapterEnd+1`, first must equal `volume.startChapter`, last must equal `volume.endChapter`.
-  Deliberately break it — `PUT /projects/:projectId/arcs/arc_1_2` with
-  `{"volumeKey":"vol_1","chapterStart":4,"chapterEnd":4}` when arc 1 ends at 2 (`volumeKey` is **required** by
-  `UpsertArcBody`; every other field omitted keeps its stored value) — and re-approve → `ARC_002`. No model call.
-- **Fails when:** `ARC_002` (gap/overlap/short coverage), `ARC_003` (volume not approved), `VOL_001`.
-
-#### Arc-scoped outlining → per-chapter briefs
-
-- **Entry:** **Volumes & Arcs** → arc → "Generate briefs" ("Regenerate briefs" once the arc's briefs exist —
-  `volumes.tsx:392`); `POST /projects/:projectId/arcs/:arcKey/outline`.
-- **Preconditions:** **every** arc of the volume approved, else `ARC_004` (`generation.service.ts:403`).
-  While this arc is unapproved the UI shows "Brief generation needs every arc in this volume approved
-  first — approve arcs from the volume page" (`volumes.tsx:395`).
-- **Input:** `{"context":"Amara narrates. Keep the Assize off-page until arc 2."}` (`context` optional).
-- **Run:** 1. Open arc `arc_1_1`. 2. "Generate briefs". 3. Toast `Drafted N chapter briefs for this arc`.
-- **Verify:** `briefs` rows for exactly the arc's range, `arc_key` and `volume_key` set, `stale_reason=NULL`,
-  `hand_edited=false`, `write_mode='standard'`. Every row must carry `ending_contract` (hookType,
-  emotionalBeat, openQuestion, handoffState), `chapter_purpose`, `reader_value` (each value drawn from
-  `new_information | relationship_change | power_or_stakes_change | goal_or_plan_change | world_state_change |
-emotional_turn`), and `context_refs`. `model_calls`: `prompt_key='outline'`, `prompt_version='2.3.0'`.
-  Coverage/chaining is post-validated (`validateOutlineCoverage`, `ai/schemas/outline.schema.ts:91`) — a missing
-  chapter, a duplicate, an out-of-span chapter or an unlisted `readerValue` fails the call. This is the
-  **structured-output** repair, not the judge ladder: the router re-prompts once with the issue list, then tries
-  tolerant JSON extraction, then throws `AI_001`. A second `model_calls` row with `attempt=1` (or
-  `status='repaired'`) is the tell that the first pass failed.
-  **Quality:** `chapterPurpose` must not restate `objective`; `repetitionRisks` should name a real prior beat.
-- **Invariant:** re-running never overwrites a protected brief — one that is `hand_edited`, has a draft, or
-  whose chapter is finalized (`generation.service.ts:506`). Log: `outlineArc: preserved protected briefs`.
-  Invented `requiredContext` refs are silently dropped (log `outline: dropped unresolved context refs`).
-- **Fails when:** `ARC_004`; `ARC_001`/`ARC_002` (arc missing or has no range); zero briefs returned.
-- **Cost:** 1 model call. _Legacy whole-book `POST /outline` still exists and is clamped to 25 chapters
-  (`MAX_WHOLE_BOOK_OUTLINE_SPAN`); arc-scoped is the intended path._
-
-#### Brief hand-edit + knowledge contract
-
-- **Entry:** **Volumes & Arcs** → arc → brief → "Edit"; `PUT /projects/:projectId/briefs/:n`.
-- **Preconditions:** a brief exists at chapter `n`.
+- **Entry:** `PUT /projects/:projectId/briefs/:n`.
+- **Preconditions:** none — the route creates the brief when chapter `n` has none.
 - **Input:**
   `{"title":"The Withdrawal Slip","body":"Amara copies the day's withdrawals. She must NOT learn who signed her own pledge.",`
   `"knowledgeContract":{"pov":["amara_veil"],"learns":[{"entityKey":"amara_veil","factKey":"rook_holds_the_slip"}]}}`
   (one object — the two spans are split for width only).
 - **Run:** 1. Open the brief. 2. Edit → paste → Save.
-- **Verify:** `briefs.hand_edited=true` (this is what shields it from arc reconciliation),
+- **Verify:** `briefs.hand_edited=true`,
   `briefs.knowledge_contract` stores **only** `{pov, learns}` — the service narrows it
   (`generation.service.ts:563`). `GET /briefs/:n` echoes it back. No model call.
   `body` is required and `knowledgeContract.pov` carries `minItems: 1`, so an omitted `body` or an empty
@@ -1048,9 +954,8 @@ emotional_turn`), and `context_refs`. `model_calls`: `prompt_key='outline'`, `pr
 #### Chapter generation (happy path)
 
 - **Entry:** **Chapters** screen → "Generate ch N"; `POST /projects/:projectId/generate` → **202**.
-- **Preconditions:** ≥1 volume `approved|source` (else `PLN_001`); no draft with
-  `review_status='contradiction'` (else `DRF_003`); briefs exist (else `BRF_001`); no stale brief in the batch
-  (else `BRF_002`); the covering arc approved when the volume has arcs (else `ARC_004`).
+- **Preconditions:** no draft with `review_status='contradiction'` (else `DRF_003`); briefs exist (else `BRF_001`);
+  no stale brief in the batch (else `BRF_002`). Volumes are not required.
 - **Input:** `{"limit": 1}` — what the UI sends. For the ladder use `{"limit":1,"autoFix":true,"maxFixes":3}`.
 - **Run:** 1. **Chapters** → "Generate ch 1". 2. Click the progress banner. 3. When it settles open the chapter.
 - **Verify:** `jobs` row `kind='generate'`, `target='1'`, payload `{chapters,autoFix,maxFixes,guidance}`.
@@ -1067,7 +972,7 @@ emotional_turn`), and `context_refs`. `model_calls`: `prompt_key='outline'`, `pr
   for text calls — only image calls record one. `GET /projects/:projectId/drafts/1/prompt` returns the same pack.
   **Quality:** the draft must land the brief's `endingContract.hookType` on its last beat and must not open by
   recapping — read the last 5 lines against the brief's `handoffState`.
-- **Fails when:** `PLN_001` / `DRF_003` / `BRF_001` / `BRF_002` / `ARC_004`; a second call while a job is
+- **Fails when:** `DRF_003` / `BRF_001` / `BRF_002`; a second call while a job is
   `pending|in_progress` silently returns the _existing_ job (`generation.service.ts:589`); job `last_error`
   `chapter N generation failed (run …)`.
 - **Re-running a chapter:** the batch is "briefs with no draft yet" — a chapter that already has a `drafts` row
@@ -1204,8 +1109,7 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   `drafts.status='final'`, `review_status='final'`. `continuity_proposals` row written with
   `model` and `status='pending'`, then flipped to `applied` + `applied_at` — **unless the delta holds any
   `confidence:'low'` entry**, in which case it stays `pending` and is rewritten down to just the held entries
-  (`apply-continuity.ts:14,23`). `chapters.continuity_applied=true`; `projects.story_current_chapter` = n and
-  `story_current_volume_key` set. An **isolated** draft skips extraction entirely, so it writes no proposal and
+  (`apply-continuity.ts:14,23`). `chapters.continuity_applied=true`; `projects.story_current_chapter` = n. An **isolated** draft skips extraction entirely, so it writes no proposal and
   leaves `continuity_applied=false` — that is by design, not a half-finalize
   (`chapter-finalization.graph.ts:162`). Canon written: `entities` (+`entity_appearances`), `plot_threads`,
   `mysteries`, `character_states`, `relationships`; `timeline`, `power` and `knowledgeChanges` are deliberately
@@ -1213,17 +1117,13 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   `ai/prompts/continuity.prompt.ts:16` declares — the graph hardcodes the telemetry version
   (`chapter-finalization.graph.ts:203`). The `propose-continuity` route below records `1.3.0` correctly, so the
   same prompt shows two versions depending on which path made the call.
-  Every `generation.reconciliation.cadence` finalized chapters inside an arc (default 5 — `bootstrap.ts:62`),
-  or as soon as a later brief is stale, the arc is silently re-outlined (log `finalize: reconciling arc
-briefs`); it never fires on the arc's own last chapter, so short arcs may never reconcile at all. The last
-  chapter of a volume writes `volumes.epitome` via `epitome@1.0.0`, once, and only for an `approved` volume.
   **Quality:** read `continuity_proposals.proposal.chapterSummary` — it must state what
   _changed_, not recap the scene, and its `threads` must reuse existing `thread_key`s, not coin duplicates.
 - **Fails when:** `FIN_001`/`FIN_002`/`FIN_003`/`CHP_005`/`DRF_004`; `[guard] Chapter N is not next in sequence`;
   `[extractContinuity] … already in progress` (a 5-minute claim lease is live); a half-finalized chapter
   (draft `final`, `chapters.continuity_applied=false`) is resumable — re-POST and watch for the warn
   `finalize: resuming a partially finalized chapter`.
-- **Cost:** 1 continuity call (+1 epitome at a volume end, +1 outline per reconciliation).
+- **Cost:** 1 continuity call.
 
 #### Continuity proposal review (low-confidence hold)
 
@@ -1305,14 +1205,13 @@ own withdrawal slip and realizes the handwriting is hers."}`
   (`chapter-insert.service.ts:67-105`): `briefs.chapter`, `drafts.chapter`, `chapters.number`,
   `continuity_proposals.chapter`, `context_packs.chapter`, `entities.first_seen_chapter`,
   `canon_facts.reveal_chapter`, `character_knowledge.learned_in_chapter`, `plot_threads.*_chapter`,
-  `mysteries.*_chapter`, `beats`, `world_facts`, `character_states`, `entity_appearances`, `chapter_images`.
-  The new brief has `write_mode='external'`, `hand_edited=true`, `inserted_at` non-null, and the covering
-  arc/volume grew by one (`arcs.chapter_end+1`, `volumes.end_chapter+1`, `target_chapter_count+1`) **silently,
-  with no `stale_reason`**. Shifted briefs have their body/`context_refs`/`knowledge_contract` chapter
+  `mysteries.*_chapter`, `world_facts`, `character_states`, `entity_appearances`, `chapter_images`.
+  The new brief has `write_mode='external'`, `hand_edited=true`, `inserted_at` non-null, and the `volume_key` of
+  the chapter it follows (of chapter 1 when inserted before it); no volume row changes. Shifted briefs have their body/`context_refs`/`knowledge_contract` chapter
   references rewritten. Descendant drafts get `stale_reason='a chapter was inserted after this point'`.
   `chapter_publications` is deliberately **not** shifted.
 - **Fails when:** `CHP_003` / `CHP_001` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
-  `planner`); a `arcs_chapter_range_check` constraint violation would mean the grow order regressed.
+  `planner`).
 - **Cost:** 0 model calls for `hand`; 1 `outline@2.3.0` call for `planner`.
 
 #### Unrestricted fill / `external` write mode
@@ -1332,7 +1231,8 @@ own withdrawal slip and realizes the handwriting is hers."}`
   **Batch truncation:** `selectGenerationBatch` _stops_, never skips, at an unfilled `external` slot
   (`common/batch-selection.ts:25`) — the 202 response carries `stoppedAtExternalChapter: N` and the UI toasts
   `Batch stopped at chapter N — it is written outside the primary model`. The stop only lifts once that
-  chapter is **finalized** (a `chapters` row), not merely drafted.
+  chapter is **finalized** (a `chapters` row), not merely drafted. It also stops at the first earlier chapter with
+  neither a draft nor finalized prose, carrying `stoppedAtUnwrittenChapter: N`; with nothing reachable it is 400 `DRF_011`.
   Isolated prose is firewalled from the vector index, continuity extraction, and the adjacency rule — confirm
   `GET /projects/:projectId/search?q=<a phrase from it>&index=prose` returns no hit.
 - **Fails when:** `DRF_002`; `CHP_005` at finalize because an isolated draft has no summary/state — use
@@ -1506,14 +1406,14 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 
 #### 0.2 What each endpoint returns
 
-| Endpoint                                              | Gives you                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /runs`                                           | The 20 newest author-facing runs (graph allowlist `AUTHOR_FACING_GRAPHS`, `generation.service.ts:125`). Fields: `id, projectId, graph, target, status, outcome, input, error, nodeTrace, jobId, startedAt, endedAt`. `chat-title` and `chat-compact` are NOT listed (fetch them by id).                                                                                                                                                                      |
-| `GET /runs/:id` (admin)                               | Adds `modelCalls[]` (`id,node,role,provider,model,promptKey,promptVersion,status,inputTokens,outputTokens,latencyMs,costUsd,reasoningEffort,attempt,createdAt`), `toolCalls[]` (`id,node,tool,args,status,resultDigest,latencyMs,createdAt`) and `contextPack{id,purpose,budgetTokens,usedTokens,sections[{key,tier,segment,tokens,truncated}]}`.                                                                                                            |
-| `GET /runs/:id/context` (admin)                       | Pack summary plus `rendered`: the exact stable-then-volatile context text. 404 `CTX_001` if no pack is linked.                                                                                                                                                                                                                                                                                                                                               |
-| `GET /runs/:id/calls/:callId` (admin)                 | Model-call row plus `rawOutput` (the raw text, stored before parsing) and `error`.                                                                                                                                                                                                                                                                                                                                                                           |
-| `GET /context/preview?purpose=chat&scopeType=project` | View of a pack: `purpose`, `budgetTokens`, `usedTokens`, `sections`, `omitted[{key,reason}]` (reason `budget` or `unresolved`), `unresolvedRefs`, `renderedStable`, `renderedVolatile`, `rendered`. Purposes: `generation, outline, chat, arc_plan, premise, audit`. `chat` needs `scopeType` (else 400 `CHT_003`); `arc_plan` needs `volumeKey` (else `VOL_001`). Only `generation` is dry — every other purpose persists a `context_packs` row (see 6.10). |
-| `GET /ai-usage`                                       | Per-role calls, tokens and recorded `costUsd`. `GET /cost` is the full spend view — see 0.5.                                                                                                                                                                                                                                                                                                                                                                 |
+| Endpoint                                              | Gives you                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /runs`                                           | The 20 newest author-facing runs (graph allowlist `AUTHOR_FACING_GRAPHS`, `generation.service.ts:125`). Fields: `id, projectId, graph, target, status, outcome, input, error, nodeTrace, jobId, startedAt, endedAt`. `chat-title` and `chat-compact` are NOT listed (fetch them by id).                                                                                                             |
+| `GET /runs/:id` (admin)                               | Adds `modelCalls[]` (`id,node,role,provider,model,promptKey,promptVersion,status,inputTokens,outputTokens,latencyMs,costUsd,reasoningEffort,attempt,createdAt`), `toolCalls[]` (`id,node,tool,args,status,resultDigest,latencyMs,createdAt`) and `contextPack{id,purpose,budgetTokens,usedTokens,sections[{key,tier,segment,tokens,truncated}]}`.                                                   |
+| `GET /runs/:id/context` (admin)                       | Pack summary plus `rendered`: the exact stable-then-volatile context text. 404 `CTX_001` if no pack is linked.                                                                                                                                                                                                                                                                                      |
+| `GET /runs/:id/calls/:callId` (admin)                 | Model-call row plus `rawOutput` (the raw text, stored before parsing) and `error`.                                                                                                                                                                                                                                                                                                                  |
+| `GET /context/preview?purpose=chat&scopeType=project` | View of a pack: `purpose`, `budgetTokens`, `usedTokens`, `sections`, `omitted[{key,reason}]` (reason `budget` or `unresolved`), `unresolvedRefs`, `renderedStable`, `renderedVolatile`, `rendered`. Purposes: `generation, outline, chat, premise, audit`. `chat` needs `scopeType` (else 400 `CHT_003`). Only `generation` is dry — every other purpose persists a `context_packs` row (see 6.10). |
+| `GET /ai-usage`                                       | Per-role calls, tokens and recorded `costUsd`. `GET /cost` is the full spend view — see 0.5.                                                                                                                                                                                                                                                                                                        |
 
 #### 0.3 What is NOT recorded
 
@@ -1537,7 +1437,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
    - plugin `prompt.contribute` system messages, inserted after the leading system messages;
    - `cache_control` breakpoints only when the module has a `cacheStrategy` AND the resolved provider is `openrouter` with a model id starting `anthropic/` (`supportsPromptCaching`). `chat-refine` has one, over `scopeInstructions` and `stableContext`.
 4. **Shortcut, dev only.** With `LOG_LEVEL=debug` the server logs `structured: invoking model` (`ai/model-router.service.ts:355`) with `input` (all template variables, not the system prompt or schema). Query `shadow-logs-dev`: `{environment="dev",namespace="novel-forge",component="server"} |= "structured: invoking model"`, bounded by start/end. Prod does not log it.
-5. `AI_LANGSMITH_API_KEY` is loaded as `ai.langsmith.api.key` (`bootstrap.ts:56`) but nothing reads it back — there is no tracing wiring in `apps/novel-forge-server/src`, so setting it changes nothing.
+5. `AI_LANGSMITH_API_KEY` is loaded as `ai.langsmith.api.key` (`bootstrap.ts:53`) but nothing reads it back — there is no tracing wiring in `apps/novel-forge-server/src`, so setting it changes nothing.
 
 #### 0.5 Tokens and cost per call
 
@@ -1567,7 +1467,7 @@ select purpose,budget_tokens,used_tokens,sections,omitted,unresolved_refs,left(r
 
 ### 1. Chat hub
 
-Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), node `chat-turn`, graph `chat-turn`.
+Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), node `chat-turn`, graph `chat-turn`.
 
 - Session routes: `/projects/:p/chat/sessions...`. Non-streaming turn: `POST /chat/sessions/:s/messages`. Streaming turn: `POST /projects/:p/chats/:s/turn/stream` (note `chats`, not `chat/sessions`).
 - Sessions are always scope `project` (`chat.service.ts:205`); the request body has no scope field.
@@ -1578,7 +1478,7 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
 - **Entry:** UI "Refinement Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`.
 - **Preconditions:** empty new_novel project.
 - **Input** (`content`):
-  > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes of 30 chapters. Do not run generation.
+  > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes, each with the goal it works towards. Do not run generation.
 - **Run:**
   1. Send it and wait for the reply.
   2. `GET /projects/$P/proposals?status=pending`.
@@ -1588,11 +1488,11 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
   - `proposal.changeSet` holds roughly 6 `entity.upsert`, 1 `fact.upsert` and 2 `volume.upsert`, each with `rationale`. There are no `action.*` ops despite "Do not run generation".
   - `proposal.baseline` has one entry per touched ref, each with `exists:false`.
   - `chat_messages` ordinals 1 (user) and 2 (assistant); `proposalId` is set on the assistant message; `chat_sessions.title` is auto-set within seconds. It comes from a separate `chat-title@1.0.0` run (role `title`, helper model) that appears only in `model_calls`. The first message must be at least 15 characters.
-  - Run: `GET /runs/<runId>` shows one `chat-refine@2.1.0` call, `attempt 0`, model `z-ai/glm-5.2`. The pack has purpose `chat_hub` with sections `premise`, `pipeline_status` and maybe `catalog`.
+  - Run: `GET /runs/<runId>` shows one `chat-refine@2.3.0` call, `attempt 0`, model `z-ai/glm-5.2`. The pack has purpose `chat_hub` with sections `premise`, `pipeline_status` and maybe `catalog`.
   - **Quality:**
     - Each character record states a want, a wound and a speech habit, and Marrow and Ilse are not generic villains.
     - The secret appears ONLY in the `fact.upsert` body, with a POV-safe `constraintNote` and tell-tale `terms`. It is absent from entity bodies and bible prose.
-    - The volumes carry `targetChapterCount: 30` and distinct objective, conflict and payoff.
+    - Each volume carries a title and a distinct goal (`objective`) naming one concrete end state, and no other field — `conflict`, `payoff`, `targetChapterCount` and `cast` are refused.
 - **Fails when:**
   - No proposal but a reply: the model discussed instead of staging. Check the raw output in `/calls/:id`.
   - 400 `RFN_004`: the change-set failed validation (op not in the hub allowlist, or an entity-bearing bible document without matching `entity.upsert`).
@@ -1603,17 +1503,17 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
 
 - **Entry:** same session as 1.1, after applying the 1.1 proposal (see 1.4). The hub context is an index: one-line volumes, first line of each document, no briefs and no prose.
 - **Preconditions:** volumes and entities exist (apply 1.1 first).
-- **Input:** `Rewrite volume 1's conflict so the Warden's plot to burn the Archive drives it, not Wren's debt. Keep everything else on the volume as is.`
+- **Input:** `Rewrite volume 1's goal so it ends with the Warden's plot to burn the Archive stopped, not Wren's debt paid. Keep everything else on the volume as is.`
 - **Run:**
   1. Send it. Expect a first reply that is only a lookup request (`reply` plus `lookups`), then the real answer.
   2. Optional streaming variant: block 1.8.
 - **Verify:**
   - `GET /runs/<runId>` `toolCalls`: at least one row `tool=get_volume`, `node=chat-hub`, `args.volumeKey=<v1 key>`, `status=ok`, non-empty `resultDigest`. `model_calls` has 2 or more `chat-refine` rows (one per lookup round).
-  - The final `changeSet` is a `volume.upsert` carrying only `volumeKey` plus the changed field(s) (`conflict`, maybe `body`). Re-emitting objective, payoff, cast etc. is a violation of the prompt's partial-update rule.
-  - **Invariant, checked by hand.** The whole-record-overwrite rule is prompt-only; no code enforces it (`chat.service.ts` has no check). So verify that for every `volume.upsert`, `arc.upsert`, `bible_document.upsert`, `brief.update` or `draft.update` in a change-set, a matching `get_*` row exists in the same run's `tool_calls`.
+  - The final `changeSet` is a `volume.upsert` carrying only `volumeKey` plus the changed field(s) (`objective`, maybe `body`). Re-emitting an unchanged `title` or `ordinal` is a violation of the prompt's partial-update rule.
+  - **Invariant, checked by hand.** The whole-record-overwrite rule is prompt-only; no code enforces it (`chat.service.ts` has no check). So verify that for every `volume.upsert`, `bible_document.upsert`, `brief.update` or `draft.update` in a change-set, a matching `get_*` row exists in the same run's `tool_calls`.
   - A turn never contains both `lookups` and `changeSet` (`postValidate`, `chat-refine.prompt.ts`).
-  - **Budget:** at most 3 lookup rounds (`MAX_LOOKUP_ROUNDS`). Per-tool caps: `get_draft` 2, `get_brief` 8, `get_volume`/`get_arc`/`get_bible_document`/`search_lore` 10, `get_entity` 15, others 5-8. Over budget writes `tool_calls.status='budget_exceeded'`. Exhausting rounds forces a reply with no lookups. It is silent; error code `CHT_004` exists but is never thrown.
-  - **Quality:** the new conflict text is coherent with the Ledger and Archive facts from 1.1, and the reply says WHY in web-novel terms (hook, escalation).
+  - **Budget:** at most 3 lookup rounds (`MAX_LOOKUP_ROUNDS`). Per-tool caps: `get_draft` 2, `get_brief` 8, `get_volume`/`get_bible_document`/`search_lore` 10, `get_entity` 15, others 5-8. Over budget writes `tool_calls.status='budget_exceeded'`. Exhausting rounds forces a reply with no lookups. It is silent; error code `CHT_004` exists but is never thrown.
+  - **Quality:** the new goal is coherent with the Ledger and Archive facts from 1.1, and the reply says WHY in web-novel terms (hook, escalation).
 - **Fails when:**
   - `tool_calls.status='invalid_args'`: the model used a wrong arg name.
   - A `volume.upsert` with no `get_volume` row: blind overwrite (prompt-following defect).
@@ -1648,7 +1548,7 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
 
 #### 1.5 Action ops and one-way doors (`never auto-applied`)
 
-- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`, all of which the hub offers: generate_chapters, plan_volumes, plan_arcs, outline_arc, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, approve_volume_plan, approve_arcs, validate, finalize).
+- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`, all of which the hub offers: generate_chapter, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, validate, finalize).
 - **Preconditions:** a pending proposal (any) from 1.1, or a fresh one from a cheap turn.
 - **Run** (deterministic; no model needed to stage):
   1. `PATCH /proposals/$X {"changeSet":[{"op":"entity.upsert","entityKey":"harbour-bell","type":"item","name":"Harbour Bell"},{"op":"action.finalize","upTo":1}]}`
@@ -1660,6 +1560,7 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
   - Step 3 applies the entity; `opResults[1]` is `declined`. The proposal is now `applied`, so finalize can no longer be selected from it (only `[1]` explicitly, before step 3, would run it: irreversible).
   - **Audit action.** `opResults[0].status='applied'`, `result.summary` "bible audit staged N finding(s) — proposal Y pending review" (or "found nothing to change"). A new proposal `kind='bible_audit'` appears; `workflow_runs.graph='bible-audit'` (role `audit`, claude-sonnet-5).
   - **Actions never revert.** An action-only proposal has empty `inverse_ops` and `revertible:false`. Actions run after the content transaction commits, sequentially and fail-fast. A failed action gives `opResults[i].status='failed'` plus `error`, later actions "skipped", HTTP still 200, and `proposal.error={"actionFailure":true}`.
+  - The same door guards `action.generate_chapter` (400 `DRF_014` on a blanket apply, declined in an auto turn); applied deliberately, it still refuses a chapter that already has a draft with `DRF_015`.
   - UI: a guarded op is unchecked by default with "Applies only when you select it deliberately." The UI always sends explicit `opIndexes`.
 - **Fails when:**
   - 500 `RFN_008`: it means "no executor registered for this action" (`proposal-apply.service.ts:246`), not an action failure, despite its message. Per-action failures are in `opResults`.
@@ -1880,7 +1781,7 @@ export default function createPlugin() {
 - **Verify:**
   - 200 `{proposalId}`. `GET /proposals/<id>`: `kind:'plugin'`, `scopeType:'project'`, `scopeRef:'harbor-lens'`, summary "Canon augmentation from Harbor Lens", `changeSet:[{op:'fact.upsert',factKey:'harbor-lens-note',body:<noteText>,rationale}]`. The UI shows a plugin source chip; nothing lands until applied.
   - The second call supersedes the first (`superseded`) — superseding is scoped to pending proposals from the same plugin whose change-set refs overlap, so two non-overlapping plugin proposals legitimately coexist. `addFact:false` gives 204, as does an enabled-but-`needsReview` plugin.
-  - A plugin cannot issue `action.*` or any op outside the plugin allowlist (entity/fact/bible_document/brief.update/arc.upsert…); such output gives 400 `PLG_005` and stages nothing. Moving an existing arc to another volume is also `PLG_005`.
+  - A plugin cannot issue `action.*` or any op outside the plugin allowlist (entity/fact/bible_document/brief.update); such output gives 400 `PLG_005` and stages nothing. A `brief.update` that sets `volumeKey` is also `PLG_005`.
   - Not-enabled plugin gives 404 `PLG_002`.
 - **Fails when:** the proposal writes domain tables before apply, or a second augment leaves the first pending proposal un-superseded despite touching the same refs.
 
@@ -1903,7 +1804,7 @@ export default function createPlugin() {
 - **Verify (call.route):**
   - Enabled: the `illustration-compose` row's `model` is `deepseek/deepseek-v4-pro` (unrestricted helper default) instead of `openai/gpt-5.6-luna`. `plugins` stamp set. Raise-only: a novel already `unrestricted` cannot be lowered.
   - For generation roles a raised call also writes `generator:'unrestricted'` and `isolated:true` on the draft and chapter, sticky for the run (see the generation recipe; `chapter-generation.graph.ts:248`). The image call is not routed by the plugin (`images()` takes no policy).
-- **Run (brief.policy):** outline an arc whose range includes chapter 1 (planning recipe).
+- **Run (brief.policy):** no route triggers this decision point today; `PluginProposalService.stageBriefPolicy` waits for a planning pass to call it.
 - **Verify (brief.policy):**
   - A pending proposal summary "Brief policy from harbor-lens", `changeSet:[{op:'brief.update',chapter:1,writeMode:'external'}]`; the briefs are already written (the planner is nudged, not compelled). Applying it sets `briefs.write_mode='external'`, which halts a batch generate at that chapter until finalized.
   - Only the first plugin (ordinal order) answers; a second answering plugin is ignored with a warning.
@@ -1946,7 +1847,7 @@ export default function createPlugin() {
 
 #### 5.1 Rate and spend ceilings (per owner, rolling window)
 
-- **Entry:** operator env `AI_QUOTA_MAX_CALLS` (default 1000), `AI_QUOTA_MAX_COST_USD` (default 50), `AI_QUOTA_WINDOW_MS` (default 3600000) — `bootstrap.ts:53-55`, documented in `.env.example:32-34`. `<=0` disables a limit dimension; a `<=0` window does not disable anything, it just makes the window empty. Restart to apply. The chat failure copy reads "Too many model calls right now" (`AI_008`) and "AI spending limit reached" (`AI_009`) (`novel-forge-web/src/components/nf/TurnStatus.tsx:39-40`).
+- **Entry:** operator env `AI_QUOTA_MAX_CALLS` (default 1000), `AI_QUOTA_MAX_COST_USD` (default 50), `AI_QUOTA_WINDOW_MS` (default 3600000) — `bootstrap.ts:50-52`, documented in `.env.example:32-34`. `<=0` disables a limit dimension; a `<=0` window does not disable anything, it just makes the window empty. Restart to apply. The chat failure copy reads "Too many model calls right now" (`AI_008`) and "AI spending limit reached" (`AI_009`) (`novel-forge-web/src/components/nf/TurnStatus.tsx:39-40`).
 - **Preconditions:** a fresh owner or project; `AI_QUOTA_MAX_CALLS=4`, `AI_QUOTA_MAX_COST_USD=0`, `AI_QUOTA_WINDOW_MS=600000`.
 - **Run:**
   1. Two manual hub turns (first turn writes 2 rows: chat plus title; second 1 row = 3).
@@ -1979,6 +1880,6 @@ export default function createPlugin() {
 7. **Unused error codes.** `CHT_004`, `CHT_005` and `AI_003` are never thrown anywhere in the server, though the web app still maps `AI_003` to failure copy. Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
 8. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
 9. **Auto-apply conflict leaves `conflicted`, not `pending`.** The `autoApply` doc comment says pending (`chat.service.ts:503`); the conflict status flip commits inside `apply`, so the reloaded proposal is `conflicted`.
-10. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `arc_plan`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
+10. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
 11. **Stale comments.** `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
 12. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).

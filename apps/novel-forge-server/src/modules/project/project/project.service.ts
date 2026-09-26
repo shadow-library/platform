@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -6,7 +6,7 @@ import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { ownedBy } from '@server/common';
+import { briefContentHash, ownedBy } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
@@ -294,13 +294,9 @@ export class ProjectService {
     this.logger.info('resetting project stage', { projectId: id, stage });
     const tablesCleared: string[] = [];
 
-    if (stage === 'extract' || stage === 'all') {
-      await this.db.delete(schema.extractionRuns).where(eq(schema.extractionRuns.projectId, id));
-      tablesCleared.push('extractionRuns');
+    if (stage === 'knowledge' || stage === 'all') {
       await this.db.delete(schema.entities).where(eq(schema.entities.projectId, id));
       tablesCleared.push('entities');
-      await this.db.delete(schema.beats).where(eq(schema.beats.projectId, id));
-      tablesCleared.push('beats');
       await this.db.delete(schema.plotThreads).where(eq(schema.plotThreads.projectId, id));
       tablesCleared.push('plotThreads');
       await this.db.delete(schema.worldFacts).where(eq(schema.worldFacts.projectId, id));
@@ -310,10 +306,23 @@ export class ProjectService {
     }
 
     if (stage === 'plan' || stage === 'all') {
-      await this.db.delete(schema.volumes).where(eq(schema.volumes.projectId, id));
+      const unassigned = await this.db.transaction(async tx => {
+        const planned = await tx
+          .select()
+          .from(schema.briefs)
+          .where(and(eq(schema.briefs.projectId, id), isNotNull(schema.briefs.volumeKey)));
+        for (const brief of planned) {
+          const contentHash = briefContentHash({ ...brief, volumeKey: null });
+          await tx
+            .update(schema.briefs)
+            .set({ volumeKey: null, revision: brief.revision + 1, contentHash, updatedAt: new Date() })
+            .where(eq(schema.briefs.id, brief.id));
+        }
+        await tx.delete(schema.volumes).where(eq(schema.volumes.projectId, id));
+        return planned.length;
+      });
       tablesCleared.push('volumes');
-      await this.db.delete(schema.jobs).where(eq(schema.jobs.projectId, id));
-      tablesCleared.push('jobs(plan)');
+      if (unassigned > 0) tablesCleared.push('briefs.volumeKey');
     }
 
     if (stage === 'generate' || stage === 'all') {
@@ -325,7 +334,7 @@ export class ProjectService {
       await this.db.delete(schema.continuityProposals).where(eq(schema.continuityProposals.projectId, id));
       tablesCleared.push('continuityProposals');
       await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), inArray(schema.jobs.kind, ['generate', 'finalize', 'backfill'])));
-      if (!tablesCleared.some(t => t.startsWith('jobs'))) tablesCleared.push('jobs(generate/finalize/backfill)');
+      tablesCleared.push('jobs(generate/finalize/backfill)');
     }
 
     this.logger.info('project stage reset complete', { projectId: id, stage, tablesCleared });
@@ -336,14 +345,14 @@ export class ProjectService {
     const project = await this.get(id);
     if (!project) throw AppErrorCode.PRJ_001.create();
 
-    // Three single-row aggregate queries with conditional counts, rather than six concurrent `$count`
-    // calls: fewer connections under load (drizzle's `$count` intermittently crashed on `res[0].count`
-    // when the pool was contended by in-flight generation writes), and each `?? 0` is crash-proof.
+    // Single-row aggregate queries with conditional counts, rather than concurrent `$count` calls: fewer
+    // connections under load (drizzle's `$count` intermittently crashed on `res[0].count` when the pool was
+    // contended by in-flight generation writes), and each `?? 0` is crash-proof.
     const [chapterRow, draftRow, volumeRow] = await Promise.all([
       this.db
         .select({
           total: sql<number>`count(*)::int`,
-          extracted: sql<number>`(count(*) filter (where ${schema.chapters.status} = 'done'))::int`,
+          final: sql<number>`(count(*) filter (where ${schema.chapters.status} = 'done'))::int`,
         })
         .from(schema.chapters)
         .where(eq(schema.chapters.projectId, id)),
@@ -355,24 +364,18 @@ export class ProjectService {
         .from(schema.drafts)
         .where(eq(schema.drafts.projectId, id)),
       this.db
-        .select({
-          total: sql<number>`count(*)::int`,
-          unapproved: sql<number>`(count(*) filter (where ${schema.volumes.status} not in ('approved', 'source')))::int`,
-        })
+        .select({ total: sql<number>`count(*)::int` })
         .from(schema.volumes)
         .where(eq(schema.volumes.projectId, id)),
     ]);
 
     const chaptersTotal = chapterRow[0]?.total ?? 0;
-    const chaptersExtracted = chapterRow[0]?.extracted ?? 0;
+    const chaptersFinal = chapterRow[0]?.final ?? 0;
     const draftsTotal = draftRow[0]?.total ?? 0;
     const draftsFinal = draftRow[0]?.final ?? 0;
     const volumesTotal = volumeRow[0]?.total ?? 0;
-    const unapprovedVolumes = volumeRow[0]?.unapproved ?? 0;
 
-    const planApproved = volumesTotal > 0 && unapprovedVolumes === 0;
-
-    return { kind: project.kind, chaptersTotal, chaptersExtracted, draftsTotal, draftsFinal, planApproved, volumesTotal };
+    return { kind: project.kind, chaptersTotal, chaptersFinal, draftsTotal, draftsFinal, volumesTotal };
   }
 
   async cost(projectId: bigint): Promise<CostResponse> {

@@ -15,7 +15,6 @@ import {
   DraftStatus,
   JobKind,
   JobStatus,
-  PlanStatus,
   SexualContentRating,
   SortByTime,
   UserFeedbackDisposition,
@@ -43,22 +42,6 @@ export class ChapterParams {
 
   @Field(() => Integer)
   n: number;
-}
-
-@Schema()
-export class ArcOutlineParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field()
-  arcKey: string;
-}
-
-@Schema()
-export class OutlineArcBody {
-  @Field({ optional: true })
-  context?: string;
 }
 
 @Schema()
@@ -115,30 +98,6 @@ export class SeedFromBriefBody {
 
   @Field({ optional: true })
   force?: boolean;
-}
-
-@Schema()
-export class PlanBody {
-  @Field(() => Integer)
-  volumeCount: number;
-
-  @Field(() => Integer)
-  chaptersPerVolume: number;
-
-  @Field({ optional: true })
-  skeleton?: string;
-}
-
-@Schema()
-export class OutlineBody {
-  @Field(() => Integer, { optional: true })
-  count?: number;
-
-  @Field(() => Integer, { optional: true })
-  start?: number;
-
-  @Field({ optional: true })
-  context?: string;
 }
 
 @Schema()
@@ -546,9 +505,6 @@ export class BriefSummaryResponse {
   volumeKey?: string | null;
 
   @Field({ optional: true, nullable: true })
-  arcKey?: string | null;
-
-  @Field({ optional: true, nullable: true })
   title?: string | null;
 
   @Field({ optional: true, nullable: true })
@@ -861,69 +817,12 @@ export class JobEnqueueResponse {
     description: 'Present when the batch was cut short of its limit: this chapter is an external-write slot that must be filled by hand before generation continues past it.',
   })
   stoppedAtExternalChapter?: number;
-}
 
-@Schema()
-export class PlanVolumeItem {
-  @Field(() => String)
-  id: bigint;
-
-  @Field(() => String)
-  projectId: bigint;
-
-  @Field()
-  volumeKey: string;
-
-  @Field(() => Integer)
-  ordinal: number;
-
-  @Field({ optional: true, nullable: true })
-  title?: string | null;
-
-  @Field({ optional: true, nullable: true })
-  objective?: string | null;
-
-  @Field({ optional: true, nullable: true })
-  conflict?: string | null;
-
-  @Field({ optional: true, nullable: true })
-  payoff?: string | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  startChapter?: number | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  endChapter?: number | null;
-
-  @Field(() => PlanStatus)
-  status: string;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-
-  @Field(() => String, { format: 'date-time' })
-  updatedAt: Date;
-}
-
-@Schema()
-export class PlanResponse {
-  @Field(() => [PlanVolumeItem])
-  volumes: PlanVolumeItem[];
-}
-
-@Schema()
-export class ApprovePlanResponse {
-  @Field(() => Integer)
-  volumesApproved: number;
-
-  @Field()
-  approved: boolean;
-}
-
-@Schema()
-export class OutlineResponse {
-  @Field(() => [BriefResponse])
-  briefs: BriefResponse[];
+  @Field(() => Integer, {
+    optional: true,
+    description: 'Present when the batch was cut short of its limit: this chapter has neither a draft nor finalized prose, and generation continues only once it has one.',
+  })
+  stoppedAtUnwrittenChapter?: number;
 }
 
 @Schema()

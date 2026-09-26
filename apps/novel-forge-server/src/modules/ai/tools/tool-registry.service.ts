@@ -2,7 +2,6 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 
-import { getArcTool } from './tools/get-arc.tool';
 import { getBibleDocumentTool } from './tools/get-bible-document.tool';
 import { getBriefTool } from './tools/get-brief.tool';
 import { getChapterSummariesTool } from './tools/get-chapter-summaries.tool';
@@ -24,7 +23,6 @@ const ALL_TOOLS: RegisteredTool[] = [
   getPlotThreadsTool,
   getBibleDocumentTool,
   getVolumeTool,
-  getArcTool,
   getBriefTool,
   getDraftTool,
 ];

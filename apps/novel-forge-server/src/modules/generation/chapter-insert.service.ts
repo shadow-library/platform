@@ -1,13 +1,13 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import { type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { markDescendantDraftsStale, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
+import { markDescendantDraftsStale, nearestVolumeKey, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type DbExecutor, type Generation, type Plan, type PrimaryDatabase, schema } from '@server/database';
+import { type DbExecutor, type Generation, type PrimaryDatabase, schema } from '@server/database';
 
 import { loadRevealGuard, sanitiseBriefReveals } from '../ai/context/canon-guard';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
@@ -62,8 +62,7 @@ interface ShiftTarget {
  * Deny-list, with the reason each is not shifted:
  * - `chapter_publications.chapter`, `.published_ordinal` — frozen historical pointers; moving one moves a reader's URL.
  * - `projects.story_current_chapter` — a cursor over finalized prose, never above the frontier.
- * - `chapter_chunks.chapter`, `validation_reports.chapter`, `extraction_runs.chapter` — written only from `done` chapters.
- * - `volumes.start_chapter`/`end_chapter`, `arcs.chapter_start`/`chapter_end` — ranges, grown by `growPlan` rather than shifted.
+ * - `chapter_chunks.chapter`, `validation_reports.chapter` — written only from `done` chapters.
  * - every `ordinal` and `*_count` column — positions and counts, not chapter numbers.
  *
  * `decision_ledger_entries.links.briefChapters` is jsonb, not a column, and is shifted by `shiftLedgerBriefLinks` in the same transaction.
@@ -86,7 +85,6 @@ const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.chapter, field: 'chapter' },
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.firstChapter, field: 'firstChapter' },
   { table: schema.entityAppearances, projectId: schema.entityAppearances.projectId, column: schema.entityAppearances.lastChapter, field: 'lastChapter' },
-  { table: schema.relationshipObservations, projectId: schema.relationshipObservations.projectId, column: schema.relationshipObservations.chapter, field: 'chapter' },
   { table: schema.canonFacts, projectId: schema.canonFacts.projectId, column: schema.canonFacts.revealChapter, field: 'revealChapter', updatedAt: 'updatedAt' },
   { table: schema.characterKnowledge, projectId: schema.characterKnowledge.projectId, column: schema.characterKnowledge.learnedInChapter, field: 'learnedInChapter' },
   {
@@ -96,7 +94,6 @@ const SHIFT_TARGETS: ShiftTarget[] = [
     field: 'lastUpdatedChapter',
     updatedAt: 'updatedAt',
   },
-  { table: schema.beats, projectId: schema.beats.projectId, column: schema.beats.chapter, field: 'chapter' },
   { table: schema.worldFacts, projectId: schema.worldFacts.projectId, column: schema.worldFacts.chapter, field: 'chapter', updatedAt: 'updatedAt' },
   { table: schema.plotThreads, projectId: schema.plotThreads.projectId, column: schema.plotThreads.openedChapter, field: 'openedChapter', updatedAt: 'updatedAt' },
   { table: schema.plotThreads, projectId: schema.plotThreads.projectId, column: schema.plotThreads.closedChapter, field: 'closedChapter' },
@@ -112,8 +109,8 @@ const INSERT_STALE_REASON = 'a chapter was inserted after this point';
 
 /**
  * Inserts a chapter slot the plan never allocated: one transaction that
- * renumbers everything above the insert point, re-renders the briefs it moved, grows the arc and volume
- * ranges, and lands an `external` write-mode brief in the hole. Legal only ahead of the write frontier,
+ * renumbers everything above the insert point, re-renders the briefs it moved, and lands an `external`
+ * write-mode brief in the hole, in the volume of the chapter it follows. Legal only ahead of the write frontier,
  * which is what keeps finalized canon — and `chapter_publications.publishedOrdinal` with it — immovable.
  */
 @Injectable()
@@ -153,7 +150,7 @@ export class ChapterInsertService {
         where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.chapter, afterChapter)),
         orderBy: asc(schema.briefs.chapter),
       });
-      const [volume, arc] = await Promise.all([this.coveringVolume(projectId, afterChapter, tx), this.coveringArc(projectId, afterChapter, tx)]);
+      const volumeKey = await nearestVolumeKey(tx, projectId, afterChapter);
 
       // Phase 1 parks every value above the insert point at its own negation, an involution onto a range no
       // live row occupies, so no two parked rows and no parked-vs-unmoved pair can collide. Phase 2 lands
@@ -166,15 +163,12 @@ export class ChapterInsertService {
 
       for (const brief of shifted) await this.rewriteShiftedBrief(tx, projectId, afterChapter, brief);
 
-      await this.growPlan(tx, projectId, afterChapter, volume, arc);
-
       const [brief] = await tx
         .insert(schema.briefs)
         .values({
           projectId,
           chapter: newChapter,
-          volumeKey: volume?.volumeKey ?? null,
-          arcKey: arc?.arcKey ?? null,
+          volumeKey,
           title: planned.title ?? null,
           body: planned.body,
           contextRefs: planned.contextRefs ?? null,
@@ -252,36 +246,6 @@ export class ChapterInsertService {
       .where(and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, brief.chapter + 1)));
   }
 
-  /**
-   * Silent growth per design decision 5 — no `staleReason` on the arc or volume rows. The covering row
-   * grows its end alone, so `arcs_chapter_range_check` cannot see a half-shifted range; every other row
-   * past the insert point moves both bounds in one statement, and is excluded by id from the growth
-   * above so the clamped `afterChapter = 0` case grows the first arc instead of shifting it away.
-   */
-  private async growPlan(tx: DbExecutor, projectId: bigint, afterChapter: number, volume?: Plan.Volume, arc?: Plan.Arc): Promise<void> {
-    if (arc) {
-      await tx
-        .update(schema.arcs)
-        .set({ chapterEnd: sql`${schema.arcs.chapterEnd} + 1`, updatedAt: new Date() })
-        .where(eq(schema.arcs.id, arc.id));
-    }
-    await tx
-      .update(schema.arcs)
-      .set({ chapterStart: sql`${schema.arcs.chapterStart} + 1`, chapterEnd: sql`${schema.arcs.chapterEnd} + 1`, updatedAt: new Date() })
-      .where(and(eq(schema.arcs.projectId, projectId), gt(schema.arcs.chapterStart, afterChapter), arc ? ne(schema.arcs.id, arc.id) : undefined));
-
-    if (volume) {
-      await tx
-        .update(schema.volumes)
-        .set({ endChapter: sql`${schema.volumes.endChapter} + 1`, targetChapterCount: sql`${schema.volumes.targetChapterCount} + 1`, updatedAt: new Date() })
-        .where(eq(schema.volumes.id, volume.id));
-    }
-    await tx
-      .update(schema.volumes)
-      .set({ startChapter: sql`${schema.volumes.startChapter} + 1`, endChapter: sql`${schema.volumes.endChapter} + 1`, updatedAt: new Date() })
-      .where(and(eq(schema.volumes.projectId, projectId), gt(schema.volumes.startChapter, afterChapter), volume ? ne(schema.volumes.id, volume.id) : undefined));
-  }
-
   /** Highest number any chapter or brief occupies — inserting past it would strand the new brief in an unplanned hole. */
   private async highestChapter(projectId: bigint, db: DbExecutor): Promise<number> {
     const [chapter, brief] = await Promise.all([
@@ -292,42 +256,17 @@ export class ChapterInsertService {
   }
 
   /**
-   * The volume the new chapter joins. `afterChapter = 0` precedes every planned range, so it clamps to
-   * the first volume — which then grows to cover chapter 1 rather than shifting away and orphaning it.
-   */
-  private async coveringVolume(projectId: bigint, chapter: number, db: DbExecutor): Promise<Plan.Volume | undefined> {
-    const containing = await db.query.volumes.findFirst({
-      where: and(eq(schema.volumes.projectId, projectId), lte(schema.volumes.startChapter, chapter), gte(schema.volumes.endChapter, chapter)),
-    });
-    if (containing) return containing;
-    const first = await db.query.volumes.findFirst({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) });
-    return first && first.startChapter !== null && chapter < first.startChapter ? first : undefined;
-  }
-
-  /** The arc the new chapter joins, clamped to the first arc for the same reason as `coveringVolume`. */
-  private async coveringArc(projectId: bigint, chapter: number, db: DbExecutor): Promise<Plan.Arc | undefined> {
-    const containing = await db.query.arcs.findFirst({
-      where: and(eq(schema.arcs.projectId, projectId), lte(schema.arcs.chapterStart, chapter), gte(schema.arcs.chapterEnd, chapter)),
-    });
-    if (containing) return containing;
-    const first = await db.query.arcs.findFirst({ where: eq(schema.arcs.projectId, projectId), orderBy: asc(schema.arcs.ordinal) });
-    return first && first.chapterStart !== null && chapter < first.chapterStart ? first : undefined;
-  }
-
-  /**
    * Drafts the hole's brief from a one-line intent with the outline prompt bound to the single new
-   * chapter — the same path `outlineArc` uses, so an inserted brief carries the same authored fields an
-   * outlined one does. Neighbours are rendered at their post-shift numbers because the model is asked
+   * chapter, so an inserted brief carries the same authored fields an outlined one does. Neighbours are rendered at their post-shift numbers because the model is asked
    * about the plan as it will read once the renumber commits.
    */
   private async planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
     const newChapter = afterChapter + 1;
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: newChapter });
     const span = { start: newChapter, end: newChapter };
-    const [pack, volume, arc, neighbours] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, newChapter, { policy, span, insertAfter: afterChapter }),
-      this.coveringVolume(projectId, afterChapter, this.db),
-      this.coveringArc(projectId, afterChapter, this.db),
+    const volumeKey = await nearestVolumeKey(this.db, projectId, afterChapter);
+    const [pack, neighbours] = await Promise.all([
+      this.contextAssembler.forOutline(projectId, newChapter, { policy, span, insertAfter: afterChapter, volumeKey }),
       this.db.query.briefs.findMany({
         where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, afterChapter), lte(schema.briefs.chapter, afterChapter + 1)),
         orderBy: asc(schema.briefs.chapter),
@@ -340,18 +279,12 @@ export class ChapterInsertService {
 
     const surrounding = neighbours.map(brief => `## Chapter ${brief.chapter > afterChapter ? brief.chapter + 1 : brief.chapter}: ${brief.title ?? ''}\n${brief.body}`).join('\n\n');
     const catalog = [pack.rendered, surrounding && `## Surrounding chapters (as they will be numbered)\n${surrounding}`].filter(Boolean).join('\n\n');
-    const volumePlan = [
-      volume ? `## Volume: ${volume.title ?? volume.volumeKey} (${volume.volumeKey})\nObjective: ${volume.objective ?? ''}\nConflict: ${volume.conflict ?? ''}` : '',
-      arc ? `## Arc: ${arc.title ?? arc.arcKey} (${arc.arcKey})\nObjective: ${arc.objective ?? ''}\nEscalation: ${arc.escalation ?? ''}\nPayoff: ${arc.payoff ?? ''}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
 
     const wordTarget = resolveWordTarget(project);
     const prompt = buildOutlinePrompt(newChapter, newChapter, wordTarget, guard.advised);
     const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
     const extraContext = `Insert a single new chapter here. Author's intent: ${intent}`;
-    const vars = { catalog, volumePlan, startChapter: newChapter, endChapter: newChapter, extraContext, ...outlineWordTargetVars(wordTarget) };
+    const vars = { catalog, volumePlan: '', startChapter: newChapter, endChapter: newChapter, extraContext, ...outlineWordTargetVars(wordTarget) };
     const raw = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
     const { briefs: outlined, sanitised } = sanitiseBriefReveals(raw, guard.all);
     if (sanitised.length > 0) this.logger.warn('insert: sanitised a brief that surfaced facts before their reveal chapter', { projectId, sanitised });

@@ -105,10 +105,10 @@ export class PublishingService {
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: adopt(body.genres, imported.genres),
-        tags: adopt(body.tags, imported.tags),
-        sexualContent: adopt(body.sexualContent, imported.sexualContent),
-        violence: adopt(body.violence, imported.violence),
-        darkContent: adopt(body.darkContent, imported.darkContent),
+        tags: body.tags ?? null,
+        sexualContent: body.sexualContent ?? null,
+        violence: body.violence ?? null,
+        darkContent: body.darkContent ?? null,
         status: body.status ?? ('live' as const),
       };
       await this.assertAttributionPermitted(projectId, values.originalAuthor, null);

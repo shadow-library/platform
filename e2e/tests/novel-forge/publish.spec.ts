@@ -156,8 +156,7 @@ test.describe('novel-forge import and publish pipeline', () => {
   });
 
   test('should reject a garbage bundle with a 422 validation error', async () => {
-    // NOTE: novel-import validation surfaces a 422 VALIDATION_ERROR, NOT IMP_002 (that code belongs to the
-    // separate plan-import endpoint). Missing envelope literals + no volumes is rejected before any DB write.
+    // Missing envelope literals + no volumes is rejected by schema validation before any DB write.
     const response = await mutate(forgeCtx, 'post', '/api/v1/import', { data: { bundle: { format: 'not-a-bundle', novel: {} } } });
     expect(response.status()).toBe(422);
     expect((await jsonOrUndefined<{ code: string }>(response))?.code).toBe('VALIDATION_ERROR');

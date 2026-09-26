@@ -8,8 +8,6 @@ import { serialiseProposal } from '../refinement/serialise';
 import {
   AiUsageResponse,
   ApproveDraftBody,
-  ApprovePlanResponse,
-  ArcOutlineParams,
   BriefResponse,
   CancelJobResponse,
   CancelRunResponse,
@@ -34,11 +32,6 @@ import {
   ListGenerationJobResponse,
   ListWorkflowRunResponse,
   MarkdownResponse,
-  OutlineArcBody,
-  OutlineBody,
-  OutlineResponse,
-  PlanBody,
-  PlanResponse,
   ProjectParams,
   ReviewQueueResponse,
   ReviseDraftBody,
@@ -71,37 +64,6 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunResponse)
   seedFromBrief(@Params() params: ProjectParams, @Body() body: SeedFromBriefBody): Promise<WorkflowRunResponse> {
     return this.generationService.seedFromBrief(params.projectId, body);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/plan')
-  @RespondFor(200, PlanResponse)
-  planVolumes(@Params() params: ProjectParams, @Body() body: PlanBody): Promise<PlanResponse> {
-    return this.generationService.plan(params.projectId, body);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Post('/approve')
-  @RespondFor(200, ApprovePlanResponse)
-  approvePlan(@Params() params: ProjectParams): Promise<ApprovePlanResponse> {
-    return this.generationService.approvePlan(params.projectId);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/outline')
-  @RespondFor(200, OutlineResponse)
-  outlineChapters(@Params() params: ProjectParams, @Body() body: OutlineBody): Promise<OutlineResponse> {
-    return this.generationService.outline(params.projectId, body);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/arcs/:arcKey/outline')
-  @RespondFor(200, OutlineResponse)
-  outlineArc(@Params() params: ArcOutlineParams, @Body() body: OutlineArcBody): Promise<OutlineResponse> {
-    return this.generationService.outlineArc(params.projectId, params.arcKey, body);
   }
 
   @Get('/briefs')

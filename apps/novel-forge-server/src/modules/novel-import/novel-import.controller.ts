@@ -21,7 +21,7 @@ interface RouteOptionsWithBodyLimit extends RouteOptions {
 // route in the app stays under the app-wide 12MB `bodyLimit` (`dynamic.modules.ts`).
 const IMPORT_ROUTE_OPTIONS: RouteOptionsWithBodyLimit = { method: HttpMethod.POST, bodyLimit: 64 * 1024 * 1024 };
 
-// Not nested under `/projects/:projectId` (unlike plan-import) — this endpoint CREATES the project,
+// Not nested under `/projects/:projectId` — this endpoint CREATES the project,
 // so there is nothing for `ProjectOwnershipGuard` to check yet; ownership is stamped on write from
 // `ContextService`, exactly like `POST /api/v1/projects`.
 @Authenticated()

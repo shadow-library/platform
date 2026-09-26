@@ -28,8 +28,7 @@
 //   `validation_reports.payload = { windowsRequested, windowsSucceeded, failedRanges, ... }`.
 // - Stale/briefless generations rejected: NOT checked here — see the CLI script's printed note. A
 //   rejected `generate()` call throws an HTTP error (`BRF_001`/`BRF_002`) and nothing is persisted to
-//   prove the rejection happened, so this invariant has no queryable trace. It is verified by
-//   `tests/bible/arc.spec.ts`'s existing `BRF_001`/`BRF_002` tests instead.
+//   prove the rejection happened, so this invariant has no queryable trace; `tests/generation/generation-gate.spec.ts` covers it.
 
 export interface DraftJudgeRow {
   chapter: number;
