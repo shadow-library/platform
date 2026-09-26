@@ -7,7 +7,6 @@ import {
   Button,
   ButtonGroup,
   Checkbox,
-  ConfirmDialog,
   Dialog,
   Drawer,
   DropdownMenu,
@@ -22,7 +21,7 @@ import {
   Tooltip,
 } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon, WarningIcon } from '@/components/icons';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon } from '@/components/icons';
 import {
   type ChipIntent,
   ContentRatingPicker,
@@ -39,22 +38,36 @@ import {
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import { BriefSections } from '@/features/briefs';
-import { EditorStrip, FinalizeButton, UnsavedChangesGuard, useChapterEditor, WorkspaceStrip } from '@/features/chapter-workspace';
+import {
+  ChecksDrawer,
+  EditorStrip,
+  FinalizeButton,
+  HeldActions,
+  UnsavedChangesGuard,
+  useChapterEditor,
+  useOverrideConfirm,
+  useReviewJobs,
+  WorkspaceStrip,
+} from '@/features/chapter-workspace';
 import {
   type AmendChapterResponse,
   type ApiError,
+  type ChapterReviewKind,
   type ChapterRowResponse,
   chapterRowsQueryOptions,
+  type CostTier,
   type DraftResponse,
   type InsertChapterBody,
   isFinalizeBlocked,
   isIsolated,
+  isQueuedReview,
   type ListChapterRowsQueryParams,
   useAddChapterImageMutation,
   useAmendChapterMutation,
   useApproveDraftMutation,
   useBriefQuery,
   useChapterImagesQuery,
+  useChapterReviewsQuery,
   useChapterRowsQuery,
   useDeleteChapterImageMutation,
   useDeleteDraftMutation,
@@ -65,13 +78,12 @@ import {
   useGenerateUnrestrictedMutation,
   useImportDraftMutation,
   useInsertChapterMutation,
-  useJudgeDraftMutation,
-  useRegenerateChapterMutation,
-  useReviseDraftMutation,
+  useRunReviewMutation,
   useStartNextDraftMutation,
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
 } from '@/lib/apis';
+import { approvalMessage, approvalRefusal, blockingHold, holdDetail, holdMessage, kindLabel, overrideWarning, repairSource } from '@/lib/chapter-checks';
 import { hasUnsavedWork, isDirty, isSaveBlocked, leaveWarning, saveLabel, wordCount } from '@/lib/chapter-editor';
 import { CHAPTER_PAGE_SIZE, type ChapterCounts, type ChapterFilter, chapterSummary, isChapterFilter, pageOfChapter } from '@/lib/chapter-list';
 import {
@@ -85,7 +97,6 @@ import {
   workspaceActions,
 } from '@/lib/chapter-workspace';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
-import { buildRepairNote } from '@/lib/review-queue';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './chapters.module.css';
@@ -98,7 +109,7 @@ interface ChaptersSearch {
   chapter?: number;
   page?: number;
   filter?: ChapterFilter;
-  /** A hand-off from elsewhere (e.g. Overview's Next step card) — opens straight into the review drawer instead of the read view. */
+  /** A hand-off from elsewhere (e.g. Overview's Next step card) — opens straight into the Checks drawer instead of the read view. */
   review?: boolean;
 }
 
@@ -837,96 +848,6 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
   );
 }
 
-interface ReviewDrawerProps {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  novelId: string;
-  draft: DraftResponse;
-  onRegenerated: () => void;
-}
-
-function ReviewDrawer({ open, onOpenChange, novelId, draft, onRegenerated }: ReviewDrawerProps): React.JSX.Element {
-  const meta = statusMeta(draft);
-  const clean = draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';
-  const contradicted = draft.reviewStatus === 'contradiction';
-  const tone = clean ? 'success' : contradicted ? 'danger' : 'warning';
-  // A finalized draft can still land in "contradiction" from a later manual Verify, but revise/delete
-  // both refuse a finalized draft (DRF_002) — Amend is the only path past that lock.
-  const recoverable = contradicted && draft.status !== 'final';
-
-  const revise = useReviseDraftMutation(novelId, draft.chapter);
-  const regenerate = useRegenerateChapterMutation(novelId);
-  const [confirmRegen, setConfirmRegen] = useState(false);
-  const regenerating = regenerate.isPending;
-
-  const repair = (): void => {
-    revise.mutate(
-      { note: buildRepairNote(draft.judgeNote) },
-      { onSuccess: () => toast.success('Repair applied — run Verify to confirm it satisfies the judge'), onError: err => toast.danger(err.message) },
-    );
-  };
-
-  // The server owns every rule that decides whether this chapter can be redrafted now (order, other contradictions,
-  // external chapters, a running job), so its refusal is the reason shown.
-  const runRegenerate = (): void => {
-    regenerate.mutate(draft.chapter, {
-      onSuccess: () => {
-        setConfirmRegen(false);
-        toast.success(`Regenerating chapter ${draft.chapter} — its current prose stays in the revision history`);
-        onRegenerated();
-      },
-      onError: err => {
-        setConfirmRegen(false);
-        toast.danger(err.message);
-      },
-    });
-  };
-
-  return (
-    <Drawer open={open} onOpenChange={onOpenChange} placement="right" size="sm">
-      <Drawer.Header title="Judge review" meta={draft.judge ?? undefined} />
-      <Drawer.Body>
-        <div className={styles.verdict} data-tone={tone}>
-          <WarningIcon size={17} className={styles.verdictIcon} />
-          <div>
-            <div className={styles.verdictLabel}>{meta.label}</div>
-            <div className={styles.verdictSub}>{clean ? 'Re-validated against the bible' : 'Judge flagged this draft'}</div>
-          </div>
-        </div>
-        {draft.judgeNote ? (
-          <p className={styles.judgeNote}>{draft.judgeNote}</p>
-        ) : (
-          <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>No judge notes recorded for this draft.</p>
-        )}
-        {recoverable && (
-          <div className={styles.reviewActions}>
-            <Button variant="primary" size="sm" loading={revise.isPending} disabled={regenerating} onClick={repair}>
-              Repair with AI
-            </Button>
-            <Button variant="secondary" size="sm" loading={regenerating} disabled={revise.isPending} onClick={() => setConfirmRegen(true)}>
-              Regenerate chapter
-            </Button>
-          </div>
-        )}
-        {contradicted && !recoverable && (
-          <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>This chapter is finalized — use Amend from the chapter view to rewrite its prose in place.</p>
-        )}
-      </Drawer.Body>
-
-      <ConfirmDialog
-        open={confirmRegen}
-        onOpenChange={setConfirmRegen}
-        intent="danger"
-        title={`Regenerate chapter ${draft.chapter}?`}
-        description="Redrafts the chapter from its brief with the judge and repairs. The current prose stays in the revision history, and later chapters are marked stale once the new draft lands."
-        confirmLabel="Regenerate"
-        loading={regenerating}
-        onConfirm={runRegenerate}
-      />
-    </Drawer>
-  );
-}
-
 interface ChapterSwitchDrawerProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -1195,7 +1116,9 @@ interface ChapterWorkspaceProps {
 function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWorkspaceProps): React.JSX.Element {
   const chapter = draft.chapter;
   const approveDraft = useApproveDraftMutation(novelId);
-  const judge = useJudgeDraftMutation(novelId, chapter);
+  const runReview = useRunReviewMutation(novelId, chapter);
+  const reviews = useChapterReviewsQuery(novelId, chapter);
+  const reviewJobs = useReviewJobs(novelId, chapter, reviews.data);
   const extract = useExtractToBibleMutation(novelId, chapter);
   const navigate = useNavigate();
   const sceneImagesQuery = useChapterImagesQuery(novelId, chapter);
@@ -1210,6 +1133,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   // is read once at mount, matching the drawer's own open state being otherwise locally controlled.
   const { review: openReviewOnLoad } = Route.useSearch();
   const [reviewOpen, setReviewOpen] = useState(openReviewOnLoad === true);
+  const [checksKind, setChecksKind] = useState<ChapterReviewKind>('judge');
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [summarizeOpen, setSummarizeOpen] = useState(false);
   const [amendOpen, setAmendOpen] = useState(false);
@@ -1245,9 +1169,13 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   }, [inEditor, save]);
 
   const meta = statusMeta(draft);
-  const actions = workspaceActions(draft, Boolean(generation));
+  const held = draft.status === 'final' ? 0 : blockingHold(reviews.data);
+  const contradiction = draft.status !== 'final' && draft.reviewStatus === 'contradiction';
+  const actions = workspaceActions(draft, Boolean(generation), held);
+  const overrideConfirm = useOverrideConfirm(chapter, held);
   const approvedBefore = changedSinceApproval(draft);
   const finalizeBlocked = isFinalizeBlocked(draft);
+  const runBlockedReason = generation ? 'The chapter is being written — review it once it’s done.' : !draft.body?.trim() ? 'There’s no text to review yet.' : undefined;
   const displayTitle = draft.title?.trim() || 'Untitled chapter';
 
   const surround = (before: string, after: string): void => {
@@ -1336,27 +1264,52 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
     else toast.danger(error.message);
   };
 
+  const announceApproval = (approved: DraftResponse, asWritten?: boolean): void => {
+    const message = approvalMessage(chapter, approved.overriddenFindings, asWritten);
+    if (approved.overriddenFindings) toast.warning(message);
+    else toast.success(message);
+  };
+
   const approve = (): void => {
-    approveDraft.mutate(draft, { onSuccess: () => toast.success(`Chapter ${chapter} approved`), onError: refuseApproval });
+    overrideConfirm.request(() => approveDraft.mutate(draft, { onSuccess: approved => announceApproval(approved), onError: refuseApproval }));
   };
 
   const approveAsWritten = (): void => {
     if (!draft.staleReason) return;
-    setStaleRefusal(undefined);
-    approveDraft.mutate(
-      { id: draft.id, chapter, revision: draft.revision, saveSeq: draft.saveSeq, keptStaleReason: draft.staleReason },
+    const keptStaleReason = draft.staleReason;
+    overrideConfirm.request(() => {
+      setStaleRefusal(undefined);
+      approveDraft.mutate(
+        { id: draft.id, chapter, revision: draft.revision, saveSeq: draft.saveSeq, keptStaleReason },
+        {
+          onSuccess: approved => announceApproval(approved, true),
+          onError: err => (approveAsWrittenRefused(err) ? setStaleRefusal(err.message) : refuseApproval(err)),
+        },
+      );
+    });
+  };
+
+  const startReview = (kind: ChapterReviewKind, costTier?: CostTier): void => {
+    runReview.mutate(
+      { kind, costTier },
       {
-        onSuccess: () => toast.success(`Chapter ${chapter} approved as written`),
-        onError: err => (approveAsWrittenRefused(err) ? setStaleRefusal(err.message) : refuseApproval(err)),
+        onSuccess: started => {
+          if (isQueuedReview(started)) return;
+          toast.success(started.openFindings === 0 ? `${kindLabel(kind)}: no issue detected` : `${kindLabel(kind)}: ${started.openFindings} open`);
+        },
+        onError: err => toast.danger(err.message),
       },
     );
   };
 
+  const openChecks = (kind: ChapterReviewKind = checksKind): void => {
+    setChecksKind(kind);
+    setReviewOpen(true);
+  };
+
   const runJudge = (): void => {
-    judge.mutate(undefined, {
-      onSuccess: r => (r.verdict === 'contradiction' ? toast.danger('Judge flagged a contradiction — open review for details') : toast.success('Judge verdict: consistent')),
-      onError: err => toast.danger(err.message),
-    });
+    openChecks('judge');
+    if (!reviewJobs.active.judge) startReview('judge');
   };
 
   const runExtract = (): void => {
@@ -1385,9 +1338,10 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   ) : draft.staleReason ? (
     <WorkspaceStrip
       tone="warning"
-      detail={staleRefusal}
+      detail={staleRefusal ?? (held > 0 ? `${holdMessage(chapter, held)} ${overrideWarning(held)}` : approvalRefusal(draft.reviewStatus, held))}
       actions={
         <>
+          {contradiction && held === 0 && <HeldActions novelId={novelId} draft={draft} repairNote={repairSource(reviews.data, draft.judgeNote)} regenerate={false} />}
           <Button variant="secondary" size="sm" disabled={!actions.approveAsWritten} loading={approveDraft.isPending} onClick={approveAsWritten}>
             Approve as written
           </Button>
@@ -1399,6 +1353,21 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
       }
     >
       {draft.staleReason}
+    </WorkspaceStrip>
+  ) : held > 0 || contradiction ? (
+    <WorkspaceStrip
+      tone="danger"
+      detail={holdDetail(held, draft.judgeNote, actions.approve)}
+      actions={
+        <>
+          <Button variant="secondary" size="sm" onClick={() => openChecks('judge')}>
+            Open checks
+          </Button>
+          <HeldActions novelId={novelId} draft={draft} repairNote={repairSource(reviews.data, draft.judgeNote)} />
+        </>
+      }
+    >
+      {holdMessage(chapter, held)}
     </WorkspaceStrip>
   ) : approvedBefore !== undefined ? (
     <WorkspaceStrip
@@ -1440,7 +1409,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
               {generation.phase === 'writing' && <StopButton onStop={stop} stopping={stopping} />}
             </>
           ) : (
-            <button onClick={() => setReviewOpen(true)} className={styles.statusPill} data-tone={toneOf(meta.intent)}>
+            <button onClick={() => openChecks()} className={styles.statusPill} data-tone={toneOf(meta.intent)}>
               {statusLabel(draft) ?? meta.label}
             </button>
           )}
@@ -1459,7 +1428,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
               )}
               <Tooltip content="Add this chapter's new canon to the bible as a proposal">{addToBible}</Tooltip>
               {actions.verify && (
-                <Button variant="secondary" size="sm" loading={judge.isPending} onClick={runJudge}>
+                <Button variant="secondary" size="sm" loading={runReview.isPending && runReview.variables?.kind === 'judge'} onClick={runJudge}>
                   Verify
                 </Button>
               )}
@@ -1625,7 +1594,20 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
 
       {amendOpen && <AmendDialog novelId={novelId} chapter={chapter} draft={draft} onOpenChange={setAmendOpen} onAmended={setAmendResult} />}
 
-      <ReviewDrawer open={reviewOpen} onOpenChange={setReviewOpen} novelId={novelId} draft={draft} onRegenerated={() => setReviewOpen(false)} />
+      {overrideConfirm.dialog}
+      <ChecksDrawer
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        novelId={novelId}
+        draft={draft}
+        reviews={reviews}
+        jobs={reviewJobs}
+        kind={checksKind}
+        onKindChange={setChecksKind}
+        runBlockedReason={runBlockedReason}
+        starting={runReview.isPending ? runReview.variables?.kind : undefined}
+        onRun={startReview}
+      />
       <ChapterSwitchDrawer open={chaptersOpen} onOpenChange={setChaptersOpen} novelId={novelId} current={chapter} onPick={onPick} />
     </div>
   );

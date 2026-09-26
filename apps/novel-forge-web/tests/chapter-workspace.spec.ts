@@ -57,6 +57,17 @@ describe('workspaceActions', () => {
     expect(workspaceActions({ ...DRAFT, reviewStatus: 'approved', approvedRevision: 2 }, false)).toMatchObject({ approve: false, finalize: true });
   });
 
+  it('should offer approval over a contradiction only while a current judge review holds it with blocking findings', () => {
+    expect(workspaceActions({ ...DRAFT, reviewStatus: 'contradiction' }, false, 2)).toMatchObject({ approve: true, finalize: false });
+  });
+
+  it('should withhold approval of a contradiction no current review explains', () => {
+    expect(workspaceActions({ ...DRAFT, reviewStatus: 'contradiction' }, false, 0)).toMatchObject({ approve: false, approveAsWritten: false });
+    expect(workspaceActions({ ...DRAFT, reviewStatus: 'contradiction', staleReason: 'ancestor chapter 3 was hand_edited' }, false)).toMatchObject({
+      approveAsWritten: false,
+    });
+  });
+
   it('should have nothing to review in an empty chapter', () => {
     expect(workspaceActions({ ...DRAFT, body: '  ' }, false).verify).toBe(false);
   });

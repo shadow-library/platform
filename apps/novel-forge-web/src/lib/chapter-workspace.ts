@@ -1,4 +1,5 @@
 import { type ApiError, type ChapterRowResponse, type DraftResponse, type FinalizeReadinessResponse, type JobEnqueueResponse } from '@/lib/apis';
+import { approvalRefusal } from '@/lib/chapter-checks';
 
 const TEACHING_GATE_CODE = 'DRF_016';
 const REVEAL_STALE_CODE = 'DRF_017';
@@ -16,13 +17,17 @@ export interface WorkspaceActions {
   askForge: boolean;
 }
 
-/** A final chapter is locked: only Amend writes to it, so every other writer is withdrawn rather than left to be refused. Reviewing it never writes, so Verify stays. */
-export function workspaceActions(draft: WorkspaceDraft, generating: boolean): WorkspaceActions {
+/**
+ * A final chapter is locked: only Amend writes to it, so every other writer is withdrawn rather than left to be refused. Reviewing it never writes, so Verify stays.
+ * A contradiction is approvable only while the current judge review holds it with open blocking findings (`blocking`), which the approval records
+ * as overridden; one no current review explains has nothing to override, so Approve stays withheld until the AI review is run.
+ */
+export function workspaceActions(draft: WorkspaceDraft, generating: boolean, blocking = 0): WorkspaceActions {
   const verify = Boolean(draft.body?.trim());
   if (draft.status === 'final') return { edit: false, approve: false, approveAsWritten: false, finalize: false, amend: true, verify, askForge: false };
   const writable = !generating;
   const stale = Boolean(draft.staleReason);
-  const approvable = writable && draft.reviewStatus !== 'contradiction' && draft.reviewStatus !== 'generating' && draft.reviewStatus !== 'approved';
+  const approvable = writable && draft.reviewStatus !== 'generating' && draft.reviewStatus !== 'approved' && !approvalRefusal(draft.reviewStatus, blocking);
   return {
     edit: writable,
     approve: approvable && !stale,

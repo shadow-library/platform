@@ -20,6 +20,10 @@ export interface DrawerProps {
   size?: DrawerSize;
   /** Modal traps focus + scrim + scroll-lock (focused edits); non-modal keeps the page interactive (browse-and-inspect). @default true */
   modal?: boolean;
+  /** Escape while open; `preventDefault()` keeps the drawer open (e.g. to close an inline form first). Non-modal drawers honour it too. */
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  /** Modal only: fires as the drawer takes focus; `preventDefault()` and focus an element yourself to choose where focus lands. */
+  onOpenAutoFocus?: (event: Event) => void;
   /** Accessible name when no `Drawer.Header` title is present. */
   'aria-label'?: string;
   className?: string;

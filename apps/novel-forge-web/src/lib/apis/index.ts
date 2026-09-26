@@ -15,6 +15,7 @@ export * from './fact.api';
 export * from './insight.api';
 export * from './refinement.api';
 export * from './ledger.api';
+export * from './review.api';
 export * from './run.api';
 export * from './events.api';
 export * from './novel-import.api';

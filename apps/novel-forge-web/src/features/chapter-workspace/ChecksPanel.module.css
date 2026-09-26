@@ -1,0 +1,196 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+}
+
+.kinds {
+  display: flex;
+  flex-direction: column;
+}
+
+.kindLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kindName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.kindSub {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.meta,
+.hint,
+.remedy,
+.evidence {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.hint,
+.note {
+  margin: 0;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-md);
+}
+
+.notice[data-tone='warning'] {
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.notice[data-tone='success'] {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-text-on-subtle);
+}
+
+.notice[data-tone='neutral'] {
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+}
+
+.clean {
+  font-weight: 600;
+}
+
+.noticeAction {
+  align-self: flex-start;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cap {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.finding {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.finding[data-settled] {
+  opacity: 0.7;
+}
+
+.findingHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.findingTitle {
+  font-weight: 600;
+}
+
+.evidence {
+  quotes: '“' '”';
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.undo {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--sh-accent-text);
+  cursor: pointer;
+}
+
+.undo:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.undo:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: 2px;
+}
+
+.undo:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.disclaimer {
+  padding-top: 4px;
+  color: var(--sh-text-secondary);
+}
+
+.running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sh-text-secondary);
+}
+
+.runRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

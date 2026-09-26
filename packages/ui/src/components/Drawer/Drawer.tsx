@@ -91,7 +91,18 @@ function DrawerFooter({ cancel, action, onAction, loading = false, className, ch
  * that keeps the page interactive for browse-and-inspect, closing via ×, Esc, or the caller. One
  * drawer at a time; slides from its edge with the emphasized curve. Shares the Dialog header/footer.
  */
-function DrawerRoot({ open, onOpenChange, placement = 'right', size = 'md', modal = true, className, children, 'aria-label': ariaLabel }: DrawerProps) {
+function DrawerRoot({
+  open,
+  onOpenChange,
+  placement = 'right',
+  size = 'md',
+  modal = true,
+  onEscapeKeyDown,
+  onOpenAutoFocus,
+  className,
+  children,
+  'aria-label': ariaLabel,
+}: DrawerProps) {
   const titleId = useId();
   const onClose = () => onOpenChange?.(false);
 
@@ -107,7 +118,13 @@ function DrawerRoot({ open, onOpenChange, placement = 'right', size = 'md', moda
         <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
           <DialogPrimitive.Portal>
             <DialogPrimitive.Overlay className={styles.scrim} />
-            <DialogPrimitive.Content {...panelProps} aria-label={ariaLabel} aria-labelledby={ariaLabel ? undefined : titleId}>
+            <DialogPrimitive.Content
+              {...panelProps}
+              aria-label={ariaLabel}
+              aria-labelledby={ariaLabel ? undefined : titleId}
+              onEscapeKeyDown={onEscapeKeyDown}
+              onOpenAutoFocus={onOpenAutoFocus}
+            >
               {children}
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>
@@ -119,7 +136,9 @@ function DrawerRoot({ open, onOpenChange, placement = 'right', size = 'md', moda
   if (!open) return null;
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>): void {
-    if (event.key === 'Escape') onClose();
+    if (event.key !== 'Escape') return;
+    onEscapeKeyDown?.(event.nativeEvent);
+    if (!event.nativeEvent.defaultPrevented) onClose();
   }
 
   return (

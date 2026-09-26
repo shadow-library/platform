@@ -11,7 +11,6 @@ import {
   type FinalizeReadinessResponse,
   type GenerateBody,
   type JobEnqueueResponse,
-  type JudgeResponse,
   type ListChapterRowsQueryParams,
   type ListChapterRowsResponse,
   type ListDraftResponse,
@@ -239,15 +238,6 @@ export function useRegenerateChapterMutation(projectId: string): UseMutationResu
       invalidateDraft(queryClient, projectId);
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'jobs'] });
     },
-  });
-}
-
-export function useJudgeDraftMutation(projectId: string, n: number): UseMutationResult<JudgeResponse, ApiError, undefined> {
-  const queryClient = useQueryClient();
-  return useMutation<JudgeResponse, ApiError, undefined>({
-    mutationFn: () => APIRequest.post(`/projects/${projectId}/drafts/${n}/judge`).body({}).execute(),
-    onSuccess: () => invalidateDraft(queryClient, projectId),
-    onError: error => refetchMovedDraft(queryClient, projectId, error),
   });
 }
 
