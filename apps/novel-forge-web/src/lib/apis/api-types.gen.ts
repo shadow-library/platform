@@ -1179,6 +1179,109 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/drafts/{n}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Versions */
+    get: operations['get_api_v1_projects_projectId_drafts_n_versions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/versions/compare': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Compare Versions */
+    get: operations['get_api_v1_projects_projectId_drafts_n_versions_compare'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/versions/{r}/restore': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore Version */
+    post: operations['post_api_v1_projects_projectId_drafts_n_versions_r_restore'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/passage-suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Suggestions */
+    get: operations['get_api_v1_projects_projectId_drafts_n_passage_suggestions'];
+    put?: never;
+    /** Request Suggestion */
+    post: operations['post_api_v1_projects_projectId_drafts_n_passage_suggestions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/passage-suggestions/{suggestionId}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply Suggestion */
+    post: operations['post_api_v1_projects_projectId_drafts_n_passage_suggestions_suggestionId_apply'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/passage-suggestions/{suggestionId}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dismiss Suggestion */
+    post: operations['post_api_v1_projects_projectId_drafts_n_passage_suggestions_suggestionId_dismiss'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/jobs/{jobId}': {
     parameters: {
       query?: never;
@@ -3618,7 +3721,7 @@ export interface components {
       createdAt: string;
     };
     /** @enum {string} */
-    DraftRevisionSource: 'generated' | 'patched' | 'rewritten' | 'revised' | 'imported' | 'hand_edited' | 'chat_edited' | 'amended';
+    DraftRevisionSource: 'generated' | 'patched' | 'rewritten' | 'revised' | 'imported' | 'hand_edited' | 'chat_edited' | 'amended' | 'restored' | 'passage_rewritten';
     MarkdownResponse: {
       markdown: string;
     };
@@ -4192,7 +4295,7 @@ export interface components {
       createdAt: string;
     };
     /** @enum {string} */
-    WriterAttemptRole: 'draft' | 'repair' | 'rewrite' | 'revise';
+    WriterAttemptRole: 'draft' | 'repair' | 'rewrite' | 'revise' | 'passage';
     /** @description The Writer's view of one attempt: the exact messages the model router sent, what was kept back and why, and the plan and Story Bible state it was written against. An isolated chapter reads this walled off, like any other standard read. */
     WriterSnapshotDetailResponse: {
       id: string;
@@ -4220,6 +4323,114 @@ export interface components {
     WriterSnapshotMessageResponse: {
       role: string;
       content: string;
+    };
+    ListDraftVersionResponse: {
+      /** @description Newest first. History is bounded: the newest 50 revisions and the approved one are kept. Restore is refused on a final chapter (VER_002), and restoring the approved revision still needs approving again. */
+      items: components['schemas']['DraftVersionResponse'][];
+    };
+    /** @description One stored version of a chapter's draft and its cause. */
+    DraftVersionResponse: {
+      revision: number;
+      /** @description What made this version; null for current text written before history was kept. */
+      source: components['schemas']['DraftRevisionSource'] | null;
+      /** @description Set on a `restored` version: the revision it brought back. */
+      restoredFrom: null | number;
+      current: boolean;
+      /** @description The revision the author last approved. */
+      approved: boolean;
+      /** @description The version's prose was isolated (an unrestricted chapter) when it was written; restoring it keeps the draft isolated. */
+      isolated: boolean;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    VersionComparisonResponse: {
+      from: number;
+      to: number;
+      /** @description Paragraph-then-word diff, in reading order. */
+      hunks: components['schemas']['DiffHunkResponse'][];
+      wordsAdded: number;
+      wordsRemoved: number;
+    };
+    /** @description A run of text that is unchanged, added or removed; concatenating `equal` and `delete` gives the older text, `equal` and `insert` the newer. */
+    DiffHunkResponse: {
+      op: components['schemas']['DiffOp'];
+      text: string;
+    };
+    /** @enum {string} */
+    DiffOp: 'equal' | 'insert' | 'delete';
+    RestoreVersionBody: {
+      /** @description The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft. */
+      baseDraftId?: string;
+      /** @description The draft revision this save was made against. */
+      baseRevision?: number;
+      /** @description The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues. */
+      baseSaveSeq?: number;
+    };
+    ListPassageSuggestionResponse: {
+      /** @description Open suggestions, newest first, each located against the draft as it stands. */
+      items: components['schemas']['PassageSuggestionResponse'][];
+    };
+    /** @description A suggested rewrite of one passage, anchored to the draft revision and selection it was made from. */
+    PassageSuggestionResponse: {
+      id: string;
+      chapter: number;
+      baseRevision: number;
+      baseSaveSeq: number;
+      anchorStart: number;
+      anchorEnd: number;
+      /** @description The selected text as it stood when the suggestion was made — the "before". */
+      passage: string;
+      /** @description The suggested text — the "after". */
+      replacement: string;
+      request: string;
+      /** @description Locked story secrets the suggestion appears to give away; empty when none. Review before using it. */
+      leakLines: string[];
+      status: components['schemas']['PassageSuggestionStatus'];
+      /** @description The draft revision applying it produced. */
+      appliedRevision: null | number;
+      location: components['schemas']['PassageLocationResponse'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    PassageSuggestionStatus: 'open' | 'applied' | 'dismissed';
+    /** @description Where the anchored passage stands in the draft now. Null offsets when stale. */
+    PassageLocationResponse: {
+      /** @description `fresh`: the passage and the 32 characters either side still stand at its anchored offsets. `relocated`: it moved cleanly — text and context occur exactly once, at the offsets given. `stale`: it or the text around it changed, is gone or is ambiguous — applying is refused with PSG_004. */
+      freshness: components['schemas']['PassageFreshness'];
+      start: null | number;
+      end: null | number;
+    };
+    /** @enum {string} */
+    PassageFreshness: 'fresh' | 'relocated' | 'stale';
+    PassageRequestBody: {
+      /** @description The id of the draft the passage was selected in. */
+      baseDraftId: string;
+      /** @description The draft revision the passage was selected in. */
+      baseRevision: number;
+      /** @description The draft `saveSeq` the passage was selected in; a draft that has moved since is refused with DRF_013 carrying the current draft. */
+      baseSaveSeq: number;
+      /** @description Start of the selection: a UTF-16 code-unit offset into the draft body, as JavaScript string indices count. */
+      start: number;
+      /** @description End of the selection, exclusive, in the same units as `start`; at most 6000 characters after it. */
+      end: number;
+      /** @description Lowercase hex SHA-256 of the selected text (UTF-8); refused with PSG_003 when the body no longer holds that text at those offsets. */
+      passageHash: string;
+      /** @description What the author wants changed in the passage — a quick option or free text. */
+      request: string;
+    };
+    ApplyPassageBody: {
+      /** @description The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft. */
+      baseDraftId?: string;
+      /** @description The draft revision this save was made against. */
+      baseRevision?: number;
+      /** @description The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues. */
+      baseSaveSeq?: number;
+    };
+    AppliedPassageResponse: {
+      /** @description The draft at the new revision the suggestion produced. */
+      draft: components['schemas']['DraftResponse'];
+      suggestion: components['schemas']['PassageSuggestionResponse'];
     };
     JobResponse: {
       id: string;
@@ -9547,6 +9758,340 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WriterSnapshotDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_drafts_n_versions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListDraftVersionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_drafts_n_versions_compare: {
+    parameters: {
+      query: {
+        /** @description The older revision; the diff reads from it. */
+        from: number | string;
+        /** @description The newer revision; the diff reads to it. */
+        to: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VersionComparisonResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_versions_r_restore: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        r: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RestoreVersionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_drafts_n_passage_suggestions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListPassageSuggestionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_passage_suggestions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PassageRequestBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PassageSuggestionResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_passage_suggestions_suggestionId_apply: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        suggestionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApplyPassageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppliedPassageResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_passage_suggestions_suggestionId_dismiss: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        suggestionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PassageSuggestionResponse'];
         };
       };
       /** @description Default Response */
@@ -15227,6 +15772,20 @@ export type WriterSnapshotSummaryResponse = components['schemas']['WriterSnapsho
 export type WriterAttemptRole = components['schemas']['WriterAttemptRole'];
 export type WriterSnapshotDetailResponse = components['schemas']['WriterSnapshotDetailResponse'];
 export type WriterSnapshotMessageResponse = components['schemas']['WriterSnapshotMessageResponse'];
+export type ListDraftVersionResponse = components['schemas']['ListDraftVersionResponse'];
+export type DraftVersionResponse = components['schemas']['DraftVersionResponse'];
+export type VersionComparisonResponse = components['schemas']['VersionComparisonResponse'];
+export type DiffHunkResponse = components['schemas']['DiffHunkResponse'];
+export type DiffOp = components['schemas']['DiffOp'];
+export type RestoreVersionBody = components['schemas']['RestoreVersionBody'];
+export type ListPassageSuggestionResponse = components['schemas']['ListPassageSuggestionResponse'];
+export type PassageSuggestionResponse = components['schemas']['PassageSuggestionResponse'];
+export type PassageSuggestionStatus = components['schemas']['PassageSuggestionStatus'];
+export type PassageLocationResponse = components['schemas']['PassageLocationResponse'];
+export type PassageFreshness = components['schemas']['PassageFreshness'];
+export type PassageRequestBody = components['schemas']['PassageRequestBody'];
+export type ApplyPassageBody = components['schemas']['ApplyPassageBody'];
+export type AppliedPassageResponse = components['schemas']['AppliedPassageResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
 export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type SortOrder = components['schemas']['SortOrder'];
@@ -15533,6 +16092,10 @@ export type ListChapterRowsQueryParams = Exclude<paths['/api/v1/projects/{projec
 export type ListChapterRowsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['path'], undefined>;
 export type ListPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots']['get']['parameters']['path'], undefined>;
 export type GetPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots/{snapshotId}']['get']['parameters']['path'], undefined>;
+export type ListVersionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/versions']['get']['parameters']['path'], undefined>;
+export type CompareVersionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/versions/compare']['get']['parameters']['query'], undefined>;
+export type CompareVersionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/versions/compare']['get']['parameters']['path'], undefined>;
+export type ListSuggestionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/passage-suggestions']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
