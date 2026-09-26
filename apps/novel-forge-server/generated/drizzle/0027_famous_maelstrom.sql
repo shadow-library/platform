@@ -1,1 +1,0 @@
-ALTER TABLE "publications" ADD COLUMN "publish_token" varchar(64);

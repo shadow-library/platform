@@ -1,1 +1,0 @@
-ALTER TABLE "model_calls" ADD COLUMN "reasoning_effort" varchar;

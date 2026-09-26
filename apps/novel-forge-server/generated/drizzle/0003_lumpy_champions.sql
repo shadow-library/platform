@@ -1,1 +1,0 @@
-ALTER TYPE "public"."judge_verdict" ADD VALUE 'evaluation_failed';

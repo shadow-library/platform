@@ -41,7 +41,7 @@ export function checkMigrations(workspace: Workspace): void {
   }
 
   log.error(`Migration drift detected in ${workspace.dir}/${MIGRATIONS_DIR} — generated migrations are not committed:`);
-  const diff = run('git', ['diff', '--', MIGRATIONS_DIR], { cwd: workspace.path, stream: false });
+  const diff = run('git', ['diff', '--stat', '--', MIGRATIONS_DIR], { cwd: workspace.path, stream: false });
   if (diff.stdout.trim()) log.error(diff.stdout);
   const untracked = changedLines.filter(line => line.startsWith('??'));
   if (untracked.length > 0) log.error(`Untracked files:\n${untracked.join('\n')}`);

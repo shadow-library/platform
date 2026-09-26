@@ -1,1 +1,0 @@
-ALTER TYPE "public"."fact_source" ADD VALUE 'generated';

@@ -1,1 +1,0 @@
-ALTER TABLE "briefs" ADD COLUMN "guidance" text;

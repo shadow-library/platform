@@ -15,12 +15,18 @@ import { findWorkspace, MIGRATIONS_DIR, type Workspace } from './workspaces.ts';
  */
 type DbCommand = 'generate' | 'migrate' | 'seed';
 
+interface DbCommandOptions {
+  /** `generate` only: drizzle-kit's `--name`, replacing its random tag so a regenerated baseline keeps its file name. */
+  name?: string;
+}
+
 /**
  * Declaring the constants
  */
-const USAGE = `Usage: bun scripts/db.ts <workspace> <generate|migrate|seed>
+const USAGE = `Usage: bun scripts/db.ts <workspace> <generate|migrate|seed> [--name=<migration-name>]
 
   workspace   repo-relative directory (apps/identity-server) or package name
+  --name      generate only: the new migration's name instead of drizzle-kit's random one
 
 Centralizes the per-backend Drizzle/Postgres tooling every backend workspace used to duplicate. "generate"
 shells drizzle-kit directly with derived schema/out/dialect flags, so no live DB connection or config file
@@ -53,10 +59,12 @@ function resolveMigrateEntry(workspace: Workspace): string {
 }
 
 /** `drizzle-kit generate` needs only schema/out/dialect to diff — no live DB connection, so no `--url` and no config file. */
-function runGenerate(workspace: Workspace): number {
+function runGenerate(workspace: Workspace, options: DbCommandOptions): number {
   const schema = resolveSchema(workspace);
+  const args = ['drizzle-kit', 'generate', '--schema', schema, '--out', MIGRATIONS_DIR, '--dialect', 'postgresql'];
+  if (options.name) args.push('--name', options.name);
   log.info(`drizzle-kit generate — schema ${schema}, out ${MIGRATIONS_DIR}`);
-  return run('bunx', ['drizzle-kit', 'generate', '--schema', schema, '--out', MIGRATIONS_DIR, '--dialect', 'postgresql'], { cwd: workspace.path }).status;
+  return run('bunx', args, { cwd: workspace.path }).status;
 }
 
 function runMigrate(workspace: Workspace): number {
@@ -77,11 +85,11 @@ function runSeed(workspace: Workspace): number {
 }
 
 /** Dispatches `command` for `workspace`, returning the child process's exit status. */
-export function runDbCommand(workspace: Workspace, command: DbCommand): number {
+export function runDbCommand(workspace: Workspace, command: DbCommand, options: DbCommandOptions = {}): number {
   if (workspace.type !== 'backend') throw new ShadowError(`${workspace.dir} is not a backend workspace — scripts/db.ts only applies to type: backend`);
   switch (command) {
     case 'generate':
-      return runGenerate(workspace);
+      return runGenerate(workspace, options);
     case 'migrate':
       return runMigrate(workspace);
     case 'seed':
@@ -97,12 +105,18 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const [target, command] = args.filter(arg => !arg.startsWith('-'));
+  const [target, command, ...extra] = args.filter(arg => !arg.startsWith('-'));
   if (!target || !command) throw new ShadowError(`A workspace and a command are required.\n\n${USAGE}`);
+  if (args.includes('--name')) throw new ShadowError(`--name takes its value after "=", e.g. --name=initial_schema\n\n${USAGE}`);
+  if (extra.length > 0) throw new ShadowError(`Unexpected argument "${extra[0]}"\n\n${USAGE}`);
   if (!COMMANDS.includes(command as DbCommand)) throw new ShadowError(`Unknown command "${command}". Expected one of: ${COMMANDS.join(', ')}\n\n${USAGE}`);
 
+  const name = args.find(arg => arg.startsWith('--name='))?.slice('--name='.length);
+  if (name !== undefined && command !== 'generate') throw new ShadowError(`--name only applies to "generate"\n\n${USAGE}`);
+  if (name === '') throw new ShadowError(`--name needs a value, e.g. --name=initial_schema\n\n${USAGE}`);
+
   const workspace = findWorkspace(target);
-  const status = runDbCommand(workspace, command as DbCommand);
+  const status = runDbCommand(workspace, command as DbCommand, { name });
   if (status !== 0) throw new ShadowError(`"${command}" failed for ${workspace.dir} (exit code ${status})`);
   log.success(`${command} ok — ${workspace.dir}`);
   return 0;

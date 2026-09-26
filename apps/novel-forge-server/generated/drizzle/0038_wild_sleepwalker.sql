@@ -1,1 +1,0 @@
-CREATE INDEX "projects_shared_with_org_organisation_id_idx" ON "projects" USING btree ("organisation_id") WHERE "projects"."shared_with_org";

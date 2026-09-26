@@ -226,7 +226,11 @@ export const loreChunks = pgTable(
     embedding: vectorType(EMBEDDING_DIM)('embedding'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [unique('lore_chunks_project_id_kind_ref_key_unique').on(t.projectId, t.kind, t.refKey), index('lore_chunks_project_id_kind_idx').on(t.projectId, t.kind)],
+  t => [
+    unique('lore_chunks_project_id_kind_ref_key_unique').on(t.projectId, t.kind, t.refKey),
+    index('lore_chunks_project_id_kind_idx').on(t.projectId, t.kind),
+    index('lore_chunks_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops')),
+  ],
 );
 
 export const workflowRunsRelations = relations(workflowRuns, ({ one }) => ({

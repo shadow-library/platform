@@ -1,1 +1,0 @@
-ALTER TABLE "briefs" ADD COLUMN "hand_edited" boolean DEFAULT false NOT NULL;

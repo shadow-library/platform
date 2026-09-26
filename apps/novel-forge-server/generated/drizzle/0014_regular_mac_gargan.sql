@@ -1,1 +1,0 @@
-ALTER TABLE "drafts" ADD COLUMN "stale_reason" varchar;

@@ -31,7 +31,7 @@ export const chapterChunks = pgTable(
     text: text('text').notNull(),
     embedding: vectorType(EMBEDDING_DIM)('embedding'),
   },
-  t => [index('chapter_chunks_project_id_chapter_idx').on(t.projectId, t.chapter)],
+  t => [index('chapter_chunks_project_id_chapter_idx').on(t.projectId, t.chapter), index('chapter_chunks_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops'))],
 );
 
 export const chapterChunksRelations = relations(chapterChunks, ({ one }) => ({

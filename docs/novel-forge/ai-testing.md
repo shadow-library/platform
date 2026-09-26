@@ -50,14 +50,14 @@ is **stale in three places** — see "Where the old README is wrong" at the end.
 
 ### 0. What you actually need running
 
-| Piece                          | Required for                  | Hard-fails without it?                                                                                                                                 |
-| ------------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Postgres 16+ **with pgvector** | everything                    | yes — `generated/drizzle/0000_initial_schema.sql:1` is `CREATE EXTENSION IF NOT EXISTS vector;`, and `vector(1024)` columns exist at `:597` and `:651` |
-| `novel-forge-server` on :8080  | every API call                | yes                                                                                                                                                    |
-| `novel-forge-web` on :3000     | UI recipes only               | no — every recipe has an API path                                                                                                                      |
-| An **identity** deployment     | booting the server at all     | **yes** (see §3)                                                                                                                                       |
-| `AI_OPENROUTER_API_KEY`        | every chat/image model call   | yes — `AI_006` / `AI_004`, `src/classes/app-error-code.ts:97,99`, thrown at `src/modules/ai/model-router.service.ts:280-281` and `:487-488`            |
-| Ollama on :11434               | lore/prose vector search only | **no — it degrades silently** (§6)                                                                                                                     |
+| Piece                          | Required for                  | Hard-fails without it?                                                                                                                              |
+| ------------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres 16+ **with pgvector** | everything                    | yes — `generated/drizzle/0000_initial_schema.sql:1` is `CREATE EXTENSION IF NOT EXISTS vector;`; `chapter_chunks`/`lore_chunks` hold `vector(1024)` |
+| `novel-forge-server` on :8080  | every API call                | yes                                                                                                                                                 |
+| `novel-forge-web` on :3000     | UI recipes only               | no — every recipe has an API path                                                                                                                   |
+| An **identity** deployment     | booting the server at all     | **yes** (see §3)                                                                                                                                    |
+| `AI_OPENROUTER_API_KEY`        | every chat/image model call   | yes — `AI_006` / `AI_004`, `src/classes/app-error-code.ts:97,99`, thrown at `src/modules/ai/model-router.service.ts:280-281` and `:487-488`         |
+| Ollama on :11434               | lore/prose vector search only | **no — it degrades silently** (§6)                                                                                                                  |
 
 There is **no docker-compose, Tiltfile or skaffold in this repo** (`AGENTS.md:25`, `AGENTS.md:71`: "there is no
 local compose deployment"). Only per-app `Dockerfile`s exist. The provided local stack is a k3d cluster driven by
