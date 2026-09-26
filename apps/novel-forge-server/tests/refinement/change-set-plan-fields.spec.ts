@@ -36,9 +36,9 @@ describe('validateChangeSet — chapter plan fields', () => {
     ]);
   });
 
-  it('should accept a volume state and reject an unknown one', () => {
+  it('should tolerate a state on volume.upsert without acting on it — the op cannot set a volume’s state', () => {
     expect(validateChangeSet([{ op: 'volume.upsert', volumeKey: 'volume_1', state: 'goal_met' }])).toEqual([]);
-    expect(validateChangeSet([{ op: 'volume.upsert', volumeKey: 'volume_1', state: 'done' }])).toEqual(['changeSet[0]: state must be one of not_started, active, goal_met']);
+    expect(validateChangeSet([{ op: 'volume.upsert', volumeKey: 'volume_1', state: 'done' }])).toEqual([]);
   });
 
   it('should accept a fact unlock condition and clues, and null for either', () => {
@@ -77,7 +77,7 @@ describe('validateChangeSet — chapter plan fields', () => {
     expect(vocabulary).toContain('"unlock": <object|null, optional>');
     expect(vocabulary).toContain('{"ending": true}');
     expect(vocabulary).toContain('"isEnding": <boolean, optional>');
-    expect(vocabulary).toContain('state is one of: not_started | active | goal_met');
+    expect(vocabulary).toContain('its state moves only through "goal met — start next"');
   });
 });
 

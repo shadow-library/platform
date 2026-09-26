@@ -155,10 +155,10 @@ const ALLOWLIST_CASES: Case[] = [
     expected: { side: 'card', reason: 'always_card', rule: 'volume_structure' },
   },
   {
-    name: "a volume's state is a card",
-    op: { op: 'volume.upsert', volumeKey: 'v2', state: 'goal_met', quote: VOLUME_QUOTE },
+    name: "a state on volume.upsert never gates the op — the op cannot set a volume's state",
+    op: { op: 'volume.upsert', volumeKey: 'v2', state: 'goal_met', quote: VOLUME_QUOTE } as unknown as ChangeOp,
     existing: ['volume:v2'],
-    expected: { side: 'card', reason: 'always_card', rule: 'volume_structure' },
+    expected: { side: 'direct' },
   },
   {
     name: "a volume's notes are a card",
@@ -258,6 +258,11 @@ const ALWAYS_CARD_CASES: Case[] = [
   { name: 'prose is always a card', op: { op: 'draft.update', chapter: 4, body: 'Mira ran.', quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'prose' } },
   { name: 'finalize is always a card', op: { op: 'action.finalize', quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   { name: 'approval is always a card', op: { op: 'action.approve_draft', chapter: 4, quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
+  {
+    name: 'goal met — start next is always a card',
+    op: { op: 'action.advance_volume', volumeKey: 'v1', quote: QUOTE },
+    expected: { side: 'card', reason: 'always_card', rule: 'action' },
+  },
 ];
 
 const OVERRIDE_CASES: Case[] = [

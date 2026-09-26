@@ -183,6 +183,8 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly VOL_001 = AppErrorCode.notFound('VOL_001', 'Volume not found');
   static readonly VOL_002 = AppErrorCode.conflict('VOL_002', 'Volume is still assigned to the plan for chapter {chapter} — move or remove the chapter plans in it first');
+  static readonly VOL_003 = AppErrorCode.conflict('VOL_003', 'Only the active volume’s goal can be marked met — this volume is not active');
+  static readonly VOL_004 = AppErrorCode.badRequest('VOL_004', 'Goal met — start next is never applied automatically — select the action and apply it deliberately');
 
   /*!
    * Bible Document Errors

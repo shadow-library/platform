@@ -3,7 +3,7 @@ import { AppError, Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 import { type Genre, NOVEL_GENRES } from '@shadow-library/sdk';
 
-import { authoringClaimClock, volumeContentHash } from '@server/common';
+import { authoringClaimClock, autoActivateVolume, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -91,6 +91,7 @@ export class NovelImportService {
           return { projectId: project.id, ...values, contentHash: volumeContentHash(values) };
         }),
       );
+      await autoActivateVolume(tx, project.id);
 
       const payload: ImportJobPayload = {
         chapters: validation.chapters.map(c => ({ title: c.title, content: c.content, volumeKey: importedVolumeKey(c.volumeOrdinal) })),

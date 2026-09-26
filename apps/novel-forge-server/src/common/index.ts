@@ -32,3 +32,4 @@ export * from './secret-title';
 export * from './teaching-gate';
 export * from './term-text';
 export * from './unlock-condition';
+export * from './volume-stats';

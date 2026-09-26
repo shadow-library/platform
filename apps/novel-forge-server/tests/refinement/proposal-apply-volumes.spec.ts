@@ -163,6 +163,49 @@ describe('ProposalApplyService — volumes and briefs', () => {
   });
 });
 
+describe('ProposalApplyService — volume auto-activation', () => {
+  it('should activate a project’s first volume on insert', async () => {
+    const { service, rows } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_1', ordinal: 1, title: 'The Crossing' }]);
+
+    await service.apply(7n, 300n);
+
+    expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active' });
+  });
+
+  it('should do nothing on a second insert while a volume is already active', async () => {
+    const { service, rows } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_2', ordinal: 2, title: 'The Far Shore' }], {
+      volumes: [{ volumeKey: 'volume_1', ordinal: 1, title: 'The Crossing', state: 'active' }],
+    });
+
+    await service.apply(7n, 300n);
+
+    expect(rows(schema.volumes).map(row => [row['volumeKey'], row['state']])).toEqual([
+      ['volume_1', 'active'],
+      ['volume_2', 'not_started'],
+    ]);
+  });
+
+  it('should activate the new volume once every earlier one is goal met', async () => {
+    const { service, rows } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_2', ordinal: 2, title: 'The Far Shore' }], {
+      volumes: [{ volumeKey: 'volume_1', ordinal: 1, title: 'The Crossing', state: 'goal_met' }],
+    });
+
+    await service.apply(7n, 300n);
+
+    expect(rows(schema.volumes).find(row => row['volumeKey'] === 'volume_2')).toMatchObject({ state: 'active' });
+  });
+
+  it('should not activate an insert that lands below a goal-met volume’s ordinal', async () => {
+    const { service, rows } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_1', ordinal: 1, title: 'Backfilled prologue' }], {
+      volumes: [{ volumeKey: 'volume_2', ordinal: 2, title: 'The Far Shore', state: 'goal_met' }],
+    });
+
+    await service.apply(7n, 300n);
+
+    expect(rows(schema.volumes).find(row => row['volumeKey'] === 'volume_1')).toMatchObject({ state: 'not_started' });
+  });
+});
+
 describe('ProposalApplyService — action.generate_chapter', () => {
   it('should refuse a blanket manual apply, so the author selects the generation step deliberately', async () => {
     const { service, executors } = await fakeProject([{ op: 'action.generate_chapter', chapter: 5 }]);
@@ -173,6 +216,22 @@ describe('ProposalApplyService — action.generate_chapter', () => {
 
   it('should refuse an automatic apply that carries it, since actions are always the author’s selection', async () => {
     const { service, executors } = await fakeProject([{ op: 'action.generate_chapter', chapter: 5 }]);
+
+    await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('content ops only');
+    expect(executors.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProposalApplyService — action.advance_volume', () => {
+  it('should refuse a blanket manual apply, so the author selects "goal met — start next" deliberately', async () => {
+    const { service, executors } = await fakeProject([{ op: 'action.advance_volume', volumeKey: 'volume_1' }]);
+
+    await expect(service.apply(7n, 300n)).rejects.toMatchObject({ code: 'VOL_004' });
+    expect(executors.get).not.toHaveBeenCalled();
+  });
+
+  it('should refuse an automatic apply that carries it, since actions are always the author’s selection', async () => {
+    const { service, executors } = await fakeProject([{ op: 'action.advance_volume', volumeKey: 'volume_1' }]);
 
     await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('content ops only');
     expect(executors.get).not.toHaveBeenCalled();

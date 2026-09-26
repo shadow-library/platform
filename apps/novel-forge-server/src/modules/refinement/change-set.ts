@@ -1,5 +1,5 @@
 import { validateBriefScenes, validateUnlockCondition } from '@server/common';
-import { type Bible, type BriefScene, type Generation, type Knowledge, type Plan, type Project, type UnlockCondition } from '@server/database';
+import { type Bible, type BriefScene, type Generation, type Knowledge, type Project, type UnlockCondition } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
@@ -34,6 +34,7 @@ export interface BibleDocumentRemoveOp {
   slug: string;
 }
 
+/** No `state`: a volume's state moves only through `action.advance_volume` ("goal met — start next"), never through an upsert. A new volume is always created `not_started`. */
 export interface VolumeUpsertOp {
   op: 'volume.upsert';
   volumeKey: string;
@@ -41,7 +42,6 @@ export interface VolumeUpsertOp {
   title?: string;
   objective?: string;
   body?: string;
-  state?: Plan.VolumeState;
 }
 
 export interface VolumeRemoveOp {
@@ -227,6 +227,12 @@ interface PlanChapterAction {
   empty?: boolean;
 }
 
+/** "Goal met — start next": only the currently active volume may be marked, and the next not-started volume in order becomes active. */
+interface AdvanceVolumeAction {
+  op: 'action.advance_volume';
+  volumeKey: string;
+}
+
 export type ContentOp =
   | PremiseUpdateOp
   | BibleDocumentUpsertOp
@@ -255,7 +261,8 @@ export type ActionOp =
   | ValidateAction
   | FinalizeAction
   | OrganiseNotesAction
-  | PlanChapterAction;
+  | PlanChapterAction
+  | AdvanceVolumeAction;
 
 /**
  * Rationale and quote are metadata about the change, not part of it: they reach the author beside the op and are stripped before any
@@ -276,7 +283,6 @@ interface OpSpec {
 
 const BRIEF_WRITE_MODES = ['standard', 'external'];
 const CONTENT_MODES = ['standard', 'unrestricted'];
-const VOLUME_STATES = ['not_started', 'active', 'goal_met'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 const MILESTONE_KINDS = ['rank', 'event', 'learned_from', 'custom'];
@@ -287,8 +293,11 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
   'volume.upsert': {
     required: { volumeKey: 'string' },
+    // `state` is deliberately not a field here: it moves only through action.advance_volume ("goal met — start next"), so this op cannot
+    // set or change it — a stored op from before this rule carried one and must still parse, so it is tolerated on read and ignored on apply.
     optional: { ordinal: 'number', title: 'string', objective: 'string', body: 'string', state: 'string' },
-    description: `objective is the goal the volume works towards; body holds the notes on it; state is one of: ${VOLUME_STATES.join(' | ')}.`,
+    description:
+      'objective is the goal the volume works towards; body holds the notes on it. A new volume always starts not_started; its state moves only through "goal met — start next".',
   },
   'volume.remove': { required: { volumeKey: 'string' }, optional: {} },
   'brief.update': {
@@ -357,6 +366,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
   'action.organise_notes': { required: {}, optional: {} },
   'action.plan_chapter': { required: {}, optional: { chapter: 'number', intent: 'string', direction: 'string', empty: 'boolean' } },
+  'action.advance_volume': { required: { volumeKey: 'string' }, optional: {} },
 };
 
 // Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
@@ -396,6 +406,8 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.organise_notes': "organise the author's stored notes into Story Bible pages, records, a timeline and open questions — runs as a job and stages the result as a card",
   'action.plan_chapter':
     "plan the next chapter — the lowest-numbered one without a draft; `chapter` must be that chapter when given. Before planning, recap in your reply the two or three obligations that matter now (the previous chapter's hook, the longest-quiet promise, what the volume goal needs); when the author has not said what happens, offer two or three directions, each saying which obligation it moves and what it costs, and let the author choose. Then plan from `direction` (the one the author chose, as offered), `intent` (what the author says happens, in their words), or `empty: true` (an empty plan the author fills in). Runs as a job and stages the plan as a card; the plan never sets the chapter's content mode",
+  'action.advance_volume':
+    'the author\'s "goal met — start next": `volumeKey` must name the currently active volume, which becomes goal met; the next not-started volume in order becomes active, or none does if there isn\'t one yet — never auto-applied',
 };
 
 export function isActionOp(op: ChangeOp): op is ActionOp;
@@ -567,8 +579,6 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'milestone.upsert' && typeof record['label'] === 'string' && record['label'].trim() === '') errors.push(`${path}: label must not be blank`);
     if (op.startsWith('milestone.') && typeof record['milestoneKey'] === 'string' && !MILESTONE_KEY.test(record['milestoneKey']))
       errors.push(`${path}: milestoneKey must be a non-empty key without spaces`);
-    if (op === 'volume.upsert' && record['state'] !== undefined && !VOLUME_STATES.includes(record['state'] as string))
-      errors.push(`${path}: state must be one of ${VOLUME_STATES.join(', ')}`);
     if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
     if (op === 'fact.upsert' && Array.isArray(record['allowedClues']) && (record['allowedClues'] as unknown[]).some(clue => typeof clue !== 'string' || clue.trim() === ''))
       errors.push(`${path}: allowedClues must hold non-empty strings`);

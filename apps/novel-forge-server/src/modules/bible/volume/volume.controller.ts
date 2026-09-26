@@ -1,10 +1,10 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
-import { Get, HttpController, Params, Query, RespondFor } from '@shadow-library/fastify';
+import { Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
-import { PROJECTS_READ_PERMISSION } from '@server/constants';
+import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
-import { ListVolumeResponse, ListVolumesQuery, VolumeKeyParams, VolumeProjectParams, VolumeResponse } from './volume.dto';
+import { ListVolumeResponse, ListVolumesQuery, VolumeAdvanceResponse, VolumeKeyParams, VolumeProjectParams, VolumeResponse } from './volume.dto';
 import { VolumeService } from './volume.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
@@ -25,5 +25,12 @@ export class VolumeController {
     const volume = await this.volumeService.get(params.projectId, params.volumeKey);
     if (!volume) throw AppErrorCode.VOL_001.create();
     return volume;
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/:volumeKey/goal-met')
+  @RespondFor(200, VolumeAdvanceResponse)
+  goalMet(@Params() params: VolumeKeyParams): Promise<VolumeAdvanceResponse> {
+    return this.volumeService.advanceGoalMet(params.projectId, params.volumeKey);
   }
 }

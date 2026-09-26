@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import { type SQL } from 'drizzle-orm';
 
 import { landFinalChapters } from '@modules/novel-import/land-chapters';
 import { type NovelBundle } from '@modules/novel-import/novel-import.dto';
 import { type ImportJobPayload, NovelImportService } from '@modules/novel-import/novel-import.service';
 import { schema } from '@server/database';
+
+import { matchesWhere } from '../sql-filter';
 
 type Row = Record<string, unknown>;
 
@@ -29,14 +32,27 @@ function bundle(): NovelBundle {
 
 function fakeImportDatabase() {
   const inserted = new Map<unknown, Row[]>();
+  const rows = (table: unknown): Row[] => inserted.get(table) ?? [];
   const insert = (table: unknown) => ({
     values: (values: Row | Row[]) => {
-      inserted.set(table, [...(inserted.get(table) ?? []), ...(Array.isArray(values) ? values : [values])]);
+      const staged = (Array.isArray(values) ? values : [values]).map((row, index) =>
+        table === schema.volumes ? { id: BigInt(rows(table).length + index + 1), revision: 1, state: 'not_started', contentHash: null, ...row } : row,
+      );
+      inserted.set(table, [...rows(table), ...staged]);
       const returned = table === schema.projects ? [{ id: 11n }] : [{ id: 'job-1' }];
       return Object.assign(Promise.resolve(), { returning: () => Object.assign(Promise.resolve(returned), { catch: () => Promise.resolve(returned) }) });
     },
   });
-  const db = { $count: async () => 0, transaction: async (run: (tx: unknown) => Promise<unknown>) => run({ insert }) };
+  const select = () => ({ from: (table: unknown) => ({ where: () => ({ for: async () => rows(table) }) }) });
+  const update = (table: unknown) => ({
+    set: (values: Row) => ({
+      where: (condition: SQL) => {
+        for (const row of rows(table).filter(row => matchesWhere(row, condition))) Object.assign(row, values);
+        return Promise.resolve();
+      },
+    }),
+  });
+  const db = { $count: async () => 0, transaction: async (run: (tx: unknown) => Promise<unknown>) => run({ insert, select, update }) };
   return { db, inserted };
 }
 
@@ -55,6 +71,19 @@ describe('novel import — chapter volumes', () => {
       ['Landfall', 'volume_2'],
     ]);
     expect((inserted.get(schema.volumes) ?? []).map(volume => volume['volumeKey'])).toEqual(['volume_1', 'volume_2']);
+  });
+
+  it('should activate volume 1, the lowest-ordinal volume a fresh import lands with none active', async () => {
+    const { db, inserted } = fakeImportDatabase();
+    const actors = { current: () => ({ kind: 'user', id: 3n, organisationId: null }) };
+    const service = new NovelImportService({ getPostgresClient: () => db } as never, actors as never);
+
+    await service.import({ bundle: bundle() });
+
+    expect((inserted.get(schema.volumes) ?? []).map(volume => [volume['volumeKey'], volume['state']])).toEqual([
+      ['volume_1', 'active'],
+      ['volume_2', 'not_started'],
+    ]);
   });
 
   it('should land each chapter in its volume, and in none when the staged payload predates chapter volumes', async () => {

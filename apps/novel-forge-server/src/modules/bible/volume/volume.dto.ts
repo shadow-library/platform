@@ -51,6 +51,18 @@ export class VolumeResponse {
   @Field(() => VolumeState, { description: 'Where the story stands against the volume goal.' })
   state: Plan.VolumeState;
 
+  @Field(() => Integer, { description: 'Computed on read from the chapters that carry this volume key — never stored.' })
+  chapterCount: number;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'Lowest chapter number in the volume; null when it has none.' })
+  firstChapter?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'Highest chapter number in the volume; null when it has none.' })
+  lastChapter?: number | null;
+
+  @Field(() => Integer, { description: 'Sum of word counts across the volume’s chapters.' })
+  wordCount: number;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
@@ -63,3 +75,12 @@ export class ListVolumesQuery extends PaginationQuery(SortByTime) {}
 
 @Schema()
 export class ListVolumeResponse extends Paginated(VolumeResponse) {}
+
+@Schema()
+export class VolumeAdvanceResponse {
+  @Field(() => VolumeResponse, { description: 'The volume just marked goal met.' })
+  completed: VolumeResponse;
+
+  @Field(() => VolumeResponse, { optional: true, nullable: true, description: 'The next volume, now active — null if none was waiting to start.' })
+  activated?: VolumeResponse | null;
+}

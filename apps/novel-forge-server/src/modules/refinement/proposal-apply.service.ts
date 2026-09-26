@@ -8,6 +8,7 @@ import {
   assertMilestoneSubject,
   assertStartsNextChapter,
   auditCardSelection,
+  autoActivateVolume,
   briefContentHash,
   changedCluesNamingTerms,
   computeBibleDocHash,
@@ -146,6 +147,7 @@ const ONE_WAY_DOORS: Partial<Record<ActionOp['op'], ErrorCode>> = {
   'action.finalize': AppErrorCode.RFN_009,
   'action.approve_draft': AppErrorCode.DRF_009,
   'action.generate_chapter': AppErrorCode.DRF_014,
+  'action.advance_volume': AppErrorCode.VOL_004,
 };
 
 /**
@@ -492,7 +494,6 @@ export class ProposalApplyService {
       title: volume.title ?? undefined,
       objective: volume.objective ?? undefined,
       body: volume.body ?? undefined,
-      state: volume.state,
     };
   }
 
@@ -690,7 +691,8 @@ export class ProposalApplyService {
       title: op.title ?? existing?.title ?? null,
       objective: op.objective ?? existing?.objective ?? null,
       body: op.body ?? existing?.body ?? null,
-      state: op.state ?? existing?.state ?? 'not_started',
+      // Never from `op`: state moves only through action.advance_volume, so an upsert keeps an existing volume's state and starts a new one not_started.
+      state: existing?.state ?? 'not_started',
     };
     const contentHash = volumeContentHash({ volumeKey: op.volumeKey, ...merged });
 
@@ -704,6 +706,7 @@ export class ProposalApplyService {
     } else {
       revision = 1;
       await ctx.tx.insert(schema.volumes).values({ projectId: ctx.projectId, volumeKey: op.volumeKey, ...merged, revision, contentHash });
+      await autoActivateVolume(ctx.tx, ctx.projectId);
     }
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: revision });
   }

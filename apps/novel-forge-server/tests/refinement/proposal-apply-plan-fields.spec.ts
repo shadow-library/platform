@@ -157,25 +157,33 @@ describe('ProposalApplyService — chapter plan fields', () => {
 describe('ProposalApplyService — volume state', () => {
   const volume: Row = { volumeKey: 'volume_1', ordinal: 1, title: 'The Ledger House', objective: 'Get in.', body: null, state: 'not_started' };
 
-  it('should set a volume state and restore it on revert', async () => {
-    const { service, rows, inverse } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_1', state: 'active' }], { volumes: [volume] });
+  it('should never change an existing volume’s state from an upsert, even one carrying a state — that moves only through goal met — start next', async () => {
+    const legacyOp = { op: 'volume.upsert', volumeKey: 'volume_1', state: 'active', objective: 'Get further in.' } as unknown as ChangeOp;
+    const { service, rows, inverse } = await fakeProject([legacyOp], { volumes: [{ ...volume, state: 'active' }] });
 
     await service.apply(7n, 300n);
-    expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active', objective: 'Get in.' });
-    expect(inverse()[0]).toMatchObject({ op: 'volume.upsert', state: 'not_started' });
+    expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active', objective: 'Get further in.' });
+    expect(inverse()[0]).toMatchObject({ op: 'volume.upsert', objective: 'Get in.' });
+    expect(inverse()[0]).not.toHaveProperty('state');
 
     await service.revert(7n, 300n);
+    expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active', objective: 'Get in.' });
+  });
+
+  it('should leave a not_started volume unchanged when the op carries state: active', async () => {
+    const legacyOp = { op: 'volume.upsert', volumeKey: 'volume_1', state: 'active' } as unknown as ChangeOp;
+    const { service, rows } = await fakeProject([legacyOp], { volumes: [volume] });
+
+    await service.apply(7n, 300n);
+
     expect(rows(schema.volumes)[0]).toMatchObject({ state: 'not_started' });
   });
 
-  it('should keep the state when the op leaves it out, and start a new volume not started', async () => {
-    const { service, rows } = await fakeProject(
-      [
-        { op: 'volume.upsert', volumeKey: 'volume_1', title: 'The Counting House' },
-        { op: 'volume.upsert', volumeKey: 'volume_2', objective: 'Get out.' },
-      ],
-      { volumes: [{ ...volume, state: 'goal_met' }] },
-    );
+  it('should start a new volume not_started whatever state the op names', async () => {
+    const legacyOp = { op: 'volume.upsert', volumeKey: 'volume_2', objective: 'Get out.', state: 'active' } as unknown as ChangeOp;
+    const { service, rows } = await fakeProject([{ op: 'volume.upsert', volumeKey: 'volume_1', title: 'The Counting House' }, legacyOp], {
+      volumes: [{ ...volume, state: 'goal_met' }],
+    });
 
     await service.apply(7n, 300n);
 

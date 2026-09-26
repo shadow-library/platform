@@ -316,6 +316,21 @@ describe('ContextAssembler.forChapter — earlier volumes', () => {
     expect(section?.rendered).not.toContain('Chapter 8');
     expect(pack.sections.find(s => s.key === 'volume_objective')?.rendered).toContain('Goal of tide 3.');
   });
+
+  it("should still show a 'goal met — start next' volume as completed once the next volume's plan makes it current, whatever state it carries", async () => {
+    const fixture: Fixture = {
+      brief: { chapter: 8, volumeKey: 'v2' },
+      volumes: [volume(1, 'goal_met'), volume(2, 'active')],
+      currentVolume: volume(2, 'active'),
+      finalized: [{ number: 1, summary: 'The tide settles at last. It leaves a mark.', volumeKey: 'v1', status: 'done' }],
+    };
+
+    const pack = await assembler(fixture).forChapter(1n, 8, { dryRun: true });
+
+    const section = pack.sections.find(s => s.key === 'completed_volumes');
+    expect(section?.sourceRefs).toEqual(['volume:v1']);
+    expect(section?.rendered).toContain('**Volume 1: Tide 1**');
+  });
 });
 
 describe('ContextAssembler.forChapter — continuation state over its limit', () => {

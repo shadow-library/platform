@@ -265,7 +265,7 @@ export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCar
 
   if (op.op === 'premise.update') return STORY_FIELDS.some(field => fields[field] !== undefined && isFilled(current?.[field])) ? 'replaces_story' : undefined;
   if (op.op === 'bible_document.upsert') return isWriterExcludedBibleDoc({ section: op.section, slug: op.slug }) ? 'planner_only_page' : undefined;
-  if (op.op === 'volume.upsert') return op.state !== undefined || op.body !== undefined || (current && op.ordinal !== undefined) ? 'volume_structure' : undefined;
+  if (op.op === 'volume.upsert') return op.body !== undefined || (current && op.ordinal !== undefined) ? 'volume_structure' : undefined;
   if (op.op !== 'fact.upsert') return undefined;
   if (current && op.body !== undefined) return 'secret_truth';
   const gates = Object.keys(fields).some(field => declaredOpFields(op.op).includes(field) && !FACT_DIRECT_FIELDS.has(field));
@@ -279,7 +279,11 @@ function asChangeSetRef(ref: string): string {
 
 /** The records an op names without writing them: the dependency edges of the split and of an undo's impact. */
 export function opReferences(op: ChangeOp): string[] {
-  if (isActionOp(op)) return 'chapter' in op && typeof op.chapter === 'number' ? [`chapter:${op.chapter}`, `draft:${op.chapter}`] : [];
+  if (isActionOp(op)) {
+    const chapterRefs = 'chapter' in op && typeof op.chapter === 'number' ? [`chapter:${op.chapter}`, `draft:${op.chapter}`] : [];
+    const volumeRefs = 'volumeKey' in op && typeof op.volumeKey === 'string' ? [`volume:${op.volumeKey}`] : [];
+    return [...chapterRefs, ...volumeRefs];
+  }
   if (op.op === 'fact.upsert') {
     const subjects = (op.subjects ?? []).map(key => `entity:${key}`);
     const unlock = (op.unlock?.all ?? []).flatMap(term => {
