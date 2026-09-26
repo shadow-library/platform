@@ -101,6 +101,17 @@
   autosave to retry. An autosave folds into the revision it continues while that revision is the author's own hand edit, under
   ten minutes old, never approved, reviewed or stale: it keeps one history row, and the cascade (later drafts stale, reveals revoked) still runs on every save. Reviews bind
   to the save sequence as well as the revision, and approvals to the draft id too. `approvedRevision` keeps the last approved revision through later edits and finalize.
+- **Passage rewrite and versions**: "Ask for changes" on a selection runs the writer route (revise role, disclosure policy, writer snapshot as a `passage` attempt) and
+  stores a suggestion anchored to the draft id, revision, save sequence, UTF-16 offsets, a SHA-256 of the selected text and up to 32 characters either side, with the
+  containment the call ran under; nothing touches the draft until it is applied. The passage is fresh where its offsets still hold that text between that context, and
+  relocated only when text and context together occur exactly once elsewhere (a clean move is safe to apply); anything else — an edit in or around it, an ambiguous
+  copy — is stale and refused (`PSG_004`). Applying and restoring decide under the draft's row lock and write through the hand-save path as a new revision
+  (`passage_rewritten`, `restored` with the revision it brought back), so they never fold into an autosave, never rewrite history, and reset approval and mark later
+  drafts stale exactly as an edit does — restoring the approved revision needs approving again, and restoring text the draft already holds changes nothing. An
+  applied rewrite keeps the unrestricted containment it was written under, and one that brings in a locked secret the passage did not already give away is held as a
+  contradiction, judged by the disclosure policy at apply time. A final chapter refuses both (`PSG_006`, `VER_002`). These are author routes and read isolated prose
+  raw, as the draft itself does; every revision records whether it was isolated, for the model-bound readers that must wall it off, and restoring one keeps the draft
+  isolated. History is bounded to a draft's newest 50 revisions plus the approved one, and each draft keeps its newest 20 suggestions.
 - **Story Bible audit**: two passes stored as one report — coverage against the manifest (add / revise / remove) and a contradiction check comparing pages, entity
   records, canon facts and the summaries of finalized, non-isolated chapters. It always runs as an `audit` job (the hub action, `POST /bible/audits` and the legacy
   `POST /bible/audit` all queue it). Its changes wait on one card; the author keeps or skips each finding, and applying the card applies only what is kept.

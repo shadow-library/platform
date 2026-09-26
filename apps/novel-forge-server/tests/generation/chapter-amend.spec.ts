@@ -42,6 +42,7 @@ interface StoredRevision {
   revision: number;
   source: string;
   body: string;
+  isolated?: boolean;
 }
 
 interface Write {
@@ -132,7 +133,7 @@ function amendFake(options: AmendFakeOptions = {}) {
               }
               if (table !== schema.drafts || !draft || options.refuseDraftWrite) return [];
               Object.assign(draft, values);
-              return [{ id: draft.id }];
+              return [{ id: draft.id, title: draft.title, isolated: draft.isolated }];
             },
           };
         },
@@ -180,6 +181,17 @@ describe('ChapterAmendService', () => {
     expect(fake.revisions).toMatchObject([
       { draftId: 11n, revision: 3, source: 'generated', body: FINAL_PROSE, summary: 'A ship is expected.', state: { tide: 'low' } },
       { draftId: 11n, revision: 4, source: 'amended', body: AMENDED_PROSE },
+    ]);
+  });
+
+  it('should record both revisions of an isolated final draft as isolated', async () => {
+    const fake = amendFake({ draft: { isolated: true } });
+
+    await fake.service.amend(1n, 4, { content: AMENDED_PROSE });
+
+    expect(fake.revisions.map(({ revision, isolated }) => ({ revision, isolated }))).toEqual([
+      { revision: 3, isolated: true },
+      { revision: 4, isolated: true },
     ]);
   });
 

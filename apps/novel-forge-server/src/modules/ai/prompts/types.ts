@@ -34,7 +34,8 @@ export type PromptKey =
   | 'illustration-compose'
   | 'appearance-describe'
   | 'notes-organise'
-  | 'chapter-plan';
+  | 'chapter-plan'
+  | 'passage-rewrite';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

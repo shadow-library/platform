@@ -127,6 +127,13 @@
       "when": 1790441416565,
       "tag": "0017_depicts_chapter",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790441574217,
+      "tag": "0018_draft_revisions",
+      "breakpoints": true
     }
   ]
 }

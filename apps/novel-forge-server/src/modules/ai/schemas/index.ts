@@ -22,4 +22,5 @@ export * from './illustration.schema';
 export * from './appearance-describe.schema';
 export * from './chapter-summarize.schema';
 export * from './notes-organise.schema';
+export * from './passage-rewrite.schema';
 export * from './validate';

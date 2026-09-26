@@ -4,14 +4,21 @@ import { and, desc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 
 import { AppErrorCode, DraftConflictError, SummaryConflictError } from '@server/classes';
-import { assertStartsNextChapter, markDescendantDraftsStale, revokeProvisionalReveals } from '@server/common';
+import { assertStartsNextChapter, markDescendantDraftsStale, pruneDraftHistory, revokeProvisionalReveals } from '@server/common';
 import { type Generation, type PrimaryTransaction, schema } from '@server/database';
 
 export const HAND_EDIT_FOLD_WINDOW_SECONDS = 600;
 
 const DEADLOCK_DETECTED = '40P01';
 
-export type HandSaveSource = 'hand_edited' | 'imported';
+export type HandSaveSource = 'hand_edited' | 'imported' | 'restored' | 'passage_rewritten';
+
+const STALE_CAUSE: Readonly<Record<HandSaveSource, string>> = {
+  hand_edited: 'was hand_edited',
+  imported: 'was imported',
+  restored: 'was restored to an earlier version',
+  passage_rewritten: 'had a passage rewritten',
+};
 
 export type HandSaveFields = Pick<typeof schema.drafts.$inferInsert, 'title' | 'summary' | 'state' | 'generator' | 'contentRating' | 'isolated'> & { body: string };
 
@@ -33,6 +40,7 @@ export interface HandSave {
   source: HandSaveSource;
   fields: HandSaveFields;
   base?: DraftBase;
+  restoredFrom?: number;
 }
 
 /** The three base fields name one read of one draft, so a save sends all of them or none. */
@@ -71,7 +79,7 @@ export async function saveHandWrittenDraft(tx: PrimaryTransaction, save: HandSav
     .where(unchangedSince(current))
     .returning();
   if (!draft) throw await refusedHandSave(tx, save.projectId, save.chapter);
-  return folds ? rewriteRevision(tx, draft) : recordRevision(tx, draft, save.source);
+  return folds ? rewriteRevision(tx, draft) : recordRevision(tx, draft, save.source, save.restoredFrom);
 }
 
 export interface SummarySave {
@@ -118,6 +126,25 @@ export async function saveDraftSummary(tx: PrimaryTransaction, save: SummarySave
 
 function isBase(current: Generation.Draft, base: DraftBase): boolean {
   return current.id === base.draftId && current.revision === base.revision && current.saveSeq === base.saveSeq;
+}
+
+export function baseOfDraft(draft: Generation.Draft): DraftBase {
+  return { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq };
+}
+
+export function assertDraftBase(current: Generation.Draft, base: DraftBase | undefined): void {
+  if (base && !isBase(current, base)) throw new DraftConflictError(current);
+}
+
+/** The chapter's draft, row-locked until the transaction ends, for a write that decides from what it reads. */
+export async function lockDraft(tx: PrimaryTransaction, projectId: bigint, chapter: number): Promise<Generation.Draft> {
+  const [draft] = await tx
+    .select()
+    .from(schema.drafts)
+    .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
+    .for('update');
+  if (!draft) throw AppErrorCode.DRF_001.create();
+  return draft;
 }
 
 function isUnchanged(current: Generation.Draft, fields: HandSaveFields): boolean {
@@ -205,21 +232,33 @@ async function foldsIntoCurrent(tx: PrimaryTransaction, current: Generation.Draf
 async function rewriteRevision(tx: PrimaryTransaction, draft: Generation.Draft): Promise<Generation.Draft> {
   await tx
     .update(schema.draftRevisions)
-    .set({ body: draft.body, summary: draft.summary })
+    .set({ title: draft.title, body: draft.body, summary: draft.summary, isolated: draft.isolated })
     .where(and(eq(schema.draftRevisions.draftId, draft.id), eq(schema.draftRevisions.revision, draft.revision)));
   return cascade(tx, draft, 'hand_edited');
 }
 
-async function recordRevision(tx: PrimaryTransaction, draft: Generation.Draft, source: HandSaveSource): Promise<Generation.Draft> {
+async function recordRevision(tx: PrimaryTransaction, draft: Generation.Draft, source: HandSaveSource, restoredFrom?: number): Promise<Generation.Draft> {
   await tx
     .insert(schema.draftRevisions)
-    .values({ projectId: draft.projectId, draftId: draft.id, revision: draft.revision, source, body: draft.body, summary: draft.summary })
+    .values({
+      projectId: draft.projectId,
+      draftId: draft.id,
+      revision: draft.revision,
+      source,
+      body: draft.body,
+      title: draft.title,
+      summary: draft.summary,
+      state: draft.state,
+      isolated: draft.isolated,
+      restoredFrom: restoredFrom ?? null,
+    })
     .onConflictDoNothing();
+  await pruneDraftHistory(tx, draft);
   return cascade(tx, draft, source);
 }
 
 async function cascade(tx: PrimaryTransaction, draft: Generation.Draft, source: HandSaveSource): Promise<Generation.Draft> {
-  await markDescendantDraftsStale(tx, draft.projectId, draft.chapter, `ancestor chapter ${draft.chapter} was ${source}`);
+  await markDescendantDraftsStale(tx, draft.projectId, draft.chapter, `ancestor chapter ${draft.chapter} ${STALE_CAUSE[source]}`);
   await revokeProvisionalReveals(tx, draft.projectId, draft.chapter);
   return draft;
 }

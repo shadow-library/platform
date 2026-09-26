@@ -70,6 +70,25 @@ describe('ProposalApplyService applyDraftUpdate', () => {
 
     expect(run.fake.writesTo(schema.drafts, 'update')[0]?.values).toMatchObject({ title: 'Slack Water', body: draftRow().body });
   });
+
+  it.each([
+    ['an isolated draft', draftRow({ isolated: true }), true],
+    ['a standard draft', draftRow(), false],
+  ])("should record a chat edit's revision with the isolation of %s", async (_, existing, isolated) => {
+    const run = applyDraftOp([existing], [{ id: 11n, revision: 3, saveSeq: 1 }]);
+
+    await run.update({ op: 'draft.update', chapter: 4, title: 'Slack Water' });
+
+    expect(run.fake.writesTo(schema.draftRevisions)[0]?.values).toMatchObject({ source: 'chat_edited', title: 'Slack Water', isolated });
+  });
+
+  it('should record a chat-created draft revision as isolated when the op declares it', async () => {
+    const run = applyDraftOp([undefined], [{ id: 12n, revision: 1, saveSeq: 0 }]);
+
+    await run.update({ op: 'draft.update', chapter: 4, body: 'Written walled off.', isolated: true, generator: 'unrestricted' });
+
+    expect(run.fake.writesTo(schema.draftRevisions)[0]?.values).toMatchObject({ source: 'chat_edited', isolated: true });
+  });
 });
 
 describe('ProposalApplyService draft ops and later chapters', () => {

@@ -3,7 +3,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-import { markDescendantDraftsStale, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
+import { markDescendantDraftsStale, pruneDraftHistory, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Generation, type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -146,9 +146,11 @@ export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistD
           draftId: previous.id,
           revision: previous.revision,
           source: previous.generator === 'human' ? 'imported' : 'generated',
+          title: previous.title,
           body: previous.body,
           summary: previous.summary,
           state: previous.state,
+          isolated: previous.isolated,
         })
         .onConflictDoNothing();
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, state.chapter)));
@@ -202,12 +204,15 @@ export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistD
         draftId: row.id,
         revision: row.revision,
         source,
+        title: row.title,
         body: state.prose,
         summary: state.summary,
         state: state.continuationState as never,
         runId: state.runId || null,
+        isolated: row.isolated,
       })
       .onConflictDoNothing();
+    await pruneDraftHistory(tx, row);
 
     return row;
   });

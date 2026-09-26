@@ -19,6 +19,7 @@ import {
   normalizeBriefScenes,
   normalizeStringList,
   planFrontier,
+  pruneDraftHistory,
   refusedDraftWriteError,
   resetApprovalForPlanChange,
   REVEAL_STALE_PREFIX,
@@ -555,12 +556,15 @@ export class GenerationService {
           draftId: updated.id,
           revision: updated.revision,
           source: 'revised',
+          title: revised.title,
           body: revised.body,
           summary: revised.summary,
           state: revised.state as never,
           feedbackId: feedback?.id,
+          isolated: updated.isolated,
         })
         .onConflictDoNothing();
+      await pruneDraftHistory(tx, updated);
 
       await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was revised`);
       await revokeProvisionalReveals(tx, projectId, chapter);
@@ -841,6 +845,21 @@ export class GenerationService {
         throw AppErrorCode.DRF_001.create();
       }
 
+      await tx
+        .insert(schema.draftRevisions)
+        .values({
+          projectId,
+          draftId: row.id,
+          revision: row.revision,
+          source: 'generated',
+          title: row.title,
+          body: row.body,
+          summary: row.summary,
+          state: row.state,
+          isolated: true,
+        })
+        .onConflictDoNothing();
+      await pruneDraftHistory(tx, row);
       await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was regenerated`);
       await revokeProvisionalReveals(tx, projectId, chapter);
 

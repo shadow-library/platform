@@ -72,7 +72,18 @@ function vectorType(dimensions: number) {
 export const workflowRunStatus = pgEnum('workflow_run_status', ['running', 'completed', 'awaiting_review', 'failed', 'cancelled']);
 export const modelCallStatus = pgEnum('model_call_status', ['ok', 'parse_error', 'repaired', 'refused', 'transport_error', 'timeout']);
 export const toolCallStatus = pgEnum('tool_call_status', ['ok', 'invalid_args', 'handler_error', 'budget_exceeded']);
-export const draftRevisionSource = pgEnum('draft_revision_source', ['generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited', 'amended']);
+export const draftRevisionSource = pgEnum('draft_revision_source', [
+  'generated',
+  'patched',
+  'rewritten',
+  'revised',
+  'imported',
+  'hand_edited',
+  'chat_edited',
+  'amended',
+  'restored',
+  'passage_rewritten',
+]);
 export const userFeedbackArtifactType = pgEnum('user_feedback_artifact_type', [
   'draft',
   'continuity_proposal',
@@ -83,7 +94,7 @@ export const userFeedbackArtifactType = pgEnum('user_feedback_artifact_type', [
 ]);
 export const costSource = pgEnum('cost_source', ['provider', 'gateway', 'estimate']);
 export const userFeedbackDisposition = pgEnum('user_feedback_disposition', ['revision_requested', 'approved', 'rejected', 'comment']);
-export const writerAttemptRole = pgEnum('writer_attempt_role', ['draft', 'repair', 'rewrite', 'revise']);
+export const writerAttemptRole = pgEnum('writer_attempt_role', ['draft', 'repair', 'rewrite', 'revise', 'passage']);
 
 export const workflowRuns = pgTable(
   'workflow_runs',
@@ -248,6 +259,10 @@ export const draftRevisions = pgTable(
     state: jsonb('state').$type<Record<string, unknown>>(),
     runId: varchar('run_id'),
     feedbackId: bigint('feedback_id', { mode: 'bigint' }),
+    title: varchar('title', { length: 500 }),
+    // Whether this revision's prose was isolated when written, so a model-bound reader or a restore keeps it walled off after the draft stops being isolated.
+    isolated: boolean('isolated').notNull().default(false),
+    restoredFrom: integer('restored_from'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [unique('draft_revisions_draft_id_revision_unique').on(t.draftId, t.revision)],

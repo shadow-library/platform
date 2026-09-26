@@ -20,6 +20,7 @@ import {
   nextWritableChapter,
   normalizeStringList,
   planFrontier,
+  pruneDraftHistory,
   refusedDraftWriteError,
   resetApprovalForPlanChange,
   revokeProvisionalReveals,
@@ -941,8 +942,18 @@ export class ProposalApplyService {
 
     await ctx.tx
       .insert(schema.draftRevisions)
-      .values({ projectId: ctx.projectId, draftId: written.id, revision: written.revision, source: 'chat_edited', body: merged.body, summary: merged.summary })
+      .values({
+        projectId: ctx.projectId,
+        draftId: written.id,
+        revision: written.revision,
+        source: 'chat_edited',
+        title: merged.title,
+        body: merged.body,
+        summary: merged.summary,
+        isolated: existing?.isolated ?? op.isolated ?? false,
+      })
       .onConflictDoNothing();
+    await pruneDraftHistory(ctx.tx, { id: written.id, revision: written.revision, approvedRevision: existing?.approvedRevision ?? null });
     await markDescendantDraftsStale(ctx.tx, ctx.projectId, op.chapter, `ancestor chapter ${op.chapter} was chat_edited`);
     if (existing) await revokeProvisionalReveals(ctx.tx, ctx.projectId, op.chapter);
     ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: written.revision, newSaveSeq: written.saveSeq, newDraftId: written.id });

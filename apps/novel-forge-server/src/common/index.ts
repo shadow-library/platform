@@ -12,6 +12,7 @@ export * from './content-hash';
 export * from './data-transformers';
 export * from './depicted-chapter';
 export * from './draft-fields';
+export * from './draft-history';
 export * from './draft-staleness';
 export * from './draft-write-guard';
 export * from './enum.dto';

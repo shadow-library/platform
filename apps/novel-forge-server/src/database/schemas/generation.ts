@@ -26,6 +26,8 @@ export namespace Generation {
   export type ContinuityProposalStatus = InferEnum<typeof continuityProposalStatus>;
   export type DraftReviewStatus = InferEnum<typeof draftReviewStatus>;
   export type BriefWriteMode = InferEnum<typeof briefWriteMode>;
+  export type PassageSuggestion = InferSelectModel<typeof passageSuggestions>;
+  export type PassageSuggestionStatus = InferEnum<typeof passageSuggestionStatus>;
 }
 
 export const draftStatus = pgEnum('draft_status', ['draft', 'final']);
@@ -33,6 +35,7 @@ export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradictio
 export const continuityProposalStatus = pgEnum('continuity_proposal_status', ['pending', 'applied', 'discarded']);
 export const draftReviewStatus = pgEnum('draft_review_status', ['generating', 'needs_review', 'contradiction', 'approved', 'final']);
 export const briefWriteMode = pgEnum('brief_write_mode', ['standard', 'external']);
+export const passageSuggestionStatus = pgEnum('passage_suggestion_status', ['open', 'applied', 'dismissed']);
 
 export const drafts = pgTable(
   'drafts',
@@ -151,6 +154,41 @@ export const continuityProposals = pgTable(
   t => [unique('continuity_proposals_project_id_chapter_unique').on(t.projectId, t.chapter)],
 );
 
+// A suggested rewrite of one passage, anchored to the draft as the author selected it: UTF-16 offsets into that revision's body, its save
+// sequence and a hash of the selected text. Staleness is computed against the draft as it stands, never stored.
+export const passageSuggestions = pgTable(
+  'passage_suggestions',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    draftId: bigint('draft_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => drafts.id, { onDelete: 'cascade' }),
+    chapter: integer('chapter').notNull(),
+    baseRevision: integer('base_revision').notNull(),
+    baseSaveSeq: integer('base_save_seq').notNull(),
+    anchorStart: integer('anchor_start').notNull(),
+    anchorEnd: integer('anchor_end').notNull(),
+    passageHash: varchar('passage_hash', { length: 64 }).notNull(),
+    passage: text('passage').notNull(),
+    // Up to 32 characters either side of the selection; a moved passage re-locates only where both still surround it.
+    contextBefore: text('context_before').notNull(),
+    contextAfter: text('context_after').notNull(),
+    // The containment the writer call ran under, so applying the text keeps it on the unrestricted side.
+    isolated: boolean('isolated').notNull().default(false),
+    request: text('request').notNull(),
+    replacement: text('replacement').notNull(),
+    leakLines: jsonb('leak_lines').$type<string[]>(),
+    status: passageSuggestionStatus('status').notNull().default('open'),
+    appliedRevision: integer('applied_revision'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [index('passage_suggestions_draft_id_idx').on(t.draftId)],
+);
+
 export const draftsRelations = relations(drafts, ({ one }) => ({
   project: one(projects, { fields: [drafts.projectId], references: [projects.id] }),
 }));
@@ -165,4 +203,9 @@ export const briefsRelations = relations(briefs, ({ one }) => ({
 
 export const continuityProposalsRelations = relations(continuityProposals, ({ one }) => ({
   project: one(projects, { fields: [continuityProposals.projectId], references: [projects.id] }),
+}));
+
+export const passageSuggestionsRelations = relations(passageSuggestions, ({ one }) => ({
+  project: one(projects, { fields: [passageSuggestions.projectId], references: [projects.id] }),
+  draft: one(drafts, { fields: [passageSuggestions.draftId], references: [drafts.id] }),
 }));

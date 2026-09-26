@@ -162,6 +162,7 @@ const BACKGROUND_INPUTS: Readonly<Record<string, string>> = {
   prose: 'The chapter text',
   body: 'The chapter text',
   draftBody: 'The chapter text',
+  passage: 'The chapter text',
   chapterProse: 'The chapter text',
   chapterSummary: 'The chapter summary',
   existingTitles: 'The chapter titles',

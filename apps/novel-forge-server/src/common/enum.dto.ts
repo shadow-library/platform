@@ -86,3 +86,4 @@ export const ProgressItemStatus = EnumType.create('ProgressItemStatus', ['open',
 export const ProgressOverrideStatus = EnumType.create('ProgressOverrideStatus', ['undecided', 'dismissed']);
 export const ProposalDiagnosticKind = EnumType.create('ProposalDiagnosticKind', [...schema.DIAGNOSTIC_KINDS]);
 export const WriterAttemptRole = EnumType.create('WriterAttemptRole', schema.writerAttemptRole.enumValues);
+export const PassageSuggestionStatus = EnumType.create('PassageSuggestionStatus', schema.passageSuggestionStatus.enumValues);

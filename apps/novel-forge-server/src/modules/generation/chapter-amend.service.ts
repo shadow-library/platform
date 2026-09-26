@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { applyAmendRepublish, declaredDraftFields, sanitizeMarkdown } from '@server/common';
+import { applyAmendRepublish, declaredDraftFields, pruneDraftHistory, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type DbExecutor, type PrimaryDatabase, schema } from '@server/database';
 
@@ -97,7 +97,7 @@ export class ChapterAmendService {
   private async syncFinalDraft(tx: DbExecutor, projectId: bigint, chapterNumber: number, chapter: Chapter.Row, fields: AmendedDraftFields): Promise<void> {
     const draft = await tx.query.drafts.findFirst({
       where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapterNumber), eq(schema.drafts.status, 'final')),
-      columns: { id: true, revision: true, body: true, summary: true, state: true, generator: true },
+      columns: { id: true, revision: true, approvedRevision: true, title: true, body: true, summary: true, state: true, generator: true, isolated: true },
     });
     if (!draft) {
       this.logger.info('amend: no final draft to carry the amended prose, skipping the draft and its revision record', { projectId, chapter: chapterNumber });
@@ -119,9 +119,11 @@ export class ChapterAmendService {
         draftId: draft.id,
         revision: draft.revision,
         source: draft.generator === 'human' ? 'imported' : 'generated',
+        title: draft.title,
         body: draft.body,
         summary: draft.summary,
         state: draft.state,
+        isolated: draft.isolated,
       })
       .onConflictDoNothing();
 
@@ -129,10 +131,13 @@ export class ChapterAmendService {
       .update(schema.drafts)
       .set({ body, words: chapter.wordCount, revision, ...fields, judge: null, judgeNote: null, updatedAt: new Date() })
       .where(and(eq(schema.drafts.id, draft.id), eq(schema.drafts.status, 'final'), eq(schema.drafts.revision, draft.revision)))
-      .returning({ id: schema.drafts.id });
+      .returning({ id: schema.drafts.id, title: schema.drafts.title, isolated: schema.drafts.isolated });
     if (!synced) throw AppErrorCode.DRF_013.create();
 
-    await tx.insert(schema.draftRevisions).values({ projectId, draftId: draft.id, revision, source: 'amended', body, summary: chapter.summary, state: draft.state });
+    await tx
+      .insert(schema.draftRevisions)
+      .values({ projectId, draftId: draft.id, revision, source: 'amended', title: synced.title, body, summary: chapter.summary, state: draft.state, isolated: synced.isolated });
+    await pruneDraftHistory(tx, { id: draft.id, revision, approvedRevision: draft.approvedRevision });
   }
 
   /**

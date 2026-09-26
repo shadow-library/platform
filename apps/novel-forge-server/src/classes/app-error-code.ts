@@ -390,4 +390,23 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FRV_010 = AppErrorCode.badRequest('FRV_010', 'Say why you are skipping this update');
   static readonly FRV_011 = AppErrorCode.conflict('FRV_011', 'These updates were already applied when the chapter was finalized');
   static readonly FRV_012 = AppErrorCode.conflict('FRV_012', 'Only the updates of the latest final chapter can be undone, and only once they are applied');
+
+  /*!
+   * Passage rewrite errors
+   */
+  static readonly PSG_001 = AppErrorCode.notFound('PSG_001', 'Passage suggestion not found');
+  static readonly PSG_002 = AppErrorCode.badRequest('PSG_002', 'Select between 1 and {max} characters inside the chapter to ask for changes');
+  static readonly PSG_003 = AppErrorCode.conflict('PSG_003', 'The selected text no longer matches the chapter — select the passage again');
+  static readonly PSG_004 = AppErrorCode.conflict('PSG_004', 'This suggestion is stale — the passage moved or changed since it was made; ask again');
+  static readonly PSG_005 = AppErrorCode.conflict('PSG_005', 'This suggestion was already {status}');
+  static readonly PSG_006 = AppErrorCode.badRequest('PSG_006', 'Chapter {chapter} is final — its prose is locked, so a passage cannot be rewritten; change it through Amend');
+
+  /*!
+   * Draft version errors
+   */
+  static readonly VER_001 = AppErrorCode.notFound('VER_001', 'Chapter {chapter} has no stored version {revision}');
+  static readonly VER_002 = AppErrorCode.badRequest(
+    'VER_002',
+    'Chapter {chapter} is final — its prose is locked, so an earlier version cannot be restored; change it through Amend',
+  );
 }

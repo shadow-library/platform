@@ -23,6 +23,7 @@ import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
 import { notesOrganisePrompt } from './notes-organise.prompt';
 import { outlinePrompt } from './outline.prompt';
+import { passageRewritePrompt } from './passage-rewrite.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
@@ -61,6 +62,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'notes-organise': notesOrganisePrompt as PromptModule<unknown>,
   'chapter-plan': chapterPlanPrompt as PromptModule<unknown>,
+  'passage-rewrite': passageRewritePrompt as PromptModule<unknown>,
 };
 
 export * from './types';
