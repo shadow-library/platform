@@ -6,13 +6,14 @@ import { DatabaseService, StorageService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, schema } from '@server/database';
 
+import { runWithCostTier } from '../ai/cost-tier-scope';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { ConcurrencyController } from './concurrency.controller';
-import { JobService } from './job.service';
+import { JobService, payloadCostTier } from './job.service';
 
 interface GeneratePayload {
   chapters: number[];
@@ -99,7 +100,7 @@ export class JobExecutor {
       this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
       const stopWatching = this.watchForCancellation(jobId);
       try {
-        await this.runJob(job);
+        await runWithCostTier(payloadCostTier(job.payload), () => this.runJob(job));
         if (await this.cancelRequested(jobId)) return this.markCancelled(job);
         await this.jobService.succeed(jobId);
         this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });

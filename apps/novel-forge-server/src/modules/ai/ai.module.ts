@@ -13,7 +13,9 @@ import { AiQuotaService } from './ai-quota.service';
 import { CatalogService } from './context/catalog.service';
 import { ContextAssembler } from './context/context-assembler.service';
 import { WorkflowRunService } from './graphs/workflow-run.service';
+import { ModelCatalogService } from './model-catalog.service';
 import { ModelRouterService } from './model-router.service';
+import { ProjectAiController } from './project-ai.controller';
 import { EmbeddingService } from './retrieval/embedding.service';
 import { IndexingService } from './retrieval/indexing.service';
 import { RetrievalService } from './retrieval/retrieval.service';
@@ -22,11 +24,12 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 
 @Module({
   imports: [ActorModule, DatabaseModule, EventsModule, FastifyModule, PluginsModule],
-  controllers: [AiController],
+  controllers: [AiController, ProjectAiController],
   providers: [
     AccountSettingsService,
     TelemetryHandler,
     ModelRouterService,
+    ModelCatalogService,
     AiQuotaService,
     AppearanceDescriberService,
     EmbeddingService,

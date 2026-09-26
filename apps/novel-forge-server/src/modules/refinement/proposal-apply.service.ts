@@ -18,9 +18,12 @@ import {
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
+import { runWithCostTier } from '../ai/cost-tier-scope';
+import { isCostTier } from '../ai/defaults';
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
-import { type ActionExecutor, ActionExecutorRegistry } from './action-registry';
+import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
+import { CHAT_TURN_GRAPH } from './chat-selection';
 import {
   type ActionOp,
   type BibleDocumentRemoveOp,
@@ -326,6 +329,7 @@ export class ProposalApplyService {
   ): Promise<{ proposal: Refinement.Proposal; opResults: OpResult[] }> {
     if (actions.length === 0) return { proposal, opResults };
 
+    const costTier = await this.turnCostTier(proposal);
     const results = [...opResults];
     let failed = false;
     for (const { index, op } of actions) {
@@ -338,7 +342,8 @@ export class ProposalApplyService {
       // Presence was verified pre-commit inside the transaction (RFN_008), so the lookup cannot miss.
       const executor = this.actionRegistry.get(op.op) as ActionExecutor;
       try {
-        const outcome = await executor(projectId, op, { autoApplied });
+        const execute = (): Promise<ActionExecutionResult> => executor(projectId, op, { autoApplied });
+        const outcome = await (costTier ? runWithCostTier(costTier, execute) : execute());
         entry.status = 'applied';
         entry.result = outcome as unknown as Record<string, unknown>;
       } catch (err) {
@@ -355,6 +360,19 @@ export class ProposalApplyService {
       .where(eq(schema.refinementProposals.id, proposal.id))
       .returning();
     return { proposal: updated ?? proposal, opResults: results };
+  }
+
+  /**
+   * The tier of the chat turn that staged the proposal, so the actions it proposed run at the tier the author chose for that turn — also
+   * when the author applies them later. Anything else leaves the caller's scope, and failing that the project's tier, in charge.
+   */
+  private async turnCostTier(proposal: Refinement.Proposal): Promise<Project.CostTier | undefined> {
+    if (!proposal.runId) return undefined;
+    const [run] = await this.db
+      .select({ costTier: sql<string | null>`${schema.workflowRuns.input}->>'costTier'` })
+      .from(schema.workflowRuns)
+      .where(and(eq(schema.workflowRuns.id, proposal.runId), eq(schema.workflowRuns.graph, CHAT_TURN_GRAPH)));
+    return isCostTier(run?.costTier) ? run.costTier : undefined;
   }
 
   private async findBaselineMismatches(tx: PrimaryDatabase, projectId: bigint, ops: ChangeOp[], baseline: Record<string, ArtifactState>): Promise<BaselineMismatch[]> {

@@ -12,22 +12,23 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { type OwnerFields } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema } from '@server/database';
+import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import {
   type AiRole,
+  COST_TIER_DEFAULTS,
+  DEFAULT_COST_TIER,
+  isCostTier,
   isRegisteredModel,
   isUnrestrictedAllowed,
-  PRODUCTION_DEFAULTS,
-  PRODUCTION_GROUP_DEFAULTS,
   type ResolvedModel,
   resolveReasoningEffort,
   ROLE_GROUP,
-  UNRESTRICTED_DEFAULTS,
 } from './defaults';
 import { type AccountModelGroup, AccountSettingsService } from './account-settings.service';
 import { AiQuotaService } from './ai-quota.service';
+import { scopedCostTier } from './cost-tier-scope';
 import { extractJsonCandidates, tryParseJson } from './json-extract';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
@@ -38,10 +39,20 @@ import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
+  costTier?: Project.CostTier | null;
   config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
   wordTargetMin?: number | null;
   wordTargetMax?: number | null;
 };
+
+export type ModelSource = 'project' | 'account' | 'tier';
+
+export interface ModelRoute {
+  resolved: ResolvedModel;
+  source: ModelSource;
+  costTier: Project.CostTier;
+  contentMode: Project.ContentMode;
+}
 
 interface TelemetryConfig {
   callbacks: TelemetryHandler[];
@@ -229,36 +240,48 @@ export class ModelRouterService {
     return true;
   }
 
-  // `call.route`: a plugin may raise this call to the permissive class, and no policy can lower a project
-  // whose own contentMode is already unrestricted — the raise-only rule is structural at the routing sink.
-  // `account` is the project owner's own defaults, which `resolveFor` loads; an unregistered one is skipped rather than
-  // failed, since the registry can drop a model long after the author picked it.
   resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy, account?: Partial<Record<AccountModelGroup, ResolvedModel>>): ResolvedModel {
-    const accountModel = account?.[ROLE_GROUP[role] as AccountModelGroup];
-    const accountDefault = accountModel && isRegisteredModel(accountModel) ? accountModel : undefined;
-    if (project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive') {
-      const unrestrictedDefault = UNRESTRICTED_DEFAULTS[role] ?? UNRESTRICTED_DEFAULTS.generation;
-      const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
-      const projectModel = models?.[role] ?? (role === 'chat' && models?.['plan'] ? models['plan'] : undefined);
-      if (projectModel && isUnrestrictedAllowed(role, projectModel)) return projectModel;
-      if (accountDefault && isUnrestrictedAllowed(role, accountDefault)) return accountDefault;
-      return unrestrictedDefault;
-    }
+    return this.routeModel(role, project, policy, account).resolved;
+  }
+
+  // Order: the project's own pin, then the owner's defaults — Balanced only, since they are that author's Balanced — then the tier map.
+  // A tier carried in by a chat turn's action outranks the project's. `call.route`: a plugin may raise this call to the permissive class,
+  // and no policy can lower a project whose own contentMode is already unrestricted — the raise-only rule is structural at the routing sink.
+  // An unregistered account default is skipped rather than failed, since the registry can drop a model long after the author picked it.
+  routeModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy, account?: Partial<Record<AccountModelGroup, ResolvedModel>>): ModelRoute {
+    const group = ROLE_GROUP[role] ?? 'writing';
+    const costTier = scopedCostTier() ?? (isCostTier(project?.costTier) ? project.costTier : DEFAULT_COST_TIER);
+    const contentMode: Project.ContentMode = project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive' ? 'unrestricted' : 'standard';
+    const route = (resolved: ResolvedModel, source: ModelSource): ModelRoute => ({ resolved, source, costTier, contentMode });
+
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role] ?? (role === 'chat' ? models?.['plan'] : undefined);
+    const accountModel = costTier === DEFAULT_COST_TIER ? account?.[group as AccountModelGroup] : undefined;
+    const accountDefault = accountModel && isRegisteredModel(accountModel) ? accountModel : undefined;
+    const tierDefault = COST_TIER_DEFAULTS[costTier][contentMode][group];
+
+    if (contentMode === 'unrestricted') {
+      if (projectModel && isUnrestrictedAllowed(role, projectModel)) return route(projectModel, 'project');
+      if (accountDefault && isUnrestrictedAllowed(role, accountDefault)) return route(accountDefault, 'account');
+      return route(tierDefault, 'tier');
+    }
     if (projectModel) {
       // Fail closed at the sink: a persisted override whose model id is not in the registry — including
       // one written before write-time validation existed — must never reach the platform credential.
       if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
-      return projectModel;
+      return route(projectModel, 'project');
     }
-    return accountDefault ?? PRODUCTION_DEFAULTS[role] ?? PRODUCTION_GROUP_DEFAULTS.writing;
+    return accountDefault ? route(accountDefault, 'account') : route(tierDefault, 'tier');
   }
 
   async resolveFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ResolvedModel> {
+    return (await this.routeFor(role, project, projectId, policy)).resolved;
+  }
+
+  async routeFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ModelRoute> {
     const account = await this.accountSettings.defaultsFor(project, projectId);
-    return this.resolveModel(role, project, policy, account);
+    return this.routeModel(role, project, policy, account);
   }
 
   // Lets a caller (e.g. the reference resolver) learn how many reference images the image model that
@@ -306,9 +329,10 @@ export class ModelRouterService {
   // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row.
   async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
     if (ctx) await this.quota.enforce(ctx.projectId);
-    const resolved = await this.resolveFor(role, project, ctx?.projectId, policy);
+    const route = await this.routeFor(role, project, ctx?.projectId, policy);
+    const { resolved } = route;
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
-    return this.buildClient(resolved, { role, ...(ctx ? { telemetry: this.invokeConfig(ctx, resolved, role, 0, policy) } : {}) });
+    return this.buildClient(resolved, { role, ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}) });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
@@ -357,7 +381,8 @@ export class ModelRouterService {
   ): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
-    const resolved = await this.resolveFor(role, project, ctx.projectId, policy);
+    const route = await this.routeFor(role, project, ctx.projectId, policy);
+    const { resolved } = route;
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     const llm = this.buildClient(resolved, { role });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
@@ -392,7 +417,7 @@ export class ModelRouterService {
     }
 
     const runSignal = ctx.runId ? this.runAborts.get(ctx.runId)?.signal : undefined;
-    const firstConfig = this.invokeConfig(ctx, resolved, role, 0, policy);
+    const firstConfig = this.invokeConfig(ctx, route, role, 0, policy);
     const rawOutput1 = relay
       ? await this.streamResilient(llm, messages, firstConfig, role, relay, runSignal)
       : await this.invokeResilient(llm, messages, firstConfig, role, runSignal);
@@ -435,7 +460,7 @@ export class ModelRouterService {
       ),
     ];
 
-    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, role, 1, policy), role, runSignal);
+    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, route, role, 1, policy), role, runSignal);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
@@ -501,7 +526,8 @@ export class ModelRouterService {
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
     await this.quota.enforce(ctx.projectId);
-    const resolved = await this.resolveFor('image', project, ctx.projectId);
+    const route = await this.routeFor('image', project, ctx.projectId);
+    const { resolved } = route;
     const maxInputReferences = MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
     const referenceCount = request.inputReferences?.length ?? 0;
     if (referenceCount > maxInputReferences) throw AppErrorCode.AI_010.create({ model: resolved.model, max: maxInputReferences, count: referenceCount });
@@ -539,7 +565,7 @@ export class ModelRouterService {
           .map(item => ({ bytes: new Uint8Array(Buffer.from(item.b64_json as string, 'base64')), contentType: item.media_type ?? 'image/png' }));
         if (images.length === 0) throw new Error('provider returned no image data');
 
-        await this.recordImageCall(ctx, resolved, 'ok', attempt, Date.now() - startedAt, payload.usage?.cost);
+        await this.recordImageCall(ctx, route, 'ok', attempt, Date.now() - startedAt, payload.usage?.cost);
         return images;
       } catch (err) {
         lastErr = err;
@@ -548,13 +574,13 @@ export class ModelRouterService {
     }
 
     this.logger.error('Image call failed after retries', { projectId: ctx.projectId, model: resolved.model, err: lastErr });
-    await this.recordImageCall(ctx, resolved, 'transport_error', this.llmMaxRetries, Date.now() - startedAt, undefined, lastErr);
+    await this.recordImageCall(ctx, route, 'transport_error', this.llmMaxRetries, Date.now() - startedAt, undefined, lastErr);
     throw AppErrorCode.AI_005.create();
   }
 
   private async recordImageCall(
     ctx: TelemetryContext,
-    resolved: ResolvedModel,
+    { resolved, costTier, contentMode }: ModelRoute,
     status: 'ok' | 'transport_error',
     attempt: number,
     latencyMs: number,
@@ -570,6 +596,8 @@ export class ModelRouterService {
         role: ctx.role,
         provider: resolveProvider(resolved),
         model: resolved.model,
+        tier: costTier,
+        contentMode,
         promptKey: ctx.promptKey,
         promptVersion: ctx.promptVersion,
         status,
@@ -623,8 +651,10 @@ export class ModelRouterService {
     ];
   }
 
-  // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).
-  private invokeConfig(ctx: TelemetryContext, resolved: ResolvedModel, role: AiRole, attempt: number, policy?: ForgeCallPolicy): TelemetryConfig {
+  // Invoke config: telemetry callback + attribution metadata, all read by the telemetry handler; `costTier` and `contentMode` sit beside
+  // `nfTelemetry` and become `model_calls.tier` / `model_calls.content_mode`.
+  private invokeConfig(ctx: TelemetryContext, route: ModelRoute, role: AiRole, attempt: number, policy?: ForgeCallPolicy): TelemetryConfig {
+    const { resolved, costTier, contentMode } = route;
     const stamps = policy?.plugins.length ? { plugins: policy.plugins, policyDigest: policy.digest } : {};
     const reasoningEffort = resolveReasoningEffort(resolved.model, ROLE_GROUP[role]);
     return {
@@ -639,6 +669,8 @@ export class ModelRouterService {
           ...(reasoningEffort ? { reasoningEffort } : {}),
           ...stamps,
         },
+        costTier,
+        contentMode,
       },
     };
   }

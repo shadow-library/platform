@@ -2,8 +2,8 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, SortByTime } from '@server/common';
-import { type Refinement } from '@server/database';
+import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, CostTier, SortByTime } from '@server/common';
+import { type Project, type Refinement } from '@server/database';
 
 import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
 
@@ -44,13 +44,19 @@ export class UpdateChatSessionBody {
   title?: string;
 }
 
-@Schema()
+@Schema({ minProperties: 1, description: 'Every field is optional: an omitted field is left as it is, `null` clears it back to the project default.' })
 export class UpdateSessionModelBody {
   @Field({ optional: true, nullable: true, description: 'Model provider override; clear both override fields to use the project or profile default.' })
   provider?: string | null;
 
   @Field({ optional: true, nullable: true, description: 'Model name override; clear both override fields to use the project or profile default.' })
   model?: string | null;
+
+  @Field(() => ContentMode, { optional: true, nullable: true, description: "This chat's default model type for its replies; chapters keep their own content mode." })
+  contentMode?: Project.ContentMode | null;
+
+  @Field(() => CostTier, { optional: true, nullable: true, description: "This chat's default cost tier; actions a turn starts run at the turn's tier." })
+  costTier?: Project.CostTier | null;
 }
 
 @Schema()
@@ -90,6 +96,12 @@ export class ChatSessionResponse {
 
   @Field({ optional: true, nullable: true })
   modelId?: string | null;
+
+  @Field(() => ContentMode, { optional: true, nullable: true, description: "The chat's own model type; null follows the project's content mode." })
+  contentMode?: Project.ContentMode | null;
+
+  @Field(() => CostTier, { optional: true, nullable: true, description: "The chat's own cost tier; null follows the project's cost tier." })
+  costTier?: Project.CostTier | null;
 
   @Field({ optional: true, nullable: true })
   summary?: string | null;
@@ -147,6 +159,16 @@ export class ChatMessageResponse {
 
   @Field({ optional: true, nullable: true })
   modelId?: string | null;
+
+  @Field(() => ContentMode, {
+    optional: true,
+    nullable: true,
+    description: 'The model type the reply was written under; null on user messages and on replies older than the selection.',
+  })
+  contentMode?: Project.ContentMode | null;
+
+  @Field(() => CostTier, { optional: true, nullable: true, description: 'The cost tier the reply was written at; null on user messages and on replies older than the selection.' })
+  costTier?: Project.CostTier | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
@@ -236,6 +258,18 @@ export class ChatTurnBody {
       "The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it.",
   })
   proseEdits?: boolean;
+
+  @Field(() => ContentMode, {
+    optional: true,
+    description: "Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode.",
+  })
+  contentMode?: Project.ContentMode;
+
+  @Field(() => CostTier, {
+    optional: true,
+    description: 'Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it.',
+  })
+  costTier?: Project.CostTier;
 }
 
 @Schema({ description: 'Proposal application outcome returned as part of an automatic-mode turn.' })

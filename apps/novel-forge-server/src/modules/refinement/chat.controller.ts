@@ -68,7 +68,11 @@ export class ChatController {
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
   async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
-    const result = await this.chatService.turn(params.projectId, params.sessionId, body.content, undefined, { proseEdits: body.proseEdits ?? false });
+    const result = await this.chatService.turn(params.projectId, params.sessionId, body.content, undefined, {
+      proseEdits: body.proseEdits ?? false,
+      contentMode: body.contentMode,
+      costTier: body.costTier,
+    });
     return serialiseTurn(result);
   }
 
@@ -83,7 +87,7 @@ export class ChatController {
   @Patch('/:sessionId/model')
   @RespondFor(200, ChatSessionResponse)
   updateSessionModel(@Params() params: ChatSessionParams, @Body() body: UpdateSessionModelBody): Promise<ChatSessionResponse> {
-    return this.chatService.updateSessionModel(params.projectId, params.sessionId, body.provider ?? null, body.model ?? null);
+    return this.chatService.updateSessionModel(params.projectId, params.sessionId, body);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

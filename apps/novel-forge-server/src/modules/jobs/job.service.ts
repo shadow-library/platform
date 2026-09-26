@@ -5,8 +5,10 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { ownedBy, type OwnerRef } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, schema } from '@server/database';
+import { type Job, type PrimaryDatabase, type Project, schema } from '@server/database';
 
+import { scopedCostTier } from '../ai/cost-tier-scope';
+import { isCostTier } from '../ai/defaults';
 import { ProjectEventService } from '../events/project-event.service';
 
 export interface JobProgress {
@@ -22,6 +24,20 @@ export interface JobProgress {
 export interface JobCancelResult {
   status: Job.Status;
   outcome: 'cancelled' | 'stopping' | 'already_settled';
+}
+
+// A job outlives the request that enqueued it, so the tier a chat turn's action runs at travels on the payload; JobExecutor restores it.
+function withScopedCostTier(payload: unknown): unknown {
+  const costTier = scopedCostTier();
+  if (!costTier) return payload;
+  if (payload === undefined || payload === null) return { costTier };
+  if (typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  return { ...payload, costTier };
+}
+
+export function payloadCostTier(payload: unknown): Project.CostTier | undefined {
+  const costTier = (payload as { costTier?: unknown } | null)?.costTier;
+  return isCostTier(costTier) ? costTier : undefined;
 }
 
 @Injectable()
@@ -43,7 +59,8 @@ export class JobService {
   // Insert a new job row for (projectId, kind, target). Deduplication only applies to *active* work:
   // if a pending/in_progress job already exists we return it unchanged, but a previously terminal job
   // (done/failed) is reset to pending with the new payload so re-posting genuinely re-runs the work.
-  async enqueue(projectId: bigint, kind: Job.Kind, target: string, payload?: unknown): Promise<string> {
+  async enqueue(projectId: bigint, kind: Job.Kind, target: string, jobPayload?: unknown): Promise<string> {
+    const payload = withScopedCostTier(jobPayload);
     this.logger.debug('enqueue', { projectId, kind, target, payload });
     const [inserted] = await this.db
       .insert(schema.jobs)

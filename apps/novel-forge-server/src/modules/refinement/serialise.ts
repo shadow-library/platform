@@ -1,4 +1,4 @@
-import { type Refinement } from '@server/database';
+import { type Project, type Refinement } from '@server/database';
 
 import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
@@ -26,6 +26,8 @@ interface ChatMessageRow {
   runId?: string | null;
   modelProvider?: string | null;
   modelId?: string | null;
+  contentMode?: Project.ContentMode | null;
+  costTier?: Project.CostTier | null;
   createdAt: Date;
 }
 
@@ -40,6 +42,8 @@ export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
     runId: message.runId ?? null,
     modelProvider: message.modelProvider ?? null,
     modelId: message.modelId ?? null,
+    contentMode: message.contentMode ?? null,
+    costTier: message.costTier ?? null,
     createdAt: message.createdAt,
   };
 }

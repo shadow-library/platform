@@ -21,7 +21,11 @@ export class TurnStreamController {
   @HttpStatus(202)
   @RespondFor(202, ChatTurnStreamResponse)
   async startTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnStreamResponse> {
-    const runId = await this.turnStreams.start(params.projectId, params.sessionId, body.content, { proseEdits: body.proseEdits ?? false });
+    const runId = await this.turnStreams.start(params.projectId, params.sessionId, body.content, {
+      proseEdits: body.proseEdits ?? false,
+      contentMode: body.contentMode,
+      costTier: body.costTier,
+    });
     return { runId };
   }
 

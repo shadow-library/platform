@@ -1,3 +1,5 @@
+import { type Project } from '@server/database';
+
 import { MODEL_MAP, type ReasoningEffort } from './models';
 
 export type AiRole =
@@ -114,6 +116,58 @@ function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<A
 }
 
 export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
+
+export const COST_TIERS: readonly Project.CostTier[] = ['economy', 'balanced', 'performant'];
+export const CONTENT_MODES: readonly Project.ContentMode[] = ['standard', 'unrestricted'];
+export const DEFAULT_COST_TIER: Project.CostTier = 'balanced';
+
+export function isCostTier(value: unknown): value is Project.CostTier {
+  return (COST_TIERS as readonly unknown[]).includes(value);
+}
+
+export function isContentMode(value: unknown): value is Project.ContentMode {
+  return (CONTENT_MODES as readonly unknown[]).includes(value);
+}
+
+const openrouter = (model: string): ResolvedModel => ({ provider: 'openrouter', model });
+
+// The gateway ignores per-request reasoning effort (it caps effort per instance), so a tier can only change cost by switching models.
+// Balanced is the pair of group maps above, so a project that never picks a tier keeps today's routing; image, vision and embedding
+// stay fixed across tiers because they have no cheaper capable model (vision) or no alternative at all (image allowlist, pgvector width).
+export const COST_TIER_DEFAULTS: Record<Project.CostTier, Record<Project.ContentMode, Record<ModelGroup, ResolvedModel>>> = {
+  economy: {
+    standard: {
+      ...PRODUCTION_GROUP_DEFAULTS,
+      writing: openrouter('anthropic/claude-haiku-4.5'),
+      planning: openrouter('anthropic/claude-sonnet-5'),
+      review: openrouter('anthropic/claude-haiku-4.5'),
+      chat: openrouter('anthropic/claude-sonnet-5'),
+    },
+    unrestricted: {
+      ...UNRESTRICTED_GROUP_DEFAULTS,
+      writing: openrouter('deepseek/deepseek-v4-pro'),
+      planning: openrouter('deepseek/deepseek-v4-pro'),
+      chat: openrouter('deepseek/deepseek-v4-pro'),
+    },
+  },
+  balanced: { standard: PRODUCTION_GROUP_DEFAULTS, unrestricted: UNRESTRICTED_GROUP_DEFAULTS },
+  performant: {
+    standard: {
+      ...PRODUCTION_GROUP_DEFAULTS,
+      writing: openrouter('anthropic/claude-opus-5.5'),
+      review: openrouter('anthropic/claude-opus-5.5'),
+      helper: openrouter('anthropic/claude-haiku-4.5'),
+    },
+    unrestricted: {
+      ...UNRESTRICTED_GROUP_DEFAULTS,
+      writing: openrouter('moonshotai/kimi-k3'),
+      planning: openrouter('moonshotai/kimi-k3'),
+      review: openrouter('moonshotai/kimi-k3'),
+      chat: openrouter('moonshotai/kimi-k3'),
+      helper: openrouter('z-ai/glm-5.2'),
+    },
+  },
+};
 
 // How hard each group is allowed to think. Hidden reasoning tokens bill as output, so the mechanical
 // helper roles (title, compact) ask for none at all; every other authoring group buys the

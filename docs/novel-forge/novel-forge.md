@@ -41,8 +41,12 @@
 - Jobs and most HTTP requests run through `WorkflowRunService` (one run row, `thread_id = run.id`) -> LangGraph graph -> nodes -> services and chains via `ModelRouterService`;
   outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows dispatched under
   a per-replica, per-project lock; a duplicate (project, kind, target) request returns the active job.
-- Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. There is no local chat-model path
-  (embeddings are local, via Ollama). AI quota is per owner and fails open on a database read error.
+- Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. A model type (standard or
+  unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`; Balanced is the pre-tier map. A call resolves
+  the project's pin for its role, then the owner's account default (Balanced only), then the tier map. Standard Performant equals Balanced
+  for planning and chat, which already run on the strongest registered model. A chat reply takes its type and tier from the turn, then the chat,
+  then the project, and a chat pin outranks the project's pick; the turn's selection is recorded in its run input. There is no local chat-model path (embeddings are local,
+  via Ollama). AI quota is per owner and fails open on a database read error.
 - Retrieval: pgvector indexes of finalized prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
 - `novel-forge-web` navigation and guards derive from one screen list keyed by project kind. It never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`,
   never default or bot-grantable) gates run inspection. It is an RBAC permission evaluated per organisation, not a scope, so the web reads it from `GET /api/v1/access`, never the
@@ -98,6 +102,12 @@
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. Plugin policy digest MUST be in any
   `llm_cache` key; only deterministic roles are cacheable, creative roles NEVER. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic
   code over AI wherever code can decide.
+- A cost tier MUST change models, not reasoning effort (the gateway ignores per-request effort), and MUST never get cheaper from Economy to Performant. Every unrestricted
+  tier entry MUST sit on the allowlist, and an unrestricted chat reply MUST go through the unrestricted route, refusing rather than falling back to standard.
+- A chat turn's model type applies to its reply only; the actions it starts (write, review, audit, finalize — including their jobs and a later manual apply of its
+  proposal) inherit its tier and NEVER its model type. A turn's selection NEVER outlives the turn; a chat's own defaults change only through its model PATCH.
+  A standard turn NEVER receives replies or a summary the unrestricted model wrote (placeholders stand in), and chat compaction's model type only rises: it runs
+  unrestricted when the novel, the chat, the turn, the prior summary or any folded reply is unrestricted.
 
 ### Canon, containment and knowledge
 
@@ -168,3 +178,4 @@
 
 - Bible audit does not flag spoiler prose outside `canon_facts`; nothing scans for it.
 - Cancellation is process-local: a cancel reaches only the replica running the work.
+- A brief's content mode is stored but not yet routed: chapter writing follows the project's content mode until per-chapter routing lands with its isolation read policy.

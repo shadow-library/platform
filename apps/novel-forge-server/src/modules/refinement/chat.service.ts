@@ -9,21 +9,23 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { type AiRole, isRegisteredModel, isUnrestrictedAllowed, type ResolvedModel } from '../ai/defaults';
+import { isRegisteredModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
-import { ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
+import { type ModelRoute, ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
 import { buildChatRefinePrompt, HUB_ALLOWED_OPS, HUB_INSTRUCTIONS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
+import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { ProjectEventService } from '../events/project-event.service';
-import { PluginPolicyService } from '../plugins/plugin-policy.service';
+import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
+import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
 import { requestedNegations } from './negation-echo';
 import { autoApplies, chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
@@ -31,13 +33,31 @@ import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
 
-export interface ChatTurnOptions {
+/** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
+export interface ChatTurnOptions extends ChatSelectionOverride {
   /** The author's explicit per-turn permission to rewrite chapter prose; without it a prose op is withheld. */
   proseEdits?: boolean;
 }
 
 export interface CreateSessionInput {
   mode?: Refinement.ChatMode;
+}
+
+/** `null` clears a field back to the project default; an omitted one is left alone. */
+export interface SessionModelUpdate {
+  provider?: string | null;
+  model?: string | null;
+  contentMode?: Project.ContentMode | null;
+  costTier?: Project.CostTier | null;
+}
+
+/** The selection is absent on user messages and on turns older than selections. */
+export type ChatMessageView = Refinement.ChatMessage & Partial<ChatSelection>;
+
+interface ChatReplyRoute {
+  policy: ForgeCallPolicy;
+  project: ProjectConfig;
+  route: ModelRoute;
 }
 
 export interface PendingTurn {
@@ -64,7 +84,7 @@ export interface ChatTurnStatus {
 
 export interface ChatTurnResult {
   userMessage: Refinement.ChatMessage;
-  assistantMessage: Refinement.ChatMessage;
+  assistantMessage: ChatMessageView;
   proposal: Refinement.Proposal | null;
   applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
   applyNote?: string;
@@ -191,7 +211,7 @@ const CHAT_TITLE_GRAPH = 'chat-title';
 // A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
 // can't leave a session's thinking indicator stuck on forever.
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
-const TURN_GRAPHS = ['chat-turn'];
+const TURN_GRAPHS = [CHAT_TURN_GRAPH];
 
 @Injectable()
 export class ChatService {
@@ -310,28 +330,35 @@ export class ChatService {
     return session;
   }
 
-  async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
+  async updateSessionModel(projectId: bigint, sessionId: string, update: SessionModelUpdate): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
-    // Clearing (both null) restores the project/profile default; a pin must name a registry model with
-    // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
-    if (provider !== null || model !== null) {
-      if (!provider || !model || !isRegisteredModel({ provider, model })) throw AppErrorCode.AI_002.create();
+    const set: Partial<typeof schema.chatSessions.$inferInsert> = { updatedAt: new Date() };
+    if (update.provider !== undefined || update.model !== undefined) {
+      const provider = update.provider ?? null;
+      const model = update.model ?? null;
+      // Clearing (both null) restores the project/profile default; a pin must name a registry model with
+      // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
+      if (provider !== null || model !== null) {
+        if (!provider || !model || !isRegisteredModel({ provider, model })) throw AppErrorCode.AI_002.create();
+      }
+      set.modelProvider = provider;
+      set.modelId = model;
     }
-    const [updated] = await this.db
-      .update(schema.chatSessions)
-      .set({ modelProvider: provider, modelId: model, updatedAt: new Date() })
-      .where(eq(schema.chatSessions.id, session.id))
-      .returning();
+    if (update.contentMode !== undefined) set.contentMode = update.contentMode;
+    if (update.costTier !== undefined) set.costTier = update.costTier;
+    const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
     if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
   }
 
-  async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<Refinement.ChatMessage[]> {
+  async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<ChatMessageView[]> {
     await this.getSession(projectId, sessionId);
     const conditions = [eq(schema.chatMessages.sessionId, sessionId)];
     if (opts.before !== undefined) conditions.push(lt(schema.chatMessages.ordinal, opts.before));
     const rows = await this.db.query.chatMessages.findMany({ where: and(...conditions), orderBy: desc(schema.chatMessages.ordinal), limit: opts.limit ?? 50 });
-    return rows.reverse();
+    const runIds = [...new Set(rows.flatMap(row => (row.role === 'assistant' && row.runId ? [row.runId] : [])))];
+    const selections = await loadTurnSelections(this.db, runIds);
+    return rows.reverse().map(row => (row.role === 'assistant' && row.runId ? { ...row, ...selections.get(row.runId) } : row));
   }
 
   /**
@@ -426,13 +453,14 @@ export class ChatService {
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
-    await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET);
+    const project = (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) })) as ProjectConfig | undefined;
+    const turnSelection = chatSelection(options, session, project);
+    await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'chat' });
-    const [pack, history, project] = await Promise.all([
+    const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
+    const [pack, history] = await Promise.all([
       this.contextAssembler.forChatTurn(projectId, session, { policy }),
-      this.compaction.buildHistory(session),
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.compaction.buildHistory(session, project, route.contentMode),
     ]);
 
     const proseEdits = options.proseEdits === true;
@@ -440,14 +468,13 @@ export class ChatService {
     const turnRules = renderTurnRules({ proseEdits });
     const scopeInstructions = `${HUB_INSTRUCTIONS}\n\n${this.renderLookupVocabulary()}`;
 
-    // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
-    // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
-    const resolvedModel = await this.resolveSessionModel(session, projectId, project as ProjectConfig | undefined);
-    const baseConfig = (project?.config as { models?: Record<string, unknown> } | null) ?? {};
-    const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
+    // Pinned into `config.models.chat` so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
+    const resolvedModel = route.resolved;
+    const effectiveProject = withChatModel(routed, resolvedModel);
+    const selection: ChatSelection = { contentMode: route.contentMode, costTier: route.costTier };
     const relay = emitter ? new EmitterRelay(emitter, err => this.logger.warn('chat turn emitter failed — running the turn unobserved', { projectId, sessionId, err })) : null;
     const streamHandlers = relay?.streamHandlers;
-    const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
+    const { runId, result } = await this.workflowRunService.runChain(projectId, CHAT_TURN_GRAPH, `session:${sessionId}`, { content, ...selection }, async runId => {
       relay?.runId(runId);
       await this.workflowRunService.linkContextPack(runId, pack.id);
       // Persist the user's message before the model call: the running chat-turn run plus this
@@ -457,7 +484,7 @@ export class ChatService {
       relay?.userMessage(userMessage);
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
-      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, project as ProjectConfig | undefined);
+      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed);
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
@@ -469,10 +496,9 @@ export class ChatService {
           turnRules,
           userMessage: content,
         };
-        const routed = effectiveProject as ProjectConfig | undefined;
         const output = streamHandlers
-          ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, routed, policy)
-          : this.modelRouter.structured(prompt, input, ctx, routed, policy);
+          ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, effectiveProject, policy)
+          : this.modelRouter.structured(prompt, input, ctx, effectiveProject, policy);
         return output as Promise<ChatRefineOutput>;
       };
 
@@ -509,7 +535,8 @@ export class ChatService {
         }
       }
 
-      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, chatTurnWarnings(warnings, planner.read));
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, chatTurnWarnings(warnings, planner.read));
+      return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
     this.logger.debug('chat turn complete', { projectId, sessionId, runId, hasProposal: !!result.proposal, proposalId: result.proposal?.id });
@@ -646,18 +673,18 @@ export class ChatService {
   }
 
   /**
-   * The chat model resolution ladder, most specific first:
-   *  1. the chat's own override (the author picked a model for this conversation),
-   *  2. otherwise the model routed for the `chat` role — the router folds in the project's group
-   *     selection, then the owner's defaults.
+   * Routes the reply under the turn's selection: the chat's own model pin, then the project's chat pick, then the owner's Balanced
+   * defaults, then the tier map. An unrestricted reply goes through the unrestricted route, which refuses rather than fall back to standard.
    */
-  private async resolveSessionModel(session: Refinement.ChatSession, projectId: bigint, project?: ProjectConfig): Promise<ResolvedModel> {
-    const role: AiRole = 'chat';
-    if (session.modelProvider && session.modelId) {
-      const picked = { provider: session.modelProvider, model: session.modelId };
-      if (project?.contentMode !== 'unrestricted' || isUnrestrictedAllowed(role, picked)) return picked;
-    }
-    return this.modelRouter.resolveFor(role, project, projectId);
+  private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
+    const call = { role: 'chat' as const };
+    const base = chatRoutedProject(project, session, selection);
+    const { policy, project: routed } =
+      selection.contentMode === 'unrestricted'
+        ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, base)
+        : { policy: await this.pluginPolicy.resolve(projectId, call, { contentMode: 'standard' }), project: base };
+    const route = await this.modelRouter.routeFor(call.role, routed ?? base, projectId, policy);
+    return { policy, project: routed ?? base, route };
   }
 
   private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {
