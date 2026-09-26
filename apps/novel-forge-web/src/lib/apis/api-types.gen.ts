@@ -187,6 +187,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/ai/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Models */
+    get: operations['get_api_v1_projects_projectId_ai_models'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/events': {
     parameters: {
       query?: never;
@@ -917,23 +934,6 @@ export interface paths {
     };
     /** Get Run Call */
     get: operations['get_api_v1_projects_projectId_runs_runId_calls_callId'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ai-usage': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Ai Usage */
-    get: operations['get_api_v1_projects_projectId_ai_usage'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1875,6 +1875,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/milestones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Milestones */
+    get: operations['get_api_v1_projects_projectId_milestones'];
+    put?: never;
+    /** Create Milestone */
+    post: operations['post_api_v1_projects_projectId_milestones'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/milestones/{milestoneKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Milestone */
+    delete: operations['delete_api_v1_projects_projectId_milestones_milestoneKey'];
+    options?: never;
+    head?: never;
+    /** Update Milestone */
+    patch: operations['patch_api_v1_projects_projectId_milestones_milestoneKey'];
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/bible/readiness': {
     parameters: {
       query?: never;
@@ -2246,7 +2282,7 @@ export interface components {
     };
     /** @description Settings that apply to every project and idea the signed-in author owns. */
     AccountSettingsResponse: {
-      /** @description Used when neither a chat pin nor the project names a model. Unrestricted projects only take a default on the unrestricted allowlist. */
+      /** @description Your Balanced tier: used at Balanced when neither a chat pin nor the project names a model; Economy and Performant use the tier map instead. Unrestricted work only takes a default on the unrestricted allowlist. */
       models: components['schemas']['AccountModelDefaults'];
     };
     /** @description Your default model per group. A group left out uses the platform default. */
@@ -2282,6 +2318,8 @@ export interface components {
       unrestrictedDefaults: components['schemas']['AiRoleDefault'][];
       /** @description Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default. */
       unrestrictedAllowlist: string[];
+      /** @description The platform model for every cost tier × model type × author-selectable group. Balanced equals `defaults` / `unrestrictedDefaults`. */
+      tiers: components['schemas']['AiTierModel'][];
     };
     AiModelOption: {
       id: string;
@@ -2302,6 +2340,45 @@ export interface components {
       role: string;
       provider: string;
       model: string;
+    };
+    AiTierModel: {
+      costTier: components['schemas']['CostTier'];
+      contentMode: components['schemas']['ContentMode'];
+      /** @description Model group: writing, planning, review, chat, helper or image. */
+      group: string;
+      provider: string;
+      model: string;
+      /** @description The product name to show an author. */
+      label: string;
+      /** @description USD per million input tokens; absent for image models. */
+      inputPricePerMToken?: number;
+      /** @description USD per million output tokens; absent for image models. */
+      outputPricePerMToken?: number;
+    };
+    /** @enum {string} */
+    CostTier: 'economy' | 'balanced' | 'performant';
+    /** @enum {string} */
+    ContentMode: 'standard' | 'unrestricted';
+    /** @description What each group of AI work on this novel runs on under one model type and cost tier — a chat pin is not included. */
+    ProjectModelsResponse: {
+      contentMode: components['schemas']['ContentMode'];
+      costTier: components['schemas']['CostTier'];
+      models: components['schemas']['ProjectModelRoute'][];
+    };
+    ProjectModelRoute: {
+      /** @description Model group: writing, planning, review, chat, helper or image. */
+      group: string;
+      provider: string;
+      model: string;
+      /** @description The product name to show an author. */
+      label: string;
+      /**
+       * @description Why this model: the project's own pick, the author's Balanced default, or the platform tier map.
+       * @enum {string}
+       */
+      source: 'project' | 'account' | 'tier';
+      inputPricePerMToken?: number;
+      outputPricePerMToken?: number;
     };
     PluginManifestResponse: components['schemas']['PluginManifestResponse1'][];
     /** @description Manifest of one plugin loaded on this deploy. */
@@ -2508,8 +2585,6 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @enum {string} */
-    ContentMode: 'standard' | 'unrestricted';
     /** @description One scene of a chapter plan. */
     BriefSceneSchema: {
       summary: string;
@@ -3000,26 +3075,6 @@ export interface components {
         [key: string]: unknown;
       };
     };
-    AiUsageResponse: {
-      totalInputTokens: number;
-      totalOutputTokens: number;
-      totalCostUsd: number;
-      callsPerRole: components['schemas']['RoleCallCounts'];
-      /** @description Per-role usage sorted by total token count in descending order. */
-      roles: components['schemas']['RoleUsage'][];
-    };
-    /** @description Model call counts keyed by AI role. */
-    RoleCallCounts: {
-      [key: string]: number;
-    };
-    RoleUsage: {
-      /** @description An AI role identifier, including scoped roles such as 'bible:plot'. */
-      role: string;
-      calls: number;
-      inputTokens: number;
-      outputTokens: number;
-      costUsd: number;
-    };
     SearchResponse: {
       hits: components['schemas']['SearchHitResponse'][];
     };
@@ -3263,6 +3318,10 @@ export interface components {
       mode: components['schemas']['ChatMode'];
       modelProvider?: null | string;
       modelId?: null | string;
+      /** @description The chat's own model type; null follows the project's content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description The chat's own cost tier; null follows the project's cost tier. */
+      costTier?: components['schemas']['CostTier'] | null;
       summary?: null | string;
       summaryThroughOrdinal: number;
       /** Format: date-time */
@@ -3297,6 +3356,10 @@ export interface components {
       runId?: null | string;
       modelProvider?: null | string;
       modelId?: null | string;
+      /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description The cost tier the reply was written at; null on user messages and on replies older than the selection. */
+      costTier?: components['schemas']['CostTier'] | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -3339,6 +3402,10 @@ export interface components {
       content: string;
       /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
       proseEdits?: boolean;
+      /** @description Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode. */
+      contentMode?: components['schemas']['ContentMode'];
+      /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
+      costTier?: components['schemas']['CostTier'];
     };
     ChatTurnResponse: {
       userMessage: components['schemas']['ChatMessageResponse'];
@@ -3360,11 +3427,16 @@ export interface components {
       mode?: components['schemas']['ChatMode'];
       title?: string;
     };
+    /** @description Every field is optional: an omitted field is left as it is, `null` clears it back to the project default. */
     UpdateSessionModelBody: {
       /** @description Model provider override; clear both override fields to use the project or profile default. */
       provider?: string | null;
       /** @description Model name override; clear both override fields to use the project or profile default. */
       model?: string | null;
+      /** @description This chat's default model type for its replies; chapters keep their own content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description This chat's default cost tier; actions a turn starts run at the turn's tier. */
+      costTier?: components['schemas']['CostTier'] | null;
     };
     /** @description A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does. */
     ChatTurnStreamResponse: {
@@ -3884,7 +3956,7 @@ export interface components {
       /** @description The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact */
       writerNote?: string;
       terms?: string[];
-      /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it. */
+      /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact, which no plan may reveal until it has an unlock condition. */
       revealChapter?: number | null;
       /** @description When the fact may be revealed. Omit to keep the current condition, send null to clear it. */
       unlock?: components['schemas']['UnlockConditionSchema'] | null;
@@ -3895,6 +3967,48 @@ export interface components {
       entityKey: string;
       chapter: number;
       note?: string;
+    };
+    ListMilestonesResponse: {
+      milestones: components['schemas']['MilestoneResponse'][];
+    };
+    MilestoneResponse: {
+      id: string;
+      projectId: string;
+      milestoneKey: string;
+      label: string;
+      subjectEntityKey?: null | string;
+      kind: components['schemas']['MilestoneKind'];
+      /** @description open until a plan claims it, planned while one does, reached once the claiming chapter is finalized. */
+      state: components['schemas']['MilestoneState'];
+      /** @description The chapter whose plan claims it; provisional until that chapter is final. */
+      plannedChapter?: null | number;
+      /** @description The finalized chapter that reached it. */
+      reachedChapter?: null | number;
+      /** @description The approved draft revision that chapter was finalized from. */
+      boundRevision?: null | number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    MilestoneKind: 'rank' | 'event' | 'learned_from' | 'custom';
+    /** @enum {string} */
+    MilestoneState: 'open' | 'planned' | 'reached';
+    CreateMilestoneBody: {
+      /** @description Stable key that plans claim and unlock conditions name; never changes. */
+      milestoneKey: string;
+      label: string;
+      /** @description The character the milestone concerns. */
+      subjectEntityKey?: string | null;
+      /** @description Defaults to custom. */
+      kind?: components['schemas']['MilestoneKind'];
+    };
+    UpdateMilestoneBody: {
+      label?: string;
+      /** @description Omit to keep, send null to clear. */
+      subjectEntityKey?: string | null;
+      kind?: components['schemas']['MilestoneKind'];
     };
     BibleReadinessResponse: {
       dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
@@ -3989,8 +4103,6 @@ export interface components {
     };
     /** @enum {string} */
     OwnerKind: 'user' | 'bot';
-    /** @enum {string} */
-    CostTier: 'economy' | 'balanced' | 'performant';
     ProjectConfig: {
       models?: components['schemas']['ProjectModelOverrides'];
     };
@@ -4132,6 +4244,12 @@ export interface components {
       byRole: components['schemas']['CostBreakdownItem'][];
       /** @description By model, highest spend first. */
       byModel: components['schemas']['CostBreakdownItem'][];
+      /** @description By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first. */
+      byCostSource: components['schemas']['CostBreakdownItem'][];
+      /** @description By the project's cost tier at call time — 'economy', 'balanced', or 'performant' — highest spend first. */
+      byTier: components['schemas']['CostBreakdownItem'][];
+      /** @description By content mode at call time — 'standard' or 'unrestricted' — highest spend first. */
+      byContentMode: components['schemas']['CostBreakdownItem'][];
     };
     /** @description Spend and token totals for one slice of a project's model calls. */
     CostBreakdownItem: {
@@ -5039,6 +5157,49 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AiModelsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_ai_models: {
+    parameters: {
+      query?: {
+        contentMode?: components['schemas']['ContentMode'];
+        costTier?: components['schemas']['CostTier'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectModelsResponse'];
         };
       };
       /** @description Default Response */
@@ -7089,46 +7250,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RunModelCallDetailResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_ai_usage: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AiUsageResponse'];
         };
       };
       /** @description Default Response */
@@ -10114,6 +10235,167 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_milestones: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListMilestonesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_milestones: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateMilestoneBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MilestoneResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_milestones_milestoneKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        milestoneKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_milestones_milestoneKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        milestoneKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateMilestoneBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MilestoneResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_bible_readiness: {
     parameters: {
       query?: never;
@@ -11181,6 +11463,11 @@ export type UpdateAccountSettingsBody = components['schemas']['UpdateAccountSett
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
+export type AiTierModel = components['schemas']['AiTierModel'];
+export type CostTier = components['schemas']['CostTier'];
+export type ContentMode = components['schemas']['ContentMode'];
+export type ProjectModelsResponse = components['schemas']['ProjectModelsResponse'];
+export type ProjectModelRoute = components['schemas']['ProjectModelRoute'];
 export type PluginManifestResponse = components['schemas']['PluginManifestResponse'];
 export type PluginManifestResponse1 = components['schemas']['PluginManifestResponse1'];
 export type DecisionPoint = components['schemas']['DecisionPoint'];
@@ -11205,7 +11492,6 @@ export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryRe
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type BriefWriteMode = components['schemas']['BriefWriteMode'];
 export type BriefResponse = components['schemas']['BriefResponse'];
-export type ContentMode = components['schemas']['ContentMode'];
 export type BriefSceneSchema = components['schemas']['BriefSceneSchema'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
 export type EndingContractSchema = components['schemas']['EndingContractSchema'];
@@ -11265,9 +11551,6 @@ export type RunContextSectionItem = components['schemas']['RunContextSectionItem
 export type CancelRunResponse = components['schemas']['CancelRunResponse'];
 export type RunContextResponse = components['schemas']['RunContextResponse'];
 export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
-export type AiUsageResponse = components['schemas']['AiUsageResponse'];
-export type RoleCallCounts = components['schemas']['RoleCallCounts'];
-export type RoleUsage = components['schemas']['RoleUsage'];
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchHitResponse = components['schemas']['SearchHitResponse'];
 export type ListChapterImageResponse = components['schemas']['ListChapterImageResponse'];
@@ -11386,6 +11669,12 @@ export type FactSource = components['schemas']['FactSource'];
 export type KnowledgeStatus = components['schemas']['KnowledgeStatus'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
+export type ListMilestonesResponse = components['schemas']['ListMilestonesResponse'];
+export type MilestoneResponse = components['schemas']['MilestoneResponse'];
+export type MilestoneKind = components['schemas']['MilestoneKind'];
+export type MilestoneState = components['schemas']['MilestoneState'];
+export type CreateMilestoneBody = components['schemas']['CreateMilestoneBody'];
+export type UpdateMilestoneBody = components['schemas']['UpdateMilestoneBody'];
 export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
 export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
 export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
@@ -11397,7 +11686,6 @@ export type ProjectKind = components['schemas']['ProjectKind'];
 export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type OwnerKind = components['schemas']['OwnerKind'];
-export type CostTier = components['schemas']['CostTier'];
 export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
 export type ProjectModelRef = components['schemas']['ProjectModelRef'];
@@ -11453,6 +11741,8 @@ export type WikiReconcileFailureItem = components['schemas']['WikiReconcileFailu
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type ModelsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ai/models']['get']['parameters']['query'], undefined>;
+export type ModelsPathParams = Exclude<paths['/api/v1/projects/{projectId}/ai/models']['get']['parameters']['path'], undefined>;
 export type StreamEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
 export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
 export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
@@ -11475,7 +11765,6 @@ export type ListRunsPathParams = Exclude<paths['/api/v1/projects/{projectId}/run
 export type GetRunPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}']['get']['parameters']['path'], undefined>;
 export type GetRunContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/context']['get']['parameters']['path'], undefined>;
 export type GetRunCallPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/calls/{callId}']['get']['parameters']['path'], undefined>;
-export type GetAiUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/ai-usage']['get']['parameters']['path'], undefined>;
 export type SearchProseQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
 export type SearchProsePathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
 export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
@@ -11512,6 +11801,7 @@ export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
+export type ListMilestonesPathParams = Exclude<paths['/api/v1/projects/{projectId}/milestones']['get']['parameters']['path'], undefined>;
 export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
