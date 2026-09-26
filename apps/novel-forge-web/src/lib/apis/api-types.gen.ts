@@ -1248,6 +1248,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/writer-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Writer Preview */
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId_writer_preview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/revert': {
     parameters: {
       query?: never;
@@ -3128,6 +3145,25 @@ export interface components {
       /** @description key of the canon fact being revealed */
       factKey: string;
     };
+    /** @description A reveal-rule refusal (PLN_001): the plan being written reveals a secret still locked at its chapter. */
+    RevealRuleErrorResponse: {
+      code: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+      /** @description Present on PLN_001: each locked secret the plan would reveal and what it still needs. */
+      details?: components['schemas']['RevealRuleDetails'];
+    };
+    RevealRuleDetails: {
+      violations: components['schemas']['RevealRuleViolationItem'][];
+    };
+    /** @description A locked secret a plan would reveal, named by its title alone. */
+    RevealRuleViolationItem: {
+      factKey: string;
+      /** @description The secret's title, never its truth. */
+      label: string;
+      /** @description What still has to hold before the plan may reveal it, read as words. */
+      missing: string[];
+    };
     GenerateBody: {
       limit?: number;
       autoFix?: boolean;
@@ -3269,6 +3305,8 @@ export interface components {
       fields?: components['schemas']['ErrorFieldDto'][];
       /** @description Present on DRF_013 when the chapter still has a draft: what it holds now. */
       current?: components['schemas']['ConflictingDraftResponse'];
+      /** @description Present on PLN_004, when an approval or finalize would ledger a plan that reveals a locked secret: each such secret and what it still needs. */
+      details?: components['schemas']['RevealRuleDetails'];
     };
     /** @description The draft as it stands when a save was refused for being made against an older one. */
     ConflictingDraftResponse: {
@@ -3404,6 +3442,8 @@ export interface components {
       fields?: components['schemas']['ErrorFieldDto'][];
       /** @description Present on DRF_013 when the chapter still has a draft: what it holds now. */
       current?: components['schemas']['ConflictingDraftResponse'];
+      /** @description Present on PLN_004, when an approval or finalize would ledger a plan that reveals a locked secret: each such secret and what it still needs. */
+      details?: components['schemas']['RevealRuleDetails'];
       /** @description The summary computed from the prose as it stood before the conflict — re-offer it once reloaded, rather than summarising again. */
       attemptedSummary: string;
     };
@@ -3466,6 +3506,8 @@ export interface components {
       };
       /** @description Advisory findings from deterministic checks on the proposal, such as a removal written as a negation; a chapter plan card also carries its pooling, point-of-view and density diagnostics, judged again on every edit. None blocks the proposal. Empty when none apply. */
       warnings: string[];
+      /** @description The warnings as typed findings, one per warning and in the same order; a chapter plan card's pooling and give-away findings carry what they point at. */
+      diagnostics: components['schemas']['ProposalDiagnosticItem'][];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -3495,6 +3537,52 @@ export interface components {
       };
     } & {
       [key: string]: unknown;
+    };
+    /** @description One advisory finding on a proposal. Its message is the matching entry of warnings. */
+    ProposalDiagnosticItem: {
+      kind: components['schemas']['ProposalDiagnosticKind'];
+      message: string;
+      data?: components['schemas']['ProposalDiagnosticData'];
+    };
+    /** @enum {string} */
+    ProposalDiagnosticKind: 'pooling' | 'give_away' | 'pov' | 'density' | 'other';
+    /** @description What a diagnostic points at, by kind; scene indexes are zero-based. */
+    ProposalDiagnosticData: {
+      /** @description pooling: the points of view that know the secrets. */
+      knowing?: components['schemas']['DiagnosticPovItem'][];
+      /** @description pooling: the points of view that do not. */
+      unaware?: components['schemas']['DiagnosticPovItem'][];
+      /** @description pooling: every pooled secret, where the message lists only the first few. */
+      facts?: components['schemas']['DiagnosticFactItem'][];
+      /** @description pooling: the scenes told by a knowing point of view. */
+      knowingScenes?: number[];
+      /** @description pooling: the scenes told by an unaware one, or those before the scene that learns it. */
+      unawareScenes?: number[];
+      /** @description pooling: the scene whose point of view learns the secret on the page, on a learned-on-the-page finding. */
+      learnedInScene?: number;
+      /** @description give_away and pov: the scene the finding is about. */
+      sceneIndex?: null | number;
+      /** @description give_away: the scene field that names the term, such as summary or beats. */
+      field?: string;
+      /** @description give_away: the beat, when the term is in one. */
+      beatIndex?: number;
+      /** @description give_away: the locked secret the term gives away. */
+      factKey?: string;
+      /** @description give_away: that secret's title — never its truth. */
+      label?: string;
+      /** @description pov: the point of view the scene names, if any. */
+      pov?: null | string;
+    };
+    /** @description A point-of-view character a diagnostic names. */
+    DiagnosticPovItem: {
+      entityKey: string;
+      name: string;
+    };
+    /** @description A secret a diagnostic names. */
+    DiagnosticFactItem: {
+      factKey: string;
+      /** @description The secret's title: its label, or its key read as words — never its truth. */
+      label: string;
     };
     UpdateContinuityBody: {
       /** @description Continuity findings and suggested edits produced by the continuity model. */
@@ -3946,6 +4034,49 @@ export interface components {
     };
     /** @enum {string} */
     UndoDependentKind: 'plan' | 'draft' | 'knowledge' | 'suggestion';
+    /** @description What the chapter writer would receive if a pending plan card were applied as it stands. */
+    WriterPreviewResponse: {
+      proposalId: string;
+      chapter: number;
+      /** @description The pages and records the plan cites that resolve for the writer, point of view first — cited and resolvable, before any budget cut the pack makes. */
+      included: components['schemas']['WriterPreviewRefItem'][];
+      /** @description Refs the plan cites that resolve to nothing. */
+      unresolved: components['schemas']['WriterPreviewRefItem'][];
+      kept: components['schemas']['WriterKeptItem'][];
+      /** @description Secrets whose unlock condition holds with the card and not with the stored plan: a claimed milestone, the ending mark or a volume move. */
+      unlocks: components['schemas']['WriterUnlockItem'][];
+      /** @description Secrets whose unlock condition holds with the stored plan and no longer with the card: a dropped claim, an unmarked ending or a volume move. */
+      relocks: components['schemas']['WriterUnlockItem'][];
+    };
+    /** @description A page or record the writer would read a section for. */
+    WriterPreviewRefItem: {
+      /** @description The plan's context ref, such as entity:mara or bible_doc:world/lamps. */
+      ref: string;
+      /** @description Scrubbed as the writer's headings are; a secret is named by its title alone. */
+      label: string;
+      /** @description A locked secret the plan cites: the writer reads its cover note as a writing constraint, never its truth. */
+      constraint?: boolean;
+    };
+    /** @description Something the writer would be kept from. Only its name is given: never its text. */
+    WriterKeptItem: {
+      kind: components['schemas']['WriterKeptKind'];
+      /** @description fact:<key> for a secret, volume:<key>, a bible_doc ref for a page, the cited ref for a refused one; ending and ending_question for those. */
+      key: string;
+      label: string;
+      /** @description secret: its writer note as the writer's scrub leaves it — what the writer reads among its writing constraints while the secret stays locked. Null when it has none; the writer is then told nothing of it. */
+      coverNote?: null | string;
+    };
+    /** @enum {string} */
+    WriterKeptKind: 'secret' | 'ending' | 'ending_question' | 'volume' | 'planner_page' | 'ref';
+    /** @description A secret whose unlock condition the card changes at its chapter, against the plan stored there now. */
+    WriterUnlockItem: {
+      factKey: string;
+      label: string;
+      /** @description The terms of the unlock condition, read as words. */
+      conditions: string[];
+      /** @description Whether the reveal rule lets this chapter reveal it once the card stands. The writer receives it only when the plan also has it learned; until then it stays among what is kept. */
+      revealRuleAllows: boolean;
+    };
     RevertProposalResponse: {
       proposal: components['schemas']['ProposalResponse'];
       reverted: components['schemas']['AppliedArtifactItem'][];
@@ -4938,6 +5069,10 @@ export interface components {
       isEmpty: boolean;
       /** @description First prose sentence or two, omitted for an empty document. */
       excerpt?: string;
+      /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
+      writerExcluded: boolean;
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review. */
+      plannerOnly: boolean;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -4951,6 +5086,10 @@ export interface components {
         [key: string]: unknown;
       };
       body?: null | string;
+      /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
+      writerExcluded: boolean;
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review. */
+      plannerOnly: boolean;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -6834,6 +6973,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -7350,6 +7498,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -7610,6 +7767,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
         };
       };
       /** @description Default Response */
@@ -8717,6 +8883,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -9069,6 +9244,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -9129,6 +9313,47 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_proposals_proposalId_writer_preview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WriterPreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_proposals_proposalId_revert: {
     parameters: {
       query?: never;
@@ -9148,6 +9373,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RevertProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
         };
       };
       /** @description Default Response */
@@ -13760,6 +13994,9 @@ export type EndingContractSchema = components['schemas']['EndingContractSchema']
 export type HookType = components['schemas']['HookType'];
 export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
 export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
+export type RevealRuleErrorResponse = components['schemas']['RevealRuleErrorResponse'];
+export type RevealRuleDetails = components['schemas']['RevealRuleDetails'];
+export type RevealRuleViolationItem = components['schemas']['RevealRuleViolationItem'];
 export type GenerateBody = components['schemas']['GenerateBody'];
 export type JobEnqueueResponse = components['schemas']['JobEnqueueResponse'];
 export type ListGenerationJobResponse = components['schemas']['ListGenerationJobResponse'];
@@ -13803,6 +14040,11 @@ export type RefinementKind = components['schemas']['RefinementKind'];
 export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
 export type ChangeOpItem = components['schemas']['ChangeOpItem'];
 export type OpResultItem = components['schemas']['OpResultItem'];
+export type ProposalDiagnosticItem = components['schemas']['ProposalDiagnosticItem'];
+export type ProposalDiagnosticKind = components['schemas']['ProposalDiagnosticKind'];
+export type ProposalDiagnosticData = components['schemas']['ProposalDiagnosticData'];
+export type DiagnosticPovItem = components['schemas']['DiagnosticPovItem'];
+export type DiagnosticFactItem = components['schemas']['DiagnosticFactItem'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type RunGraph = components['schemas']['RunGraph'];
@@ -13851,6 +14093,11 @@ export type AppliedActionJobItem = components['schemas']['AppliedActionJobItem']
 export type UndoImpactResponse = components['schemas']['UndoImpactResponse'];
 export type UndoDependentItem = components['schemas']['UndoDependentItem'];
 export type UndoDependentKind = components['schemas']['UndoDependentKind'];
+export type WriterPreviewResponse = components['schemas']['WriterPreviewResponse'];
+export type WriterPreviewRefItem = components['schemas']['WriterPreviewRefItem'];
+export type WriterKeptItem = components['schemas']['WriterKeptItem'];
+export type WriterKeptKind = components['schemas']['WriterKeptKind'];
+export type WriterUnlockItem = components['schemas']['WriterUnlockItem'];
 export type RevertProposalResponse = components['schemas']['RevertProposalResponse'];
 export type ListChangesResponse = components['schemas']['ListChangesResponse'];
 export type ChangeItemResponse = components['schemas']['ChangeItemResponse'];
@@ -14114,6 +14361,7 @@ export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectI
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
 export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
+export type WriterPreviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/writer-preview']['get']['parameters']['path'], undefined>;
 export type ListChangesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['query'], undefined>;
 export type ListChangesPathParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['path'], undefined>;
 export type ListSessionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['query'], undefined>;

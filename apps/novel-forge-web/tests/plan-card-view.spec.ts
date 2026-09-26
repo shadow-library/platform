@@ -41,6 +41,7 @@ function proposal(overrides: Partial<ProposalResponse> = {}): ProposalResponse {
     autoApplied: false,
     revertible: false,
     warnings: [],
+    diagnostics: [],
     createdAt: '2026-09-26T10:00:00.000Z',
     updatedAt: '2026-09-26T10:00:00.000Z',
     ...overrides,

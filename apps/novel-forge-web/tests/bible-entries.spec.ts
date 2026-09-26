@@ -29,7 +29,7 @@ function entity(overrides: Partial<EntryEntity> & Pick<EntryEntity, 'entityKey'>
 }
 
 function doc(overrides: Partial<BibleDocListItem> & Pick<BibleDocListItem, 'section' | 'slug'>): BibleDocListItem {
-  return { title: overrides.slug, wordCount: 300, isEmpty: false, updatedAt: '2026-03-01T00:00:00.000Z', ...overrides };
+  return { title: overrides.slug, wordCount: 300, isEmpty: false, writerExcluded: false, plannerOnly: false, updatedAt: '2026-03-01T00:00:00.000Z', ...overrides };
 }
 
 const entities: EntryEntity[] = [

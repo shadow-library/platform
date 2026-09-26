@@ -4,7 +4,7 @@ import { type BibleDocListItem, type BibleReadinessRoleResponse } from '../src/l
 import { documentTopic, entityTopic, newEntryType, parseBibleTopic, stagesByDocument, tabsFit, topicByKeywords, topicForEntityType } from '../src/lib/bible-topics';
 
 function doc(overrides: Partial<BibleDocListItem> & Pick<BibleDocListItem, 'section' | 'slug'>): BibleDocListItem {
-  return { title: overrides.slug, wordCount: 100, isEmpty: false, updatedAt: '2026-01-01T00:00:00.000Z', ...overrides };
+  return { title: overrides.slug, wordCount: 100, isEmpty: false, writerExcluded: false, plannerOnly: false, updatedAt: '2026-01-01T00:00:00.000Z', ...overrides };
 }
 
 function role(overrides: Partial<BibleReadinessRoleResponse> & Pick<BibleReadinessRoleResponse, 'stage'>): BibleReadinessRoleResponse {
