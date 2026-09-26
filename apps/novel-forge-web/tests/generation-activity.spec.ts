@@ -30,7 +30,7 @@ describe('jobChapters', () => {
 describe('activeGenerateJob', () => {
   it('should pick the running generate job over finished and other kinds', () => {
     const running = job({ id: 'live' });
-    expect(activeGenerateJob([job({ id: 'old', status: 'done' }), job({ id: 'extract', kind: 'extract' }), running])).toBe(running);
+    expect(activeGenerateJob([job({ id: 'old', status: 'done' }), job({ id: 'publish', kind: 'publish' }), running])).toBe(running);
   });
 
   it('should return nothing when no generate job is running', () => {
