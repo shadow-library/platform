@@ -38,6 +38,7 @@ import {
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import { BriefSections } from '@/features/briefs';
+import { ChapterToolbar, ChapterToolbarStatus, GoalMetDialog, VolumeList, VolumeNote, VolumeSection } from '@/features/chapter-list';
 import {
   ChecksDrawer,
   EditorStrip,
@@ -63,6 +64,7 @@ import {
   isIsolated,
   isQueuedReview,
   type ListChapterRowsQueryParams,
+  listVolumesQueryOptions,
   SummaryConflictError,
   useAddChapterImageMutation,
   useAmendChapterMutation,
@@ -80,15 +82,40 @@ import {
   useGenerateUnrestrictedMutation,
   useImportDraftMutation,
   useInsertChapterMutation,
+  useListChaptersQuery,
+  useListEntitiesQuery,
+  useListVolumesQuery,
   useRunReviewMutation,
   useSaveSummaryMutation,
+  useSearchChaptersQuery,
   useStartNextDraftMutation,
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
 } from '@/lib/apis';
 import { approvalMessage, approvalRefusal, blockingHold, holdDetail, holdMessage, kindLabel, overrideWarning, repairSource } from '@/lib/chapter-checks';
 import { hasUnsavedWork, isDirty, isSaveBlocked, leaveWarning, saveLabel, wordCount } from '@/lib/chapter-editor';
-import { CHAPTER_PAGE_SIZE, type ChapterCounts, type ChapterFilter, chapterSummary, isChapterFilter, pageOfChapter } from '@/lib/chapter-list';
+import {
+  CHAPTER_PAGE_SIZE,
+  type ChapterCounts,
+  type ChapterGroup,
+  type ChapterShow,
+  chaptersOnPage,
+  chaptersSubtitle,
+  clampGroupPages,
+  currentPageOf,
+  emptyVolumeNote,
+  goalMetLabel,
+  groupChaptersByVolume,
+  isChapterShow,
+  jumpToChapter,
+  nextVolumeGroup,
+  opensByDefault,
+  parseGroupPages,
+  rowsWindow,
+  rowVisible,
+  showCounts,
+  visibleChapters,
+} from '@/lib/chapter-list';
 import {
   approvalMoved,
   approveAsWrittenRefused,
@@ -108,36 +135,51 @@ function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
   return intent === 'success' ? 'success' : intent === 'danger' ? 'danger' : 'warning';
 }
 
-interface ChaptersSearch {
-  chapter?: number;
+// The list's whole-novel figures (counts, every chapter number, the next chapter) come with any page, so the smallest one is asked for.
+const SUMMARY_ROWS: ListChapterRowsQueryParams = { filter: 'all', limit: 1, offset: 0 };
+
+interface ChapterListView {
+  show?: ChapterShow;
+  /** Entity key of the point-of-view character to filter by. */
+  pov?: string;
+  /** Prose search; while set, search hits replace the volume groups. */
+  q?: string;
+  /** Page of the search hits. */
   page?: number;
-  filter?: ChapterFilter;
+  /** Page each volume shows, by volume key; a volume missing here opens on its default page. */
+  pages?: Record<string, number>;
+}
+
+interface ChaptersSearch extends ChapterListView {
+  chapter?: number;
   /** A hand-off from elsewhere (e.g. Overview's Next step card) — opens straight into the Checks drawer instead of the read view. */
   review?: boolean;
 }
 
-// The open chapter, list page and filter live in the URL, so a refresh or Back returns to the same place.
+// The open chapter, list pages and filters live in the URL, so a refresh or Back returns to the same place.
 export const Route = createFileRoute('/novels/$novelId/chapters')({
   validateSearch: (search: Record<string, unknown>): ChaptersSearch => {
     const chapter = Number(search.chapter);
     const page = Number(search.page);
+    const q = typeof search.q === 'string' ? search.q.trim() : '';
     return {
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
+      show: isChapterShow(search.show) && search.show !== 'all' ? search.show : undefined,
+      pov: typeof search.pov === 'string' && search.pov ? search.pov : undefined,
+      q: q || undefined,
       page: Number.isInteger(page) && page > 1 ? page : undefined,
-      filter: isChapterFilter(search.filter) && search.filter !== 'all' ? search.filter : undefined,
+      pages: parseGroupPages(search.pages),
       review: search.review === true || search.review === 'true' ? true : undefined,
     };
   },
-  loaderDeps: ({ search }) => ({ page: search.page ?? 1, filter: search.filter ?? 'all' }),
-  loader: async ({ context, params, deps }) => {
-    await context.queryClient.prefetchQuery(chapterRowsQueryOptions(params.novelId, chapterRowsParams(deps.page, deps.filter)));
+  loader: async ({ context, params }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(chapterRowsQueryOptions(params.novelId, SUMMARY_ROWS)),
+      context.queryClient.prefetchQuery(listVolumesQueryOptions(params.novelId)),
+    ]);
   },
   component: ChaptersScreen,
 });
-
-function chapterRowsParams(page: number, filter: ChapterFilter): ListChapterRowsQueryParams {
-  return { filter, limit: CHAPTER_PAGE_SIZE, offset: (page - 1) * CHAPTER_PAGE_SIZE };
-}
 
 type ReviewStatus = DraftResponse['reviewStatus'];
 
@@ -273,12 +315,14 @@ interface FillSlotDialogProps {
   chapter: number;
   onOpenChange: (open: boolean) => void;
   onFilled: (chapter: number) => void;
+  /** `paste` is Import chapters: the author's own prose, so the dialog opens on pasting it rather than on the unrestricted writer. */
+  initialMode?: FillMode;
 }
 
-function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDialogProps): React.JSX.Element {
+function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled, initialMode = 'generate' }: FillSlotDialogProps): React.JSX.Element {
   const generate = useGenerateUnrestrictedMutation(novelId, chapter);
   const importDraft = useImportDraftMutation(novelId, chapter);
-  const [mode, setMode] = useState<FillMode>('generate');
+  const [mode, setMode] = useState<FillMode>(initialMode);
   const [guidance, setGuidance] = useState('');
   const [prose, setProse] = useState('');
   const [title, setTitle] = useState('');
@@ -315,8 +359,12 @@ function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDi
     <Dialog open onOpenChange={open => !pending && onOpenChange(open)}>
       <Dialog.Content size="lg">
         <Dialog.Header
-          title={`Fill chapter ${chapter}`}
-          description="This slot is written outside the primary model — either generated by the unrestricted writer or pasted in by you."
+          title={initialMode === 'paste' ? `Import chapter ${chapter}` : `Fill chapter ${chapter}`}
+          description={
+            initialMode === 'paste'
+              ? 'Paste a chapter you wrote elsewhere. It lands as a draft you review and approve like any other.'
+              : 'This slot is written outside the primary model — either generated by the unrestricted writer or pasted in by you.'
+          }
         />
         <Dialog.Body>
           <div className={styles.dialogForm}>
@@ -392,14 +440,6 @@ function FillSlotDialog({ novelId, chapter, onOpenChange, onFilled }: FillSlotDi
   );
 }
 
-const FILTERS: readonly { value: ChapterFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'not_written', label: 'Not written' },
-  { value: 'needs_review', label: 'Needs review' },
-  { value: 'draft', label: 'Drafts' },
-  { value: 'final', label: 'Final' },
-];
-
 function formatChapterNumber(chapter: number): string {
   return String(chapter).padStart(2, '0');
 }
@@ -463,27 +503,128 @@ function BriefDrawer({ novelId, chapter, generation, generateLabel, onOpenChange
   );
 }
 
-interface ChapterListProps {
+interface GroupRowsProps {
   novelId: string;
-  page: number;
-  filter: ChapterFilter;
-  onOpen: (n: number) => void;
-  onBrowse: (page: number, filter: ChapterFilter, replace?: boolean) => void;
+  label: string;
+  allChapters: readonly number[];
+  pageChapters: readonly number[];
+  show: ChapterShow;
+  povChapters?: ReadonlySet<number>;
+  renderRow: (row: ChapterRowResponse) => React.JSX.Element;
 }
 
-function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListProps): React.JSX.Element {
-  const rowsQuery = useChapterRowsQuery(novelId, chapterRowsParams(page, filter));
+function GroupRows({ novelId, label, allChapters, pageChapters, show, povChapters, renderRow }: GroupRowsProps): React.JSX.Element {
+  const pageRows = rowsWindow(allChapters, pageChapters);
+  const rowsQuery = useChapterRowsQuery(novelId, { filter: 'all', ...(pageRows ?? { offset: 0, limit: 1 }) }, Boolean(pageRows));
+  if (rowsQuery.isLoading) return <PaneLoader />;
+  if (rowsQuery.error) return <PaneError error={rowsQuery.error} />;
+
+  const onPage = new Set(pageChapters);
+  const rows = (rowsQuery.data?.items ?? []).filter(row => (rowsQuery.isPlaceholderData || onPage.has(row.chapter)) && rowVisible(row, show, povChapters));
+  if (rows.length === 0) return <VolumeNote>No chapters on this page match the filters.</VolumeNote>;
+  return (
+    <ul className={`${styles.listBody} ${styles.listBodyNested}`} aria-label={label} aria-busy={rowsQuery.isPlaceholderData || undefined}>
+      {rows.map(renderRow)}
+    </ul>
+  );
+}
+
+interface ChapterSearchResultsProps {
+  novelId: string;
+  query: string;
+  pov?: string;
+  page: number;
+  onPage: (page: number) => void;
+  onOpen: (chapter: number) => void;
+}
+
+function ChapterSearchResults({ novelId, query, pov, page, onPage, onOpen }: ChapterSearchResultsProps): React.JSX.Element {
+  const searchQuery = useSearchChaptersQuery(novelId, { q: query, pov, limit: CHAPTER_PAGE_SIZE, offset: (page - 1) * CHAPTER_PAGE_SIZE });
+  const hits = searchQuery.data?.items ?? [];
+  const total = searchQuery.data?.total ?? 0;
+  return (
+    <QueryState
+      isLoading={searchQuery.isLoading}
+      error={searchQuery.error}
+      isEmpty={hits.length === 0}
+      emptyTitle={`No chapter mentions “${query}”`}
+      emptyDescription="Search looks through the prose of every chapter you can read here."
+    >
+      <>
+        <ul className={styles.listBody} aria-label={`Chapters mentioning “${query}”`} aria-busy={searchQuery.isPlaceholderData || undefined}>
+          {hits.map(hit => {
+            const open = (): void => onOpen(hit.number);
+            return (
+              <li key={hit.number}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open chapter ${hit.number}: ${hit.title ?? 'Untitled chapter'}`}
+                  className={`nf-selrow ${styles.row} ${styles.rowWritten}`}
+                  onClick={open}
+                  onKeyDown={activateOnKey(open)}
+                >
+                  <span className={styles.rowNum}>{formatChapterNumber(hit.number)}</span>
+                  <span className={styles.hitMain}>
+                    <span className={`${styles.rowTitle} ${hit.title ? '' : styles.rowTitleUntitled}`}>{hit.title ?? 'Untitled chapter'}</span>
+                    <span className={styles.hitSnippet}>{hit.snippet}</span>
+                  </span>
+                  <span className={styles.rowMeta}>
+                    <span className={styles.rowOrigin} />
+                    <span className={styles.rowWords}>{hit.matchCount === 1 ? '1 match' : `${hit.matchCount.toLocaleString()} matches`}</span>
+                    <span className={styles.rowStatus} />
+                  </span>
+                  <span className={styles.rowActions} />
+                  <ChevronRightIcon size={16} className={styles.rowChevron} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {total > CHAPTER_PAGE_SIZE && <Pagination className={styles.pagination} page={page} total={total} pageSize={CHAPTER_PAGE_SIZE} onPageChange={onPage} />}
+      </>
+    </QueryState>
+  );
+}
+
+interface ChapterListProps {
+  novelId: string;
+  view: ChapterListView;
+  onOpen: (n: number) => void;
+  onView: (view: ChapterListView, replace?: boolean) => void;
+}
+
+function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps): React.JSX.Element {
+  const { show = 'all', pov, q, page = 1, pages } = view;
+  const summaryQuery = useChapterRowsQuery(novelId, SUMMARY_ROWS);
+  const volumesQuery = useListVolumesQuery(novelId);
+  const charactersQuery = useListEntitiesQuery(novelId, { type: 'character', limit: 500 });
+  const povQuery = useListChaptersQuery(novelId, { pov, limit: 500 }, Boolean(pov));
   const generate = useGenerateMutation(novelId);
   const { activity, stop, stopping } = useGenerationActivity(novelId);
-  const data = rowsQuery.data;
-  const rows = data?.items ?? [];
+  const data = summaryQuery.data;
   const counts = data?.counts ?? EMPTY_COUNTS;
-  const chapters = data?.chapters ?? [];
+  const chapters = useMemo(() => data?.chapters ?? [], [data?.chapters]);
+  const volumes = useMemo(() => volumesQuery.data?.items ?? [], [volumesQuery.data?.items]);
+  const groups = useMemo(() => groupChaptersByVolume(volumes, chapters), [volumes, chapters]);
+  const povOptions = useMemo(() => (charactersQuery.data?.items ?? []).map(entity => ({ key: entity.entityKey, name: entity.name })), [charactersQuery.data?.items]);
+  const povChapters = useMemo(() => (pov && povQuery.data ? new Set(povQuery.data.items.map(chapter => chapter.number)) : undefined), [pov, povQuery.data]);
   const nextBriefChapter = data?.nextBriefChapter ?? undefined;
   const nextManualChapter = data?.nextWritableChapter ?? 1;
   const contradiction = data?.contradiction ?? undefined;
   const frontier = data?.frontier ?? 0;
-  const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / CHAPTER_PAGE_SIZE));
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [highlight, setHighlight] = useState<{ chapter: number; focus: boolean } | undefined>();
+  const [jumpMessage, setJumpMessage] = useState<string | undefined>();
+  const [goalMetGroup, setGoalMetGroup] = useState<ChapterGroup | undefined>();
+  const isOpen = useCallback((group: ChapterGroup): boolean => openGroups[group.key] ?? opensByDefault(group), [openGroups]);
+  const scrollIntoView = useCallback((element: HTMLElement | null) => element?.scrollIntoView({ block: 'center' }), []);
+  const focusRow = useCallback((element: HTMLElement | null) => {
+    element?.scrollIntoView({ block: 'center' });
+    element?.querySelector<HTMLElement>('[role="button"]')?.focus({ preventScroll: true });
+  }, []);
+  const highlightRef = highlight?.focus ? focusRow : scrollIntoView;
 
   // Judge + repair costs more per draft, so it stays a per-run choice — on by default per product decision.
   const [autoFix, setAutoFix] = useState(true);
@@ -500,16 +641,28 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
 
   const writeYourself = useStartNextDraftMutation(novelId);
 
-  // A page past the end (the last row on it was deleted, or a stale link) snaps back to the last real page.
-  const overshot = Boolean(data && page > pageCount);
-  useEffect(() => {
-    if (overshot) onBrowse(pageCount, filter, true);
-  }, [overshot, pageCount, filter, onBrowse]);
-
-  const reveal = (chapter: number): void => {
-    if (rows.some(row => row.chapter === chapter)) return;
-    onBrowse(pageOfChapter(chapters, chapter), 'all');
+  // Go to chapter clears search and filters so the chapter it lands on is always shown; revealing a chapter being written keeps them.
+  const jump = (text: string, announce = true): void => {
+    const target = jumpToChapter(groups, text, nextManualChapter);
+    setJumpMessage(announce ? target.message : undefined);
+    if (target.kind === 'missing') {
+      setHighlight(undefined);
+      return;
+    }
+    setHighlight({ chapter: target.chapter, focus: announce });
+    setOpenGroups(previous => ({ ...previous, [target.groupKey]: true }));
+    const reset: ChapterListView = announce ? { q: undefined, page: undefined, show: undefined, pov: undefined } : {};
+    onView({ ...reset, pages: { ...pages, [target.groupKey]: target.page } });
   };
+
+  const reveal = (chapter: number): void => jump(String(chapter), false);
+
+  const loaded = Boolean(summaryQuery.data && volumesQuery.data);
+  const clampedPages = loaded ? JSON.stringify(clampGroupPages(groups, pages) ?? null) : 'null';
+  useEffect(() => {
+    const corrected = JSON.parse(clampedPages) as Record<string, number> | null;
+    if (corrected) onView({ pages: corrected }, true);
+  }, [clampedPages, onView]);
 
   // A batch truncates rather than skips at an external-write slot, a gap left by an undrafted chapter, or a chapter
   // that teaches its characters something; the toast gives immediate feedback on *this* run.
@@ -550,7 +703,7 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
   const deleteDraft = useDeleteDraftMutation(novelId);
   const [deleteTarget, setDeleteTarget] = useState<ChapterRowResponse | undefined>();
   const [insertAfter, setInsertAfter] = useState<number | undefined>();
-  const [fillTarget, setFillTarget] = useState<number | undefined>();
+  const [fillTarget, setFillTarget] = useState<{ chapter: number; mode: FillMode } | undefined>();
   const doDelete = (): void => {
     if (!deleteTarget) return;
     deleteDraft.mutate(deleteTarget.chapter, {
@@ -562,9 +715,182 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
     });
   };
 
-  const offscreen = activity && !rows.some(row => row.chapter === activity.current) ? activity : undefined;
+  const visible = visibleChapters(groups, isOpen, pages);
+  const offscreen = activity && !q && !visible.has(activity.current) ? activity : undefined;
   const offscreenGeneration = offscreen && chapterGeneration(offscreen, offscreen.current);
   const briefIsNext = briefChapter !== undefined && briefChapter === nextBriefChapter;
+  const ungrouped = volumes.length === 0;
+
+  const renderRow = (row: ChapterRowResponse): React.JSX.Element => {
+    const generation = chapterGeneration(activity, row.chapter);
+    const writing = generation?.phase === 'writing';
+    const stopAction = writing && <StopButton onStop={stop} stopping={stopping} />;
+    const highlighted = row.chapter === highlight?.chapter;
+    const highlightClass = highlighted ? styles.rowHighlight : '';
+
+    if (row.kind === 'planned') {
+      const openBrief = (): void => setBriefChapter(row.chapter);
+      return (
+        <li key={`slot-${row.chapter}`} ref={highlighted ? highlightRef : undefined}>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`View the brief for chapter ${row.chapter}: ${row.title ?? 'Untitled chapter'}`}
+            className={`nf-selrow ${styles.row} ${styles.rowPlanned} ${highlightClass}`}
+            onClick={openBrief}
+            onKeyDown={activateOnKey(openBrief)}
+          >
+            <span className={styles.rowNum}>{formatChapterNumber(row.chapter)}</span>
+            <span className={styles.rowMain}>
+              <span className={`${styles.rowTitle} ${row.title ? '' : styles.rowTitleUntitled}`}>{row.title ?? 'Untitled chapter'}</span>
+              {row.writeMode === 'external' && (
+                <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
+                  <span className={styles.badge}>
+                    <StatusChip intent="warning">external slot</StatusChip>
+                  </span>
+                </Tooltip>
+              )}
+            </span>
+            <span className={styles.rowMeta}>
+              <span className={styles.rowOrigin} />
+              <span className={styles.rowWords} />
+              <span className={styles.rowStatus}>
+                {generation ? (
+                  <GenerationStatus generation={generation} />
+                ) : (
+                  <span className={styles.plannedChip}>
+                    <span className={styles.plannedDot} />
+                    Not written
+                  </span>
+                )}
+              </span>
+            </span>
+            <span className={styles.rowActions}>
+              {stopAction ||
+                (!generation && row.chapter === nextManualChapter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    prefix={<UploadIcon size={14} />}
+                    onClick={event => {
+                      event.stopPropagation();
+                      setFillTarget({ chapter: row.chapter, mode: 'generate' });
+                    }}
+                    aria-label={`Fill slot for chapter ${row.chapter}`}
+                  >
+                    Fill slot
+                  </Button>
+                ))}
+            </span>
+            <ChevronRightIcon size={16} className={styles.rowChevron} />
+          </div>
+        </li>
+      );
+    }
+
+    const meta = statusMeta({ status: row.status ?? 'draft', reviewStatus: row.reviewStatus ?? 'generating' });
+    const changed = rowChangedSinceApproval(row);
+    const words = row.wordCount ?? 0;
+    const open = (): void => onOpen(row.chapter);
+    return (
+      <li key={`draft-${row.chapter}`} ref={highlighted ? highlightRef : undefined}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Open chapter ${row.chapter}: ${row.title ?? 'Untitled chapter'}`}
+          className={`nf-selrow ${styles.row} ${styles.rowWritten} ${highlightClass}`}
+          onClick={open}
+          onKeyDown={activateOnKey(open)}
+        >
+          <span className={styles.rowNum}>{formatChapterNumber(row.chapter)}</span>
+          <span className={styles.rowMain}>
+            <span className={`${styles.rowTitle} ${row.title ? '' : styles.rowTitleUntitled}`}>{row.title ?? 'Untitled chapter'}</span>
+            {row.isolated && (
+              <span className={styles.badge}>
+                <UnrestrictedBadge />
+              </span>
+            )}
+            {row.finalizeBlocked && (
+              <Tooltip
+                content={row.isolated ? 'Finalize is refused until this chapter has a summary and continuation state.' : 'Finalize is refused until this chapter has a summary.'}
+              >
+                <span className={styles.badge}>
+                  <StatusChip intent="danger">needs summary</StatusChip>
+                </span>
+              </Tooltip>
+            )}
+          </span>
+          <span className={styles.rowMeta}>
+            <span className={styles.rowOrigin}>
+              <StatusChip intent={row.generator === 'human' ? 'neutral' : 'accent'}>{row.generator === 'human' ? 'You' : 'AI'}</StatusChip>
+            </span>
+            <span className={styles.rowWords}>{words === 0 ? 'Empty' : `${words.toLocaleString()} words`}</span>
+            <span className={styles.rowStatus}>
+              {generation ? (
+                <GenerationStatus generation={generation} label="Rewriting" />
+              ) : (
+                <StatusChip intent={changed ? 'warning' : meta.intent} dot>
+                  {changed ? 'Changed since approved' : meta.label}
+                </StatusChip>
+              )}
+            </span>
+          </span>
+          <span className={`${writing ? '' : 'nf-rowactions'} ${styles.rowActions}`}>
+            {stopAction || (
+              <>
+                {row.chapter >= frontier && (
+                  <RowAction label={`Insert a chapter after ${row.chapter}`} onClick={() => setInsertAfter(row.chapter)}>
+                    <PlusIcon size={14} />
+                  </RowAction>
+                )}
+                <RowAction label={`Delete chapter ${row.chapter}`} danger onClick={() => setDeleteTarget(row)}>
+                  <TrashIcon size={14} />
+                </RowAction>
+              </>
+            )}
+          </span>
+          <ChevronRightIcon size={16} className={styles.rowChevron} />
+        </div>
+      </li>
+    );
+  };
+
+  const renderGroup = (group: ChapterGroup): React.JSX.Element => {
+    const groupPage = currentPageOf(group, pages);
+    const next = nextVolumeGroup(groups, group.key);
+    const goalMet = group.volume?.state === 'active' ? { label: goalMetLabel(group, next), onClick: () => setGoalMetGroup(group) } : undefined;
+    return (
+      <VolumeSection
+        key={group.key}
+        group={group}
+        open={isOpen(group)}
+        onToggle={() => setOpenGroups(previous => ({ ...previous, [group.key]: !isOpen(group) }))}
+        page={groupPage}
+        onPage={nextPage => {
+          setHighlight(undefined);
+          onView({ pages: { ...pages, [group.key]: nextPage } });
+        }}
+        goalMet={goalMet}
+      >
+        {group.chapters.length === 0 ? (
+          <VolumeNote>{emptyVolumeNote(group, groups)}</VolumeNote>
+        ) : (
+          <GroupRows
+            novelId={novelId}
+            label={group.number ? `Chapters in volume ${group.number}` : 'Chapters'}
+            allChapters={chapters}
+            pageChapters={chaptersOnPage(group, groupPage)}
+            show={show}
+            povChapters={povChapters}
+            renderRow={renderRow}
+          />
+        )}
+      </VolumeSection>
+    );
+  };
+
+  const povNote = pov ? 'Point of view matches final chapters only — drafts and planned chapters are hidden while it’s set.' : undefined;
+  const status = jumpMessage ?? povNote;
 
   return (
     <div className={`nf-scroll ${styles.screenScroll}`}>
@@ -572,43 +898,51 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
         <div className={styles.listHead}>
           <div className={styles.listHeadMain}>
             <h1 className={styles.title}>Chapters</h1>
-            <p className={styles.subtitle}>{chapterSummary(counts, data?.totalWords ?? 0)}</p>
+            <p className={styles.subtitle}>{chaptersSubtitle(counts, data?.totalWords ?? 0, volumes)}</p>
           </div>
-          <ButtonGroup variant="primary" aria-label="Chapter creation">
-            <Button loading={generate.isPending || writeYourself.isPending || Boolean(activity)} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually}>
-              {activity ? `Writing ch ${activity.current}` : canGenerate ? `Generate ch ${nextBriefChapter}` : 'Write chapter'}
+          <div className={styles.listActions}>
+            <Button variant="secondary" disabled={Boolean(activity)} onClick={() => setFillTarget({ chapter: nextManualChapter, mode: 'paste' })}>
+              Import chapters
             </Button>
-            <DropdownMenu>
-              <DropdownMenu.Trigger asChild>
-                <Button aria-label="Chapter creation options" className={styles.splitCaret}>
-                  <ChevronDownIcon size={14} />
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="end">
-                <DropdownMenu.Item disabled={!canGenerate} onSelect={startGeneration}>
-                  Generate ch {nextBriefChapter ?? nextManualChapter} from its brief
-                </DropdownMenu.Item>
-                <DropdownMenu.Item disabled={Boolean(activity) || writeYourself.isPending} onSelect={writeManually}>
-                  Write ch {nextManualChapter} yourself
-                </DropdownMenu.Item>
-                {!canGenerate && (activity || generateReason) && (
-                  <div className={styles.menuNote}>{activity ? `Chapter ${activity.current} is being written — stop it or wait for it to finish` : generateReason}</div>
-                )}
-                <DropdownMenu.Separator />
-                <DropdownMenu.Label>Advanced</DropdownMenu.Label>
-                <DropdownMenu.CheckboxItem checked={autoFix} onCheckedChange={checked => setAutoFix(checked === true)}>
-                  Auto-fix contradictions
-                </DropdownMenu.CheckboxItem>
-                <div className={styles.menuNote}>Judge + repair reviews every draft and rewrites it when flagged — costs more per chapter.</div>
-                <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
-                  Draft the next 5 chapters
-                </DropdownMenu.Item>
-                <DropdownMenu.Item disabled={frontier > 0} onSelect={() => setInsertAfter(0)}>
-                  Insert a chapter ahead of ch 1
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu>
-          </ButtonGroup>
+            <Button variant="secondary" disabled={Boolean(activity)} loading={writeYourself.isPending} onClick={writeManually}>
+              Write chapter {nextManualChapter} myself
+            </Button>
+            <ButtonGroup variant="primary" aria-label="Chapter creation">
+              <Button loading={generate.isPending || writeYourself.isPending || Boolean(activity)} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually}>
+                {activity ? `Writing ch ${activity.current}` : canGenerate ? `Generate ch ${nextBriefChapter}` : 'Write chapter'}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenu.Trigger asChild>
+                  <Button aria-label="Chapter creation options" className={styles.splitCaret}>
+                    <ChevronDownIcon size={14} />
+                  </Button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content align="end">
+                  <DropdownMenu.Item disabled={!canGenerate} onSelect={startGeneration}>
+                    Generate ch {nextBriefChapter ?? nextManualChapter} from its brief
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item disabled={Boolean(activity) || writeYourself.isPending} onSelect={writeManually}>
+                    Write ch {nextManualChapter} yourself
+                  </DropdownMenu.Item>
+                  {!canGenerate && (activity || generateReason) && (
+                    <div className={styles.menuNote}>{activity ? `Chapter ${activity.current} is being written — stop it or wait for it to finish` : generateReason}</div>
+                  )}
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Label>Advanced</DropdownMenu.Label>
+                  <DropdownMenu.CheckboxItem checked={autoFix} onCheckedChange={checked => setAutoFix(checked === true)}>
+                    Auto-fix contradictions
+                  </DropdownMenu.CheckboxItem>
+                  <div className={styles.menuNote}>Judge + repair reviews every draft and rewrites it when flagged — costs more per chapter.</div>
+                  <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
+                    Draft the next 5 chapters
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item disabled={frontier > 0} onSelect={() => setInsertAfter(0)}>
+                    Insert a chapter ahead of ch 1
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu>
+            </ButtonGroup>
+          </div>
         </div>
 
         {offscreen && offscreenGeneration && (
@@ -646,177 +980,33 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
           </Alert>
         )}
 
-        <div className={styles.filterWrap}>
-          <SegmentedControl value={filter} onValueChange={v => onBrowse(1, v as ChapterFilter)}>
-            {FILTERS.map(({ value, label }) => (
-              <SegmentedControl.Item key={value} value={value}>
-                {label} <span className={styles.filterCount}>{counts[value]}</span>
-              </SegmentedControl.Item>
-            ))}
-          </SegmentedControl>
-        </div>
+        <ChapterToolbar
+          show={show}
+          counts={showCounts(counts)}
+          onShow={next => onView({ show: next === 'all' ? undefined : next })}
+          povOptions={povOptions}
+          pov={pov}
+          onPov={next => onView({ pov: next })}
+          query={q}
+          onSearch={next => onView({ q: next, page: undefined })}
+          onJump={text => jump(text)}
+        />
+        {status && <ChapterToolbarStatus>{status}</ChapterToolbarStatus>}
 
-        <QueryState
-          isLoading={rowsQuery.isLoading}
-          error={rowsQuery.error}
-          isEmpty={rows.length === 0 && !overshot}
-          emptyTitle={filter === 'all' ? 'No chapters yet' : `No chapters match “${FILTERS.find(f => f.value === filter)?.label}”`}
-          emptyDescription={filter === 'all' ? (canGenerate ? 'Generate your first chapter from its brief.' : generateReason) : 'Pick another filter to see the rest of the list.'}
-          emptyAction={
-            filter === 'all'
-              ? { label: canGenerate ? 'Generate first chapter' : 'Write chapter 1', onClick: canGenerate ? startGeneration : writeManually }
-              : { label: 'Show all chapters', onClick: () => onBrowse(1, 'all') }
-          }
-        >
-          <>
-            <ul className={styles.listBody} aria-label="Chapters" aria-busy={rowsQuery.isPlaceholderData || undefined}>
-              {rows.map(row => {
-                const generation = chapterGeneration(activity, row.chapter);
-                const writing = generation?.phase === 'writing';
-                const stopAction = writing && <StopButton onStop={stop} stopping={stopping} />;
-
-                if (row.kind === 'planned') {
-                  const openBrief = (): void => setBriefChapter(row.chapter);
-                  return (
-                    <li key={`slot-${row.chapter}`}>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`View the brief for chapter ${row.chapter}: ${row.title ?? 'Untitled chapter'}`}
-                        className={`nf-selrow ${styles.row} ${styles.rowPlanned}`}
-                        onClick={openBrief}
-                        onKeyDown={activateOnKey(openBrief)}
-                      >
-                        <span className={styles.rowNum}>{formatChapterNumber(row.chapter)}</span>
-                        <span className={styles.rowMain}>
-                          <span className={`${styles.rowTitle} ${row.title ? '' : styles.rowTitleUntitled}`}>{row.title ?? 'Untitled chapter'}</span>
-                          {row.writeMode === 'external' && (
-                            <Tooltip content="The primary writer skips this slot — fill it with the unrestricted writer or your own prose.">
-                              <span className={styles.badge}>
-                                <StatusChip intent="warning">external slot</StatusChip>
-                              </span>
-                            </Tooltip>
-                          )}
-                        </span>
-                        <span className={styles.rowMeta}>
-                          <span className={styles.rowOrigin} />
-                          <span className={styles.rowWords} />
-                          <span className={styles.rowStatus}>
-                            {generation ? (
-                              <GenerationStatus generation={generation} />
-                            ) : (
-                              <span className={styles.plannedChip}>
-                                <span className={styles.plannedDot} />
-                                Not written
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                        <span className={styles.rowActions}>
-                          {stopAction ||
-                            (!generation && row.chapter === nextManualChapter && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                prefix={<UploadIcon size={14} />}
-                                onClick={event => {
-                                  event.stopPropagation();
-                                  setFillTarget(row.chapter);
-                                }}
-                                aria-label={`Fill slot for chapter ${row.chapter}`}
-                              >
-                                Fill slot
-                              </Button>
-                            ))}
-                        </span>
-                        <ChevronRightIcon size={16} className={styles.rowChevron} />
-                      </div>
-                    </li>
-                  );
-                }
-
-                const meta = statusMeta({ status: row.status ?? 'draft', reviewStatus: row.reviewStatus ?? 'generating' });
-                const changed = rowChangedSinceApproval(row);
-                const words = row.wordCount ?? 0;
-                const open = (): void => onOpen(row.chapter);
-                return (
-                  <li key={`draft-${row.chapter}`}>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Open chapter ${row.chapter}: ${row.title ?? 'Untitled chapter'}`}
-                      className={`nf-selrow ${styles.row} ${styles.rowWritten}`}
-                      onClick={open}
-                      onKeyDown={activateOnKey(open)}
-                    >
-                      <span className={styles.rowNum}>{formatChapterNumber(row.chapter)}</span>
-                      <span className={styles.rowMain}>
-                        <span className={`${styles.rowTitle} ${row.title ? '' : styles.rowTitleUntitled}`}>{row.title ?? 'Untitled chapter'}</span>
-                        {row.isolated && (
-                          <span className={styles.badge}>
-                            <UnrestrictedBadge />
-                          </span>
-                        )}
-                        {row.finalizeBlocked && (
-                          <Tooltip
-                            content={
-                              row.isolated
-                                ? 'Finalize is refused until this chapter has a summary and continuation state.'
-                                : 'Finalize is refused until this chapter has a summary.'
-                            }
-                          >
-                            <span className={styles.badge}>
-                              <StatusChip intent="danger">needs summary</StatusChip>
-                            </span>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className={styles.rowMeta}>
-                        <span className={styles.rowOrigin}>
-                          <StatusChip intent={row.generator === 'human' ? 'neutral' : 'accent'}>{row.generator === 'human' ? 'You' : 'AI'}</StatusChip>
-                        </span>
-                        <span className={styles.rowWords}>{words === 0 ? 'Empty' : `${words.toLocaleString()} words`}</span>
-                        <span className={styles.rowStatus}>
-                          {generation ? (
-                            <GenerationStatus generation={generation} label="Rewriting" />
-                          ) : (
-                            <StatusChip intent={changed ? 'warning' : meta.intent} dot>
-                              {changed ? 'Changed' : meta.label}
-                            </StatusChip>
-                          )}
-                        </span>
-                      </span>
-                      <span className={`${writing ? '' : 'nf-rowactions'} ${styles.rowActions}`}>
-                        {stopAction || (
-                          <>
-                            {row.chapter >= frontier && (
-                              <RowAction label={`Insert a chapter after ${row.chapter}`} onClick={() => setInsertAfter(row.chapter)}>
-                                <PlusIcon size={14} />
-                              </RowAction>
-                            )}
-                            <RowAction label={`Delete chapter ${row.chapter}`} danger onClick={() => setDeleteTarget(row)}>
-                              <TrashIcon size={14} />
-                            </RowAction>
-                          </>
-                        )}
-                      </span>
-                      <ChevronRightIcon size={16} className={styles.rowChevron} />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            {(data?.total ?? 0) > CHAPTER_PAGE_SIZE && (
-              <Pagination
-                className={styles.pagination}
-                page={Math.min(page, pageCount)}
-                total={data?.total ?? 0}
-                pageSize={CHAPTER_PAGE_SIZE}
-                onPageChange={next => onBrowse(next, filter)}
-              />
-            )}
-          </>
-        </QueryState>
+        {q ? (
+          <ChapterSearchResults novelId={novelId} query={q} pov={pov} page={page} onPage={next => onView({ page: next })} onOpen={onOpen} />
+        ) : (
+          <QueryState
+            isLoading={summaryQuery.isLoading || volumesQuery.isLoading}
+            error={summaryQuery.error ?? volumesQuery.error}
+            isEmpty={counts.all === 0 && ungrouped}
+            emptyTitle="No chapters yet"
+            emptyDescription={canGenerate ? 'Generate your first chapter from its brief.' : generateReason}
+            emptyAction={{ label: canGenerate ? 'Generate first chapter' : 'Write chapter 1', onClick: canGenerate ? startGeneration : writeManually }}
+          >
+            <VolumeList>{groups.map(renderGroup)}</VolumeList>
+          </QueryState>
+        )}
       </div>
 
       {briefChapter !== undefined && (
@@ -835,7 +1025,13 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
         <InsertChapterDialog novelId={novelId} afterChapter={insertAfter} downstream={chapters} onOpenChange={open => !open && setInsertAfter(undefined)} />
       )}
 
-      {fillTarget !== undefined && <FillSlotDialog novelId={novelId} chapter={fillTarget} onOpenChange={open => !open && setFillTarget(undefined)} onFilled={onOpen} />}
+      {fillTarget !== undefined && (
+        <FillSlotDialog novelId={novelId} chapter={fillTarget.chapter} initialMode={fillTarget.mode} onOpenChange={open => !open && setFillTarget(undefined)} onFilled={onOpen} />
+      )}
+
+      {goalMetGroup && (
+        <GoalMetDialog novelId={novelId} group={goalMetGroup} next={nextVolumeGroup(groups, goalMetGroup.key)} onOpenChange={open => !open && setGoalMetGroup(undefined)} />
+      )}
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
         <Dialog.Content size="sm">
@@ -1696,19 +1892,15 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
 
 function ChaptersScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { chapter, page = 1, filter = 'all' } = Route.useSearch();
+  const search = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const openChapter = (n?: number): Promise<void> => navigate({ search: previous => ({ ...previous, chapter: n, review: undefined }) });
-  const browse = useCallback(
-    (next: number, nextFilter: ChapterFilter, replace?: boolean): Promise<void> =>
-      navigate({ search: { page: next > 1 ? next : undefined, filter: nextFilter === 'all' ? undefined : nextFilter }, replace }),
-    [navigate],
-  );
+  const changeView = useCallback((next: ChapterListView, replace?: boolean): Promise<void> => navigate({ search: previous => ({ ...previous, ...next }), replace }), [navigate]);
 
-  return chapter != null ? (
-    <ChapterEditor novelId={novelId} chapter={chapter} onBack={() => openChapter(undefined)} onPick={openChapter} />
+  return search.chapter != null ? (
+    <ChapterEditor novelId={novelId} chapter={search.chapter} onBack={() => openChapter(undefined)} onPick={openChapter} />
   ) : (
-    <ChapterList novelId={novelId} page={page} filter={filter} onOpen={openChapter} onBrowse={browse} />
+    <ChapterList novelId={novelId} view={search} onOpen={openChapter} onView={changeView} />
   );
 }

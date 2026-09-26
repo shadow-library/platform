@@ -1,6 +1,6 @@
-import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-import { type ChapterResponse, type ListChapterResponse, type ListChaptersQueryParams } from './api-types.gen';
+import { type ChapterResponse, type ChapterSearchResponse, type ListChapterResponse, type ListChaptersQueryParams, type SearchChaptersQueryParams } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
 const chapterKeys = {
@@ -20,6 +20,15 @@ export const listChaptersQueryOptions = (projectId: string, params?: ListChapter
 
 export function useListChaptersQuery(projectId: string, params?: ListChaptersQueryParams, enabled = true): UseQueryResult<ListChapterResponse, ApiError> {
   return useQuery({ ...listChaptersQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
+}
+
+export function useSearchChaptersQuery(projectId: string, params: SearchChaptersQueryParams, enabled = true): UseQueryResult<ChapterSearchResponse, ApiError> {
+  return useQuery<ChapterSearchResponse, ApiError>({
+    queryKey: [...chapterKeys.all(projectId), 'search', params],
+    queryFn: () => APIRequest.get(`/projects/${projectId}/source/chapters/search`).query(params).execute(),
+    placeholderData: keepPreviousData,
+    enabled: enabled && Boolean(projectId) && params.q.trim() !== '',
+  });
 }
 
 export function useChapterQuery(projectId: string, n: number, enabled = true): UseQueryResult<ChapterResponse, ApiError> {

@@ -1,0 +1,50 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 26px 0 4px;
+  max-width: 100%;
+}
+
+.count {
+  margin-left: 4px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.select {
+  width: auto;
+}
+
+.search {
+  width: 280px;
+  max-width: 100%;
+}
+
+.jump {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.jumpField {
+  width: 150px;
+}
+
+.status {
+  margin: 12px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}

@@ -28,6 +28,12 @@
   flex: 1;
 }
 
+.listActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .title {
   margin: 0 0 5px;
   font-size: var(--sh-text-h1);
@@ -71,18 +77,6 @@
   font-weight: 600;
 }
 
-.filterWrap {
-  margin: 26px 0 4px;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.filterCount {
-  margin-left: 4px;
-  color: var(--sh-text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
 .listBody {
   container-type: inline-size;
   margin: 12px 0 0;
@@ -96,6 +90,13 @@
 
 .listBody > li + li {
   border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.listBodyNested {
+  margin: 0;
+  border: none;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: 0;
 }
 
 /* Two-class selector so the grid wins over the global `.nf-selrow` flex layout regardless of stylesheet order. */
@@ -154,6 +155,26 @@
   color: var(--sh-text-tertiary);
 }
 
+.listBody .rowHighlight {
+  background: var(--sh-warning-bg-subtle);
+}
+
+.hitMain {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hitSnippet {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .badge {
   display: inline-flex;
   flex-shrink: 0;
@@ -162,7 +183,7 @@
 .rowMeta {
   grid-area: meta;
   display: grid;
-  grid-template-columns: 40px 88px 118px;
+  grid-template-columns: 40px 88px 150px;
   align-items: center;
   column-gap: 12px;
 }

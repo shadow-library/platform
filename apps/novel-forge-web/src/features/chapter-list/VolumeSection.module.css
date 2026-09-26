@@ -1,0 +1,132 @@
+.volumes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.section {
+  container-type: inline-size;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.section[data-writing] {
+  border-color: var(--sh-info-border);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.head:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: calc(-1 * var(--sh-focus-ring-width));
+}
+
+.chevron {
+  flex-shrink: 0;
+  width: 12px;
+  color: var(--sh-text-secondary);
+}
+
+.headMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.headLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.eyebrow {
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.volumeTitle {
+  font-size: var(--sh-text-h3);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.goal,
+.meta {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.meta {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.note {
+  margin: 0;
+  padding: 16px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-secondary);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.range {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.writing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.writingAction {
+  margin-left: auto;
+}
+
+@container (max-width: 640px) {
+  .meta {
+    display: none;
+  }
+}
