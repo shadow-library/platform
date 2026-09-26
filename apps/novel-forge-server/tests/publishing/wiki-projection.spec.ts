@@ -174,6 +174,109 @@ describe('buildWikiProjections', () => {
     });
   });
 
+  describe('images as of a chapter', () => {
+    const ordinals = new Map([
+      [1, 1],
+      [3, 3],
+      [50, 50],
+    ]);
+
+    // What web-novel-server serves at `gate`: the entry once it is visible, then its images and their captions gated one by one.
+    function readerView(projection: ReturnType<typeof buildWikiProjections>[number] | undefined, gate: number): { imageRef?: string; images: string[]; captions: string[] } {
+      if (!projection || projection.payload.firstVisibleOrdinal > gate) return { images: [], captions: [] };
+      const images = projection.payload.images.filter(image => image.visibleFromOrdinal <= gate);
+      return { imageRef: projection.payload.imageRef, images: images.map(image => image.imageRef), captions: images.flatMap(image => (image.caption ? [image.caption] : [])) };
+    }
+
+    it('should keep a chapter-50 portrait and gallery image, with its caption, from chapter-1 readers', () => {
+      const [projection] = build({
+        entities: [
+          entity({
+            imageRef: 'scarred.png',
+            imageDepictsChapter: 50,
+            images: [{ imageRef: 'crowned.png', caption: 'Crowned after the siege', sortOrder: 0, depictsChapter: 50 }],
+          }),
+        ],
+        ordinalByChapter: ordinals,
+      });
+
+      expect(readerView(projection, 1)).toEqual({ imageRef: undefined, images: [], captions: [] });
+      expect(readerView(projection, 50)).toEqual({ imageRef: undefined, images: ['scarred.png', 'crowned.png'], captions: ['Crowned after the siege'] });
+    });
+
+    it('should keep a portrait no later than the entry itself as the top-level image', () => {
+      const [projection] = build({ entities: [entity({ imageRef: 'young.png', imageDepictsChapter: 1 })], ordinalByChapter: ordinals });
+
+      expect(projection?.payload.imageRef).toBe('young.png');
+      expect(projection?.payload.images).toEqual([]);
+    });
+
+    it('should withhold an image whose depicted chapter is not published yet', () => {
+      const [projection] = build({
+        entities: [entity({ imageRef: 'future.png', imageDepictsChapter: 60, images: [{ imageRef: 'later.png', caption: 'Later', sortOrder: 0, depictsChapter: 60 }] })],
+        ordinalByChapter: ordinals,
+      });
+
+      expect(projection?.payload.imageRef).toBeUndefined();
+      expect(projection?.payload.images).toEqual([]);
+    });
+
+    it('should keep a legacy undated portrait as the headline and its gallery at the old ordinal', () => {
+      const [projection] = build({
+        entities: [
+          entity({
+            firstSeenChapter: 3,
+            imageRef: 'legacy.png',
+            images: [{ imageRef: 'sketch.png', caption: 'Old sketch', sortOrder: 0 }],
+            relationships: [{ targetKey: 'boone', kind: 'rival', note: null, chapter: 1 }],
+          }),
+        ],
+        ordinalByChapter: ordinals,
+      });
+
+      expect(projection?.payload.imageRef).toBe('legacy.png');
+      expect(projection?.payload.images).toEqual([{ imageRef: 'sketch.png', caption: 'Old sketch', sortOrder: 0, visibleFromOrdinal: 3 }]);
+    });
+
+    it('should keep the old ordinal 0 for a legacy gallery when the entity is visible only through a relationship with no chapter', () => {
+      const [projection] = build({
+        entities: [
+          entity({
+            firstSeenChapter: 9,
+            imageRef: 'legacy.png',
+            images: [
+              { imageRef: 'old.png', caption: null, sortOrder: 0 },
+              { imageRef: 'dated.png', caption: 'Dated', sortOrder: 1, depictsChapter: 3 },
+            ],
+            relationships: [{ targetKey: 'boone', kind: 'rival', note: null, chapter: null }],
+          }),
+        ],
+        ordinalByChapter: ordinals,
+      });
+
+      expect(projection?.payload.firstVisibleOrdinal).toBe(0);
+      expect(projection?.payload.imageRef).toBe('legacy.png');
+      expect(projection?.payload.images).toEqual([
+        { imageRef: 'old.png', sortOrder: 0, visibleFromOrdinal: 0 },
+        { imageRef: 'dated.png', caption: 'Dated', sortOrder: 1, visibleFromOrdinal: 3 },
+      ]);
+    });
+
+    it('should show an image dated before the story from ordinal 0', () => {
+      const [projection] = build({ entities: [entity({ images: [{ imageRef: 'child.png', caption: null, sortOrder: 0, depictsChapter: 0 }] })], ordinalByChapter: ordinals });
+
+      expect(projection?.payload.images).toEqual([{ imageRef: 'child.png', sortOrder: 0, visibleFromOrdinal: 0 }]);
+    });
+
+    it('should leave the payload of a legacy portrait unchanged by dating', () => {
+      const undated = build({ entities: [entity({ imageRef: 'legacy.png' })] });
+      const datedAtFirstSighting = build({ entities: [entity({ imageRef: 'legacy.png', imageDepictsChapter: 1 })] });
+
+      expect(undated[0]?.payload.imageRef).toBe('legacy.png');
+      expect(undated[0]?.contentHash).toBe(datedAtFirstSighting[0]?.contentHash ?? '');
+    });
+  });
+
   describe('determinism', () => {
     const facts: WikiFactInput[] = [
       { factKey: 'b_fact', text: 'B.', subjects: ['amara'], learnedInChapters: [2] },

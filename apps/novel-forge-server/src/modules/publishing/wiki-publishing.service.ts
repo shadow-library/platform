@@ -52,9 +52,10 @@ export class WikiPublishingService {
         attributes: entity.attributes,
         firstSeenChapter: entity.firstSeenChapter,
         imageRef: entity.imagePath,
+        imageDepictsChapter: entity.imageDepictsChapter,
         wikiVisibility: entity.wikiVisibility,
         aliases: entity.aliases.map(alias => alias.alias),
-        images: entity.images.map(image => ({ imageRef: image.imagePath, caption: image.caption, sortOrder: image.sortOrder })),
+        images: entity.images.map(image => ({ imageRef: image.imagePath, caption: image.caption, sortOrder: image.sortOrder, depictsChapter: image.depictsChapter })),
         relationships: entity.relationships.map(relationship => ({
           targetKey: relationship.targetKey,
           kind: relationship.kind,

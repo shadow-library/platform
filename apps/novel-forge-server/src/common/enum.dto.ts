@@ -69,6 +69,7 @@ export const IllustrationAttachableReferenceRole = EnumType.create('Illustration
 export const IllustrationReferenceOrigin = EnumType.create('IllustrationReferenceOrigin', ['auto', 'attached']);
 export const IllustrationReferenceWarningCode = EnumType.create('IllustrationReferenceWarningCode', [
   'capacity-trimmed',
+  'later-chapter',
   'merged-with-edit-source',
   'missing-file',
   'too-large',

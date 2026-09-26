@@ -85,6 +85,14 @@ export class EntityImageResponse {
 
   @Field(() => Integer)
   sortOrder: number;
+
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    description:
+      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on an image from before dating, which keeps its old visibility.',
+  })
+  depictsChapter?: number | null;
 }
 
 @Schema()
@@ -131,6 +139,14 @@ export class EntityResponse {
   @Field({ optional: true, nullable: true, description: 'Absolute public URL for the portrait, or null when the entity has no portrait.' })
   imageUrl?: string | null;
 
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    description:
+      'The chapter the portrait shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on a portrait from before dating, which keeps its old visibility.',
+  })
+  imageDepictsChapter?: number | null;
+
   @Field(() => [EntityImageResponse], { optional: true, description: "The entity's additional reference images. Included by the single-entity endpoint." })
   images?: EntityImageResponse[];
 
@@ -148,6 +164,24 @@ export class UploadImageBody {
 
   @Field({ description: 'Base64-encoded image bytes without a data URL prefix.' })
   image: string;
+
+  @Field(() => Integer, {
+    optional: true,
+    minimum: 0,
+    description:
+      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016.',
+  })
+  depictsChapter?: number;
+}
+
+@Schema()
+export class DateEntityImageBody {
+  @Field(() => Integer, {
+    minimum: 0,
+    description:
+      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A chapter past the latest final one is refused with ILL_016.',
+  })
+  depictsChapter: number;
 }
 
 @Schema()

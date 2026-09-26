@@ -74,6 +74,8 @@ export const entities = pgTable(
     // re-rolls and refinements keep producing the same character rather than a new one each time.
     appearance: text('appearance'),
     imagePath: varchar('image_path'),
+    // The chapter the portrait shows the entity as of; null for a portrait that predates dating.
+    imageDepictsChapter: integer('image_depicts_chapter'),
     wikiVisibility: entityWikiVisibility('wiki_visibility').notNull().default('default'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -95,6 +97,7 @@ export const entityImages = pgTable(
     imagePath: varchar('image_path').notNull(),
     caption: varchar('caption'),
     sortOrder: integer('sort_order').notNull().default(0),
+    depictsChapter: integer('depicts_chapter'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [index('entity_images_entity_id_idx').on(t.entityId)],

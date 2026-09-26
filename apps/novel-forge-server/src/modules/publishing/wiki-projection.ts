@@ -40,6 +40,8 @@ interface WikiEntityImageInput {
   imageRef: string;
   caption?: string | null;
   sortOrder: number;
+  /** The chapter the image shows the entity as of, 0 for before the story; null only on a row written before images were dated. */
+  depictsChapter?: number | null;
 }
 
 /** A single chapter-stamped relationship observation toward a target entity. */
@@ -61,6 +63,7 @@ export interface WikiEntityInput {
   firstSeenChapter?: number | null;
   /** Content-addressed portrait ref (`entities.imagePath`), pushed verbatim as the entry's `imageRef`. */
   imageRef?: string | null;
+  imageDepictsChapter?: number | null;
   wikiVisibility: Knowledge.EntityWikiVisibility;
   aliases: string[];
   images: WikiEntityImageInput[];
@@ -134,6 +137,12 @@ function renderObservation(relationship: WikiRelationshipInput, nameByKey: Map<s
   return relationship.note?.trim() ? `${head}: ${relationship.note.trim()}` : head;
 }
 
+interface RawImage {
+  imageRef: string;
+  caption?: string | null;
+  visibleFromOrdinal: number;
+}
+
 interface RawFacet {
   facetKey: string;
   content: string;
@@ -205,18 +214,38 @@ function projectEntity(entity: WikiEntityInput, facts: WikiFactInput[], ordinalB
 
   const facets: WikiFacet[] = raw.map((facet, index) => ({ facetKey: facet.facetKey, content: facet.content, sortOrder: index, visibleFromOrdinal: facet.visibleFromOrdinal }));
 
-  // Gallery images are reference art, not per-chapter reveals: they share the entity's first-visible ordinal
-  // (0 when it has none). The entry itself stays hidden until `firstVisibleOrdinal`, so this never leaks art early.
-  const imageOrdinal = Math.max(0, baseOrdinal ?? 0);
-  const images: WikiImage[] = [...entity.images]
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.imageRef.localeCompare(b.imageRef))
-    .map((image, index) => ({ imageRef: image.imageRef, ...(image.caption?.trim() ? { caption: image.caption.trim() } : {}), sortOrder: index, visibleFromOrdinal: imageOrdinal }));
-
   const firstVisibleOrdinal = Math.min(...facets.map(facet => facet.visibleFromOrdinal));
+  // Rows written before images were dated keep the visibility they always had, so an author never finds a published thumbnail gone:
+  // the portrait heads the entry and the gallery shares the entity's first-visible ordinal.
+  const legacyOrdinal = Math.max(0, baseOrdinal ?? 0);
+  const depictedOrdinal = (depictsChapter: number | null | undefined): number | null => {
+    if (depictsChapter === null || depictsChapter === undefined) return legacyOrdinal;
+    return depictsChapter === 0 ? 0 : ordinalOf(depictsChapter, ordinalByChapter);
+  };
+
+  // The reader shows the top-level portrait whenever the entry is visible, so only a portrait no later than the entry itself rides there;
+  // a later one joins the gallery, the one place the reader gates per image. Every dated image, with its caption, waits for its chapter.
+  const legacyPortrait = entity.imageDepictsChapter === null || entity.imageDepictsChapter === undefined;
+  const portraitOrdinal = entity.imageRef ? depictedOrdinal(entity.imageDepictsChapter) : null;
+  const headline = entity.imageRef && portraitOrdinal !== null && (legacyPortrait || portraitOrdinal <= firstVisibleOrdinal) ? entity.imageRef : undefined;
+  const gatedPortrait: RawImage[] = entity.imageRef && !headline && portraitOrdinal !== null ? [{ imageRef: entity.imageRef, visibleFromOrdinal: portraitOrdinal }] : [];
+  const gallery = [...entity.images]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.imageRef.localeCompare(b.imageRef))
+    .flatMap((image): RawImage[] => {
+      const visibleFromOrdinal = depictedOrdinal(image.depictsChapter);
+      return visibleFromOrdinal === null ? [] : [{ imageRef: image.imageRef, caption: image.caption, visibleFromOrdinal }];
+    });
+  const images: WikiImage[] = [...gatedPortrait, ...gallery].map((image, index) => ({
+    imageRef: image.imageRef,
+    ...(image.caption?.trim() ? { caption: image.caption.trim() } : {}),
+    sortOrder: index,
+    visibleFromOrdinal: image.visibleFromOrdinal,
+  }));
+
   const payload: WikiEntryPayload = {
     type: entity.type,
     name: entity.name,
-    ...(entity.imageRef ? { imageRef: entity.imageRef } : {}),
+    ...(headline ? { imageRef: headline } : {}),
     firstVisibleOrdinal,
     facets,
     images,

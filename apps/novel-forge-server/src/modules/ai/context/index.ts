@@ -1,3 +1,4 @@
+export * from './art-context';
 export * from './bible-docs';
 export * from './canon-guard';
 export * from './catalog.service';

@@ -166,6 +166,9 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ILL_013 = AppErrorCode.badRequest('ILL_013', 'Reference images total {size} bytes, over the {limit} byte request limit');
   static readonly ILL_014 = AppErrorCode.badRequest('ILL_014', 'Reference image for {source} is {contentType}; only PNG, JPEG and WebP are supported');
   static readonly ILL_015 = AppErrorCode.badRequest('ILL_015', 'Reference for {source} cannot use the edit-source role — it is reserved for the image being refined');
+  static readonly ILL_016 = AppErrorCode.badRequest('ILL_016', 'Chapter {chapter} is not final — an image can depict the story only up to its latest final chapter, {frontier}');
+  static readonly ILL_017 = AppErrorCode.badRequest('ILL_017', 'Only an entity illustration can be drawn as of a chapter');
+  static readonly ILL_018 = AppErrorCode.badRequest('ILL_018', 'Reference for {source} depicts chapter {depicts}, later than chapter {chapter} this image is drawn as of');
 
   /*!
    * Continuity Errors

@@ -72,6 +72,7 @@ const SECTION_LABELS: Record<string, string> = {
   hidden_constraints: '## BEHAVIORAL CONSTRAINTS',
   art_style: '## ART STYLE BIBLE',
   subject_card: '## SUBJECT',
+  subject_changes: '## HOW THE SUBJECT HAS CHANGED SO FAR',
   cast_appearance: '## CAST APPEARANCE',
   ledger: '## DECISION LEDGER',
   author_brief: "## THE AUTHOR'S OWN WORDS",

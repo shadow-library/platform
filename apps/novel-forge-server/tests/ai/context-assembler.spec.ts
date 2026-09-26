@@ -5,6 +5,7 @@ import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/c
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
+import { WriterDisclosurePolicy } from '@modules/bible/fact/writer-disclosure-policy';
 import { emptyPolicy } from '@modules/plugins/plugin-policy.service';
 
 describe('countTokens', () => {
@@ -1460,6 +1461,87 @@ describe('ContextAssembler.forIllustration', () => {
     const pack = await assembler.forIllustration(1n, 'entity', 'hero');
 
     expect(pack.rendered).toContain('none recorded — derive one');
+  });
+
+  describe('drawn as of a chapter', () => {
+    const SECRET = 'Evan is the lost heir of the ridge court';
+    const depiction = new WriterDisclosurePolicy({
+      chapter: 5,
+      lockedFacts: [{ factKey: 'evan_heir', text: SECRET, terms: ['ridge court'] }],
+      plannerOnly: [],
+      plannerPages: [],
+      volumeOrdinals: new Map(),
+      currentVolumeOrdinal: null,
+    });
+    const hero = {
+      id: 7n,
+      entityKey: 'hero',
+      name: 'Evan Vale',
+      type: 'character',
+      significance: 'major',
+      status: 'crowned king',
+      appearance: 'silver hair',
+      body: `A ferry hand. ${SECRET}.`,
+      notes: 'Planner aside: he loses the eye at the siege.',
+      motivation: null,
+      aliases: [],
+    };
+    const ISOLATED_PROSE = 'The archive doors split and the black water took the lamps one by one.';
+    const events = [
+      { chapter: 3, kind: 'state', detailKey: '', after: { condition: 'broken wrist' }, status: 'committed' },
+      { chapter: 4, kind: 'state', detailKey: '', after: { location: 'the drowned archive' }, status: 'committed' },
+      { chapter: 50, kind: 'state', detailKey: '', after: { condition: 'one-eyed' }, status: 'committed' },
+    ];
+
+    async function datedPack() {
+      const assembler = illustrationAssembler({
+        entities: { findFirst: mock(async () => hero) },
+        characterEvents: { findMany: mock(async () => events) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => [{ number: 4, isolated: true }]) },
+        drafts: { findFirst: mock(async () => ({ chapter: 4, content: ISOLATED_PROSE })), findMany: mock(async () => [{ chapter: 4, content: ISOLATED_PROSE }]) },
+      });
+      return assembler.forIllustration(1n, 'entity', 'hero', { depiction });
+    }
+
+    it('should carry the changes up to the chapter and none after it', async () => {
+      const pack = await datedPack();
+
+      expect(pack.chapter).toBe(5);
+      expect(pack.rendered).toContain('## HOW THE SUBJECT HAS CHANGED SO FAR');
+      expect(pack.rendered).toContain('broken wrist');
+      expect(pack.rendered).not.toContain('one-eyed');
+    });
+
+    it('should keep a change from an isolated chapter without any of its prose', async () => {
+      const pack = await datedPack();
+
+      expect(pack.rendered).toContain('the drowned archive');
+      expect(pack.rendered).not.toContain('black water');
+    });
+
+    it('should drop the notes and mark the entity record as present-day, overridden by the timeline', async () => {
+      const pack = await datedPack();
+
+      expect(pack.rendered).not.toContain('Planner aside');
+      expect(pack.rendered).toContain('Current record (may describe later chapters) — appearance: silver hair');
+      expect(pack.rendered).toContain('Current record (may describe later chapters) — profile: A ferry hand.');
+      expect(pack.rendered).toContain('where the changes up to chapter 5 differ from it, they win');
+    });
+
+    it('should withhold the secret truth and the present-day status', async () => {
+      const pack = await datedPack();
+
+      expect(pack.rendered).toContain('A ferry hand.');
+      expect(pack.rendered).not.toContain('lost heir');
+      expect(pack.rendered).not.toContain('crowned king');
+      expect(pack.rendered).toContain('as of chapter 5');
+    });
+
+    it('should ignore the chapter for a subject other than an entity', async () => {
+      const pack = await illustrationAssembler({}).forIllustration(1n, 'cover', null, { depiction });
+
+      expect(pack.chapter).toBeNull();
+    });
   });
 
   it('renders a chapter subject with the appearance of its on-page cast', async () => {

@@ -7,6 +7,7 @@ import { ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRIT
 import {
   AddEntityImageBody,
   CreateEntityBody,
+  DateEntityImageBody,
   EntityImageParams,
   EntityKeyParams,
   EntityProjectParams,
@@ -71,7 +72,14 @@ export class EntityController {
   @Post('/:entityKey/image')
   @RespondFor(200, EntityResponse)
   uploadImage(@Params() params: EntityKeyParams, @Body() body: UploadImageBody): Promise<EntityResponse> {
-    return this.entityService.setImage(params.projectId, params.entityKey, body.image, body.mime);
+    return this.entityService.setImage(params.projectId, params.entityKey, body.image, body.mime, body.depictsChapter);
+  }
+
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
+  @Patch('/:entityKey/image')
+  @RespondFor(200, EntityResponse)
+  datePortrait(@Params() params: EntityKeyParams, @Body() body: DateEntityImageBody): Promise<EntityResponse> {
+    return this.entityService.datePortrait(params.projectId, params.entityKey, body.depictsChapter);
   }
 
   @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
@@ -86,7 +94,14 @@ export class EntityController {
   @RespondFor(201, EntityResponse)
   @HttpStatus(201)
   addImage(@Params() params: EntityKeyParams, @Body() body: AddEntityImageBody): Promise<EntityResponse> {
-    return this.entityService.addImage(params.projectId, params.entityKey, body.image, body.mime, body.caption);
+    return this.entityService.addImage(params.projectId, params.entityKey, body.image, body.mime, body.caption, body.depictsChapter);
+  }
+
+  @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)
+  @Patch('/:entityKey/images/:imageId')
+  @RespondFor(200, EntityResponse)
+  dateImage(@Params() params: EntityImageParams, @Body() body: DateEntityImageBody): Promise<EntityResponse> {
+    return this.entityService.dateImage(params.projectId, params.entityKey, params.imageId, body.depictsChapter);
   }
 
   @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)

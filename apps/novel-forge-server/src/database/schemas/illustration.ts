@@ -56,6 +56,8 @@ export namespace Illustration {
     appearanceAnchor?: string;
     /** True when the composer derived the anchor because the entity carried none — the save flow offers it back to the client. */
     appearanceDerived?: boolean;
+    /** Set when the anchor is the entity's present-day record but the image is drawn as of this earlier chapter: the render asks to adjust it. */
+    appearanceAsOfChapter?: number;
     /** Set when the derived anchor came from describing a likeness reference rather than from the composer. */
     appearanceDescription?: AppearanceDescription;
     /** The author's attached references; every refinement re-resolves them below the edit source and trims them, with a warning, when the model is out of slots. */
@@ -101,6 +103,9 @@ export const illustrations = pgTable(
     // Latest per image: one entry per storage ref ever sent, carrying the most recent round's role and note. Per-round truth lives on each candidate.
     references: jsonb('references').$type<Illustration.Reference[]>().notNull().default([]),
     selectedRef: varchar('selected_ref'),
+    // The chapter an entity illustration is drawn as of (null for other subjects and for rows from before dating): its art context stops
+    // there, and saving carries it onto the portrait or gallery row.
+    depictsChapter: integer('depicts_chapter'),
     revision: integer('revision').notNull().default(1),
     ownerKind: ownerKind('owner_kind').notNull().default('user'),
     ownerId: bigint('owner_id', { mode: 'bigint' }),

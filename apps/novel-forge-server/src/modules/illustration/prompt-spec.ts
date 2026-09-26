@@ -54,7 +54,7 @@ export function renderReferenceManifest(references: Illustration.Reference[]): s
  */
 export function renderPromptSpec(spec: Illustration.PromptSpec, references: Illustration.Reference[] = []): string {
   return [
-    spec.appearanceAnchor ? `Subject appearance (must match exactly): ${spec.appearanceAnchor}` : '',
+    renderAppearanceAnchor(spec),
     renderReferenceBlock(references),
     spec.basePrompt,
     spec.subjectFraming,
@@ -64,6 +64,12 @@ export function renderPromptSpec(spec: Illustration.PromptSpec, references: Illu
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+function renderAppearanceAnchor(spec: Illustration.PromptSpec): string {
+  if (!spec.appearanceAnchor) return '';
+  if (spec.appearanceAsOfChapter === undefined) return `Subject appearance (must match exactly): ${spec.appearanceAnchor}`;
+  return `Subject's current appearance — adjust it to how they looked at chapter ${spec.appearanceAsOfChapter}, as the description below says: ${spec.appearanceAnchor}`;
 }
 
 // Captions, subject keys and words like "chapter" or "illustration" leak into image models as literal content, so each image is named only by position, role and portrait name.

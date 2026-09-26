@@ -7,6 +7,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import {
   enforcePlanWrite,
+  latestFinalChapter,
   markDescendantDraftsStale,
   nearestVolumeKey,
   renderBriefBody,
@@ -123,6 +124,21 @@ const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.mysteries, projectId: schema.mysteries.projectId, column: schema.mysteries.payoffWindow, field: 'payoffWindow' },
   { table: schema.modelCalls, projectId: schema.modelCalls.projectId, column: schema.modelCalls.chapter, field: 'chapter' },
   { table: schema.characterEvents, projectId: schema.characterEvents.projectId, column: schema.characterEvents.chapter, field: 'chapter' },
+  {
+    table: schema.entities,
+    projectId: schema.entities.projectId,
+    column: schema.entities.imageDepictsChapter,
+    field: 'imageDepictsChapter',
+    updatedAt: 'updatedAt',
+  },
+  { table: schema.entityImages, projectId: schema.entityImages.projectId, column: schema.entityImages.depictsChapter, field: 'depictsChapter' },
+  {
+    table: schema.illustrations,
+    projectId: schema.illustrations.projectId,
+    column: schema.illustrations.depictsChapter,
+    field: 'depictsChapter',
+    updatedAt: 'updatedAt',
+  },
 ];
 
 const INSERT_STALE_REASON = 'a chapter was inserted after this point';
@@ -226,13 +242,8 @@ export class ChapterInsertService {
   }
 
   /** `max(number)` over finalized chapters — inserting at it is legal, inserting behind it would move canon. */
-  private async writeFrontier(projectId: bigint, db: DbExecutor = this.db): Promise<number> {
-    const latest = await db.query.chapters.findFirst({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
-      orderBy: desc(schema.chapters.number),
-      columns: { number: true },
-    });
-    return latest?.number ?? 0;
+  private writeFrontier(projectId: bigint, db: DbExecutor = this.db): Promise<number> {
+    return latestFinalChapter(db, projectId);
   }
 
   private async assertInsertable(projectId: bigint, afterChapter: number, db: DbExecutor = this.db): Promise<void> {

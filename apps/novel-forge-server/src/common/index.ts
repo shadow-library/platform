@@ -10,6 +10,7 @@ export * from './chapter-rows';
 export * from './chapter-shift';
 export * from './content-hash';
 export * from './data-transformers';
+export * from './depicted-chapter';
 export * from './draft-fields';
 export * from './draft-staleness';
 export * from './draft-write-guard';

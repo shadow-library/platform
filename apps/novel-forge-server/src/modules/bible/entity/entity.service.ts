@@ -4,6 +4,7 @@ import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { resolveDepiction } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
@@ -127,13 +128,14 @@ export class EntityService {
     return this.present(result);
   }
 
-  async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<PresentedEntity> {
+  async setImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, depictsChapter?: number): Promise<PresentedEntity> {
+    const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
     const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
-    return this.setImageRef(projectId, entityKey, ref);
+    return this.setImageRef(projectId, entityKey, ref, chapter);
   }
 
   /** Points the portrait at an object already in storage — the path the illustration subsystem takes, since it saved the bytes itself. */
-  async setImageRef(projectId: bigint, entityKey: string, ref: string): Promise<PresentedEntity> {
+  async setImageRef(projectId: bigint, entityKey: string, ref: string, depictsChapter: number): Promise<PresentedEntity> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
@@ -141,7 +143,7 @@ export class EntityService {
     // (it may still back another row); replacing the portrait only repoints this entity's ref.
     const [updated] = await this.db
       .update(schema.entities)
-      .set({ imagePath: ref, updatedAt: new Date() })
+      .set({ imagePath: ref, imageDepictsChapter: depictsChapter, updatedAt: new Date() })
       .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
       .returning();
 
@@ -155,7 +157,7 @@ export class EntityService {
 
     const [updated] = await this.db
       .update(schema.entities)
-      .set({ imagePath: null, updatedAt: new Date() })
+      .set({ imagePath: null, imageDepictsChapter: null, updatedAt: new Date() })
       .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
       .returning();
 
@@ -163,20 +165,53 @@ export class EntityService {
     return this.present(updated);
   }
 
-  async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<PresentedEntityWithImages> {
+  async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string, depictsChapter?: number): Promise<PresentedEntityWithImages> {
+    const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
     const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
-    return this.addImageRef(projectId, entityKey, ref, caption);
+    return this.addImageRef(projectId, entityKey, ref, chapter, caption);
   }
 
   /** Appends a gallery row for an object already in storage — the path the illustration subsystem takes. */
-  async addImageRef(projectId: bigint, entityKey: string, ref: string, caption?: string): Promise<PresentedEntityWithImages> {
+  async addImageRef(projectId: bigint, entityKey: string, ref: string, depictsChapter: number, caption?: string): Promise<PresentedEntityWithImages> {
     const entity = await this.get(projectId, entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
 
     const nextOrder = entity.images.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
 
-    await this.db.insert(schema.entityImages).values({ entityId: entity.id, projectId, imagePath: ref, caption: caption ?? null, sortOrder: nextOrder });
+    await this.db.insert(schema.entityImages).values({ entityId: entity.id, projectId, imagePath: ref, caption: caption ?? null, sortOrder: nextOrder, depictsChapter });
 
+    return this.getOrThrow(projectId, entityKey);
+  }
+
+  /** Dates or re-dates the portrait; readers see it from that chapter on. */
+  async datePortrait(projectId: bigint, entityKey: string, depictsChapter: number): Promise<PresentedEntity> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw AppErrorCode.ENT_001.create();
+    if (!entity.imagePath) throw AppErrorCode.ENT_002.create();
+    const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
+
+    const [updated] = await this.db
+      .update(schema.entities)
+      .set({ imageDepictsChapter: chapter, updatedAt: new Date() })
+      .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
+      .returning();
+    if (!updated) throw AppErrorCode.ENT_001.create();
+    this.logger.info('portrait dated', { projectId, entityKey, depictsChapter: chapter });
+    return this.present(updated);
+  }
+
+  /** Dates or re-dates one gallery image; readers see it, with its caption, from that chapter on. */
+  async dateImage(projectId: bigint, entityKey: string, imageId: bigint, depictsChapter: number): Promise<PresentedEntityWithImages> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw AppErrorCode.ENT_001.create();
+    if (!entity.images.some(image => image.id === imageId)) throw AppErrorCode.ENT_002.create();
+    const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
+
+    await this.db
+      .update(schema.entityImages)
+      .set({ depictsChapter: chapter })
+      .where(and(eq(schema.entityImages.id, imageId), eq(schema.entityImages.projectId, projectId)));
+    this.logger.info('entity image dated', { projectId, entityKey, imageId, depictsChapter: chapter });
     return this.getOrThrow(projectId, entityKey);
   }
 

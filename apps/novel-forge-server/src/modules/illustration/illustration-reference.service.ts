@@ -4,10 +4,12 @@ import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageErrorCode, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { isDepictedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Illustration, type PrimaryDatabase, schema } from '@server/database';
 
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
+import { type WriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 
 export type ReferenceRequest = Illustration.AttachedReference;
 
@@ -27,9 +29,14 @@ export interface ResolveReferencesInput {
   editSourceRef?: string;
   /** `metadata` validates and ranks from storage heads alone and leaves `dataUrls` empty. Defaults to `bytes`. */
   load?: ReferenceLoadMode;
+  /**
+   * The policy of the chapter an entity is drawn as of: no reference may show a later point (attached ones are refused, carried and auto
+   * ones dropped) and every label and note passes its scrub.
+   */
+  depiction?: Pick<WriterDisclosurePolicy, 'chapter' | 'scrub'>;
 }
 
-export type ReferenceWarningCode = 'capacity-trimmed' | 'merged-with-edit-source' | 'missing-file' | 'too-large' | 'unsupported-format';
+export type ReferenceWarningCode = 'capacity-trimmed' | 'later-chapter' | 'merged-with-edit-source' | 'missing-file' | 'too-large' | 'unsupported-format';
 
 export interface ReferenceWarning {
   code: ReferenceWarningCode;
@@ -105,6 +112,8 @@ interface SourceMatch {
   ref: string;
   label: string;
   name?: string;
+  /** The chapter the image shows; null for a row written before images were dated, or a cover. */
+  depicts?: number | null;
 }
 
 // Raw bytes, before base64's ~4/3 inflation: the request cap keeps the JSON body near 11 MiB, and one reference may
@@ -156,7 +165,7 @@ export class IllustrationReferenceService {
 
     const loaded = input.load === 'metadata' ? { slots, dataUrls: [] } : await this.read(slots, warnings);
     const resolved: ResolvedReferences = {
-      references: loaded.slots.map(slot => slot.reference),
+      references: loaded.slots.map(slot => (input.depiction ? scrubReference(slot.reference, input.depiction) : slot.reference)),
       dataUrls: loaded.dataUrls,
       warnings,
       capacity,
@@ -248,7 +257,7 @@ export class IllustrationReferenceService {
 
   private async attachedReferences(input: ResolveReferencesInput, warnings: ReferenceWarning[]): Promise<Illustration.Reference[]> {
     const accepted: Illustration.Reference[] = [];
-    const resolved = await Promise.all(input.attached.map(request => this.resolveAttached(input.projectId, request)));
+    const resolved = await Promise.all(input.attached.map(request => this.resolveAttached(input, request)));
     for (const reference of resolved) {
       if (reference.ref === input.editSourceRef) warnings.push(mergedWarning(reference));
       else if (!accepted.some(entry => entry.ref === reference.ref)) accepted.push(reference);
@@ -276,7 +285,9 @@ export class IllustrationReferenceService {
         if (AppError.is(error, AppErrorCode.ILL_009)) return undefined;
         throw error;
       });
-      if (match) carried.push(toAttached(request, match));
+      if (match && !isDepictedBy(match.depicts, input.depiction?.chapter ?? Number.POSITIVE_INFINITY)) {
+        warnings.push({ code: 'later-chapter', ...sourceOf(request), reason: `the attached image depicts chapter ${match.depicts}, after the chapter this image is drawn as of` });
+      } else if (match) carried.push(toAttached(request, match));
       else warnings.push({ code: 'missing-file', ...sourceOf(request), reason: 'the attached image no longer exists in this project' });
     }
     return carried;
@@ -339,10 +350,12 @@ export class IllustrationReferenceService {
     return { slots: kept, dataUrls };
   }
 
-  private async resolveAttached(projectId: bigint, request: ReferenceRequest): Promise<Illustration.Reference> {
+  private async resolveAttached(input: ResolveReferencesInput, request: ReferenceRequest): Promise<Illustration.Reference> {
     if (isEditSourceRole(request)) throw AppErrorCode.ILL_015.create({ source: request.source });
-    const match = await this.lookupSource(projectId, request);
+    const match = await this.lookupSource(input.projectId, request);
     if (!match) throw AppErrorCode.ILL_010.create({ source: request.source });
+    const chapter = input.depiction?.chapter;
+    if (chapter !== undefined && !isDepictedBy(match.depicts, chapter)) throw AppErrorCode.ILL_018.create({ source: request.source, depicts: match.depicts, chapter });
     return toAttached(request, match);
   }
 
@@ -358,19 +371,19 @@ export class IllustrationReferenceService {
         if (!sourceId?.trim()) throw AppErrorCode.ILL_009.create({ source });
         const entity = await this.db.query.entities.findFirst({
           where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, sourceId)),
-          columns: { imagePath: true, name: true },
+          columns: { imagePath: true, name: true, imageDepictsChapter: true },
         });
-        return entity?.imagePath ? { ref: entity.imagePath, label: portraitLabel(entity.name), name: entity.name } : undefined;
+        return entity?.imagePath ? { ref: entity.imagePath, label: portraitLabel(entity.name), name: entity.name, depicts: entity.imageDepictsChapter } : undefined;
       }
       case 'gallery': {
         const id = parseRowId(source, sourceId);
         const { entityImages, entities } = schema;
         const [image] = await this.db
-          .select({ imagePath: entityImages.imagePath, caption: entityImages.caption, name: entities.name })
+          .select({ imagePath: entityImages.imagePath, caption: entityImages.caption, name: entities.name, depicts: entityImages.depictsChapter })
           .from(entityImages)
           .innerJoin(entities, eq(entities.id, entityImages.entityId))
           .where(and(eq(entityImages.id, id), eq(entityImages.projectId, projectId)));
-        return image ? { ref: image.imagePath, label: withCaption(`gallery image of ${image.name}`, image.caption) } : undefined;
+        return image ? { ref: image.imagePath, label: withCaption(`gallery image of ${image.name}`, image.caption), depicts: image.depicts } : undefined;
       }
       case 'chapter-image': {
         const id = parseRowId(source, sourceId);
@@ -378,18 +391,28 @@ export class IllustrationReferenceService {
           where: and(eq(schema.chapterImages.id, id), eq(schema.chapterImages.projectId, projectId)),
           columns: { imagePath: true, chapter: true, caption: true },
         });
-        return image ? { ref: image.imagePath, label: withCaption(`chapter ${image.chapter} scene image`, image.caption) } : undefined;
+        return image ? { ref: image.imagePath, label: withCaption(`chapter ${image.chapter} scene image`, image.caption), depicts: image.chapter } : undefined;
       }
       case 'candidate': {
         const id = parseRowId(source, sourceId);
         const { illustrations } = schema;
         const [illustration] = await this.db
-          .select({ selectedRef: illustrations.selectedRef, subjectType: illustrations.subjectType, subjectKey: illustrations.subjectKey, name: schema.entities.name })
+          .select({
+            selectedRef: illustrations.selectedRef,
+            subjectType: illustrations.subjectType,
+            subjectKey: illustrations.subjectKey,
+            depictsChapter: illustrations.depictsChapter,
+            name: schema.entities.name,
+          })
           .from(illustrations)
           .leftJoin(schema.entities, subjectEntityJoin())
           .where(and(eq(illustrations.id, id), eq(illustrations.projectId, projectId)));
         return illustration?.selectedRef
-          ? { ref: illustration.selectedRef, label: candidateLabel(illustration.subjectType, illustration.subjectKey, illustration.name) }
+          ? {
+              ref: illustration.selectedRef,
+              label: candidateLabel(illustration.subjectType, illustration.subjectKey, illustration.name),
+              depicts: illustration.subjectType === 'chapter' ? Number(illustration.subjectKey) : illustration.depictsChapter,
+            }
           : undefined;
       }
     }
@@ -397,17 +420,18 @@ export class IllustrationReferenceService {
 
   private async autoReferences(input: ResolveReferencesInput): Promise<Illustration.Reference[]> {
     if (!input.subjectKey) return [];
-    if (input.subjectType === 'entity') return this.entityPortrait(input.projectId, input.subjectKey);
+    if (input.subjectType === 'entity') return this.entityPortrait(input.projectId, input.subjectKey, input.depiction?.chapter);
     if (input.subjectType === 'chapter' && /^\d+$/.test(input.subjectKey)) return this.chapterCast(input.projectId, Number(input.subjectKey));
     return [];
   }
 
-  private async entityPortrait(projectId: bigint, entityKey: string): Promise<Illustration.Reference[]> {
+  private async entityPortrait(projectId: bigint, entityKey: string, depictsChapter?: number): Promise<Illustration.Reference[]> {
     const entity = await this.db.query.entities.findFirst({
       where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
-      columns: { imagePath: true, name: true },
+      columns: { imagePath: true, name: true, imageDepictsChapter: true },
     });
     if (!entity?.imagePath) return [];
+    if (depictsChapter !== undefined && !isDepictedBy(entity.imageDepictsChapter, depictsChapter)) return [];
     return [
       {
         source: 'portrait',
@@ -425,22 +449,29 @@ export class IllustrationReferenceService {
   private async chapterCast(projectId: bigint, chapter: number): Promise<Illustration.Reference[]> {
     const { entities, entityAppearances } = schema;
     const cast = await this.db
-      .select({ entityKey: entities.entityKey, name: entities.name, imagePath: entities.imagePath })
+      .select({
+        entityKey: entities.entityKey,
+        name: entities.name,
+        imagePath: entities.imagePath,
+        imageDepictsChapter: entities.imageDepictsChapter,
+      })
       .from(entityAppearances)
       .innerJoin(entities, and(eq(entities.id, entityAppearances.entityId), eq(entities.projectId, projectId)))
       .where(and(eq(entityAppearances.projectId, projectId), eq(entityAppearances.chapter, chapter), eq(entities.type, 'character'), isNotNull(entities.imagePath)))
       .orderBy(sql`CASE ${entities.significance} WHEN 'major' THEN 0 WHEN 'minor' THEN 1 ELSE 2 END`, asc(entities.id));
 
-    return cast.map(member => ({
-      source: 'portrait',
-      sourceId: member.entityKey,
-      ref: member.imagePath as string,
-      role: 'likeness',
-      origin: 'auto',
-      reason: CHAPTER_CAST_REASON,
-      label: portraitLabel(member.name),
-      name: member.name,
-    }));
+    return cast
+      .filter(member => isDepictedBy(member.imageDepictsChapter, chapter))
+      .map(member => ({
+        source: 'portrait',
+        sourceId: member.entityKey,
+        ref: member.imagePath as string,
+        role: 'likeness',
+        origin: 'auto',
+        reason: CHAPTER_CAST_REASON,
+        label: portraitLabel(member.name),
+        name: member.name,
+      }));
   }
 
   // Heads only: every size and format decision is made before a single object is transferred.
@@ -513,6 +544,17 @@ function subjectEntityJoin(): SQL | undefined {
 
 function withCaption(label: string, caption: string | null): string {
   return caption ? `${label}, captioned "${caption}"` : label;
+}
+
+function scrubReference(reference: Illustration.Reference, depiction: Pick<WriterDisclosurePolicy, 'scrub'>): Illustration.Reference {
+  const scrub = (text: string | undefined): string | undefined => (text === undefined ? undefined : depiction.scrub(text, 'reference'));
+  const { label, note, name } = reference;
+  return {
+    ...reference,
+    ...(label === undefined ? {} : { label: scrub(label) }),
+    ...(note === undefined ? {} : { note: scrub(note) }),
+    ...(name === undefined ? {} : { name: scrub(name) }),
+  };
 }
 
 function toAttached(request: ReferenceRequest, match: SourceMatch): Illustration.Reference {

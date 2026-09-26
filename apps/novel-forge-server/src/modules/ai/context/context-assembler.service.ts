@@ -21,7 +21,7 @@ import {
   renderReaderKnows,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
-import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
+import { loadWriterDisclosurePolicy, WriterDisclosurePolicy, type WriterField } from '../../bible/fact/writer-disclosure-policy';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
@@ -30,6 +30,7 @@ import { hardLineError, screenTexts, sectionScreens } from '../hard-line';
 import { standardReadableState } from '../isolation-read-policy';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
+import { renderEventsAsOf } from './art-context';
 import { isWriterExcludedBibleDoc } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
@@ -70,6 +71,11 @@ import { assertWriterContextFits, renderCompletedVolumes, WRITER_OPTIONAL_PRIORI
 export interface PackPolicyOptions {
   /** The policy of the roles that will read this pack, resolved ahead of assembly so the writer class is already fixed when sections are chosen. */
   policy?: ForgeCallPolicy;
+}
+
+export interface IllustrationPackOptions extends PackPolicyOptions {
+  /** The policy of the chapter an entity subject is drawn as of; ignored for any other subject. */
+  depiction?: WriterDisclosurePolicy;
 }
 
 export interface PackOptions extends PackPolicyOptions {
@@ -176,6 +182,40 @@ function makeSectionTail(key: string, content: string, maxTokens: number, tier: 
   const rendered = renderSection(key, text);
   const tokens = countTokens(rendered);
   return { key, tier, segment: 'volatile', tokens, truncated, sourceRefs, rendered };
+}
+
+interface SubjectRecord {
+  name: string;
+  status: string | null;
+  appearance: string | null;
+  body: string | null;
+  notes: string | null;
+  motivation: string | null;
+}
+
+function presentSubjectCard(entity: SubjectRecord, heading: string, aliases: string): string[] {
+  return [
+    heading,
+    aliases,
+    entity.status ? `Status: ${entity.status}` : '',
+    entity.appearance ? `Canonical appearance: ${entity.appearance}` : 'Canonical appearance: none recorded — derive one.',
+    entity.body ?? '',
+    entity.notes ?? '',
+    entity.motivation ? `Motivation: ${entity.motivation}` : '',
+  ];
+}
+
+// The entity row is its present-day record, so a draw at an earlier chapter reads it as a baseline the timeline corrects; the author's
+// working notes and the present-day status are left out, since neither is a description of the entity at that chapter.
+function datedSubjectCard(entity: SubjectRecord, heading: string, aliases: string, chapter: number): string[] {
+  return [
+    heading,
+    `Draw ${entity.name} as of chapter ${chapter}. The current record below may describe later chapters; where the changes up to chapter ${chapter} differ from it, they win.`,
+    aliases,
+    entity.appearance ? `Current record (may describe later chapters) — appearance: ${entity.appearance}` : `Appearance: none recorded — derive one as of chapter ${chapter}.`,
+    entity.body ? `Current record (may describe later chapters) — profile: ${entity.body}` : '',
+    entity.motivation ? `Current record (may describe later chapters) — motivation: ${entity.motivation}` : '',
+  ];
 }
 
 function asStable(section: ContextSection): ContextSection {
@@ -1331,14 +1371,17 @@ export class ContextAssembler {
    * Pack for composing one image prompt. The art-style bible and the project premise are stable (they
    * bind every illustration in the project); the subject card and the canon that describes how the
    * subject looks are volatile. `subjectKey` is the entity key, the chapter number as text, or null
-   * for the project cover.
+   * for the project cover. An entity drawn as of a chapter reads only what that chapter's writer may: every section passes its
+   * disclosure scrub, its changes stop at the chapter, and its present-day status is left out.
    */
   async forIllustration(
     projectId: bigint,
     subjectType: schema.Illustration.SubjectType,
     subjectKey: string | null,
-    opts?: PackPolicyOptions,
+    opts?: IllustrationPackOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
+    const disclosure = subjectType === 'entity' ? opts?.depiction : undefined;
+    const scrub = (text: string, field: WriterField): string => (disclosure ? disclosure.scrub(text, field) : text);
     const [project, artStyle] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.bibleDocuments.findFirst({
@@ -1347,45 +1390,53 @@ export class ContextAssembler {
     ]);
 
     const sections: ContextSection[] = [];
-    if (artStyle?.body) sections.push(asStable(makeSection('art_style', artStyle.body, 'canonical', [`doc:${ART_STYLE_DOC.section}/${ART_STYLE_DOC.slug}`])));
-    if (project)
-      sections.push(
-        asStable(makeSection('premise', [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n'), 'canonical', ['premise'])),
-      );
+    if (artStyle?.body) sections.push(asStable(makeSection('art_style', scrub(artStyle.body, 'style'), 'canonical', [`doc:${ART_STYLE_DOC.section}/${ART_STYLE_DOC.slug}`])));
+    if (project) {
+      const premise = [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n');
+      sections.push(asStable(makeSection('premise', scrub(premise, 'summary'), 'canonical', ['premise'])));
+    }
 
-    if (subjectType === 'entity' && subjectKey) sections.push(...(await this.entitySubjectSections(projectId, subjectKey)));
+    if (subjectType === 'entity' && subjectKey) sections.push(...(await this.entitySubjectSections(projectId, subjectKey, disclosure)));
     if (subjectType === 'chapter' && subjectKey) sections.push(...(await this.chapterSubjectSections(projectId, Number(subjectKey))));
 
-    return this.finalize(projectId, 'illustration', subjectType === 'chapter' && subjectKey ? Number(subjectKey) : null, sections, [], ILLUSTRATION_BUDGET, opts);
+    const chapter = subjectType === 'chapter' && subjectKey ? Number(subjectKey) : (disclosure?.chapter ?? null);
+    return this.finalize(projectId, 'illustration', chapter, sections, [], ILLUSTRATION_BUDGET, { policy: opts?.policy, disclosure });
   }
 
-  private async entitySubjectSections(projectId: bigint, entityKey: string): Promise<ContextSection[]> {
+  private async entitySubjectSections(projectId: bigint, entityKey: string, disclosure?: WriterDisclosurePolicy): Promise<ContextSection[]> {
     const entity = await this.db.query.entities.findFirst({
       where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
       with: { aliases: true },
     });
     if (!entity) return [];
 
-    const card = [
-      `${entity.name} (${entity.type}${entity.significance ? `, ${entity.significance}` : ''})`,
-      entity.aliases.length > 0 ? `Also known as: ${entity.aliases.map(a => a.alias).join(', ')}` : '',
-      entity.status ? `Status: ${entity.status}` : '',
-      entity.appearance ? `Canonical appearance: ${entity.appearance}` : 'Canonical appearance: none recorded — derive one.',
-      entity.body ?? '',
-      entity.notes ?? '',
-      entity.motivation ? `Motivation: ${entity.motivation}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const scrub = (text: string, field: WriterField): string => (disclosure ? disclosure.scrub(text, field) : text);
+    const heading = `${entity.name} (${entity.type}${entity.significance ? `, ${entity.significance}` : ''})`;
+    const aliases = entity.aliases.length > 0 ? `Also known as: ${entity.aliases.map(a => a.alias).join(', ')}` : '';
+    const card = (disclosure ? datedSubjectCard(entity, heading, aliases, disclosure.chapter) : presentSubjectCard(entity, heading, aliases)).filter(Boolean).join('\n');
 
-    const sections = [makeSection('subject_card', card, 'canonical', [`entity:${entityKey}`])];
+    const sections = [makeSection('subject_card', scrub(card, 'entity'), 'canonical', [`entity:${entityKey}`])];
+
+    if (disclosure) {
+      const events = await this.db.query.characterEvents.findMany({
+        where: and(
+          eq(schema.characterEvents.projectId, projectId),
+          eq(schema.characterEvents.entityId, entity.id),
+          eq(schema.characterEvents.status, 'committed'),
+          lte(schema.characterEvents.chapter, disclosure.chapter),
+        ),
+        orderBy: [schema.characterEvents.chapter, schema.characterEvents.createdAt],
+      });
+      const changes = renderEventsAsOf(events, disclosure.chapter, disclosure);
+      if (changes) sections.push(makeSection('subject_changes', changes, 'canonical', [`entity:${entityKey}`]));
+    }
 
     const facts = await this.db.query.worldFacts.findMany({
       where: eq(schema.worldFacts.projectId, projectId),
       orderBy: [schema.worldFacts.category, schema.worldFacts.key],
       limit: ILLUSTRATION_WORLD_FACTS_MAX,
     });
-    if (facts.length > 0) sections.push(makeSection('world_facts', facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'canonical', []));
+    if (facts.length > 0) sections.push(makeSection('world_facts', scrub(facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'reference'), 'canonical', []));
 
     return sections;
   }

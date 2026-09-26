@@ -81,6 +81,14 @@ export class StartIllustrationBody {
 
   @Field({ optional: true, description: "Whether the auto-rules (the entity's portrait, a chapter's cast portraits) may add references. Defaults to true." })
   autoReferences?: boolean;
+
+  @Field(() => Integer, {
+    optional: true,
+    minimum: 0,
+    description:
+      "Entity subjects only (else ILL_017): draw the entity as of this chapter (0 = before the story), from canon up to it with the chapter writer's secrets withheld. Defaults to the latest final chapter; a later one is refused with ILL_016. The saved image reaches readers from this chapter on.",
+  })
+  depictsChapter?: number;
 }
 
 @Schema()
@@ -296,6 +304,9 @@ export class IllustrationResponse {
 
   @Field({ optional: true, nullable: true })
   selectedUrl?: string | null;
+
+  @Field(() => Integer, { nullable: true, description: 'The chapter an entity illustration is drawn as of; null for other subjects and for sessions from before dating.' })
+  depictsChapter: number | null;
 
   @Field({ optional: true, description: 'Appearance the composer derived because the entity had none; PATCH it onto the entity to make it canon.' })
   suggestedAppearance?: string;
