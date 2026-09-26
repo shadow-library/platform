@@ -218,6 +218,21 @@
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
 - `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft (regenerating one is
   the author's own request). Action ops run after the content transaction commits and stop at first failure.
+- **Quote rule**: a chat op applies within the turn only when an auto-mode session (the default for a new chat) sent it, its kind is allowlisted
+  (Story Bible page, entity, fact, volume title or goal, an empty story field), no always-card rule holds (removals and cleared fields, plans, prose,
+  actions, planner-only and writer-excluded pages, replacing a filled story field, a secret's truth once it exists, a secret's gating — writer note,
+  clues, unlock, reveal chapter — at any time, a volume's order, state or notes), and its `quote` supports it: at least three content words
+  (character bigrams in scripts written without spaces) found verbatim, whitespace-, case- and typography-normalised, in the author's message of
+  that turn; its sentence stated rather than asked, hedged, negated before the quote or turned down after it; no word the op writes coming only
+  from a sentence the author asked or hedged; no field dropping more than max(4, 25%) of the content words it held (a truncation); and the whole op
+  adding at most max(4, 25%) content words that are neither in the author's stated sentences nor already in the record. It must also name no record
+  only a card op creates, the author must not be "just discussing", and no warning may hold the turn. A model-declared quote or origin never
+  authorises a write on its own. The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the applied
+  block shows each written value beside its quote (T18) and undo stays one click away. The applied ops form one revertible proposal
+  (`chat_messages.applied_proposal_id`, linked the moment it commits), applied before the cards, which form a second, pending one
+  (`proposal_id`); a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait. Undo lists what relies on
+  the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed
+  fact and pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, state lives in chat tables.
 - Plan edits stay plan edits: a chat turn MUST NEVER rewrite a chapter's prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose
   for that turn; otherwise it changes the brief and the author regenerates from it. The toggle is the only permission — wording may suggest turning it on, never grant it. A

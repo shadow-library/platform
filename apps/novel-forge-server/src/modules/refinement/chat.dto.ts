@@ -148,8 +148,15 @@ export class ChatMessageResponse {
   @Field()
   content: string;
 
-  @Field(() => String, { optional: true, nullable: true })
+  @Field(() => String, { optional: true, nullable: true, description: "The turn's suggestion cards: a pending proposal the author accepts or declines op by op." })
   proposalId?: bigint | null;
+
+  @Field(() => String, {
+    optional: true,
+    nullable: true,
+    description: "The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal.",
+  })
+  appliedProposalId?: bigint | null;
 
   @Field({ optional: true, nullable: true })
   runId?: string | null;
@@ -275,6 +282,12 @@ export class ChatTurnBody {
   })
   proseEdits?: boolean;
 
+  @Field({
+    optional: true,
+    description: 'Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default.',
+  })
+  justDiscussing?: boolean;
+
   @Field(() => ContentMode, {
     optional: true,
     description: "Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode.",
@@ -308,13 +321,16 @@ export class ChatTurnResponse {
   @Field(() => ChatMessageResponse)
   assistantMessage: ChatMessageResponse;
 
-  @Field(() => ProposalResponse, { optional: true })
+  @Field(() => ProposalResponse, { optional: true, description: "The turn's suggestion cards, pending the author's per-op accept or decline." })
   proposal?: ProposalResponse;
 
-  @Field(() => TurnAppliedResult, { optional: true, description: 'present when the session runs in auto mode and this turn applied its change-set' })
+  @Field(() => ProposalResponse, { optional: true, description: "The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable." })
+  appliedProposal?: ProposalResponse;
+
+  @Field(() => TurnAppliedResult, { optional: true, description: 'present when this turn applied the changes taken from the author’s own words' })
   applied?: TurnAppliedResult;
 
-  @Field({ optional: true, description: 'why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure)' })
+  @Field({ optional: true, description: 'why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write)' })
   applyNote?: string;
 
   @Field()

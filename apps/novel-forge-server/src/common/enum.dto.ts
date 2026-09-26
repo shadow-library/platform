@@ -46,6 +46,7 @@ export const PublicationVisibility = EnumType.create('PublicationVisibility', sc
 export const PublicationGrantState = EnumType.create('PublicationGrantState', schema.publicationGrantState.enumValues);
 export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);
 export const ChatTurnOutcome = EnumType.create('ChatTurnOutcome', ['failed', 'cancelled']);
+export const UndoDependentKind = EnumType.create('UndoDependentKind', ['plan', 'draft', 'knowledge', 'suggestion']);
 export const IllustrationSubjectType = EnumType.create('IllustrationSubjectType', schema.illustrationSubjectType.enumValues);
 export const IllustrationStatus = EnumType.create('IllustrationStatus', schema.illustrationStatus.enumValues);
 export const IllustrationSaveTarget = EnumType.create('IllustrationSaveTarget', ['portrait', 'gallery', 'chapter', 'cover']);

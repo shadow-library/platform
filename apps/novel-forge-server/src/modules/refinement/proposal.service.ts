@@ -8,9 +8,10 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { loadArtifactStates } from './artifact-state';
-import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
+import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
+import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';
 
 export interface ChangeItem {
   id: bigint;
@@ -252,6 +253,15 @@ export class ProposalService {
       .returning();
     if (!updated) throw AppErrorCode.RFN_001.create();
     return updated;
+  }
+
+  /** What reverting an applied proposal would leave relying on records it no longer backs — shown before the author undoes it. */
+  async undoImpact(projectId: bigint, proposalId: bigint): Promise<UndoImpact> {
+    const proposal = await this.get(projectId, proposalId);
+    const inverseOps = proposal.inverseOps as ContentOp[] | null;
+    if (proposal.status !== 'applied' || !inverseOps?.length) throw AppErrorCode.RFN_007.create();
+    const refs = Object.keys((proposal.postState ?? {}) as Record<string, unknown>);
+    return undoImpact(undoneChange(refs, inverseOps), await loadImpactRows(this.db, projectId, proposalId, refs));
   }
 
   async discard(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {

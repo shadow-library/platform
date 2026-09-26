@@ -14,7 +14,7 @@ import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from './scope-playbooks';
 import { type PromptModule } from './types';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. A changeSet is a staged proposal: nothing is applied until the author accepts it, so propose boldly. Give the complete new value of every field you DO change (a whole field, never a fragment or diff of one), but when you are UPDATING a record that already exists, include ONLY the fields you are changing plus the op's required keys — every field you omit keeps its current stored value, so never re-emit unchanged fields (e.g. to change one character's motivation, changeSet [{"op":"entity.upsert","entityKey":"mira","type":"character","motivation":"<the new motivation>"}] and leave name, notes, body and the rest out). The one exception is bible_document.upsert — a document is a single whole artifact, so always send its complete frontmatter and body, never a subset. When the turn is exploration or debate, return reply only and no changeSet. Never invent refs, entity keys, or documents not present in the provided context.\n\nIf the playbook lists lookup tools and the provided context is NOT enough to answer or to draft a correct changeSet, request lookups INSTEAD of guessing: return {"reply": <one short sentence saying what you are checking>, "lookups": [{"tool": <listed tool name>, "args": {...}}]} and nothing else — never lookups and a changeSet together. The results come back as the next message; then answer normally. The lookup budget is small, so batch what you need.\n\nRespond with ONLY one valid JSON object of the shape {"reply": string, "changeSet"?: [ops], "lookups"?: [{tool, args}]} — all your prose goes INSIDE the reply string; nothing outside the JSON, no markdown fences.`;
+const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. An op that records what the author said in this message carries their exact words as its quote, and the server decides whether it applies; every other op is a suggestion card that nothing applies until the author accepts it, so propose your own ideas boldly — as ideas, without a quote. A what-if worth keeping is a suggestion card too. Give the complete new value of every field you DO change (a whole field, never a fragment or diff of one), but when you are UPDATING a record that already exists, include ONLY the fields you are changing plus the op's required keys — every field you omit keeps its current stored value, so never re-emit unchanged fields (e.g. to change one character's motivation, changeSet [{"op":"entity.upsert","entityKey":"mira","type":"character","motivation":"<the new motivation>"}] and leave name, notes, body and the rest out). The one exception is bible_document.upsert — a document is a single whole artifact, so always send its complete frontmatter and body, never a subset. Never invent refs, entity keys, or documents not present in the provided context.\n\nIf the playbook lists lookup tools and the provided context is NOT enough to answer or to draft a correct changeSet, request lookups INSTEAD of guessing: return {"reply": <one short sentence saying what you are checking>, "lookups": [{"tool": <listed tool name>, "args": {...}}]} and nothing else — never lookups and a changeSet together. The results come back as the next message; then answer normally. The lookup budget is small, so batch what you need.\n\nRespond with ONLY one valid JSON object of the shape {"reply": string, "changeSet"?: [ops], "lookups"?: [{tool, args}]} — all your prose goes INSIDE the reply string; nothing outside the JSON, no markdown fences.`;
 
 // The message layout is the caching contract: static system, then the stable scope
 // context, then history, with the volatile tail last — keep this ordering when editing.
@@ -46,7 +46,7 @@ export function chatPromptTokens(scopeInstructions: string): number {
 
 export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
-  version: '2.6.0',
+  version: '2.8.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },
@@ -59,12 +59,18 @@ export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
 export interface ChatTurnPermissions {
   /** Whether the author turned on Edit prose for this turn. */
   proseEdits: boolean;
+  /** Whether the author marked the turn as just discussing. */
+  justDiscussing?: boolean;
 }
 
+const JUST_DISCUSSING_RULE =
+  'Just discussing: ON — the author is thinking aloud, so nothing this turn applies. Any change you propose becomes a suggestion card for the author to accept or decline; leave quotes out.';
+
 export function renderTurnRules(permissions: ChatTurnPermissions): string {
-  return permissions.proseEdits
+  const prose = permissions.proseEdits
     ? 'Prose edits: ON — the author turned on Edit prose, so draft.update, draft.remove and action.revise_draft are available this turn.'
     : 'Prose edits: OFF — the author did not turn on Edit prose. draft.update, draft.remove and action.revise_draft will be rejected, along with approving, judging or finalizing that prose; keep a plan edit in the plan.';
+  return permissions.justDiscussing ? `${prose}\n${JUST_DISCUSSING_RULE}` : prose;
 }
 
 /**

@@ -9,13 +9,7 @@ export interface ActionExecutionResult {
   proposalId?: string;
 }
 
-export interface ActionExecutionContext {
-  // True when the action runs from an auto-mode turn — chain-producing executors then auto-apply the
-  // proposal they staged; manual applies leave it pending for review.
-  autoApplied: boolean;
-}
-
-export type ActionExecutor = (projectId: bigint, action: ActionOp, ctx: ActionExecutionContext) => Promise<ActionExecutionResult>;
+export type ActionExecutor = (projectId: bigint, action: ActionOp) => Promise<ActionExecutionResult>;
 
 /**
  * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)

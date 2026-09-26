@@ -171,13 +171,10 @@ describe('ProposalApplyService — action.generate_chapter', () => {
     expect(executors.get).not.toHaveBeenCalled();
   });
 
-  it('should decline it in an auto-applied turn and leave the proposal pending', async () => {
+  it('should refuse an automatic apply that carries it, since actions are always the author’s selection', async () => {
     const { service, executors } = await fakeProject([{ op: 'action.generate_chapter', chapter: 5 }]);
 
-    const result = await service.apply(7n, 300n, { autoApplied: true });
-
-    expect(result.proposal.status).toBe('pending');
-    expect(result.opResults).toEqual([{ index: 0, status: 'declined', note: expect.stringContaining('never applied automatically') }]);
+    await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('content ops only');
     expect(executors.get).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { autoApplies, chatTurnWarnings, PLANNER_ONLY_WARNING, readsPlannerOnlyPage } from '@modules/refinement/planner-only-guard';
+import { chatTurnWarnings, PLANNER_ONLY_WARNING, readsPlannerOnlyPage } from '@modules/refinement/planner-only-guard';
 
 describe('planner-only guard', () => {
   it('should notice a lookup that read the organised timeline or the open questions, and no other page', () => {
@@ -23,13 +23,5 @@ describe('planner-only guard', () => {
     expect(chatTurnWarnings(['echo'], true)).toEqual(['echo', PLANNER_ONLY_WARNING]);
     expect(chatTurnWarnings([PLANNER_ONLY_WARNING], true)).toEqual([PLANNER_ONLY_WARNING]);
     expect(chatTurnWarnings(['echo'], false)).toEqual(['echo']);
-  });
-
-  it('should hold an auto-mode proposal drawn from a planner-only page for review, and apply a clean one', () => {
-    expect(autoApplies('auto', { warnings: chatTurnWarnings([], true) })).toBe(false);
-    expect(autoApplies('auto', { warnings: [] })).toBe(true);
-    expect(autoApplies('auto', { warnings: null })).toBe(true);
-    expect(autoApplies('manual', { warnings: [] })).toBe(false);
-    expect(autoApplies('auto', null)).toBe(false);
   });
 });

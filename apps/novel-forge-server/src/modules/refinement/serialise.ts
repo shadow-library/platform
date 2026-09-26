@@ -13,8 +13,8 @@ import { type ProposalResponse } from './refinement.dto';
  * payload the DTO reduces to the derived `revertible` flag — in front of the client.
  *
  * Bigints are left as bigints: a field typed `@Field(() => String)` is coerced by the response
- * serialiser, except on the nullable path (a message's `proposalId`, a proposal's `messageId`), where a
- * raw bigint fails its `string | null` schema — so those two are coerced here instead.
+ * serialiser, except on the nullable path (a message's `proposalId` and `appliedProposalId`, a proposal's `messageId`), where a
+ * raw bigint fails its `string | null` schema — so those are coerced here instead.
  */
 
 interface ChatMessageRow {
@@ -24,6 +24,7 @@ interface ChatMessageRow {
   role: string;
   content: string;
   proposalId?: bigint | null;
+  appliedProposalId?: bigint | null;
   runId?: string | null;
   modelProvider?: string | null;
   modelId?: string | null;
@@ -40,6 +41,7 @@ export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
     role: message.role,
     content: message.content,
     proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint),
+    appliedProposalId: message.appliedProposalId == null ? null : (String(message.appliedProposalId) as unknown as bigint),
     runId: message.runId ?? null,
     modelProvider: message.modelProvider ?? null,
     modelId: message.modelId ?? null,
@@ -84,6 +86,7 @@ export function serialiseTurn(result: ChatTurnResult): ChatTurnResponse {
     userMessage: serialiseMessage(result.userMessage),
     assistantMessage: serialiseMessage(result.assistantMessage),
     proposal: result.proposal ? serialiseProposal(result.proposal) : undefined,
+    appliedProposal: result.appliedProposal ? serialiseProposal(result.appliedProposal) : undefined,
     applied: applied && {
       applied: applied.applied.map(({ artifactRef, newRevision }) => ({ artifactRef, newRevision })),
       staleMarked: applied.staleMarked,

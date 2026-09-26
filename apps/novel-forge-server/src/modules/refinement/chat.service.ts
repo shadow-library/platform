@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -26,16 +26,19 @@ import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
 import { requestedNegations } from './negation-echo';
-import { autoApplies, chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
-import { type ApplyResult, declinedOpNote, ProposalApplyService } from './proposal-apply.service';
+import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
+import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
+import { splitTurnChangeSet, stageTurnChangeSet, type TurnProposalPort, type TurnStaging } from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
   /** The author's explicit per-turn permission to rewrite chapter prose; without it a prose op is withheld. */
   proseEdits?: boolean;
+  /** Just discussing: nothing the turn proposes applies; every op becomes a card. */
+  justDiscussing?: boolean;
 }
 
 export interface CreateSessionInput {
@@ -84,7 +87,10 @@ export interface ChatTurnStatus {
 export interface ChatTurnResult {
   userMessage: Refinement.ChatMessage;
   assistantMessage: ChatMessageView;
+  /** The turn's suggestion cards, pending review. */
   proposal: Refinement.Proposal | null;
+  /** The ops the author's own words backed, applied in the turn. */
+  appliedProposal?: Refinement.Proposal | null;
   applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
   applyNote?: string;
   runId: string;
@@ -190,8 +196,6 @@ interface SessionListFilter {
 const MAX_LOOKUP_ROUNDS = 3;
 const CHAT_HUB_NODE = 'chat-hub';
 
-const AUTO_APPLY_HELD_NOTE = 'Not applied automatically: review the warnings on this proposal first.';
-
 function withheldProse(output: ChatRefineOutput, proseEdits: boolean): ChatRefineOutput {
   if (proseEdits || !output.changeSet?.length) return output;
   const { kept, withheld } = withoutProseEditOps(output.changeSet);
@@ -236,7 +240,7 @@ export class ChatService {
   async createSession(projectId: bigint, input: CreateSessionInput): Promise<Refinement.ChatSession> {
     const [session] = await this.db
       .insert(schema.chatSessions)
-      .values({ projectId, scopeType: 'project', scopeRef: null, title: null, mode: input.mode ?? 'manual' })
+      .values({ projectId, scopeType: 'project', scopeRef: null, title: null, mode: input.mode ?? 'auto' })
       .returning();
     if (!session) throw AppErrorCode.CHT_001.create();
     this.logger.info('chat session created', { projectId, sessionId: session.id, mode: session.mode });
@@ -459,8 +463,9 @@ export class ChatService {
     const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
     const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
+    const justDiscussing = options.justDiscussing === true;
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
-    const turnRules = renderTurnRules({ proseEdits });
+    const turnRules = renderTurnRules({ proseEdits, justDiscussing });
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE));
     const promptTokens = chatPromptTokens(scopeInstructions);
     const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
@@ -537,36 +542,13 @@ export class ChatService {
         }
       }
 
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, chatTurnWarnings(warnings, planner.read));
+      const turnWarnings = chatTurnWarnings(warnings, planner.read);
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, justDiscussing);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
-    this.logger.debug('chat turn complete', { projectId, sessionId, runId, hasProposal: !!result.proposal, proposalId: result.proposal?.id });
-
-    // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply), unless something on it asks for review first.
-    if (session.mode === 'auto' && result.proposal) {
-      if (!autoApplies(session.mode, result.proposal)) return { ...result, applyNote: AUTO_APPLY_HELD_NOTE, runId };
-      const settled = await this.autoApply(projectId, result.proposal);
-      return { ...result, ...settled, runId };
-    }
+    this.logger.debug('chat turn complete', { projectId, sessionId, runId, proposalId: result.proposal?.id, appliedProposalId: result.appliedProposal?.id });
     return { ...result, runId };
-  }
-
-  /** Applies an auto-mode turn's proposal immediately; failures downgrade to a pending proposal with a note, never a failed turn. */
-  private async autoApply(projectId: bigint, proposal: Refinement.Proposal): Promise<Pick<ChatTurnResult, 'proposal' | 'applied' | 'applyNote'>> {
-    try {
-      const applied = await this.proposalApplyService.apply(projectId, proposal.id, { autoApplied: true });
-      return {
-        proposal: applied.proposal,
-        applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults },
-        applyNote: declinedOpNote(applied.opResults),
-      };
-    } catch (err) {
-      const fresh = await this.proposalService.get(projectId, proposal.id);
-      const note = AppError.is(err) || err instanceof Error ? err.message : String(err);
-      this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
-      return { proposal: fresh, applyNote: note };
-    }
   }
 
   /** Names a session from its opening message alone. */
@@ -707,6 +689,7 @@ export class ChatService {
     runId: string,
     model: { provider: string; model: string },
     warnings: string[],
+    justDiscussing: boolean,
   ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const [assistantMessage] = await this.db
       .insert(schema.chatMessages)
@@ -725,26 +708,67 @@ export class ChatService {
       .catch(err => this.databaseService.translateError(err));
     if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
-    let proposal: Refinement.Proposal | null = null;
-    if (output.changeSet && output.changeSet.length > 0) {
-      proposal = await this.proposalService.create(projectId, {
-        sessionId: session.id,
-        messageId: assistantMessage.id,
-        scopeType: session.scopeType,
-        scopeRef: session.scopeRef,
-        kind: session.scopeType === 'project' ? 'hub' : 'chat',
-        summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
-        changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: HUB_ALLOWED_OPS,
-        runId,
-        warnings,
-      });
-      await this.db.update(schema.chatMessages).set({ proposalId: proposal.id }).where(eq(schema.chatMessages.id, assistantMessage.id));
-      assistantMessage.proposalId = proposal.id;
-    }
+    const staging = await this.stageChangeSet(projectId, session, assistantMessage, userMessage.content, output, runId, warnings, justDiscussing);
+    if (staging.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staging.cardProposal.id });
 
     await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
-    return { userMessage, assistantMessage, proposal };
+    return { userMessage, assistantMessage, proposal: staging.cardProposal, appliedProposal: staging.appliedProposal, applied: staging.applied, applyNote: staging.applyNote };
+  }
+
+  /** Splits the change-set by the quote rule and stages it as at most two proposals: the author's words applied, the rest as cards. */
+  private async stageChangeSet(
+    projectId: bigint,
+    session: Refinement.ChatSession,
+    message: Refinement.ChatMessage,
+    authorMessage: string,
+    output: ChatRefineOutput,
+    runId: string,
+    warnings: string[],
+    justDiscussing: boolean,
+  ): Promise<TurnStaging> {
+    const ops = (output.changeSet ?? []) as unknown as ChangeOp[];
+    if (ops.length === 0) return { appliedProposal: null, cardProposal: null };
+
+    const split = await splitTurnChangeSet(this.db, projectId, ops, { authorMessage, mode: session.mode, justDiscussing, warnings });
+    this.logger.debug('chat turn: write policy', { projectId, runId, dispositions: split.dispositions });
+
+    const port: TurnProposalPort = {
+      stage: (changeSet, stageWarnings, options) =>
+        this.proposalService
+          .create(projectId, {
+            sessionId: session.id,
+            messageId: message.id,
+            scopeType: session.scopeType,
+            scopeRef: session.scopeRef,
+            kind: session.scopeType === 'project' ? 'hub' : 'chat',
+            summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
+            changeSet,
+            allowedOps: HUB_ALLOWED_OPS,
+            entityMaterialization: options.entityMaterialization,
+            runId,
+            warnings: stageWarnings,
+          })
+          .catch((err: unknown) => {
+            this.logger.warn('chat turn: staging a proposal failed', { projectId, runId, err });
+            throw err;
+          }),
+      apply: proposalId => this.proposalApplyService.apply(projectId, proposalId, { autoApplied: true }),
+      linkApplied: proposal =>
+        this.linkMessage(message, { appliedProposalId: proposal.id }).catch((err: unknown) => {
+          this.logger.warn('chat turn: linking the applied proposal to its reply failed', { projectId, runId, proposalId: proposal.id, err });
+          throw err;
+        }),
+      discard: proposalId =>
+        this.proposalService.discard(projectId, proposalId).catch(err => this.logger.warn('chat turn: discarding an unapplied proposal failed', { projectId, proposalId, err })),
+    };
+    const staging = await stageTurnChangeSet(port, split, warnings);
+    if (staging.applyNote) this.logger.info('chat turn: author-worded ops not applied as written', { projectId, runId, note: staging.applyNote });
+    return staging;
+  }
+
+  private async linkMessage(message: Refinement.ChatMessage, link: Pick<Refinement.ChatMessage, 'proposalId'> | Pick<Refinement.ChatMessage, 'appliedProposalId'>): Promise<void> {
+    await this.db.update(schema.chatMessages).set(link).where(eq(schema.chatMessages.id, message.id));
+    Object.assign(message, link);
   }
 
   private async negationWarnings(projectId: bigint, output: ChatRefineOutput, exempt: ReadonlySet<string>): Promise<string[]> {

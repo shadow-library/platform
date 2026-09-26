@@ -220,8 +220,12 @@ export type ContentOp =
 export type ActionOp =
   GenerateChapterAction | AuditBibleAction | EnhancePremiseAction | JudgeDraftAction | ReviseDraftAction | ApproveDraftAction | ValidateAction | FinalizeAction;
 
-/** Rationale is metadata about the change, not part of it: it reaches the author beside the op and is stripped before any applier sees it, so `ContentOp` — the shape inverses are captured as — deliberately lacks it. */
-export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string };
+/**
+ * Rationale and quote are metadata about the change, not part of it: they reach the author beside the op and are stripped before any
+ * applier sees them, so `ContentOp` — the shape inverses are captured as — deliberately lacks them. `quote` is the author's own words
+ * the op rests on; only a quote the server finds in the author's message lets the op apply without review.
+ */
+export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string; quote?: string };
 export type OpType = ChangeOp['op'];
 export type ActionType = ActionOp['op'];
 
@@ -313,10 +317,20 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
 };
 
-// Rationale is metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
+// Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
+export const OP_METADATA_FIELDS = ['rationale', 'quote'] as const;
 const OP_SPECS = Object.fromEntries(
-  (Object.entries(DECLARED_OP_SPECS) as [OpType, OpSpec][]).map(([op, spec]): [OpType, OpSpec] => [op, { ...spec, optional: { ...spec.optional, rationale: 'string' } }]),
+  (Object.entries(DECLARED_OP_SPECS) as [OpType, OpSpec][]).map(([op, spec]): [OpType, OpSpec] => [
+    op,
+    { ...spec, optional: { ...spec.optional, rationale: 'string', quote: 'string' } },
+  ]),
 ) as Record<OpType, OpSpec>;
+
+/** The artifact fields an op may carry, metadata excluded. */
+export function declaredOpFields(op: OpType): string[] {
+  const spec = DECLARED_OP_SPECS[op];
+  return [...Object.keys(spec.required), ...Object.keys(spec.optional)];
+}
 
 const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
 export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
@@ -557,15 +571,25 @@ export function validatePluginChangeSet(value: unknown): string[] {
 const RATIONALE_NOTE =
   'rationale, on any op, is one short sentence saying why that change is being made. It is shown to the author beside the op when they review the proposal and is never written into the story itself.';
 
+const QUOTE_NOTE =
+  "quote, on any op, is the exact words from the author's message in this turn that the op records — copied character for character, never paraphrased, shortened with an ellipsis, or taken from an earlier message or your own reply. The server decides whether an op with a quote the author really wrote applies: it must only record what they said, stated rather than asked or hedged. Every other op becomes a suggestion card the author accepts or declines. Give a quote only when the op states what the author said, and leave it out of your own ideas.";
+
+export interface OpVocabularyOptions {
+  /** Whether the vocabulary offers `quote`: only the chat turn has an author message for the server to find it in. */
+  quotes?: boolean;
+}
+
 /**
  * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
  * malformed change-sets when the vocabulary is named but never shown.
  */
-export function renderOpVocabulary(ops: readonly OpType[]): string {
+export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabularyOptions = {}): string {
   const lines = ops.map(op => {
     const spec = OP_SPECS[op];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
-    const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
+    const optional = Object.entries(spec.optional)
+      .filter(([key]) => options.quotes || key !== 'quote')
+      .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}${spec.description ? ` — ${spec.description}` : ''}`;
   });
   const contractShape = ops.includes('brief.update')
@@ -577,7 +601,8 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   const factRules = ops.includes('fact.upsert')
     ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — an undated fact without an unlock stays hidden and no plan may reveal it. unlock, when present, is {"all": [<one of {"milestone": <key>} | {"volume": <key>} | {"chapter": <number>} | {"ending": true}>, ...]} — the fact may be revealed only once every term holds; allowedClues are observable effects the writer may show while the explanation stays hidden. Omit either to keep it; pass null to clear it.'
     : '';
-  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
+  const quoteNote = options.quotes ? `\n${QUOTE_NOTE}` : '';
+  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${quoteNote}${contractShape}${knowledgeShape}${factRules}`;
 }
 
 /** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them. */
@@ -590,7 +615,7 @@ export function renderActionVocabulary(actions: readonly ActionType[]): string {
     const stamped = SERVER_STAMPED_FIELDS[action] ?? [];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
     const optional = Object.entries(spec.optional)
-      .filter(([key]) => !stamped.includes(key))
+      .filter(([key]) => !stamped.includes(key) && key !== 'quote')
       .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${action}"${[...required, ...optional].map(f => `, ${f}`).join('')}} — ${ACTION_PURPOSES[action]}`;
   });

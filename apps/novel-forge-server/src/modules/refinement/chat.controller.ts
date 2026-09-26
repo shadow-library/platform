@@ -75,6 +75,7 @@ export class ChatController {
   async createTurn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
     const result = await this.chatService.turn(params.projectId, params.sessionId, body.content, undefined, {
       proseEdits: body.proseEdits ?? false,
+      justDiscussing: body.justDiscussing ?? false,
       contentMode: body.contentMode,
       costTier: body.costTier,
     });

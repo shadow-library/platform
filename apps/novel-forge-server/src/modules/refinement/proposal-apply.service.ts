@@ -49,6 +49,7 @@ import {
   isActionOp,
   type MilestoneRemoveOp,
   type MilestoneUpsertOp,
+  OP_METADATA_FIELDS,
   type PremiseUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
@@ -63,13 +64,14 @@ export interface OpResult {
   index: number;
   status: 'applied' | 'declined' | 'pending' | 'failed';
   error?: string;
-  /** Why an op the author did not reject was declined anyway — set when the engine declined it itself. */
+  /** Why the engine declined an op the author did not reject; only proposals applied before the quote rule carry one. */
   note?: string;
   result?: Record<string, unknown>;
 }
 
 export interface ApplyOptions {
   opIndexes?: number[];
+  /** Set by a chat turn applying the author's own words; such an apply carries content ops only. */
   autoApplied?: boolean;
   /** Applies inside the caller's transaction, so the change commits or rolls back with the caller's own writes. Content ops only: actions run after a commit. */
   tx?: PrimaryTransaction;
@@ -120,7 +122,6 @@ interface ApplyContext {
 
 type TxResult =
   | { outcome: 'applied'; proposal: Refinement.Proposal; applied: AppliedArtifact[]; staleMarked: string[]; opResults: OpResult[] }
-  | { outcome: 'declined'; proposal: Refinement.Proposal; opResults: OpResult[] }
   | { outcome: 'conflicted'; proposal: Refinement.Proposal };
 
 /** A draft the proposal's own content ops rewrote is approved at the revision they wrote — the prose the author reviewed in the proposal. */
@@ -131,25 +132,14 @@ export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArti
 }
 
 /**
- * The one-way doors: finalize locks prose, so it is not covered by the revert guarantee. An auto-mode
- * turn declines them and applies the rest of its change-set — throwing would discard a whole turn's work
- * over the one op that may not run — and a blanket manual apply refuses, so the author must select the
- * op's own index to walk through the door.
+ * The one-way doors: finalize locks prose, so it is not covered by the revert guarantee. A blanket apply refuses them, so the author must
+ * select the op's own index to walk through the door.
  */
-const NEVER_AUTO_APPLIED: Partial<Record<ActionOp['op'], { code: ErrorCode; note: string }>> = {
-  'action.finalize': { code: AppErrorCode.RFN_009, note: 'Finalize is never applied automatically — select the finalize step and apply it deliberately.' },
-  'action.approve_draft': { code: AppErrorCode.DRF_009, note: 'Draft approval is never applied automatically — select the approval step and apply it deliberately.' },
-  'action.generate_chapter': {
-    code: AppErrorCode.DRF_014,
-    note: 'Chapter generation is never applied automatically — select the generation step and apply it deliberately.',
-  },
+const ONE_WAY_DOORS: Partial<Record<ActionOp['op'], ErrorCode>> = {
+  'action.finalize': AppErrorCode.RFN_009,
+  'action.approve_draft': AppErrorCode.DRF_009,
+  'action.generate_chapter': AppErrorCode.DRF_014,
 };
-
-/** The engine's own decline reasons, as the one line an auto-applied turn reports back to the author. */
-export function declinedOpNote(opResults: OpResult[]): string | undefined {
-  const notes = [...new Set(opResults.flatMap(result => (result.note ? [result.note] : [])))];
-  return notes.length > 0 ? notes.join(' ') : undefined;
-}
 
 /**
  * A volume can be removed only once no brief names it, and a milestone only once no plan claims it and no fact's unlock names it; a
@@ -179,11 +169,11 @@ async function enforcePlanOps(tx: PrimaryDatabase, projectId: bigint, ops: reado
   await enforcePlanWrite(tx, projectId, written);
 }
 
-/** The one gate between an op and the artifact it edits: `rationale` explains the change to the author and is never stored beside the content it describes. */
-function withoutRationale<T extends ChangeOp>(op: T): T {
-  if (!('rationale' in op)) return op;
+/** The one gate between an op and the artifact it edits: its rationale and quote explain the change to the author and are never stored beside the content they describe. */
+function withoutMetadata<T extends ChangeOp>(op: T): T {
+  if (!OP_METADATA_FIELDS.some(field => field in op)) return op;
   const rest = { ...op } as Record<string, unknown>;
-  delete rest['rationale'];
+  for (const field of OP_METADATA_FIELDS) delete rest[field];
   return rest as T;
 }
 
@@ -203,8 +193,8 @@ export class ProposalApplyService {
    * Applies a pending proposal: lock, per-op selection (cherry-pick),
    * baseline conflict check over the selected refs, guarded op dispatch with inverse capture,
    * staleness propagation, audit. Content ops are transactional; selected actions execute after
-   * commit, sequentially, with their outcomes folded into opResults — except the one-way doors, which
-   * an auto-mode turn declines with a note rather than failing over. On its own transaction, a
+   * commit, sequentially, with their outcomes folded into opResults. An automatic apply carries content ops only, and a blanket apply
+   * refuses the one-way doors. On its own transaction, a
    * baseline mismatch commits only the `conflicted` status flip and surfaces as HTTP 409; any other
    * failure rolls the whole transaction back and leaves the proposal pending. With `options.tx`
    * everything runs inside the caller's transaction instead: the 409 is thrown with the flip still
@@ -230,26 +220,11 @@ export class ProposalApplyService {
 
       if (options?.tx && selectedActions.length > 0) throw AppError.internal('action ops cannot run inside a caller transaction');
 
-      const guarded = selectedActions.flatMap(action => {
-        const door = NEVER_AUTO_APPLIED[action.op.op];
-        return door ? [{ ...action, door }] : [];
-      });
-      const blanketManualApply = !options?.autoApplied && !options?.opIndexes;
-      if (blanketManualApply && guarded[0]) throw guarded[0].door.code.create();
-      const declinedNotes = new Map(options?.autoApplied ? guarded.map(action => [action.index, action.door.note]) : []);
-      const actionOps = selectedActions.filter(action => !declinedNotes.has(action.index));
+      if (options?.autoApplied && selectedActions.length > 0) throw AppError.internal('an automatic apply carries content ops only — actions are always the author’s selection');
+      const door = options?.opIndexes ? undefined : selectedActions.map(action => ONE_WAY_DOORS[action.op.op]).find(code => code !== undefined);
+      if (door) throw door.create();
 
-      // An apply whose every selected op was declined executed nothing, so it is not an application: the
-      // proposal stays pending and no approval is recorded, leaving the author free to select the
-      // one-way-door op themselves later instead of having it locked behind an `applied` status.
-      // Vacuously true for an empty selection too, so an empty change-set also stays pending — unreachable
-      // from the live routes, which never stage a proposal without ops.
-      if (selected.every(index => declinedNotes.has(index))) {
-        this.logger.info(`proposal ${proposalId} declined in full — every selected op is a one-way door, leaving it pending`);
-        return { outcome: 'declined', proposal, opResults: this.opResultsFor(ops, selected, declinedNotes) };
-      }
-
-      for (const action of actionOps) {
+      for (const action of selectedActions) {
         if (!this.actionRegistry.has(action.op.op)) throw AppErrorCode.RFN_008.create();
       }
 
@@ -286,7 +261,7 @@ export class ProposalApplyService {
       await enforcePlanOps(ctx.tx, projectId, selectedContent);
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
 
-      const opResults = this.opResultsFor(ops, selected, declinedNotes);
+      const opResults = this.opResultsFor(ops, selected);
 
       const [applied] = await tx
         .update(schema.refinementProposals)
@@ -322,20 +297,17 @@ export class ProposalApplyService {
     const result = options?.tx ? await applyInTransaction(options.tx) : await this.db.transaction(applyInTransaction);
 
     if (result.outcome === 'conflicted') throw AppErrorCode.RFN_003.create();
-    if (result.outcome === 'declined') return { proposal: result.proposal, applied: [], staleMarked: [], opResults: result.opResults };
 
     const ops = result.proposal.changeSet as ChangeOp[];
     const pendingActions = result.opResults.filter(r => r.status === 'pending').map(r => ({ index: r.index, op: bindApprovalRevision(ops[r.index] as ActionOp, result.applied) }));
-    const { opResults, proposal } = await this.executeActions(projectId, result.proposal, result.opResults, pendingActions, options?.autoApplied ?? false);
+    const { opResults, proposal } = await this.executeActions(projectId, result.proposal, result.opResults, pendingActions);
 
     this.logger.info(`proposal ${proposalId} applied: ${result.applied.map(a => a.artifactRef).join(', ') || 'actions only'}`);
     return { proposal, applied: result.applied, staleMarked: result.staleMarked, opResults };
   }
 
-  private opResultsFor(ops: ChangeOp[], selected: number[], declinedNotes: Map<number, string>): OpResult[] {
+  private opResultsFor(ops: ChangeOp[], selected: number[]): OpResult[] {
     return ops.map((op, index) => {
-      const note = declinedNotes.get(index);
-      if (note) return { index, status: 'declined', note };
       if (!selected.includes(index)) return { index, status: 'declined' };
       return { index, status: isActionOp(op) ? 'pending' : 'applied' };
     });
@@ -360,7 +332,6 @@ export class ProposalApplyService {
     proposal: Refinement.Proposal,
     opResults: OpResult[],
     actions: { index: number; op: ActionOp }[],
-    autoApplied: boolean,
   ): Promise<{ proposal: Refinement.Proposal; opResults: OpResult[] }> {
     if (actions.length === 0) return { proposal, opResults };
 
@@ -377,7 +348,7 @@ export class ProposalApplyService {
       // Presence was verified pre-commit inside the transaction (RFN_008), so the lookup cannot miss.
       const executor = this.actionRegistry.get(op.op) as ActionExecutor;
       try {
-        const execute = (): Promise<ActionExecutionResult> => executor(projectId, op, { autoApplied });
+        const execute = (): Promise<ActionExecutionResult> => executor(projectId, op);
         const outcome = await (costTier ? runWithCostTier(costTier, execute) : execute());
         entry.status = 'applied';
         entry.result = outcome as unknown as Record<string, unknown>;
@@ -595,7 +566,7 @@ export class ProposalApplyService {
   }
 
   private applyOp(ctx: ApplyContext, incoming: ChangeOp): Promise<void> {
-    const op = withoutRationale(incoming);
+    const op = withoutMetadata(incoming);
     switch (op.op) {
       case 'premise.update':
         return this.applyPremiseUpdate(ctx, op);

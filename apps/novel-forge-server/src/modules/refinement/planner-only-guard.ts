@@ -1,5 +1,3 @@
-import { type Refinement } from '@server/database';
-
 import { isPlannerOnlyBibleDoc } from '../ai/context/bible-docs';
 
 export const PLANNER_ONLY_LOOKUP_TOOL = 'get_bible_document';
@@ -25,9 +23,4 @@ export function readsPlannerOnlyPage(tool: string, args: unknown): boolean {
 
 export function chatTurnWarnings(warnings: string[], readPlannerOnly: boolean): string[] {
   return readPlannerOnly && !warnings.includes(PLANNER_ONLY_WARNING) ? [...warnings, PLANNER_ONLY_WARNING] : warnings;
-}
-
-/** An auto-mode turn applies its proposal only when nothing on it asks for the author's review first. */
-export function autoApplies(mode: Refinement.ChatSession['mode'], proposal: Pick<Refinement.Proposal, 'warnings'> | null): boolean {
-  return mode === 'auto' && proposal !== null && (proposal.warnings?.length ?? 0) === 0;
 }

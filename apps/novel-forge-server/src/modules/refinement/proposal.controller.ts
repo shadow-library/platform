@@ -14,6 +14,7 @@ import {
   ProposalProjectParams,
   ProposalResponse,
   RevertProposalResponse,
+  UndoImpactResponse,
   UpdateProposalBody,
 } from './refinement.dto';
 import { serialiseProposal } from './serialise';
@@ -51,6 +52,13 @@ export class ProposalController {
   @RespondFor(200, ApplyProposalResponse)
   applyProposal(@Params() params: ProposalIdParams, @Body() body: ApplyProposalBody): Promise<ApplyProposalResponse> {
     return this.proposalApplyService.apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes }).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
+  }
+
+  @Get('/:proposalId/undo-impact')
+  @RespondFor(200, UndoImpactResponse)
+  async undoImpact(@Params() params: ProposalIdParams): Promise<UndoImpactResponse> {
+    const impact = await this.proposalService.undoImpact(params.projectId, params.proposalId);
+    return { proposalId: params.proposalId, ...impact };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

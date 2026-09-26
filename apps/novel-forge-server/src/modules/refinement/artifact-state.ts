@@ -126,3 +126,61 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
 
   return states;
 }
+
+export type RecordFields = Readonly<Record<string, unknown>>;
+
+/**
+ * Every ref that exists, mapped to the fields an op of its kind writes — spelled as the op spells them — for the kinds a chat turn may
+ * apply without review; the other kinds map to no fields, since only their existence matters there.
+ */
+export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Map<string, RecordFields>> {
+  const states = await loadArtifactStates(db, projectId, refs);
+  const existing = refs.filter(ref => states[ref]?.exists);
+  const parsed = parseRefs(existing);
+  const records = new Map<string, RecordFields>(existing.map(ref => [ref, {}]));
+
+  const [project, docs, volumes, entities, facts] = await Promise.all([
+    parsed.premise ? db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }) : undefined,
+    parsed.docs.length > 0
+      ? db.query.bibleDocuments.findMany({
+          where: and(
+            eq(schema.bibleDocuments.projectId, projectId),
+            inArray(
+              schema.bibleDocuments.section,
+              parsed.docs.map(doc => doc.section),
+            ),
+            inArray(
+              schema.bibleDocuments.slug,
+              parsed.docs.map(doc => doc.slug),
+            ),
+          ),
+        })
+      : [],
+    parsed.volumeKeys.length > 0 ? db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) }) : [],
+    parsed.entityKeys.length > 0 ? db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, parsed.entityKeys)) }) : [],
+    parsed.factKeys.length > 0 ? db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) }) : [],
+  ]);
+
+  if (project) records.set('premise', { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
+  for (const row of docs) {
+    const ref = `doc:${row.section}/${row.slug}`;
+    if (records.has(ref)) records.set(ref, { body: row.body, frontmatter: row.frontmatter });
+  }
+  for (const row of volumes) records.set(`volume:${row.volumeKey}`, { ordinal: row.ordinal, title: row.title, objective: row.objective, body: row.body, state: row.state });
+  for (const row of entities) {
+    records.set(`entity:${row.entityKey}`, { type: row.type, name: row.name, status: row.status, motivation: row.motivation, notes: row.notes, body: row.body });
+  }
+  for (const row of facts) {
+    records.set(`fact:${row.factKey}`, {
+      body: row.text,
+      subjects: row.subjects,
+      constraintNote: row.constraintNote,
+      writerNote: row.writerNote,
+      terms: row.terms,
+      revealChapter: row.revealChapter,
+      unlock: row.unlock,
+      allowedClues: row.allowedClues,
+    });
+  }
+  return records;
+}

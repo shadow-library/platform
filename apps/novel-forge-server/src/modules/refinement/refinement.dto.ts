@@ -2,7 +2,7 @@ import { Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ChatScope, RefinementKind, RefinementProposalStatus, SortByTime } from '@server/common';
+import { ChatScope, RefinementKind, RefinementProposalStatus, SortByTime, UndoDependentKind } from '@server/common';
 import { type Refinement } from '@server/database';
 
 @Schema()
@@ -189,6 +189,39 @@ export class RevertProposalResponse {
 
   @Field(() => [String])
   staleMarked: string[];
+}
+
+@Schema({ description: 'A record that relies on something an undo would take back.' })
+export class UndoDependentItem {
+  @Field(() => UndoDependentKind)
+  kind: 'plan' | 'draft' | 'knowledge' | 'suggestion';
+
+  @Field({
+    description:
+      'The dependent record: `chapter:<n>` for a plan, `draft:<n>` for a draft, `knowledge:<entityKey>/<factKey>` for what a character knows, `proposal:<id>` for a pending suggestion.',
+  })
+  ref: string;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'The chapter the record belongs to, or where the character learned the fact.' })
+  chapter?: number | null;
+
+  @Field({ description: 'The undone record this one relies on, as a change-set ref.' })
+  because: string;
+
+  @Field({ description: 'Finalized history: undo never rewrites it, so the record stays as it is after the revert.' })
+  final: boolean;
+}
+
+@Schema({ description: 'What undoing an applied change would affect, listed before the author confirms the revert.' })
+export class UndoImpactResponse {
+  @Field(() => String)
+  proposalId: bigint;
+
+  @Field(() => [UndoDependentItem])
+  dependents: UndoDependentItem[];
+
+  @Field(() => Integer, { description: 'Finalized plans and drafts that relied only on an updated record: the undo leaves them as they are, so they are counted, not listed.' })
+  finalUnaffected: number;
 }
 
 @Schema()

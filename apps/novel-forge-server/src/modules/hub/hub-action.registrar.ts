@@ -6,9 +6,14 @@ import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
 import { GenerationService } from '../generation/generation.service';
-import { type ActionExecutionContext, type ActionExecutionResult, ActionExecutorRegistry, ProposalApplyService } from '../refinement';
+import { type ActionExecutionResult, ActionExecutorRegistry } from '../refinement';
 import { RefineService } from '../refinement/refine.service';
 import { ChapterReviewService } from '../review/chapter-review.service';
+
+/** A chain's proposal is the AI's own work, never the author's words, so it waits for the author whatever mode the chat runs in. */
+function pendingChainProposal(proposal: Refinement.Proposal, runId: string, summary: string): ActionExecutionResult {
+  return { summary: `${summary} — proposal ${proposal.id} pending review`, runId, proposalId: String(proposal.id) };
+}
 
 /**
  * Wires every chat action to the service that performs it. Lives outside the
@@ -23,7 +28,6 @@ export class HubActionRegistrar {
     private readonly registry: ActionExecutorRegistry,
     private readonly generationService: GenerationService,
     private readonly refineService: RefineService,
-    private readonly proposalApplyService: ProposalApplyService,
     private readonly reviewService: ChapterReviewService,
   ) {}
 
@@ -36,16 +40,16 @@ export class HubActionRegistrar {
       return { summary: `enqueued generation of chapter ${action.chapter}`, jobId: job.jobId };
     });
 
-    registry.register('action.audit_bible', async (projectId, _action, ctx) => {
+    registry.register('action.audit_bible', async projectId => {
       const result = await this.refineService.auditBible(projectId);
       if (!result.proposal) return { summary: `bible audit found nothing to change (${result.findings.length} finding(s))`, runId: result.runId };
-      return this.settleChainProposal(projectId, result.proposal, result.runId, `bible audit staged ${result.findings.length} finding(s)`, ctx);
+      return pendingChainProposal(result.proposal, result.runId, `bible audit staged ${result.findings.length} finding(s)`);
     });
 
-    registry.register('action.enhance_premise', async (projectId, action, ctx) => {
+    registry.register('action.enhance_premise', async (projectId, action) => {
       if (action.op !== 'action.enhance_premise') throw AppError.internal('executor misrouted');
       const result = await this.refineService.enhancePremise(projectId, action.overview);
-      return this.settleChainProposal(projectId, result.proposal, result.runId, 'premise enhancement staged', ctx);
+      return pendingChainProposal(result.proposal, result.runId, 'premise enhancement staged');
     });
 
     registry.register('action.judge_draft', async (projectId, action) => {
@@ -87,21 +91,5 @@ export class HubActionRegistrar {
     });
 
     this.logger.debug('hub action executors registered');
-  }
-
-  /**
-   * Chain-producing actions stage their own proposal; in an auto-mode turn that proposal is applied
-   * on the spot so the mode stays honest end-to-end — a conflict leaves it pending for manual review
-   * instead of failing the action.
-   */
-  private async settleChainProposal(projectId: bigint, proposal: Refinement.Proposal, runId: string, summary: string, ctx: ActionExecutionContext): Promise<ActionExecutionResult> {
-    if (!ctx.autoApplied) return { summary: `${summary} — proposal ${proposal.id} pending review`, runId, proposalId: String(proposal.id) };
-    try {
-      await this.proposalApplyService.apply(projectId, proposal.id, { autoApplied: true });
-      return { summary: `${summary} — proposal ${proposal.id} auto-applied`, runId, proposalId: String(proposal.id) };
-    } catch (err) {
-      this.logger.warn(`auto-apply of chain proposal ${proposal.id} failed; left for manual review`, { err });
-      return { summary: `${summary} — proposal ${proposal.id} staged (auto-apply conflicted; review manually)`, runId, proposalId: String(proposal.id) };
-    }
   }
 }

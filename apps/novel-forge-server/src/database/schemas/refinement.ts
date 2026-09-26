@@ -33,8 +33,9 @@ export const chatSessions = pgTable(
     scopeRef: varchar('scope_ref'),
     title: varchar('title', { length: 500 }),
     status: chatSessionStatus('status').notNull().default('active'),
-    // How this session lands its change-sets: 'manual' stages proposals for per-op review, 'auto'
-    // applies them in-turn. Switchable mid-conversation; provenance lives on each proposal (autoApplied).
+    // How this session lands its change-sets: 'auto' applies the author's quoted words in-turn under the quote rule and stages the
+    // rest as cards; 'manual' stages everything as cards. ChatService.createSession sets 'auto' for a new chat — this column default
+    // stays 'manual' only so no migration is needed. Provenance lives on each proposal (autoApplied).
     mode: chatMode('mode').notNull().default('manual'),
     // Per-session model override (null → the project/profile default). Lets one chat run on a different
     // provider/model without changing the project defaults; new sessions inherit the default.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import { type ChangeOp, ProposalService } from '@modules/refinement';
-import { autoApplies } from '@modules/refinement/planner-only-guard';
+import { stageTurnChangeSet } from '@modules/refinement/turn-proposals';
 
 function fakeExecutor(factRows: Record<string, unknown>[]) {
   return {
@@ -34,12 +34,25 @@ describe('ProposalService.create — reveal-clear warning always runs, even with
     expect(proposal.warnings).toBeNull();
   });
 
-  it('should hold auto-apply for a proposal the reveal-clear check flagged', async () => {
+  it('should hold a direct side the reveal-clear check flagged, applying nothing and staging every op as a card', async () => {
     const service = new ProposalService(new FakeDatabaseService());
     const executor = fakeExecutor([{ factKey: 'f1', revealChapter: 12 }]);
+    const applied: bigint[] = [];
+    const discarded: bigint[] = [];
+    const port = {
+      stage: (changeSet: ChangeOp[], warnings: string[]) => service.create(7n, { scopeType: 'project', kind: 'chat', changeSet, warnings }, executor as never),
+      apply: async (id: bigint) => (applied.push(id), Promise.reject(new Error('never applied'))),
+      discard: async (id: bigint) => discarded.push(id),
+      linkApplied: async () => undefined,
+    };
+    const split = { ops: undateOp, direct: undateOp, cards: [], dispositions: [{ index: 0, side: 'direct' as const }], held: false };
 
-    const proposal = await service.create(7n, { scopeType: 'project', kind: 'chat', changeSet: undateOp, warnings: [] }, executor as never);
+    const staging = await stageTurnChangeSet(port, split, []);
 
-    expect(autoApplies('auto', proposal)).toBe(false);
+    expect(applied).toEqual([]);
+    expect(discarded).toEqual([300n]);
+    expect(staging.appliedProposal).toBeNull();
+    expect(staging.cardProposal?.changeSet).toEqual(undateOp);
+    expect(staging.cardProposal?.warnings?.length).toBeGreaterThan(0);
   });
 });
