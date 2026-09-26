@@ -1,6 +1,6 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { Logger, type OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -8,7 +8,9 @@ import { sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, schema } from '@server/database';
 
-import { type ListChaptersQuery, type UpdateChapterBody } from './chapter.dto';
+import { CHAPTER_LIST_DEFAULT_LIMIT, type ListChaptersQuery, type UpdateChapterBody } from './chapter.dto';
+
+export type ChapterListResult = OffsetPaginationResult<Chapter.Row> & { page: number; totalPages: number };
 
 @Injectable()
 export class ChapterService {
@@ -19,15 +21,33 @@ export class ChapterService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  async list(projectId: bigint, filter: ListChaptersQuery): Promise<OffsetPaginationResult<Chapter.Row>> {
+  async list(projectId: bigint, filter: ListChaptersQuery): Promise<ChapterListResult> {
     const query = utils.pagination.normalise(filter, {
       mode: 'offset',
-      defaults: { limit: 20, offset: 0, sortBy: 'createdAt', sortOrder: 'asc' },
+      defaults: { limit: CHAPTER_LIST_DEFAULT_LIMIT, offset: 0, sortBy: 'number', sortOrder: 'desc' },
     });
 
-    const where = filter.status ? and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, filter.status)) : eq(schema.chapters.projectId, projectId);
+    const numberFilter = filter.pov || filter.thread ? await this.resolveNumberFilter(projectId, filter) : null;
+    if (numberFilter && numberFilter.size === 0) return this.emptyResult(query);
 
-    const column = query.sortBy === 'createdAt' ? schema.chapters.createdAt : schema.chapters.updatedAt;
+    const conditions = [eq(schema.chapters.projectId, projectId)];
+    if (filter.status) conditions.push(eq(schema.chapters.status, filter.status));
+    if (filter.volumeKey) conditions.push(eq(schema.chapters.volumeKey, filter.volumeKey));
+    if (numberFilter) conditions.push(inArray(schema.chapters.number, [...numberFilter]));
+    const where = and(...conditions);
+
+    if (filter.goto !== undefined) {
+      const listed = await this.db.$count(schema.chapters, and(where, eq(schema.chapters.number, filter.goto)));
+      if (listed === 0) throw AppErrorCode.CHP_001.create();
+      query.sortBy = 'number';
+      const position = await this.db.$count(
+        schema.chapters,
+        and(where, query.sortOrder === 'desc' ? gt(schema.chapters.number, filter.goto) : lt(schema.chapters.number, filter.goto)),
+      );
+      query.offset = Math.floor(position / query.limit) * query.limit;
+    }
+
+    const column = query.sortBy === 'number' ? schema.chapters.number : query.sortBy === 'createdAt' ? schema.chapters.createdAt : schema.chapters.updatedAt;
     const order = query.sortOrder === 'asc' ? asc(column) : desc(column);
 
     const [total, items] = await Promise.all([
@@ -35,7 +55,43 @@ export class ChapterService {
       this.db.query.chapters.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
     ]);
 
-    return utils.pagination.createResult(query, items, total);
+    return this.toResult(query, items, total);
+  }
+
+  private async resolveNumberFilter(projectId: bigint, filter: ListChaptersQuery): Promise<Set<number>> {
+    const sets: Set<number>[] = [];
+    if (filter.pov) sets.push(await this.chapterNumbersByPov(projectId, filter.pov));
+    if (filter.thread) sets.push(await this.chapterNumbersByThread(projectId, filter.thread));
+    const [first, ...rest] = sets;
+    if (!first) return new Set();
+    return rest.reduce((kept, next) => new Set([...kept].filter(number => next.has(number))), first);
+  }
+
+  private async chapterNumbersByPov(projectId: bigint, pov: string): Promise<Set<number>> {
+    const briefs = await this.db.query.briefs.findMany({
+      columns: { chapter: true, pov: true, scenes: true },
+      where: eq(schema.briefs.projectId, projectId),
+    });
+    const matches = briefs.filter(brief => brief.pov === pov || (brief.scenes ?? []).some(scene => scene.pov === pov));
+    return new Set(matches.map(brief => brief.chapter));
+  }
+
+  private async chapterNumbersByThread(projectId: bigint, threadKey: string): Promise<Set<number>> {
+    const thread = await this.db.query.plotThreads.findFirst({
+      columns: { openedChapter: true, closedChapter: true, lastAdvancedChapter: true },
+      where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.threadKey, threadKey)),
+    });
+    if (!thread) return new Set();
+    const numbers = [thread.openedChapter, thread.closedChapter, thread.lastAdvancedChapter].filter((n): n is number => n != null);
+    return new Set(numbers);
+  }
+
+  private emptyResult(query: { limit: number; offset: number }): ChapterListResult {
+    return { total: 0, limit: query.limit, offset: query.offset, items: [], page: Math.floor(query.offset / query.limit) + 1, totalPages: 0 };
+  }
+
+  private toResult(query: { limit: number; offset: number }, items: Chapter.Row[], total: number): ChapterListResult {
+    return { total, limit: query.limit, offset: query.offset, items, page: Math.floor(query.offset / query.limit) + 1, totalPages: Math.ceil(total / query.limit) };
   }
 
   get(projectId: bigint, number: number): Promise<Chapter.Row | null> {

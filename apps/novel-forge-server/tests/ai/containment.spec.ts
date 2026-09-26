@@ -83,7 +83,8 @@ describe('RetrievalService.searchProse', () => {
 
     expect(captured).toBeDefined();
     const rendered = new PgDialect().sqlToQuery(captured as SQL).sql;
-    expect(rendered).toContain('ch.isolated = false');
+    expect(rendered).toContain('cc.chapter NOT IN');
+    expect(rendered).toContain('isolated = true');
     expect(rendered).not.toContain('generator');
   });
 });

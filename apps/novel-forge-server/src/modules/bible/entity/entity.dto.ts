@@ -169,7 +169,13 @@ export class ListEntitiesQuery extends PaginationQuery(SortByTime, { sortBy: 'up
 }
 
 @Schema()
-export class ListEntityResponse extends Paginated(EntityResponse) {}
+export class ListEntityResponse extends Paginated(EntityResponse) {
+  @Field(() => Integer)
+  page: number;
+
+  @Field(() => Integer)
+  totalPages: number;
+}
 
 @Schema()
 export class CharacterEventResponse {

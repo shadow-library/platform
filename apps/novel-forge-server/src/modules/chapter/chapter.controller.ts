@@ -4,19 +4,38 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Query, Re
 import { AppErrorCode } from '@server/classes';
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
-import { ChapterParams, ChapterProjectParams, ChapterResponse, ListChapterResponse, ListChaptersQuery, UpdateChapterBody } from './chapter.dto';
+import {
+  ChapterParams,
+  ChapterProjectParams,
+  ChapterResponse,
+  ChapterSearchResponse,
+  ListChapterResponse,
+  ListChaptersQuery,
+  SearchChaptersQuery,
+  UpdateChapterBody,
+} from './chapter.dto';
+import { ChapterSearchService } from './chapter-search.service';
 import { ChapterService } from './chapter.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/source/chapters')
 export class ChapterController {
-  constructor(private readonly chapterService: ChapterService) {}
+  constructor(
+    private readonly chapterService: ChapterService,
+    private readonly chapterSearchService: ChapterSearchService,
+  ) {}
 
   @Get()
   @RespondFor(200, ListChapterResponse)
   listChapters(@Params() params: ChapterProjectParams, @Query() query: ListChaptersQuery): Promise<ListChapterResponse> {
     return this.chapterService.list(params.projectId, query);
+  }
+
+  @Get('/search')
+  @RespondFor(200, ChapterSearchResponse)
+  searchChapters(@Params() params: ChapterProjectParams, @Query() query: SearchChaptersQuery): Promise<ChapterSearchResponse> {
+    return this.chapterSearchService.search(params.projectId, query);
   }
 
   @Get('/:n')

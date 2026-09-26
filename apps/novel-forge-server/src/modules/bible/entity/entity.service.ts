@@ -79,7 +79,7 @@ export class EntityService {
     return this.present(entity);
   }
 
-  async list(projectId: bigint, filter: ListEntitiesQuery): Promise<OffsetPaginationResult<PresentedEntity>> {
+  async list(projectId: bigint, filter: ListEntitiesQuery): Promise<OffsetPaginationResult<PresentedEntity> & { page: number; totalPages: number }> {
     const query = utils.pagination.normalise(filter, {
       mode: 'offset',
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
@@ -98,11 +98,12 @@ export class EntityService {
       this.db.query.entities.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
     ]);
 
-    return utils.pagination.createResult(
+    const result = utils.pagination.createResult(
       query,
       items.map(item => this.present(item)),
       total,
     );
+    return { ...result, page: Math.floor(query.offset / query.limit) + 1, totalPages: Math.ceil(total / query.limit) };
   }
 
   get(projectId: bigint, entityKey: string): Promise<PresentedEntityWithImages | null> {

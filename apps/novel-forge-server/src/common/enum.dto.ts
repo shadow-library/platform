@@ -7,6 +7,7 @@ import { CHAPTER_FILTERS } from './chapter-rows';
 import { PROGRESS_ITEM_KEYS } from './progress';
 
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
+export const SortByChapter = EnumType.create('SortByChapter', ['number', 'createdAt', 'updatedAt']);
 export const OwnerKind = EnumType.create('OwnerKind', schema.ownerKind.enumValues);
 export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
 export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);

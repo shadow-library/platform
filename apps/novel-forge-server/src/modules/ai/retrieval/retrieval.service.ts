@@ -3,6 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { isolatedChapterNumbers } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 
@@ -52,10 +53,9 @@ export class RetrievalService {
         SELECT cc.chapter, cc.text,
                (1 - (cc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector))::float4 AS score
         FROM chapter_chunks cc
-        JOIN chapters ch ON ch.project_id = cc.project_id AND ch.number = cc.chapter
         WHERE cc.project_id = ${projectId}
           AND cc.embedding IS NOT NULL
-          AND ch.isolated = false
+          AND cc.chapter NOT IN ${isolatedChapterNumbers(projectId)}
         ORDER BY cc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector
         LIMIT ${k}
       `);

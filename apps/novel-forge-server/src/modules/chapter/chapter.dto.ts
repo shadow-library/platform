@@ -1,8 +1,8 @@
-import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ChapterStatus, SortByTime } from '@server/common';
+import { ChapterStatus, SortByChapter } from '@server/common';
 import { type Chapter } from '@server/database';
 
 @Schema()
@@ -23,10 +23,24 @@ export class ChapterParams {
   n: number;
 }
 
+export const CHAPTER_LIST_DEFAULT_LIMIT = 25;
+
 @Schema()
-export class ListChaptersQuery extends PaginationQuery(SortByTime, {}, { maximumLimit: 500 }) {
+export class ListChaptersQuery extends PaginationQuery(SortByChapter, { sortBy: 'number', sortOrder: 'desc', limit: CHAPTER_LIST_DEFAULT_LIMIT }, { maximumLimit: 500 }) {
   @Field(() => ChapterStatus, { optional: true })
   status?: Chapter.Status;
+
+  @Field({ optional: true, description: 'Only chapters in this volume.' })
+  volumeKey?: string;
+
+  @Field({ optional: true, description: "Only chapters whose brief's point of view (any pooled scene) is this entity key." })
+  pov?: string;
+
+  @Field({ optional: true, description: 'Only chapters this thread opened, closed, or was last advanced in.' })
+  thread?: string;
+
+  @Field(() => Integer, { optional: true, description: 'Ignore limit/offset and return the page containing this chapter number instead.' })
+  goto?: number;
 }
 
 @Schema()
@@ -54,6 +68,12 @@ class ChapterListResponse {
 
   @Field()
   continuityApplied: boolean;
+
+  @Field()
+  isolated: boolean;
+
+  @Field({ optional: true, nullable: true })
+  volumeKey?: string | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
@@ -84,4 +104,40 @@ export class UpdateChapterBody {
 }
 
 @Schema()
-export class ListChapterResponse extends Paginated(ChapterListResponse) {}
+export class ListChapterResponse extends Paginated(ChapterListResponse) {
+  @Field(() => Integer)
+  page: number;
+
+  @Field(() => Integer)
+  totalPages: number;
+}
+
+@Schema()
+export class SearchChaptersQuery extends OmitType(ListChaptersQuery, ['status', 'goto', 'sortBy', 'sortOrder'] as const) {
+  @Field({ minLength: 1, maxLength: 200, description: 'Text to search for across finalized and drafted prose.' })
+  q: string;
+}
+
+@Schema()
+export class ChapterSearchHit {
+  @Field(() => Integer)
+  number: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field({ description: 'A short excerpt around the first match, ellipsised at either end when truncated.' })
+  snippet: string;
+
+  @Field(() => Integer, { description: 'How many times the query occurs in this chapter, case-insensitively.' })
+  matchCount: number;
+}
+
+@Schema()
+export class ChapterSearchResponse extends Paginated(ChapterSearchHit) {
+  @Field(() => Integer)
+  page: number;
+
+  @Field(() => Integer)
+  totalPages: number;
+}
