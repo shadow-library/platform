@@ -14,8 +14,9 @@ import { ORGANISE_MIN_WORDS, organiseApplies } from '../notes';
 import { type ActionContext, ActionExecutorRegistry } from '../refinement/action-registry';
 import { type ActionOp } from '../refinement/change-set';
 import { actionJobOrigin, actionJobTarget, assertNotesUnorganised, ORGANISE_GRAPH, PLAN_GRAPH, type StartedActionJob } from './action-jobs';
+import { assertEmptyPlanAllowed } from './chapter-plan.service';
 import { OrganiseJobService } from './organise-job.service';
-import { assertPlansNextChapter, type PlanJobPayload, PlanJobService } from './plan-job.service';
+import { assertNoOtherPlan, assertPlansNextChapter, authorMessagesFor, planJobInput, PlanJobService, planSteer } from './plan-job.service';
 
 type PlanChapterOp = Extract<ActionOp, { op: 'action.plan_chapter' }>;
 
@@ -61,8 +62,18 @@ export class ActionJobService {
 
   async plan(projectId: bigint, action: PlanChapterOp, context: ActionContext): Promise<StartedActionJob & { chapter: number }> {
     const chapter = await assertPlansNextChapter(this.db, projectId, action.chapter);
-    const payload: PlanJobPayload = { chapter, ...(action.intent?.trim() ? { intent: action.intent.trim() } : {}) };
-    return { ...(await this.start(projectId, 'plan', PLAN_GRAPH, context, payload)), chapter };
+    await assertNoOtherPlan(this.db, projectId, actionJobTarget(context), chapter);
+    if (action.empty) await assertEmptyPlanAllowed(this.db, projectId, chapter);
+    const steer = planSteer(action.intent, action.direction, action.intent?.trim() ? await authorMessagesFor(this.db, context) : []);
+    if (steer.droppedIntent) this.logger.info('plan: dropped an intent the author never stated, for the direction they chose', { projectId, chapter, direction: steer.direction });
+    const payload = planJobInput({ chapter, intent: steer.intent, direction: steer.direction, empty: action.empty });
+    try {
+      return { ...(await this.start(projectId, 'plan', PLAN_GRAPH, context, payload)), chapter };
+    } catch (err) {
+      // The authoring claim refuses a plan while any authoring job runs; when that job is itself a plan, the plan's own refusal says why.
+      if (err instanceof AppError && err.code === AppErrorCode.JOB_002.code) await assertNoOtherPlan(this.db, projectId, actionJobTarget(context), chapter);
+      throw err;
+    }
   }
 
   // The run opens with the job, so the author's apply answers with both ids; the job's first attempt resumes it rather than opening another.

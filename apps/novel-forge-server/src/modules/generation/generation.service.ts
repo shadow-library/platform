@@ -8,6 +8,7 @@ import {
   assertPlanRevealsHold,
   assertTeacherSettled,
   briefContentHash,
+  composePlanBody,
   declaredDraftFields,
   enforcePlanWrite,
   ledgerBriefReveals,
@@ -239,7 +240,9 @@ export class GenerationService {
   async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
     const sceneErrors = body.scenes ? validateBriefScenes(body.scenes) : [];
     if (sceneErrors.length > 0) throw AppErrorCode.BRF_004.create({ reason: sceneErrors.join('; ') });
-    const edits: Partial<typeof schema.briefs.$inferInsert> = { body: body.body, densityRisk: null };
+    const scenes = body.scenes === undefined ? undefined : body.scenes && normalizeBriefScenes(body.scenes);
+    const planBody = scenes === undefined ? body.body : composePlanBody(body.body, scenes ?? []);
+    const edits: Partial<typeof schema.briefs.$inferInsert> = { body: planBody, densityRisk: null };
     const title = body.title?.trim();
     if (title) edits.title = title;
     if (body.knowledgeContract) edits.knowledgeContract = { pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] };
@@ -249,7 +252,7 @@ export class GenerationService {
     if (body.guidance !== undefined) edits.guidance = body.guidance.trim() || null;
     if (body.direction !== undefined) edits.direction = body.direction?.trim() || null;
     if (body.contentMode !== undefined) edits.contentMode = body.contentMode;
-    if (body.scenes !== undefined) edits.scenes = body.scenes && normalizeBriefScenes(body.scenes);
+    if (scenes !== undefined) edits.scenes = scenes;
     if (body.claimedMilestones !== undefined) edits.claimedMilestones = body.claimedMilestones && normalizeStringList(body.claimedMilestones);
     if (body.isEnding !== undefined) edits.isEnding = body.isEnding;
 
@@ -268,7 +271,7 @@ export class GenerationService {
       const contentHash = briefContentHash({ ...existing, ...created, chapter, volumeKey, ...edits });
       const [upserted] = await tx
         .insert(schema.briefs)
-        .values({ knowledgeContract: null, ...created, ...edits, projectId, chapter, volumeKey, body: body.body, revision, contentHash, handEdited: true })
+        .values({ knowledgeContract: null, ...created, ...edits, projectId, chapter, volumeKey, body: planBody, revision, contentHash, handEdited: true })
         .onConflictDoUpdate({
           target: [schema.briefs.projectId, schema.briefs.chapter],
           set: { ...edits, revision, contentHash, handEdited: true, updatedAt: new Date() },

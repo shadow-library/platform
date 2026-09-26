@@ -11,6 +11,7 @@ import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '
 import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
 import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
+import { planCardDiagnostics } from './plan-diagnostics';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';
@@ -123,6 +124,7 @@ export class ProposalService {
       ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
       ...(await this.revealClearWarnings(executor, projectId, input.changeSet)),
       ...(input.sourceIsolated ? [ISOLATED_SOURCE_WARNING] : []),
+      ...(await this.planWarnings(executor, projectId, input.kind, changeSet)),
     ];
 
     const [proposal] = await executor
@@ -155,6 +157,17 @@ export class ProposalService {
       return await findNegationEchoWarnings(executor, projectId, ops);
     } catch (err) {
       this.logger.warn('proposal review warnings failed — staging without them', { projectId, err });
+      return [];
+    }
+  }
+
+  /** A plan pass card's pooling, point-of-view and density diagnostics, judged on the card as it now stands. */
+  private async planWarnings(executor: DbExecutor, projectId: bigint, kind: Refinement.Kind, ops: ChangeOp[]): Promise<string[]> {
+    if (kind !== 'chapter_plan') return [];
+    try {
+      return await planCardDiagnostics(executor, projectId, ops);
+    } catch (err) {
+      this.logger.warn('proposal plan diagnostics failed — staging without them', { projectId, err });
       return [];
     }
   }
@@ -259,7 +272,11 @@ export class ProposalService {
 
     const ops = await stampApprovalRevisions(this.db, projectId, changeSet as ChangeOp[], true);
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
-    const warnings = [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))];
+    const warnings = [
+      ...(await this.reviewWarnings(this.db, projectId, ops)),
+      ...(await this.revealClearWarnings(this.db, projectId, ops)),
+      ...(await this.planWarnings(this.db, projectId, existing.kind, ops)),
+    ];
     const [updated] = await this.db
       .update(schema.refinementProposals)
       .set({ changeSet: ops, baseline, warnings: warnings.length > 0 ? warnings : null, updatedAt: new Date() })

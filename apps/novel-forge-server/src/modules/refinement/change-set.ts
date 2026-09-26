@@ -68,9 +68,12 @@ export interface BriefUpdateOp {
   /** An explicit `null` comes only from a captured inverse, so a revert takes a brief back out of a volume the proposal put it in; `OP_SPECS` refuses it from anyone else. */
   volumeKey?: string | null;
   contextRefs?: string[];
-  pov?: string;
+  /** `null` clears the chapter's point of view. */
+  pov?: string | null;
   chapterPurpose?: string;
   readerValue?: string[];
+  repetitionRisks?: string[] | null;
+  densityRisk?: string | null;
   endingContract?: EndingContract;
   /** Explicit `null` drops the chapter's contract — the only way to un-reveal without deleting the brief. */
   knowledgeContract?: KnowledgeContract | null;
@@ -210,6 +213,8 @@ interface PlanChapterAction {
   op: 'action.plan_chapter';
   chapter?: number;
   intent?: string;
+  direction?: string;
+  empty?: boolean;
 }
 
 export type ContentOp =
@@ -283,9 +288,11 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       writeMode: 'string',
       volumeKey: 'string',
       contextRefs: 'string[]',
-      pov: 'string',
+      pov: 'string|null',
       chapterPurpose: 'string',
       readerValue: 'string[]',
+      repetitionRisks: 'string[]|null',
+      densityRisk: 'string|null',
       endingContract: 'object',
       knowledgeContract: 'object|null',
       direction: 'string|null',
@@ -337,7 +344,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
   'action.organise_notes': { required: {}, optional: {} },
-  'action.plan_chapter': { required: {}, optional: { chapter: 'number', intent: 'string' } },
+  'action.plan_chapter': { required: {}, optional: { chapter: 'number', intent: 'string', direction: 'string', empty: 'boolean' } },
 };
 
 // Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
@@ -375,7 +382,7 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
   'action.organise_notes': "organise the author's stored notes into Story Bible pages, records, a timeline and open questions — runs as a job and stages the result as a card",
   'action.plan_chapter':
-    'plan the next chapter — the lowest-numbered one without a draft — from `intent`, what the author agreed it should do; `chapter` must be that chapter when given — runs as a job and stages the plan as a card',
+    "plan the next chapter — the lowest-numbered one without a draft; `chapter` must be that chapter when given. Before planning, recap in your reply the two or three obligations that matter now (the previous chapter's hook, the longest-quiet promise, what the volume goal needs); when the author has not said what happens, offer two or three directions, each saying which obligation it moves and what it costs, and let the author choose. Then plan from `direction` (the one the author chose, as offered), `intent` (what the author says happens, in their words), or `empty: true` (an empty plan the author fills in). Runs as a job and stages the plan as a card; the plan never sets the chapter's content mode",
 };
 
 export function isActionOp(op: ChangeOp): op is ActionOp;

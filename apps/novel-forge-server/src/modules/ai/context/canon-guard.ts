@@ -49,6 +49,7 @@ interface LimitWorldFactRow {
 }
 
 interface PlannedScene {
+  summary?: string;
   goal?: string;
   obstacle?: string;
   turn?: string;
@@ -230,6 +231,7 @@ export function renderRevealViolation({ subject, field, factKey, revealChapter }
 function sceneFields(scene: PlannedScene, index: number): [string, string | undefined][] {
   const path = `scenes[${index}]`;
   return [
+    [`${path}.summary`, scene.summary],
     [`${path}.goal`, scene.goal],
     [`${path}.obstacle`, scene.obstacle],
     [`${path}.turn`, scene.turn],
@@ -325,6 +327,7 @@ function sanitiseScene<T extends PlannedScene>(scene: T, path: string, state: Sa
   const beats = scene.beats === undefined ? undefined : sanitiseList(scene.beats, `${path}.beats`, state);
   return withKnownKeys({
     ...scene,
+    summary: sanitiseOptional(scene.summary, `${path}.summary`, state),
     goal: sanitiseOptional(scene.goal, `${path}.goal`, state),
     obstacle: sanitiseOptional(scene.obstacle, `${path}.obstacle`, state),
     turn: sanitiseOptional(scene.turn, `${path}.turn`, state),

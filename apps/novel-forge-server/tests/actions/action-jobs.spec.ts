@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
+import { AppErrorCode } from '@server/classes';
 import { type Job, type Ledger, schema } from '@server/database';
 
 import { ActionJobService } from '@modules/actions/action-job.service';
 import { OrganiseJobService } from '@modules/actions/organise-job.service';
-import { planCardOp, PlanJobService } from '@modules/actions/plan-job.service';
+import { PlanJobService } from '@modules/actions/plan-job.service';
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from '@modules/ai/prompts/scope-playbooks';
 import { type NotesOrganiseOutput } from '@modules/ai/schemas/notes-organise.schema';
-import { type PlannedSlotBrief } from '@modules/generation/chapter-insert.service';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { ORGANISE_CHANGE_OPS } from '@modules/notes';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
@@ -61,6 +61,10 @@ interface Stored {
   chapters?: { number: number }[];
   appliedOrganise?: { id: bigint }[];
   organiseDecision?: { createdAt: Date }[];
+  briefs?: { chapter: number }[];
+  runningPlans?: { payload: unknown }[];
+  authorMessages?: string[];
+  claimHeldBy?: 'plan' | 'generate';
 }
 
 /**
@@ -75,6 +79,10 @@ function databaseOver(stored: Stored) {
       decisionLedgerEntries: { findMany: async () => stored.ledger ?? [] },
       chapters: { findMany: async () => stored.chapters ?? [] },
       drafts: { findMany: async () => stored.drafts ?? [] },
+      briefs: { findFirst: async () => stored.briefs?.[0] },
+      jobs: { findFirst: async () => stored.runningPlans?.[0] },
+      chatMessages: { findMany: async () => (stored.authorMessages ?? []).map(content => ({ content })) },
+      refinementProposals: { findFirst: async () => undefined },
     },
     select: () => ({
       from: (table: unknown) => ({
@@ -147,11 +155,13 @@ describe('OrganiseJobService', () => {
 });
 
 describe('PlanJobService', () => {
+  const GATE_PLAN = { op: 'brief.update', chapter: 3, body: 'Ilse reaches the gate.', title: 'The Gate' };
+
   function planner(stored: Stored) {
     const seen = recorder();
     const planned: unknown[][] = [];
-    const chapterInsert = { planNext: async (...args: unknown[]) => (planned.push(args), { body: 'Ilse reaches the gate.', title: 'The Gate' }) };
-    const service = new PlanJobService(databaseOver(stored) as never, seen.jobService as never, seen.workflowRunService as never, chapterInsert as never, seen.proposals as never);
+    const planner = { plan: async (...args: unknown[]) => (planned.push(args), GATE_PLAN) };
+    const service = new PlanJobService(databaseOver(stored) as never, seen.jobService as never, seen.workflowRunService as never, planner as never, seen.proposals as never);
     return { service, planned, ...seen };
   }
 
@@ -160,15 +170,16 @@ describe('PlanJobService', () => {
 
     await service.run(job({ kind: 'plan', payload: { chapter: 3, intent: 'She reaches the gate', origin: ORIGIN } }));
 
-    expect(planned).toEqual([[1n, 3, 'She reaches the gate', 'run-1']]);
-    expect(created).toEqual([
-      expect.objectContaining({
-        kind: 'chapter_plan',
-        sessionId: SESSION,
-        runId: 'run-1',
-        changeSet: [{ op: 'brief.update', chapter: 3, body: 'Ilse reaches the gate.', title: 'The Gate' }],
-      }),
-    ]);
+    expect(planned).toEqual([[1n, { chapter: 3, intent: 'She reaches the gate' }, 'run-1']]);
+    expect(created).toEqual([expect.objectContaining({ kind: 'chapter_plan', sessionId: SESSION, runId: 'run-1', changeSet: [GATE_PLAN], allowedOps: ['brief.update'] })]);
+  });
+
+  it('should hand the planner the author’s direction and empty-plan choice but never the job’s origin', async () => {
+    const { service, planned } = planner({ drafts: [{ chapter: 1 }, { chapter: 2 }] });
+
+    await service.run(job({ kind: 'plan', payload: { chapter: 3, direction: ' The mine floods ', empty: true, origin: ORIGIN } }));
+
+    expect(planned).toEqual([[1n, { chapter: 3, direction: 'The mine floods', empty: true }, 'run-1']]);
   });
 
   it('should not plan again when a retry finds the card its first attempt staged', async () => {
@@ -185,18 +196,28 @@ describe('PlanJobService', () => {
   it('should answer with the card another attempt staged when its own staging conflicts', async () => {
     const stored: Stored = { drafts: [{ chapter: 1 }, { chapter: 2 }] };
     const seen = recorder();
-    const chapterInsert = { planNext: async () => ({ body: 'Ilse reaches the gate.' }) };
+    const planner = { plan: async () => GATE_PLAN };
     const proposals = {
       create: async () => {
         stored.staged = [{ id: 41n }];
         throw new Error('duplicate key value violates unique constraint "refinement_proposals_job_card_run_id_unique"');
       },
     };
-    const service = new PlanJobService(databaseOver(stored) as never, seen.jobService as never, seen.workflowRunService as never, chapterInsert as never, proposals as never);
+    const service = new PlanJobService(databaseOver(stored) as never, seen.jobService as never, seen.workflowRunService as never, planner as never, proposals as never);
 
     await service.run(job({ kind: 'plan', payload: { chapter: 3 } }));
 
     expect(seen.progress.at(-1)).toMatchObject({ phase: 'staged', proposalId: '41' });
+  });
+
+  it('should refuse to stage a plan for a chapter a draft written while it was being made has moved past', async () => {
+    const stored: Stored = { drafts: [{ chapter: 1 }, { chapter: 2 }] };
+    const seen = recorder();
+    const planner = { plan: async () => (stored.drafts?.push({ chapter: 3 }), GATE_PLAN) };
+    const service = new PlanJobService(databaseOver(stored) as never, seen.jobService as never, seen.workflowRunService as never, planner as never, seen.proposals as never);
+
+    await expect(service.run(job({ kind: 'plan', payload: { chapter: 3 } }))).rejects.toMatchObject({ code: 'PLN_008' });
+    expect(seen.created).toEqual([]);
   });
 
   it('should refuse to plan a chapter a draft written while the job waited has moved past', async () => {
@@ -205,20 +226,6 @@ describe('PlanJobService', () => {
     await expect(service.run(job({ kind: 'plan', payload: { chapter: 3 } }))).rejects.toMatchObject({ code: 'PLN_006' });
     expect(planned).toEqual([]);
     expect(created).toEqual([]);
-  });
-
-  it('should carry the planner’s authored fields and leave out what it did not give', () => {
-    const planned: PlannedSlotBrief = { body: 'Body', pov: 'ilse', readerValue: ['new_information'], chapterPurpose: 'Why', endingContract: { mustEndWith: 'x' } };
-
-    expect(planCardOp(4, planned)).toEqual({
-      op: 'brief.update',
-      chapter: 4,
-      body: 'Body',
-      pov: 'ilse',
-      readerValue: ['new_information'],
-      chapterPurpose: 'Why',
-      endingContract: { mustEndWith: 'x' } as never,
-    });
   });
 });
 
@@ -229,7 +236,14 @@ describe('ActionJobService', () => {
     const dispatched: string[] = [];
     const handlers = new Map<Job.Kind, unknown>();
     const registry = new ActionExecutorRegistry();
-    const jobService = { enqueueJob: async (...args: unknown[]) => (enqueued.push(args), { id: 'job-1', outcome: stored.dedupe ? 'deduped' : 'inserted' }) };
+    const jobService = {
+      enqueueJob: async (...args: unknown[]) => {
+        if (stored.claimHeldBy === 'plan') stored.runningPlans = [{ payload: { chapter: 2 } }];
+        if (stored.claimHeldBy) throw AppErrorCode.JOB_002.create();
+        enqueued.push(args);
+        return { id: 'job-1', outcome: stored.dedupe ? 'deduped' : 'inserted' };
+      },
+    };
     const jobExecutor = { dispatch: async (jobId: string) => void dispatched.push(jobId), registerHandler: (kind: Job.Kind, handler: unknown) => handlers.set(kind, handler) };
     const workflowRunService = { createRun: async (...args: unknown[]) => (runs.push(args), 'run-1') };
     const service = new ActionJobService(databaseOver(stored) as never, jobService as never, jobExecutor as never, workflowRunService as never, {} as never, {} as never, registry);
@@ -238,14 +252,68 @@ describe('ActionJobService', () => {
   }
 
   it('should queue the next chapter’s plan as its own job and answer with its job and run', async () => {
-    const { registry, enqueued, runs, dispatched } = actions({ drafts: [{ chapter: 1 }] });
+    const { registry, enqueued, runs, dispatched } = actions({ drafts: [{ chapter: 1 }], authorMessages: ['Next chapter: Ilse reaches the salt gate at dawn.'] });
 
-    const result = await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', intent: ' She reaches the gate ' }, CARD);
+    const result = await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', intent: ' Ilse reaches the salt gate ' }, CARD);
 
     expect(result).toMatchObject({ jobId: 'job-1', runId: 'run-1' });
-    expect(enqueued).toEqual([[1n, 'plan', 'proposal-9-1', { chapter: 2, intent: 'She reaches the gate', origin: ORIGIN }]]);
-    expect(runs).toEqual([[1n, 'chapter-plan', 'proposal-9-1', { chapter: 2, intent: 'She reaches the gate' }, 'job-1']]);
+    expect(enqueued).toEqual([[1n, 'plan', 'proposal-9-1', { chapter: 2, intent: 'Ilse reaches the salt gate', origin: ORIGIN }]]);
+    expect(runs).toEqual([[1n, 'chapter-plan', 'proposal-9-1', { chapter: 2, intent: 'Ilse reaches the salt gate' }, 'job-1']]);
     expect(dispatched).toEqual(['job-1']);
+  });
+
+  it('should queue the direction the author chose, or an empty plan, as the plan job’s request', async () => {
+    const { registry, enqueued } = actions({ drafts: [{ chapter: 1 }] });
+
+    await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', direction: 'The mine floods', empty: true }, CARD);
+
+    expect(enqueued).toEqual([[1n, 'plan', 'proposal-9-1', { chapter: 2, direction: 'The mine floods', empty: true, origin: ORIGIN }]]);
+  });
+
+  it('should plan an intent the author never wrote as a direction, and let the author’s own direction win over it', async () => {
+    const { registry, enqueued } = actions({ drafts: [{ chapter: 1 }], authorMessages: ['What should happen next?'] });
+
+    await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', intent: 'She reaches the gate' }, CARD);
+    await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', intent: 'She reaches the gate', direction: 'The mine floods' }, CARD);
+
+    expect(enqueued.map(call => call[3])).toEqual([
+      { chapter: 2, direction: 'She reaches the gate', origin: ORIGIN },
+      { chapter: 2, direction: 'The mine floods', origin: ORIGIN },
+    ]);
+  });
+
+  it('should find an intent the author stated in an earlier turn, however short, but not one they only wondered about', async () => {
+    const plan = async (authorMessages: string[], intent: string) => {
+      const { registry, enqueued } = actions({ drafts: [{ chapter: 1 }], authorMessages });
+      await registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', intent }, CARD);
+      return enqueued[0]?.[3];
+    };
+
+    expect(await plan(['Yes, go ahead.', 'Next chapter: Ilse burns the ledger in the mine.'], 'Ilse burns the ledger')).toMatchObject({ intent: 'Ilse burns the ledger' });
+    expect(await plan(['She sells the lamp.'], 'She sells the lamp')).toMatchObject({ intent: 'She sells the lamp' });
+    expect(await plan(['Maybe Ilse burns the ledger?'], 'Ilse burns the ledger')).toMatchObject({ direction: 'Ilse burns the ledger' });
+  });
+
+  it('should refuse an empty plan for a chapter that already has one', async () => {
+    const { registry, enqueued } = actions({ drafts: [{ chapter: 1 }], briefs: [{ chapter: 2 }] });
+
+    await expect(registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter', empty: true }, CARD)).rejects.toMatchObject({ code: 'PLN_007' });
+    expect(enqueued).toEqual([]);
+  });
+
+  it('should say so when another card’s plan is already being made, rather than folding into it', async () => {
+    const { registry, enqueued } = actions({ drafts: [{ chapter: 1 }], runningPlans: [{ payload: { chapter: 2 } }] });
+
+    await expect(registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter' }, CARD)).rejects.toMatchObject({ code: 'PLN_009', data: { chapter: '2' } });
+    expect(enqueued).toEqual([]);
+  });
+
+  it('should name a plan already being made when the authoring claim refuses the job, and leave any other holder’s refusal as it is', async () => {
+    const planning = actions({ drafts: [{ chapter: 1 }], claimHeldBy: 'plan' });
+    const writing = actions({ drafts: [{ chapter: 1 }], claimHeldBy: 'generate' });
+
+    await expect(planning.registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter' }, CARD)).rejects.toMatchObject({ code: 'PLN_009' });
+    await expect(writing.registry.get('action.plan_chapter')?.(1n, { op: 'action.plan_chapter' }, CARD)).rejects.toMatchObject({ code: 'JOB_002' });
   });
 
   it('should refuse a plan card for any chapter but the next one', async () => {

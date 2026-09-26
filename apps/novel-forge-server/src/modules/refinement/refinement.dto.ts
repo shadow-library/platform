@@ -142,7 +142,10 @@ export class ProposalResponse {
   })
   error?: Record<string, unknown> | null;
 
-  @Field(() => [String], { description: 'Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply.' })
+  @Field(() => [String], {
+    description:
+      'Advisory findings from deterministic checks on the proposal, such as a removal written as a negation; a chapter plan card also carries its pooling, point-of-view and density diagnostics, judged again on every edit. None blocks the proposal. Empty when none apply.',
+  })
   warnings: string[];
 
   @Field(() => String, { format: 'date-time' })

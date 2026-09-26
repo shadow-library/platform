@@ -5,9 +5,15 @@ import { type ContentRating } from '@shadow-library/sdk';
 import { jsonb } from './jsonb';
 import { contentGenerator, contentMode, projects } from './projects';
 
+/** A planned scene; the planner's goal, obstacle, turn, beats and length ride along so the writer's brief can be rendered from the scenes. */
 export interface BriefScene {
   summary: string;
   pov: string | null;
+  goal?: string;
+  obstacle?: string;
+  turn?: string;
+  beats?: string[];
+  estimatedWords?: number;
 }
 
 export namespace Generation {

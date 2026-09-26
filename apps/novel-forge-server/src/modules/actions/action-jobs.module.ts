@@ -10,6 +10,7 @@ import { RefinementModule } from '../refinement/refinement.module';
 import { ActionJobService } from './action-job.service';
 import { ChatJobReader } from './chat-job.reader';
 import { ChatJobService } from './chat-job.service';
+import { ChapterPlanService } from './chapter-plan.service';
 import { ChatJobsController } from './chat-jobs.controller';
 import { OrganiseJobService } from './organise-job.service';
 import { PlanJobService } from './plan-job.service';
@@ -17,7 +18,7 @@ import { PlanJobService } from './plan-job.service';
 @Module({
   imports: [DatabaseModule, AiModule, EventsModule, GenerationModule, JobsModule, PluginsModule, RefinementModule],
   controllers: [ChatJobsController],
-  providers: [ActionJobService, OrganiseJobService, PlanJobService, ChatJobReader, ChatJobService],
+  providers: [ActionJobService, ChapterPlanService, OrganiseJobService, PlanJobService, ChatJobReader, ChatJobService],
   exports: [ActionJobService],
 })
 export class ActionJobsModule {}

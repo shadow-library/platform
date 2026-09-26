@@ -284,12 +284,6 @@ export class ChapterInsertService {
     return Math.max(chapter?.number ?? 0, brief?.chapter ?? 0);
   }
 
-  /** Drafts the next chapter's plan from the author's intent with the same outline call an insert makes, with no renumbering to picture. */
-  planNext(projectId: bigint, chapter: number, intent: string | undefined, runId: string): Promise<PlannedSlotBrief> {
-    const direction = intent?.trim() ? ` Author's intent: ${intent.trim()}` : '';
-    return this.outlineSlot(projectId, chapter, `Plan chapter ${chapter}, the next chapter to write.${direction}`, false, runId);
-  }
-
   private planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
     return this.outlineSlot(projectId, afterChapter + 1, `Insert a single new chapter here. Author's intent: ${intent}`, true);
   }

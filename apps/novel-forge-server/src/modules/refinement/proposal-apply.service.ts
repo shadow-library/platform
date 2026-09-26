@@ -10,12 +10,14 @@ import {
   auditCardSelection,
   briefContentHash,
   changedCluesNamingTerms,
+  composePlanBody,
   computeBibleDocHash,
   enforcePlanWrite,
   findMilestoneReferences,
   lockProjectPlan,
   markDescendantDraftsStale,
   nearestVolumeKey,
+  nextWritableChapter,
   normalizeBriefScenes,
   normalizeStringList,
   planFrontier,
@@ -174,6 +176,15 @@ async function enforcePlanOps(tx: PrimaryDatabase, projectId: bigint, ops: reado
   await enforcePlanWrite(tx, projectId, written);
 }
 
+/** A plan pass plans only the next chapter, so its card goes out of date once a draft moves the story past the chapter it planned. */
+async function assertPlanCardCurrent(tx: PrimaryDatabase, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
+  const planned = ops.flatMap(op => (op.op === 'brief.update' ? [op.chapter] : []));
+  if (planned.length === 0) return;
+  const next = await nextWritableChapter(tx, projectId);
+  const stale = planned.find(chapter => chapter !== next);
+  if (stale !== undefined) throw AppErrorCode.PLN_008.create({ chapter: String(stale), next: String(next) });
+}
+
 /** The one gate between an op and the artifact it edits: its rationale and quote explain the change to the author and are never stored beside the content they describe. */
 function withoutMetadata<T extends ChangeOp>(op: T): T {
   if (!OP_METADATA_FIELDS.some(field => field in op)) return op;
@@ -259,6 +270,7 @@ export class ProposalApplyService {
       const inverseOps: ContentOp[] = [];
       const selectedContent = contentOps.map(entry => entry.op);
       if (selectedContent.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
+      if (proposal.kind === 'chapter_plan') await assertPlanCardCurrent(ctx.tx, projectId, selectedContent);
       for (const op of removalsLast(selectedContent)) {
         const inverse = await this.captureInverse(ctx, op);
         await this.applyOp(ctx, op);
@@ -492,9 +504,11 @@ export class ProposalApplyService {
       writeMode: brief.writeMode,
       handEdited: brief.handEdited,
       contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
-      pov: brief.pov ?? undefined,
+      pov: brief.pov,
       chapterPurpose: brief.chapterPurpose ?? undefined,
       readerValue: (brief.readerValue as string[] | null) ?? undefined,
+      repetitionRisks: brief.repetitionRisks,
+      densityRisk: brief.densityRisk,
       endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
       // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
       knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
@@ -723,9 +737,11 @@ export class ProposalApplyService {
       writeMode: op.writeMode ?? existing?.writeMode ?? 'standard',
       volumeKey: op.volumeKey !== undefined ? op.volumeKey : existing ? existing.volumeKey : await nearestVolumeKey(ctx.tx, ctx.projectId, op.chapter),
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
-      pov: op.pov ?? existing?.pov ?? null,
+      pov: op.pov !== undefined ? op.pov?.trim() || null : (existing?.pov ?? null),
       chapterPurpose: op.chapterPurpose ?? existing?.chapterPurpose ?? null,
       readerValue: op.readerValue ?? existing?.readerValue ?? null,
+      repetitionRisks: op.repetitionRisks !== undefined ? op.repetitionRisks : (existing?.repetitionRisks ?? null),
+      densityRisk: op.densityRisk !== undefined ? op.densityRisk?.trim() || null : (existing?.densityRisk ?? null),
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
       knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
       direction: op.direction !== undefined ? op.direction?.trim() || null : (existing?.direction ?? null),
@@ -734,6 +750,7 @@ export class ProposalApplyService {
       claimedMilestones: op.claimedMilestones !== undefined ? op.claimedMilestones && normalizeStringList(op.claimedMilestones) : (existing?.claimedMilestones ?? null),
       isEnding: op.isEnding ?? existing?.isEnding ?? false,
     };
+    if (op.scenes !== undefined) merged.body = composePlanBody(merged.body, merged.scenes ?? []);
     const contentHash = briefContentHash({ ...existing, chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;
 

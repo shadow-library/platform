@@ -93,6 +93,18 @@ describe('GenerationService.updateBrief — chapter plan fields', () => {
     expect(written.set).toMatchObject({ direction: null, contentMode: null, scenes: null, claimedMilestones: null });
   });
 
+  it('should keep the planner’s scene details and write the scenes into the writer’s brief', async () => {
+    const { service, written } = makeService();
+    const scene = { summary: 'The lamp gutters', pov: 'mira', goal: 'Keep it lit', beats: ['She cups the flame.'], estimatedWords: 800 };
+
+    await service.updateBrief(7n, 4, { body: 'The keeper climbs the stair.\nScene 1. An old scene line.', scenes: [scene] });
+
+    expect(written.set).toMatchObject({
+      scenes: [scene],
+      body: 'The keeper climbs the stair.\nScene 1 (~800 words). The lamp gutters. Goal: Keep it lit. Beats: She cups the flame. POV: mira.',
+    });
+  });
+
   it('should refuse a scene whose summary is blank', async () => {
     const { service, written } = makeService();
 

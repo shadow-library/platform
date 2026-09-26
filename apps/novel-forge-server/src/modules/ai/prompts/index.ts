@@ -10,6 +10,7 @@ import { volumesPrompt } from './bible-builder/volumes.prompt';
 import { worldPrompt } from './bible-builder/world.prompt';
 import { chapterExpandPrompt } from './chapter-expand.prompt';
 import { chapterExtractPrompt } from './chapter-extract.prompt';
+import { chapterPlanPrompt } from './chapter-plan.prompt';
 import { chapterSummarizePrompt } from './chapter-summarize.prompt';
 import { chatCompactPrompt } from './chat-compact.prompt';
 import { chatTitlePrompt } from './chat-title.prompt';
@@ -59,6 +60,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'notes-organise': notesOrganisePrompt as PromptModule<unknown>,
+  'chapter-plan': chapterPlanPrompt as PromptModule<unknown>,
 };
 
 export * from './types';
@@ -67,3 +69,4 @@ export * from './scope-playbooks';
 export { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
 export { CONTRADICTION_OPS } from './bible-contradiction.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
+export { chapterPlanPrompt } from './chapter-plan.prompt';

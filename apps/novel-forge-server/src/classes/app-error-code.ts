@@ -71,6 +71,9 @@ export class AppErrorCode extends ServerErrorCode {
   );
   static readonly PLN_005 = AppErrorCode.badRequest('PLN_005', 'Chapter {chapter} is finalized — its plan can no longer change');
   static readonly PLN_006 = AppErrorCode.badRequest('PLN_006', 'Only the next chapter can be planned — that is chapter {next}, not chapter {chapter}');
+  static readonly PLN_007 = AppErrorCode.conflict('PLN_007', 'Chapter {chapter} already has a plan — edit it instead');
+  static readonly PLN_008 = AppErrorCode.conflict('PLN_008', 'The plan for chapter {chapter} is out of date — the story has moved on to chapter {next}; plan again');
+  static readonly PLN_009 = AppErrorCode.conflict('PLN_009', 'A plan for chapter {chapter} is already being made — wait for it or cancel it');
 
   /*!
    * Draft Errors

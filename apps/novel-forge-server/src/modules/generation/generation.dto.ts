@@ -111,6 +111,21 @@ export class BriefSceneSchema {
 
   @Field({ optional: true, nullable: true, description: 'Entity key of the scene’s point-of-view character.' })
   pov?: string | null;
+
+  @Field({ optional: true, description: 'What the point-of-view character wants in the scene.' })
+  goal?: string;
+
+  @Field({ optional: true, description: 'Who or what stands in the way.' })
+  obstacle?: string;
+
+  @Field({ optional: true, description: 'How things stand differently when the scene ends.' })
+  turn?: string;
+
+  @Field(() => [String], { optional: true, description: 'The on-page beats of the scene, in order.' })
+  beats?: string[];
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'The share of the chapter length the scene fills, in words.' })
+  estimatedWords?: number;
 }
 
 @Schema()
