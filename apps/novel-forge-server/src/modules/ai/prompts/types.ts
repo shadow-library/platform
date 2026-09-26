@@ -26,6 +26,7 @@ export type PromptKey =
   | 'bible:volumes'
   | 'premise-enhance'
   | 'bible-audit'
+  | 'bible-contradiction'
   | 'chat-refine'
   | 'chat-compact'
   | 'chat-title'

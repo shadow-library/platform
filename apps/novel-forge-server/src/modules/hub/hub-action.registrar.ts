@@ -5,6 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
+import { BibleAuditService } from '../audit/bible-audit.service';
 import { GenerationService } from '../generation/generation.service';
 import { type ActionExecutionResult, ActionExecutorRegistry } from '../refinement';
 import { RefineService } from '../refinement/refine.service';
@@ -29,6 +30,7 @@ export class HubActionRegistrar {
     private readonly generationService: GenerationService,
     private readonly refineService: RefineService,
     private readonly reviewService: ChapterReviewService,
+    private readonly auditService: BibleAuditService,
   ) {}
 
   onModuleInit(): void {
@@ -41,9 +43,8 @@ export class HubActionRegistrar {
     });
 
     registry.register('action.audit_bible', async projectId => {
-      const result = await this.refineService.auditBible(projectId);
-      if (!result.proposal) return { summary: `bible audit found nothing to change (${result.findings.length} finding(s))`, runId: result.runId };
-      return pendingChainProposal(result.proposal, result.runId, `bible audit staged ${result.findings.length} finding(s)`);
+      const { jobId, runId } = await this.auditService.start(projectId);
+      return { summary: 'bible audit queued', jobId, runId };
     });
 
     registry.register('action.enhance_premise', async (projectId, action) => {

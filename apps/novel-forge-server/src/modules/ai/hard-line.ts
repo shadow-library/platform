@@ -171,6 +171,7 @@ const BACKGROUND_INPUTS: Readonly<Record<string, string>> = {
   docInventory: 'The Story Bible',
   entityInventory: 'The Story Bible',
   manifest: 'The Story Bible',
+  material: 'The Story Bible',
   scopeInstructions: 'The instructions',
   turnRules: 'The instructions',
   section: 'The instructions',

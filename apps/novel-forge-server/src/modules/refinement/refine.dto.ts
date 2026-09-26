@@ -58,30 +58,6 @@ export class EnhancePremiseResponse {
 }
 
 @Schema()
-export class AuditFindingResponse {
-  @Field()
-  ref: string;
-
-  @Field()
-  action: string;
-
-  @Field()
-  finding: string;
-}
-
-@Schema()
-export class AuditBibleResponse {
-  @Field(() => ProposalResponse, { optional: true })
-  proposal?: ProposalResponse;
-
-  @Field(() => [AuditFindingResponse])
-  findings: AuditFindingResponse[];
-
-  @Field()
-  runId: string;
-}
-
-@Schema()
 export class ContextPreviewQuery {
   @Field({ enum: ['generation', 'outline', 'chat', 'premise', 'audit'] })
   purpose: string;

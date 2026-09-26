@@ -43,6 +43,13 @@
       "when": 1790423467625,
       "tag": "0005_brief_content_mode_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790424027364,
+      "tag": "0006_bible_audit_reports",
+      "breakpoints": true
     }
   ]
 }

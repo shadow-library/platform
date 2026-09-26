@@ -88,6 +88,9 @@
   autosave to retry. An autosave folds into the revision it continues while that revision is the author's own hand edit, under
   ten minutes old, never approved, reviewed or stale: it keeps one history row, and the cascade (later drafts stale, reveals revoked) still runs on every save. Reviews bind
   to the save sequence as well as the revision, and approvals to the draft id too. `approvedRevision` keeps the last approved revision through later edits and finalize.
+- **Story Bible audit**: two passes stored as one report — coverage against the manifest (add / revise / remove) and a contradiction check comparing pages, entity
+  records, canon facts and the summaries of finalized, non-isolated chapters. It always runs as an `audit` job (the hub action, `POST /bible/audits` and the legacy
+  `POST /bible/audit` all queue it). Its changes wait on one card; the author keeps or skips each finding, and applying the card applies only what is kept.
 - **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation, the latest validation
   report holds an error for this chapter, the draft is stale, or a blocking finding is still open on its latest judge review. Readiness answers from the same checks. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
   another), sets each revealed fact's `disclosedInChapter` unless an earlier chapter set it, and reaches the claimed milestones; a replay finds nothing left to do.
@@ -233,6 +236,22 @@
 - A check the judge left out is never claimed: it is dropped from what was checked and reported as not assessed, so "No issue detected" cannot follow from an omission.
 - Reviews of an isolated or unrestricted chapter are marked `isolated`: their findings quote prose a standard model must not read.
 
+### Story Bible audit
+
+- A report claims only what was read: a pass that failed, a page read in part, an entry over budget, a finalized chapter without a summary and an isolated chapter
+  narrow "Checked: …"; facts and chapters are claimed only when the contradiction pass ran. A clean report says it found nothing and lists what it checked.
+- Isolated chapters are never read, not even their summaries; standard chapters are read by summary only, the most recent first when they run over budget.
+- Evidence cites only a source the audit read, and a quote only when three or more of its words are found there. A contradiction with no such quote is dropped; one
+  that does not quote both sides (two sources, or two non-overlapping passages of one) is reported without a card.
+- The audit is author-facing and reads secrets, but it never stages a fix that adds a secret where the chapter writer reads it (a page, an entity record, a fact's
+  writer note, allowed clues or a revealable fact's body), nor one that changes a secret's reveal, unlock or give-away terms; the finding says why. Only what the fix
+  adds to the record counts, so correcting a page that already names a secret is not held against it.
+- The material and the card's baseline are read in one repeatable-read snapshot, so an edit made while the audit ran conflicts at apply. Two findings changing one record
+  differently stage only the first. A cancelled audit stores nothing.
+- The server enforces Keep and Skip: applying an audit card with no selection applies what was kept, a selection must stay within it, a card with nothing kept is
+  refused, and a card a report points into cannot be edited. Skipping every finding discards the card; keeping one again restages it through the ordinary proposal
+  checks on the audit's baseline. A card applied, undone or conflicted settles the report.
+
 ### Proposals and chat
 
 - Chat, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
@@ -282,7 +301,8 @@
 
 ## Open work
 
-- Bible audit does not flag spoiler prose outside `canon_facts`; nothing scans for it.
+- Bible audit does not flag spoiler prose already on a page outside `canon_facts`; it only refuses to stage text a fix adds that carries a secret, which it recognises by
+  give-away term, the truth quoted, or most of the truth's words in one sentence — a paraphrase in other words still passes.
 - Cancellation is process-local: a cancel reaches only the replica running the work.
 - The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered
   `DRF_013` until the cascade locks them in chapter order.

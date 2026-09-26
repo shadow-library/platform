@@ -7,6 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import {
   assertMilestoneSubject,
   assertStartsNextChapter,
+  auditCardSelection,
   briefContentHash,
   changedCluesNamingTerms,
   computeBibleDocHash,
@@ -217,7 +218,8 @@ export class ProposalApplyService {
       if (proposal.status !== 'pending') throw AppErrorCode.RFN_002.create();
 
       const ops = proposal.changeSet as ChangeOp[];
-      const selected = this.resolveSelection(ops, options?.opIndexes);
+      const auditSelection = proposal.kind === 'bible_audit' ? await auditCardSelection(tx, proposal.id, options?.opIndexes) : undefined;
+      const selected = this.resolveSelection(ops, auditSelection ?? options?.opIndexes);
       const selectedOps = selected.map(index => ({ index, op: ops[index] as ChangeOp }));
       const contentOps = selectedOps.filter((s): s is { index: number; op: ContentOp } => !isActionOp(s.op));
       const selectedActions = selectedOps.filter((s): s is { index: number; op: ActionOp } => isActionOp(s.op));

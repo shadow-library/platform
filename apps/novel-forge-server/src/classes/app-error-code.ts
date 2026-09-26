@@ -276,6 +276,20 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly REV_007 = AppErrorCode.conflict('REV_007', 'Chapter {chapter} is still being written — review it once the draft is ready');
 
   /*!
+   * Story Bible Audit Errors
+   */
+  static readonly AUD_001 = AppErrorCode.notFound('AUD_001', 'Audit report not found');
+  static readonly AUD_002 = AppErrorCode.notFound('AUD_002', 'That finding is not part of this audit report');
+  static readonly AUD_003 = AppErrorCode.conflict(
+    'AUD_003',
+    'The changes from this audit were already applied or undone — run the audit again to review the Story Bible as it is now',
+  );
+  static readonly AUD_004 = AppErrorCode.unavailable('AUD_004', 'Neither audit check could run — try the audit again');
+  static readonly AUD_005 = AppErrorCode.conflict('AUD_005', 'Every finding on this audit card was skipped — keep one before applying it');
+  static readonly AUD_006 = AppErrorCode.badRequest('AUD_006', 'An audit card applies only changes from findings you kept — keep the finding first');
+  static readonly AUD_007 = AppErrorCode.badRequest('AUD_007', 'An audit card changes only by keeping or skipping its findings — run the audit again for different changes');
+
+  /*!
    * Publishing Errors
    */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');

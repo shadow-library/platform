@@ -4,11 +4,12 @@ import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { findAuditReportForCard } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
-import { loadArtifactStates } from './artifact-state';
+import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
@@ -46,6 +47,12 @@ export interface CreateProposalInput {
   warnings?: string[];
   /** Read from an isolated chapter: the proposal carries a warning saying so, which also holds it from any automatic apply. */
   sourceIsolated?: boolean;
+  /** States read before the change-set was written (an audit's, taken as it loaded the bible), so an edit made meanwhile conflicts at apply; read now otherwise. */
+  baseline?: Readonly<Record<string, ArtifactState>>;
+}
+
+function pickBaseline(states: Readonly<Record<string, ArtifactState>>, refs: readonly string[]): Record<string, ArtifactState> {
+  return Object.fromEntries(refs.map(ref => [ref, states[ref] ?? MISSING_ARTIFACT]));
 }
 
 type ApproveDraftOp = Extract<ChangeOp, { op: 'action.approve_draft' }>;
@@ -110,7 +117,7 @@ export class ProposalService {
 
     const changeSet = await stampApprovalRevisions(executor, projectId, input.changeSet, false);
     const refs = changeSetRefs(changeSet);
-    const baseline = await loadArtifactStates(executor, projectId, refs);
+    const baseline = input.baseline ? pickBaseline(input.baseline, refs) : await loadArtifactStates(executor, projectId, refs);
     // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
     const warnings = [
       ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
@@ -244,6 +251,8 @@ export class ProposalService {
   async updateChangeSet(projectId: bigint, proposalId: bigint, changeSet: unknown): Promise<Refinement.Proposal> {
     const existing = await this.get(projectId, proposalId);
     if (existing.status !== 'pending') throw AppErrorCode.RFN_002.create();
+    // A finding's op indexes point into the card as staged, so an edit would re-aim every Keep and Skip.
+    if (existing.kind === 'bible_audit' && (await findAuditReportForCard(this.db, existing.id))) throw AppErrorCode.AUD_007.create();
 
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();

@@ -12,10 +12,8 @@ import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { chatPromptTokens, chatScopeInstructions, PROMPT_REGISTRY } from '../ai/prompts';
-import { type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { type PremiseEnhanceOutput } from '../ai/schemas';
 import { toolsForNode } from '../ai/tools';
-import { renderDocInventory, renderEntityInventory } from '../bible/bible-inventory';
-import { renderManifest } from '../bible/bible-manifest';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
@@ -24,12 +22,6 @@ import { type ContextPreviewResponse } from './refine.dto';
 export interface PremiseEnhanceResult {
   proposal: Refinement.Proposal;
   rationale: Omit<PremiseEnhanceOutput, 'changeSet'>;
-  runId: string;
-}
-
-export interface BibleAuditResult {
-  proposal: Refinement.Proposal | null;
-  findings: BibleAuditOutput['findings'];
   runId: string;
 }
 
@@ -100,54 +92,6 @@ export class RefineService {
     });
 
     this.logger.info('enhancePremise: staged proposal', { projectId, runId, proposalId: result.proposal.id });
-    return { ...result, runId };
-  }
-
-  /**
-   * Audits the bible against the required-document manifest: drafted content for what is
-   * missing or thin, removals for dead weight — all staged through the same proposal pipe. A clean
-   * bible returns findings with no proposal.
-   */
-  async auditBible(projectId: bigint): Promise<BibleAuditResult> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw AppErrorCode.PRJ_001.create();
-
-    const prompt = PROMPT_REGISTRY['bible-audit'];
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'audit' }, project);
-    const [pack, docs, entities] = await Promise.all([
-      this.contextAssembler.forAudit(projectId, { policy }),
-      this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
-      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true, name: true, type: true } }),
-    ]);
-    const docInventory = renderDocInventory(docs);
-    const entityInventory = renderEntityInventory(entities);
-    this.logger.info('auditBible: starting', { projectId, existingDocs: docs.length, existingEntities: entities.length });
-
-    const { runId, result } = await this.workflowRunService.runChain(projectId, 'bible-audit', 'bible', {}, async runId => {
-      await this.workflowRunService.linkContextPack(runId, pack.id);
-      const ctx = { projectId, runId, node: 'bible-audit', promptKey: prompt.key, promptVersion: prompt.version, role: 'audit' };
-      const output = (await this.modelRouter.structured(
-        prompt,
-        { stableContext: pack.rendered, docInventory, entityInventory, manifest: renderManifest() },
-        ctx,
-        project as ProjectConfig,
-        policy,
-      )) as BibleAuditOutput;
-
-      this.logger.info('auditBible: findings', { projectId, runId, findings: output.findings.length, changeSetOps: output.changeSet.length });
-      if (output.changeSet.length === 0) return { proposal: null, findings: output.findings };
-
-      const proposal = await this.proposalService.create(projectId, {
-        scopeType: 'novel',
-        kind: 'bible_audit',
-        summary: `bible audit: ${output.changeSet.length} canon change(s) proposed`,
-        changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'],
-        runId,
-      });
-      return { proposal, findings: output.findings };
-    });
-
     return { ...result, runId };
   }
 

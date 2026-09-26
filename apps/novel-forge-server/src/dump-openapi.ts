@@ -14,6 +14,7 @@ const { AppModule } = await import('./app.module');
 const { WorkflowRunService } = await import('@modules/ai/graphs/workflow-run.service');
 const { AuthoringJobJanitor, CheckpointJanitor, JobExecutor, JobService, PublicationJanitor } = await import('@modules/jobs');
 const { ChapterReviewService } = await import('@modules/review');
+const { BibleAuditService } = await import('@modules/audit');
 
 /** Each of these recovers, dispatches, sweeps or registers jobs at boot; the workflow runner opens its own LangGraph checkpoint connection */
 const overrides = [
@@ -27,6 +28,7 @@ const overrides = [
   withoutStartupHooks(CheckpointJanitor),
   withoutStartupHooks(PublicationJanitor),
   withoutStartupHooks(ChapterReviewService),
+  withoutStartupHooks(BibleAuditService),
 ];
 await dumpOpenApiDocument(AppModule, { outputPath: process.argv[2], overrides });
 process.exit(0);

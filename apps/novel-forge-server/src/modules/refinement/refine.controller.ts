@@ -3,7 +3,7 @@ import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@sha
 
 import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
-import { AuditBibleResponse, ContextPreviewQuery, ContextPreviewResponse, EnhancePremiseBody, EnhancePremiseResponse, RefineProjectParams } from './refine.dto';
+import { ContextPreviewQuery, ContextPreviewResponse, EnhancePremiseBody, EnhancePremiseResponse, RefineProjectParams } from './refine.dto';
 import { RefineService } from './refine.service';
 import { serialiseProposal } from './serialise';
 
@@ -19,14 +19,6 @@ export class RefineController {
   @RespondFor(200, EnhancePremiseResponse)
   enhancePremise(@Params() params: RefineProjectParams, @Body() body: EnhancePremiseBody): Promise<EnhancePremiseResponse> {
     return this.refineService.enhancePremise(params.projectId, body.overview).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @BotPermission(GENERATION_RUN_PERMISSION)
-  @Post('/bible/audit')
-  @RespondFor(200, AuditBibleResponse)
-  auditBible(@Params() params: RefineProjectParams): Promise<AuditBibleResponse> {
-    return this.refineService.auditBible(params.projectId).then(r => ({ ...r, proposal: r.proposal ? serialiseProposal(r.proposal) : undefined }));
   }
 
   @BotPermission(GENERATION_RUN_PERMISSION)

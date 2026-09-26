@@ -1,5 +1,6 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
+import { bibleContradictionPrompt } from './bible-contradiction.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
@@ -50,6 +51,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'bible:volumes': volumesPrompt as PromptModule<unknown>,
   'premise-enhance': premiseEnhancePrompt as PromptModule<unknown>,
   'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
+  'bible-contradiction': bibleContradictionPrompt as PromptModule<unknown>,
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
@@ -63,4 +65,5 @@ export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
+export { CONTRADICTION_OPS } from './bible-contradiction.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';

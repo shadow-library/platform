@@ -344,7 +344,8 @@ const VALIDATION_SCOPES = ['novel', 'chapter'];
 const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.generate_chapter':
     'draft one planned chapter from its plan (drafted, judged, and queued for review) — chapters are written in order, so it must be the next one without a draft; never auto-applied',
-  'action.audit_bible': 'audit the story bible for missing/pointless documents — stages a bible-audit proposal',
+  'action.audit_bible':
+    'queue a Story Bible audit: missing, thin or pointless pages and records, and contradictions between pages, records, facts and finalized chapters — its report holds the findings and one card of proposed changes',
   'action.enhance_premise': 'evaluate and strengthen the premise as a web novel — stages a premise proposal',
   'action.judge_draft': 'run the continuity judge on one chapter draft',
   'action.revise_draft': 'revise one chapter draft using `note` as the revision feedback',

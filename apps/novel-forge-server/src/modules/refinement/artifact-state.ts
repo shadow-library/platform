@@ -20,7 +20,7 @@ interface ParsedRefs {
   milestoneKeys: string[];
 }
 
-const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
+export const MISSING_ARTIFACT: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
   const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [], milestoneKeys: [] };
@@ -48,7 +48,7 @@ function parseRefs(refs: string[]): ParsedRefs {
 export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Record<string, ArtifactState>> {
   const parsed = parseRefs(refs);
   const states: Record<string, ArtifactState> = {};
-  for (const ref of refs) states[ref] = MISSING;
+  for (const ref of refs) states[ref] = MISSING_ARTIFACT;
 
   if (parsed.premise) {
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });

@@ -224,7 +224,7 @@ describe('HubActionRegistrar action.approve_draft', () => {
         return draftRow();
       },
     };
-    new HubActionRegistrar(registry, generation as never, {} as never, {} as never).onModuleInit();
+    new HubActionRegistrar(registry, generation as never, {} as never, {} as never, {} as never).onModuleInit();
     const approve = registry.get('action.approve_draft');
     if (!approve) throw new Error('approve executor missing');
     return { approve, approvals };
@@ -274,7 +274,7 @@ describe('HubActionRegistrar action.generate_chapter', () => {
     const registry = new ActionExecutorRegistry();
     const calls: unknown[][] = [];
     const generation = { generateChapter: async (...args: unknown[]) => (calls.push(args), { jobId: 'job-1', kind: 'generate', status: 'pending', target: '5' }) };
-    new HubActionRegistrar(registry, generation as never, {} as never, {} as never).onModuleInit();
+    new HubActionRegistrar(registry, generation as never, {} as never, {} as never, {} as never).onModuleInit();
     const generate = registry.get('action.generate_chapter');
 
     const result = await generate?.(1n, { op: 'action.generate_chapter', chapter: 5 });
@@ -285,7 +285,7 @@ describe('HubActionRegistrar action.generate_chapter', () => {
 
   it('should register no executor for the removed planning actions', () => {
     const registry = new ActionExecutorRegistry();
-    new HubActionRegistrar(registry, {} as never, {} as never, {} as never).onModuleInit();
+    new HubActionRegistrar(registry, {} as never, {} as never, {} as never, {} as never).onModuleInit();
 
     for (const action of ['action.plan_volumes', 'action.plan_arcs', 'action.outline_arc', 'action.approve_volume_plan', 'action.approve_arcs', 'action.generate_chapters']) {
       expect(registry.get(action as never)).toBeUndefined();
