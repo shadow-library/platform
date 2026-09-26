@@ -19,6 +19,7 @@ import {
   type ApplyProposalResponse,
   type BibleAuditJobResponse,
   type CancelRunResponse,
+  type ChangeOpItem,
   type ChatMessageResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
@@ -715,6 +716,20 @@ export function useRollbackMutation(projectId: string): UseMutationResult<Rollba
   return useMutation<RollbackResponse, ApiError, string>({
     mutationFn: afterProposalId => APIRequest.post(`/projects/${projectId}/changes/rollback`).body({ afterProposalId }).execute(),
     onSuccess: () => invalidateProposals(queryClient, projectId),
+  });
+}
+
+export interface UpdateProposalVariables {
+  proposalId: string;
+  changeSet: ChangeOpItem[];
+}
+
+/** Replaces a pending card's change-set; the server re-checks it and returns the card with its warnings judged again. */
+export function useUpdateProposalMutation(projectId: string): UseMutationResult<ProposalResponse, ApiError, UpdateProposalVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<ProposalResponse, ApiError, UpdateProposalVariables>({
+    mutationFn: ({ proposalId, changeSet }) => APIRequest.patch(`/projects/${projectId}/proposals/${proposalId}`).body({ changeSet }).execute(),
+    onSuccess: proposal => queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal),
   });
 }
 

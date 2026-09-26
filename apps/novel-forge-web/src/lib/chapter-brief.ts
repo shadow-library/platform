@@ -270,7 +270,7 @@ function isHookType(value: unknown): value is HookType {
   return typeof value === 'string' && (HOOK_TYPES as readonly string[]).includes(value);
 }
 
-function endingDraftOf(value: unknown): EndingDraft {
+export function endingDraftOf(value: unknown): EndingDraft {
   const record = value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const field = (key: string): string => (typeof record[key] === 'string' ? record[key] : '');
   return {
