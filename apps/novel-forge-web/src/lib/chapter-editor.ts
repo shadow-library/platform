@@ -183,6 +183,32 @@ export function leaveWarning(state: EditorState): string {
   return 'Your latest edits to this chapter aren’t saved yet. Leaving now loses them.';
 }
 
+/** What a write that must stand on saved text — a restore, a passage rewrite — found when it asked the editor to settle. */
+export type SettledBase = { kind: 'settled'; base: DraftBase } | { kind: 'unsettled'; status: EditorStatus };
+
+export function settledBaseOf(state: EditorState): SettledBase {
+  if (!isSettled(state)) return { kind: 'unsettled', status: state.status };
+  const { draftId, revision, saveSeq } = state.base;
+  return { kind: 'settled', base: { draftId, revision, saveSeq } };
+}
+
+export function unsettledMessage(status: EditorStatus): string {
+  switch (status) {
+    case 'conflict':
+      return 'A newer version of this chapter arrived while you were editing — choose which text to keep, then try again.';
+    case 'held':
+      return 'The AI is writing this chapter, so your edits can’t be saved yet — try again once it’s done.';
+    case 'locked':
+      return 'This chapter is final — its text is locked.';
+    case 'deleted':
+      return 'This chapter was deleted.';
+    case 'failed':
+      return 'Your edits couldn’t be saved — save them, then try again.';
+    default:
+      return 'Your edits aren’t saved yet — save them, then try again.';
+  }
+}
+
 export type SaveLabel = 'Saving…' | 'Unsaved changes' | 'Not saved' | 'Saved';
 
 export function saveLabel(state: EditorState): SaveLabel {

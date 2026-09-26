@@ -1,0 +1,142 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  font-family: var(--sh-font-sans);
+  font-size: var(--sh-text-body);
+  line-height: 22px;
+  color: var(--sh-text-primary);
+}
+
+.card[data-tone='ask'] {
+  border-color: var(--sh-border-interactive);
+  background: var(--sh-accent-soft);
+}
+
+.card[data-tone='proposed'] {
+  border-color: var(--sh-warning-border);
+  background: var(--sh-warning-bg-subtle);
+}
+
+.card[data-tone='stale'] {
+  background: var(--sh-surface-well);
+}
+
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.heading {
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.quote {
+  margin: 0;
+  padding: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.request textarea {
+  font-size: var(--sh-text-body);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  margin-left: auto;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.before {
+  color: var(--sh-text-tertiary);
+  text-decoration: line-through;
+  white-space: pre-wrap;
+}
+
+.after {
+  color: var(--sh-success-text);
+  white-space: pre-wrap;
+}
+
+.note {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.label {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.leaks {
+  margin: 0;
+  padding: 0 0 0 1.6em;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.staleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.staleText {
+  flex: 1;
+  min-width: 0;
+}
+
+.selection {
+  position: relative;
+}
+
+/* Each piece renders as its own Markdown block, whose last paragraph drops its margin; this puts the paragraph gap back between pieces. */
+.segment:not(:last-child) {
+  margin-bottom: 1.1em;
+}
+
+.selectionAction {
+  position: absolute;
+  z-index: 2;
+  font-family: var(--sh-font-sans);
+}
+
+.selectionNote {
+  position: absolute;
+  z-index: 2;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-raised);
+  box-shadow: var(--sh-shadow-e2);
+  font-family: var(--sh-font-sans);
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-secondary);
+}

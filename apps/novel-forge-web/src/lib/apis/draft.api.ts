@@ -150,12 +150,17 @@ export class DraftSaveConflict extends ApiError {
 
 /** A PUT answers 409 with a body, not a throw, so the current draft it carries reaches the editor. */
 export function savedDraftOrThrow(payload: DraftResponse | DraftConflictResponse): DraftResponse {
+  return resultOrConflict(payload);
+}
+
+/** Any draft write read with `modeled(409)`: its refusal is thrown as a {@link DraftSaveConflict}, carrying the current draft when the server sent one. */
+export function resultOrConflict<T extends object>(payload: T | DraftConflictResponse): T {
   if (isConflictBody(payload)) throw new DraftSaveConflict(payload);
   return payload;
 }
 
-// `modeled` hands back the body without its status, so the refusal is told apart from a draft by its own fields.
-function isConflictBody(payload: DraftResponse | DraftConflictResponse): payload is DraftConflictResponse {
+// `modeled` hands back the body without its status, so the refusal is told apart from a result by its own fields.
+function isConflictBody<T extends object>(payload: T | DraftConflictResponse): payload is DraftConflictResponse {
   return 'current' in payload || ('code' in payload && typeof payload.code === 'string' && !('id' in payload));
 }
 

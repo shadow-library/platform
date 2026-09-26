@@ -12,6 +12,8 @@ import {
   openEditor,
   runSave,
   saveRefusalOf,
+  type SettledBase,
+  settledBaseOf,
 } from '@/lib/chapter-editor';
 
 export interface ChapterEditorController {
@@ -26,6 +28,8 @@ export interface ChapterEditorController {
   restore: (text: EditorText) => void;
   /** Lets a save held back by the server be tried again. */
   retry: () => Promise<boolean>;
+  /** Saves anything unsaved, then hands back the server version the editor now stands on — the base a restore or a suggestion is applied against. */
+  settledBase: () => Promise<SettledBase>;
 }
 
 export function useChapterEditor(novelId: string, draft: DraftResponse, deleted: boolean): ChapterEditorController {
@@ -85,6 +89,10 @@ export function useChapterEditor(novelId: string, draft: DraftResponse, deleted:
     retry: () => {
       dispatch({ type: 'retry' });
       return save();
+    },
+    settledBase: async () => {
+      await save();
+      return settledBaseOf(stateRef.current);
     },
   };
 }

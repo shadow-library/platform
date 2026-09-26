@@ -8,6 +8,7 @@ export * from './chapter.api';
 export * from './chapter-image.api';
 export * from './illustration.api';
 export * from './draft.api';
+export * from './chapter-history.api';
 export * from './brief.api';
 export * from './interstitial.api';
 export * from './bible.api';

@@ -466,7 +466,23 @@
 .body {
   flex: 1;
   min-height: 0;
+  display: flex;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
   position: relative;
+}
+
+@media (max-width: 960px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .main {
+    min-height: 0;
+  }
 }
 
 .editorInner {

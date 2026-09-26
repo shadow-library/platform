@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type DraftResponse } from '../src/lib/apis/api-types.gen';
-import { DraftSaveConflict, savedDraftOrThrow } from '../src/lib/apis/draft.api';
+import { DraftSaveConflict, resultOrConflict, savedDraftOrThrow } from '../src/lib/apis/draft.api';
 import { ApiError } from '../src/lib/apis/transport';
 import {
   canAutosave,
@@ -21,6 +21,8 @@ import {
   saveLabel,
   saveRefusalOf,
   type ServerDraft,
+  settledBaseOf,
+  unsettledMessage,
   wordCount,
 } from '../src/lib/chapter-editor';
 
@@ -267,6 +269,24 @@ describe('savedDraftOrThrow', () => {
   });
 });
 
+describe('resultOrConflict', () => {
+  it('should raise a passage or version refusal read with modeled(409), such as a stale suggestion, as a conflict without a current draft', () => {
+    try {
+      resultOrConflict({ code: 'PSG_004', message: 'stale' });
+      throw new Error('expected a conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DraftSaveConflict);
+      expect([(error as DraftSaveConflict).code, (error as DraftSaveConflict).current]).toEqual(['PSG_004', undefined]);
+    }
+  });
+
+  it('should pass an applied suggestion through, though it carries no id of its own', () => {
+    const applied = { draft: { id: 'd1' } as DraftResponse, suggestion: { id: 's1' } };
+
+    expect(resultOrConflict(applied)).toBe(applied);
+  });
+});
+
 describe('saveRefusalOf', () => {
   it('should read a refusal carrying the current draft as a conflict with it', () => {
     expect(saveRefusalOf(conflict(THEIRS))).toEqual({ kind: 'conflict', current: { ...THEIRS, summary: null, updatedAt: '2026-09-26T00:00:00Z' } });
@@ -458,5 +478,25 @@ describe('enqueueSave', () => {
 
     expect(await enqueueSave({ current: Promise.resolve() }, () => runSave(h.deps))).toBe(true);
     expect(h.writes).toEqual([]);
+  });
+});
+
+describe('settledBaseOf', () => {
+  it('should hand back the base of clean, idle text', () => {
+    expect(settledBaseOf(openEditor(DRAFT))).toEqual({ kind: 'settled', base: { draftId: 'd1', revision: 3, saveSeq: 7 } });
+  });
+
+  it('should refuse unsaved, conflicting or held text, naming why', () => {
+    expect(settledBaseOf(run(openEditor(DRAFT), { type: 'edit', body: 'mine' }))).toEqual({ kind: 'unsettled', status: 'idle' });
+    const conflicted = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'server', draft: THEIRS });
+    expect(settledBaseOf(conflicted)).toEqual({ kind: 'unsettled', status: 'conflict' });
+  });
+});
+
+describe('unsettledMessage', () => {
+  it('should say what to do for a conflict and for a save the AI is holding back', () => {
+    expect(unsettledMessage('conflict')).toContain('choose which text to keep');
+    expect(unsettledMessage('held')).toContain('The AI is writing this chapter');
+    expect(unsettledMessage('idle')).toBe('Your edits aren’t saved yet — save them, then try again.');
   });
 });

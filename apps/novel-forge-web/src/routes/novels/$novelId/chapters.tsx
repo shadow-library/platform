@@ -1,7 +1,7 @@
 import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -40,14 +40,19 @@ import { ImageGallery } from '@/components/nf/ImageGallery';
 import { BriefSections } from '@/features/briefs';
 import { ChapterToolbar, ChapterToolbarStatus, GoalMetDialog, VolumeList, VolumeNote, VolumeSection } from '@/features/chapter-list';
 import {
+  ChapterDetailsPanel,
   ChecksDrawer,
   EditorStrip,
   FinalizeButton,
   HeldActions,
+  PassageAskCard,
+  PassageReader,
+  PassageSuggestionCard,
   StoryBibleUpdatesButton,
   UnsavedChangesGuard,
   useChapterEditor,
   useOverrideConfirm,
+  usePassageAsk,
   useReviewJobs,
   WorkspaceStrip,
 } from '@/features/chapter-workspace';
@@ -129,6 +134,7 @@ import {
   workspaceActions,
 } from '@/lib/chapter-workspace';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
+import { editorSelection, type PassageRange, type ProseAnchor, selectionProblem, suggestionView } from '@/lib/passage-suggestions';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './chapters.module.css';
@@ -1111,6 +1117,10 @@ interface ProseToolbarProps {
   onBulleted: () => void;
   onNumbered: () => void;
   onTable: () => void;
+  /** Absent where the chapter can't take a passage rewrite. */
+  onAsk?: () => void;
+  /** Why Ask for changes is unavailable right now; shown beside it, and the button is disabled while set. */
+  askBlockedReason?: string;
 }
 
 interface ToolbarButton {
@@ -1119,7 +1129,8 @@ interface ToolbarButton {
   action: () => void;
 }
 
-function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: ProseToolbarProps): React.JSX.Element {
+function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable, onAsk, askBlockedReason }: ProseToolbarProps): React.JSX.Element {
+  const askReasonId = useId();
   const buttons: ToolbarButton[] = [
     { label: <strong>B</strong>, title: 'Bold (⌘B)', action: onBold },
     { label: <em>I</em>, title: 'Italic (⌘I)', action: onItalic },
@@ -1137,6 +1148,23 @@ function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: Pro
         </Tooltip>
       ))}
       <div className={styles.spacer} />
+      {onAsk && askBlockedReason && (
+        <span id={askReasonId} className={styles.toolbarNote}>
+          {askBlockedReason}
+        </span>
+      )}
+      {onAsk && (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={Boolean(askBlockedReason)}
+          aria-describedby={askBlockedReason ? askReasonId : undefined}
+          onMouseDown={e => e.preventDefault()}
+          onClick={onAsk}
+        >
+          Ask for changes
+        </Button>
+      )}
       <span className={styles.toolbarNote}>Markdown supported</span>
     </div>
   );
@@ -1392,6 +1420,8 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const generation = chapterGeneration(activity, chapter);
   const editor = useChapterEditor(novelId, draft, deleted);
   const { title, body } = editor.state;
+  const passageAsk = usePassageAsk(novelId, draft, editor.settledBase);
+  const [proseSelection, setProseSelection] = useState<PassageRange>({ start: 0, end: 0 });
 
   // A `?review=1` hand-off (e.g. from Overview's Next step card) opens straight into the drawer; this
   // is read once at mount, matching the drawer's own open state being otherwise locally controlled.
@@ -1446,6 +1476,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const finalizeBlocked = isFinalizeBlocked(draft);
   const runBlockedReason = generation ? 'The chapter is being written — review it once it’s done.' : !draft.body?.trim() ? 'There’s no text to review yet.' : undefined;
   const displayTitle = draft.title?.trim() || 'Untitled chapter';
+  const askable = actions.askForge && !generation && draft.reviewStatus !== 'generating';
 
   const surround = (before: string, after: string): void => {
     const el = editorRef.current;
@@ -1500,6 +1531,64 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
 
   const finishEditing = async (): Promise<void> => {
     if (await editor.save()) setEditing(false);
+  };
+
+  // A suggestion is anchored to saved text, so the edits are saved first and the ask opens in the reader, where the suggestion lands.
+  const askFromEditor = async (): Promise<void> => {
+    const result = editorSelection(body, editorRef.current?.value ?? '', proseSelection.start, proseSelection.end);
+    if (result.kind !== 'ok') {
+      const problem = selectionProblem(result);
+      if (problem) toast.warning(problem);
+      return;
+    }
+    if (!(await editor.save())) {
+      toast.warning('Your edits aren’t saved yet — save them, then ask for changes.');
+      return;
+    }
+    setEditing(false);
+    passageAsk.open(result.selection);
+  };
+
+  const suggestionViews = new Map(passageAsk.suggestions.map(suggestion => [suggestion.id, suggestionView(suggestion, draft, Boolean(generation))]));
+  const proseAnchors: ProseAnchor[] = [
+    ...(passageAsk.ask ? [{ key: 'ask', at: passageAsk.ask.selection.end }] : []),
+    ...passageAsk.suggestions.map(suggestion => ({ key: suggestion.id, at: suggestionViews.get(suggestion.id)?.anchorEnd })),
+  ];
+
+  const newestStaleId = passageAsk.suggestions.find(suggestion => suggestionViews.get(suggestion.id)?.state === 'stale')?.id;
+
+  const renderProseCard = (key: string): React.ReactNode => {
+    const { ask } = passageAsk;
+    if (key === 'ask') {
+      return (
+        ask && (
+          <PassageAskCard
+            selection={ask.selection}
+            request={ask.request}
+            requesting={passageAsk.requesting}
+            onRequestChange={passageAsk.setRequest}
+            onSubmit={() => void passageAsk.submit()}
+            onCancel={passageAsk.cancel}
+          />
+        )
+      );
+    }
+    const suggestion = passageAsk.suggestions.find(candidate => candidate.id === key);
+    const view = suggestionViews.get(key);
+    if (!suggestion || !view) return null;
+    const retry = askable ? passageAsk.retryTarget(suggestion) : undefined;
+    return (
+      <PassageSuggestionCard
+        suggestion={suggestion}
+        view={view}
+        busy={passageAsk.busy}
+        announce={suggestion.id === newestStaleId}
+        applying={passageAsk.busyId === suggestion.id}
+        onRetry={retry && (() => passageAsk.open(retry, suggestion.request, suggestion.id))}
+        onApply={() => void passageAsk.apply(suggestion)}
+        onDismiss={() => void passageAsk.dismiss(suggestion)}
+      />
+    );
   };
 
   const copyMine = (): void => {
@@ -1744,136 +1833,150 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
       {chapterStrip}
 
       <div className={styles.body}>
-        {inEditor ? (
-          <div className={`nf-scroll ${styles.scrollFill}`}>
-            <div className={`nf-page ${styles.editorInner}`}>
-              <div className={styles.titleField}>
-                <Input value={title} onValueChange={editor.setTitle} aria-label="Chapter title" placeholder="Chapter title" readOnly={textLocked} />
-              </div>
-              <div className={styles.tabs}>
-                {(['write', 'preview'] as const).map(t => (
-                  <button key={t} onClick={() => setTab(t)} className={styles.tab} data-active={tab === t}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-              {tab === 'write' ? (
-                <>
-                  <ProseToolbar
-                    onBold={() => surround('**', '**')}
-                    onItalic={() => surround('*', '*')}
-                    onBulleted={() => prefixLines(() => '- ')}
-                    onNumbered={() => prefixLines(i => `${i + 1}. `)}
-                    onTable={insertTable}
-                  />
-                  <textarea
-                    ref={editorRef}
-                    value={body}
-                    onChange={e => editor.setBody(e.target.value)}
-                    onKeyDown={onEditorKeyDown}
-                    readOnly={textLocked}
-                    spellCheck
-                    aria-label="Chapter prose (Markdown)"
-                    placeholder="Write your chapter in Markdown…"
-                    className={styles.textarea}
-                  />
-                </>
-              ) : (
-                <Markdown content={body} className={styles.preview} />
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className={`nf-scroll ${styles.scrollFill}`}>
-            <article className={`nf-page ${styles.reader}`}>
-              {finalizeBlocked &&
-                (isIsolated(draft) ? (
-                  <Alert
-                    intent="danger"
-                    title="Finalize is blocked until this chapter is summarized"
-                    action={{ label: 'Summarize', onClick: () => openSummarize(true) }}
-                    className={styles.notice}
-                  >
-                    This chapter’s prose is firewalled, so chapter {chapter + 1} sees only its summary and continuation state — and both are empty. Summarizing proposes them; you
-                    review and apply before anything is saved.
-                  </Alert>
-                ) : (
-                  <Alert
-                    intent="danger"
-                    title="Finalize needs a summary for this chapter"
-                    action={{ label: 'Summarise with AI', onClick: () => openSummarize(true) }}
-                    className={styles.notice}
-                  >
-                    Chapter {chapter + 1}’s writer reads this chapter’s summary, not its prose — and it’s empty.{' '}
-                    <button type="button" className={styles.linkButton} onClick={() => openSummarize(false)}>
-                      Write your own
-                    </button>{' '}
-                    instead.
-                  </Alert>
-                ))}
-              {amendResult?.suggestExtractToBible && (
-                <Alert
-                  intent="warning"
-                  title="Canon was not re-derived"
-                  action={{ label: 'Add to bible', onClick: runExtract }}
-                  onDismiss={() => setAmendResult(undefined)}
-                  className={styles.notice}
-                >
-                  The amendment replaced prose only. Anything this chapter already contributed to the bible is still there and still propagating.
-                </Alert>
-              )}
-              {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
-              {draft.body?.trim() ? (
-                <Markdown content={draft.body} />
-              ) : (
-                <p className={styles.emptyProse}>
-                  {draft.status === 'final' ? 'This chapter has no prose.' : 'This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.'}
-                </p>
-              )}
-              {!actions.askForge && <p className={styles.finalNote}>The chat can’t change a final chapter. To change the text yourself, use Amend.</p>}
-
-              <section className={styles.sceneImages}>
-                <div className={styles.sceneImagesHead}>
-                  Scene images
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    prefix={<SparkIcon />}
-                    onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'chapter', key: String(chapter), start: true } })}
-                  >
-                    Generate scene art
-                  </Button>
+        <div className={styles.main}>
+          {inEditor ? (
+            <div className={`nf-scroll ${styles.scrollFill}`}>
+              <div className={`nf-page ${styles.editorInner}`}>
+                <div className={styles.titleField}>
+                  <Input value={title} onValueChange={editor.setTitle} aria-label="Chapter title" placeholder="Chapter title" readOnly={textLocked} />
                 </div>
-                <ImageGallery
-                  images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
-                  busy={addSceneImage.isPending || removeSceneImage.isPending}
-                  addLabel="Add scene image"
-                  onAdd={image => addSceneImage.mutate(image, { onSuccess: () => toast.success('Scene image added'), onError: e => toast.danger(e.message) })}
-                  onRemove={id => removeSceneImage.mutate(id, { onSuccess: () => toast.success('Scene image removed'), onError: e => toast.danger(e.message) })}
-                />
-              </section>
-            </article>
-          </div>
-        )}
+                <div className={styles.tabs}>
+                  {(['write', 'preview'] as const).map(t => (
+                    <button key={t} onClick={() => setTab(t)} className={styles.tab} data-active={tab === t}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {tab === 'write' ? (
+                  <>
+                    <ProseToolbar
+                      onBold={() => surround('**', '**')}
+                      onItalic={() => surround('*', '*')}
+                      onBulleted={() => prefixLines(() => '- ')}
+                      onNumbered={() => prefixLines(i => `${i + 1}. `)}
+                      onTable={insertTable}
+                      onAsk={askable ? () => void askFromEditor() : undefined}
+                      askBlockedReason={
+                        saveBlocked ? 'Resolve the save problem first' : proseSelection.start === proseSelection.end ? 'Select a passage to ask for changes' : undefined
+                      }
+                    />
+                    <textarea
+                      ref={editorRef}
+                      value={body}
+                      onChange={e => {
+                        editor.setBody(e.target.value);
+                        setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd });
+                      }}
+                      onSelect={e => setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
+                      onKeyDown={onEditorKeyDown}
+                      readOnly={textLocked}
+                      spellCheck
+                      aria-label="Chapter prose (Markdown)"
+                      placeholder="Write your chapter in Markdown…"
+                      className={styles.textarea}
+                    />
+                  </>
+                ) : (
+                  <Markdown content={body} className={styles.preview} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className={`nf-scroll ${styles.scrollFill}`}>
+              <article className={`nf-page ${styles.reader}`}>
+                {finalizeBlocked &&
+                  (isIsolated(draft) ? (
+                    <Alert
+                      intent="danger"
+                      title="Finalize is blocked until this chapter is summarized"
+                      action={{ label: 'Summarize', onClick: () => openSummarize(true) }}
+                      className={styles.notice}
+                    >
+                      This chapter’s prose is firewalled, so chapter {chapter + 1} sees only its summary and continuation state — and both are empty. Summarizing proposes them; you
+                      review and apply before anything is saved.
+                    </Alert>
+                  ) : (
+                    <Alert
+                      intent="danger"
+                      title="Finalize needs a summary for this chapter"
+                      action={{ label: 'Summarise with AI', onClick: () => openSummarize(true) }}
+                      className={styles.notice}
+                    >
+                      Chapter {chapter + 1}’s writer reads this chapter’s summary, not its prose — and it’s empty.{' '}
+                      <button type="button" className={styles.linkButton} onClick={() => openSummarize(false)}>
+                        Write your own
+                      </button>{' '}
+                      instead.
+                    </Alert>
+                  ))}
+                {amendResult?.suggestExtractToBible && (
+                  <Alert
+                    intent="warning"
+                    title="Canon was not re-derived"
+                    action={{ label: 'Add to bible', onClick: runExtract }}
+                    onDismiss={() => setAmendResult(undefined)}
+                    className={styles.notice}
+                  >
+                    The amendment replaced prose only. Anything this chapter already contributed to the bible is still there and still propagating.
+                  </Alert>
+                )}
+                {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
+                {draft.body?.trim() ? (
+                  <PassageReader body={draft.body} askable={askable} anchors={proseAnchors} renderCard={renderProseCard} onAsk={selection => passageAsk.open(selection)} />
+                ) : (
+                  <p className={styles.emptyProse}>
+                    {draft.status === 'final' ? 'This chapter has no prose.' : 'This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.'}
+                  </p>
+                )}
+                {!actions.askForge && <p className={styles.finalNote}>The chat can’t change a final chapter. To change the text yourself, use Amend.</p>}
+                {askable && Boolean(draft.body?.trim()) && (
+                  <p className={styles.finalNote}>Select any passage to ask for changes to it — or, from the keyboard, select it in Edit prose and press Ask for changes.</p>
+                )}
 
-        {inEditor ? (
-          <div className={styles.wordBadge}>
-            {wordCount(body).toLocaleString()} words · <span aria-live="polite">{saveLabel(editor.state)}</span>
-            {draft.reviewStatus === 'approved' && ' · Saving resets your approval'}
-          </div>
-        ) : (
-          <div className={styles.wordBadge}>{wordCount(draft.body).toLocaleString()} words</div>
-        )}
+                <section className={styles.sceneImages}>
+                  <div className={styles.sceneImagesHead}>
+                    Scene images
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      prefix={<SparkIcon />}
+                      onClick={() => navigate({ to: '/novels/$novelId/illustrations', params: { novelId }, search: { subject: 'chapter', key: String(chapter), start: true } })}
+                    >
+                      Generate scene art
+                    </Button>
+                  </div>
+                  <ImageGallery
+                    images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
+                    busy={addSceneImage.isPending || removeSceneImage.isPending}
+                    addLabel="Add scene image"
+                    onAdd={image => addSceneImage.mutate(image, { onSuccess: () => toast.success('Scene image added'), onError: e => toast.danger(e.message) })}
+                    onRemove={id => removeSceneImage.mutate(id, { onSuccess: () => toast.success('Scene image removed'), onError: e => toast.danger(e.message) })}
+                  />
+                </section>
+              </article>
+            </div>
+          )}
 
-        {!inEditor && actions.askForge && (
-          <div className={styles.forgeDock}>
-            <ForgeBar
-              novelId={novelId}
-              scope={{ type: 'brief', ref: `chapter:${chapter}`, title: displayTitle }}
-              placeholder={`Ask Forge to revise ${draft.title?.trim() || `chapter ${chapter}`} — tighten a scene, fix continuity, adjust the ending…`}
-            />
-          </div>
-        )}
+          {inEditor ? (
+            <div className={styles.wordBadge}>
+              {wordCount(body).toLocaleString()} words · <span aria-live="polite">{saveLabel(editor.state)}</span>
+              {draft.reviewStatus === 'approved' && ' · Saving resets your approval'}
+            </div>
+          ) : (
+            <div className={styles.wordBadge}>{wordCount(draft.body).toLocaleString()} words</div>
+          )}
+
+          {!inEditor && actions.askForge && (
+            <div className={styles.forgeDock}>
+              <ForgeBar
+                novelId={novelId}
+                scope={{ type: 'brief', ref: `chapter:${chapter}`, title: displayTitle }}
+                placeholder={`Ask Forge to revise ${draft.title?.trim() || `chapter ${chapter}`} — tighten a scene, fix continuity, adjust the ending…`}
+              />
+            </div>
+          )}
+        </div>
+        <ChapterDetailsPanel novelId={novelId} draft={draft} generating={Boolean(generation)} settledBase={editor.settledBase} />
       </div>
 
       <UnsavedChangesGuard when={unsaved} description={leaveWarning(editor.state)} onSave={saveBlocked ? undefined : editor.save} />

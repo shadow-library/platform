@@ -31,6 +31,8 @@ export interface SidePanelProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   /** Merged onto the panel's own `<aside>`, for a host that has to restate its frame — a border-left in place of the card. */
   className?: string;
+  /** Merged onto the expanded title row, for a host whose own controls stand in for it at some widths. */
+  headClassName?: string;
   children: ReactNode;
 }
 
@@ -47,6 +49,7 @@ export function SidePanel({
   defaultCollapsed = false,
   onCollapsedChange,
   className,
+  headClassName,
   children,
 }: SidePanelProps): ReactElement {
   const bodyId = useId();
@@ -77,7 +80,7 @@ export function SidePanel({
           </span>
         </button>
       ) : (
-        <div className={styles.head}>
+        <div className={headClassName ? `${styles.head} ${headClassName}` : styles.head}>
           <h2 className={styles.title}>{title}</h2>
           {titleAccessory}
           <span className={styles.spacer} />
