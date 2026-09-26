@@ -111,10 +111,10 @@ function NewBotPage(): React.JSX.Element {
           <SectionCard title="Details" description="Members see the handle wherever the bot creates or changes something.">
             <div className={styles.form}>
               <FormField label="Display name" required error={nameError}>
-                <Input value={displayName} onValueChange={setDisplayName} placeholder="Curation bot" autoFocus />
+                <Input value={displayName} onValueChange={setDisplayName} placeholder="Digest bot" autoFocus />
               </FormField>
               <FormField label="Handle" required error={handleError} helper={handleError ? undefined : 'Lowercase letters, numbers and hyphens. Can’t be changed later.'}>
-                <Input value={handle} onValueChange={value => setHandle(value.toLowerCase())} placeholder="curation-bot" suffix="[bot]" />
+                <Input value={handle} onValueChange={value => setHandle(value.toLowerCase())} placeholder="digest-bot" suffix="[bot]" />
               </FormField>
               <FormField label="Description" optional>
                 <Textarea value={description} onValueChange={setDescription} minRows={2} maxLength={280} placeholder="What this bot does and why it exists." />

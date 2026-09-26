@@ -147,13 +147,13 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         },
       ],
       permissions: [
-        { name: 'novel-forge:curate', description: 'Publish third-party novels under their original author and manage curated-ingest API keys' },
+        { name: 'novel-forge:curate', description: "Reach an organisation's shared projects and set authorship attribution on a publish" },
         { name: 'novel-forge:admin', description: 'Inspect workflow runs: prompt anatomy, context packs, per-call latency and raw model output' },
       ],
       roles: [
         {
           name: 'NovelForgeCurator',
-          description: 'Internal platform admin who brings third-party novels into the platform',
+          description: "Organisation member who works on the organisation's shared projects",
           permissions: ['novel-forge:curate'],
           grantToBootstrapAdmin: true,
         },
