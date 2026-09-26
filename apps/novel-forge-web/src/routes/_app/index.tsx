@@ -118,7 +118,7 @@ function Dashboard(): React.JSX.Element {
               Import novel
             </Button>
             <Button variant="primary" prefix={<PlusIcon />} onClick={() => setCreateOpen(true)}>
-              New project
+              New novel
             </Button>
           </>
         }
@@ -134,8 +134,8 @@ function Dashboard(): React.JSX.Element {
         error={projectsQuery.error}
         isEmpty={projects.length === 0}
         emptyTitle="No projects yet"
-        emptyDescription="Create your first novel from a premise, or import one from a novel-import bundle."
-        emptyAction={{ label: 'New project', onClick: () => setCreateOpen(true) }}
+        emptyDescription="Start a novel from a title and, if you like, your notes — or import chapters you have already written."
+        emptyAction={{ label: 'New novel', onClick: () => setCreateOpen(true) }}
       >
         <div className={styles.grid}>
           {projects.map(project => (
@@ -145,13 +145,13 @@ function Dashboard(): React.JSX.Element {
             <span className={styles.newIcon}>
               <PlusIcon size={20} />
             </span>
-            <span className={styles.newLabel}>New project</span>
-            <span className={styles.newHint}>Start from a premise</span>
+            <span className={styles.newLabel}>New novel</span>
+            <span className={styles.newHint}>A title and, if you like, your notes</span>
           </button>
         </div>
       </QueryState>
 
-      <NewNovelModal open={createOpen} onOpenChange={setCreateOpen} onCreated={project => navigate({ to: '/novels/$novelId', params: { novelId: project.id } })} />
+      <NewNovelModal open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { type QueryClient, queryOptions, useMutation, type UseMutationResult, us
 
 import {
   type CloneProjectBody,
-  type CreateProjectBody,
+  type CreateNovelWithNotesBody,
+  type CreateNovelWithNotesResponse,
   type ListProjectResponse,
   type ListProjectsQueryParams,
   type ProjectDetailResponse,
@@ -67,11 +68,13 @@ export function invalidateProjectStatus(queryClient: QueryClient, projectId: str
   invalidateSoon(queryClient, { queryKey: projectKeys.status(projectId) });
 }
 
-export function useCreateProjectMutation(): UseMutationResult<ProjectResponse, ApiError, CreateProjectBody> {
+export function useCreateNovelWithNotesMutation(): UseMutationResult<CreateNovelWithNotesResponse, ApiError, CreateNovelWithNotesBody> {
   const queryClient = useQueryClient();
-  return useMutation<ProjectResponse, ApiError, CreateProjectBody>({
-    mutationFn: data => APIRequest.post('/projects').body(data).execute(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.lists() }),
+  return useMutation<CreateNovelWithNotesResponse, ApiError, CreateNovelWithNotesBody>({
+    mutationFn: data => APIRequest.post('/projects/new-novel').body(data).execute(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    },
   });
 }
 

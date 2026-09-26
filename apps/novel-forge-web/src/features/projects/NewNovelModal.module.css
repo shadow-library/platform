@@ -21,3 +21,11 @@
   font-size: var(--sh-text-caption);
   color: var(--sh-text-secondary);
 }
+
+.formError {
+  outline: none;
+}
+
+.overLimit {
+  color: var(--sh-danger-text-on-subtle);
+}
