@@ -11,7 +11,6 @@ import {
   type ProjectModelOverrides,
   type ProjectModelRoute,
   type ProjectWordTarget,
-  useAccountSettingsQuery,
   useAiModelsQuery,
   useDeleteProjectMutation,
   useListPluginsQuery,
@@ -20,7 +19,7 @@ import {
   useUpdateProjectMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
-import { inheritedModel, modelLabel, modelSaveBody } from '@/lib/model-defaults';
+import { inheritedModel, type ModelGroup, modelLabel, modelSaveBody } from '@/lib/model-defaults';
 import { contentModeLabel, groupLabel, tierLabel } from '@/lib/usage';
 
 import styles from './settings.module.css';
@@ -48,8 +47,6 @@ type AiRole = keyof ProjectModelOverrides;
 // The author picks a model per *group*, not per fine-grained role. Selecting a group's model fans that
 // choice out across every role it owns (GROUP_ROLES) so the backend — which still resolves per role —
 // routes them identically. `embedding` is intentionally absent: it's locked to the pgvector schema.
-type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image';
-
 const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
   writing: ['generation', 'revision', 'fix'],
   planning: ['premise', 'plan', 'outline', 'bible', 'extraction'],
@@ -196,7 +193,7 @@ function ModelCostDefaults({ novelId, contentMode, costTier, onContentModeChange
                   <dt>{groupLabel(route.group)}</dt>
                   <dd>
                     {route.label}
-                    {route.source === 'project' ? ' · your pick' : route.source === 'account' ? ' · your default' : ''}
+                    {route.source === 'project' ? ' · your pick' : ''}
                   </dd>
                   <dd className={styles.jobPrice}>{routePrice(route)}</dd>
                 </div>
@@ -216,7 +213,6 @@ function SettingsScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const modelsQuery = useAiModelsQuery();
-  const accountQuery = useAccountSettingsQuery();
   const pluginsQuery = useListPluginsQuery();
   const updateProject = useUpdateProjectMutation(novelId);
   const deleteProject = useDeleteProjectMutation();
@@ -301,8 +297,7 @@ function SettingsScreen(): React.JSX.Element {
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const registry = modelsQuery.data?.models ?? [];
   const modelOptions = registry.filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
-  const profile = modelsQuery.data?.profile;
-  const inheritedDefaults = unrestricted ? (modelsQuery.data?.unrestrictedDefaults ?? []) : (modelsQuery.data?.defaults ?? []);
+  const tiers = modelsQuery.data?.tiers ?? [];
 
   return (
     <PageContainer>
@@ -390,8 +385,8 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
-                  Operations set to “Inherit default” use your defaults from Settings, or else the
-                  <strong>{profile ? ` ${profile}` : ''}</strong> server profile{unrestricted ? ' Unrestricted map' : ''}. In-flight jobs keep the model they started with.
+                  Operations set to “Inherit default” use the platform’s model for this novel’s cost tier{unrestricted ? ' on the Unrestricted map' : ''}. In-flight jobs keep the
+                  model they started with.
                   {unrestricted ? ' Unrestricted only lists the models cleared for it; the rest are hidden.' : ''}
                 </Alert>
               </div>
@@ -409,7 +404,7 @@ function SettingsScreen(): React.JSX.Element {
                     <div key={section.title} className={styles.modelGroup}>
                       <div className={styles.modelGroupHead}>{section.title}</div>
                       {section.roles.map(role => {
-                        const inherited = inheritedModel(role.key, accountQuery.data?.models, inheritedDefaults, registry, unrestricted ? allowlist : undefined);
+                        const inherited = inheritedModel(role.key, tiers, costTier, contentMode);
                         return (
                           <div key={role.key} className={styles.roleRow}>
                             <div className={styles.roleInfo}>
@@ -417,7 +412,7 @@ function SettingsScreen(): React.JSX.Element {
                               <div className={styles.roleHint}>
                                 {role.hint}
                                 {models[role.key] === INHERIT_MODEL && inherited
-                                  ? ` · inherits ${modelLabel(registry, inherited.model, inherited.provider)} from ${inherited.source === 'account' ? 'your defaults' : 'the platform'}`
+                                  ? ` · inherits ${modelLabel(registry, inherited.model, inherited.provider)} from the ${tierLabel(costTier)} tier`
                                   : ''}
                               </div>
                             </div>

@@ -989,7 +989,7 @@ export class GenerationService {
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
       allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
-      model: (await this.modelRouter.resolveFor(promptModule.role ?? 'extraction', project, projectId, policy)).model,
+      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project, policy).model,
       sourceIsolated: draft.isolated,
     });
   }

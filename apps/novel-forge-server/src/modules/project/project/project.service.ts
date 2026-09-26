@@ -19,6 +19,7 @@ import { setProjectCover } from '../../illustration/uploaded-cover';
 import { AuthoringClaimService } from '../../jobs/authoring-claim.service';
 import { clearLedgerBriefLinks } from '../../ledger/ledger-entries';
 import { type CostWindow, summarizeByDay, summarizeCost } from './project-cost';
+import { ownerDefaultCostTier } from './project-defaults';
 import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
@@ -115,6 +116,7 @@ export class ProjectService {
         title: body.title,
         instructions: writingInstructionAdditions(body.instructions),
         contentMode: body.contentMode,
+        costTier: body.costTier ?? (await ownerDefaultCostTier(executor, actor)),
         wordTargetMin: body.wordTarget?.min,
         wordTargetMax: body.wordTarget?.max,
       })

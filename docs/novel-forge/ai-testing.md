@@ -293,16 +293,16 @@ Model selection is **code + database**, not environment.
 - Registry of selectable models: `src/modules/ai/models.ts:41-247`. Every LLM id is an OpenRouter `vendor/model`
   slug and its `provider` must be `openrouter`.
 
-Three ways to override, in precedence order (`model-router.service.ts:229-249`):
+Two ways to pick a model, in precedence order (`ModelRouterService.routeModel`):
 
 1. **Per project, per role** — `PATCH /api/v1/projects/:id` with
    `{"config":{"models":{"bible":{"provider":"openrouter","model":"anthropic/claude-opus-5"}}}}`.
    Field list: `src/modules/project/project/project.dto.ts:52-...` (`ProjectModelOverrides`, `bible` at `:89-90`).
    Validated at write time by `isRegisteredModel` (`src/modules/project/project/project.service.ts:80-83`) →
    a wrong provider or unknown id gives `AI_002`.
-2. **Per account, per group** — `PUT /api/v1/ai/settings` `{"models":{"planning":{...}}}`
-   (`src/modules/ai/ai.controller.ts:20-24`; groups at `src/modules/ai/account-settings.service.ts:18`).
-3. Otherwise the production/unrestricted group default.
+2. Otherwise the platform model for the project's cost tier and model type (`COST_TIER_DEFAULTS`). A chat turn's tier
+   outranks the project's. There is no per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}`
+   only sets the tier a new project starts on.
 
 `GET /api/v1/ai/models` (`ai.controller.ts:26-54`) returns the whole registry with prices, context windows and both
 default maps — the quickest way to see what is selectable.
@@ -317,7 +317,7 @@ a registered id with the right provider — the helper that previously pinned an
 
 `POST /api/v1/projects` — `src/modules/project/project/project.controller.ts:29` (201, `ProjectResponse`).
 
-Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`.
+Body (`CreateProjectBody`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`, `costTier` (omitted → the owner's default cost tier).
 
 - `kind` has one value, `new_novel` (`src/database/schemas/projects.ts`).
 - `contentMode`: `standard | unrestricted` (`projects.ts`).
@@ -1838,28 +1838,29 @@ export default function createPlugin() {
 
 ---
 
-### 4. Per-account AI settings and model groups
+### 4. Account settings and model routing
 
-#### 4.1 Settings, precedence and routing
+#### 4.1 Default cost tier, precedence and routing
 
-- **Entry:** UI Settings (`/settings`, "Your defaults for every project you own"; rows Writing / Planning & canon / Review & QA / Refinement chat / Fast helpers / Illustrations; "Save changes"; alert "Unrestricted projects"). API `GET /ai/models`, `GET|PUT /ai/settings`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
-- **Input:** `PUT /ai/settings {"models":{"chat":{"provider":"openrouter","model":"anthropic/claude-haiku-4.5"},"helper":{"provider":"openrouter","model":"openai/gpt-5.4-mini"}}}`.
+- **Entry:** UI Settings (`/settings`: one "Default cost tier for new projects" control, Economy / Balanced / Performant; "Save changes"; info alert "How models are picked"). API `GET /ai/models`, `GET|PUT /ai/settings`, `POST /projects`, `POST /projects/new-novel`, `POST /import`, `POST /projects/:p/clone`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
+- **Input:** `PUT /ai/settings {"defaultCostTier":"economy"}`.
 - **Run:**
-  1. `GET /ai/models` → note `profile:'production'`, `defaults` per group and prices.
-  2. PUT as above (the body REPLACES the whole set; groups left out revert to platform defaults).
-  3. Hub turn (new chat) then check its `model_calls`.
-  4. Pin: `PATCH /chat/sessions/$S/model {"provider":"openrouter","model":"z-ai/glm-5.2"}`, turn again; clear with both null.
+  1. `GET /ai/settings` on a fresh account → `{"defaultCostTier":"balanced"}`.
+  2. PUT as above, then create a project through each creation path without a `costTier`, and once with `"costTier":"performant"`.
+  3. Clone a Performant project.
+  4. Hub turn on an Economy project (new chat), then check its `model_calls`.
   5. Project override: `PATCH /projects/$P {"config":{"models":{"chat":{"provider":"openrouter","model":"openai/gpt-5.6-luna"}}}}`, turn.
-  6. Negatives: an LLM model in `image`, a registered model with the wrong provider, an unknown id.
-  7. Set project `contentMode:'unrestricted'` and repeat with the haiku default.
+  6. Pick Performant for one turn in the composer, then send another turn without it.
+  7. Set project `contentMode:'unrestricted'` with a standard-only chat pin (e.g. `anthropic/claude-opus-5.5`), turn.
 - **Verify:**
-  - Step 3: the chat call's `model` is haiku and `chat_messages.model_id` (assistant) matches; the title call's `model` is gpt-5.4-mini (helper group).
-  - Precedence exactly: chat pin > project setting > your default > platform default (UI shows this ladder). Step 4 uses the pin, then falls back after clearing; step 5 beats the account default but loses to a pin.
-  - Step 6: each is 400 `AI_002`; the `image` group needs an image model and other groups an LLM (`account-settings.service.ts`).
-  - Step 7: an account pick not on the unrestricted allowlist (`x-ai/grok-4.6, deepseek/deepseek-v4-pro, z-ai/glm-5.2, moonshotai/kimi-k3`, image `x-ai/grok-imagine-image-2.0`) is ignored; the project uses the unrestricted default (chat `z-ai/glm-5.2`). A chat pin is filtered the same way on an unrestricted project. `GET /ai/models` `unrestrictedAllowlist`/`unrestrictedDefaults` show the lists.
+  - Step 2: every project created without a tier is Economy; the one that named Performant is Performant. A bot-owned project starts on Balanced, and `PUT /ai/settings` as a bot is 403 `AI_016`.
+  - Step 3: the clone is Performant whatever the account default.
+  - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches.
+  - Precedence exactly: the turn's tier > project pin for the role > the tier map. Step 5 uses the pin; step 6 uses the Performant chat model for that turn only, and the next turn is back on Economy.
+  - Step 7: a pin not on the unrestricted allowlist (`x-ai/grok-4.6, deepseek/deepseek-v4-pro, z-ai/glm-5.2, moonshotai/kimi-k3`, image `x-ai/grok-imagine-image-2.0`) is ignored; the project uses the unrestricted model for its tier. `GET /ai/models` `unrestrictedAllowlist` shows the list.
+  - `GET /projects/:p/models` reports each group's `source` as `project` or `tier`, never anything else.
   - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.
-  - Account `planning` does NOT drive chat (the router folds `plan` into `chat` only at project level, not for account defaults). Test: set only `planning` → chat still uses the platform chat default.
-- **Fails when:** a stored account model later leaves the registry: it is skipped (platform default) with no error, by design; a project override with an unregistered id gives 400 `AI_002` at call time.
+- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, or a project override with an unregistered id does not give 400 `AI_002` at call time.
 
 ---
 

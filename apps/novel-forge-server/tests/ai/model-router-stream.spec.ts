@@ -60,12 +60,7 @@ function fakeClient(streams: StreamScript[], invokeResponses: string[] = []) {
 
 function makeRouter(client: unknown, cachedResponse?: string) {
   const warns: { message: string; meta: Record<string, unknown> }[] = [];
-  const router = new ModelRouterService(
-    {} as never,
-    { getPostgresClient: () => stubDb(cachedResponse) } as never,
-    { enforce: async () => undefined } as never,
-    { defaultsFor: async () => undefined } as never,
-  );
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => stubDb(cachedResponse) } as never, { enforce: async () => undefined } as never);
   (router as unknown as Record<string, unknown>)['buildClient'] = () => client;
   (router as unknown as Record<string, unknown>)['llmBackoffMs'] = 0;
   (router as unknown as Record<string, unknown>)['logger'] = {

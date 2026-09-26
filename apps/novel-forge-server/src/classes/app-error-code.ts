@@ -147,6 +147,7 @@ export class AppErrorCode extends ServerErrorCode {
     'This request was declined before it reached a model: {source} appears to involve sexual content with a minor, which Novel Forge never writes in any mode',
     422,
   );
+  static readonly AI_016 = AppErrorCode.forbidden('AI_016', 'A bot has no account settings; its projects start on the Balanced cost tier');
 
   /*!
    * Illustration Errors

@@ -55,7 +55,7 @@ function fakeRouter(reply: (key: string) => unknown) {
       );
       return reply(prompt.key);
     },
-    resolveFor: async (role: string, project?: { contentMode?: string }) =>
+    resolveModel: (role: string, project?: { contentMode?: string }) =>
       project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }

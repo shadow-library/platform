@@ -76,12 +76,7 @@ interface Capture {
 function capturingRouter(): Capture {
   const wire: BaseMessage[][] = [];
   const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) };
-  const router = new ModelRouterService(
-    {} as never,
-    { getPostgresClient: () => db } as never,
-    { enforce: async () => undefined } as never,
-    { defaultsFor: async () => undefined } as never,
-  );
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, { enforce: async () => undefined } as never);
   let promptKey = '';
   const structured = router.structured.bind(router);
   router.structured = (prompt, ...rest) => {

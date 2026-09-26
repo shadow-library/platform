@@ -37,8 +37,8 @@ function chat() {
     }),
   };
   const modelRouter = {
-    resolveFor: async () => UNRESTRICTED_DEFAULTS.chat,
-    routeFor: async () => ({ resolved: UNRESTRICTED_DEFAULTS.chat, source: 'tier', costTier: 'balanced', contentMode: 'unrestricted' }),
+    resolveModel: () => UNRESTRICTED_DEFAULTS.chat,
+    routeModel: () => ({ resolved: UNRESTRICTED_DEFAULTS.chat, source: 'tier', costTier: 'balanced', contentMode: 'unrestricted' }),
   };
   const workflowRunService = {
     runChain: async (_projectId: bigint, _graph: string, _target: string, input: unknown) => {
@@ -125,7 +125,7 @@ describe('ChatCompactionService.compactIfNeeded under the hard line', () => {
       }),
     };
     const modelRouter = {
-      resolveFor: async () => UNRESTRICTED_DEFAULTS.compact,
+      resolveModel: () => UNRESTRICTED_DEFAULTS.compact,
       structured: async (_prompt: unknown, input: { transcript: string }) => {
         transcripts.push(input.transcript);
         return fold();

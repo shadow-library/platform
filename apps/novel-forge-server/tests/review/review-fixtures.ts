@@ -195,8 +195,8 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
   const routed = (role: string, project?: { contentMode?: string }) =>
     project?.contentMode === 'unrestricted' ? (options.unrestrictedModel ?? UNRESTRICTED_DEFAULTS[role as 'judge']) : PRODUCTION_DEFAULTS[role as 'judge'];
   const modelRouter = {
-    resolveFor: async (role: string, project?: { contentMode?: string }) => routed(role, project),
-    routeFor: async (role: string, project?: { contentMode?: string }) => ({
+    resolveModel: (role: string, project?: { contentMode?: string }) => routed(role, project),
+    routeModel: (role: string, project?: { contentMode?: string }) => ({
       resolved: routed(role, project),
       source: 'tier',
       costTier: scopedCostTier() ?? 'balanced',

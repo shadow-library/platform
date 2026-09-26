@@ -1,7 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-import { ContentMode, ProgressItemKey, ProgressItemStatus, type ProgressOverrideKind, ProgressOverrideStatus, type ProgressStatus } from '@server/common';
+import { ContentMode, CostTier, ProgressItemKey, ProgressItemStatus, type ProgressOverrideKind, ProgressOverrideStatus, type ProgressStatus } from '@server/common';
 import { type Project } from '@server/database';
 
 export const NOTES_MAX_CHARS = 100_000;
@@ -35,6 +35,9 @@ export class CreateNovelWithNotesBody {
 
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
+
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  costTier?: Project.CostTier;
 }
 
 @Schema()

@@ -16,7 +16,7 @@ const depiction = new WriterDisclosurePolicy({
 function service(portrait: { imagePath: string; name: string; imageDepictsChapter: number | null }) {
   const db = { query: { entities: { findFirst: mock(async () => portrait) } } };
   const storage = { stat: mock(async () => ({ size: 10, contentType: 'image/png' })), read: mock(async () => ({ bytes: new Uint8Array([1]) })) };
-  return new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never, { referenceCapacity: mock(async () => 4) } as never);
+  return new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never, { referenceCapacity: mock(() => 4) } as never);
 }
 
 function input(overrides: Partial<ResolveReferencesInput>): ResolveReferencesInput {

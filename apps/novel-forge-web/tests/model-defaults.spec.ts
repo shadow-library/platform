@@ -1,37 +1,32 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type AiModelOption } from '../src/lib/apis/api-types.gen';
+import { type AiTierModel } from '../src/lib/apis/api-types.gen';
 import { inheritedModel, modelSaveBody } from '../src/lib/model-defaults';
 
-const option = (id: string): AiModelOption => ({ id, provider: 'openrouter', label: id, kind: 'llm', enabled: true });
+const tier = (costTier: AiTierModel['costTier'], contentMode: AiTierModel['contentMode'], group: string, model: string): AiTierModel => ({
+  costTier,
+  contentMode,
+  group,
+  provider: 'openrouter',
+  model,
+  label: model,
+});
 
-const REGISTRY = [option('anthropic/claude-opus-5'), option('z-ai/glm-5.2')];
-const PLATFORM = [{ role: 'planning', provider: 'openrouter', model: 'anthropic/claude-opus-5' }];
+const TIERS = [
+  tier('balanced', 'standard', 'planning', 'anthropic/claude-opus-5'),
+  tier('economy', 'standard', 'planning', 'z-ai/glm-5.2'),
+  tier('economy', 'unrestricted', 'planning', 'moonshotai/kimi-k3'),
+];
 
 describe('inheritedModel', () => {
-  it('should prefer the author’s own default', () => {
-    expect(inheritedModel('planning', { planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' } }, PLATFORM, REGISTRY)).toEqual({
-      provider: 'openrouter',
-      model: 'z-ai/glm-5.2',
-      source: 'account',
-    });
+  it('should inherit the platform model for the tier and model type', () => {
+    expect(inheritedModel('planning', TIERS, 'balanced', 'standard')).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+    expect(inheritedModel('planning', TIERS, 'economy', 'standard')).toEqual({ provider: 'openrouter', model: 'z-ai/glm-5.2' });
+    expect(inheritedModel('planning', TIERS, 'economy', 'unrestricted')).toEqual({ provider: 'openrouter', model: 'moonshotai/kimi-k3' });
   });
 
-  it('should fall back to the platform default when the author set none', () => {
-    expect(inheritedModel('planning', {}, PLATFORM, REGISTRY)).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5', source: 'platform' });
-  });
-
-  it('should skip an own default the registry no longer lists', () => {
-    expect(inheritedModel('planning', { planning: { provider: 'openrouter', model: 'retired/model' } }, PLATFORM, REGISTRY)?.source).toBe('platform');
-  });
-
-  it('should skip an own default the unrestricted allowlist refuses', () => {
-    const own = { planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5' } };
-    expect(inheritedModel('planning', own, PLATFORM, REGISTRY, new Set(['z-ai/glm-5.2']))?.source).toBe('platform');
-  });
-
-  it('should find nothing for a group with no platform default and no own default', () => {
-    expect(inheritedModel('writing', undefined, PLATFORM, REGISTRY)).toBeUndefined();
+  it('should find nothing for a group the tier map does not list', () => {
+    expect(inheritedModel('writing', TIERS, 'balanced', 'standard')).toBeUndefined();
   });
 });
 

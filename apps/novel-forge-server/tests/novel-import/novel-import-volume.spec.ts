@@ -30,8 +30,8 @@ function bundle(): NovelBundle {
   };
 }
 
-function fakeImportDatabase() {
-  const inserted = new Map<unknown, Row[]>();
+function fakeImportDatabase(accountSettings: Row[] = []) {
+  const inserted = new Map<unknown, Row[]>([[schema.accountSettings, [...accountSettings, { ownerKind: 'user', ownerId: 4n, defaultCostTier: 'performant' }]]]);
   const rows = (table: unknown): Row[] => inserted.get(table) ?? [];
   const insert = (table: unknown) => ({
     values: (values: Row | Row[]) => {
@@ -43,7 +43,11 @@ function fakeImportDatabase() {
       return Object.assign(Promise.resolve(), { returning: () => Object.assign(Promise.resolve(returned), { catch: () => Promise.resolve(returned) }) });
     },
   });
-  const select = () => ({ from: (table: unknown) => ({ where: () => ({ for: async () => rows(table) }) }) });
+  const select = () => ({
+    from: (table: unknown) => ({
+      where: (condition: SQL) => Object.assign(Promise.resolve(rows(table).filter(row => matchesWhere(row, condition))), { for: async () => rows(table) }),
+    }),
+  });
   const update = (table: unknown) => ({
     set: (values: Row) => ({
       where: (condition: SQL) => {
@@ -84,6 +88,28 @@ describe('novel import — chapter volumes', () => {
       ['volume_1', 'active'],
       ['volume_2', 'not_started'],
     ]);
+  });
+
+  it('should start the project on the owner’s default cost tier when the request names none', async () => {
+    const { db, inserted } = fakeImportDatabase([{ ownerKind: 'user', ownerId: 3n, defaultCostTier: 'economy' }]);
+    const actors = { current: () => ({ kind: 'user', id: 3n, organisationId: null }) };
+    const service = new NovelImportService({ getPostgresClient: () => db } as never, actors as never);
+
+    await service.import({ bundle: bundle() });
+
+    expect(inserted.get(schema.projects)?.[0]?.['costTier']).toBe('economy');
+  });
+
+  it('should start the project on Balanced when the owner has no settings, and on the request’s tier when it names one', async () => {
+    const bare = fakeImportDatabase();
+    const explicit = fakeImportDatabase([{ ownerKind: 'user', ownerId: 3n, defaultCostTier: 'economy' }]);
+    const actors = { current: () => ({ kind: 'user', id: 3n, organisationId: null }) };
+
+    await new NovelImportService({ getPostgresClient: () => bare.db } as never, actors as never).import({ bundle: bundle() });
+    await new NovelImportService({ getPostgresClient: () => explicit.db } as never, actors as never).import({ bundle: bundle(), costTier: 'performant' });
+
+    expect(bare.inserted.get(schema.projects)?.[0]?.['costTier']).toBe('balanced');
+    expect(explicit.inserted.get(schema.projects)?.[0]?.['costTier']).toBe('performant');
   });
 
   it('should land each chapter in its volume, and in none when the staged payload predates chapter volumes', async () => {

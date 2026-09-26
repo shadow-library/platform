@@ -5,9 +5,9 @@ import { ActorService } from '@modules/actor';
 
 import { AiQuotaService } from './ai-quota.service';
 import { AiUsageService } from './ai-usage.service';
-import { ACCOUNT_MODEL_GROUPS, AccountSettingsService } from './account-settings.service';
+import { AccountSettingsService } from './account-settings.service';
 import { AccountSettingsResponse, AccountUsageResponse, AiModelOption, AiModelsResponse, AiQuotaResponse, UpdateAccountSettingsBody } from './ai.dto';
-import { PRODUCTION_GROUP_DEFAULTS, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
+import { PRODUCTION_GROUP_DEFAULTS, SELECTABLE_MODEL_GROUPS, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
 import { tierCatalog } from './model-catalog.service';
 import { MODEL_REGISTRY } from './models';
 
@@ -23,14 +23,14 @@ export class AiController {
 
   @Get('/settings')
   @RespondFor(200, AccountSettingsResponse)
-  async getSettings(): Promise<AccountSettingsResponse> {
-    return { models: await this.accountSettings.getModels() };
+  getSettings(): Promise<AccountSettingsResponse> {
+    return this.accountSettings.get();
   }
 
   @Put('/settings')
   @RespondFor(200, AccountSettingsResponse)
-  async updateSettings(@Body() body: UpdateAccountSettingsBody): Promise<AccountSettingsResponse> {
-    return { models: await this.accountSettings.updateModels(body.models) };
+  updateSettings(@Body() body: UpdateAccountSettingsBody): Promise<AccountSettingsResponse> {
+    return this.accountSettings.update(body);
   }
 
   @Get('/models')
@@ -49,10 +49,9 @@ export class AiController {
       supportsStructuredOutput: m.supportsStructuredOutput,
     }));
 
-    // The author picks a model per group, not per fine-grained role, and only for the author-configurable groups: `embedding` is
-    // locked to the pgvector dimension and `vision` must stay image-capable. The response's `role` field carries the group key.
+    // The author picks a model per group, not per fine-grained role; the response's `role` field carries the group key.
     const toRoleDefaults = (groups: typeof UNRESTRICTED_GROUP_DEFAULTS) =>
-      ACCOUNT_MODEL_GROUPS.map(group => ({ role: group, provider: groups[group].provider, model: groups[group].model }));
+      SELECTABLE_MODEL_GROUPS.map(group => ({ role: group, provider: groups[group].provider, model: groups[group].model }));
 
     return {
       profile: 'production',

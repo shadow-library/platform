@@ -10,6 +10,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 import { ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
+import { ownerDefaultCostTier } from '../project/project/project-defaults';
 import { assertUnderProjectCap } from '../project/project/project-limits';
 import { type ImportNovelBody, type ImportNovelResponse } from './novel-import.dto';
 import { validateNovelBundle } from './novel-import.validator';
@@ -78,6 +79,7 @@ export class NovelImportService {
           themes: bundle.novel.tags ?? null,
           instructions: writingInstructionAdditions(bundle.novel.instructions),
           importedMeta: genre ? { genres: [genre] } : null,
+          costTier: body.costTier ?? (await ownerDefaultCostTier(tx, actor)),
         })
         .returning()
         .catch(err => this.databaseService.translateError(err));

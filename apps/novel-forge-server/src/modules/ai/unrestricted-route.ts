@@ -18,7 +18,7 @@ export interface CallRoute {
 
 export interface UnrestrictedRouteDeps {
   pluginPolicy: Pick<PluginPolicyService, 'resolve'>;
-  modelRouter: Pick<ModelRouterService, 'resolveFor'>;
+  modelRouter: Pick<ModelRouterService, 'resolveModel'>;
 }
 
 const logger = Logger.getLogger(APP_NAME, 'unrestricted-route');
@@ -26,7 +26,7 @@ const logger = Logger.getLogger(APP_NAME, 'unrestricted-route');
 export async function resolveUnrestrictedRoute(deps: UnrestrictedRouteDeps, projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined): Promise<CallRoute> {
   const policy = await deps.pluginPolicy.resolve(projectId, call, { contentMode: 'unrestricted' });
   const routed: ProjectConfig = { ...project, contentMode: 'unrestricted' };
-  const resolved = await deps.modelRouter.resolveFor(call.role, routed, projectId, policy);
+  const resolved = deps.modelRouter.resolveModel(call.role, routed, policy);
   if (isUnrestrictedAllowed(call.role, resolved)) return { policy, project: routed };
   logger.warn('unrestricted route resolved a model off the allowlist — refusing the call', { projectId, role: call.role, model: resolved.model });
   throw AppErrorCode.AI_003.create();

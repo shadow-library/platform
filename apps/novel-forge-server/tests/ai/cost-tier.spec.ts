@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ACCOUNT_MODEL_GROUPS } from '@modules/ai/account-settings.service';
 import { runWithCostTier, scopedCostTier } from '@modules/ai/cost-tier-scope';
 import {
   type AiRole,
@@ -14,6 +13,7 @@ import {
   PRODUCTION_GROUP_DEFAULTS,
   type ResolvedModel,
   ROLE_GROUP,
+  SELECTABLE_MODEL_GROUPS,
   UNRESTRICTED_DEFAULTS,
   UNRESTRICTED_GROUP_DEFAULTS,
 } from '@modules/ai/defaults';
@@ -41,12 +41,7 @@ const opus: ResolvedModel = { provider: 'openrouter', model: 'anthropic/claude-o
 const kimi: ResolvedModel = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
 
 function router(): ModelRouterService {
-  return new ModelRouterService(
-    {} as never,
-    { getPostgresClient: () => ({}) } as never,
-    { enforce: async () => undefined } as never,
-    { defaultsFor: async () => undefined } as never,
-  );
+  return new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
 }
 
 function price(model: ResolvedModel): [number, number] {
@@ -126,7 +121,7 @@ describe('tierCatalog', () => {
   it('should list every tier × mode × author-selectable group with its label and prices', () => {
     const catalog = tierCatalog();
 
-    expect(catalog).toHaveLength(COST_TIERS.length * CONTENT_MODES.length * ACCOUNT_MODEL_GROUPS.length);
+    expect(catalog).toHaveLength(COST_TIERS.length * CONTENT_MODES.length * SELECTABLE_MODEL_GROUPS.length);
     expect(catalog).toContainEqual({
       costTier: 'economy',
       contentMode: 'standard',
@@ -142,8 +137,6 @@ describe('tierCatalog', () => {
 });
 
 describe('ModelRouterService.routeModel', () => {
-  const account = { writing: opus, chat: opus };
-
   it('should resolve every role exactly as before the tiers when a project is Balanced or has no tier', () => {
     for (const role of ROLES) {
       expect(router().resolveModel(role, { contentMode: 'standard' })).toEqual(PRODUCTION_DEFAULTS[role]);
@@ -153,14 +146,13 @@ describe('ModelRouterService.routeModel', () => {
   });
 
   it.each([
-    ['a project pin beats the tier', { costTier: 'economy', config: { models: { generation: opus } } }, undefined, opus, 'project'],
-    ['a project pin beats the account default', { costTier: 'balanced', config: { models: { generation: kimi } } }, account, kimi, 'project'],
-    ['the account default is the Balanced pick', { costTier: 'balanced' }, account, opus, 'account'],
-    ['Economy ignores the account default', { costTier: 'economy' }, account, COST_TIER_DEFAULTS.economy.standard.writing, 'tier'],
-    ['Performant ignores the account default', { costTier: 'performant' }, account, COST_TIER_DEFAULTS.performant.standard.writing, 'tier'],
-    ['the tier map is the last resort', { costTier: 'economy' }, undefined, COST_TIER_DEFAULTS.economy.standard.writing, 'tier'],
-  ] as const)('should resolve writing in order: %s', (_name, project, accountDefaults, expected, source) => {
-    const route = router().routeModel('generation', { contentMode: 'standard', ...project } as ProjectConfig, undefined, accountDefaults);
+    ['a project pin beats the Economy tier', { costTier: 'economy', config: { models: { generation: opus } } }, opus, 'project'],
+    ['a project pin beats the Balanced tier', { costTier: 'balanced', config: { models: { generation: kimi } } }, kimi, 'project'],
+    ['Economy falls back to its tier map', { costTier: 'economy' }, COST_TIER_DEFAULTS.economy.standard.writing, 'tier'],
+    ['Balanced falls back to its tier map', { costTier: 'balanced' }, COST_TIER_DEFAULTS.balanced.standard.writing, 'tier'],
+    ['Performant falls back to its tier map', { costTier: 'performant' }, COST_TIER_DEFAULTS.performant.standard.writing, 'tier'],
+  ] as const)('should resolve writing in order: %s', (_name, project, expected, source) => {
+    const route = router().routeModel('generation', { contentMode: 'standard', ...project } as ProjectConfig);
 
     expect(route).toMatchObject({ resolved: expected, source, costTier: project.costTier, contentMode: 'standard' });
   });
@@ -192,12 +184,11 @@ describe('ModelRouterService.routeModel', () => {
     expect(route).toMatchObject({ resolved: COST_TIER_DEFAULTS.economy.unrestricted.writing, contentMode: 'unrestricted' });
   });
 
-  it('should never resolve an unrestricted call off the allowlist, whatever the tier or the standard picks around it', () => {
-    const standardPicks = { writing: opus, planning: opus, review: opus, chat: opus, helper: opus };
+  it('should never resolve an unrestricted call off the allowlist, whatever the tier or the standard pins around it', () => {
     const pins = Object.fromEntries(ROLES.map(role => [role, opus]));
     for (const costTier of COST_TIERS) {
       for (const role of ROLES) {
-        const resolved = router().resolveModel(role, { contentMode: 'unrestricted', costTier, config: { models: pins } }, undefined, standardPicks);
+        const resolved = router().resolveModel(role, { contentMode: 'unrestricted', costTier, config: { models: pins } });
         expect({ costTier, role, allowed: isUnrestrictedAllowed(role, resolved) }).toMatchObject({ allowed: true });
       }
     }

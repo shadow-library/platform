@@ -29,7 +29,7 @@ function staging(extract: () => Promise<unknown> = async () => ({ relationships:
       calls.push({ contextPack: input.contextPack, contentMode: project?.contentMode });
       return extract();
     },
-    resolveFor: async () => UNRESTRICTED_DEFAULTS.continuity,
+    resolveModel: () => UNRESTRICTED_DEFAULTS.continuity,
   };
   const run = () => stageIsolatedContinuity({ db: db as never, modelRouter: modelRouter as never }, { projectId: 7n, chapter: 4, prose: MARKER, contextPack: 'ROSTER' }, CTX);
   return { run, calls, upserts };

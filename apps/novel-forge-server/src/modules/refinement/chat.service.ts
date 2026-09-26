@@ -676,8 +676,8 @@ export class ChatService {
   }
 
   /**
-   * Routes the reply under the turn's selection: the chat's own model pin, then the project's chat pick, then the owner's Balanced
-   * defaults, then the tier map. An unrestricted reply goes through the unrestricted route, which refuses rather than fall back to standard.
+   * Routes the reply under the turn's selection: the chat's own model pin, then the project's chat pick, then the tier map. An unrestricted
+   * reply goes through the unrestricted route, which refuses rather than fall back to standard.
    */
   private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
     const call = { role: 'chat' as const };
@@ -686,7 +686,7 @@ export class ChatService {
       selection.contentMode === 'unrestricted'
         ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, base)
         : { policy: await this.pluginPolicy.resolve(projectId, call, { contentMode: 'standard' }), project: base };
-    const route = await this.modelRouter.routeFor(call.role, routed ?? base, projectId, policy);
+    const route = this.modelRouter.routeModel(call.role, routed ?? base, policy);
     return { policy, project: routed ?? base, route };
   }
 

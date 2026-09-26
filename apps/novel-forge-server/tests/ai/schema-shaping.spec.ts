@@ -63,7 +63,7 @@ describe('ModelRouterService.buildMessages', () => {
         coachMessage: 'ok',
       }),
     }));
-    const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
+    const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
     (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke });
 
     const prompt = { ...notesOrganisePrompt, template: { formatMessages: async () => [] } as never, postValidate: undefined };

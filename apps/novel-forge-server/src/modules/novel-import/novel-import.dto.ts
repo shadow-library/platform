@@ -1,5 +1,8 @@
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 
+import { CostTier } from '@server/common';
+import { type Project } from '@server/database';
+
 // Kept as a single-value field so bundle files written for schema version 1 stay valid.
 const NOVEL_IMPORT_MODES = ['final'] as const;
 const NovelImportMode = EnumType.create('NovelImportMode', [...NOVEL_IMPORT_MODES]);
@@ -109,6 +112,9 @@ export class NovelBundle {
 export class ImportNovelBody {
   @Field(() => NovelBundle)
   bundle: NovelBundle;
+
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  costTier?: Project.CostTier;
 }
 
 @Schema()

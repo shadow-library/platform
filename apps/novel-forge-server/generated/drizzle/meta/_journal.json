@@ -8,6 +8,13 @@
       "when": 1790454416372,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790456768171,
+      "tag": "0001_account_default_cost_tier",
+      "breakpoints": true
     }
   ]
 }

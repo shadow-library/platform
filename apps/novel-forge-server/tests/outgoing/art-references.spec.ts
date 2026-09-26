@@ -20,7 +20,7 @@ function references(cast: CastMember[] = CAST): { service: IllustrationReference
   const chain = { from: () => chain, innerJoin: () => chain, where: () => chain, orderBy: async () => (reads++, cast) };
   const db = { select: () => chain, query: { entities: { findFirst: async () => undefined } } };
   const storage = { stat: async () => ({ size: 10, contentType: 'image/png' }), read: async () => ({ bytes: new Uint8Array([1]) }) };
-  const service = new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never, { referenceCapacity: async () => 4 } as never);
+  const service = new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never, { referenceCapacity: () => 4 } as never);
   return { service, castReads: () => reads };
 }
 

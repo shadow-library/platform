@@ -88,7 +88,7 @@ function router(answer = CONSISTENT) {
   const inserts: Insert[] = [];
   const databaseService = { getPostgresClient: () => fakeDb(inserts) } as never;
   const telemetry = new TelemetryHandler(databaseService);
-  const service = new ModelRouterService(telemetry, databaseService, { enforce: async () => undefined } as never, { defaultsFor: async () => undefined } as never);
+  const service = new ModelRouterService(telemetry, databaseService, { enforce: async () => undefined } as never);
   const invoke = mock(async () => ({ content: answer }));
   const stream = mock(async function* () {
     yield { content: answer };

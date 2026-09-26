@@ -45,7 +45,7 @@ export class NewNovelService {
     if (!title) throw AppErrorCode.PRJ_014.create();
 
     const result = await this.db.transaction(async tx => {
-      const project = await this.projectService.create({ name: title, kind: 'new_novel', title, contentMode: body.contentMode }, tx);
+      const project = await this.projectService.create({ name: title, kind: 'new_novel', title, contentMode: body.contentMode, costTier: body.costTier }, tx);
       await this.notes.replace(project.id, body.notes ?? '', tx);
       const session = await this.chat.createSession(project.id, {}, tx);
       return { projectId: project.id, sessionId: session.id };

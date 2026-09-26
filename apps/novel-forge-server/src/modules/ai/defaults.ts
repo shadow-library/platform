@@ -31,6 +31,11 @@ export interface ResolvedModel {
 
 export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'vision' | 'embedding';
 
+// `embedding` is locked to the pgvector dimension and `vision` must stay image-capable, so an author never picks either.
+export type SelectableModelGroup = Exclude<ModelGroup, 'vision' | 'embedding'>;
+
+export const SELECTABLE_MODEL_GROUPS: readonly SelectableModelGroup[] = ['writing', 'planning', 'review', 'chat', 'helper', 'image'];
+
 // Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained
 // internally (prompts + telemetry + routing); the group is only the unit the author selects a model
 // for. `chat` is its own group but, when unset, follows the planning selection (see resolveModel).

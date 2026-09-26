@@ -10,12 +10,7 @@ const kimi: ResolvedModel = { provider: 'openrouter', model: 'moonshotai/kimi-k3
 const bare = { contentMode: null, costTier: null, modelProvider: null, modelId: null };
 
 function router(): ModelRouterService {
-  return new ModelRouterService(
-    {} as never,
-    { getPostgresClient: () => ({}) } as never,
-    { enforce: async () => undefined } as never,
-    { defaultsFor: async () => undefined } as never,
-  );
+  return new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
 }
 
 describe('chatSelection', () => {

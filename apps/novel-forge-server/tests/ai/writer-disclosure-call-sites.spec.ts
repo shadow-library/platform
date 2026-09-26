@@ -21,7 +21,7 @@ function recordingRouter(calls: RecordedCall[], answer: (key: string) => unknown
       calls.push({ key: prompt.key, vars });
       return answer(prompt.key);
     },
-    resolveFor: async (role: string, project?: { contentMode?: string }) =>
+    resolveModel: (role: string, project?: { contentMode?: string }) =>
       project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }

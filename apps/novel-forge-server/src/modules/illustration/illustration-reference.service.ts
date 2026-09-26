@@ -144,7 +144,7 @@ export class IllustrationReferenceService {
   }
 
   async resolve(input: ResolveReferencesInput): Promise<ResolvedReferences> {
-    const capacity = await this.modelRouter.referenceCapacity(input.project, input.projectId);
+    const capacity = this.modelRouter.referenceCapacity(input.project);
     const warnings: ReferenceWarning[] = [];
     const attached = await this.attachedReferences(input, warnings);
     const count = attached.length + (input.editSourceRef ? 1 : 0);

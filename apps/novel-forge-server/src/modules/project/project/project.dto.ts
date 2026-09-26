@@ -53,6 +53,9 @@ export class CreateProjectBody {
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  costTier?: Project.CostTier;
+
   @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words).' })
   wordTarget?: ProjectWordTarget;
 }

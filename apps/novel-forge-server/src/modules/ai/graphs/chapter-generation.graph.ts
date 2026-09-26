@@ -510,7 +510,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     let raised = state.writerClassRaised || policy.raised;
     if (!title) {
       const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
-      const titleRoute = await routeFor(projectId, 'title', { ...state, writerClassRaised: raised }, undefined);
+      const titleRoute = await routeFor(projectId, 'title', { ...state, writerClassRaised: raised }, projectRow as ProjectConfig | undefined);
       raised ||= titleRoute.policy.raised;
       const titleResult = (await modelRouter.structured(
         PROMPT_REGISTRY.title,

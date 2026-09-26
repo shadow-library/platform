@@ -21,7 +21,7 @@ function summarizingRouter(summary = SUMMARY) {
         calls.push(input);
         return { summary, state: { lastBeat: 'counted' } };
       },
-      resolveFor: async (role: string, project?: { contentMode?: string }) =>
+      resolveModel: (role: string, project?: { contentMode?: string }) =>
         project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'continuity'] : PRODUCTION_DEFAULTS[role as 'continuity'],
     },
     pluginPolicy: {

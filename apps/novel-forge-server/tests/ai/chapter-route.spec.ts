@@ -41,7 +41,7 @@ function deps(model: (role: string, contentMode?: string) => ResolvedModel) {
         },
       },
       modelRouter: {
-        resolveFor: async (role: string, project?: { contentMode?: string }) => {
+        resolveModel: (role: string, project?: { contentMode?: string }) => {
           routed.push({ role, contentMode: project?.contentMode });
           return model(role, project?.contentMode);
         },

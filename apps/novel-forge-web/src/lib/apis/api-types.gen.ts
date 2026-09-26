@@ -3138,34 +3138,17 @@ export interface components {
        */
       outcome: 'cancelled' | 'stopping' | 'already_settled';
     };
-    /** @description Settings that apply to every project and idea the signed-in author owns. */
+    /** @description The signed-in author’s own settings. */
     AccountSettingsResponse: {
-      /** @description Your Balanced tier: used at Balanced when neither a chat pin nor the project names a model; Economy and Performant use the tier map instead. Unrestricted work only takes a default on the unrestricted allowlist. */
-      models: components['schemas']['AccountModelDefaults'];
+      /** @description The cost tier a new project starts on when its creation request names none. */
+      defaultCostTier: components['schemas']['CostTier'];
     };
-    /** @description Your default model per group. A group left out uses the platform default. */
-    AccountModelDefaults: {
-      /** @description Chapter prose: drafts, revisions and repairs. */
-      writing?: components['schemas']['AccountModelRef'];
-      /** @description Premise, chapter plans, bible and extraction. */
-      planning?: components['schemas']['AccountModelRef'];
-      /** @description Continuity judge, validation and editorial review. */
-      review?: components['schemas']['AccountModelRef'];
-      /** @description Refinement chat on a novel. */
-      chat?: components['schemas']['AccountModelRef'];
-      /** @description Idea names, chapter titles and context compaction. */
-      helper?: components['schemas']['AccountModelRef'];
-      /** @description Cover and scene art; must name an image model. */
-      image?: components['schemas']['AccountModelRef'];
-    };
-    AccountModelRef: {
-      provider: string;
-      model: string;
-    };
+    /** @enum {string} */
+    CostTier: 'economy' | 'balanced' | 'performant';
     /** @description Replaces the signed-in author’s settings. */
     UpdateAccountSettingsBody: {
-      /** @description The full set of defaults; a group left out goes back to the platform default. */
-      models: components['schemas']['AccountModelDefaults'];
+      /** @description The cost tier a new project starts on when its creation request names none. */
+      defaultCostTier: components['schemas']['CostTier'];
     };
     AiModelsResponse: {
       /** @description The active server profile. Roles without an override inherit this profile's defaults. */
@@ -3213,8 +3196,6 @@ export interface components {
       /** @description USD per million output tokens; absent for image models. */
       outputPricePerMToken?: number;
     };
-    /** @enum {string} */
-    CostTier: 'economy' | 'balanced' | 'performant';
     /** @enum {string} */
     ContentMode: 'standard' | 'unrestricted';
     /** @description Cost, tokens and calls across every novel the signed-in author owns — the same shaping as a single project's cost, plus a per-novel breakdown. */
@@ -3305,10 +3286,10 @@ export interface components {
       /** @description The product name to show an author. */
       label: string;
       /**
-       * @description Why this model: the project's own pick, the author's Balanced default, or the platform tier map.
+       * @description Why this model: the project's own pick, or the platform's model for the cost tier.
        * @enum {string}
        */
-      source: 'project' | 'account' | 'tier';
+      source: 'project' | 'tier';
       inputPricePerMToken?: number;
       outputPricePerMToken?: number;
     };
@@ -6078,6 +6059,8 @@ export interface components {
       /** @description Project additions to the built-in chapter-writing style (point of view, tone, content limits); they take precedence where the two conflict. */
       instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
+      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      costTier?: components['schemas']['CostTier'];
       /** @description Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
     };
@@ -6298,6 +6281,8 @@ export interface components {
       /** @description The author's own words about the novel, kept verbatim and read by the chat as the author's notes. Up to 10,000 words. */
       notes?: string;
       contentMode?: components['schemas']['ContentMode'];
+      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      costTier?: components['schemas']['CostTier'];
     };
     CreateNovelWithNotesResponse: {
       projectId: string;
@@ -6355,6 +6340,8 @@ export interface components {
     };
     ImportNovelBody: {
       bundle: components['schemas']['NovelBundle'];
+      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      costTier?: components['schemas']['CostTier'];
     };
     NovelBundle: {
       /** @enum {string} */
@@ -15905,14 +15892,12 @@ export type ChatJobEventResponse = components['schemas']['ChatJobEventResponse']
 export type JobEventType = components['schemas']['JobEventType'];
 export type CancelJobResponse = components['schemas']['CancelJobResponse'];
 export type AccountSettingsResponse = components['schemas']['AccountSettingsResponse'];
-export type AccountModelDefaults = components['schemas']['AccountModelDefaults'];
-export type AccountModelRef = components['schemas']['AccountModelRef'];
+export type CostTier = components['schemas']['CostTier'];
 export type UpdateAccountSettingsBody = components['schemas']['UpdateAccountSettingsBody'];
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
 export type AiTierModel = components['schemas']['AiTierModel'];
-export type CostTier = components['schemas']['CostTier'];
 export type ContentMode = components['schemas']['ContentMode'];
 export type AccountUsageResponse = components['schemas']['AccountUsageResponse'];
 export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];

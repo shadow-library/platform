@@ -45,7 +45,7 @@ function fakeCompaction(scenario: Scenario = {}) {
     },
   };
   const modelRouter = {
-    resolveFor: async () => COST_TIER_DEFAULTS.economy.unrestricted.helper,
+    resolveModel: () => COST_TIER_DEFAULTS.economy.unrestricted.helper,
     structured: async (_prompt: unknown, _input: unknown, _ctx: unknown, project: ProjectConfig, policy: unknown) => {
       calls.push({ project, policy });
       return { summary: 'folded' };

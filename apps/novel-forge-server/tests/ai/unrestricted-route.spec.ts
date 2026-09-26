@@ -21,7 +21,7 @@ function deps(model: ResolvedModel) {
         },
       },
       modelRouter: {
-        resolveFor: async (...args: unknown[]) => {
+        resolveModel: (...args: unknown[]) => {
           routerCalls.push(args);
           return model;
         },
@@ -40,7 +40,7 @@ describe('resolveUnrestrictedRoute', () => {
 
     expect(run.policyCalls).toEqual([[1n, { role: 'revision', chapter: 4 }, { contentMode: 'unrestricted' }]]);
     expect(route).toEqual({ policy: run.policy as never, project: { ...project, contentMode: 'unrestricted' } });
-    expect(run.routerCalls).toEqual([['revision', route.project, 1n, run.policy]]);
+    expect(run.routerCalls).toEqual([['revision', route.project, run.policy]]);
   });
 
   it('should route a call without a project row onto the unrestricted map', async () => {

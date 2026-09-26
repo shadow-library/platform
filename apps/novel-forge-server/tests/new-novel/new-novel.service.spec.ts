@@ -100,6 +100,16 @@ describe('NewNovelService.createWithNotes', () => {
     expect(createCalls[0]?.body).toMatchObject({ name: 'The Tide Bargain', title: 'The Tide Bargain', kind: 'new_novel' });
   });
 
+  it('should pass the requested cost tier through, and leave it unset for the owner’s default when none is sent', async () => {
+    const { service, createCalls } = makeService();
+
+    await service.createWithNotes({ title: 'The Tide Bargain', costTier: 'economy' });
+    await service.createWithNotes({ title: 'The Tide Bargain' });
+
+    expect(createCalls[0]?.body).toMatchObject({ costTier: 'economy' });
+    expect(createCalls[1]?.body['costTier']).toBeUndefined();
+  });
+
   it('should refuse a blank title without touching the database', async () => {
     const { service, createCalls } = makeService();
 

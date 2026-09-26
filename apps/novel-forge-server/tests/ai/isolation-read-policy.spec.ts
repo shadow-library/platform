@@ -115,7 +115,7 @@ function recordingRouter(calls: RecordedCall[], extracted?: unknown) {
       },
     }),
     screenOutput: async () => undefined,
-    resolveFor: async (role: string, project?: { contentMode?: string }) =>
+    resolveModel: (role: string, project?: { contentMode?: string }) =>
       project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }

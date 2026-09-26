@@ -27,12 +27,12 @@ function setup({ draft, raised = false, unrestrictedModel, overCaps = false }: S
   const fake = fakeGenerationDb({ draftReads: [draft], draftWriteResult: [{ ...draft, revision: draft.revision + 1 }] });
   const policyBaselines: (string | null | undefined)[] = [];
   const modelCalls: RoutedCall[] = [];
-  const resolveFor = async (role: string, project?: { contentMode?: string }) =>
+  const resolveModel = (role: string, project?: { contentMode?: string }) =>
     project?.contentMode === 'unrestricted' ? (unrestrictedModel ?? UNRESTRICTED_DEFAULTS[role as 'revision']) : PRODUCTION_DEFAULTS[role as 'revision'];
 
   const service = makeGenerationService(fake.db, {
     modelRouter: {
-      resolveFor,
+      resolveModel,
       structured: async (module: { role?: string; key: string }, _input: unknown, _ctx: unknown, project?: RoutedCall['project'], policy?: RoutedCall['policy']) => {
         modelCalls.push({ role: module.role ?? module.key, project, policy });
         return REVISED;

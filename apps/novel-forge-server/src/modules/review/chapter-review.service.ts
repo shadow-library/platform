@@ -299,15 +299,15 @@ export class ChapterReviewService {
       async runId => {
         const context: ModelKindContext = { projectId, chapter, source, brief: setting.brief, route, settled, runId };
         const outcome = kind === 'judge' ? await this.judge(context) : await this.editorial(context);
-        const model = (await usedModel(this.db, runId, [role])) ?? (await this.routedModel(role, route, projectId));
+        const model = (await usedModel(this.db, runId, [role])) ?? this.routedModel(role, route);
         return { outcome, model };
       },
       jobId,
     );
   }
 
-  private async routedModel(role: 'judge' | 'review', route: CallRoute, projectId: bigint): Promise<UsedModel> {
-    const routed = await this.modelRouter.routeFor(role, route.project, projectId, route.policy);
+  private routedModel(role: 'judge' | 'review', route: CallRoute): UsedModel {
+    const routed = this.modelRouter.routeModel(role, route.project, route.policy);
     return { modelProvider: routed.resolved.provider, model: routed.resolved.model, costTier: routed.costTier, contentMode: routed.contentMode };
   }
 

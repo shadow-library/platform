@@ -41,7 +41,7 @@ export interface IsolatedContinuityInput {
  * logged and the chapter still finalizes.
  */
 export async function stageIsolatedContinuity(
-  services: { db: PrimaryDatabase; modelRouter: Pick<ModelRouterService, 'structured' | 'resolveFor'> },
+  services: { db: PrimaryDatabase; modelRouter: Pick<ModelRouterService, 'structured' | 'resolveModel'> },
   input: IsolatedContinuityInput,
   ctx: TelemetryContext,
 ): Promise<void> {
@@ -56,7 +56,7 @@ export async function stageIsolatedContinuity(
       routed,
     )) as ContinuityOutput;
     const proposal = isolatedContinuityProposal(extracted);
-    const resolvedModel = await modelRouter.resolveFor('continuity', routed, input.projectId);
+    const resolvedModel = modelRouter.resolveModel('continuity', routed);
     await db
       .insert(schema.continuityProposals)
       .values({ projectId: input.projectId, chapter: input.chapter, proposal: proposal as never, model: resolvedModel.model, status: 'pending' })
@@ -346,7 +346,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       )) as ContinuityOutput;
 
       // Upsert continuity proposal.
-      const resolvedModel = await modelRouter.resolveFor('continuity', routed, projectId);
+      const resolvedModel = modelRouter.resolveModel('continuity', routed);
       await db.transaction(async tx => {
         await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
         await tx

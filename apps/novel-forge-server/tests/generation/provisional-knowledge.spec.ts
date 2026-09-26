@@ -24,7 +24,7 @@ function serviceOver(options: FakeGenerationDbOptions) {
   const fake = fakeGenerationDb(options);
   const service = makeGenerationService(fake.db, {
     modelRouter: {
-      resolveFor: async () => UNRESTRICTED_DEFAULTS.generation,
+      resolveModel: () => UNRESTRICTED_DEFAULTS.generation,
       structured: async () => PROSE,
       chatFor: async () => ({ invoke: async () => new AIMessage('{"verdict":"consistent","findings":[]}') }),
     },

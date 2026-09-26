@@ -15,18 +15,7 @@ import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import { GatewayChatOpenAI, type RequestGuard } from './gateway-chat-openai';
-import {
-  type AiRole,
-  COST_TIER_DEFAULTS,
-  DEFAULT_COST_TIER,
-  isCostTier,
-  isRegisteredModel,
-  isUnrestrictedAllowed,
-  type ResolvedModel,
-  resolveReasoningEffort,
-  ROLE_GROUP,
-} from './defaults';
-import { type AccountModelGroup, AccountSettingsService } from './account-settings.service';
+import { type AiRole, COST_TIER_DEFAULTS, DEFAULT_COST_TIER, isCostTier, isUnrestrictedAllowed, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
 import { AiQuotaService } from './ai-quota.service';
 import { scopedCostTier } from './cost-tier-scope';
 import {
@@ -58,7 +47,7 @@ export type ProjectConfig = OwnerFields & {
   wordTargetMax?: number | null;
 };
 
-export type ModelSource = 'project' | 'account' | 'tier';
+export type ModelSource = 'project' | 'tier';
 
 export interface ModelRoute {
   resolved: ResolvedModel;
@@ -263,7 +252,6 @@ export class ModelRouterService {
     private readonly telemetry: TelemetryHandler,
     private readonly databaseService: DatabaseService,
     private readonly quota: AiQuotaService,
-    private readonly accountSettings: AccountSettingsService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -291,15 +279,14 @@ export class ModelRouterService {
     return true;
   }
 
-  resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy, account?: Partial<Record<AccountModelGroup, ResolvedModel>>): ResolvedModel {
-    return this.routeModel(role, project, policy, account).resolved;
+  resolveModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy): ResolvedModel {
+    return this.routeModel(role, project, policy).resolved;
   }
 
-  // Order: the project's own pin, then the owner's defaults — Balanced only, since they are that author's Balanced — then the tier map.
-  // A tier carried in by a chat turn's action outranks the project's. `call.route`: a plugin may raise this call to the permissive class,
-  // and no policy can lower a project whose own contentMode is already unrestricted — the raise-only rule is structural at the routing sink.
-  // An unregistered account default is skipped rather than failed, since the registry can drop a model long after the author picked it.
-  routeModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy, account?: Partial<Record<AccountModelGroup, ResolvedModel>>): ModelRoute {
+  // Order: a tier carried in by a chat turn's action, then the project's own pin, then the tier map. `call.route`: a plugin may raise this call
+  // to the permissive class, and no policy can lower a project whose own contentMode is already unrestricted — the raise-only rule is structural
+  // at the routing sink.
+  routeModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy): ModelRoute {
     const group = ROLE_GROUP[role] ?? 'writing';
     const costTier = scopedCostTier() ?? (isCostTier(project?.costTier) ? project.costTier : DEFAULT_COST_TIER);
     const contentMode: Project.ContentMode = project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive' ? 'unrestricted' : 'standard';
@@ -308,38 +295,21 @@ export class ModelRouterService {
     // The settings UI writes one selection across every role in a group, so group members resolve identically.
     const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
     const projectModel = models?.[role] ?? (role === 'chat' ? models?.['plan'] : undefined);
-    const accountModel = costTier === DEFAULT_COST_TIER ? account?.[group as AccountModelGroup] : undefined;
-    const accountDefault = accountModel && isRegisteredModel(accountModel) ? accountModel : undefined;
     const tierDefault = COST_TIER_DEFAULTS[costTier][contentMode][group];
 
-    if (contentMode === 'unrestricted') {
-      if (projectModel && isUnrestrictedAllowed(role, projectModel)) return route(projectModel, 'project');
-      if (accountDefault && isUnrestrictedAllowed(role, accountDefault)) return route(accountDefault, 'account');
-      return route(tierDefault, 'tier');
-    }
-    if (projectModel) {
-      // Fail closed at the sink: a persisted override whose model id is not in the registry — including
-      // one written before write-time validation existed — must never reach the platform credential.
-      if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
-      return route(projectModel, 'project');
-    }
-    return accountDefault ? route(accountDefault, 'account') : route(tierDefault, 'tier');
-  }
-
-  async resolveFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ResolvedModel> {
-    return (await this.routeFor(role, project, projectId, policy)).resolved;
-  }
-
-  async routeFor(role: AiRole, project?: ProjectConfig, projectId?: bigint, policy?: ForgeCallPolicy): Promise<ModelRoute> {
-    const account = await this.accountSettings.defaultsFor(project, projectId);
-    return this.routeModel(role, project, policy, account);
+    if (contentMode === 'unrestricted') return projectModel && isUnrestrictedAllowed(role, projectModel) ? route(projectModel, 'project') : route(tierDefault, 'tier');
+    if (!projectModel) return route(tierDefault, 'tier');
+    // Fail closed at the sink: a persisted override whose model id is not in the registry — including
+    // one written before write-time validation existed — must never reach the platform credential.
+    if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
+    return route(projectModel, 'project');
   }
 
   // Lets a caller (e.g. the reference resolver) learn how many reference images the image model that
   // would actually be used can accept, before it composes a request. No `policy` parameter: `images()`
   // itself resolves without one, so accepting one here could answer for a model it would never enforce.
-  async referenceCapacity(project?: ProjectConfig, projectId?: bigint): Promise<number> {
-    const resolved = await this.resolveFor('image', project, projectId);
+  referenceCapacity(project?: ProjectConfig): number {
+    const resolved = this.resolveModel('image', project);
     return MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
   }
 
@@ -383,7 +353,7 @@ export class ModelRouterService {
   // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row.
   async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
     if (ctx) await this.quota.enforce(ctx.projectId);
-    const route = await this.routeFor(role, project, ctx?.projectId, policy);
+    const route = this.routeModel(role, project, policy);
     const { resolved } = route;
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
     return this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}) });
@@ -435,7 +405,7 @@ export class ModelRouterService {
   ): Promise<T> {
     await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
-    const route = await this.routeFor(role, project, ctx.projectId, policy);
+    const route = this.routeModel(role, project, policy);
     const { resolved } = route;
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
@@ -583,7 +553,7 @@ export class ModelRouterService {
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
     await this.quota.enforce(ctx.projectId);
-    const route = await this.routeFor('image', project, ctx.projectId);
+    const route = this.routeModel('image', project);
     const { resolved } = route;
     await this.refuseHardLine(route, [{ text: request.prompt, scope: 'supplied', source: 'The image prompt' }], ctx);
     const maxInputReferences = MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
@@ -711,7 +681,7 @@ export class ModelRouterService {
 
   /** The parsed answer of a `chatFor` client (judge, validation), screened for its role before the caller keeps or forwards it. */
   async screenOutput(role: AiRole, output: unknown, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<void> {
-    const route = await this.routeFor(role, project, ctx.projectId, policy);
+    const route = this.routeModel(role, project, policy);
     await this.refuseHardLine(route, outputScreens(output, role), ctx, false);
   }
 

@@ -133,8 +133,8 @@ export class ProjectModelRoute {
   label: string;
 
   @Field(() => String, {
-    enum: ['project', 'account', 'tier'],
-    description: "Why this model: the project's own pick, the author's Balanced default, or the platform tier map.",
+    enum: ['project', 'tier'],
+    description: "Why this model: the project's own pick, or the platform's model for the cost tier.",
   })
   source: ModelSource;
 
@@ -157,51 +157,16 @@ export class ProjectModelsResponse {
   models: ProjectModelRoute[];
 }
 
-@Schema()
-export class AccountModelRef {
-  @Field()
-  provider: string;
-
-  @Field()
-  model: string;
-}
-
-// Enumerated per group, like `ProjectModelOverrides`, so client code generation sees a closed object.
-@Schema({ description: 'Your default model per group. A group left out uses the platform default.' })
-export class AccountModelDefaults {
-  @Field(() => AccountModelRef, { optional: true, description: 'Chapter prose: drafts, revisions and repairs.' })
-  writing?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'Premise, chapter plans, bible and extraction.' })
-  planning?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'Continuity judge, validation and editorial review.' })
-  review?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'Refinement chat on a novel.' })
-  chat?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'Idea names, chapter titles and context compaction.' })
-  helper?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'Cover and scene art; must name an image model.' })
-  image?: AccountModelRef;
-}
-
-@Schema({ description: 'Settings that apply to every project and idea the signed-in author owns.' })
+@Schema({ description: 'The signed-in author’s own settings.' })
 export class AccountSettingsResponse {
-  @Field(() => AccountModelDefaults, {
-    description:
-      'Your Balanced tier: used at Balanced when neither a chat pin nor the project names a model; Economy and Performant use the tier map instead. ' +
-      'Unrestricted work only takes a default on the unrestricted allowlist.',
-  })
-  models: AccountModelDefaults;
+  @Field(() => CostTier, { description: 'The cost tier a new project starts on when its creation request names none.' })
+  defaultCostTier: Project.CostTier;
 }
 
 @Schema({ description: 'Replaces the signed-in author’s settings.' })
 export class UpdateAccountSettingsBody {
-  @Field(() => AccountModelDefaults, { description: 'The full set of defaults; a group left out goes back to the platform default.' })
-  models: AccountModelDefaults;
+  @Field(() => CostTier, { description: 'The cost tier a new project starts on when its creation request names none.' })
+  defaultCostTier: Project.CostTier;
 }
 
 @Schema({ description: "Spend on one of the signed-in author's novels." })
