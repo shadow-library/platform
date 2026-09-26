@@ -5,6 +5,7 @@ import { type ChangeOp } from '@/lib/proposals';
 import {
   type CardEntryNote,
   type CommitBarView,
+  isActionOp,
   opSubject,
   opTopicLabel,
   opWrittenField,
@@ -13,6 +14,8 @@ import {
   rationaleOf,
   REJECTION_SCOPE_LABEL,
   type RejectionScope,
+  rejectionScopeNote,
+  rejectionScopesFor,
   RETIRES_NOTE,
   SUGGESTED_EYEBROW,
   type SuggestionDecision,
@@ -44,8 +47,6 @@ export interface SuggestionCardProps {
   onScope: (scope: RejectionScope) => void;
 }
 
-const SCOPES: readonly RejectionScope[] = ['never', 'not_now'];
-
 export function SuggestionCard(props: SuggestionCardProps): React.JSX.Element {
   const { op, decision, scope, draft, busy, remaining, note } = props;
   const subject = opSubject(op);
@@ -65,17 +66,32 @@ export function SuggestionCard(props: SuggestionCardProps): React.JSX.Element {
     );
   }
 
+  if (decision === 'decline' && isActionOp(op)) {
+    return (
+      <div className={styles.notice}>
+        <span>Won’t run “{subject}”.</span>
+        {canUndo && (
+          <span className={styles.row}>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={props.onUndoDecision}>
+              Change
+            </Button>
+          </span>
+        )}
+      </div>
+    );
+  }
+
   if (decision === 'decline') {
     return (
       <div className={styles.notice}>
         <span>
           {scope
-            ? `Noted in your Notebook — “${subject}” won’t be suggested again ${scope === 'never' ? 'for this story' : 'for now'}. Close variations are steered away from too, though not every one may be caught.`
+            ? `Noted in your Notebook — “${subject}” won’t be suggested again ${rejectionScopeNote(scope)}. Close variations are steered away from too, though not every one may be caught.`
             : `Won’t add “${subject}”${canUndo && remaining > 0 ? ` — ${remaining} left to answer` : ''}. Should it ever be suggested again?`}
         </span>
         {note?.retires && <span className={styles.caption}>{RETIRES_NOTE}</span>}
         <span className={styles.row} role="group" aria-label={`When to suggest “${subject}” again`}>
-          {SCOPES.map(option => (
+          {rejectionScopesFor(op).map(option => (
             <Button key={option} size="sm" variant="secondary" aria-pressed={scope === option} disabled={busy || Boolean(scope)} onClick={() => props.onScope(option)}>
               {REJECTION_SCOPE_LABEL[option]}
             </Button>
@@ -120,7 +136,7 @@ export function SuggestionCard(props: SuggestionCardProps): React.JSX.Element {
               </Button>
             )}
             <Button size="sm" variant="ghost" disabled={busy} onClick={props.onDecline}>
-              Not this
+              {isActionOp(op) ? 'Don’t run it' : 'Not this'}
             </Button>
           </>
         ) : (

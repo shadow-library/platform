@@ -7,6 +7,7 @@ import {
   type ChatQuestionResponse,
   type EntityType,
   type JobKind,
+  type LedgerRejectionScope,
   type ProgressItemKey,
   type ProgressItemResponse,
   type UndoImpactResponse,
@@ -58,12 +59,6 @@ export function opWrittenField(op: ChangeOp): (typeof PROSE_FIELDS)[number] | 'l
   if (text(op.label)) return 'label';
   if (text(op.title)) return 'title';
   return text(op.name) ? 'name' : undefined;
-}
-
-/** The field's own words, unlabelled — what a rejection records so a later organise pass recognises the same idea. */
-export function opRawValue(op: ChangeOp): string {
-  const field = opWrittenField(op);
-  return (field && text(op[field])) ?? opSubject(op);
 }
 
 export function opWrittenValue(op: ChangeOp): string {
@@ -161,24 +156,53 @@ export function proposalPresentation(proposal: { kind: string; status: string; c
   return 'suggestions';
 }
 
-export type RejectionScope = 'never' | 'not_now';
+const FINALIZE_BLOCKED_CODES: ReadonlySet<string> = new Set(['FRV_002', 'FRV_003', 'FRV_004', 'FRV_005', 'FRV_006']);
 
-export const REJECTION_SCOPE_LABEL: Record<RejectionScope, string> = { never: 'Never', not_now: 'Not now — maybe later' };
-
-export interface RejectionEntry {
-  kind: 'rejected' | 'backlog';
-  statement: string;
-  why: string;
+/** A finalize action refused because its review isn't ready or answered yet — every other failure keeps the bare error. */
+export function finalizeReviewBlocked(op: ChangeOp, code: string): boolean {
+  return String(op.op) === 'action.finalize' && FINALIZE_BLOCKED_CODES.has(code);
 }
 
-/**
- * "Never" records the raw value as a rejected idea, the same words organise dedupes on. "Not now" is a backlog entry, which the Notebook
- * files under Later — so it is worded as an idea set aside, not as something to do.
- */
-export function rejectionEntry(op: ChangeOp, scope: RejectionScope): RejectionEntry {
-  const raw = opRawValue(op);
-  if (scope === 'never') return { kind: 'rejected', statement: raw, why: 'Declined in the chat: not for this story.' };
-  return { kind: 'backlog', statement: `Set aside for now: ${raw}`, why: 'Declined in the chat for now; it may fit later.' };
+/** The chapter to open the finalize review for, when the action named one; otherwise the review's own chapter is unknown to the client. */
+export function finalizeReviewChapter(op: ChangeOp): number | undefined {
+  return typeof op.upTo === 'number' ? op.upTo : undefined;
+}
+
+/** An action step, not an idea for the Story Bible — the reject route refuses every scope on one outright (LDG_007). */
+export function isActionOp(op: ChangeOp): boolean {
+  return String(op.op).startsWith('action.');
+}
+
+export type RejectionScope = LedgerRejectionScope;
+
+export const REJECTION_SCOPE_LABEL: Record<RejectionScope, string> = {
+  never: 'Never',
+  not_now: 'Not now — maybe later',
+  not_this_version: 'Not for this version',
+};
+
+/** Whether a decline's `not_this_version` scope has anything to anchor to — false for an action (see `isActionOp`) and for `organise.rule`, which the server refuses that scope for touching no record (LDG_008). */
+export function opTouchesRecord(op: ChangeOp): boolean {
+  return !isActionOp(op) && String(op.op) !== 'organise.rule';
+}
+
+/** The scopes a decline may offer: none for an action, which is run or not rather than remembered. */
+export function rejectionScopesFor(op: ChangeOp): readonly RejectionScope[] {
+  if (isActionOp(op)) return [];
+  return opTouchesRecord(op) ? ['never', 'not_now', 'not_this_version'] : ['never', 'not_now'];
+}
+
+export function rejectionScopeNote(scope: RejectionScope): string {
+  if (scope === 'never') return 'for this story';
+  if (scope === 'not_now') return 'for now';
+  return 'for this version';
+}
+
+/** The reason kept on the Notebook entry the reject route writes; the server derives the statement and topic from the op itself. */
+export function rejectionWhy(scope: RejectionScope): string {
+  if (scope === 'never') return 'Declined in the chat: not for this story.';
+  if (scope === 'not_now') return 'Declined in the chat for now; it may fit later.';
+  return 'Declined in the chat for this version; a later edit to what it touches makes it eligible again.';
 }
 
 export interface DecisionPick {
@@ -232,16 +256,6 @@ export function commitBarView({ total, decisions, committing, error }: CommitBar
   const action = plan.kind === 'discard' ? 'Pass on these now' : `Add ${plan.opIndexes.length} now`;
   const text = error ? `Couldn’t finish: ${error} Your answers are kept.` : 'Every suggestion has an answer.';
   return { kind: 'ready', action, text, failed: Boolean(error) };
-}
-
-/** Ledger topics are `[a-z0-9][a-z0-9_.-]{0,99}`. */
-export function ideaTopic(op: ChangeOp): string {
-  const slug = opSubject(op)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-  return `idea.${slug || 'suggestion'}`;
 }
 
 export interface ChecklistItemView {

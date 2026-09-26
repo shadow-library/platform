@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, Checkbox, toast } from '@shadow-library/ui';
 
@@ -8,6 +9,7 @@ import { type ApplyProposalResponse, type ProposalResponse, useApplyProposalMuta
 import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from '@/lib/proposals';
 
+import { finalizeReviewBlocked, finalizeReviewChapter } from './chat-view';
 import styles from './Chat.module.css';
 
 const OP_RESULT_INTENT: Record<string, ChipIntent> = {
@@ -23,6 +25,11 @@ export interface TurnProposalCardProps {
   onApplied?: (result: ApplyProposalResponse) => void;
 }
 
+interface FinalizeRefusal {
+  /** The chapter the action named; absent when the server picked one on its own and the client has no way to know which. */
+  chapter?: number;
+}
+
 /** The explicit per-op card: kept for one-way doors, conflicts and anything the transcript has no friendlier view of. */
 export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalCardProps): React.JSX.Element {
   const apply = useApplyProposalMutation(novelId);
@@ -30,6 +37,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   const revert = useRevertProposalMutation(novelId);
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [finalizeRefusal, setFinalizeRefusal] = useState<FinalizeRefusal>();
 
   // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
   // it during render rather than in an effect — an effect would paint one frame of the old selection.
@@ -37,6 +45,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   if (selectionFor !== proposal.id) {
     setSelectionFor(proposal.id);
     setDeclined(defaultDeclined(proposal.changeSet));
+    setFinalizeRefusal(undefined);
   }
 
   const isPending = proposal.status === 'pending';
@@ -53,6 +62,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   const doApply = (): void => {
     const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
+    setFinalizeRefusal(undefined);
     // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
     // one-way door, so naming the indexes is what makes finalize reachable at all.
     apply.mutate(
@@ -64,7 +74,11 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
           if (failed.length > 0) toast.danger(`Applied with ${failed.length} failed action(s)`);
           else toast.success('Changes applied to canon');
         },
-        onError: err => toast.danger(err.message),
+        onError: err => {
+          const finalizeOp = proposal.changeSet.find(op => finalizeReviewBlocked(op, err.code));
+          if (finalizeOp) return setFinalizeRefusal({ chapter: finalizeReviewChapter(finalizeOp) });
+          toast.danger(err.message);
+        },
       },
     );
   };
@@ -116,6 +130,18 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
         </div>
       ))}
       {proposal.status === 'conflicted' && <div className={styles.turnCardNote}>The canon moved on since this was drafted — ask again for a fresh change-set.</div>}
+      {finalizeRefusal && (
+        <>
+          <div className={styles.turnCardNote}>The finalize review for this chapter isn’t ready or fully answered yet.</div>
+          <div className={styles.cardActions}>
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/novels/$novelId/chapters" params={{ novelId }} search={finalizeRefusal.chapter !== undefined ? { chapter: finalizeRefusal.chapter } : {}}>
+                {finalizeRefusal.chapter !== undefined ? 'Open the finalize review' : 'Open Chapters to answer the finalize review'}
+              </Link>
+            </Button>
+          </div>
+        </>
+      )}
       {regenerateChapters.length > 0 && (
         <div className={styles.cardActions}>
           <RegenerateAppliedBriefs novelId={novelId} chapters={regenerateChapters} />

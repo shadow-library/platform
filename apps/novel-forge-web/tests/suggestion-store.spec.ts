@@ -44,23 +44,32 @@ describe('suggestion answers', () => {
 });
 
 describe('answersSettled', () => {
+  const changeSet = [
+    { op: 'entity.upsert', entityKey: 'council' },
+    { op: 'entity.upsert', entityKey: 'maren' },
+  ];
   const declined = new Map<number, 'add' | 'decline'>([
     [0, 'add'],
     [1, 'decline'],
   ]);
 
   it('should keep a pending card’s answers', () => {
-    expect(answersSettled('pending', declined, new Map())).toBe(false);
+    expect(answersSettled('pending', changeSet, declined, new Map())).toBe(false);
   });
 
   it('should keep a committed card’s answers until every decline has its scope', () => {
-    expect(answersSettled('applied', declined, new Map())).toBe(false);
-    expect(answersSettled('applied', declined, new Map([[1, 'never']]))).toBe(true);
-    expect(answersSettled('discarded', new Map([[0, 'add']]), new Map())).toBe(true);
+    expect(answersSettled('applied', changeSet, declined, new Map())).toBe(false);
+    expect(answersSettled('applied', changeSet, declined, new Map([[1, 'never']]))).toBe(true);
+    expect(answersSettled('discarded', changeSet, new Map([[0, 'add']]), new Map())).toBe(true);
   });
 
   it('should drop a replaced card’s answers at once', () => {
-    expect(answersSettled('superseded', declined, new Map())).toBe(true);
-    expect(answersSettled('conflicted', declined, new Map())).toBe(true);
+    expect(answersSettled('superseded', changeSet, declined, new Map())).toBe(true);
+    expect(answersSettled('conflicted', changeSet, declined, new Map())).toBe(true);
+  });
+
+  it('should settle a declined action without a scope, since it is run or not rather than remembered', () => {
+    const actionChangeSet = [{ op: 'action.organise_notes' }];
+    expect(answersSettled('applied', actionChangeSet, new Map([[0, 'decline']]), new Map())).toBe(true);
   });
 });

@@ -5,7 +5,7 @@ import { SidePanel, StatusChip } from '@/components/nf';
 import { type LedgerEntryResponse, useLedgerEntriesQuery, useLedgerTopicQuery, useWithdrawLedgerEntryMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
-import { groupEntriesByKind, isWithdrawable, LEDGER_KIND_LABELS, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from './notebook';
+import { groupEntriesByKind, isWithdrawable, LEDGER_KIND_LABELS, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts, rejectionScopeChip } from './notebook';
 import styles from './NotebookPanel.module.css';
 
 const KIND_INTENT = { decision: 'success', system: 'info', direction: 'accent', rejected: 'danger', backlog: 'neutral' } as const;
@@ -27,10 +27,12 @@ interface EntryRowProps {
 }
 
 function EntryRow({ entry, isNew, onOpenTopic }: EntryRowProps): ReactElement {
+  const scopeChip = rejectionScopeChip(entry);
   return (
     <article className={styles.nbEntry} data-kind={entry.kind} data-new={isNew || undefined}>
       <div className={styles.nbEntryHead}>
         <StatusChip intent={KIND_INTENT[entry.kind]}>{LEDGER_KIND_LABELS[entry.kind]}</StatusChip>
+        {scopeChip && <StatusChip intent="neutral">{scopeChip}</StatusChip>}
         {isNew && <span className={styles.nbNew}>new</span>}
         <button type="button" className={styles.nbTopic} aria-label={`${ledgerTopicLabel(entry.topic)} — open its history`} onClick={() => onOpenTopic(entry.topic)}>
           {ledgerTopicLabel(entry.topic)}

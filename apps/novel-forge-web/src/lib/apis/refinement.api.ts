@@ -29,6 +29,7 @@ import {
   type CostTier,
   type CreateChatSessionBody,
   type FailedTurnResponse,
+  type LedgerEntryResponse,
   type ListChangesResponse,
   type ListChatMessagesResponse,
   type ListChatSessionResponse,
@@ -36,10 +37,12 @@ import {
   type ListProposalsQueryParams,
   type PendingTurnResponse,
   type ProposalResponse,
+  type RejectProposalOpBody,
   type RevertProposalResponse,
   type RollbackResponse,
 } from './api-types.gen';
 import { flushInvalidations, invalidateSoon } from './batched-invalidation';
+import { invalidateLedger } from './ledger.api';
 import { livePolling } from './live-polling';
 import { invalidateRuns } from './run.api';
 import { ApiError, APIRequest, isApiError } from './transport';
@@ -739,6 +742,20 @@ export function useUpdateProposalMutation(projectId: string): UseMutationResult<
   return useMutation<ProposalResponse, ApiError, UpdateProposalVariables>({
     mutationFn: ({ proposalId, changeSet }) => APIRequest.patch(`/projects/${projectId}/proposals/${proposalId}`).body({ changeSet }).execute(),
     onSuccess: proposal => queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal),
+  });
+}
+
+export interface RejectProposalOpVariables extends RejectProposalOpBody {
+  proposalId: string;
+  opIndex: number;
+}
+
+/** Turns down one op of a pending card as a Notebook rejection, scoped to how long it stays turned down. */
+export function useRejectProposalOpMutation(projectId: string): UseMutationResult<LedgerEntryResponse, ApiError, RejectProposalOpVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<LedgerEntryResponse, ApiError, RejectProposalOpVariables>({
+    mutationFn: ({ proposalId, opIndex, ...body }) => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/ops/${opIndex}/reject`).body(body).execute(),
+    onSuccess: () => invalidateLedger(queryClient, projectId),
   });
 }
 

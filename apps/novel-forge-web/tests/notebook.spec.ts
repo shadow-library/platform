@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { groupEntriesByKind, isWithdrawable, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from '../src/features/notebook/notebook';
+import {
+  groupEntriesByKind,
+  isWithdrawable,
+  LEDGER_STATUS_LABELS,
+  ledgerTopicLabel,
+  newLedgerEntryIds,
+  notebookCounts,
+  rejectionScopeChip,
+} from '../src/features/notebook/notebook';
 import { type LedgerEntryResponse } from '../src/lib/apis';
 
 function entry(id: string, overrides: Partial<LedgerEntryResponse> = {}): LedgerEntryResponse {
@@ -134,5 +142,17 @@ describe('LEDGER_STATUS_LABELS', () => {
   it('should say what a retired entry is in words, not in the enum', () => {
     expect(LEDGER_STATUS_LABELS.superseded).toBe('Replaced');
     expect(LEDGER_STATUS_LABELS.withdrawn).toBe('Withdrawn');
+  });
+});
+
+describe('rejectionScopeChip', () => {
+  it('should label an idea rejection by its scope', () => {
+    expect(rejectionScopeChip(entry('a', { kind: 'rejected', ideaId: 'idea.council', rejectionScope: 'never' }))).toBe('Never');
+    expect(rejectionScopeChip(entry('a', { kind: 'rejected', ideaId: 'idea.council', rejectionScope: 'not_this_version' }))).toBe('Not for this version');
+  });
+
+  it('should show nothing for an entry with no idea rejection to scope', () => {
+    expect(rejectionScopeChip(entry('a', { kind: 'decision' }))).toBeUndefined();
+    expect(rejectionScopeChip(entry('a', { kind: 'rejected', ideaId: null, rejectionScope: null }))).toBeUndefined();
   });
 });

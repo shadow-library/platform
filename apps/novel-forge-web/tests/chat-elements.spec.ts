@@ -183,11 +183,39 @@ describe('SuggestionCard', () => {
     expect(declined).toContain('Should it ever be suggested again?');
     expect(declined).toContain('Never');
     expect(declined).toContain('Not now — maybe later');
+    expect(declined).toContain('Not for this version');
     expect(declined).toContain('Change');
     const scoped = suggestion({ decision: 'decline', scope: 'not_now' });
     expect(scoped).toContain('Noted in your Notebook');
     expect(scoped).toContain('aria-pressed="true"');
     expect(suggestion({ decision: 'decline', canUndo: false })).not.toContain('Change');
+  });
+
+  it('should offer no scope past "not now" for a rule, which the server refuses to anchor to no record (LDG_008)', () => {
+    const declined = suggestion({ op: { op: 'organise.rule', rule: 'No magic at sea' }, decision: 'decline' });
+    expect(declined).toContain('Never');
+    expect(declined).toContain('Not now — maybe later');
+    expect(declined).not.toContain('Not for this version');
+  });
+
+  it('should hide Change once a decline has a recorded scope, so it can’t flip back to Keep', () => {
+    expect(suggestion({ decision: 'decline' })).toContain('Change');
+    expect(suggestion({ decision: 'decline', scope: 'never' })).not.toContain('Change');
+    expect(suggestion({ decision: 'decline', scope: 'not_this_version' })).not.toContain('Change');
+  });
+
+  it('should offer a plain "Don’t run it" decline for an action, with no scope buttons and no Notebook mention', () => {
+    const action = { op: 'action.organise_notes' };
+    const pending = suggestion({ op: action, decision: undefined });
+    expect(pending).toContain('Don’t run it');
+    expect(pending).not.toContain('Not this');
+    const declined = suggestion({ op: action, decision: 'decline' });
+    expect(declined).toContain('Won’t run “Organise your notes”.');
+    expect(declined).not.toContain('Never');
+    expect(declined).not.toContain('Not now');
+    expect(declined).not.toContain('Noted in your Notebook');
+    expect(declined).toContain('Change');
+    expect(suggestion({ op: action, decision: 'decline', canUndo: false })).not.toContain('Change');
   });
 });
 

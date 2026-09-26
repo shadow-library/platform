@@ -6,9 +6,9 @@ import {
   type ApplyProposalResponse,
   type ProposalResponse,
   useApplyProposalMutation,
-  useCreateLedgerEntryMutation,
   useDiscardProposalMutation,
   useProposalQuery,
+  useRejectProposalOpMutation,
   useRevertProposalMutation,
   useUndoImpactQuery,
   useUpdateProposalMutation,
@@ -19,14 +19,13 @@ import {
   appliedRows,
   type CardEntryNote,
   commitBarView,
-  ideaTopic,
   opWrittenField,
   picksOf,
   picksSentence,
   proposalPresentation,
   type QuoteSource,
-  rejectionEntry,
   type RejectionScope,
+  rejectionWhy,
   suggestionCommit,
   type SuggestionDecision,
 } from './chat-view';
@@ -158,7 +157,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
   const update = useUpdateProposalMutation(novelId);
-  const remember = useCreateLedgerEntryMutation(novelId);
+  const remember = useRejectProposalOpMutation(novelId);
   const [stored] = useState(() => readAnswers(proposal.id));
   const [decisions, setDecisions] = useState<ReadonlyMap<number, SuggestionDecision>>(() => new Map(stored.decisions));
   const [scopes, setScopes] = useState<ReadonlyMap<number, RejectionScope>>(() => new Map(stored.scopes));
@@ -171,7 +170,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
   const total = proposal.changeSet.length;
   const pending = proposal.status === 'pending';
   const remaining = total - decisions.size;
-  const finished = answersSettled(proposal.status, decisions, scopes);
+  const finished = answersSettled(proposal.status, proposal.changeSet, decisions, scopes);
 
   useEffect(() => {
     writeAnswers(proposal.id, finished ? { decisions: [], scopes: [] } : { decisions: [...decisions.entries()], scopes: [...scopes.entries()] });
@@ -254,9 +253,8 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
   const recordScope = (index: number, scope: RejectionScope): void => {
     const op = proposal.changeSet[index];
     if (!op) return;
-    const entry = rejectionEntry(op, scope);
     remember.mutate(
-      { ...entry, topic: ideaTopic(op), payload: { scope, proposalId: proposal.id, opIndex: index } },
+      { proposalId: proposal.id, opIndex: index, scope, why: rejectionWhy(scope) },
       {
         onSuccess: () => setScopes(current => new Map(current).set(index, scope)),
         onError: err => toast.danger(err.message),

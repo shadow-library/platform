@@ -7,16 +7,18 @@ import {
   commitBarView,
   composerHint,
   entryNotes,
+  finalizeReviewBlocked,
+  finalizeReviewChapter,
   heroText,
-  ideaTopic,
+  isActionOp,
   isProgressItemKey,
   jobKindForOp,
   jobView,
   lastUserOrdinal,
   offersNotes,
   openerChip,
-  opRawValue,
   opTopicLabel,
+  opTouchesRecord,
   opWrittenValue,
   organiseReceiptView,
   pendingDecisionLabel,
@@ -26,7 +28,9 @@ import {
   proposalPresentation,
   questionOf,
   rationaleOf,
-  rejectionEntry,
+  rejectionScopeNote,
+  rejectionScopesFor,
+  rejectionWhy,
   RETIRES_NOTE,
   rowSource,
   shouldRefocusComposer,
@@ -127,10 +131,55 @@ describe('suggestionCommit', () => {
   });
 });
 
-describe('ideaTopic', () => {
-  it('should build a ledger topic the server accepts', () => {
-    expect(ideaTopic(COUNCIL)).toBe('idea.the-tidewarden-s-council');
-    expect(ideaTopic(COUNCIL)).toMatch(/^[a-z0-9][a-z0-9_.-]{0,99}$/);
+describe('isActionOp', () => {
+  it('should recognise any op that starts an action rather than proposing an idea', () => {
+    expect(isActionOp({ op: 'action.organise_notes' })).toBe(true);
+    expect(isActionOp({ op: 'action.plan_chapter' })).toBe(true);
+    expect(isActionOp(COUNCIL)).toBe(false);
+  });
+});
+
+describe('rejectionScopesFor', () => {
+  it('should offer "not this version" for an op that touches a record', () => {
+    expect(rejectionScopesFor(COUNCIL)).toEqual(['never', 'not_now', 'not_this_version']);
+  });
+
+  it('should leave it out for a rule, which the server refuses to scope that way (LDG_008)', () => {
+    expect(opTouchesRecord({ op: 'organise.rule', rule: 'No magic at sea' })).toBe(false);
+    expect(rejectionScopesFor({ op: 'organise.rule', rule: 'No magic at sea' })).toEqual(['never', 'not_now']);
+  });
+
+  it('should offer no scopes at all for an action — it is run or not, never remembered as an idea (LDG_007)', () => {
+    expect(opTouchesRecord({ op: 'action.organise_notes' })).toBe(false);
+    expect(rejectionScopesFor({ op: 'action.organise_notes' })).toEqual([]);
+    expect(rejectionScopesFor({ op: 'action.plan_chapter' })).toEqual([]);
+  });
+});
+
+describe('rejectionScopeNote + rejectionWhy', () => {
+  it('should read each scope back as a sentence fragment and a Notebook reason', () => {
+    expect(rejectionScopeNote('never')).toBe('for this story');
+    expect(rejectionScopeNote('not_now')).toBe('for now');
+    expect(rejectionScopeNote('not_this_version')).toBe('for this version');
+    expect(rejectionWhy('never')).toContain('not for this story');
+    expect(rejectionWhy('not_now')).toContain('may fit later');
+    expect(rejectionWhy('not_this_version')).toContain('eligible again');
+  });
+});
+
+describe('finalizeReviewBlocked + finalizeReviewChapter', () => {
+  const finalize = { op: 'action.finalize' };
+
+  it('should recognise only a finalize action refused for a review reason', () => {
+    expect(finalizeReviewBlocked(finalize, 'FRV_002')).toBe(true);
+    expect(finalizeReviewBlocked(finalize, 'FRV_006')).toBe(true);
+    expect(finalizeReviewBlocked(finalize, 'FRV_001')).toBe(false);
+    expect(finalizeReviewBlocked({ op: 'action.approve_draft' }, 'FRV_002')).toBe(false);
+  });
+
+  it('should read the chapter off the action when it named one, and leave it unknown otherwise', () => {
+    expect(finalizeReviewChapter({ op: 'action.finalize', upTo: 5 })).toBe(5);
+    expect(finalizeReviewChapter(finalize)).toBeUndefined();
   });
 });
 
@@ -358,12 +407,6 @@ describe('answering a card', () => {
     );
     expect(picksSentence(picks)).toBe('You had picked: add “The Tidewarden’s council”, not “Maren”.');
     expect(picksSentence([])).toBe('You had not answered any of it yet.');
-  });
-
-  it('should record "Never" with the raw value organise dedupes on, and "Not now" as an idea set aside', () => {
-    expect(opRawValue(COUNCIL)).toBe('The families who grew rich trading memories.');
-    expect(rejectionEntry(COUNCIL, 'never')).toMatchObject({ kind: 'rejected', statement: 'The families who grew rich trading memories.' });
-    expect(rejectionEntry(COUNCIL, 'not_now')).toMatchObject({ kind: 'backlog', statement: 'Set aside for now: The families who grew rich trading memories.' });
   });
 
   it('should say the retire note once, from the receipt rather than the rationale', () => {

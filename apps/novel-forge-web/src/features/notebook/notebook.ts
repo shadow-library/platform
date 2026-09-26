@@ -1,5 +1,6 @@
 import { ORGANISE_ACCEPTED_TOPIC, ORGANISE_RULED_OUT_TOPIC, ORGANISE_RULES_TOPIC, ORGANISE_TOPIC } from '@shadow-library/sdk';
 
+import { REJECTION_SCOPE_LABEL } from '@/features/chat';
 import { type LedgerEntryKind, type LedgerEntryResponse, type LedgerEntryStatus } from '@/lib/apis';
 
 export interface NotebookCounts {
@@ -103,3 +104,9 @@ export const LEDGER_KIND_LABELS: Record<LedgerEntryKind, string> = {
   backlog: 'Backlog',
   system: 'System’s choice',
 };
+
+/** An idea rejection's scope, for the chip beside it — undefined for anything else the ledger records. */
+export function rejectionScopeChip(entry: Pick<LedgerEntryResponse, 'ideaId' | 'rejectionScope'>): string | undefined {
+  if (!entry.ideaId || !entry.rejectionScope) return undefined;
+  return REJECTION_SCOPE_LABEL[entry.rejectionScope];
+}

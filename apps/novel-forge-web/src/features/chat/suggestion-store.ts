@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
-import { type RejectionScope, type SuggestionDecision } from './chat-view';
+import { type ChangeOp } from '@/lib/proposals';
+
+import { isActionOp, type RejectionScope, type SuggestionDecision } from './chat-view';
 
 export interface StoredAnswers {
   decisions: [number, SuggestionDecision][];
@@ -46,11 +48,20 @@ export function writeAnswers(proposalId: string, answers: StoredAnswers): void {
   }
 }
 
-/** Whether a card's saved answers have done their job: the card is no longer pending, and nothing it shows still needs a scope. */
-export function answersSettled(status: string, decisions: ReadonlyMap<number, SuggestionDecision>, scopes: ReadonlyMap<number, RejectionScope>): boolean {
+/** Whether a card's saved answers have done their job: the card is no longer pending, and nothing it shows still needs a scope — an action's decline never does, since it is run or not rather than remembered. */
+export function answersSettled(
+  status: string,
+  changeSet: readonly ChangeOp[],
+  decisions: ReadonlyMap<number, SuggestionDecision>,
+  scopes: ReadonlyMap<number, RejectionScope>,
+): boolean {
   if (status === 'pending') return false;
   if (status !== 'applied' && status !== 'discarded' && status !== 'reverted') return true;
-  return [...decisions.entries()].every(([index, decision]) => decision !== 'decline' || scopes.has(index));
+  return [...decisions.entries()].every(([index, decision]) => {
+    if (decision !== 'decline') return true;
+    const op = changeSet[index];
+    return !op || isActionOp(op) || scopes.has(index);
+  });
 }
 
 const halfAnswered = new Map<string, number>();
