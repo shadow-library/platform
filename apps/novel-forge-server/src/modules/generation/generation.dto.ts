@@ -963,11 +963,11 @@ export class ListRunsQuery extends OmitType(PaginationQuery(SortByTime, { limit:
   @Field(() => RunGraph, { optional: true })
   graph?: (typeof AUTHOR_FACING_GRAPHS)[number];
 
-  @Field(() => String, { optional: true, format: 'date-time', description: 'Only runs started at or after this time.' })
+  @Field(() => String, { optional: true, description: 'Only runs started at or after this ISO 8601 time.' })
   @Transform('date:parse')
   from?: Date;
 
-  @Field(() => String, { optional: true, format: 'date-time', description: 'Only runs started at or before this time.' })
+  @Field(() => String, { optional: true, description: 'Only runs started at or before this ISO 8601 time.' })
   @Transform('date:parse')
   to?: Date;
 }

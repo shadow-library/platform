@@ -187,6 +187,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/ai/usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Usage */
+    get: operations['get_api_v1_ai_usage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/quota': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Quota */
+    get: operations['get_api_v1_ai_quota'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/ai/models': {
     parameters: {
       query?: never;
@@ -883,6 +917,40 @@ export interface paths {
     };
     /** Get Run */
     get: operations['get_api_v1_projects_projectId_runs_runId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/runs/{runId}/usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Run Usage */
+    get: operations['get_api_v1_projects_projectId_runs_runId_usage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/cost': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Chapter Cost */
+    get: operations['get_api_v1_projects_projectId_chapters_n_cost'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2359,6 +2427,80 @@ export interface components {
     CostTier: 'economy' | 'balanced' | 'performant';
     /** @enum {string} */
     ContentMode: 'standard' | 'unrestricted';
+    /** @description Cost, tokens and calls across every novel the signed-in author owns — the same shaping as a single project's cost, plus a per-novel breakdown. */
+    AccountUsageResponse: {
+      totalCostUsd: number;
+      /** @description The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded. */
+      estimatedCostUsd: number;
+      /** @description Spend by calls made in the last 7 days. */
+      last7DaysCostUsd: number;
+      /** @description Spend by calls made in the last 30 days. */
+      last30DaysCostUsd: number;
+      /** @description Every recorded model call, including transport-error calls that carry no tokens or cost. */
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      /** @description By user-facing model group, highest spend first. */
+      byGroup: components['schemas']['CostBreakdownItem'][];
+      /** @description By internal call role, highest spend first. */
+      byRole: components['schemas']['CostBreakdownItem'][];
+      /** @description By model, highest spend first. */
+      byModel: components['schemas']['CostBreakdownItem'][];
+      /** @description By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first. */
+      byCostSource: components['schemas']['CostBreakdownItem'][];
+      /** @description By the project's cost tier at call time — 'economy', 'balanced', or 'performant' — highest spend first. */
+      byTier: components['schemas']['CostBreakdownItem'][];
+      /** @description By content mode at call time — 'standard' or 'unrestricted' — highest spend first. */
+      byContentMode: components['schemas']['CostBreakdownItem'][];
+      /** @description Spend by UTC calendar day over the last 30 days, oldest first. A day with no calls is omitted rather than zero-filled. */
+      byDay: components['schemas']['DayCostItem'][];
+      /** @description By novel, highest spend first. */
+      byProject: components['schemas']['ProjectCostItem'][];
+    };
+    /** @description Spend and token totals for one slice of a project's model calls. */
+    CostBreakdownItem: {
+      /** @description The model group, role, or model id this row aggregates. */
+      key: string;
+      /** @description Display name: the registry label for a model, otherwise the key itself. */
+      label: string;
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
+      costUsd: number;
+      /** @description The part of `costUsd` estimated from registry list prices because the call recorded no cost. */
+      estimatedCostUsd: number;
+    };
+    /** @description Spend on one UTC calendar day. */
+    DayCostItem: {
+      /** @description UTC calendar day, YYYY-MM-DD. */
+      day: string;
+      calls: number;
+      costUsd: number;
+    };
+    /** @description Spend on one of the signed-in author's novels. */
+    ProjectCostItem: {
+      projectId: string;
+      title?: null | string;
+      calls: number;
+      costUsd: number;
+    };
+    /** @description The rolling spend window an author’s calls are throttled against. */
+    AiQuotaResponse: {
+      calls: number;
+      costUsd: number;
+      /** @description Calls allowed in the window; 0 or below means the rate dimension is disabled. */
+      maxCalls: number;
+      /** @description Spend allowed in the window, in USD; 0 or below means the spend dimension is disabled. */
+      maxCostUsd: number;
+      /** @description Width of the rolling window, in milliseconds. */
+      windowMs: number;
+      /**
+       * Format: date-time
+       * @description When the oldest call counted in the window ages out and the window first frees capacity. Null when nothing is counted in the window right now.
+       */
+      resetsAt?: null | string;
+    };
     /** @description What each group of AI work on this novel runs on under one model type and cost tier — a chat pin is not included. */
     ProjectModelsResponse: {
       contentMode: components['schemas']['ContentMode'];
@@ -2679,11 +2821,30 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+      usage: components['schemas']['JobUsageResponse'];
     };
     /** @enum {string} */
     JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
+    /** @description Cost and token totals across every run this job drove — empty (zero calls) for a job kind that makes no model calls, such as publish. */
+    JobUsageResponse: {
+      calls: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
+      costUsd: number;
+      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
+      estimatedCostUsd: number;
+      byCostSource: components['schemas']['JobCostSourceItem'][];
+    };
+    /** @description Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none. */
+    JobCostSourceItem: {
+      costSource: string;
+      calls: number;
+      costUsd: number;
+    };
     CancelJobResponse: {
       jobId: string;
       /** @description The job status as recorded right now — a `stopping` outcome still reads `in_progress` because the worker writes `cancelled` as it settles. */
@@ -2950,8 +3111,52 @@ export interface components {
       drafts: components['schemas']['DraftResponse'][];
       proposals: components['schemas']['ContinuityProposalResponse'][];
     };
+    /** @enum {string} */
+    RunGraph: 'chat-turn' | 'premise-enhance' | 'bible-audit' | 'illustration' | 'chapter-generation' | 'chapter-finalization' | 'bible-builder' | 'novel-validation';
     ListWorkflowRunResponse: {
-      items: components['schemas']['WorkflowRunDetailResponse'][];
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['WorkflowRunListItemResponse'][];
+    };
+    /** @description The non-admin-safe projection of a workflow run: identity, status and timing, never its input, error or context pack. */
+    WorkflowRunListItemResponse: {
+      id: string;
+      projectId: string;
+      jobId?: null | string;
+      graph: string;
+      target: string;
+      status: components['schemas']['WorkflowRunStatus'];
+      outcome?: null | string;
+      /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
+      skippedStages: string[];
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      endedAt?: null | string;
+      totals: components['schemas']['RunUsageResponse'];
+    };
+    /** @enum {string} */
+    WorkflowRunStatus: 'running' | 'completed' | 'awaiting_review' | 'failed' | 'cancelled';
+    /** @description A workflow run's cost, tokens and call totals — the author-facing figure, never the prompt or response bodies behind it. */
+    RunUsageResponse: {
+      calls: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
+      costUsd: number;
+      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
+      estimatedCostUsd: number;
+      /** @description Wall-clock milliseconds from startedAt to endedAt; null while the run is still in progress. */
+      durationMs?: null | number;
+      byCostSource: components['schemas']['RunCostSourceItem'][];
+    };
+    /** @description Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none. */
+    RunCostSourceItem: {
+      costSource: string;
+      calls: number;
+      costUsd: number;
     };
     WorkflowRunDetailResponse: {
       id: string;
@@ -2981,9 +3186,8 @@ export interface components {
       startedAt: string;
       /** Format: date-time */
       endedAt?: null | string;
+      totals: components['schemas']['RunUsageResponse'];
     };
-    /** @enum {string} */
-    WorkflowRunStatus: 'running' | 'completed' | 'awaiting_review' | 'failed' | 'cancelled';
     RunModelCallResponse: {
       id: string;
       node?: null | string;
@@ -2994,15 +3198,24 @@ export interface components {
       promptVersion: string;
       status: string;
       inputTokens?: null | number;
+      /** @description The share of inputTokens served from a provider cache; null when the provider reported no cache accounting. */
+      cachedInputTokens?: null | number;
       outputTokens?: null | number;
       latencyMs?: null | number;
       costUsd?: null | string;
+      /** @description Where costUsd came from; null on a row written before cost_source existed. */
+      costSource?: components['schemas']['CostSource'] | null;
+      /** @description The cost tier this call ran under; null when the call predates tier tracking. */
+      tier?: components['schemas']['CostTier'] | null;
+      contentMode?: components['schemas']['ContentMode'] | null;
       /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
       reasoningEffort?: null | string;
       attempt: number;
       /** Format: date-time */
       createdAt: string;
     };
+    /** @enum {string} */
+    CostSource: 'provider' | 'gateway' | 'estimate';
     /** @description A read-only lookup performed by a model during a run. */
     RunToolCallResponse: {
       id: string;
@@ -3031,6 +3244,37 @@ export interface components {
       segment: string;
       tokens: number;
       truncated: boolean;
+    };
+    /** @description A workflow run's model calls, without prompt, context or raw output — that detail stays admin-only. */
+    RunUsageDetailResponse: {
+      id: string;
+      projectId: string;
+      jobId?: null | string;
+      graph: string;
+      target: string;
+      status: components['schemas']['WorkflowRunStatus'];
+      outcome?: null | string;
+      /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
+      skippedStages: string[];
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      endedAt?: null | string;
+      totals: components['schemas']['RunUsageResponse'];
+      calls: components['schemas']['RunModelCallResponse'][];
+    };
+    /** @description Every model call any action has made against one chapter — generation, judging, review, revision, continuity and extraction alike. */
+    ChapterCostResponse: {
+      chapter: number;
+      totals: components['schemas']['RunUsageResponse'];
+      /** @description By internal call role, highest spend first. */
+      byRole: components['schemas']['ChapterCostBreakdownItem'][];
+    };
+    /** @description Spend under one internal call role ('generation', 'judge', 'review', 'revision', 'continuity', 'chapter-extract', 'chapter-summarize', …). */
+    ChapterCostBreakdownItem: {
+      role: string;
+      calls: number;
+      costUsd: number;
     };
     CancelRunResponse: {
       runId: string;
@@ -3062,9 +3306,16 @@ export interface components {
       promptVersion: string;
       status: string;
       inputTokens?: null | number;
+      /** @description The share of inputTokens served from a provider cache; null when the provider reported no cache accounting. */
+      cachedInputTokens?: null | number;
       outputTokens?: null | number;
       latencyMs?: null | number;
       costUsd?: null | string;
+      /** @description Where costUsd came from; null on a row written before cost_source existed. */
+      costSource?: components['schemas']['CostSource'] | null;
+      /** @description The cost tier this call ran under; null when the call predates tier tracking. */
+      tier?: components['schemas']['CostTier'] | null;
+      contentMode?: components['schemas']['ContentMode'] | null;
       /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
       reasoningEffort?: null | string;
       attempt: number;
@@ -3230,6 +3481,7 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+      usage: components['schemas']['JobUsageResponse'];
     };
     /** @description The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing. */
     PluginAugmentResponse: {
@@ -3360,6 +3612,11 @@ export interface components {
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description The cost tier the reply was written at; null on user messages and on replies older than the selection. */
       costTier?: components['schemas']['CostTier'] | null;
+      /** @description This reply's model cost, folding in its title and compaction runs; null on user messages and on a reply that carries no run. */
+      costUsd?: null | number;
+      inputTokens?: null | number;
+      cachedInputTokens?: null | number;
+      outputTokens?: null | number;
       /** Format: date-time */
       createdAt: string;
     };
@@ -4250,20 +4507,8 @@ export interface components {
       byTier: components['schemas']['CostBreakdownItem'][];
       /** @description By content mode at call time — 'standard' or 'unrestricted' — highest spend first. */
       byContentMode: components['schemas']['CostBreakdownItem'][];
-    };
-    /** @description Spend and token totals for one slice of a project's model calls. */
-    CostBreakdownItem: {
-      /** @description The model group, role, or model id this row aggregates. */
-      key: string;
-      /** @description Display name: the registry label for a model, otherwise the key itself. */
-      label: string;
-      calls: number;
-      inputTokens: number;
-      outputTokens: number;
-      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
-      costUsd: number;
-      /** @description The part of `costUsd` estimated from registry list prices because the call recorded no cost. */
-      estimatedCostUsd: number;
+      /** @description Spend by UTC calendar day over the last 30 days, oldest first. A day with no calls is omitted rather than zero-filled. */
+      byDay: components['schemas']['DayCostItem'][];
     };
     UploadImageBody1: {
       /** @enum {string} */
@@ -5157,6 +5402,82 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AiModelsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_usage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountUsageResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_quota: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiQuotaResponse'];
         };
       };
       /** @description Default Response */
@@ -7069,7 +7390,15 @@ export interface operations {
   };
   get_api_v1_projects_projectId_runs: {
     parameters: {
-      query?: never;
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        graph?: components['schemas']['RunGraph'];
+        /** @description Only runs started at or after this ISO 8601 time. */
+        from?: string;
+        /** @description Only runs started at or before this ISO 8601 time. */
+        to?: string;
+      };
       header?: never;
       path: {
         projectId: string;
@@ -7126,6 +7455,88 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_runs_runId_usage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RunUsageDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapters_n_cost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterCostResponse'];
         };
       };
       /** @description Default Response */
@@ -11466,6 +11877,11 @@ export type AiRoleDefault = components['schemas']['AiRoleDefault'];
 export type AiTierModel = components['schemas']['AiTierModel'];
 export type CostTier = components['schemas']['CostTier'];
 export type ContentMode = components['schemas']['ContentMode'];
+export type AccountUsageResponse = components['schemas']['AccountUsageResponse'];
+export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];
+export type DayCostItem = components['schemas']['DayCostItem'];
+export type ProjectCostItem = components['schemas']['ProjectCostItem'];
+export type AiQuotaResponse = components['schemas']['AiQuotaResponse'];
 export type ProjectModelsResponse = components['schemas']['ProjectModelsResponse'];
 export type ProjectModelRoute = components['schemas']['ProjectModelRoute'];
 export type PluginManifestResponse = components['schemas']['PluginManifestResponse'];
@@ -11504,6 +11920,8 @@ export type ListGenerationJobResponse = components['schemas']['ListGenerationJob
 export type GenerationJobItem = components['schemas']['GenerationJobItem'];
 export type JobKind = components['schemas']['JobKind'];
 export type JobStatus = components['schemas']['JobStatus'];
+export type JobUsageResponse = components['schemas']['JobUsageResponse'];
+export type JobCostSourceItem = components['schemas']['JobCostSourceItem'];
 export type CancelJobResponse = components['schemas']['CancelJobResponse'];
 export type ListDraftResponse = components['schemas']['ListDraftResponse'];
 export type DraftResponse = components['schemas']['DraftResponse'];
@@ -11541,13 +11959,21 @@ export type OpResultItem = components['schemas']['OpResultItem'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
 export type ChapterReviewResponse = components['schemas']['ChapterReviewResponse'];
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
+export type RunGraph = components['schemas']['RunGraph'];
 export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
-export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
+export type WorkflowRunListItemResponse = components['schemas']['WorkflowRunListItemResponse'];
 export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
+export type RunUsageResponse = components['schemas']['RunUsageResponse'];
+export type RunCostSourceItem = components['schemas']['RunCostSourceItem'];
+export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
 export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
+export type CostSource = components['schemas']['CostSource'];
 export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
 export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
 export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
+export type RunUsageDetailResponse = components['schemas']['RunUsageDetailResponse'];
+export type ChapterCostResponse = components['schemas']['ChapterCostResponse'];
+export type ChapterCostBreakdownItem = components['schemas']['ChapterCostBreakdownItem'];
 export type CancelRunResponse = components['schemas']['CancelRunResponse'];
 export type RunContextResponse = components['schemas']['RunContextResponse'];
 export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
@@ -11697,7 +12123,6 @@ export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
-export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];
 export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
 export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
 export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
@@ -11761,8 +12186,11 @@ export type GetRevisionPathParams = Exclude<paths['/api/v1/projects/{projectId}/
 export type GetDraftPromptPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/prompt']['get']['parameters']['path'], undefined>;
 export type GetContinuityProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/continuity-proposal']['get']['parameters']['path'], undefined>;
 export type GetReviewQueuePathParams = Exclude<paths['/api/v1/projects/{projectId}/review-queue']['get']['parameters']['path'], undefined>;
+export type ListRunsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['query'], undefined>;
 export type ListRunsPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['path'], undefined>;
 export type GetRunPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}']['get']['parameters']['path'], undefined>;
+export type GetRunUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/usage']['get']['parameters']['path'], undefined>;
+export type GetChapterCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/cost']['get']['parameters']['path'], undefined>;
 export type GetRunContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/context']['get']['parameters']['path'], undefined>;
 export type GetRunCallPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/calls/{callId}']['get']['parameters']['path'], undefined>;
 export type SearchProseQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;

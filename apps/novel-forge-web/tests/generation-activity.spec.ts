@@ -13,6 +13,7 @@ function job(overrides: Partial<GenerationJobItem> = {}): GenerationJobItem {
     attempts: 1,
     createdAt: '2026-09-22T10:00:00.000Z',
     updatedAt: '2026-09-22T10:02:00.000Z',
+    usage: { calls: 0, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, costUsd: 0, estimatedCostUsd: 0, byCostSource: [] },
     ...overrides,
   };
 }
