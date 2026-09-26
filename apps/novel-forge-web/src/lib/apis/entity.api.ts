@@ -6,6 +6,7 @@ import {
   type EntityResponse,
   type ListEntitiesQueryParams,
   type ListEntityResponse,
+  type TimelineResponse,
   type UpdateEntityBody,
   type UploadImageBody,
 } from './api-types.gen';
@@ -26,6 +27,7 @@ const entityKeys = {
   all: (projectId: string) => ['projects', projectId, 'entities'] as const,
   list: (projectId: string, params?: ListEntitiesQueryParams) => [...entityKeys.all(projectId), 'list', params] as const,
   detail: (projectId: string, entityKey: string) => [...entityKeys.all(projectId), entityKey] as const,
+  timeline: (projectId: string, entityKey: string) => [...entityKeys.all(projectId), entityKey, 'timeline'] as const,
 };
 
 export const listEntitiesQueryOptions = (projectId: string, params?: ListEntitiesQueryParams): UseQueryOptions<ListEntityResponse, ApiError> =>
@@ -45,6 +47,14 @@ export function useEntityQuery(projectId: string, entityKey: string, enabled = t
   return useQuery<EntityWithImages, ApiError>({
     queryKey: entityKeys.detail(projectId, entityKey),
     queryFn: () => APIRequest.get(`/projects/${projectId}/entities/${entityKey}`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(entityKey),
+  });
+}
+
+export function useEntityTimelineQuery(projectId: string, entityKey: string, enabled = true): UseQueryResult<TimelineResponse, ApiError> {
+  return useQuery<TimelineResponse, ApiError>({
+    queryKey: entityKeys.timeline(projectId, entityKey),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/entities/${entityKey}/timeline`).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(entityKey),
   });
 }

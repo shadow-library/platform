@@ -35,6 +35,22 @@ export function useUpsertFactMutation(projectId: string): UseMutationResult<Fact
   });
 }
 
+export type PatchFactVariables = Omit<UpsertFactBody, 'text'> & { factKey: string };
+
+/** The PUT requires `text`, so it is read fresh right before the write — a page's copy may predate someone else's edit and would silently revert it. */
+export function usePatchFactMutation(projectId: string): UseMutationResult<FactResponse, ApiError, PatchFactVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<FactResponse, ApiError, PatchFactVariables>({
+    mutationFn: async ({ factKey, ...patch }) => {
+      const current: FactResponse = await APIRequest.get(`/projects/${projectId}/facts/${factKey}`).execute();
+      return APIRequest.put(`/projects/${projectId}/facts/${factKey}`)
+        .body({ ...patch, text: current.text })
+        .execute();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: factKeys.all(projectId) }),
+  });
+}
+
 export function useDeleteFactMutation(projectId: string): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({

@@ -401,6 +401,19 @@
   color: var(--sh-text-primary);
 }
 
+.secretCols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.secretCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .secretText {
   margin: 0;
   font-size: var(--sh-text-body-sm);
@@ -548,6 +561,35 @@
   color: var(--sh-text-tertiary);
 }
 
+.truthBox,
+.writerBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: var(--sh-border-width) solid;
+  border-radius: var(--sh-radius-md);
+}
+
+.truthBox {
+  border-color: var(--sh-warning-border);
+  background: var(--sh-warning-bg-subtle);
+}
+
+.writerBox {
+  border-color: var(--sh-success-border);
+  background: var(--sh-success-bg-subtle);
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .ledgerRow {
   display: flex;
   align-items: flex-start;
@@ -647,6 +689,7 @@
     flex-wrap: wrap;
   }
 
+  .secretCols,
   .twoCol,
   .dialogGrid {
     grid-template-columns: minmax(0, 1fr);

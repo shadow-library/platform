@@ -22,6 +22,12 @@ describe('parseBibleSearch', () => {
     expect(parseBibleSearch({ type: 'faction', topic: 'lore' }).topic).toBe('lore');
   });
 
+  it('should open Threads & promises and a power rule’s ladder', () => {
+    expect(parseBibleSearch({ view: 'threads' })).toMatchObject({ view: 'threads' });
+    expect(parseBibleSearch({ topic: 'power', ladder: 'lamp_ranks' })).toMatchObject({ topic: 'power', ladder: 'lamp_ranks' });
+    expect(parseBibleSearch({ ladder: '' }).ladder).toBeUndefined();
+  });
+
   it('should drop the old Entities view and anything malformed', () => {
     expect(parseBibleSearch({ view: 'entities', topic: 'everything', guide: 'diary/page', entity: '' })).toEqual({
       topic: undefined,

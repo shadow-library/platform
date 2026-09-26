@@ -1,23 +1,16 @@
-import { type ReactElement, useId, useState } from 'react';
+import { type ReactElement } from 'react';
 
 import { Button } from '@shadow-library/ui';
 
-import { EyeIcon, EyeOffIcon, LockIcon } from '@/components/icons';
+import { LockIcon } from '@/components/icons';
 import { StatusChip } from '@/components/nf';
 import { type FactResponse } from '@/lib/apis';
 import { secretRevealLabel, secretTitle } from '@/lib/bible-secrets';
-import { factHiddenFromWriter } from '@/lib/canon-facts';
 
+import { SecretStates } from './SecretStates';
 import styles from './StoryBible.module.css';
 
 export const TERMS_SHOWN = 3;
-
-const CONCEALED_TRUTH = 'The truth stays out of the page until you choose to show it here.';
-
-export function writerNoteText(fact: Pick<FactResponse, 'writerNote' | 'knowledge'>): string {
-  if (factHiddenFromWriter(fact)) return 'Nothing — the writer never sees this until it is revealed.';
-  return fact.writerNote?.trim() ?? '';
-}
 
 export function RevealChip({ fact }: { fact: FactResponse }): ReactElement {
   return (
@@ -49,14 +42,12 @@ export function TermChips({ terms, limit }: TermChipsProps): ReactElement {
 }
 
 interface SecretCardProps {
+  novelId: string;
   fact: FactResponse;
   onEdit: (fact: FactResponse) => void;
 }
 
-/** Until it is shown the truth is not in the page at all — the blur covers fixed filler, so neither a screen reader nor a stray copy can spoil it. */
-export function SecretCard({ fact, onEdit }: SecretCardProps): ReactElement {
-  const [shown, setShown] = useState(false);
-  const truthId = useId();
+export function SecretCard({ novelId, fact, onEdit }: SecretCardProps): ReactElement {
   const title = secretTitle(fact.factKey);
   const terms = fact.terms ?? [];
 
@@ -69,30 +60,7 @@ export function SecretCard({ fact, onEdit }: SecretCardProps): ReactElement {
           Edit
         </Button>
       </div>
-      <div className={styles.secretCols}>
-        <div className={styles.secretCol}>
-          <p className={styles.label}>What the writer is told</p>
-          <p className={styles.secretText}>{writerNoteText(fact)}</p>
-        </div>
-        <div className={styles.secretCol}>
-          <p className={styles.label}>The truth</p>
-          <p id={truthId} className={shown ? styles.secretText : `${styles.secretText} ${styles.blurred}`} aria-hidden={!shown}>
-            {shown ? fact.text : CONCEALED_TRUTH}
-          </p>
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              prefix={shown ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
-              aria-controls={truthId}
-              aria-expanded={shown}
-              onClick={() => setShown(value => !value)}
-            >
-              {shown ? 'Hide truth' : 'Show truth'}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <SecretStates novelId={novelId} fact={fact} />
       {terms.length > 0 && (
         <div className={styles.terms}>
           <span className={styles.label}>Never named early</span>

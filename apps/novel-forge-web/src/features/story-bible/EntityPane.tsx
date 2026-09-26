@@ -12,10 +12,12 @@ import {
   type BibleDocListItem,
   type EntityResponse,
   type FactResponse,
+  type UpdateEntityBody,
   useAddEntityImageMutation,
   useDeleteEntityImageByIdMutation,
   useDeleteEntityImageMutation,
   useEntityQuery,
+  useUpdateEntityMutation,
   useUploadEntityImageMutation,
 } from '@/lib/apis';
 import { docAddress } from '@/lib/bible-documents';
@@ -23,8 +25,12 @@ import { guidesMentioning, leadSection } from '@/lib/bible-entries';
 import { type BibleSearch } from '@/lib/bible-search';
 import { knownFactsAbout, secretRevealLabel, secretsAbout, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, TOPIC_LABEL } from '@/lib/bible-topics';
+import { ladderFacts } from '@/lib/power-ladder';
 import { stripEntityHeading, TYPE_SINGULAR } from '@/lib/story-bible';
 
+import detailStyles from './BibleDetails.module.css';
+import { CharacterTimeline } from './CharacterTimeline';
+import { EditableField } from './EditableField';
 import { SecretCard } from './SecretCard';
 import styles from './StoryBible.module.css';
 
@@ -34,6 +40,7 @@ export interface EntityPaneProps {
   topic: BibleTopic;
   facts: readonly FactResponse[];
   docs: readonly BibleDocListItem[];
+  names: ReadonlyMap<string, string>;
   backSearch: BibleSearch;
   onEdit: (entity: EntityResponse) => void;
   onDelete: (entity: EntityResponse) => void;
@@ -42,17 +49,29 @@ export interface EntityPaneProps {
   onEditFact: (fact: FactResponse) => void;
 }
 
-export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, onEdit, onDelete, onAddSecret, onAddFact, onEditFact }: EntityPaneProps): ReactElement {
+export function EntityPane({ novelId, entity, topic, facts, docs, names, backSearch, onEdit, onDelete, onAddSecret, onAddFact, onEditFact }: EntityPaneProps): ReactElement {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const fullId = useId();
   const entityKey = entity.entityKey;
+  const update = useUpdateEntityMutation(novelId, entityKey);
   const secrets = useMemo(() => secretsAbout(facts, entityKey), [facts, entityKey]);
   const known = useMemo(() => knownFactsAbout(facts, entityKey), [facts, entityKey]);
+  const rungs = useMemo(() => (entity.type === 'power_rule' ? ladderFacts(facts, entityKey).length : 0), [entity.type, facts, entityKey]);
   const mentions = useMemo(() => guidesMentioning(entity.name, docs), [entity.name, docs]);
   const body = stripEntityHeading(entity.body ?? '', entity.name);
   const { lead, truncated } = leadSection(body);
-  const hasMore = truncated || Boolean(entity.appearance?.trim()) || Boolean(entity.notes?.trim());
+  const hasMore = truncated || Boolean(entity.notes?.trim());
+  const isCharacter = entity.type === 'character';
+
+  const save = (patch: UpdateEntityBody): Promise<unknown> =>
+    update.mutateAsync(patch).then(
+      () => toast.success('Saved'),
+      (err: Error) => {
+        toast.danger(err.message);
+        throw err;
+      },
+    );
 
   return (
     <section className={styles.pane} aria-label={entity.name}>
@@ -63,7 +82,10 @@ export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, on
       <header className={styles.paneHeader}>
         <Avatar name={entity.name} src={entity.imageUrl ?? undefined} alt="" size="xl" shape="square" />
         <div className={styles.paneIdentity}>
-          <h2 className={styles.paneTitle}>{entity.name}</h2>
+          <h2 className="sr-only">{entity.name}</h2>
+          <EditableField label="Name" value={entity.name} multiline={false} required title onSave={name => save({ name })}>
+            <p className={styles.paneTitle}>{entity.name}</p>
+          </EditableField>
           <div className={styles.paneChips}>
             <StatusChip intent="neutral">{TYPE_SINGULAR[entity.type]}</StatusChip>
             <StatusChip intent={entity.significance === 'major' ? 'accent' : 'neutral'}>{entity.significance === 'major' ? 'Major' : 'Minor'}</StatusChip>
@@ -90,28 +112,39 @@ export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, on
         </div>
       </header>
 
-      {entity.motivation?.trim() && (
-        <div className={styles.wants}>
-          <p className={styles.label}>Wants</p>
-          <Markdown content={entity.motivation} className={styles.prose} />
+      {rungs > 0 && (
+        <div className={detailStyles.ladderLink}>
+          <span>
+            Power ladder · {rungs} {rungs === 1 ? 'rung' : 'rungs'}, each unlocked for the writer by its own conditions.
+          </span>
+          <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ topic: 'power', ladder: entityKey }} className={styles.chipLink}>
+            Open the ladder
+          </Link>
         </div>
       )}
 
-      {lead ? <Markdown content={expanded ? body : lead} className={styles.prose} /> : <p className={styles.muted}>No summary written yet.</p>}
-      {expanded && (
+      {(isCharacter || entity.motivation?.trim()) && (
+        <div className={styles.wants}>
+          <p className={styles.label}>Wants</p>
+          <EditableField label="Wants" value={entity.motivation ?? ''} onSave={motivation => save({ motivation })}>
+            {entity.motivation?.trim() ? (
+              <Markdown content={entity.motivation} className={styles.prose} />
+            ) : (
+              <p className={styles.muted}>Nothing yet — click to add what they want.</p>
+            )}
+          </EditableField>
+        </div>
+      )}
+
+      <EditableField label={isCharacter ? 'Who they are' : 'About'} value={entity.body ?? ''} onSave={next => save({ body: next })}>
+        {lead ? <Markdown content={expanded ? body : lead} className={styles.prose} /> : <p className={styles.muted}>No summary written yet — click to write one.</p>}
+      </EditableField>
+      {expanded && entity.notes?.trim() && (
         <div id={fullId} className={styles.col}>
-          {entity.appearance?.trim() && (
-            <>
-              <p className={styles.label}>Appearance</p>
-              <Markdown content={entity.appearance} className={styles.prose} />
-            </>
-          )}
-          {entity.notes?.trim() && (
-            <>
-              <p className={styles.label}>Notes</p>
-              <Markdown content={entity.notes} className={styles.prose} />
-            </>
-          )}
+          <p className={styles.label}>Notes</p>
+          <EditableField label="Notes" value={entity.notes} onSave={notes => save({ notes })}>
+            <Markdown content={entity.notes} className={styles.prose} />
+          </EditableField>
         </div>
       )}
       {hasMore && (
@@ -120,11 +153,23 @@ export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, on
         </button>
       )}
 
+      <div className={styles.col}>
+        <p className={styles.label}>Appearance · every portrait is drawn from this</p>
+        <EditableField label="Appearance" value={entity.appearance ?? ''} onSave={appearance => save({ appearance })}>
+          {entity.appearance?.trim() ? (
+            <Markdown content={entity.appearance} className={styles.prose} />
+          ) : (
+            <p className={styles.muted}>Not described yet — click to describe how {entity.name} looks.</p>
+          )}
+        </EditableField>
+        {isCharacter && <p className={styles.muted}>Changes the story makes are kept in “How {entity.name} has changed” below.</p>}
+      </div>
+
       <section className={styles.secrets} aria-label={`Secrets about ${entity.name}`}>
         <div className={styles.secretsHead}>
           <LockIcon size={16} />
           <h3 className={styles.secretsTitle}>Secrets · {secrets.length}</h3>
-          <span className={styles.secretsHint}>Hidden from the writer until their reveal chapter</span>
+          <span className={styles.secretsHint}>Kept back from the writer until they unlock</span>
           <Button variant="secondary" size="sm" prefix={<PlusIcon size={14} />} onClick={() => onAddSecret(entityKey)}>
             Add secret
           </Button>
@@ -132,9 +177,11 @@ export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, on
         {secrets.length === 0 ? (
           <p className={styles.muted}>No secrets about {entity.name}. Add one for anything the reader should learn later.</p>
         ) : (
-          secrets.map(fact => <SecretCard key={fact.factKey} fact={fact} onEdit={onEditFact} />)
+          secrets.map(fact => <SecretCard key={fact.factKey} novelId={novelId} fact={fact} onEdit={onEditFact} />)
         )}
       </section>
+
+      {isCharacter && <CharacterTimeline novelId={novelId} entityKey={entityKey} name={entity.name} names={names} />}
 
       <div className={styles.twoCol}>
         <section className={styles.col} aria-label="Known facts">
@@ -148,6 +195,7 @@ export function EntityPane({ novelId, entity, topic, facts, docs, backSearch, on
                   <p className={styles.secretText}>{fact.text}</p>
                   <span className={styles.factMeta}>
                     <StatusChip intent="success">{secretRevealLabel(fact)}</StatusChip>
+                    {fact.knowledge.every(entry => entry.status === 'provisional') && <StatusChip intent="accent">Pending finalize</StatusChip>}
                     <button type="button" className={styles.linkButton} aria-label={`Edit ${secretTitle(fact.factKey)}`} onClick={() => onEditFact(fact)}>
                       Edit
                     </button>

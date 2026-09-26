@@ -2,7 +2,9 @@ import { parseGuideAddress } from './bible-entries';
 import { type BibleTopic, parseBibleTopic, topicForEntityType } from './bible-topics';
 import { parseEntityType } from './story-bible';
 
-export type BibleView = 'secrets' | 'recent';
+export type BibleView = 'secrets' | 'threads' | 'recent';
+
+export const BIBLE_VIEWS: readonly BibleView[] = ['secrets', 'threads', 'recent'];
 
 export interface BibleSearch {
   topic?: BibleTopic;
@@ -10,6 +12,8 @@ export interface BibleSearch {
   entity?: string;
   guide?: string;
   fact?: string;
+  /** A power rule whose ladder fills the page in place of the list and pane. */
+  ladder?: string;
 }
 
 function text(value: unknown): string | undefined {
@@ -20,7 +24,8 @@ function text(value: unknown): string | undefined {
 export function parseBibleSearch(search: Record<string, unknown>): BibleSearch {
   const fact = text(search.fact);
   const legacyType = parseEntityType(search.type);
-  const view: BibleView | undefined = search.view === 'secrets' || search.view === 'facts' ? 'secrets' : search.view === 'recent' ? 'recent' : fact ? 'secrets' : undefined;
+  const named = BIBLE_VIEWS.find(view => view === search.view);
+  const view: BibleView | undefined = search.view === 'facts' ? 'secrets' : (named ?? (fact ? 'secrets' : undefined));
   const guide = text(search.guide);
   return {
     topic: parseBibleTopic(search.topic) ?? (legacyType ? topicForEntityType(legacyType) : undefined),
@@ -28,5 +33,6 @@ export function parseBibleSearch(search: Record<string, unknown>): BibleSearch {
     entity: text(search.entity),
     guide: parseGuideAddress(guide) ? guide : undefined,
     fact,
+    ladder: text(search.ladder),
   };
 }

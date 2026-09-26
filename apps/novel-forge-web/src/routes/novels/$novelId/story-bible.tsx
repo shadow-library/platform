@@ -23,10 +23,13 @@ import {
   type FactPurpose,
   GuidePane,
   ListHead,
+  PowerLadder,
   SecretDetail,
   SecretRow,
   SecretsList,
   type StartedAudit,
+  ThreadsList,
+  ThreadsPane,
   TopicList,
   useAuditPoll,
   useTabsFit,
@@ -73,7 +76,7 @@ import {
   visibleTopics,
 } from '@/lib/bible-entries';
 import { readinessDisplay } from '@/lib/bible-readiness';
-import { type BibleSearch, type BibleView, parseBibleSearch } from '@/lib/bible-search';
+import { BIBLE_VIEWS, type BibleSearch, type BibleView, parseBibleSearch } from '@/lib/bible-search';
 import { groupSecrets, isSecret, secretCountsBySubject, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, newEntryType, parseBibleTopic, stagesByDocument, TOPIC_LABEL } from '@/lib/bible-topics';
 import { emptyFactForm, factBodyFromForm, factFormFromFact, type FactFormState, filterFacts } from '@/lib/canon-facts';
@@ -89,7 +92,7 @@ export const Route = createFileRoute('/novels/$novelId/story-bible')({
   component: StoryBibleScreen,
 });
 
-const VIEW_LABEL: Record<BibleView, string> = { secrets: 'Secrets', recent: 'Recently changed' };
+const VIEW_LABEL: Record<BibleView, string> = { secrets: 'Secrets', threads: 'Threads & promises', recent: 'Recently changed' };
 
 const PHONE_QUERY = '(max-width: 760px)';
 
@@ -97,7 +100,9 @@ const SEED_DESCRIPTION =
   'Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. ' +
   'This runs the full bible builder and can take a few minutes.';
 
-const VIEWS: readonly BibleView[] = ['secrets', 'recent'];
+function isView(value: BibleTopic | BibleView): value is BibleView {
+  return BIBLE_VIEWS.some(view => view === value);
+}
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Something went wrong.';
@@ -190,7 +195,8 @@ function StoryBibleScreen(): React.JSX.Element {
   const pickTab = (value: string): void => {
     setQuery('');
     const topic = parseBibleTopic(value);
-    void goSearch({ search: topic ? { topic } : { view: value === 'recent' ? 'recent' : 'secrets' } });
+    const picked = BIBLE_VIEWS.find(item => item === value);
+    void goSearch({ search: topic ? { topic } : { view: picked ?? 'secrets' } });
   };
 
   const jumpItems = useMemo(() => entries.map(entry => ({ id: entry.id, label: entry.name, caption: entryMeta(entry, true) })), [entries]);
@@ -385,6 +391,9 @@ function StoryBibleScreen(): React.JSX.Element {
   } else if (view === 'secrets') {
     list = <SecretsList novelId={novelId} groups={secretGroups} names={names} selectedKey={search.fact} searchFor={searchForFact} />;
     fallback = { fact: secretGroups.planned[0] ?? secretGroups.unplanned[0] };
+  } else if (view === 'threads') {
+    list = <ThreadsList />;
+    fallback = {};
   } else if (view === 'recent') {
     list = (
       <>
@@ -427,7 +436,9 @@ function StoryBibleScreen(): React.JSX.Element {
   const entryTopic = (entityKey: string): BibleTopic | undefined => entryById.get(recordId(entityKey))?.topic;
 
   let pane: ReactNode;
-  if (placeholder) {
+  if (view === 'threads' && !searching) {
+    pane = <ThreadsPane novelId={novelId} />;
+  } else if (placeholder) {
     pane = (
       <section className={styles.pane}>
         <Alert intent="info" title={`“${placeholder.doc.title}” is an empty placeholder page`} action={{ label: 'Tidy up', onClick: () => setTidying(true) }}>
@@ -466,6 +477,7 @@ function StoryBibleScreen(): React.JSX.Element {
         topic={paneEntry.topic}
         facts={facts}
         docs={docs}
+        names={names}
         backSearch={backSearch}
         onEdit={target => setEntityDialog({ mode: 'edit', initial: entityFormFrom(target) })}
         onDelete={setDeleteEntityTarget}
@@ -506,10 +518,17 @@ function StoryBibleScreen(): React.JSX.Element {
       })
     : undefined;
 
-  const tabValues: (BibleTopic | BibleView)[] = [...topics, 'secrets', 'recent'];
-  const tabCount = (value: BibleTopic | BibleView): number => (value === 'secrets' ? secretTotal : value === 'recent' ? recent.thisWeek.length : counts[value]);
-  const tabLabel = (value: BibleTopic | BibleView): string => (value === 'secrets' || value === 'recent' ? VIEW_LABEL[value] : TOPIC_LABEL[value]);
-  const tabsKey = tabValues.map(value => `${value}:${tabCount(value)}`).join('|');
+  const tabValues: (BibleTopic | BibleView)[] = [...topics, ...BIBLE_VIEWS];
+  const tabCount = (value: BibleTopic | BibleView): number | undefined => {
+    if (value === 'threads') return undefined;
+    return value === 'secrets' ? secretTotal : value === 'recent' ? recent.thisWeek.length : counts[value];
+  };
+  const tabLabel = (value: BibleTopic | BibleView): string => (isView(value) ? VIEW_LABEL[value] : TOPIC_LABEL[value]);
+  const pickerLabel = (value: BibleTopic | BibleView): string => {
+    const count = tabCount(value);
+    return count === undefined ? tabLabel(value) : `${tabLabel(value)} · ${count}`;
+  };
+  const tabsKey = tabValues.map(value => `${value}:${tabCount(value) ?? ''}`).join('|');
   const { observeContainer, measureList, fits: tabsFit } = useTabsFit(tabsKey);
 
   let body: ReactNode;
@@ -541,7 +560,22 @@ function StoryBibleScreen(): React.JSX.Element {
       />
     );
   } else {
-    const split = (
+    const ladderEntity = search.ladder ? entityByKey.get(search.ladder) : undefined;
+    const ladderRule = ladderEntity?.type === 'power_rule' ? ladderEntity : undefined;
+    const split = ladderRule ? (
+      <PowerLadder
+        key={ladderRule.entityKey}
+        novelId={novelId}
+        entity={ladderRule}
+        facts={facts}
+        onEditFact={openEditFact}
+        onAddSecret={entityKey => openNewFact(entityKey, 'secret')}
+      />
+    ) : search.ladder ? (
+      <Alert intent="warning" title="There is no power ladder here." action={{ label: 'Back to Power & rules', onClick: () => void goSearch({ search: { topic: 'power' } }) }}>
+        Only a power rule has a ladder; this one was deleted, renamed, or the link was typed by hand.
+      </Alert>
+    ) : (
       <div className={styles.split} data-has-selection={explicitSelection || undefined}>
         <nav className={styles.listCol} aria-label={searching ? 'Search results' : tabLabel(tabValue)}>
           {list}
@@ -587,15 +621,15 @@ function StoryBibleScreen(): React.JSX.Element {
                   <Select.Group label="Topics">
                     {topics.map(value => (
                       <Select.Item key={value} value={value}>
-                        {`${tabLabel(value)} · ${tabCount(value)}`}
+                        {pickerLabel(value)}
                       </Select.Item>
                     ))}
                   </Select.Group>
                   <Select.Separator />
                   <Select.Group label="Views">
-                    {VIEWS.map(value => (
+                    {BIBLE_VIEWS.map(value => (
                       <Select.Item key={value} value={value}>
-                        {`${tabLabel(value)} · ${tabCount(value)}`}
+                        {pickerLabel(value)}
                       </Select.Item>
                     ))}
                   </Select.Group>
@@ -610,7 +644,7 @@ function StoryBibleScreen(): React.JSX.Element {
   }
 
   return (
-    <div className={`nf-page ${styles.page}`} data-has-selection={explicitSelection || undefined}>
+    <div className={`nf-page ${styles.page}`} data-has-selection={explicitSelection || Boolean(search.ladder) || undefined}>
       <header className={styles.header}>
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>Story Bible</h1>
