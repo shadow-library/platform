@@ -67,6 +67,7 @@ export class AppErrorCode extends ServerErrorCode {
     'The plan for chapter {chapter} reveals facts that are locked there — change the plan before approving or finalizing: {violations}',
   );
   static readonly PLN_005 = AppErrorCode.badRequest('PLN_005', 'Chapter {chapter} is finalized — its plan can no longer change');
+  static readonly PLN_006 = AppErrorCode.badRequest('PLN_006', 'Only the next chapter can be planned — that is chapter {next}, not chapter {chapter}');
 
   /*!
    * Draft Errors
@@ -200,6 +201,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_005 = AppErrorCode.badRequest('CHT_005', 'Invalid chat session mode');
   static readonly CHT_006 = AppErrorCode.conflict('CHT_006', 'Another turn wrote to this conversation at the same time — send the message again');
   static readonly CHT_007 = AppErrorCode.notFound('CHT_007', 'Turn stream not found — the run is unknown, belongs to another project, or its buffer has expired');
+  static readonly CHT_008 = AppErrorCode.badRequest('CHT_008', 'Invalid job event cursor — Last-Event-ID must be a sequence number this chat’s job stream sent');
 
   /*!
    * Refinement Proposal Errors
@@ -263,6 +265,11 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly NTS_001 = AppErrorCode.badRequest('NTS_001', 'What you kept from your organised notes cannot be written: {issues}');
   static readonly NTS_002 = AppErrorCode.badRequest('NTS_002', 'Option "{optionId}" is not one the organised notes offered');
+  static readonly NTS_003 = AppErrorCode.badRequest('NTS_003', 'There are no notes long enough to organise yet — organising needs at least {words} words of your notes');
+  static readonly NTS_004 = AppErrorCode.conflict(
+    'NTS_004',
+    'Your notes are already organised into the Story Bible, or a card organising them is waiting for you — organising them again now would write the same pages a second time. Accept or discard that card, or undo the applied change, to organise afresh',
+  );
 
   /*!
    * Chapter Review Errors

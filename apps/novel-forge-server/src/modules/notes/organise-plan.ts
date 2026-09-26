@@ -329,6 +329,18 @@ export function describeOrganiseOptions(options: OrganiseOptions): OrganiseOptio
   ];
 }
 
+/** Everything the round offered, for a host with no screen to choose on: suggestions stay undecided, so nothing the notes lack is written. */
+export function keepEveryOrganiseOption(options: OrganiseOptions): OrganiseSelection {
+  return {
+    sections: options.pages.flatMap(page => page.sections.map(section => section.id)),
+    records: options.records.map(record => record.id),
+    timeline: options.timeline.map(event => ({ optionId: event.id, band: event.band })),
+    rules: options.rules.map(rule => rule.id),
+    questions: options.questions.map(item => item.id),
+    suggestions: [],
+  };
+}
+
 export function chosenOrganiseOptionIds(selection: OrganiseSelection): string[] {
   return [
     ...selection.sections,

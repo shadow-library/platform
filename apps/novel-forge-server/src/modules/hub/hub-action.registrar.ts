@@ -5,6 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Refinement } from '@server/database';
 
+import { actionJobOrigin } from '../actions/action-jobs';
 import { BibleAuditService } from '../audit/bible-audit.service';
 import { GenerationService } from '../generation/generation.service';
 import { type ActionExecutionResult, ActionExecutorRegistry } from '../refinement';
@@ -36,10 +37,11 @@ export class HubActionRegistrar {
   onModuleInit(): void {
     const registry = this.registry;
 
-    registry.register('action.generate_chapter', async (projectId, action) => {
+    registry.register('action.generate_chapter', async (projectId, action, context) => {
       if (action.op !== 'action.generate_chapter') throw AppError.internal('executor misrouted');
-      const job = await this.generationService.generateChapter(projectId, action.chapter);
-      return { summary: `enqueued generation of chapter ${action.chapter}`, jobId: job.jobId };
+      const job = await this.generationService.generateChapter(projectId, action.chapter, actionJobOrigin(context));
+      const summary = job.deduped ? `generation of chapter ${action.chapter} is already running` : `enqueued generation of chapter ${action.chapter}`;
+      return { summary, jobId: job.jobId };
     });
 
     registry.register('action.audit_bible', async projectId => {

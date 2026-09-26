@@ -45,7 +45,7 @@ function makeService(fixture: GateFixture = {}) {
       chapters: { findFirst: async () => undefined, findMany: async () => (fixture.finalized ?? []).map(number => ({ number })) },
     },
   };
-  const jobService = { enqueue: async (...args: unknown[]) => (enqueued.push(args), 'job-1') };
+  const jobService = { enqueueJob: async (...args: unknown[]) => (enqueued.push(args), { id: 'job-1', outcome: 'inserted' }) };
   const jobExecutor = { dispatch: async () => undefined };
   const claims = fixture.claims ?? new FakeAuthoringClaims();
   const noop = {} as never;

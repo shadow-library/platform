@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, lt, lte, ne, sql } from 'drizzle-orm';
 import { type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -35,7 +35,7 @@ export interface InsertOptions {
   intent?: string;
 }
 
-interface PlannedSlotBrief {
+export interface PlannedSlotBrief {
   body: string;
   title?: string;
   contextRefs?: string[];
@@ -284,20 +284,31 @@ export class ChapterInsertService {
     return Math.max(chapter?.number ?? 0, brief?.chapter ?? 0);
   }
 
+  /** Drafts the next chapter's plan from the author's intent with the same outline call an insert makes, with no renumbering to picture. */
+  planNext(projectId: bigint, chapter: number, intent: string | undefined, runId: string): Promise<PlannedSlotBrief> {
+    const direction = intent?.trim() ? ` Author's intent: ${intent.trim()}` : '';
+    return this.outlineSlot(projectId, chapter, `Plan chapter ${chapter}, the next chapter to write.${direction}`, false, runId);
+  }
+
+  private planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
+    return this.outlineSlot(projectId, afterChapter + 1, `Insert a single new chapter here. Author's intent: ${intent}`, true);
+  }
+
   /**
-   * Drafts the hole's brief from a one-line intent with the outline prompt bound to the single new
-   * chapter, so an inserted brief carries the same authored fields an outlined one does. Neighbours are rendered at their post-shift numbers because the model is asked
-   * about the plan as it will read once the renumber commits.
+   * Drafts one chapter's brief with the outline prompt bound to that single chapter, so the brief carries the same authored fields an
+   * outlined one does. For an insert, neighbours are rendered at their post-shift numbers because the model is asked about the plan as it
+   * will read once the renumber commits.
    */
-  private async planBrief(projectId: bigint, afterChapter: number, intent: string): Promise<PlannedSlotBrief> {
-    const newChapter = afterChapter + 1;
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter: newChapter });
-    const span = { start: newChapter, end: newChapter };
+  private async outlineSlot(projectId: bigint, chapter: number, extraContext: string, insert: boolean, runId?: string): Promise<PlannedSlotBrief> {
+    const afterChapter = chapter - 1;
+    const policy = await this.pluginPolicy.resolve(projectId, { role: 'outline', chapter });
+    const span = { start: chapter, end: chapter };
     const volumeKey = await nearestVolumeKey(this.db, projectId, afterChapter);
+    const neighbourRange = insert ? lte(schema.briefs.chapter, afterChapter + 1) : and(lte(schema.briefs.chapter, chapter + 1), ne(schema.briefs.chapter, chapter));
     const [pack, neighbours] = await Promise.all([
-      this.contextAssembler.forOutline(projectId, newChapter, { policy, span, insertAfter: afterChapter, volumeKey }),
+      this.contextAssembler.forOutline(projectId, chapter, { policy, span, volumeKey, ...(insert ? { insertAfter: afterChapter } : {}) }),
       this.db.query.briefs.findMany({
-        where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, afterChapter), lte(schema.briefs.chapter, afterChapter + 1)),
+        where: and(eq(schema.briefs.projectId, projectId), gte(schema.briefs.chapter, afterChapter), neighbourRange),
         orderBy: asc(schema.briefs.chapter),
       }),
     ]);
@@ -306,22 +317,23 @@ export class ChapterInsertService {
       loadRevealGuard(this.db, projectId, span, afterChapter),
     ]);
 
-    const surrounding = neighbours.map(brief => `## Chapter ${brief.chapter > afterChapter ? brief.chapter + 1 : brief.chapter}: ${brief.title ?? ''}\n${brief.body}`).join('\n\n');
-    const catalog = [pack.rendered, surrounding && `## Surrounding chapters (as they will be numbered)\n${surrounding}`].filter(Boolean).join('\n\n');
+    const numbered = (brief: Generation.Brief): number => (insert && brief.chapter > afterChapter ? brief.chapter + 1 : brief.chapter);
+    const surrounding = neighbours.map(brief => `## Chapter ${numbered(brief)}: ${brief.title ?? ''}\n${brief.body}`).join('\n\n');
+    const heading = insert ? '## Surrounding chapters (as they will be numbered)' : '## Surrounding chapters';
+    const catalog = [pack.rendered, surrounding && `${heading}\n${surrounding}`].filter(Boolean).join('\n\n');
 
     const wordTarget = resolveWordTarget(project);
-    const prompt = buildOutlinePrompt(newChapter, newChapter, wordTarget, guard.advised);
-    const ctx = { projectId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const extraContext = `Insert a single new chapter here. Author's intent: ${intent}`;
-    const vars = { catalog, volumePlan: '', startChapter: newChapter, endChapter: newChapter, extraContext, ...outlineWordTargetVars(wordTarget) };
+    const prompt = buildOutlinePrompt(chapter, chapter, wordTarget, guard.advised);
+    const ctx = { projectId, runId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
+    const vars = { catalog, volumePlan: '', startChapter: chapter, endChapter: chapter, extraContext, ...outlineWordTargetVars(wordTarget) };
     const raw = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
     const { briefs: outlined, sanitised } = sanitiseBriefReveals(raw, guard.all);
-    if (sanitised.length > 0) this.logger.warn('insert: sanitised a brief that surfaced facts before their reveal chapter', { projectId, sanitised });
+    if (sanitised.length > 0) this.logger.warn('plan: sanitised a brief that surfaced facts before their reveal chapter', { projectId, chapter, sanitised });
 
-    const chapter = outlined[0];
-    if (!chapter) throw AppErrorCode.BRF_001.create();
-    const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, chapter.requiredContext ?? []);
-    if (dropped.length > 0) this.logger.warn('insert: dropped context refs', { projectId, chapter: newChapter, dropped });
-    return { ...chapter, contextRefs: kept, body: renderBriefBody({ ...chapter, events: renderSceneEvents(chapter.scenes) }) };
+    const planned = outlined[0];
+    if (!planned) throw AppErrorCode.BRF_001.create();
+    const { kept, dropped } = await this.contextAssembler.sanitizeOutlinedRefs(projectId, planned.requiredContext ?? []);
+    if (dropped.length > 0) this.logger.warn('plan: dropped context refs', { projectId, chapter, dropped });
+    return { ...planned, contextRefs: kept, body: renderBriefBody({ ...planned, events: renderSceneEvents(planned.scenes) }) };
   }
 }

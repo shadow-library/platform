@@ -292,7 +292,7 @@ describe('HubActionRegistrar action.audit_bible', () => {
     const registry = new ActionExecutorRegistry();
     new HubActionRegistrar(registry, {} as never, {} as never, {} as never, service).onModuleInit();
 
-    const result = await registry.get('action.audit_bible')?.(1n, { op: 'action.audit_bible' });
+    const result = await registry.get('action.audit_bible')?.(1n, { op: 'action.audit_bible' }, { proposalId: 9n, opIndex: 0, sessionId: null, messageId: null });
 
     expect(result).toEqual({ summary: 'bible audit queued', jobId: 'job-1', runId: 'run-queued' });
     expect(reports).toEqual([]);

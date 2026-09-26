@@ -4,7 +4,7 @@ import { bigint, bigserial, index, integer, pgEnum, pgTable, smallint, text, tim
 import { workflowRuns } from './ai';
 import { jsonb } from './jsonb';
 import { projects } from './projects';
-import { refinementProposals } from './refinement';
+import { chatSessions, refinementProposals } from './refinement';
 
 export type BibleAuditGroup = 'add' | 'revise' | 'remove' | 'contradiction';
 
@@ -54,10 +54,13 @@ export namespace Job {
   export type AuthoringClaim = InferSelectModel<typeof authoringClaims>;
   export type FindingDecision = InferSelectModel<typeof validationFindingDecisions>;
   export type FindingDecisionKind = InferEnum<typeof validationFindingDecision>;
+  export type Event = InferSelectModel<typeof jobEvents>;
+  export type EventType = InferEnum<typeof jobEventType>;
 }
 
 export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review', 'audit']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
+export const jobEventType = pgEnum('job_event_type', ['queued', 'started', 'step', 'retrying', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter', 'bible']);
 export const validationFindingDecision = pgEnum('validation_finding_decision', ['kept', 'skipped']);
 
@@ -81,6 +84,29 @@ export const jobs = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   t => [unique('jobs_project_id_kind_target_unique').on(t.projectId, t.kind, t.target), index('jobs_project_id_kind_status_idx').on(t.projectId, t.kind, t.status)],
+);
+
+/** What a job started from a chat did, in order: `seq` is the cursor a reconnecting client replays from. */
+export const jobEvents = pgTable(
+  'job_events',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => jobs.id, { onDelete: 'cascade' }),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => chatSessions.id, { onDelete: 'cascade' }),
+    /** The session's cursor: ordered by commit, not by insert. */
+    seq: integer('seq').notNull(),
+    type: jobEventType('type').notNull(),
+    data: jsonb('data'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [unique('job_events_session_id_seq_unique').on(t.sessionId, t.seq), index('job_events_job_id_idx').on(t.jobId), index('job_events_project_id_idx').on(t.projectId)],
 );
 
 export const validationReports = pgTable(
@@ -149,6 +175,10 @@ export const validationReportsRelations = relations(validationReports, ({ one, m
 
 export const validationFindingDecisionsRelations = relations(validationFindingDecisions, ({ one }) => ({
   report: one(validationReports, { fields: [validationFindingDecisions.reportId], references: [validationReports.id] }),
+}));
+
+export const jobEventsRelations = relations(jobEvents, ({ one }) => ({
+  job: one(jobs, { fields: [jobEvents.jobId], references: [jobs.id] }),
 }));
 
 export const authoringClaimsRelations = relations(authoringClaims, ({ one }) => ({

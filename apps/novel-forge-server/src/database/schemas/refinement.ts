@@ -1,5 +1,5 @@
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
 import { contentMode, costTier, projects } from './projects';
@@ -43,6 +43,8 @@ export const chatSessions = pgTable(
     modelId: varchar('model_id'),
     contentMode: contentMode('content_mode'),
     costTier: costTier('cost_tier'),
+    /** The last `job_events.seq` handed out in this session; taken under the row lock, so the cursor follows commit order. */
+    jobEventSeq: integer('job_event_seq').notNull().default(0),
     summary: text('summary'),
     summaryThroughOrdinal: integer('summary_through_ordinal').notNull().default(0),
     lastTurnAt: timestamp('last_turn_at'),
@@ -121,6 +123,10 @@ export const refinementProposals = pgTable(
     index('refinement_proposals_project_id_status_idx').on(t.projectId, t.status),
     index('refinement_proposals_session_id_idx').on(t.sessionId),
     index('refinement_proposals_project_id_scope_status_idx').on(t.projectId, t.scopeType, t.scopeRef, t.status),
+    // A job's run stages one card: a second attempt racing the first on the same run conflicts instead of staging a duplicate.
+    uniqueIndex('refinement_proposals_job_card_run_id_unique')
+      .on(t.runId)
+      .where(sql`${t.kind} in ('organise', 'chapter_plan')`),
   ],
 );
 

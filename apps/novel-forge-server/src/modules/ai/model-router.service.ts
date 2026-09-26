@@ -48,6 +48,7 @@ import { type PromptModule } from './prompts/types';
 import { ReplyStreamScanner } from './reply-stream-scanner';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toHostedPromptSchema } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
+import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
 
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
@@ -828,7 +829,7 @@ export class ModelRouterService {
       }
     }
     this.logger.error('LLM call failed after retries', { role, attempts: this.llmMaxRetries + 1, err: lastErr });
-    throw AppErrorCode.AI_007.create();
+    throw modelCallFailed(lastErr);
   }
 
   // The streaming twin of `invokeResilient` — same budget, same backoff, same transport-only retry rule —
@@ -864,7 +865,7 @@ export class ModelRouterService {
       }
     }
     this.logger.error('LLM stream failed after retries', { role, attempts: this.llmMaxRetries + 1, err: lastErr });
-    throw AppErrorCode.AI_007.create();
+    throw modelCallFailed(lastErr);
   }
 
   // The `aborted` check is what makes abandonment provider-independent: it drops the chunk before the sink
@@ -884,7 +885,7 @@ export class ModelRouterService {
   private withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
     let timer: ReturnType<typeof setTimeout>;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`LLM call exceeded ${ms}ms timeout budget`)), ms);
+      timer = setTimeout(() => reject(new ModelCallTimeoutError(ms)), ms);
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }

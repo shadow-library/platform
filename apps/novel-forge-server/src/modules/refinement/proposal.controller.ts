@@ -17,7 +17,7 @@ import {
   UndoImpactResponse,
   UpdateProposalBody,
 } from './refinement.dto';
-import { serialiseProposal } from './serialise';
+import { serialiseProposal, startedJobs } from './serialise';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
@@ -51,7 +51,9 @@ export class ProposalController {
   @Post('/:proposalId/apply')
   @RespondFor(200, ApplyProposalResponse)
   applyProposal(@Params() params: ProposalIdParams, @Body() body: ApplyProposalBody): Promise<ApplyProposalResponse> {
-    return this.proposalApplyService.apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes }).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
+    return this.proposalApplyService
+      .apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes })
+      .then(r => ({ ...r, proposal: serialiseProposal(r.proposal), jobs: startedJobs(r.opResults) }));
   }
 
   @Get('/:proposalId/undo-impact')

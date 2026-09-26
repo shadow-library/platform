@@ -213,6 +213,8 @@ describe('ProposalService.create approval staging', () => {
   });
 });
 
+const CARD = { proposalId: 9n, opIndex: 0, sessionId: null, messageId: null };
+
 describe('HubActionRegistrar action.approve_draft', () => {
   function register() {
     const registry = new ActionExecutorRegistry();
@@ -233,7 +235,7 @@ describe('HubActionRegistrar action.approve_draft', () => {
   it('should approve exactly the draft, revision and save sequence the card was staged against', async () => {
     const { approve, approvals } = register();
 
-    await approve(1n, { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: '11' });
+    await approve(1n, { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: '11' }, CARD);
 
     expect(approvals).toEqual([[1n, 4, { revision: 2, saveSeq: 5, draftId: 11n }]]);
   });
@@ -244,7 +246,7 @@ describe('HubActionRegistrar action.approve_draft', () => {
       { artifactRef: 'draft:4', newRevision: 1, newSaveSeq: 0, newDraftId: 12n },
     ]);
 
-    await approve(1n, card);
+    await approve(1n, card, CARD);
 
     expect(approvals).toEqual([[1n, 4, { revision: 1, saveSeq: 0, draftId: 12n }]]);
   });
@@ -257,14 +259,14 @@ describe('HubActionRegistrar action.approve_draft', () => {
   ] as const)('should refuse a card staged without %s rather than approve whatever the draft now holds', async (_, card) => {
     const { approve, approvals } = register();
 
-    await expect(approve(1n, card)).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(approve(1n, card, CARD)).rejects.toMatchObject({ code: 'DRF_013' });
     expect(approvals).toEqual([]);
   });
 
   it('should report a card staged for a chapter that had no draft as a missing draft', async () => {
     const { approve, approvals } = register();
 
-    await expect(approve(1n, { op: 'action.approve_draft', chapter: 6 })).rejects.toMatchObject({ code: 'DRF_001' });
+    await expect(approve(1n, { op: 'action.approve_draft', chapter: 6 }, CARD)).rejects.toMatchObject({ code: 'DRF_001' });
     expect(approvals).toEqual([]);
   });
 });
@@ -277,10 +279,27 @@ describe('HubActionRegistrar action.generate_chapter', () => {
     new HubActionRegistrar(registry, generation as never, {} as never, {} as never, {} as never).onModuleInit();
     const generate = registry.get('action.generate_chapter');
 
-    const result = await generate?.(1n, { op: 'action.generate_chapter', chapter: 5 });
+    const result = await generate?.(1n, { op: 'action.generate_chapter', chapter: 5 }, CARD);
 
-    expect(calls).toEqual([[1n, 5]]);
+    expect(calls).toEqual([[1n, 5, undefined]]);
     expect(result).toEqual({ summary: 'enqueued generation of chapter 5', jobId: 'job-1' });
+  });
+
+  it('should queue the chapter with the chat card it came from, and say so when that chapter was already being drafted', async () => {
+    const registry = new ActionExecutorRegistry();
+    const calls: unknown[][] = [];
+    const generation = { generateChapter: async (...args: unknown[]) => (calls.push(args), { jobId: 'job-1', kind: 'generate', status: 'pending', target: '5', deduped: true }) };
+    new HubActionRegistrar(registry, generation as never, {} as never, {} as never, {} as never).onModuleInit();
+    const session = '11111111-1111-4111-8111-111111111111';
+
+    const result = await registry.get('action.generate_chapter')?.(
+      1n,
+      { op: 'action.generate_chapter', chapter: 5 },
+      { proposalId: 9n, opIndex: 2, sessionId: session, messageId: 4n },
+    );
+
+    expect(calls).toEqual([[1n, 5, { sessionId: session, messageId: '4', proposalId: '9', opIndex: 2 }]]);
+    expect(result).toEqual({ summary: 'generation of chapter 5 is already running', jobId: 'job-1' });
   });
 
   it('should register no executor for the removed planning actions', () => {

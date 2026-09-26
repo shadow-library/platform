@@ -47,6 +47,19 @@
   authoring jobs left without a live claim, which is how a crashed worker's job recovers. Heartbeat, release and settle are conditioned on the holder's fencing token, but
   draft writes themselves are not: a job that lost its claim may still land the chapter in flight, then stops at the next chapter and never settles as done.
   Publish and reindex jobs take no claim.
+- **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op; the apply answers with its job and, when it opens one at queue
+  time, its run) and never runs the work inline. A job started from a chat carries its origin (session, message, card, op) in its payload from the transaction that
+  queues it, and a queue request that lands on the same active job leaves that origin alone and says so. Organise and plan retry once, on a model call that timed out,
+  was rate limited, met a 5xx or lost its connection after the router's own retries — never on a refusal the request caused (authentication, context length, other 4xx) — after a backoff
+  kept under half the claim TTL, with the claim re-reserved as the first attempt settles; a cancel that lands first settles the job as cancelled instead. A retry
+  never stages a second card: a job's card is staged under the job row's lock and one card per run is enforced by a unique index.
+- **Job events**: every transition of a job a chat started writes a `job_events` row in the same transaction (queued, started, step, retrying, done, failed,
+  cancelled), numbered by a per-session `seq` taken under the session row's lock, so `seq` follows commit order and a cursor never skips an event that commits late;
+  a failed event insert is logged and never undoes the transition. A transition is published on the project bus only after it commits. The session's job stream
+  (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays only the running jobs' events and
+  how each job settled in the last hour ended, and its cursor comes from the same snapshot as the job list. It is a stream per session rather than part of the turn
+  stream: a turn's stream ends with its reply, and actions start later, when the author accepts the card. A follower polls every two seconds while a job of the session is
+  running and every twenty while none is, so a job another replica starts is still seen; events of jobs settled over a week ago are swept at boot and daily.
 - Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. A model type (standard or
   unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`; Balanced is the pre-tier map. A call resolves
   the project's pin for its role, then the owner's account default (Balanced only), then the tier map. Standard Performant equals Balanced
@@ -256,6 +269,10 @@
 
 - Chat, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
+- Organise (`action.organise_notes`) and plan (`action.plan_chapter`) are always cards and run as jobs whose own output is again a card: an organised Story Bible
+  or a plan for the next writable chapter only, never a direct write. Until organise records what it wrote, the chat does not offer it, and starting it is refused
+  (`NTS_004`) while an organise card is pending, or one applied is newer than the latest organise decision, because a second pass would write the organised
+  pages twice.
 - `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft (regenerating one is
   the author's own request). Action ops run after the content transaction commits and stop at first failure.
 - **Quote rule**: a chat op applies within the turn only when an auto-mode session (the default for a new chat) sent it, its kind is allowlisted

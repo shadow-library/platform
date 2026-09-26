@@ -354,7 +354,8 @@ export class ProposalApplyService {
       // Presence was verified pre-commit inside the transaction (RFN_008), so the lookup cannot miss.
       const executor = this.actionRegistry.get(op.op) as ActionExecutor;
       try {
-        const execute = (): Promise<ActionExecutionResult> => executor(projectId, op);
+        const execute = (): Promise<ActionExecutionResult> =>
+          executor(projectId, op, { proposalId: proposal.id, opIndex: index, sessionId: proposal.sessionId, messageId: proposal.messageId });
         const outcome = await (costTier ? runWithCostTier(costTier, execute) : execute());
         entry.status = 'applied';
         entry.result = outcome as unknown as Record<string, unknown>;

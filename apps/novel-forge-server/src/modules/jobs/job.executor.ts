@@ -9,12 +9,13 @@ import { type DbExecutor, type Job, type PrimaryDatabase, schema } from '@server
 
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { isTransientModelFailure } from '../ai/transient-model-error';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { AuthoringClaimService } from './authoring-claim.service';
-import { JobService, payloadCostTier } from './job.service';
+import { JobService, payloadCostTier, type TransitionedJob } from './job.service';
 
 interface GeneratePayload {
   chapters: number[];
@@ -38,12 +39,30 @@ const CANCEL_POLL_MS = 1000;
 
 const BUILT_IN_KINDS: ReadonlySet<Job.Kind> = new Set(['generate', 'backfill', 'publish', 'import']);
 
+// A model call that still times out, is rate limited, meets a 5xx or loses its connection after the router's own retries is retried once more as a whole job,
+// later: organising long notes or planning can outlast a gateway's patience on a bad minute. Only kinds whose handler skips work it already staged are retried.
+const RETRYABLE_KINDS: ReadonlySet<Job.Kind> = new Set(['organise', 'plan']);
+const MAX_JOB_ATTEMPTS = 2;
+const RETRY_BACKOFF_MS = 30_000;
+
 const CLAIM_REFUSED_MESSAGE = 'Another chapter was being written, planned or finalized for this novel, so this job did not start';
 const CLAIM_LOST_MESSAGE = 'This job stopped responding and another job took over the novel, so its result was not kept as finished';
 
 export type JobHandler = (job: Job.Row) => Promise<void>;
 
-type SettleOutcome = { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'cancelled' };
+type SettleOutcome =
+  { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'retry'; error: string; cause: unknown; nextAttemptAt: Date } | { status: 'cancelled' };
+
+/**
+ * `attempts` is read before the dispatch that counts this attempt, so the attempt now ending is one more. The wait stays within half the
+ * claim TTL: the reservation that holds the novel for the retry is not heartbeated, and must not go stale before the retry is due.
+ */
+export function retryAfter(job: Pick<Job.Row, 'kind' | 'attempts'>, err: unknown, claimTtlMs: number, now = Date.now()): Date | undefined {
+  const attempt = job.attempts + 1;
+  if (!RETRYABLE_KINDS.has(job.kind) || attempt >= MAX_JOB_ATTEMPTS) return undefined;
+  if (!AppError.is(err) || !isTransientModelFailure(err)) return undefined;
+  return new Date(now + Math.min(RETRY_BACKOFF_MS * 2 ** (attempt - 1), claimTtlMs / 2));
+}
 
 interface JobWatch {
   observed: boolean;
@@ -57,6 +76,7 @@ export class JobExecutor {
   private readonly db: PrimaryDatabase;
   private readonly cancelWatches = new Map<string, JobWatch>();
   private readonly handlers = new Map<Job.Kind, JobHandler>();
+  private readonly retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly jobService: JobService,
@@ -80,6 +100,11 @@ export class JobExecutor {
     for (const job of pending) this.dispatch(job.id).catch(err => this.logger.error('Boot dispatch failed', { err, jobId: job.id }));
   }
 
+  onModuleDestroy(): void {
+    for (const timer of this.retryTimers.values()) clearTimeout(timer);
+    this.retryTimers.clear();
+  }
+
   /** Lets a module above this one run its own job kind, since this module cannot depend on it. */
   registerHandler(kind: Job.Kind, handler: JobHandler): void {
     this.handlers.set(kind, handler);
@@ -100,6 +125,9 @@ export class JobExecutor {
       return;
     }
 
+    const wait = (job.nextAttemptAt?.getTime() ?? 0) - Date.now();
+    if (wait > 0) return this.dispatchLater(jobId, wait);
+
     // Left pending rather than failed: a handler missing here is a wiring fault, and the next dispatch after it is fixed runs the job.
     if (!BUILT_IN_KINDS.has(job.kind) && !this.handlers.has(job.kind)) {
       this.logger.error('dispatch: no handler is registered for this job kind — leaving the job pending', { jobId, kind: job.kind });
@@ -110,6 +138,17 @@ export class JobExecutor {
     const token = await this.claims.acquire(job.projectId, job.id, job.kind);
     if (!token) return this.refuseUnclaimed(job);
     return this.execute(job, token);
+  }
+
+  // One timer per job: the boot drain and the janitor can both find a job waiting out its backoff.
+  private dispatchLater(jobId: string, delayMs: number): void {
+    if (this.retryTimers.has(jobId)) return;
+    const timer = setTimeout(() => {
+      this.retryTimers.delete(jobId);
+      this.dispatch(jobId).catch(err => this.logger.error('retry dispatch failed', { err, jobId }));
+    }, delayMs);
+    timer.unref();
+    this.retryTimers.set(jobId, timer);
   }
 
   // A claim still naming this job belongs to an earlier dispatch of it (a crashed worker, or a replica still running it); the janitor retries once it is stale.
@@ -154,7 +193,9 @@ export class JobExecutor {
       // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and cancellation makes
       // the job terminal-cancelled with its finished work kept, not failed into a retry ladder.
       if (await this.cancelRequested(job.id)) return { status: 'cancelled' };
-      return { status: 'failed', error: err instanceof Error ? err.message : String(err), cause: err };
+      const error = err instanceof Error ? err.message : String(err);
+      const nextAttemptAt = retryAfter(job, err, this.claims.ttlMs);
+      return nextAttemptAt ? { status: 'retry', error, cause: err, nextAttemptAt } : { status: 'failed', error, cause: err };
     } finally {
       stopWatching();
     }
@@ -162,15 +203,33 @@ export class JobExecutor {
 
   // The settle is the fencing point: the final status commits with the claim's release, and only while the token still holds it.
   private async settle(job: Job.Row, token: string | undefined, outcome: SettleOutcome): Promise<void> {
-    const write = (db?: DbExecutor): Promise<void> => {
-      if (outcome.status === 'done') return this.jobService.succeed(job.id, db);
-      if (outcome.status === 'failed') return this.jobService.fail(job.id, outcome.error, db);
-      return this.jobService.settleCancelled(job.id, db);
+    const settled: { outcome: SettleOutcome; transitions: TransitionedJob[] } = { outcome, transitions: [] };
+    const keep = (transition: TransitionedJob | undefined): void => void (transition && settled.transitions.push(transition));
+    const write = async (db?: DbExecutor): Promise<void> => {
+      if (outcome.status === 'done') return keep(await this.jobService.succeed(job.id, db));
+      if (outcome.status === 'failed') return keep(await this.jobService.fail(job.id, outcome.error, db));
+      if (outcome.status === 'cancelled') return keep(await this.jobService.settleCancelled(job.id, db));
+      const retried = await this.jobService.scheduleRetry(job.id, outcome.error, outcome.nextAttemptAt, db);
+      if (!retried) {
+        settled.outcome = { status: 'cancelled' };
+        return keep(await this.jobService.settleCancelled(job.id, db));
+      }
+      keep(retried);
+      // Re-reserved as the claim is released, so no other authoring job takes the novel while this one waits out its backoff.
+      if (isAuthoringJob(job.kind)) await this.claims.reserve(db ?? this.db, job.projectId, job.id, job.kind);
     };
     if (!token) await write();
     else if (!(await this.claims.settle(job.projectId, token, write))) return this.settleLostClaim(job, outcome);
-    if (outcome.status !== 'done') await this.workflowRunService.settleJobRuns(job.id, outcome.status, outcome.status === 'failed' ? outcome.cause : undefined);
-    if (outcome.status === 'cancelled') this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
+    else for (const transition of settled.transitions) this.jobService.publish(job.id, transition);
+
+    const final = settled.outcome;
+    if (final.status === 'retry') {
+      await this.workflowRunService.settleJobRuns(job.id, 'failed', final.cause);
+      this.logger.warn('Job will be retried', { jobId: job.id, kind: job.kind, projectId: job.projectId, nextAttemptAt: final.nextAttemptAt });
+      return this.dispatchLater(job.id, final.nextAttemptAt.getTime() - Date.now());
+    }
+    if (final.status !== 'done') await this.workflowRunService.settleJobRuns(job.id, final.status, final.status === 'failed' ? final.cause : undefined);
+    if (final.status === 'cancelled') this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
   }
 
   // A claim re-taken for this same job means a newer run of it owns the row now, so the stale run leaves the row alone.

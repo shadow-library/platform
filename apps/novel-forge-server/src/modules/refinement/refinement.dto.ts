@@ -164,6 +164,18 @@ export class AppliedArtifactItem {
   newRevision?: number | null;
 }
 
+@Schema({ description: "A job an applied action started — follow it on the chat's job event stream." })
+export class AppliedActionJobItem {
+  @Field(() => Integer, { description: 'The action op that started it.' })
+  index: number;
+
+  @Field()
+  jobId: string;
+
+  @Field({ optional: true, description: 'The workflow run it opened, when the job opens one as it is queued.' })
+  runId?: string;
+}
+
 @Schema()
 export class ApplyProposalResponse {
   @Field(() => ProposalResponse)
@@ -177,6 +189,9 @@ export class ApplyProposalResponse {
 
   @Field(() => [OpResultItem])
   opResults: OpResultItem[];
+
+  @Field(() => [AppliedActionJobItem])
+  jobs: AppliedActionJobItem[];
 }
 
 @Schema()

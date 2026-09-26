@@ -9,7 +9,15 @@ export interface ActionExecutionResult {
   proposalId?: string;
 }
 
-export type ActionExecutor = (projectId: bigint, action: ActionOp) => Promise<ActionExecutionResult>;
+/** The card an action was accepted from, so a job it starts can report back to that chat. */
+export interface ActionContext {
+  proposalId: bigint;
+  opIndex: number;
+  sessionId: string | null;
+  messageId: bigint | null;
+}
+
+export type ActionExecutor = (projectId: bigint, action: ActionOp, context: ActionContext) => Promise<ActionExecutionResult>;
 
 /**
  * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)

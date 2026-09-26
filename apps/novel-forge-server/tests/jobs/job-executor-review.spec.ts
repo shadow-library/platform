@@ -110,6 +110,7 @@ describe('JobService.cancel — runs opened for a pending job', () => {
           },
         }),
       }),
+      transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
     };
     const service = new JobService({ getPostgresClient: () => db } as never, { publish: () => undefined } as never, new FakeAuthoringClaims().asService());
 

@@ -4,7 +4,7 @@ import { Body, Get, HttpController, Params, Post, RespondFor } from '@shadow-lib
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ApplyProposalResponse, ProposalProjectParams } from '../refinement.dto';
-import { serialiseProposal } from '../serialise';
+import { serialiseProposal, startedJobs } from '../serialise';
 import { ApplyBibleTidyBody, type BibleTidyItem, BibleTidyPreviewResponse } from './bible-tidy.dto';
 import { BibleTidyService } from './bible-tidy.service';
 import { type TidyItem } from './bible-tidy';
@@ -41,6 +41,6 @@ export class BibleTidyController {
   @RespondFor(200, ApplyProposalResponse)
   async applyBibleTidy(@Params() params: ProposalProjectParams, @Body() body: ApplyBibleTidyBody): Promise<ApplyProposalResponse> {
     const result = await this.bibleTidyService.apply(params.projectId, body.items);
-    return { ...result, proposal: serialiseProposal(result.proposal) };
+    return { ...result, proposal: serialiseProposal(result.proposal), jobs: startedJobs(result.opResults) };
   }
 }

@@ -56,7 +56,7 @@ import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { redactJobForResponse, toJobUsageResponse } from '../jobs/job-response';
 import { type JobUsageResponse } from '../jobs/jobs.dto';
 import { JobExecutor } from '../jobs/job.executor';
-import { JobService } from '../jobs/job.service';
+import { type JobOrigin, JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { PluginProposalService } from '../plugins/plugin-proposal.service';
 import { type ChangeOp } from '../refinement/change-set';
@@ -172,6 +172,8 @@ export interface JobEnqueueResult {
   stoppedAtUnwrittenChapter?: number;
   /** Set when a chapter whose plan teaches its cast something ended the batch before its limit: the next waits for its approval. */
   stoppedAtTeachingChapter?: number;
+  /** Set when the same work was already queued or running: the job named is that one, still reporting to whoever started it. */
+  deduped?: boolean;
 }
 
 const APPROVED_AS_WRITTEN_PREFIX = 'approved as written over: ';
@@ -339,10 +341,10 @@ export class GenerationService {
   }
 
   /** Drafts one planned chapter that has no draft yet; replacing an existing draft stays with {@link regenerateChapter}, which the author starts. */
-  async generateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
+  async generateChapter(projectId: bigint, chapter: number, origin?: JobOrigin): Promise<JobEnqueueResult> {
     const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)), columns: { id: true } });
     if (draft) throw AppErrorCode.DRF_015.create({ chapter: String(chapter) });
-    return this.regenerateChapter(projectId, chapter);
+    return this.regenerateChapter(projectId, chapter, origin);
   }
 
   /**
@@ -351,7 +353,7 @@ export class GenerationService {
    * It keeps generate's rules: chapters are drafted in order, a contradiction elsewhere or an unfilled external chapter
    * at or before this one blocks it, and only one generation job runs at a time.
    */
-  async regenerateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
+  async regenerateChapter(projectId: bigint, chapter: number, origin?: JobOrigin): Promise<JobEnqueueResult> {
     await this.assertProjectExists(projectId);
 
     const [brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
@@ -387,15 +389,20 @@ export class GenerationService {
     await assertTeacherSettled(this.db, projectId, chapter);
 
     this.logger.info('regenerate: enqueueing chapter', { projectId, chapter, hadDraft: Boolean(draft) });
-    return this.enqueueGeneration(projectId, chapters, { autoFix: true });
+    return this.enqueueGeneration(projectId, chapters, { autoFix: true }, origin);
   }
 
-  private async enqueueGeneration(projectId: bigint, chapters: number[], options: Pick<GenerateBody, 'autoFix' | 'maxFixes' | 'guidance'>): Promise<JobEnqueueResult> {
+  private async enqueueGeneration(
+    projectId: bigint,
+    chapters: number[],
+    options: Pick<GenerateBody, 'autoFix' | 'maxFixes' | 'guidance'>,
+    origin?: JobOrigin,
+  ): Promise<JobEnqueueResult> {
     const target = [...chapters].sort((a, b) => a - b).join(',');
-    const payload = { chapters, autoFix: options.autoFix, maxFixes: options.maxFixes, guidance: options.guidance };
-    const jobId = await this.jobService.enqueue(projectId, 'generate', target, payload);
+    const payload = { chapters, autoFix: options.autoFix, maxFixes: options.maxFixes, guidance: options.guidance, ...(origin ? { origin } : {}) };
+    const { id: jobId, outcome } = await this.jobService.enqueueJob(projectId, 'generate', target, payload);
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('generate job dispatch failed', { err, jobId }));
-    return { jobId, kind: 'generate', status: 'pending', target };
+    return { jobId, kind: 'generate', status: 'pending', target, ...(outcome === 'deduped' ? { deduped: true } : {}) };
   }
 
   async listDrafts(projectId: bigint): Promise<Generation.Draft[]> {

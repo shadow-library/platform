@@ -202,6 +202,16 @@ interface FinalizeAction {
   upTo?: number;
 }
 
+interface OrganiseNotesAction {
+  op: 'action.organise_notes';
+}
+
+interface PlanChapterAction {
+  op: 'action.plan_chapter';
+  chapter?: number;
+  intent?: string;
+}
+
 export type ContentOp =
   | PremiseUpdateOp
   | BibleDocumentUpsertOp
@@ -220,7 +230,16 @@ export type ContentOp =
   | MilestoneRemoveOp;
 
 export type ActionOp =
-  GenerateChapterAction | AuditBibleAction | EnhancePremiseAction | JudgeDraftAction | ReviseDraftAction | ApproveDraftAction | ValidateAction | FinalizeAction;
+  | GenerateChapterAction
+  | AuditBibleAction
+  | EnhancePremiseAction
+  | JudgeDraftAction
+  | ReviseDraftAction
+  | ApproveDraftAction
+  | ValidateAction
+  | FinalizeAction
+  | OrganiseNotesAction
+  | PlanChapterAction;
 
 /**
  * Rationale and quote are metadata about the change, not part of it: they reach the author beside the op and are stripped before any
@@ -317,6 +336,8 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number', saveSeq: 'number', draftId: 'string' } },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
+  'action.organise_notes': { required: {}, optional: {} },
+  'action.plan_chapter': { required: {}, optional: { chapter: 'number', intent: 'string' } },
 };
 
 // Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
@@ -352,6 +373,9 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.approve_draft': 'approve one reviewed chapter draft',
   'action.validate': 'run continuity validation over the novel or one chapter',
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
+  'action.organise_notes': "organise the author's stored notes into Story Bible pages, records, a timeline and open questions — runs as a job and stages the result as a card",
+  'action.plan_chapter':
+    'plan the next chapter — the lowest-numbered one without a draft — from `intent`, what the author agreed it should do; `chapter` must be that chapter when given — runs as a job and stages the plan as a card',
 };
 
 export function isActionOp(op: ChangeOp): op is ActionOp;

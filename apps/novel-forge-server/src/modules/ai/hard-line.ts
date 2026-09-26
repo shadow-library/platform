@@ -139,6 +139,7 @@ const SUPPLIED_INPUTS: Readonly<Record<string, string>> = {
   projectBrief: "The novel's brief",
   overview: "The novel's overview",
   extraContext: 'The planning notes',
+  authorNotes: 'Your notes',
   settledFindings: 'The findings you settled',
   subjectLabel: 'The illustration subject',
   references: 'The reference images',

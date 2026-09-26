@@ -50,6 +50,13 @@
       "when": 1790424027364,
       "tag": "0006_bible_audit_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790424664340,
+      "tag": "0007_job_events",
+      "breakpoints": true
     }
   ]
 }

@@ -82,7 +82,7 @@ describe('JobService.enqueue — authoring claim', () => {
 
     await service.enqueue(1n, 'publish', 'publish-1');
 
-    expect(transactions).toEqual([]);
+    expect(transactions).toEqual(['committed']);
     expect(claims.rows.get(1n)?.jobId).toBe('job-1');
   });
 });

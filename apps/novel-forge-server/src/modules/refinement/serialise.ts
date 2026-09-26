@@ -3,7 +3,8 @@ import { type Project, type Refinement } from '@server/database';
 import { type CallUsageTotals } from '../ai/usage/call-usage';
 import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
-import { type ProposalResponse } from './refinement.dto';
+import { type OpResult } from './proposal-apply.service';
+import { type AppliedActionJobItem, type ProposalResponse } from './refinement.dto';
 
 /**
  * Response serialisation for the refinement module. Every helper here **projects** its row onto the
@@ -101,4 +102,13 @@ export function serialiseTurn(result: ChatTurnResult): ChatTurnResponse {
 export function withTurnCost(message: ChatMessageResponse, usage: CallUsageTotals | undefined): ChatMessageResponse {
   if (!usage) return message;
   return { ...message, costUsd: usage.costUsd, inputTokens: usage.inputTokens, cachedInputTokens: usage.cachedInputTokens, outputTokens: usage.outputTokens };
+}
+
+export function startedJobs(opResults: readonly OpResult[]): AppliedActionJobItem[] {
+  return opResults.flatMap(({ index, status, result }) => {
+    const jobId = result?.['jobId'];
+    if (status !== 'applied' || typeof jobId !== 'string') return [];
+    const runId = result?.['runId'];
+    return [{ index, jobId, ...(typeof runId === 'string' ? { runId } : {}) }];
+  });
 }

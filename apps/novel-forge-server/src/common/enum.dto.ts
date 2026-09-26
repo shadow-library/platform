@@ -26,6 +26,7 @@ export const DraftStatus = EnumType.create('DraftStatus', schema.draftStatus.enu
 export const JudgeVerdict = EnumType.create('JudgeVerdict', schema.judgeVerdict.enumValues);
 export const JobKind = EnumType.create('JobKind', schema.jobKind.enumValues);
 export const JobStatus = EnumType.create('JobStatus', schema.jobStatus.enumValues);
+export const JobEventType = EnumType.create('JobEventType', schema.jobEventType.enumValues);
 export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
 export const DraftReviewStatus = EnumType.create('DraftReviewStatus', schema.draftReviewStatus.enumValues);
 export const BriefWriteMode = EnumType.create('BriefWriteMode', schema.briefWriteMode.enumValues);

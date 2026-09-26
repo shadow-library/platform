@@ -1,0 +1,23 @@
+import { Module } from '@shadow-library/app';
+import { DatabaseModule } from '@shadow-library/modules';
+
+import { AiModule } from '../ai/ai.module';
+import { EventsModule } from '../events/events.module';
+import { GenerationModule } from '../generation/generation.module';
+import { JobsModule } from '../jobs/jobs.module';
+import { PluginsModule } from '../plugins/plugins.module';
+import { RefinementModule } from '../refinement/refinement.module';
+import { ActionJobService } from './action-job.service';
+import { ChatJobReader } from './chat-job.reader';
+import { ChatJobService } from './chat-job.service';
+import { ChatJobsController } from './chat-jobs.controller';
+import { OrganiseJobService } from './organise-job.service';
+import { PlanJobService } from './plan-job.service';
+
+@Module({
+  imports: [DatabaseModule, AiModule, EventsModule, GenerationModule, JobsModule, PluginsModule, RefinementModule],
+  controllers: [ChatJobsController],
+  providers: [ActionJobService, OrganiseJobService, PlanJobService, ChatJobReader, ChatJobService],
+  exports: [ActionJobService],
+})
+export class ActionJobsModule {}

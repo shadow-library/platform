@@ -37,12 +37,12 @@ Respond with ONLY one valid JSON object, nothing outside it and no markdown fenc
 
 export const notesOrganisePrompt: PromptModule<NotesOrganiseOutput> = {
   key: 'notes-organise',
-  version: '1.3.0',
+  version: '1.4.0',
   kind: 'analytical',
   role: 'bible',
-  cacheStrategy: { stableVars: ['stableContext'] },
+  cacheStrategy: { stableVars: ['stableContext', 'authorNotes'] },
   system,
-  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', '{stableContext}'], ['human', '{volatileContext}']]),
+  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', '{stableContext}'], ['human', '{authorNotes}'], ['human', '{volatileContext}']]),
   schema: NotesOrganiseSchema,
   postValidate: organiseOutputIssues,
 };
