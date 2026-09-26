@@ -169,7 +169,7 @@ export class UploadImageBody {
     optional: true,
     minimum: 0,
     description:
-      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016.',
+      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one stays hidden from readers until it is published.',
   })
   depictsChapter?: number;
 }
@@ -179,7 +179,7 @@ export class DateEntityImageBody {
   @Field(() => Integer, {
     minimum: 0,
     description:
-      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A chapter past the latest final one is refused with ILL_016.',
+      'The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A later chapter stays hidden from readers until it is published.',
   })
   depictsChapter: number;
 }

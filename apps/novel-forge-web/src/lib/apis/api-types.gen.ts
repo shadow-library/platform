@@ -5712,11 +5712,11 @@ export interface components {
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
-      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016. */
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one stays hidden from readers until it is published. */
       depictsChapter?: number;
     };
     DateEntityImageBody: {
-      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A chapter past the latest final one is refused with ILL_016. */
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A later chapter stays hidden from readers until it is published. */
       depictsChapter: number;
     };
     AddEntityImageBody: {
@@ -5724,7 +5724,7 @@ export interface components {
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
-      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016. */
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one stays hidden from readers until it is published. */
       depictsChapter?: number;
       caption?: string;
     };
