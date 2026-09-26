@@ -23,7 +23,7 @@ describe('jobSettled', () => {
 
 describe('parseProjectEvent', () => {
   it('should read a job event off the stream', () => {
-    expect(parseProjectEvent(JSON.stringify({ type: 'job', jobId: 'j1', kind: 'blueprint', status: 'done' }))).toMatchObject({ type: 'job', kind: 'blueprint' });
+    expect(parseProjectEvent(JSON.stringify({ type: 'job', jobId: 'j1', kind: 'extract', status: 'done' }))).toMatchObject({ type: 'job', kind: 'extract' });
   });
 
   it('should ignore anything that is not one of the three event types', () => {

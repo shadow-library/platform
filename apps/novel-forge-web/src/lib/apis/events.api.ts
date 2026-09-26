@@ -2,7 +2,6 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { type JobStatus } from './api-types.gen';
-import { invalidateBlueprintProgress } from './blueprint.api';
 import { invalidateJobs } from './insight.api';
 import { setEventStreamLive } from './live-polling';
 import { invalidateChat, invalidateChatSession, invalidateChatSessions } from './refinement.api';
@@ -20,9 +19,8 @@ export type ProjectEvent =
 
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
-const BLUEPRINT_JOB_KIND = 'blueprint';
 // Settled is the complement of the two in-flight statuses rather than a list of the terminal ones: a
-// status the server adds later that this misses would leave a finished round on screen forever, while
+// status the server adds later that this misses would leave a finished job on screen forever, while
 // mistaking a new in-flight status for a settled one costs only a refetch.
 const LIVE_JOB_STATUSES: readonly JobStatus[] = ['pending', 'in_progress'];
 // The stream ends itself every 15 minutes and reconnects within its 3-second retry; only an outage longer than this
@@ -30,7 +28,7 @@ const LIVE_JOB_STATUSES: readonly JobStatus[] = ['pending', 'in_progress'];
 const OUTAGE_AFTER_MS = 5_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
 
-/** A blueprint round only changes what a screen shows once its job settles; the start mutation already refetched the pending round. */
+/** Whether a job's status is a terminal one — the caller decides what to refetch once it is. */
 export function jobSettled(status: string): boolean {
   return !LIVE_JOB_STATUSES.includes(status as JobStatus);
 }
@@ -49,7 +47,6 @@ export function parseProjectEvent(data: unknown): ProjectEvent | undefined {
 export function applyProjectEvent(queryClient: QueryClient, projectId: string, event: ProjectEvent): void {
   if (event.type === 'job') {
     invalidateJobs(queryClient, projectId);
-    if (event.kind === BLUEPRINT_JOB_KIND && jobSettled(event.status)) invalidateBlueprintProgress(queryClient, projectId);
     return;
   }
   if (event.type === 'chat') return invalidateChatSession(queryClient, projectId, event.sessionId);
@@ -66,7 +63,6 @@ function resynchronise(queryClient: QueryClient, projectId: string): void {
   invalidateJobs(queryClient, projectId);
   invalidateRuns(queryClient, projectId);
   invalidateChatSessions(queryClient, projectId);
-  invalidateBlueprintProgress(queryClient, projectId);
 }
 
 /**

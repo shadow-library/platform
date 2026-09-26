@@ -15,11 +15,11 @@ export const Route = createFileRoute('/_app/import')({
 const BUNDLE_FORMAT = 'novel-import';
 const BUNDLE_SCHEMA_VERSION = 1;
 
-// Optional-chained like import-plan.tsx's own preview counts (`bundle[key]?.length ?? 0`): a bundle that
-// parses as JSON and carries the right envelope (`format`/`schemaVersion`) can still be structurally
-// broken past that — a missing volume `chapters` array, say. `readBundle` already rejects those before
-// they reach `bundle` state, but this stays defensive so a preview render can never crash into the route
-// error boundary even if that guard is ever loosened.
+// Optional-chained (`bundle[key]?.length ?? 0`) because a bundle that parses as JSON and carries the right
+// envelope (`format`/`schemaVersion`) can still be structurally broken past that — a missing volume
+// `chapters` array, say. `readBundle` already rejects those before they reach `bundle` state, but this
+// stays defensive so a preview render can never crash into the route error boundary even if that guard is
+// ever loosened.
 function chapterCount(bundle: NovelBundle): number {
   return (bundle.volumes ?? []).reduce((sum, volume) => sum + (volume.chapters?.length ?? 0), 0);
 }

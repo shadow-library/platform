@@ -1,0 +1,307 @@
+/* Option cards */
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.option[data-selected] {
+  border-color: var(--sh-accent);
+  box-shadow: inset 0 0 0 1px var(--sh-accent);
+}
+
+.option[data-killed] {
+  opacity: 0.62;
+}
+
+.option[data-killed] .optionTitle {
+  text-decoration: line-through;
+  text-decoration-color: var(--sh-danger-solid);
+}
+
+.optionPick {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.optionPick:disabled {
+  cursor: default;
+}
+
+.optionTitle {
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+}
+
+.optionDescription {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.optionActions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.optionVerdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.optionReason {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-danger-text-on-subtle);
+}
+
+/* Steer box */
+.steer {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sh-accent-soft);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  overflow: hidden;
+}
+
+.steerThread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 0;
+}
+
+.steerMessage {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.45;
+}
+
+.steerMessage[data-who='you'] {
+  align-self: flex-end;
+  max-width: 82%;
+  padding: 7px 10px;
+  border-radius: 10px 10px 2px 10px;
+  background: var(--sh-accent-soft);
+}
+
+.steerWho {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.steerNudges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 12px 0;
+}
+
+.steerCount {
+  font-size: var(--sh-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-tertiary);
+}
+
+.steerCount[data-over] {
+  color: var(--sh-danger-solid);
+}
+
+.nudge {
+  padding: 3px 10px;
+  border: 1px dashed var(--sh-border-default);
+  border-radius: var(--sh-radius-full);
+  background: transparent;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+}
+
+.nudge:hover:not(:disabled) {
+  border-style: solid;
+  color: var(--sh-text-primary);
+}
+
+.nudge[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 600;
+}
+
+.nudge:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.steerRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px 12px;
+}
+
+.steerInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.steerFoot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+}
+
+.steerHint {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+@media (max-width: 600px) {
+  .steerRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Decision card */
+.decision {
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  overflow: hidden;
+}
+
+.decisionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+}
+
+.decisionTitle {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+}
+
+.decisionActions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.decisionList {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  font-size: var(--sh-text-body-sm);
+}
+
+.decisionList dt {
+  padding: 7px 14px;
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.decisionList dd {
+  margin: 0;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.decisionList > :nth-last-child(-n + 2) {
+  border-bottom: none;
+}
+
+@media (max-width: 600px) {
+  .decisionList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decisionList dt {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+/* Round status */
+.roundRunning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.roundRunningLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+/* Lock bar */
+.lockBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+}
+
+.lockHint {
+  flex: 1;
+  min-width: 200px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.lockActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.nudge:focus-visible,
+.optionPick:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--sh-radius-sm);
+}

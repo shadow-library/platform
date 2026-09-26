@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type BlueprintPhaseProgressResponse, type BlueprintProgressResponse } from '../src/lib/apis';
-import {
-  blueprintStage,
-  blueprintStageLabel,
-  currentBlueprintPhase,
-  groupByRecency,
-  LIFECYCLE_PHASES,
-  lifecyclePhase,
-  projectDotColor,
-  projectKindIntent,
-  projectKindLabel,
-  projectKindTag,
-  sharedOwnerLabel,
-} from '../src/lib/format';
+import { groupByRecency, LIFECYCLE_PHASES, lifecyclePhase, projectDotColor, projectKindIntent, projectKindLabel, projectKindTag, sharedOwnerLabel } from '../src/lib/format';
 
 describe('projectKindLabel', () => {
   it('should label the original-novel project kind', () => {
@@ -70,67 +57,6 @@ describe('lifecyclePhase', () => {
 
   it('should expose only the new_novel workflow', () => {
     expect(LIFECYCLE_PHASES.new_novel).toEqual(['Bible', 'Plan', 'Arcs', 'Drafts', 'Review']);
-  });
-});
-
-function phase(name: BlueprintPhaseProgressResponse['phase'], status: BlueprintPhaseProgressResponse['status']): BlueprintPhaseProgressResponse {
-  return { phase: name, label: name, status, steps: [] };
-}
-
-function blueprint(stage: BlueprintProgressResponse['stage'], phases: BlueprintPhaseProgressResponse[]): BlueprintProgressResponse {
-  return { stage, phases };
-}
-
-describe('blueprintStage', () => {
-  it('should read the stage an original novel reports', () => {
-    expect(blueprintStage({ blueprint: blueprint('blueprint', []) })).toBe('blueprint');
-    expect(blueprintStage({ blueprint: blueprint('workspace', []) })).toBe('workspace');
-  });
-
-  it('should report no stage before the status loads or for a kind without a Blueprint', () => {
-    expect(blueprintStage(undefined)).toBeNull();
-    expect(blueprintStage({ blueprint: null })).toBeNull();
-    expect(blueprintStage({})).toBeNull();
-  });
-});
-
-describe('currentBlueprintPhase', () => {
-  it('should find the current phase even after a done phase that follows it', () => {
-    const phases = [phase('idea', 'done'), phase('heart', 'current'), phase('core', 'done'), phase('world', 'locked')];
-    expect(currentBlueprintPhase({ blueprint: blueprint('blueprint', phases) })?.phase).toBe('heart');
-  });
-
-  it('should report none in the Workspace, when every phase is done, or without a Blueprint', () => {
-    expect(currentBlueprintPhase({ blueprint: blueprint('workspace', [phase('idea', 'done'), phase('heart', 'open')]) })).toBeNull();
-    expect(currentBlueprintPhase({ blueprint: blueprint('blueprint', [phase('idea', 'done')]) })).toBeNull();
-    expect(currentBlueprintPhase({ blueprint: null })).toBeNull();
-  });
-});
-
-describe('blueprintStageLabel', () => {
-  it('should name the phase a novel still being designed is on', () => {
-    const phases = [phase('idea', 'done'), phase('heart', 'current')];
-    expect(blueprintStageLabel({ blueprint: blueprint('blueprint', phases) })).toBe('Blueprint · heart');
-  });
-
-  it('should say only Blueprint when no phase is current', () => {
-    expect(blueprintStageLabel({ blueprint: blueprint('blueprint', [phase('idea', 'done')]) })).toBe('Blueprint');
-  });
-
-  it('should carry no chip once the Workspace is open, so the card shows its writing progress instead', () => {
-    expect(blueprintStageLabel({ blueprint: blueprint('workspace', [phase('idea', 'open')]) })).toBeNull();
-  });
-
-  it('should carry no stage for a project that has no Blueprint', () => {
-    expect(blueprintStageLabel({ blueprint: null })).toBeNull();
-    expect(blueprintStageLabel(undefined)).toBeNull();
-  });
-});
-
-describe('lifecyclePhase for a Workspace novel', () => {
-  it('should keep walking the authoring phases whatever the Blueprint reports', () => {
-    const status = { kind: 'new_novel' as const, volumesTotal: 3, planApproved: true, blueprint: blueprint('workspace', [phase('idea', 'open')]) };
-    expect(lifecyclePhase(status)).toEqual({ completed: 3, total: 5, label: 'Drafts' });
   });
 });
 

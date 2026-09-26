@@ -9,49 +9,16 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
     draftsTotal: 10,
     draftsFinal: 10,
     briefsRemaining: 0,
-    arcsLeft: false,
     reviewQueueCount: 0,
     ...overrides,
   };
 }
 
-describe('computeNextStep for a novel still in its Blueprint', () => {
-  it('should send the author back to the Blueprint rather than telling them to build the plan by hand', () => {
-    const result = computeNextStep(input({ blueprintStage: 'blueprint', blueprintPhaseLabel: 'Spine', volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
-
-    expect(result.next).toMatchObject({ id: 'continue-blueprint', label: 'Continue the Blueprint', target: { screen: 'blueprint' } });
-    expect(result.next?.reason).toContain('Spine');
-    expect(result.comingUp.map(item => item.id)).toEqual(['open-workspace', 'generate-chapter']);
-  });
-
-  it('should offer the gate once every required step is locked', () => {
-    const result = computeNextStep(input({ blueprintStage: 'blueprint', blueprintComplete: true, volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
-
-    expect(result.next).toMatchObject({ id: 'continue-blueprint', label: 'Open the gate', target: { screen: 'blueprint' } });
-  });
-
-  it('should still put a contradicted chapter first, because a Blueprint-stage novel can already have drafts', () => {
-    expect(computeNextStep(input({ blueprintStage: 'blueprint', contradictedChapter: 4 })).next?.id).toBe('repair-chapter');
-  });
-
-  it('should go back to the Workspace roadmap once the gate is open', () => {
-    const result = computeNextStep(input({ blueprintStage: 'workspace', briefsRemaining: 3, nextBriefChapter: 1 }));
-
-    expect(result.next?.id).toBe('generate-chapter');
-  });
-});
-
 describe('computeNextStep', () => {
-  it('should send a first-time novelist to the story bible when nothing is outlined yet', () => {
+  it('should send a first-time novelist to the assistant when nothing is outlined yet', () => {
     const result = computeNextStep(input({ volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
-    expect(result.next).toMatchObject({ id: 'build-plan', target: { screen: 'story-bible' } });
-    expect(result.comingUp.map(item => item.id)).toEqual(['approve-plan', 'generate-chapter', 'plan-next-arc']);
-  });
-
-  it('should ask for plan approval once volumes exist but are not approved', () => {
-    const result = computeNextStep(input({ volumesTotal: 3, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
-    expect(result.next).toMatchObject({ id: 'approve-plan', target: { screen: 'volumes' } });
-    expect(result.comingUp.map(item => item.id)).toEqual(['generate-chapter', 'plan-next-arc', 'finalize-chapters']);
+    expect(result.next).toMatchObject({ id: 'build-plan', label: 'Build your plan', target: { screen: 'chat' } });
+    expect(result.comingUp.map(item => item.id)).toEqual(['generate-chapter', 'finalize-chapters']);
   });
 
   it('should point at the specific next chapter once briefs are outlined but not all drafted', () => {
@@ -64,19 +31,8 @@ describe('computeNextStep', () => {
     expect(result.next?.label).toBe('Generate the next chapter');
   });
 
-  it('should prefer generating over planning the next arc when both conditions hold, but preview the arc next', () => {
-    const result = computeNextStep(input({ briefsRemaining: 2, nextBriefChapter: 9, arcsLeft: true, nextArcVolumeKey: 'v2' }));
-    expect(result.next?.id).toBe('generate-chapter');
-    expect(result.comingUp[0]).toEqual({ id: 'plan-next-arc', label: 'Plan the next arc' });
-  });
-
-  it('should ask to plan the next arc once briefs run out early and the volume plan still has range left', () => {
-    const result = computeNextStep(input({ briefsRemaining: 0, arcsLeft: true, nextArcVolumeKey: 'v3' }));
-    expect(result.next).toMatchObject({ id: 'plan-next-arc', target: { screen: 'volumes', volumeKey: 'v3' } });
-  });
-
   it('should ask to finalize through the chat assistant once every outlined chapter is drafted and approved', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, arcsLeft: false, reviewQueueCount: 0, notFinalChapterRange: '7–10' }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '7–10' }));
     expect(result.next).toMatchObject({
       id: 'finalize-chapters',
       target: { screen: 'chat' },
@@ -85,28 +41,28 @@ describe('computeNextStep', () => {
   });
 
   it('should give a generic finalize reason when the not-final chapter range is unknown', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, arcsLeft: false, reviewQueueCount: 0 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0 }));
     expect(result.next?.reason).toBe('Every drafted chapter is approved — ask the assistant to finalize them.');
   });
 
   it('should use singular phrasing in the finalize reason for a single not-final chapter', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 9, briefsRemaining: 0, arcsLeft: false, reviewQueueCount: 0, notFinalChapterRange: '10' }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 9, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '10' }));
     expect(result.next?.reason).toBe('Every drafted chapter is approved — ask the assistant to finalize chapter 10.');
   });
 
   it('should not offer to finalize while anything is still pending review', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, arcsLeft: false, reviewQueueCount: 2 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 2 }));
     expect(result.next?.id).toBe('review-queue');
   });
 
   it('should report nothing left to do once the project is fully drafted, approved, and finalized', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 10, briefsRemaining: 0, arcsLeft: false, reviewQueueCount: 0 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 10, briefsRemaining: 0, reviewQueueCount: 0 }));
     expect(result.next).toBeUndefined();
     expect(result.comingUp).toEqual([]);
   });
 
   it('should send a contradicted draft to repair, with the review drawer flagged open, before anything else pending', () => {
-    const result = computeNextStep(input({ contradictedChapter: 5, reviewQueueCount: 3, briefsRemaining: 2, nextBriefChapter: 11, arcsLeft: true }));
+    const result = computeNextStep(input({ contradictedChapter: 5, reviewQueueCount: 3, briefsRemaining: 2, nextBriefChapter: 11 }));
     expect(result.next).toMatchObject({ id: 'repair-chapter', label: 'Repair chapter 5', target: { screen: 'chapters', chapter: 5, review: true } });
   });
 
@@ -133,7 +89,6 @@ function state(overrides: Partial<NextStepStateInput> = {}): NextStepStateInput 
     draftsTotal: 0,
     draftsFinal: 0,
     briefs: [],
-    volumes: [],
     draftedChapters: [],
     reviewDrafts: [],
     pendingContinuityCount: 0,
@@ -212,47 +167,6 @@ describe('deriveNextStepInput', () => {
       }),
     );
     expect(result.notFinalChapterRange).toBeUndefined();
-  });
-
-  it('should size a volume from its target chapter count when its end chapter is not set yet', () => {
-    const result = deriveNextStepInput(
-      state({ volumes: [{ volumeKey: 'v1', ordinal: 1, startChapter: 1, endChapter: null, targetChapterCount: 12 }], briefs: [{ chapter: 1, volumeKey: 'v1' }] }),
-    );
-    expect(result.arcsLeft).toBe(true);
-    expect(result.nextArcVolumeKey).toBe('v1');
-  });
-
-  it('should report no arcs left once briefs cover every volume’s planned chapter range', () => {
-    const result = deriveNextStepInput(
-      state({
-        volumes: [{ volumeKey: 'v1', ordinal: 1, startChapter: 1, endChapter: 3 }],
-        briefs: [
-          { chapter: 1, volumeKey: 'v1' },
-          { chapter: 2, volumeKey: 'v1' },
-          { chapter: 3, volumeKey: 'v1' },
-        ],
-      }),
-    );
-    expect(result.arcsLeft).toBe(false);
-    expect(result.nextArcVolumeKey).toBeUndefined();
-  });
-
-  it('should offer the earliest volume by ordinal that still needs more arcs', () => {
-    const result = deriveNextStepInput(
-      state({
-        volumes: [
-          { volumeKey: 'v1', ordinal: 1, startChapter: 1, endChapter: 3 },
-          { volumeKey: 'v2', ordinal: 2, startChapter: 4, endChapter: 6 },
-        ],
-        briefs: [
-          { chapter: 1, volumeKey: 'v1' },
-          { chapter: 2, volumeKey: 'v1' },
-          { chapter: 3, volumeKey: 'v1' },
-          { chapter: 4, volumeKey: 'v2' },
-        ],
-      }),
-    );
-    expect(result.nextArcVolumeKey).toBe('v2');
   });
 
   it('should surface the lowest contradicted chapter when more than one draft is flagged', () => {

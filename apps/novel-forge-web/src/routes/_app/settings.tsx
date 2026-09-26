@@ -37,7 +37,6 @@ const SECTIONS: { title: string; rows: GroupRow[] }[] = [
       { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, arcs, outlines, bible and extraction', kind: 'llm' },
       { key: 'review', label: 'Review & QA', hint: 'Continuity judge, validation and editorial review', kind: 'llm' },
       { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals on a novel', kind: 'llm' },
-      { key: 'ideation', label: 'Blueprint', hint: 'The guided design flow’s small steps', kind: 'llm' },
     ],
   },
   {

@@ -12,8 +12,6 @@ import {
   type ListChapterRowsQueryParams,
   type ListChapterRowsResponse,
   type ListDraftResponse,
-  type PlanBody,
-  type PlanResponse,
   type ProposalResponse,
   type ReviewQueueResponse,
   type SeedFromBriefBody,
@@ -220,16 +218,5 @@ export function useSeedFromBriefMutation(projectId: string): UseMutationResult<W
   return useMutation<WorkflowRunResponse, ApiError, SeedFromBriefBody>({
     mutationFn: data => APIRequest.post(`/projects/${projectId}/seed-from-brief`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId] }),
-  });
-}
-
-export function usePlanMutation(projectId: string): UseMutationResult<PlanResponse, ApiError, PlanBody> {
-  const queryClient = useQueryClient();
-  return useMutation<PlanResponse, ApiError, PlanBody>({
-    mutationFn: data => APIRequest.post(`/projects/${projectId}/plan`).body(data).execute(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'volumes'] });
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'status'] });
-    },
   });
 }

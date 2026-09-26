@@ -5,10 +5,8 @@ import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-librar
 import { userDisplayName } from '@shadow-library/web';
 
 import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
-import { blueprintNavSections } from '@/features/blueprint/blueprint-nav';
-import { blueprintStepMeta } from '@/features/blueprint/blueprint-steps';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
-import { blueprintStage, currentBlueprintPhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
+import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
 import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon } from '../icons';
@@ -16,7 +14,7 @@ import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
-import { type ProjectScreen, SCREEN_LABEL, screensForWorkflow } from './screens';
+import { PROJECT_SCREENS, type ProjectScreen, SCREEN_LABEL } from './screens';
 
 const PROJECT_LIMIT = 50;
 
@@ -87,12 +85,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   });
 
   const isAdmin = useIsAdmin();
-  const screens = useMemo(() => screensForWorkflow(project?.kind).filter(screen => !screen.adminOnly || isAdmin), [project?.kind, isAdmin]);
-  // While the stage is Blueprint the sidebar is the Blueprint's own rail: the Workspace screens have
-  // nothing to show yet, and the phases are the only navigation the author has.
-  const inBlueprint = blueprintStage(status) === 'blueprint';
-  const blueprintPhases = status?.blueprint?.phases ?? [];
-  const blueprintPhasesDone = blueprintPhases.filter(candidate => candidate.status === 'done').length;
+  const screens = useMemo(() => PROJECT_SCREENS.filter(screen => !screen.adminOnly || isAdmin), [isAdmin]);
   const nav: NavConfig = inProject
     ? {
         variant: 'project',
@@ -104,9 +97,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           onSelect: id => void navigate({ to: '/novels/$novelId', params: { novelId: id } }),
           footerAction: { label: 'View all projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
         },
-        sections: inBlueprint
-          ? blueprintNavSections(novelId ?? '', status?.blueprint?.phases ?? [])
-          : [{ items: screens.filter(screen => !screen.trailing).map(toLeaf) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
+        sections: [{ items: screens.filter(screen => !screen.trailing).map(toLeaf) }, { items: screens.filter(screen => screen.trailing).map(toLeaf) }],
       }
     : {
         variant: 'sections',
@@ -170,9 +161,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const segments = pathname.split('/').filter(Boolean);
   const leafSegment = segments.at(-1);
-  const blueprintStepKey = segments.at(-2) === 'blueprint' ? leafSegment : undefined;
-  const crumbLeaf =
-    !inProject || leafSegment == null ? undefined : blueprintStepKey != null ? `Blueprint · ${blueprintStepMeta(blueprintStepKey).label}` : SCREEN_LABEL.get(leafSegment);
+  const crumbLeaf = !inProject || leafSegment == null ? undefined : SCREEN_LABEL.get(leafSegment);
   const crumbRoot = inProject && project ? projectTitle(project) : pathname === '/settings' ? 'Settings' : 'Projects';
 
   const breadcrumb = crumbLeaf != null ? `${crumbRoot} / ${crumbLeaf}` : crumbRoot;
@@ -213,23 +202,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
         utility={<ThemeToggle />}
         sidebarFooter={
-          inBlueprint ? (
-            <div className={styles.lifecycle}>
-              <div className={styles.lifecycleHeading}>Blueprint</div>
-              <div className={styles.lifecycleBar}>
-                {blueprintPhases.map(blueprintPhase => (
-                  <div
-                    key={blueprintPhase.phase}
-                    className={styles.lifecycleSeg}
-                    data-state={blueprintPhase.status === 'done' ? 'done' : blueprintPhase.status === 'current' ? 'current' : 'todo'}
-                  />
-                ))}
-              </div>
-              <div className={styles.lifecycleLabel}>
-                {currentBlueprintPhase(status)?.label ?? 'Every phase done'} · {blueprintPhasesDone} of {blueprintPhases.length} phases
-              </div>
-            </div>
-          ) : inProject && phase.total > 0 ? (
+          inProject && phase.total > 0 ? (
             <div className={styles.lifecycle}>
               <div className={styles.lifecycleHeading}>Lifecycle</div>
               <div className={styles.lifecycleBar}>

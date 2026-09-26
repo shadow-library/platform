@@ -62,7 +62,7 @@ export function useProjectStatusQuery(projectId: string, enabled = true): UseQue
   return useQuery({ ...projectStatusQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
-/** The status the shell reads its lifecycle and Blueprint stage from; anything that can complete a phase has to reach it. */
+/** The status the shell reads its lifecycle from; anything that can complete a phase has to reach it. */
 export function invalidateProjectStatus(queryClient: QueryClient, projectId: string): void {
   invalidateSoon(queryClient, { queryKey: projectKeys.status(projectId) });
 }

@@ -5,7 +5,6 @@ import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
-import { blueprintComplete, BlueprintOverviewCard } from '@/features/blueprint';
 import {
   type CostBreakdownItem,
   type GenerationJobItem,
@@ -20,7 +19,6 @@ import {
   useListJobsQuery,
   useListProposalsQuery,
   useListRunsQuery,
-  useListVolumesQuery,
   useProjectCostQuery,
   useProjectQuery,
   useProjectStatusQuery,
@@ -30,7 +28,7 @@ import {
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { blueprintStage, currentBlueprintPhase, LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
 
 import styles from './overview.module.css';
@@ -272,7 +270,6 @@ function OverviewScreen(): React.JSX.Element {
   const reviewQueueQuery = useReviewQueueQuery(novelId);
   const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 });
   const briefsQuery = useListBriefsQuery(novelId);
-  const volumesQuery = useListVolumesQuery(novelId, { limit: 50 });
   const draftsQuery = useDraftSummaryQuery(novelId);
   // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
   // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
@@ -303,19 +300,15 @@ function OverviewScreen(): React.JSX.Element {
 
   // Every input the rule engine reads has to have actually arrived — otherwise an empty brief/draft
   // list reads as "nothing outlined" and briefly recommends the wrong action until the real data lands.
-  const nextStepReady = !briefsQuery.isLoading && !volumesQuery.isLoading && !reviewQueueQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
+  const nextStepReady = !briefsQuery.isLoading && !reviewQueueQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
   const nextStep = nextStepReady
     ? computeNextStep(
         deriveNextStepInput({
-          blueprintStage: blueprintStage(status),
-          blueprintPhaseLabel: currentBlueprintPhase(status)?.label,
-          blueprintComplete: blueprintComplete(status?.blueprint?.phases ?? []),
           volumesTotal,
           planApproved: status?.planApproved ?? false,
           draftsTotal,
           draftsFinal,
           briefs: briefsQuery.data?.items ?? [],
-          volumes: volumesQuery.data?.items ?? [],
           draftedChapters: draftsQuery.data?.items ?? [],
           reviewDrafts: reviewQueueQuery.data?.drafts ?? [],
           pendingContinuityCount: reviewQueueQuery.data?.proposals.length ?? 0,
@@ -326,15 +319,6 @@ function OverviewScreen(): React.JSX.Element {
 
   const goToNextStepTarget = (target: NextStepTarget): void => {
     switch (target.screen) {
-      case 'blueprint':
-        navigate({ to: '/novels/$novelId/blueprint', params: { novelId } });
-        return;
-      case 'story-bible':
-        navigate({ to: '/novels/$novelId/story-bible', params: { novelId } });
-        return;
-      case 'volumes':
-        navigate({ to: '/novels/$novelId/volumes', params: { novelId }, search: { volume: target.volumeKey } });
-        return;
       case 'chapters':
         navigate({ to: '/novels/$novelId/chapters', params: { novelId }, search: { chapter: target.chapter, review: target.review } });
         return;
@@ -541,12 +525,6 @@ function OverviewScreen(): React.JSX.Element {
               </div>
             </StatCard>
           </div>
-
-          {status?.blueprint && (
-            <div className={styles.sectionSpacer}>
-              <BlueprintOverviewCard novelId={novelId} blueprint={status.blueprint} />
-            </div>
-          )}
 
           <div className={styles.mainGrid}>
             <SectionCard>

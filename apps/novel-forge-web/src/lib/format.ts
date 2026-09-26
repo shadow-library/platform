@@ -1,4 +1,4 @@
-import { type BlueprintPhaseProgressResponse, type BlueprintStage, type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
+import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
 
 // A role's model override is a `{ provider, model }` pair, but a `Select` needs a single string value,
 // so the two are joined on '::'. A model id never contains '::', so the split back is unambiguous.
@@ -171,27 +171,6 @@ export function lifecyclePhase(status?: ProjectStatusResponse, kind: ProjectResp
     completed++;
   }
   return { completed, total, label: phases[Math.min(completed, total - 1)] ?? phases[0] ?? '' };
-}
-
-/** Null until the status loads, and always for a kind that has no Blueprint (only an original novel does). */
-export function blueprintStage(status?: Pick<ProjectStatusResponse, 'blueprint'>): BlueprintStage | null {
-  return status?.blueprint?.stage ?? null;
-}
-
-/** The phase the author is working on; null in the Workspace, where no phase is current, and once every phase is done. */
-export function currentBlueprintPhase(status?: Pick<ProjectStatusResponse, 'blueprint'>): BlueprintPhaseProgressResponse | null {
-  return status?.blueprint?.phases.find(phase => phase.status === 'current') ?? null;
-}
-
-/**
- * The stage chip a library card carries, and the phase the design is on. Null once the Workspace is open:
- * from there the card's own writing progress is the more useful thing to say, and "Workspace" would be the
- * last thing a finished novel ever said about itself.
- */
-export function blueprintStageLabel(status?: Pick<ProjectStatusResponse, 'blueprint'>): string | null {
-  if (blueprintStage(status) !== 'blueprint') return null;
-  const phase = currentBlueprintPhase(status);
-  return phase ? `Blueprint · ${phase.label}` : 'Blueprint';
 }
 
 export function formatElapsed(ms: number): string {

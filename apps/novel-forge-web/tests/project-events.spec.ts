@@ -31,22 +31,8 @@ describe('applyProjectEvent', () => {
     }) as QueryClient['invalidateQueries'];
   });
 
-  it('should refetch only the job list for a job event', () => {
+  it('should refetch only the job list for a job event, whatever its kind or status', () => {
     applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'extract', status: 'in_progress' });
-    flushInvalidations(queryClient);
-
-    expect(invalidated).toEqual(['projects/7/jobs']);
-  });
-
-  it('should refetch the Blueprint, the Notebook and the stage once a blueprint job settles', () => {
-    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'blueprint', status: 'done' });
-    flushInvalidations(queryClient);
-
-    expect(invalidated).toEqual(['projects/7/jobs', 'projects/7/blueprint', 'projects/7/ledger', 'projects/7/status']);
-  });
-
-  it('should leave the Blueprint alone while a blueprint job is still running', () => {
-    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'blueprint', status: 'in_progress' });
     flushInvalidations(queryClient);
 
     expect(invalidated).toEqual(['projects/7/jobs']);

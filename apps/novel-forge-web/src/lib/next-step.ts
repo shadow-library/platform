@@ -1,17 +1,13 @@
-import { type BlueprintStage } from '@/lib/apis';
-
-export type NextStepScreen = 'blueprint' | 'story-bible' | 'volumes' | 'chapters' | 'review' | 'chat';
+export type NextStepScreen = 'chapters' | 'review' | 'chat';
 
 export interface NextStepTarget {
   screen: NextStepScreen;
   chapter?: number;
-  volumeKey?: string;
   /** Open the chapter straight into its review drawer instead of the read view. */
   review?: boolean;
 }
 
-export type NextStepId =
-  'continue-blueprint' | 'open-workspace' | 'repair-chapter' | 'review-queue' | 'build-plan' | 'approve-plan' | 'generate-chapter' | 'plan-next-arc' | 'finalize-chapters';
+export type NextStepId = 'repair-chapter' | 'review-queue' | 'build-plan' | 'generate-chapter' | 'finalize-chapters';
 
 export interface NextStepAction {
   id: NextStepId;
@@ -31,12 +27,6 @@ export interface NextStepResult {
 }
 
 export interface NextStepInput {
-  /** Null for a project with no Blueprint at all; `blueprint` while the design is still being settled. */
-  blueprintStage?: BlueprintStage | null;
-  /** The phase the author is on, for the reason line. */
-  blueprintPhaseLabel?: string;
-  /** Every required step that applies is locked, so the only thing left in the Blueprint is the gate. */
-  blueprintComplete?: boolean;
   volumesTotal: number;
   planApproved: boolean;
   draftsTotal: number;
@@ -45,10 +35,6 @@ export interface NextStepInput {
   briefsRemaining: number;
   /** Chapter number of the lowest un-drafted brief, when known. */
   nextBriefChapter?: number;
-  /** The approved plan still has chapter range the outlined briefs don't cover yet. */
-  arcsLeft: boolean;
-  /** Volume whose range still needs another arc outlined, when identifiable. */
-  nextArcVolumeKey?: string;
   /** Chapter number of the lowest draft the judge flagged as contradicting the bible. */
   contradictedChapter?: number;
   /** Queued drafts, plus pending continuity and refinement proposals — the Review Queue's own count. */
@@ -59,17 +45,12 @@ export interface NextStepInput {
 
 interface NextStepRule {
   id: NextStepId;
-  /** Replaces the roadmap padding for a rule whose own path is not the Workspace roadmap. */
-  comingUp?: (input: NextStepInput) => readonly ComingUpItem[];
-  /** Position in the bible → plan → draft → arc → finalize roadmap; interrupts (repair/review) have none. */
+  /** Position in the bible → draft → finalize roadmap; interrupts (repair/review) have none. */
   roadmapIndex?: number;
   test(input: NextStepInput): boolean;
   build(input: NextStepInput): NextStepAction;
   comingUpLabel: string;
 }
-
-const OPEN_WORKSPACE: ComingUpItem = { id: 'open-workspace', label: 'Open the Workspace' };
-const FIRST_CHAPTER: ComingUpItem = { id: 'generate-chapter', label: 'Generate chapter 1' };
 
 const RULES: readonly NextStepRule[] = [
   {
@@ -95,57 +76,20 @@ const RULES: readonly NextStepRule[] = [
     comingUpLabel: 'Clear the review queue',
   },
   {
-    // The Blueprint answers "what do I do next" on its own, and it settles the plan the Workspace roadmap
-    // would otherwise tell the author to build by hand — so it replaces the roadmap rather than joining it.
-    id: 'continue-blueprint',
-    // At the gate the next step already IS opening the Workspace, so listing it again would be the same click twice.
-    comingUp: input => (input.blueprintComplete === true ? [FIRST_CHAPTER] : [OPEN_WORKSPACE, FIRST_CHAPTER]),
-    test: input => input.blueprintStage === 'blueprint',
-    build: input =>
-      input.blueprintComplete === true
-        ? {
-            id: 'continue-blueprint',
-            label: 'Open the gate',
-            reason: 'Every phase of the Blueprint is settled — read the design once more and open the Workspace.',
-            target: { screen: 'blueprint' },
-          }
-        : {
-            id: 'continue-blueprint',
-            label: 'Continue the Blueprint',
-            reason: input.blueprintPhaseLabel
-              ? `${input.blueprintPhaseLabel} is the phase you’re on. Nothing is written until the Blueprint is done.`
-              : 'The novel is still being designed. Nothing is written until the Blueprint is done.',
-            target: { screen: 'blueprint' },
-          },
-    comingUpLabel: 'Finish the Blueprint',
-  },
-  {
     id: 'build-plan',
     roadmapIndex: 0,
     test: input => input.volumesTotal === 0,
     build: () => ({
       id: 'build-plan',
       label: 'Build your plan',
-      reason: 'Nothing is outlined yet — start with the story bible.',
-      target: { screen: 'story-bible' },
+      reason: 'Nothing is outlined yet — ask the assistant to help build the Story Bible.',
+      target: { screen: 'chat' },
     }),
     comingUpLabel: 'Build your plan',
   },
   {
-    id: 'approve-plan',
-    roadmapIndex: 1,
-    test: input => input.volumesTotal > 0 && !input.planApproved,
-    build: () => ({
-      id: 'approve-plan',
-      label: 'Approve the volume plan',
-      reason: 'The volume plan is drafted and waiting on your approval.',
-      target: { screen: 'volumes' },
-    }),
-    comingUpLabel: 'Approve the volume plan',
-  },
-  {
     id: 'generate-chapter',
-    roadmapIndex: 2,
+    roadmapIndex: 1,
     test: input => input.planApproved && input.briefsRemaining > 0,
     build: input => ({
       id: 'generate-chapter',
@@ -156,20 +100,8 @@ const RULES: readonly NextStepRule[] = [
     comingUpLabel: 'Generate the next chapter',
   },
   {
-    id: 'plan-next-arc',
-    roadmapIndex: 3,
-    test: input => input.planApproved && input.arcsLeft && input.briefsRemaining <= 2,
-    build: input => ({
-      id: 'plan-next-arc',
-      label: 'Plan the next arc',
-      reason: 'The outline is running low on drafted chapters.',
-      target: { screen: 'volumes', volumeKey: input.nextArcVolumeKey },
-    }),
-    comingUpLabel: 'Plan the next arc',
-  },
-  {
     id: 'finalize-chapters',
-    roadmapIndex: 4,
+    roadmapIndex: 2,
     test: input => input.planApproved && input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.reviewQueueCount === 0 && input.briefsRemaining <= 0,
     build: input => ({
       id: 'finalize-chapters',
@@ -190,26 +122,23 @@ function hasRoadmapIndex(rule: NextStepRule): rule is NextStepRule & { roadmapIn
 
 const ROADMAP = [...RULES].filter(hasRoadmapIndex).sort((a, b) => a.roadmapIndex - b.roadmapIndex);
 
+/** Nothing is outlined: pad from the top of the roadmap; otherwise the next rung down is generating a chapter. */
 function roadmapAnchorIndex(input: NextStepInput): number {
-  if (input.volumesTotal === 0) return 0;
-  if (!input.planApproved) return 1;
-  return 2;
+  return input.volumesTotal === 0 ? 0 : 1;
 }
 
 /**
  * The Overview "Next step" rule engine: evaluates the fixed priority order below against the project's
  * current state and returns the one action the author should take next, plus a short preview of what
- * follows. Priority (highest first): a contradicted draft, a non-empty review queue, an empty plan, an
- * unapproved plan, un-drafted briefs, a low-brief warning while more arcs remain, then chapters awaiting
- * finalize. `comingUp` prefers other rules that are independently true right now (in priority order) and
- * pads the rest from the roadmap stages ahead of wherever the author actually is.
+ * follows. Priority (highest first): a contradicted draft, a non-empty review queue, an empty plan,
+ * un-drafted briefs, then chapters awaiting finalize. `comingUp` prefers other rules that are
+ * independently true right now (in priority order) and pads the rest from the roadmap stages ahead of
+ * wherever the author actually is.
  */
 export function computeNextStep(input: NextStepInput): NextStepResult {
   const evaluated = RULES.map(rule => ({ rule, isTrue: rule.test(input) }));
   const nextEntry = evaluated.find(entry => entry.isTrue);
   if (!nextEntry) return { comingUp: [] };
-
-  if (nextEntry.rule.comingUp) return { next: nextEntry.rule.build(input), comingUp: [...nextEntry.rule.comingUp(input)] };
 
   const nextRuleIndex = RULES.indexOf(nextEntry.rule);
   const comingUp: ComingUpItem[] = [];
@@ -234,15 +163,6 @@ export function computeNextStep(input: NextStepInput): NextStepResult {
 
 interface BriefLike {
   chapter: number;
-  volumeKey?: string | null;
-}
-
-interface VolumeLike {
-  volumeKey: string;
-  ordinal: number;
-  startChapter?: number | null;
-  endChapter?: number | null;
-  targetChapterCount?: number | null;
 }
 
 interface ReviewDraftLike {
@@ -256,26 +176,16 @@ interface DraftedChapterLike {
 }
 
 export interface NextStepStateInput {
-  blueprintStage?: BlueprintStage | null;
-  blueprintPhaseLabel?: string;
-  blueprintComplete?: boolean;
   volumesTotal: number;
   planApproved: boolean;
   draftsTotal: number;
   draftsFinal: number;
   briefs: readonly BriefLike[];
-  volumes: readonly VolumeLike[];
   /** Every project draft's chapter + status — the actual drafted set, not just a count. */
   draftedChapters: readonly DraftedChapterLike[];
   reviewDrafts: readonly ReviewDraftLike[];
   pendingContinuityCount: number;
   pendingRefinementCount: number;
-}
-
-function volumeChapterEnd(volume: VolumeLike): number | undefined {
-  if (volume.endChapter != null) return volume.endChapter;
-  if (volume.startChapter != null && volume.targetChapterCount != null) return volume.startChapter + volume.targetChapterCount - 1;
-  return undefined;
 }
 
 /** Collapses sorted chapter numbers into runs, e.g. [1,2,3,5,6] -> "1–3, 5–6". */
@@ -303,8 +213,8 @@ function formatChapterRange(chapters: readonly number[]): string {
 }
 
 /**
- * Shapes the raw project/brief/volume/draft/review-queue data the Overview screen already has into the
- * rule engine's input. Kept separate from `computeNextStep` so both halves stay independently testable.
+ * Shapes the raw project/brief/draft/review-queue data the Overview screen already has into the rule
+ * engine's input. Kept separate from `computeNextStep` so both halves stay independently testable.
  */
 export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
   const draftedChapterSet = new Set(state.draftedChapters.map(draft => draft.chapter));
@@ -318,41 +228,18 @@ export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
   const notFinalChapters = state.draftedChapters.filter(draft => draft.status !== 'final').map(draft => draft.chapter);
   const notFinalChapterRange = notFinalChapters.length > 0 ? formatChapterRange(notFinalChapters) : undefined;
 
-  const plannedChaptersTotal = state.volumes.reduce((sum, volume) => {
-    const end = volumeChapterEnd(volume);
-    if (end == null || volume.startChapter == null) return sum + (volume.targetChapterCount ?? 0);
-    return sum + (end - volume.startChapter + 1);
-  }, 0);
-  const arcsLeft = plannedChaptersTotal > 0 && state.briefs.length < plannedChaptersTotal;
-
-  let nextArcVolumeKey: string | undefined;
-  for (const volume of [...state.volumes].sort((a, b) => a.ordinal - b.ordinal)) {
-    const end = volumeChapterEnd(volume);
-    if (end == null) continue;
-    const maxBriefInVolume = Math.max(0, ...state.briefs.filter(brief => brief.volumeKey === volume.volumeKey).map(brief => brief.chapter));
-    if (maxBriefInVolume < end) {
-      nextArcVolumeKey = volume.volumeKey;
-      break;
-    }
-  }
-
   const contradictedChapter = state.reviewDrafts
     .filter(draft => draft.reviewStatus === 'contradiction')
     .map(draft => draft.chapter)
     .sort((a, b) => a - b)[0];
 
   return {
-    blueprintStage: state.blueprintStage,
-    blueprintPhaseLabel: state.blueprintPhaseLabel,
-    blueprintComplete: state.blueprintComplete,
     volumesTotal: state.volumesTotal,
     planApproved: state.planApproved,
     draftsTotal: state.draftsTotal,
     draftsFinal: state.draftsFinal,
     briefsRemaining,
     nextBriefChapter,
-    arcsLeft,
-    nextArcVolumeKey,
     contradictedChapter,
     reviewQueueCount: state.reviewDrafts.length + state.pendingContinuityCount + state.pendingRefinementCount,
     notFinalChapterRange,

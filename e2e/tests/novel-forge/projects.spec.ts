@@ -19,8 +19,8 @@ import { createProject, HAIKU_MODEL, haikuModelConfig, jsonOrUndefined, uniqueSu
  * Project CRUD + settings, driven API-first as user1: create → list → status/cost → patch title/brief →
  * patch the Haiku model pin → clone → delete → 404. Assertions are contract-level (status codes, the
  * PRJ_001 error code, the persisted `config.models` shape) rather than copy-text. A single UI test then
- * proves the dashboard card renders and the "Start a new novel" modal creates a project whose workspace
- * overview loads with its lifecycle stepper.
+ * proves the dashboard card renders and the "Start a new novel" modal creates a project that opens
+ * straight into its Workspace chat.
  */
 
 test.describe('novel-forge project CRUD and settings (API)', () => {
@@ -108,7 +108,7 @@ test.describe('novel-forge project CRUD and settings (API)', () => {
 test.describe('novel-forge dashboard and new-novel modal (UI)', () => {
   test.use({ storageState: storageStateFor('user1') });
 
-  test('should create a project from the modal and land on the workspace overview', async ({ page }) => {
+  test('should create a project from the modal and land on the workspace chat', async ({ page }) => {
     const base = requireProductUrl('novelForge');
     const workingTitle = `E2E Modal Novel ${uniqueSuffix()}`;
 
@@ -127,8 +127,8 @@ test.describe('novel-forge dashboard and new-novel modal (UI)', () => {
     // Content mode defaults to "Standard" in the modal's SegmentedControl, so it is left untouched.
     await page.getByRole('button', { name: 'Create novel' }).click();
 
-    // A successful create routes to /novels/:id/overview, whose lifecycle stepper renders the primary CTA.
-    await expect(page).toHaveURL(/\/novels\/\d+\/overview/, { timeout: 20_000 });
+    // A successful create routes straight to /novels/:id/chat — there is no Blueprint stage any more.
+    await expect(page).toHaveURL(/\/novels\/\d+\/chat/, { timeout: 20_000 });
     await expect(page.getByRole('main')).toBeVisible();
   });
 });

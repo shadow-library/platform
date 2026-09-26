@@ -372,10 +372,8 @@ interface BriefDrawerProps {
 }
 
 function BriefDrawer({ novelId, chapter, generation, generateLabel, onOpenChange, onGenerate, generating }: BriefDrawerProps): React.JSX.Element {
-  const navigate = useNavigate();
   const briefQuery = useBriefQuery(novelId, chapter);
   const brief = briefQuery.data;
-  const openFullBrief = (): Promise<void> => navigate({ to: '/novels/$novelId/volumes', params: { novelId }, search: { volume: brief?.volumeKey ?? undefined, chapter } });
 
   return (
     <Drawer open onOpenChange={onOpenChange} placement="right" size="md">
@@ -401,16 +399,13 @@ function BriefDrawer({ novelId, chapter, generation, generateLabel, onOpenChange
           </>
         ) : null}
       </Drawer.Body>
-      <Drawer.Footer>
-        <Button variant="ghost" onClick={openFullBrief}>
-          Open full brief →
-        </Button>
-        {onGenerate && (
+      {onGenerate && (
+        <Drawer.Footer>
           <Button variant="primary" prefix={<SparkIcon />} loading={generating} onClick={onGenerate}>
             {generateLabel}
           </Button>
-        )}
-      </Drawer.Footer>
+        </Drawer.Footer>
+      )}
     </Drawer>
   );
 }
