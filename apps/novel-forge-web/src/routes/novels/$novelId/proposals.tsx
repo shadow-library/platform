@@ -1,17 +1,10 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Button, Checkbox, ConfirmDialog, toast } from '@shadow-library/ui';
 
-import { type ChipIntent, DetailPage, ItemPager, type ItemPagerJump, Markdown, RegenerateAppliedBriefs, StatusChip } from '@/components/nf';
-import {
-  type ProposalResponse,
-  useAiModelsQuery,
-  useApplyProposalMutation,
-  useDiscardProposalMutation,
-  useListAuditsQuery,
-  useListPluginsQuery,
-  useRevertProposalMutation,
-} from '@/lib/apis';
+import { type ChipIntent, DetailPage, ItemPager, type ItemPagerJump, RegenerateAppliedBriefs, StatusChip } from '@/components/nf';
+import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
+import { type ProposalResponse, useAiModelsQuery, useApplyProposalMutation, useDiscardProposalMutation, useListAuditsQuery, useRevertProposalMutation } from '@/lib/apis';
 import { auditOpKept, findAuditReportByProposal } from '@/lib/bible-audit';
 import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { relativeTime } from '@/lib/format';
@@ -19,7 +12,6 @@ import { modelLabel } from '@/lib/model-defaults';
 import {
   applyButtonLabel,
   backLabel,
-  type ChangeOp,
   defaultDeclined,
   isGuardedOp,
   NEVER_AUTO_NOTE,
@@ -41,7 +33,7 @@ interface ProposalRedirectSearch {
 
 // The Proposals directory merged into the Review Queue (routes/novels/$novelId/review.tsx) — every pending
 // proposal type belongs in one inbox. This route survives only to bounce old links to the queue's Proposals
-// section; `ProposalDetail`/`ChangeOpBody`/`PluginSourceChip` below are what the queue reuses for the detail view.
+// section; `ProposalDetail` below is what the queue reuses for the detail view.
 export const Route = createFileRoute('/novels/$novelId/proposals')({
   validateSearch: (search: Record<string, unknown>): ProposalRedirectSearch => ({
     filter: parseProposalFilter(search.filter),
@@ -70,73 +62,6 @@ const OP_RESULT_INTENT: Record<string, ChipIntent> = {
 
 export function statusIntent(status: string): ChipIntent {
   return STATUS_INTENT[status] ?? 'neutral';
-}
-
-// Fields whose values are prose/Markdown — shown as a rendered block instead of an inline value.
-const OP_PROSE_FIELDS = new Set([
-  'body',
-  'premise',
-  'brief',
-  'objective',
-  'escalation',
-  'payoff',
-  'hook',
-  'conflict',
-  'motivation',
-  'notes',
-  'summary',
-  'chapterSummary',
-  'instructions',
-  'note',
-]);
-
-function formatOpValue(value: unknown): string {
-  if (Array.isArray(value)) return value.map(v => (v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ');
-  if (value !== null && typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-}
-
-/**
- * A readable view of one change-set op: the identifying/scalar fields as a compact key/value grid,
- * and the prose fields (a rewritten body, a new objective, a revision note) rendered as Markdown —
- * so a change reads as what it does, not as a raw JSON blob. Also reused for a continuity proposal's
- * findings, whose blob has no `op` field of its own.
- */
-export function ChangeOpBody({ op }: { op: ChangeOp }): React.JSX.Element {
-  const rationale = typeof op.rationale === 'string' ? op.rationale.trim() : '';
-  const entries = Object.entries(op).filter(([k]) => k !== 'op' && k !== 'rationale' && op[k] !== undefined);
-  const prose = entries.filter(([k, v]) => OP_PROSE_FIELDS.has(k) && typeof v === 'string' && v.trim() !== '');
-  const inline = entries.filter(([k, v]) => !prose.some(([pk]) => pk === k) && v !== undefined);
-
-  return (
-    <div className={styles.opBody}>
-      {rationale !== '' && <div className={styles.opRationale}>{rationale}</div>}
-      {inline.length > 0 && (
-        <div className={styles.opFields}>
-          {inline.map(([k, v]) => (
-            <Fragment key={k}>
-              <span className={styles.opFieldKey}>{k}</span>
-              <span className={styles.opFieldVal}>{formatOpValue(v)}</span>
-            </Fragment>
-          ))}
-        </div>
-      )}
-      {prose.map(([k, v]) => (
-        <div key={k}>
-          <div className={styles.opProseLabel}>{k}</div>
-          <Markdown content={v as string} className={styles.opProse} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** A plugin proposal's `scopeRef` is the id of the plugin that staged it. */
-export function PluginSourceChip({ proposal }: { proposal: ProposalResponse }): React.JSX.Element | null {
-  const isPlugin = proposal.kind === 'plugin' && Boolean(proposal.scopeRef);
-  const pluginsQuery = useListPluginsQuery(isPlugin);
-  if (!isPlugin) return null;
-  return <StatusChip intent="accent">{pluginsQuery.data?.find(manifest => manifest.id === proposal.scopeRef)?.title ?? proposal.scopeRef}</StatusChip>;
 }
 
 export interface ProposalDetailProps {

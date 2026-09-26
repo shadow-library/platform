@@ -15,6 +15,7 @@ export * from './fact.api';
 export * from './milestone.api';
 export * from './insight.api';
 export * from './refinement.api';
+export * from './chat.api';
 export * from './ledger.api';
 export * from './review.api';
 export * from './run.api';

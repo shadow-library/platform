@@ -1,0 +1,558 @@
+.spacer {
+  flex: 1;
+}
+
+/* The page owns the viewport — the composer is pinned, only the transcript scrolls. Nothing here is a
+   card: the ground is the page's own surface and only the composer, a proposal and a change row draw a
+   border. The panel beside the column is separated by a rule, not floated off it. */
+.screen {
+  position: absolute;
+  inset: 0;
+  /* Centred on the same column every other screen uses: `inset: 0` with `max-width` leaves the
+     over-constrained width to the auto margins, which is what centres an absolutely positioned box. */
+  max-width: var(--sh-page-max);
+  margin-inline: auto;
+  display: flex;
+  overflow: hidden;
+  background: var(--sh-surface-app);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.column {
+  flex: 1;
+  min-width: 0;
+  /* A column-flex item defaults to min-height:auto (= content height); without this the column grows
+     past the pane, the composer lands offscreen, and the transcript cannot scroll. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  flex-shrink: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.headTitleButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  color: inherit;
+}
+
+.headTitleButton:hover {
+  background: var(--sh-bg-hover);
+}
+
+.headTitle {
+  min-width: 0;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headTitleEdit {
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+
+.headTitleInput {
+  width: 260px;
+}
+
+/* The two states of one column. `centred` gathers the question, the composer and the chips into a single
+   block in the middle of the page; `conversation` fills from the top with the composer pinned under it.
+   Only `justify-content` and the transcript's flex move — the composer element itself never unmounts. */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.body[data-view='centred'] {
+  justify-content: center;
+  padding-bottom: 6vh;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 24px 20px;
+}
+
+.body[data-view='centred'] .scroll {
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+}
+
+.msgList {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.userRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.userCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 86%;
+  min-width: 0;
+}
+
+.userBubble {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  padding: 11px 14px;
+  border-radius: 14px 14px 4px 14px;
+  font-size: var(--sh-text-body);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.userTime {
+  margin-top: 4px;
+  padding-right: 2px;
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+}
+
+.assistantRow {
+  display: flex;
+  gap: 12px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-700));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.assistantCol {
+  max-width: 88%;
+  min-width: 0;
+}
+
+.assistantBubble {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  padding: 12px 15px;
+  border-radius: 14px 14px 14px 4px;
+  font-size: var(--sh-text-body);
+  line-height: 1.6;
+}
+
+.composer {
+  flex: none;
+  padding: 6px 20px 16px;
+}
+
+.composerInner {
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  box-shadow: var(--sh-shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
+  padding: 10px 12px;
+}
+
+.input {
+  border: none;
+  background: transparent;
+}
+
+.composerBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero {
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.heroSub {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.6;
+  color: var(--sh-text-tertiary);
+}
+
+.suggestions {
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.suggestion {
+  border-radius: 99px;
+}
+
+/* SidePanel draws itself as a card; here it is context beside the transcript, so the frame becomes a
+   single rule. Doubled to outrank the primitive's own single-class root, which import order does not settle. */
+.panel.panel {
+  border: 0;
+  border-left: 1px solid var(--sh-border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.turnCard {
+  margin-top: 8px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  overflow: hidden;
+  width: 100%;
+  max-width: 720px;
+}
+
+.turnCard[data-status='applied'] {
+  border-color: var(--sh-success-border, var(--sh-border-default));
+}
+
+.turnCard[data-status='conflicted'] {
+  border-color: var(--sh-danger-border, var(--sh-border-default));
+}
+
+.turnCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.turnCardTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.turnOps {
+  display: flex;
+  flex-direction: column;
+}
+
+.turnOp {
+  padding: 8px 12px;
+}
+
+.turnOp[data-declined='true'] {
+  opacity: 0.45;
+}
+
+.turnOp:not(:first-child) {
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.turnOpRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turnOpLabel {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  text-align: left;
+}
+
+.turnOpLabel:hover {
+  text-decoration: underline;
+}
+
+.turnOpNote {
+  margin-top: 4px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.turnOpError {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.turnOpSummary {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.turnCardNote {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.turnCardWarning {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-warning-text);
+}
+
+.turnCardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+/* Doubled to outrank ui's own `.panel[data-size]`, which CSS-module import order does not settle. Fixed on
+   both axes: sixty-three conversations, one, or a search that matches none must all draw the same frame. */
+.historyPanel.historyPanel[data-size] {
+  width: 680px;
+  max-width: 100%;
+  height: 660px;
+}
+
+.historyToolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.historySearch {
+  flex: 1;
+  min-width: 200px;
+}
+
+.segmentCount {
+  margin-left: 6px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.historyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historyGroup + .historyGroup {
+  margin-top: 16px;
+}
+
+.historyGroupLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.historySentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.changeList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.changeRow {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  padding: 10px 12px;
+}
+
+.changeRow[data-reverted='true'] {
+  opacity: 0.55;
+}
+
+.changeRowTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.changeTime {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.changeSummary {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.changeRefs {
+  margin-top: 4px;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.changeActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.streamCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streamFailed {
+  border-color: var(--sh-danger-border, var(--sh-border-default));
+}
+
+.streamStopped {
+  border-color: var(--sh-border-default);
+  opacity: 0.75;
+}
+
+.streamStoppedNote {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.panelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panelGroupLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+}
+
+.panelRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+}
+
+.panelRow[data-reverted='true'] {
+  opacity: 0.55;
+}
+
+.panelRowTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.panelRowTime {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.panelRowSummary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+@media (max-width: 960px) {
+  .screen {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel.panel {
+    border-left: 0;
+    border-top: 1px solid var(--sh-border-subtle);
+  }
+}

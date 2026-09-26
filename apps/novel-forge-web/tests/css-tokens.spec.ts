@@ -10,7 +10,6 @@ const KNOWN_UNDEFINED: Record<string, readonly string[]> = {
   'components/nf/ImageUpload.module.css': ['--sh-border'],
   'components/nf/ImageGallery.module.css': ['--sh-border'],
   'routes/novels/$novelId/publish.module.css': ['--sh-surface-muted'],
-  'routes/novels/$novelId/chat.module.css': ['--sh-shadow-sm'],
 };
 
 function cssFiles(dir: string): string[] {

@@ -35,3 +35,68 @@
   font-size: 10px;
   color: var(--sh-text-tertiary);
 }
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.resolved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-bg-hover);
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+}
+
+.resolvedModel {
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.resolvedPrice {
+  margin-left: auto;
+}
+
+.note {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--sh-text-secondary);
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--sh-accent-text);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.done {
+  margin-left: auto;
+}

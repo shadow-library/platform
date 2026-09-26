@@ -34,7 +34,12 @@ const CARD: Expected[] = [
     values: { width: '100%', 'max-width': '720px', 'margin-top': '8px', 'border-radius': 'var(--sh-radius-lg)' },
     source: 'turnCard: width 100%, max-width 720px, margin-top 8px, radius lg (chat.module.css); canvas l.121 radius 8px',
   },
-  { selector: '.card[data-indent]', values: { 'max-width': '680px', 'margin-left': '40px' }, source: 'canvas l.121 margin-left 40px inside the 720px column (720 − 40)' },
+  {
+    selector: '.card[data-indent]',
+    values: { width: 'auto', 'max-width': '680px', 'margin-top': '0', 'margin-left': '40px' },
+    source:
+      'canvas l.121 margin-left 40px inside the 720px column (720 − 40); width auto so the indent never overflows a list under 720px; margin-top 0 — the transcript gap 20 is the canvas spacing',
+  },
   { selector: '.head', values: { gap: '8px', padding: '10px 12px' }, source: 'turnCard .turnCardHead gap 8, padding 10px 12px; canvas l.122 identical' },
   { selector: '.length', values: { gap: '6px', 'margin-left': 'auto' }, source: 'canvas l.125 length control gap 6px, margin-left auto' },
   { selector: '.alert', values: { padding: '10px 12px' }, source: 'turnCard .turnCardNote/.turnCardWarning padding 10px 12px' },

@@ -1,0 +1,48 @@
+.opBody {
+  padding: 8px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opFields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 12px;
+  align-items: baseline;
+}
+
+.opFieldKey {
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.opFieldVal {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.opProseLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 5px;
+}
+
+.opProse {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  line-height: 1.6;
+}
+
+.opRationale {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  border-left: 2px solid var(--sh-border-strong);
+  padding-left: 10px;
+}

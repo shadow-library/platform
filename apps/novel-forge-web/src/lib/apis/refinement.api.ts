@@ -25,6 +25,8 @@ import {
   type ChatTurnResponse,
   type ChatTurnStatusResponse,
   type ChatTurnStreamResponse,
+  type ContentMode,
+  type CostTier,
   type CreateChatSessionBody,
   type FailedTurnResponse,
   type ListChangesResponse,
@@ -73,6 +75,10 @@ export interface ChatTurnRequest {
   content: string;
   /** The author's Edit prose toggle: only with it may the turn rewrite chapter text. */
   proseEdits?: boolean;
+  justDiscussing?: boolean;
+  /** This turn only; omitted follows the chat, then the project. */
+  contentMode?: ContentMode;
+  costTier?: CostTier;
 }
 
 interface ForgeTurnVariables extends ChatTurnRequest {
@@ -691,7 +697,10 @@ export function useApplyProposalMutation(projectId: string): UseMutationResult<A
       APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/apply`)
         .body(opIndexes ? { opIndexes } : {})
         .execute(),
-    onSuccess: () => invalidateProposals(queryClient, projectId),
+    onSuccess: result => {
+      queryClient.setQueryData(refinementKeys.proposal(projectId, result.proposal.id), result.proposal);
+      invalidateProposals(queryClient, projectId);
+    },
   });
 }
 
@@ -737,7 +746,10 @@ export function useDiscardProposalMutation(projectId: string): UseMutationResult
   const queryClient = useQueryClient();
   return useMutation<ProposalResponse, ApiError, string>({
     mutationFn: proposalId => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/discard`).execute(),
-    onSuccess: () => invalidateProposals(queryClient, projectId),
+    onSuccess: proposal => {
+      queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal);
+      invalidateProposals(queryClient, projectId);
+    },
   });
 }
 

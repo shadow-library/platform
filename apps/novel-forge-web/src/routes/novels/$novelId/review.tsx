@@ -6,6 +6,7 @@ import { CheckIcon, ProposalsIcon, WarningIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import { useOverrideConfirm } from '@/features/chapter-workspace';
+import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import {
   type ApiError,
   type ContinuityProposalResponse,
@@ -62,7 +63,7 @@ import {
   wordCount,
 } from '@/lib/review-queue';
 
-import { ChangeOpBody, PluginSourceChip, ProposalDetail, statusIntent } from './proposals';
+import { ProposalDetail, statusIntent } from './proposals';
 import styles from './review.module.css';
 
 interface ReviewSearch {
