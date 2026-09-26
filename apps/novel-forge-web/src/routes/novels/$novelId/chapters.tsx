@@ -37,7 +37,7 @@ import {
   isFinalizeBlocked,
   isIsolated,
   type ListChapterRowsQueryParams,
-  projectStatusQueryOptions,
+  unwrittenStopChapter,
   useAddChapterImageMutation,
   useAmendChapterMutation,
   useApproveDraftMutation,
@@ -54,7 +54,6 @@ import {
   useImportDraftMutation,
   useInsertChapterMutation,
   useJudgeDraftMutation,
-  useProjectStatusQuery,
   useRegenerateChapterMutation,
   useReviseDraftMutation,
   useSummarizeChapterMutation,
@@ -93,10 +92,7 @@ export const Route = createFileRoute('/novels/$novelId/chapters')({
   },
   loaderDeps: ({ search }) => ({ page: search.page ?? 1, filter: search.filter ?? 'all' }),
   loader: async ({ context, params, deps }) => {
-    await Promise.all([
-      context.queryClient.prefetchQuery(chapterRowsQueryOptions(params.novelId, chapterRowsParams(deps.page, deps.filter))),
-      context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)),
-    ]);
+    await context.queryClient.prefetchQuery(chapterRowsQueryOptions(params.novelId, chapterRowsParams(deps.page, deps.filter)));
   },
   component: ChaptersScreen,
 });
@@ -197,7 +193,7 @@ function InsertChapterDialog({ novelId, afterChapter, downstream, onOpenChange }
                     ? 'Nothing downstream to renumber — the new chapter lands at the end of the plan.'
                     : `Chapters ${shifted[0]}–${shifted[shifted.length - 1]} move up by one: ${shifted.length} briefs are renumbered and re-rendered.`}
                 </li>
-                <li>The arc and volume around this point each grow by one chapter; later arcs and volumes shift. This happens silently — the plan is not re-approved.</li>
+                <li>The new chapter is placed in the volume of the chapter it follows.</li>
                 <li>Every draft after the insert point is marked stale.</li>
                 <li>Finalized chapters never move, so the insert is refused below the write frontier.</li>
               </ul>
@@ -220,7 +216,7 @@ function InsertChapterDialog({ novelId, afterChapter, downstream, onOpenChange }
                 />
               </FormField>
             ) : (
-              <FormField label="Intent" required helper="One line. The planner drafts the brief from it plus the surrounding chapters and the arc objective.">
+              <FormField label="Intent" required helper="One line. The planner drafts the brief from it plus the surrounding chapters and the volume objective.">
                 <Input value={intent} onValueChange={setIntent} autoFocus placeholder="Kael finally tells Amara what happened in the vault." />
               </FormField>
             )}
@@ -420,7 +416,6 @@ interface ChapterListProps {
 
 function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListProps): React.JSX.Element {
   const rowsQuery = useChapterRowsQuery(novelId, chapterRowsParams(page, filter));
-  const statusQuery = useProjectStatusQuery(novelId);
   const generate = useGenerateMutation(novelId);
   const { activity, stop, stopping } = useGenerationActivity(novelId);
   const data = rowsQuery.data;
@@ -431,21 +426,18 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
   const nextManualChapter = (data?.lastChapter ?? 0) + 1;
   const contradiction = data?.contradiction ?? undefined;
   const frontier = data?.frontier ?? 0;
-  const planApproved = statusQuery.data?.planApproved ?? false;
   const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / CHAPTER_PAGE_SIZE));
 
   // Judge + repair costs more per draft, so it stays a per-run choice — on by default per product decision.
   const [autoFix, setAutoFix] = useState(true);
   const [briefChapter, setBriefChapter] = useState<number | undefined>();
 
-  // Generation gates mirror the backend (PLN_001 / DRF_003); surface the reason rather than let the call throw.
+  // Generation gates mirror the backend (DRF_003); surface the reason rather than let the call throw.
   const generateReason = !nextBriefChapter
     ? 'No brief to generate from — write it yourself'
-    : !planApproved
-      ? 'Approve the volume plan first'
-      : contradiction
-        ? `Resolve chapter ${contradiction.chapter}’s flagged contradiction first`
-        : undefined;
+    : contradiction
+      ? `Resolve chapter ${contradiction.chapter}’s flagged contradiction first`
+      : undefined;
   const canGenerate = !generateReason && !activity;
 
   const createManual = useUpdateDraftMutation(novelId, nextManualChapter);
@@ -461,16 +453,19 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
     onBrowse(pageOfChapter(chapters, chapter), 'all');
   };
 
-  // A batch truncates rather than skips at an external-write slot; the brief's own `writeMode` marks
-  // that slot in the row list regardless, but the toast still gives immediate feedback on *this* run.
+  // A batch truncates rather than skips at an external-write slot, or at a gap left by an undrafted chapter;
+  // the brief's own `writeMode` marks the external slot in the row list regardless, but the toast still gives
+  // immediate feedback on *this* run.
   const runGenerate = (limit: number): void => {
     const target = nextBriefChapter;
     generate.mutate(
       { limit, autoFix },
       {
         onSuccess: job => {
-          const stopped = externalStopChapter(job);
-          if (stopped) toast.warning(`Batch stopped at chapter ${stopped} — it is written outside the primary model`);
+          const stoppedExternal = externalStopChapter(job);
+          const stoppedUnwritten = unwrittenStopChapter(job);
+          if (stoppedExternal) toast.warning(`Batch stopped at chapter ${stoppedExternal} — it is written outside the primary model`);
+          else if (stoppedUnwritten) toast.warning(`Batch stopped at chapter ${stoppedUnwritten} — it has no draft yet`);
           setBriefChapter(undefined);
           if (target) reveal(target);
         },

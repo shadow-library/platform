@@ -27,6 +27,11 @@ export function externalStopChapter(job: JobEnqueueResponse): number | undefined
   return job.stoppedAtExternalChapter;
 }
 
+/** Names the undrafted chapter that truncated the last generate batch, if any. */
+export function unwrittenStopChapter(job: JobEnqueueResponse): number | undefined {
+  return job.stoppedAtUnwrittenChapter;
+}
+
 function invalidateChapterViews(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {
   queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts'] });
   queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'briefs'] });

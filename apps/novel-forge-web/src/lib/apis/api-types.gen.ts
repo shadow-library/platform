@@ -360,74 +360,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/plan': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Plan Volumes */
-    post: operations['post_api_v1_projects_projectId_plan'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/approve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Approve Plan */
-    post: operations['post_api_v1_projects_projectId_approve'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/outline': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Outline Chapters */
-    post: operations['post_api_v1_projects_projectId_outline'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/arcs/{arcKey}/outline': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Outline Arc */
-    post: operations['post_api_v1_projects_projectId_arcs_arcKey_outline'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/briefs': {
     parameters: {
       query?: never;
@@ -1492,23 +1424,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs/plan': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Plan Arcs */
-    post: operations['post_api_v1_projects_projectId_volumes_volumeKey_arcs_plan'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/context/preview': {
     parameters: {
       query?: never;
@@ -1538,323 +1453,6 @@ export interface paths {
     put?: never;
     /** Apply Bible Tidy */
     post: operations['post_api_v1_projects_projectId_bible_tidy'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Entities */
-    get: operations['get_api_v1_projects_projectId_entities'];
-    put?: never;
-    /** Create Entity */
-    post: operations['post_api_v1_projects_projectId_entities'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Entity */
-    get: operations['get_api_v1_projects_projectId_entities_entityKey'];
-    put?: never;
-    post?: never;
-    /** Delete Entity */
-    delete: operations['delete_api_v1_projects_projectId_entities_entityKey'];
-    options?: never;
-    head?: never;
-    /** Update Entity */
-    patch: operations['patch_api_v1_projects_projectId_entities_entityKey'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/image': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Upload Image */
-    post: operations['post_api_v1_projects_projectId_entities_entityKey_image'];
-    /** Delete Image */
-    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_image'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/images': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Add Image */
-    post: operations['post_api_v1_projects_projectId_entities_entityKey_images'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/images/{imageId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Remove Image */
-    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_images_imageId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/volumes/approve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Approve Volumes */
-    post: operations['post_api_v1_projects_projectId_volumes_approve'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/volumes': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Volumes */
-    get: operations['get_api_v1_projects_projectId_volumes'];
-    put?: never;
-    /** Create Volume */
-    post: operations['post_api_v1_projects_projectId_volumes'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/volumes/{volumeKey}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Volume */
-    get: operations['get_api_v1_projects_projectId_volumes_volumeKey'];
-    put?: never;
-    post?: never;
-    /** Delete Volume */
-    delete: operations['delete_api_v1_projects_projectId_volumes_volumeKey'];
-    options?: never;
-    head?: never;
-    /** Update Volume */
-    patch: operations['patch_api_v1_projects_projectId_volumes_volumeKey'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Arcs */
-    get: operations['get_api_v1_projects_projectId_volumes_volumeKey_arcs'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs/approve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Approve Arcs */
-    post: operations['post_api_v1_projects_projectId_volumes_volumeKey_arcs_approve'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/arcs/{arcKey}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Arc */
-    get: operations['get_api_v1_projects_projectId_arcs_arcKey'];
-    /** Upsert Arc */
-    put: operations['put_api_v1_projects_projectId_arcs_arcKey'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Bible Docs */
-    get: operations['get_api_v1_projects_projectId_bible'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/{section}/{slug}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Bible Doc */
-    get: operations['get_api_v1_projects_projectId_bible_section_slug'];
-    /** Upsert Bible Doc */
-    put: operations['put_api_v1_projects_projectId_bible_section_slug'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/facts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Facts */
-    get: operations['get_api_v1_projects_projectId_facts'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/facts/{factKey}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Fact */
-    get: operations['get_api_v1_projects_projectId_facts_factKey'];
-    /** Upsert Fact */
-    put: operations['put_api_v1_projects_projectId_facts_factKey'];
-    post?: never;
-    /** Delete Fact */
-    delete: operations['delete_api_v1_projects_projectId_facts_factKey'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/facts/{factKey}/reveal': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Reveal Fact */
-    post: operations['post_api_v1_projects_projectId_facts_factKey_reveal'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/facts/{factKey}/knowledge/{entityKey}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Retract Knowledge */
-    delete: operations['delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/readiness': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Readiness */
-    get: operations['get_api_v1_projects_projectId_bible_readiness'];
-    put?: never;
-    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2043,6 +1641,251 @@ export interface paths {
     put?: never;
     /** Cancel Illustration */
     post: operations['post_api_v1_projects_projectId_entities_entityKey_illustration_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Entities */
+    get: operations['get_api_v1_projects_projectId_entities'];
+    put?: never;
+    /** Create Entity */
+    post: operations['post_api_v1_projects_projectId_entities'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Entity */
+    get: operations['get_api_v1_projects_projectId_entities_entityKey'];
+    put?: never;
+    post?: never;
+    /** Delete Entity */
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey'];
+    options?: never;
+    head?: never;
+    /** Update Entity */
+    patch: operations['patch_api_v1_projects_projectId_entities_entityKey'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/image': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload Image */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_image'];
+    /** Delete Image */
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_image'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/images': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add Image */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_images'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/images/{imageId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove Image */
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_images_imageId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/volumes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Volumes */
+    get: operations['get_api_v1_projects_projectId_volumes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/volumes/{volumeKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Volume */
+    get: operations['get_api_v1_projects_projectId_volumes_volumeKey'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Bible Docs */
+    get: operations['get_api_v1_projects_projectId_bible'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/{section}/{slug}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Bible Doc */
+    get: operations['get_api_v1_projects_projectId_bible_section_slug'];
+    /** Upsert Bible Doc */
+    put: operations['put_api_v1_projects_projectId_bible_section_slug'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Facts */
+    get: operations['get_api_v1_projects_projectId_facts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Fact */
+    get: operations['get_api_v1_projects_projectId_facts_factKey'];
+    /** Upsert Fact */
+    put: operations['put_api_v1_projects_projectId_facts_factKey'];
+    post?: never;
+    /** Delete Fact */
+    delete: operations['delete_api_v1_projects_projectId_facts_factKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}/reveal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reveal Fact */
+    post: operations['post_api_v1_projects_projectId_facts_factKey_reveal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}/knowledge/{entityKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Retract Knowledge */
+    delete: operations['delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/readiness': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Readiness */
+    get: operations['get_api_v1_projects_projectId_bible_readiness'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2258,23 +2101,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/plan/import': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Import Plan */
-    post: operations['post_api_v1_projects_projectId_plan_import'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/publish': {
     parameters: {
       query?: never;
@@ -2427,7 +2253,7 @@ export interface components {
     AccountModelDefaults: {
       /** @description Chapter prose: drafts, revisions and repairs. */
       writing?: components['schemas']['AccountModelRef'];
-      /** @description Premise, plan, arcs, outlines, bible and extraction. */
+      /** @description Premise, chapter plans, bible and extraction. */
       planning?: components['schemas']['AccountModelRef'];
       /** @description Continuity judge, validation and editorial review. */
       review?: components['schemas']['AccountModelRef'];
@@ -2611,45 +2437,29 @@ export interface components {
       /** @description Bible-builder only: stages a non-force run left untouched because their document already had content. */
       skippedStages?: string[];
     };
-    PlanBody: {
-      volumeCount: number;
-      chaptersPerVolume: number;
-      skeleton?: string;
+    ListBriefSummaryResponse: {
+      items: components['schemas']['BriefSummaryResponse'][];
     };
-    PlanResponse: {
-      volumes: components['schemas']['PlanVolumeItem'][];
-    };
-    PlanVolumeItem: {
-      id: string;
-      projectId: string;
-      volumeKey: string;
-      ordinal: number;
+    /** @description A brief's identity and freshness without its body. */
+    BriefSummaryResponse: {
+      chapter: number;
+      volumeKey?: null | string;
       title?: null | string;
-      objective?: null | string;
-      conflict?: null | string;
-      payoff?: null | string;
-      startChapter?: null | number;
-      endChapter?: null | number;
-      status: components['schemas']['PlanStatus'];
-      /** Format: date-time */
-      createdAt: string;
+      staleReason?: null | string;
+      /** @description Set when the outliner judged the planned material too thin for the word target. */
+      densityRisk?: null | string;
+      /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
+      writeMode: components['schemas']['BriefWriteMode'];
+      /**
+       * Format: date-time
+       * @description Set when this brief was created by the insert operation rather than by an outline pass.
+       */
+      insertedAt?: null | string;
       /** Format: date-time */
       updatedAt: string;
     };
     /** @enum {string} */
-    PlanStatus: 'draft' | 'approved' | 'source';
-    ApprovePlanResponse: {
-      volumesApproved: number;
-      approved: boolean;
-    };
-    OutlineBody: {
-      count?: number;
-      start?: number;
-      context?: string;
-    };
-    OutlineResponse: {
-      briefs: components['schemas']['BriefResponse'][];
-    };
+    BriefWriteMode: 'standard' | 'external';
     BriefResponse: {
       id: string;
       projectId: string;
@@ -2686,33 +2496,6 @@ export interface components {
       insertedAt?: null | string;
       /** Format: date-time */
       createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @enum {string} */
-    BriefWriteMode: 'standard' | 'external';
-    OutlineArcBody: {
-      context?: string;
-    };
-    ListBriefSummaryResponse: {
-      items: components['schemas']['BriefSummaryResponse'][];
-    };
-    /** @description A brief's identity and freshness without its body. */
-    BriefSummaryResponse: {
-      chapter: number;
-      volumeKey?: null | string;
-      arcKey?: null | string;
-      title?: null | string;
-      staleReason?: null | string;
-      /** @description Set when the outliner judged the planned material too thin for the word target. */
-      densityRisk?: null | string;
-      /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
-      writeMode: components['schemas']['BriefWriteMode'];
-      /**
-       * Format: date-time
-       * @description Set when this brief was created by the insert operation rather than by an outline pass.
-       */
-      insertedAt?: null | string;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -2769,6 +2552,8 @@ export interface components {
       target: string;
       /** @description Present when the batch was cut short of its limit: this chapter is an external-write slot that must be filled by hand before generation continues past it. */
       stoppedAtExternalChapter?: number;
+      /** @description Present when the batch was cut short of its limit: this chapter has neither a draft nor finalized prose, and generation continues only once it has one. */
+      stoppedAtUnwrittenChapter?: number;
     };
     ListGenerationJobResponse: {
       items: components['schemas']['GenerationJobItem'][];
@@ -3024,9 +2809,9 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
+    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'plugin';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'chapter_extract' | 'plugin';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
@@ -3588,28 +3373,6 @@ export interface components {
       action: string;
       finding: string;
     };
-    PlanArcsBody: {
-      arcCount?: number;
-      guidance?: string;
-    };
-    PlanArcsResponse: {
-      proposal: components['schemas']['ProposalResponse'];
-      arcs: components['schemas']['PlannedArcItem'][];
-      runId: string;
-    };
-    PlannedArcItem: {
-      arcKey: string;
-      title: string;
-      objective: string;
-      escalation: string;
-      payoff: string;
-      hook: string;
-      chapterStart: number;
-      chapterEnd: number;
-      cast: string[];
-      body: string;
-      ideas: string[];
-    };
     ContextPreviewResponse: {
       purpose: string;
       budgetTokens: number;
@@ -3675,312 +3438,6 @@ export interface components {
       /** @description split only: overrides the suggested entity type. */
       entityType?: components['schemas']['EntityType'];
     };
-    CreateEntityBody: {
-      entityKey: string;
-      type: components['schemas']['EntityType'];
-      name: string;
-      significance?: components['schemas']['EntitySignificance'];
-      status?: string;
-      origin?: components['schemas']['EntityOrigin'];
-      notes?: string;
-      motivation?: string;
-      body?: string;
-      /** @description Canonical visual description; anchors every generated illustration of this entity so re-rolls keep the same look. */
-      appearance?: string;
-      aliases?: string[];
-    };
-    /** @enum {string} */
-    EntitySignificance: 'major' | 'minor';
-    /** @enum {string} */
-    EntityOrigin: 'extracted' | 'seeded' | 'generated';
-    EntityResponse: {
-      id: string;
-      projectId: string;
-      entityKey: string;
-      type: components['schemas']['EntityType'];
-      name: string;
-      /** @enum {string} */
-      significance?: 'major' | 'minor';
-      status?: null | string;
-      origin?: null | string;
-      firstSeenChapter?: null | number;
-      notes?: null | string;
-      motivation?: null | string;
-      body?: null | string;
-      /** @description Canonical visual description used as the anchor for generated illustrations. */
-      appearance?: null | string;
-      /** @description Absolute public URL for the portrait, or null when the entity has no portrait. */
-      imageUrl?: null | string;
-      /** @description The entity's additional reference images. Included by the single-entity endpoint. */
-      images?: components['schemas']['EntityImageResponse'][];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    EntityImageResponse: {
-      id: string;
-      /** @description Absolute public URL for the stored image. */
-      imageUrl: string;
-      caption?: null | string;
-      sortOrder: number;
-    };
-    ListEntityResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['EntityResponse'][];
-    };
-    UpdateEntityBody: {
-      name?: string;
-      significance?: components['schemas']['EntitySignificance'];
-      status?: string;
-      origin?: components['schemas']['EntityOrigin'];
-      notes?: string;
-      motivation?: string;
-      body?: string;
-      /** @description Canonical visual description; anchors every generated illustration of this entity so re-rolls keep the same look. */
-      appearance?: string;
-      aliases?: string[];
-    };
-    UploadImageBody: {
-      /** @enum {string} */
-      mime: 'image/png' | 'image/jpeg' | 'image/webp';
-      /** @description Base64-encoded image bytes without a data URL prefix. */
-      image: string;
-    };
-    AddEntityImageBody: {
-      /** @enum {string} */
-      mime: 'image/png' | 'image/jpeg' | 'image/webp';
-      /** @description Base64-encoded image bytes without a data URL prefix. */
-      image: string;
-      caption?: string;
-    };
-    ApprovePlanResponse1: {
-      volumesApproved: number;
-      approved: boolean;
-    };
-    CreateVolumeBody: {
-      volumeKey: string;
-      ordinal?: number;
-      title?: string;
-      objective?: string;
-      conflict?: string;
-      payoff?: string;
-      startChapter?: number;
-      endChapter?: number;
-      targetChapterCount?: number;
-      status?: components['schemas']['PlanStatus'];
-      /** @description Entity keys for the characters featured in this volume. */
-      cast?: string[];
-      body?: string;
-    };
-    VolumeResponse: {
-      id: string;
-      projectId: string;
-      volumeKey: string;
-      ordinal: number;
-      title?: null | string;
-      objective?: null | string;
-      conflict?: null | string;
-      payoff?: null | string;
-      startChapter?: null | number;
-      endChapter?: null | number;
-      targetChapterCount?: null | number;
-      revision: number;
-      staleReason?: null | string;
-      status: components['schemas']['PlanStatus'];
-      /** @description Entity keys for the characters featured in this volume. */
-      cast?: null | string[];
-      body?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ListVolumeResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['VolumeResponse'][];
-    };
-    UpdateVolumeBody: {
-      ordinal?: number;
-      title?: string;
-      objective?: string;
-      conflict?: string;
-      payoff?: string;
-      startChapter?: number;
-      endChapter?: number;
-      targetChapterCount?: number;
-      status?: components['schemas']['PlanStatus'];
-      /** @description Entity keys for the characters featured in this volume. */
-      cast?: string[];
-      body?: string;
-    };
-    ListArcResponse: {
-      arcs: components['schemas']['ArcResponse'][];
-    };
-    ArcResponse: {
-      id: string;
-      projectId: string;
-      arcKey: string;
-      volumeKey: string;
-      ordinal: number;
-      title?: null | string;
-      objective?: null | string;
-      escalation?: null | string;
-      payoff?: null | string;
-      hook?: null | string;
-      chapterStart?: null | number;
-      chapterEnd?: null | number;
-      cast?: null | string[];
-      status: components['schemas']['PlanStatus'];
-      body?: null | string;
-      revision: number;
-      staleReason?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ApproveArcsResponse: {
-      arcsApproved: number;
-      approved: boolean;
-    };
-    UpsertArcBody: {
-      volumeKey: string;
-      ordinal?: number;
-      title?: string;
-      objective?: string;
-      escalation?: string;
-      payoff?: string;
-      hook?: string;
-      chapterStart?: number;
-      chapterEnd?: number;
-      cast?: string[];
-      body?: string;
-    };
-    ListBibleDocResponse: {
-      docs: components['schemas']['BibleDocListItem'][];
-    };
-    BibleDocListItem: {
-      section: components['schemas']['BibleSection'];
-      slug: string;
-      /** @description frontmatter.title, else the first "# " heading, else the slug read as words. */
-      title: string;
-      wordCount: number;
-      isEmpty: boolean;
-      /** @description First prose sentence or two, omitted for an empty document. */
-      excerpt?: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    BibleDocResponse: {
-      id: string;
-      projectId: string;
-      section: components['schemas']['BibleSection'];
-      slug: string;
-      /** @description Author-authored YAML frontmatter with document-specific keys. */
-      frontmatter?: null | {
-        [key: string]: unknown;
-      };
-      body?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    UpsertBibleDocBody: {
-      /** @description Author-authored YAML frontmatter with document-specific keys. */
-      frontmatter?: {
-        [key: string]: unknown;
-      };
-      body?: string;
-    };
-    ListFactsResponse: {
-      facts: components['schemas']['FactResponse'][];
-    };
-    FactResponse: {
-      id: string;
-      projectId: string;
-      factKey: string;
-      text: string;
-      subjects?: null | string[];
-      constraintNote?: null | string;
-      writerNote?: null | string;
-      terms?: null | string[];
-      revealChapter?: null | number;
-      knowledge: components['schemas']['KnowledgeEntryResponse'][];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    KnowledgeEntryResponse: {
-      entityKey: string;
-      entityName: string;
-      learnedInChapter: number;
-      source: components['schemas']['FactSource'];
-      note?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @enum {string} */
-    FactSource: 'brief' | 'manual' | 'import' | 'seed' | 'generated';
-    UpsertFactBody: {
-      text: string;
-      subjects?: string[];
-      /** @description Author-only note on what the fact protects; never shown to the chapter writer */
-      constraintNote?: string;
-      /** @description The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact */
-      writerNote?: string;
-      terms?: string[];
-      /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it. */
-      revealChapter?: number | null;
-    };
-    RevealFactBody: {
-      entityKey: string;
-      chapter: number;
-      note?: string;
-    };
-    BibleReadinessResponse: {
-      dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
-      /** @description one entry per bible role, in manifest order, explaining what the coverage dimension counted */
-      roles?: components['schemas']['BibleReadinessRoleResponse'][];
-      /** @description false while canon is absent or exists only as prose the Story Bible cannot read */
-      readyToDraft: boolean;
-      /** @description the coverage and record gaps that hold `readyToDraft` false */
-      blockingGaps: string[];
-    };
-    BibleReadinessDimensionResponse: {
-      dimension: components['schemas']['BibleReadinessDimension'];
-      /** @description strong = every check passed, thin = some passed, empty = none passed */
-      verdict: components['schemas']['BibleReadinessVerdict'];
-      /** @description checks this dimension passed */
-      satisfied: number;
-      /** @description checks this dimension ran; zero means the dimension had nothing to judge and reads as strong */
-      total: number;
-      /** @description what to fix, phrased as an action an author can take */
-      gaps: string[];
-    };
-    /** @enum {string} */
-    BibleReadinessDimension: 'coverage' | 'records' | 'substance' | 'integrity' | 'reveal';
-    /** @enum {string} */
-    BibleReadinessVerdict: 'strong' | 'thin' | 'empty';
-    BibleReadinessRoleResponse: {
-      stage: components['schemas']['BibleStage'];
-      /** @description what the role is called on the readiness banner */
-      label: string;
-      /** @description the canonical `section/slug` the bible builder writes this role to */
-      address: string;
-      /** @description true when any document or record set carries the substance this role needs, whatever it is named */
-      covered: boolean;
-      /** @description the documents (`section/slug`) and record summaries that cover the role; empty when it is uncovered */
-      coveredBy: string[];
-    };
-    /** @enum {string} */
-    BibleStage: 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
     StartIllustrationBody: {
       subjectType: components['schemas']['IllustrationSubjectType'];
       /** @description Entity key for 'entity', the chapter number for 'chapter'; omitted for the project cover. */
@@ -4192,6 +3649,229 @@ export interface components {
     LegacyCancelIllustrationResponse: {
       cancelled: boolean;
     };
+    CreateEntityBody: {
+      entityKey: string;
+      type: components['schemas']['EntityType'];
+      name: string;
+      significance?: components['schemas']['EntitySignificance'];
+      status?: string;
+      origin?: components['schemas']['EntityOrigin'];
+      notes?: string;
+      motivation?: string;
+      body?: string;
+      /** @description Canonical visual description; anchors every generated illustration of this entity so re-rolls keep the same look. */
+      appearance?: string;
+      aliases?: string[];
+    };
+    /** @enum {string} */
+    EntitySignificance: 'major' | 'minor';
+    /** @enum {string} */
+    EntityOrigin: 'extracted' | 'seeded' | 'generated';
+    EntityResponse: {
+      id: string;
+      projectId: string;
+      entityKey: string;
+      type: components['schemas']['EntityType'];
+      name: string;
+      /** @enum {string} */
+      significance?: 'major' | 'minor';
+      status?: null | string;
+      origin?: null | string;
+      firstSeenChapter?: null | number;
+      notes?: null | string;
+      motivation?: null | string;
+      body?: null | string;
+      /** @description Canonical visual description used as the anchor for generated illustrations. */
+      appearance?: null | string;
+      /** @description Absolute public URL for the portrait, or null when the entity has no portrait. */
+      imageUrl?: null | string;
+      /** @description The entity's additional reference images. Included by the single-entity endpoint. */
+      images?: components['schemas']['EntityImageResponse'][];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    EntityImageResponse: {
+      id: string;
+      /** @description Absolute public URL for the stored image. */
+      imageUrl: string;
+      caption?: null | string;
+      sortOrder: number;
+    };
+    ListEntityResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['EntityResponse'][];
+    };
+    UpdateEntityBody: {
+      name?: string;
+      significance?: components['schemas']['EntitySignificance'];
+      status?: string;
+      origin?: components['schemas']['EntityOrigin'];
+      notes?: string;
+      motivation?: string;
+      body?: string;
+      /** @description Canonical visual description; anchors every generated illustration of this entity so re-rolls keep the same look. */
+      appearance?: string;
+      aliases?: string[];
+    };
+    UploadImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
+      image: string;
+    };
+    AddEntityImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      /** @description Base64-encoded image bytes without a data URL prefix. */
+      image: string;
+      caption?: string;
+    };
+    ListVolumeResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['VolumeResponse'][];
+    };
+    VolumeResponse: {
+      id: string;
+      projectId: string;
+      volumeKey: string;
+      ordinal: number;
+      title?: null | string;
+      /** @description The goal the volume works towards. */
+      objective?: null | string;
+      revision: number;
+      /** @description The author's notes on the volume. */
+      body?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ListBibleDocResponse: {
+      docs: components['schemas']['BibleDocListItem'][];
+    };
+    BibleDocListItem: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+      /** @description frontmatter.title, else the first "# " heading, else the slug read as words. */
+      title: string;
+      wordCount: number;
+      isEmpty: boolean;
+      /** @description First prose sentence or two, omitted for an empty document. */
+      excerpt?: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    BibleDocResponse: {
+      id: string;
+      projectId: string;
+      section: components['schemas']['BibleSection'];
+      slug: string;
+      /** @description Author-authored YAML frontmatter with document-specific keys. */
+      frontmatter?: null | {
+        [key: string]: unknown;
+      };
+      body?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    UpsertBibleDocBody: {
+      /** @description Author-authored YAML frontmatter with document-specific keys. */
+      frontmatter?: {
+        [key: string]: unknown;
+      };
+      body?: string;
+    };
+    ListFactsResponse: {
+      facts: components['schemas']['FactResponse'][];
+    };
+    FactResponse: {
+      id: string;
+      projectId: string;
+      factKey: string;
+      text: string;
+      subjects?: null | string[];
+      constraintNote?: null | string;
+      writerNote?: null | string;
+      terms?: null | string[];
+      revealChapter?: null | number;
+      knowledge: components['schemas']['KnowledgeEntryResponse'][];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    KnowledgeEntryResponse: {
+      entityKey: string;
+      entityName: string;
+      learnedInChapter: number;
+      source: components['schemas']['FactSource'];
+      note?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    FactSource: 'brief' | 'manual' | 'import' | 'seed' | 'generated';
+    UpsertFactBody: {
+      text: string;
+      subjects?: string[];
+      /** @description Author-only note on what the fact protects; never shown to the chapter writer */
+      constraintNote?: string;
+      /** @description The only trace of the fact the chapter writer sees while it is hidden — omit to keep the current note, send an empty string to clear it and withhold the fact */
+      writerNote?: string;
+      terms?: string[];
+      /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it. */
+      revealChapter?: number | null;
+    };
+    RevealFactBody: {
+      entityKey: string;
+      chapter: number;
+      note?: string;
+    };
+    BibleReadinessResponse: {
+      dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
+      /** @description one entry per bible role, in manifest order, explaining what the coverage dimension counted */
+      roles?: components['schemas']['BibleReadinessRoleResponse'][];
+      /** @description false while canon is absent or exists only as prose the Story Bible cannot read */
+      readyToDraft: boolean;
+      /** @description the coverage and record gaps that hold `readyToDraft` false */
+      blockingGaps: string[];
+    };
+    BibleReadinessDimensionResponse: {
+      dimension: components['schemas']['BibleReadinessDimension'];
+      /** @description strong = every check passed, thin = some passed, empty = none passed */
+      verdict: components['schemas']['BibleReadinessVerdict'];
+      /** @description checks this dimension passed */
+      satisfied: number;
+      /** @description checks this dimension ran; zero means the dimension had nothing to judge and reads as strong */
+      total: number;
+      /** @description what to fix, phrased as an action an author can take */
+      gaps: string[];
+    };
+    /** @enum {string} */
+    BibleReadinessDimension: 'coverage' | 'records' | 'substance' | 'integrity' | 'reveal';
+    /** @enum {string} */
+    BibleReadinessVerdict: 'strong' | 'thin' | 'empty';
+    BibleReadinessRoleResponse: {
+      stage: components['schemas']['BibleStage'];
+      /** @description what the role is called on the readiness banner */
+      label: string;
+      /** @description the canonical `section/slug` the bible builder writes this role to */
+      address: string;
+      /** @description true when any document or record set carries the substance this role needs, whatever it is named */
+      covered: boolean;
+      /** @description the documents (`section/slug`) and record summaries that cover the role; empty when it is uncovered */
+      coveredBy: string[];
+    };
+    /** @enum {string} */
+    BibleStage: 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
@@ -4260,7 +3940,6 @@ export interface components {
       audit?: components['schemas']['ProjectModelRef'];
       chat?: components['schemas']['ProjectModelRef'];
       compact?: components['schemas']['ProjectModelRef'];
-      arc?: components['schemas']['ProjectModelRef'];
       embedding?: components['schemas']['ProjectModelRef'];
       image?: components['schemas']['ProjectModelRef'];
     };
@@ -4306,10 +3985,10 @@ export interface components {
     ProjectStatusResponse: {
       kind: components['schemas']['ProjectKind'];
       chaptersTotal?: number;
-      chaptersExtracted?: number;
+      /** @description Chapters finalized into canon. */
+      chaptersFinal?: number;
       draftsTotal?: number;
       draftsFinal?: number;
-      planApproved?: boolean;
       volumesTotal?: number;
     };
     UpdateProjectBody: {
@@ -4333,7 +4012,7 @@ export interface components {
     };
     ResetBody: {
       /** @enum {string} */
-      stage: 'extract' | 'plan' | 'generate' | 'all';
+      stage: 'knowledge' | 'plan' | 'generate' | 'all';
     };
     ResetResponse: {
       stage: string;
@@ -4422,7 +4101,6 @@ export interface components {
       entityKeys?: string[];
       factKeys?: string[];
       volumeKeys?: string[];
-      arcKeys?: string[];
       briefChapters?: number[];
     };
     LedgerBibleDocumentLinkResponse: {
@@ -4523,129 +4201,6 @@ export interface components {
       jobId: string;
       /** @description Bundle content the import accepted but could not store. */
       warnings: string[];
-    };
-    ImportPlanBody: {
-      bundle: components['schemas']['PlanBundle'];
-      overwrite?: boolean;
-      approve?: boolean;
-    };
-    PlanBundle: {
-      format: string;
-      version: number;
-      bible?: components['schemas']['PlanBundleBibleDoc'][];
-      entities?: components['schemas']['PlanBundleEntity'][];
-      /** @description Canon facts used to populate the character-knowledge ledger. */
-      facts?: components['schemas']['PlanBundleFact'][];
-      volumes?: components['schemas']['PlanBundleVolume'][];
-      arcs?: components['schemas']['PlanBundleArc'][];
-      briefs?: components['schemas']['PlanBundleBrief'][];
-    };
-    PlanBundleBibleDoc: {
-      section: components['schemas']['PlanBundleSection'];
-      slug: string;
-      /** @description Arbitrary key/value frontmatter for the Bible document. */
-      frontmatter?: {
-        [key: string]: unknown;
-      };
-      body: string;
-    };
-    /** @enum {string} */
-    PlanBundleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'lore';
-    PlanBundleEntity: {
-      entityKey: string;
-      type: components['schemas']['EntityType'];
-      name: string;
-      significance?: components['schemas']['EntitySignificance'];
-      status?: string;
-      motivation?: string;
-      notes?: string;
-      body?: string;
-    };
-    PlanBundleFact: {
-      factKey: string;
-      text: string;
-      subjects?: string[];
-      constraintNote?: string;
-      /** @description What the chapter writer sees while the fact is hidden; without it the hidden fact is withheld from the writer entirely */
-      writerNote?: string;
-      terms?: string[];
-      revealChapter?: number;
-    };
-    PlanBundleVolume: {
-      volumeKey: string;
-      ordinal: number;
-      title: string;
-      objective: string;
-      conflict: string;
-      payoff: string;
-      /** @description Number of chapters in this volume; approval derives chapter ranges cumulatively. */
-      targetChapterCount: number;
-      cast?: string[];
-      body?: string;
-    };
-    PlanBundleArc: {
-      arcKey: string;
-      volumeKey: string;
-      ordinal: number;
-      title: string;
-      objective: string;
-      escalation: string;
-      payoff: string;
-      hook: string;
-      chapterStart: number;
-      chapterEnd: number;
-      cast?: string[];
-      body?: string;
-    };
-    PlanBundleBrief: {
-      chapter: number;
-      volumeKey: string;
-      arcKey?: string;
-      title: string;
-      objective: string;
-      events: string[];
-      requiredContext?: string[];
-      continuesIntoNextChapter?: boolean;
-      startsFromPreviousChapter?: boolean;
-      handoffBeat?: string;
-      /** @description Required pacing and ending constraints for the chapter. */
-      endingContract: components['schemas']['EndingContractSchema'];
-      /** @description Optional character-knowledge constraints; omission leaves the chapter unfiltered. */
-      knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
-      /** @description entityKey of the point-of-view character; it pulls that entity's full card into the drafting context. An unknown key is stored and reported as a warning. */
-      pov?: string;
-      /** @description One sentence on why the chapter exists — its narrative job in the arc, not a restatement of the objective's events. */
-      chapterPurpose?: string;
-      /** @description What must change for the reader in this chapter, drawn from new_information, relationship_change, power_or_stakes_change, goal_or_plan_change, world_state_change, emotional_turn; any other value is stored as written and reported as a warning. */
-      readerValue?: string[];
-      /** @description Scene patterns or beats this chapter must avoid repeating from recent chapters. */
-      repetitionRisks?: string[];
-      /** @description Free-form authorial direction for the drafter, rendered as its own section of the chapter brief. */
-      guidance?: string;
-    };
-    ImportPlanResponse: {
-      results: components['schemas']['ImportResults'];
-      approval?: components['schemas']['ApprovalResult'];
-      /** @description Non-blocking findings, including every bundle field the import did not recognise and therefore ignored. */
-      warnings: string[];
-    };
-    ImportResults: {
-      bible: components['schemas']['CollectionResult'];
-      entities: components['schemas']['CollectionResult'];
-      facts: components['schemas']['CollectionResult'];
-      volumes: components['schemas']['CollectionResult'];
-      arcs: components['schemas']['CollectionResult'];
-      briefs: components['schemas']['CollectionResult'];
-    };
-    CollectionResult: {
-      created: number;
-      updated: number;
-      unchanged: number;
-      pruned: number;
-    };
-    ApprovalResult: {
-      volumesApproved: number;
-      arcsApproved: number;
     };
     PublishNovelBody: {
       /** @description Reader URL slug; omission derives it from the title. A slug another project holds is rejected. A different one on a later publish renames the novel: the next converge moves it, chapters and all, and the old reader URL stops resolving. */
@@ -5897,179 +5452,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_plan: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PlanBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PlanResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_approve: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApprovePlanResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_outline: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['OutlineBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OutlineResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_arcs_arcKey_outline: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        arcKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['OutlineArcBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OutlineResponse'];
         };
       };
       /** @description Default Response */
@@ -9131,61 +8513,14 @@ export interface operations {
       };
     };
   };
-  post_api_v1_projects_projectId_volumes_volumeKey_arcs_plan: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PlanArcsBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PlanArcsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   get_api_v1_projects_projectId_context_preview: {
     parameters: {
       query: {
-        purpose: 'generation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
+        purpose: 'generation' | 'outline' | 'chat' | 'premise' | 'audit';
         /** @description required for generation/outline */
         chapter?: number | string;
         /** @description chat scope type */
-        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
-        /** @description volume for arc_plan previews */
-        volumeKey?: string;
+        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
       };
       header?: never;
       path: {
@@ -9286,1217 +8621,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplyProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_entities: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        type?: components['schemas']['EntityType'];
-        origin?: components['schemas']['EntityOrigin'];
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListEntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_entities: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateEntityBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_entities_entityKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_entities_entityKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_entities_entityKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateEntityBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_entities_entityKey_image: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UploadImageBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_entities_entityKey_image: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_entities_entityKey_images: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AddEntityImageBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_entities_entityKey_images_imageId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-        imageId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EntityResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_volumes_approve: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApprovePlanResponse1'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_volumes: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        status?: components['schemas']['PlanStatus'];
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListVolumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_volumes: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateVolumeBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VolumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_volumes_volumeKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VolumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_volumes_volumeKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_volumes_volumeKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateVolumeBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['VolumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_volumes_volumeKey_arcs: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListArcResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_volumes_volumeKey_arcs_approve: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        volumeKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApproveArcsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_arcs_arcKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        arcKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ArcResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_projects_projectId_arcs_arcKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        arcKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpsertArcBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ArcResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListBibleDocResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible_section_slug: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        section: components['schemas']['BibleSection'];
-        slug: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleDocResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_projects_projectId_bible_section_slug: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        section: components['schemas']['BibleSection'];
-        slug: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpsertBibleDocBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleDocResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_facts: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListFactsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_facts_factKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        factKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['FactResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_projects_projectId_facts_factKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        factKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpsertFactBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['FactResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_facts_factKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        factKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_facts_factKey_reveal: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        factKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RevealFactBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['FactResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        factKey: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['FactResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible_readiness: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleReadinessResponse'];
         };
       };
       /** @description Default Response */
@@ -11031,6 +9155,887 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LegacyCancelIllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_entities: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        type?: components['schemas']['EntityType'];
+        origin?: components['schemas']['EntityOrigin'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListEntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_entities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateEntityBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_entities_entityKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_entities_entityKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_entities_entityKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateEntityBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_entities_entityKey_image: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UploadImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_entities_entityKey_image: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_entities_entityKey_images: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddEntityImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_entities_entityKey_images_imageId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+        imageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_volumes: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListVolumeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_volumes_volumeKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        volumeKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VolumeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListBibleDocResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible_section_slug: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        section: components['schemas']['BibleSection'];
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleDocResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_bible_section_slug: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        section: components['schemas']['BibleSection'];
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpsertBibleDocBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleDocResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_facts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListFactsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpsertFactBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_facts_factKey_reveal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RevealFactBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible_readiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleReadinessResponse'];
         };
       };
       /** @description Default Response */
@@ -11768,50 +10773,6 @@ export interface operations {
       };
     };
   };
-  post_api_v1_projects_projectId_plan_import: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ImportPlanBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ImportPlanResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   post_api_v1_projects_projectId_publish: {
     parameters: {
       query?: never;
@@ -12144,18 +11105,10 @@ export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
 export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
 export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
-export type PlanBody = components['schemas']['PlanBody'];
-export type PlanResponse = components['schemas']['PlanResponse'];
-export type PlanVolumeItem = components['schemas']['PlanVolumeItem'];
-export type PlanStatus = components['schemas']['PlanStatus'];
-export type ApprovePlanResponse = components['schemas']['ApprovePlanResponse'];
-export type OutlineBody = components['schemas']['OutlineBody'];
-export type OutlineResponse = components['schemas']['OutlineResponse'];
-export type BriefResponse = components['schemas']['BriefResponse'];
-export type BriefWriteMode = components['schemas']['BriefWriteMode'];
-export type OutlineArcBody = components['schemas']['OutlineArcBody'];
 export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
+export type BriefWriteMode = components['schemas']['BriefWriteMode'];
+export type BriefResponse = components['schemas']['BriefResponse'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
 export type EndingContractSchema = components['schemas']['EndingContractSchema'];
 export type HookType = components['schemas']['HookType'];
@@ -12267,9 +11220,6 @@ export type EnhancePremiseResponse = components['schemas']['EnhancePremiseRespon
 export type PremiseRationaleResponse = components['schemas']['PremiseRationaleResponse'];
 export type AuditBibleResponse = components['schemas']['AuditBibleResponse'];
 export type AuditFindingResponse = components['schemas']['AuditFindingResponse'];
-export type PlanArcsBody = components['schemas']['PlanArcsBody'];
-export type PlanArcsResponse = components['schemas']['PlanArcsResponse'];
-export type PlannedArcItem = components['schemas']['PlannedArcItem'];
 export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
 export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
 export type OmittedSectionPreview = components['schemas']['OmittedSectionPreview'];
@@ -12280,40 +11230,6 @@ export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
-export type CreateEntityBody = components['schemas']['CreateEntityBody'];
-export type EntitySignificance = components['schemas']['EntitySignificance'];
-export type EntityOrigin = components['schemas']['EntityOrigin'];
-export type EntityResponse = components['schemas']['EntityResponse'];
-export type EntityImageResponse = components['schemas']['EntityImageResponse'];
-export type ListEntityResponse = components['schemas']['ListEntityResponse'];
-export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
-export type UploadImageBody = components['schemas']['UploadImageBody'];
-export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
-export type ApprovePlanResponse1 = components['schemas']['ApprovePlanResponse1'];
-export type CreateVolumeBody = components['schemas']['CreateVolumeBody'];
-export type VolumeResponse = components['schemas']['VolumeResponse'];
-export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
-export type UpdateVolumeBody = components['schemas']['UpdateVolumeBody'];
-export type ListArcResponse = components['schemas']['ListArcResponse'];
-export type ArcResponse = components['schemas']['ArcResponse'];
-export type ApproveArcsResponse = components['schemas']['ApproveArcsResponse'];
-export type UpsertArcBody = components['schemas']['UpsertArcBody'];
-export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
-export type BibleDocListItem = components['schemas']['BibleDocListItem'];
-export type BibleDocResponse = components['schemas']['BibleDocResponse'];
-export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
-export type ListFactsResponse = components['schemas']['ListFactsResponse'];
-export type FactResponse = components['schemas']['FactResponse'];
-export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryResponse'];
-export type FactSource = components['schemas']['FactSource'];
-export type UpsertFactBody = components['schemas']['UpsertFactBody'];
-export type RevealFactBody = components['schemas']['RevealFactBody'];
-export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
-export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
-export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
-export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
-export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRoleResponse'];
-export type BibleStage = components['schemas']['BibleStage'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
 export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
@@ -12347,6 +11263,33 @@ export type LegacyRefineIllustrationResponse = components['schemas']['LegacyRefi
 export type LegacySessionBody = components['schemas']['LegacySessionBody'];
 export type LegacySaveIllustrationResponse = components['schemas']['LegacySaveIllustrationResponse'];
 export type LegacyCancelIllustrationResponse = components['schemas']['LegacyCancelIllustrationResponse'];
+export type CreateEntityBody = components['schemas']['CreateEntityBody'];
+export type EntitySignificance = components['schemas']['EntitySignificance'];
+export type EntityOrigin = components['schemas']['EntityOrigin'];
+export type EntityResponse = components['schemas']['EntityResponse'];
+export type EntityImageResponse = components['schemas']['EntityImageResponse'];
+export type ListEntityResponse = components['schemas']['ListEntityResponse'];
+export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
+export type UploadImageBody = components['schemas']['UploadImageBody'];
+export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
+export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
+export type VolumeResponse = components['schemas']['VolumeResponse'];
+export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
+export type BibleDocListItem = components['schemas']['BibleDocListItem'];
+export type BibleDocResponse = components['schemas']['BibleDocResponse'];
+export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
+export type ListFactsResponse = components['schemas']['ListFactsResponse'];
+export type FactResponse = components['schemas']['FactResponse'];
+export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryResponse'];
+export type FactSource = components['schemas']['FactSource'];
+export type UpsertFactBody = components['schemas']['UpsertFactBody'];
+export type RevealFactBody = components['schemas']['RevealFactBody'];
+export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
+export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
+export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
+export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
+export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRoleResponse'];
+export type BibleStage = components['schemas']['BibleStage'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
@@ -12386,19 +11329,6 @@ export type NovelImportVolume = components['schemas']['NovelImportVolume'];
 export type NovelImportChapter = components['schemas']['NovelImportChapter'];
 export type NovelImportAsset = components['schemas']['NovelImportAsset'];
 export type ImportNovelResponse = components['schemas']['ImportNovelResponse'];
-export type ImportPlanBody = components['schemas']['ImportPlanBody'];
-export type PlanBundle = components['schemas']['PlanBundle'];
-export type PlanBundleBibleDoc = components['schemas']['PlanBundleBibleDoc'];
-export type PlanBundleSection = components['schemas']['PlanBundleSection'];
-export type PlanBundleEntity = components['schemas']['PlanBundleEntity'];
-export type PlanBundleFact = components['schemas']['PlanBundleFact'];
-export type PlanBundleVolume = components['schemas']['PlanBundleVolume'];
-export type PlanBundleArc = components['schemas']['PlanBundleArc'];
-export type PlanBundleBrief = components['schemas']['PlanBundleBrief'];
-export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
-export type ImportResults = components['schemas']['ImportResults'];
-export type CollectionResult = components['schemas']['CollectionResult'];
-export type ApprovalResult = components['schemas']['ApprovalResult'];
 export type PublishNovelBody = components['schemas']['PublishNovelBody'];
 export type NovelGenre = components['schemas']['NovelGenre'];
 export type NovelTag = components['schemas']['NovelTag'];
@@ -12466,23 +11396,21 @@ export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/t
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
+export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
+export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
+export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;
+export type ListReferenceOptionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;
 export type ListVolumesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['query'], undefined>;
 export type ListVolumesPathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['path'], undefined>;
 export type GetVolumePathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes/{volumeKey}']['get']['parameters']['path'], undefined>;
-export type ListArcsPathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs']['get']['parameters']['path'], undefined>;
-export type GetArcPathParams = Exclude<paths['/api/v1/projects/{projectId}/arcs/{arcKey}']['get']['parameters']['path'], undefined>;
 export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible']['get']['parameters']['path'], undefined>;
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
 export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
-export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
-export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
-export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;
-export type ListReferenceOptionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;

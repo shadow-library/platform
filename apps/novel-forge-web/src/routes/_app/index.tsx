@@ -82,19 +82,14 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
           {project.storyCurrentChapter ? ` · Chapter ${project.storyCurrentChapter}` : ''}
         </p>
         <div className={styles.statGrid}>
-          <Stat value={status?.chaptersExtracted} total={status?.chaptersTotal} label="chapters planned" />
+          <Stat value={status?.chaptersFinal} total={status?.chaptersTotal} label="chapters planned" />
           <Stat value={status?.draftsFinal} total={status?.draftsTotal} label="drafts final" />
-          <div>
-            <div className={styles.planValue} data-approved={status?.planApproved ?? false}>
-              {status?.planApproved ? 'Yes' : 'No'}
-            </div>
-            <div className={styles.statLabel}>plan approved</div>
-          </div>
+          <Stat value={status?.volumesTotal} label="volumes" />
         </div>
         <div className={styles.cardFooter}>
           {draftsDone ? (
             <StatusChip intent="success">On track</StatusChip>
-          ) : status?.planApproved ? (
+          ) : (status?.volumesTotal ?? 0) > 0 ? (
             <StatusChip intent="info">Drafting</StatusChip>
           ) : (
             <StatusChip intent="neutral">Planning</StatusChip>

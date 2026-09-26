@@ -119,16 +119,6 @@
   color: var(--sh-text-tertiary);
 }
 
-.planValue {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--sh-text-tertiary);
-}
-
-.planValue[data-approved='true'] {
-  color: var(--sh-success-text-on-subtle);
-}
-
 .cardFooter {
   display: flex;
   align-items: center;

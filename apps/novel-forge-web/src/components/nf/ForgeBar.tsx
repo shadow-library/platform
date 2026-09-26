@@ -10,7 +10,7 @@ import styles from './ForgeBar.module.css';
 
 /**
  * The section the bar refines. `type`/`ref` map to the backend chat scope, so whatever the author is
- * looking at (an entity, a volume, an arc, a chapter) rides along as the model's context.
+ * looking at (an entity, a volume, a chapter) rides along as the model's context.
  */
 export interface ForgeScope {
   type: ChatScope;

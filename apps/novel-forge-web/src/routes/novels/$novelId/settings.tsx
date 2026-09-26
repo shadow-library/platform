@@ -36,7 +36,7 @@ type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image
 
 const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
   writing: ['generation', 'revision', 'fix'],
-  planning: ['premise', 'plan', 'arc', 'outline', 'bible', 'extraction'],
+  planning: ['premise', 'plan', 'outline', 'bible', 'extraction'],
   review: ['judge', 'validation', 'continuity', 'review', 'audit'],
   chat: ['chat'],
   helper: ['title', 'compact'],
@@ -60,7 +60,7 @@ const ROLE_GROUPS: RoleGroup[] = [
     title: 'Text generation',
     roles: [
       { key: 'writing', label: 'Writing', hint: 'Chapter prose — drafts, revisions, and repairs', kind: 'llm' },
-      { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, arcs, outlines, bible & extraction', kind: 'llm' },
+      { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, outlines, bible & extraction', kind: 'llm' },
       { key: 'review', label: 'Review & QA', hint: 'Continuity judge, validation, editorial review & bible audit', kind: 'llm' },
       { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals · defaults to the Planning model', kind: 'llm' },
       { key: 'helper', label: 'Fast helpers', hint: 'Titles & context compaction — small, cheap calls', kind: 'llm' },

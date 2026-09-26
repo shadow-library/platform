@@ -305,7 +305,6 @@ function OverviewScreen(): React.JSX.Element {
     ? computeNextStep(
         deriveNextStepInput({
           volumesTotal,
-          planApproved: status?.planApproved ?? false,
           draftsTotal,
           draftsFinal,
           briefs: briefsQuery.data?.items ?? [],
@@ -495,7 +494,7 @@ function OverviewScreen(): React.JSX.Element {
           <div className={styles.statGrid}>
             <StatCard label="Chapters">
               <div className={styles.statBig}>
-                <span className={styles.statNum}>{status?.chaptersExtracted ?? 0}</span>
+                <span className={styles.statNum}>{status?.chaptersFinal ?? 0}</span>
                 <span className={styles.statUnit}>/ {status?.chaptersTotal ?? 0} planned</span>
               </div>
             </StatCard>
@@ -509,19 +508,6 @@ function OverviewScreen(): React.JSX.Element {
               <div className={styles.statBig}>
                 <span className={styles.statNum}>{status?.draftsFinal ?? 0}</span>
                 <span className={styles.statUnit}>/ {status?.draftsTotal ?? 0} final</span>
-              </div>
-            </StatCard>
-            <StatCard label="Plan status">
-              <div className={styles.planRow}>
-                {status?.planApproved ? (
-                  <StatusChip intent="success" dot>
-                    Approved
-                  </StatusChip>
-                ) : (
-                  <StatusChip intent="neutral" dot>
-                    Draft
-                  </StatusChip>
-                )}
               </div>
             </StatCard>
           </div>
@@ -618,7 +604,7 @@ function OverviewScreen(): React.JSX.Element {
               <Select value={resetStage} onValueChange={v => setResetStage(v as ResetBody['stage'])}>
                 <Select.Item value="generate">Generated drafts</Select.Item>
                 <Select.Item value="plan">Plan &amp; drafts</Select.Item>
-                <Select.Item value="extract">Everything after extract</Select.Item>
+                <Select.Item value="knowledge">Knowledge (characters, facts, summaries)</Select.Item>
                 <Select.Item value="all">Everything</Select.Item>
               </Select>
             </FormField>

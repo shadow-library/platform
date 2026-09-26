@@ -612,8 +612,8 @@ const DRAFT_SUGGESTIONS: DraftSuggestion[] = [
     icon: <SearchIcon size={14} />,
   },
   {
-    label: 'Plan the next arc',
-    prompt: 'Look at where the story stands and propose the next arc: the chapters it spans, the beats it has to hit, and what it sets up for later.',
+    label: 'Plan the next volume',
+    prompt: 'Look at where the story stands and propose the next volume: the chapters it spans, the beats it has to hit, and what it sets up for later.',
     icon: <ListIcon size={14} />,
   },
   {

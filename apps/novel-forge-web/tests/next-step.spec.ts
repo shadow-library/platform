@@ -5,7 +5,6 @@ import { computeNextStep, deriveNextStepInput, type NextStepInput, type NextStep
 function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
   return {
     volumesTotal: 3,
-    planApproved: true,
     draftsTotal: 10,
     draftsFinal: 10,
     briefsRemaining: 0,
@@ -16,7 +15,7 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
 
 describe('computeNextStep', () => {
   it('should send a first-time novelist to the assistant when nothing is outlined yet', () => {
-    const result = computeNextStep(input({ volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
+    const result = computeNextStep(input({ volumesTotal: 0, draftsTotal: 0, draftsFinal: 0 }));
     expect(result.next).toMatchObject({ id: 'build-plan', label: 'Build your plan', target: { screen: 'chat' } });
     expect(result.comingUp.map(item => item.id)).toEqual(['generate-chapter', 'finalize-chapters']);
   });
@@ -77,7 +76,7 @@ describe('computeNextStep', () => {
   });
 
   it('should cap the coming-up preview at three items', () => {
-    const result = computeNextStep(input({ volumesTotal: 0, planApproved: false, draftsTotal: 0, draftsFinal: 0 }));
+    const result = computeNextStep(input({ volumesTotal: 0, draftsTotal: 0, draftsFinal: 0 }));
     expect(result.comingUp.length).toBeLessThanOrEqual(3);
   });
 });
@@ -85,7 +84,6 @@ describe('computeNextStep', () => {
 function state(overrides: Partial<NextStepStateInput> = {}): NextStepStateInput {
   return {
     volumesTotal: 1,
-    planApproved: true,
     draftsTotal: 0,
     draftsFinal: 0,
     briefs: [],

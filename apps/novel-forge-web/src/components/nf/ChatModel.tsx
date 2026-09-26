@@ -24,7 +24,7 @@ import styles from './ChatModel.module.css';
 /**
  * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / resolveModel):
  *  1. the chat's own override (picked inline in the composer),
- *  2. the project setting for the scope's role (an arc chat IS planning work, so it follows Planning),
+ *  2. the project setting for the scope's role,
  *  3. refinement chat with no explicit model follows the Planning selection,
  *  4. the project owner's default for the scope's model group, from Settings,
  *  5. the active profile's default for that group.
@@ -36,10 +36,7 @@ import styles from './ChatModel.module.css';
 const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
   project: 'chat',
   novel: 'chat',
-  volume_plan: 'plan',
   volume: 'plan',
-  arc_plan: 'arc',
-  arc: 'arc',
   brief: 'outline',
   bible_document: 'bible',
 };
@@ -48,10 +45,7 @@ const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
 const SCOPE_GROUP: Record<ChatScope, AccountModelGroup> = {
   project: 'chat',
   novel: 'chat',
-  volume_plan: 'planning',
   volume: 'planning',
-  arc_plan: 'planning',
-  arc: 'planning',
   brief: 'planning',
   bible_document: 'planning',
 };

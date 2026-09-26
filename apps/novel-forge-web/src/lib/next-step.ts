@@ -28,7 +28,6 @@ export interface NextStepResult {
 
 export interface NextStepInput {
   volumesTotal: number;
-  planApproved: boolean;
   draftsTotal: number;
   draftsFinal: number;
   /** Outlined chapters (briefs) that have no draft yet. */
@@ -90,7 +89,7 @@ const RULES: readonly NextStepRule[] = [
   {
     id: 'generate-chapter',
     roadmapIndex: 1,
-    test: input => input.planApproved && input.briefsRemaining > 0,
+    test: input => input.briefsRemaining > 0,
     build: input => ({
       id: 'generate-chapter',
       label: input.nextBriefChapter != null ? `Generate chapter ${input.nextBriefChapter}` : 'Generate the next chapter',
@@ -102,7 +101,7 @@ const RULES: readonly NextStepRule[] = [
   {
     id: 'finalize-chapters',
     roadmapIndex: 2,
-    test: input => input.planApproved && input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.reviewQueueCount === 0 && input.briefsRemaining <= 0,
+    test: input => input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.reviewQueueCount === 0 && input.briefsRemaining <= 0,
     build: input => ({
       id: 'finalize-chapters',
       label: 'Finalize chapters',
@@ -177,7 +176,6 @@ interface DraftedChapterLike {
 
 export interface NextStepStateInput {
   volumesTotal: number;
-  planApproved: boolean;
   draftsTotal: number;
   draftsFinal: number;
   briefs: readonly BriefLike[];
@@ -235,7 +233,6 @@ export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
 
   return {
     volumesTotal: state.volumesTotal,
-    planApproved: state.planApproved,
     draftsTotal: state.draftsTotal,
     draftsFinal: state.draftsFinal,
     briefsRemaining,

@@ -142,7 +142,7 @@ export function sharedOwnerTag(project: Pick<ProjectResponse, 'ownerKind' | 'sha
 
 /** Sidebar lifecycle labels for the one project workflow this app now has. */
 export const LIFECYCLE_PHASES: Partial<Record<ProjectResponse['kind'], readonly string[]>> = {
-  new_novel: ['Bible', 'Plan', 'Arcs', 'Drafts', 'Review'],
+  new_novel: ['Bible', 'Volumes', 'Drafts', 'Review'],
 };
 
 export interface LifecyclePhase {
@@ -155,7 +155,7 @@ export interface LifecyclePhase {
  * Derive a monotonic lifecycle position from a project's status. `kind` defaults to `status?.kind`, then
  * `new_novel`, but a caller that already knows the kind (from the project itself, which loads before its
  * status) should pass it explicitly so the shell and the overview screen agree on `total`/hiding from the
- * first paint, instead of waiting on `status` to arrive. Bible → Plan → Arcs → Drafts → Review; a phase
+ * first paint, instead of waiting on `status` to arrive. Bible → Volumes → Drafts → Review; a phase
  * counts as complete only when every earlier phase is too, so the bar never regresses.
  */
 export function lifecyclePhase(status?: ProjectStatusResponse, kind: ProjectResponse['kind'] = status?.kind ?? 'new_novel'): LifecyclePhase {
@@ -164,7 +164,7 @@ export function lifecyclePhase(status?: ProjectStatusResponse, kind: ProjectResp
   if (total === 0 || !status) return { completed: 0, total, label: phases[0] ?? '' };
   const draftsTotal = status.draftsTotal ?? 0;
   const draftsFinal = status.draftsFinal ?? 0;
-  const flags = [true, (status.volumesTotal ?? 0) > 0, status.planApproved === true, draftsTotal > 0, draftsTotal > 0 && draftsFinal === draftsTotal];
+  const flags = [true, (status.volumesTotal ?? 0) > 0, draftsTotal > 0, draftsTotal > 0 && draftsFinal === draftsTotal];
   let completed = 0;
   for (const ok of flags) {
     if (!ok) break;

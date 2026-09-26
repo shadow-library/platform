@@ -43,20 +43,19 @@ describe('sharedOwnerLabel', () => {
 
 describe('lifecyclePhase', () => {
   it('should default to the new_novel phases when status is unknown', () => {
-    expect(lifecyclePhase(undefined)).toEqual({ completed: 0, total: 5, label: 'Bible' });
+    expect(lifecyclePhase(undefined)).toEqual({ completed: 0, total: 4, label: 'Bible' });
   });
 
   it('should walk the authoring phases forward as status fields complete', () => {
     const kind = 'new_novel' as const;
-    expect(lifecyclePhase({ kind })).toEqual({ completed: 1, total: 5, label: 'Plan' });
-    expect(lifecyclePhase({ kind, volumesTotal: 3 })).toEqual({ completed: 2, total: 5, label: 'Arcs' });
-    expect(lifecyclePhase({ kind, volumesTotal: 3, planApproved: true })).toEqual({ completed: 3, total: 5, label: 'Drafts' });
-    expect(lifecyclePhase({ kind, volumesTotal: 3, planApproved: true, draftsTotal: 10 })).toEqual({ completed: 4, total: 5, label: 'Review' });
-    expect(lifecyclePhase({ kind, volumesTotal: 3, planApproved: true, draftsTotal: 10, draftsFinal: 10 })).toEqual({ completed: 5, total: 5, label: 'Review' });
+    expect(lifecyclePhase({ kind })).toEqual({ completed: 1, total: 4, label: 'Volumes' });
+    expect(lifecyclePhase({ kind, volumesTotal: 3 })).toEqual({ completed: 2, total: 4, label: 'Drafts' });
+    expect(lifecyclePhase({ kind, volumesTotal: 3, draftsTotal: 10 })).toEqual({ completed: 3, total: 4, label: 'Review' });
+    expect(lifecyclePhase({ kind, volumesTotal: 3, draftsTotal: 10, draftsFinal: 10 })).toEqual({ completed: 4, total: 4, label: 'Review' });
   });
 
   it('should expose only the new_novel workflow', () => {
-    expect(LIFECYCLE_PHASES.new_novel).toEqual(['Bible', 'Plan', 'Arcs', 'Drafts', 'Review']);
+    expect(LIFECYCLE_PHASES.new_novel).toEqual(['Bible', 'Volumes', 'Drafts', 'Review']);
   });
 });
 

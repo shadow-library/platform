@@ -24,7 +24,7 @@ export function useListFactsQuery(projectId: string, enabled = true): UseQueryRe
 
 export type UpsertFactVariables = UpsertFactBody & { factKey: string };
 
-// One PUT endpoint serves both create and update (arc-style merge), so the target key is part of the
+// One PUT endpoint serves both create and update, so the target key is part of the
 // mutation's variables rather than fixed at hook-instantiation time — the create dialog only learns the
 // key the user typed at submit time.
 export function useUpsertFactMutation(projectId: string): UseMutationResult<FactResponse, ApiError, UpsertFactVariables> {
