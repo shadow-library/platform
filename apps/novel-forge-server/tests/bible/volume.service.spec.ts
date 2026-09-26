@@ -8,8 +8,8 @@ import { matchesWhere, queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
 
-/** An in-memory `volumes`/`chapters` pair honouring the filters the service writes, transactions included. */
-function fakeDb(seed: { volumes?: Row[]; chapters?: Row[] } = {}) {
+/** An in-memory `volumes`/`chapters`/`drafts`/`briefs` set honouring the filters the service writes, transactions included. */
+function fakeDb(seed: { volumes?: Row[]; chapters?: Row[]; drafts?: Row[]; briefs?: Row[] } = {}) {
   const tables = new Map<unknown, Row[]>([
     [
       schema.volumes,
@@ -28,6 +28,8 @@ function fakeDb(seed: { volumes?: Row[]; chapters?: Row[] } = {}) {
       })),
     ],
     [schema.chapters, (seed.chapters ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 1n, ...row }))],
+    [schema.drafts, (seed.drafts ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 1n, ...row }))],
+    [schema.briefs, (seed.briefs ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 1n, ...row }))],
   ]);
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
   const finder = (table: unknown) => ({
@@ -35,7 +37,7 @@ function fakeDb(seed: { volumes?: Row[]; chapters?: Row[] } = {}) {
     findMany: async (query: Parameters<typeof queryRows>[1] = {}) => queryRows(rows(table), query),
   });
   const db = {
-    query: { volumes: finder(schema.volumes), chapters: finder(schema.chapters) },
+    query: { volumes: finder(schema.volumes), chapters: finder(schema.chapters), drafts: finder(schema.drafts), briefs: finder(schema.briefs) },
     $count: async (table: unknown, where?: SQL) => queryRows(rows(table), { where }).length,
     update: (table: unknown) => ({
       set: (values: Row) => ({
@@ -127,5 +129,24 @@ describe('VolumeService derived display data', () => {
   it('should report an empty volume with zero counts and null range for get()', async () => {
     const volume = await service({ volumes: [{ volumeKey: 'v1', ordinal: 1, state: 'not_started' }], chapters: [] }).get(1n, 'v1');
     expect(volume).toMatchObject({ chapterCount: 0, firstChapter: null, lastChapter: null, wordCount: 0 });
+  });
+
+  it('should widen the plan range with drafted and briefed chapters the final-only range misses', async () => {
+    const volume = await service({
+      volumes: [{ volumeKey: 'v1', ordinal: 1, state: 'active' }],
+      chapters: [{ number: 1, wordCount: 1000, volumeKey: 'v1' }],
+      drafts: [{ chapter: 2, volumeKey: 'v1' }],
+      briefs: [
+        { chapter: 2, volumeKey: 'v1' },
+        { chapter: 3, volumeKey: 'v1' },
+      ],
+    }).get(1n, 'v1');
+
+    expect(volume).toMatchObject({ chapterCount: 1, firstChapter: 1, lastChapter: 1, planChapterCount: 3, planFirstChapter: 1, planLastChapter: 3 });
+  });
+
+  it('should report a null plan range for a volume with no chapters anywhere in the plan', async () => {
+    const volume = await service({ volumes: [{ volumeKey: 'v1', ordinal: 1, state: 'not_started' }] }).get(1n, 'v1');
+    expect(volume).toMatchObject({ planChapterCount: 0, planFirstChapter: null, planLastChapter: null });
   });
 });

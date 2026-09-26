@@ -4,7 +4,7 @@ import { Logger, type OffsetPaginationResult, utils } from '@shadow-library/comm
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { sanitizeMarkdown } from '@server/common';
+import { briefMatchesPov, resolveThreadChapterNumbers, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, schema } from '@server/database';
 
@@ -72,18 +72,12 @@ export class ChapterService {
       columns: { chapter: true, pov: true, scenes: true },
       where: eq(schema.briefs.projectId, projectId),
     });
-    const matches = briefs.filter(brief => brief.pov === pov || (brief.scenes ?? []).some(scene => scene.pov === pov));
+    const matches = briefs.filter(brief => briefMatchesPov(brief, pov));
     return new Set(matches.map(brief => brief.chapter));
   }
 
-  private async chapterNumbersByThread(projectId: bigint, threadKey: string): Promise<Set<number>> {
-    const thread = await this.db.query.plotThreads.findFirst({
-      columns: { openedChapter: true, closedChapter: true, lastAdvancedChapter: true },
-      where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.threadKey, threadKey)),
-    });
-    if (!thread) return new Set();
-    const numbers = [thread.openedChapter, thread.closedChapter, thread.lastAdvancedChapter].filter((n): n is number => n != null);
-    return new Set(numbers);
+  private chapterNumbersByThread(projectId: bigint, threadKey: string): Promise<Set<number>> {
+    return resolveThreadChapterNumbers(this.db, projectId, threadKey);
   }
 
   private emptyResult(query: { limit: number; offset: number }): ChapterListResult {

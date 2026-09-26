@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChapterRows, CHAPTER_FILTERS, type ChapterRowBrief, type ChapterRowDraft, pageChapterRows, summarizeChapterRows } from '@server/common';
+import { buildChapterRows, CHAPTER_FILTERS, chapterNumbersMatchingPov, type ChapterRowBrief, type ChapterRowDraft, pageChapterRows, summarizeChapterRows } from '@server/common';
 
 function draft(chapter: number, overrides: Partial<ChapterRowDraft> = {}): ChapterRowDraft {
   return {
@@ -11,11 +11,16 @@ function draft(chapter: number, overrides: Partial<ChapterRowDraft> = {}): Chapt
     generator: 'standard',
     isolated: false,
     finalizeBlocked: false,
+    revision: 0,
     approvedRevision: null,
     wordCount: 100,
     judgeNote: null,
     ...overrides,
   };
+}
+
+function brief(chapter: number, overrides: Partial<ChapterRowBrief> = {}): ChapterRowBrief {
+  return { chapter, title: `Brief ${chapter}`, writeMode: 'standard', pov: null, scenes: null, ...overrides };
 }
 
 const drafts: ChapterRowDraft[] = [
@@ -25,10 +30,10 @@ const drafts: ChapterRowDraft[] = [
 ];
 
 const briefs: ChapterRowBrief[] = [
-  { chapter: 1, title: 'Brief one', writeMode: 'standard' },
-  { chapter: 2, title: 'Brief two', writeMode: 'external' },
-  { chapter: 3, title: 'Brief three', writeMode: 'standard' },
-  { chapter: 4, title: null, writeMode: 'standard' },
+  brief(1, { title: 'Brief one' }),
+  brief(2, { title: 'Brief two', writeMode: 'external' }),
+  brief(3, { title: 'Brief three' }),
+  brief(4, { title: null }),
 ];
 
 describe('buildChapterRows', () => {
@@ -48,11 +53,42 @@ describe('buildChapterRows', () => {
   });
 
   it('should carry the brief write mode onto a planned slot', () => {
-    expect(buildChapterRows(drafts, briefs).find(r => r.chapter === 2)).toEqual({ kind: 'planned', chapter: 2, title: 'Brief two', writeMode: 'external' });
+    expect(buildChapterRows(drafts, briefs).find(r => r.chapter === 2)).toEqual({ kind: 'planned', chapter: 2, title: 'Brief two', writeMode: 'external', pov: null });
   });
 
   it('should leave the write mode null on a written chapter with no brief', () => {
     expect(buildChapterRows(drafts, briefs).find(r => r.chapter === 5)?.writeMode).toBeNull();
+  });
+
+  it('should carry the draft revision onto a written row', () => {
+    const rows = buildChapterRows([draft(1, { revision: 3 })], []);
+    expect(rows[0]).toMatchObject({ revision: 3 });
+  });
+
+  it('should resolve pov from the brief onto both written and planned rows', () => {
+    const rows = buildChapterRows([draft(1)], [brief(1, { pov: 'mara' }), brief(2, { pov: 'ren' })]);
+    expect(rows.find(r => r.chapter === 1)?.pov).toBe('mara');
+    expect(rows.find(r => r.chapter === 2)?.pov).toBe('ren');
+  });
+
+  it('should pool a scene pov onto a row when the brief itself names none', () => {
+    const rows = buildChapterRows([], [brief(1, { pov: null, scenes: [{ summary: 'x', pov: 'lio' }] })]);
+    expect(rows[0]?.pov).toBe('lio');
+  });
+
+  it('should leave pov null on a written chapter with no brief', () => {
+    expect(buildChapterRows(drafts, briefs).find(r => r.chapter === 5)?.pov).toBeNull();
+  });
+});
+
+describe('chapterNumbersMatchingPov', () => {
+  it('should match a brief pov and a pooled scene pov alike', () => {
+    const numbers = chapterNumbersMatchingPov([brief(1, { pov: 'mara' }), brief(2, { pov: 'ren', scenes: [{ summary: 'x', pov: 'mara' }] }), brief(3, { pov: 'ren' })], 'mara');
+    expect([...numbers].sort()).toEqual([1, 2]);
+  });
+
+  it('should return an empty set when no brief names the pov', () => {
+    expect(chapterNumbersMatchingPov([brief(1, { pov: 'ren' })], 'mara').size).toBe(0);
   });
 });
 
@@ -77,7 +113,7 @@ describe('summarizeChapterRows', () => {
   });
 
   it('should report no next brief once every brief is written', () => {
-    expect(summarizeChapterRows(buildChapterRows([draft(1)], [{ chapter: 1, title: null, writeMode: 'standard' }])).nextBriefChapter).toBeNull();
+    expect(summarizeChapterRows(buildChapterRows([draft(1)], [brief(1, { title: null })])).nextBriefChapter).toBeNull();
   });
 
   it('should place the frontier at the highest finalized chapter', () => {

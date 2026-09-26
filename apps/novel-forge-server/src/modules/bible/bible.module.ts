@@ -10,6 +10,8 @@ import { FactController } from './fact/fact.controller';
 import { FactService } from './fact/fact.service';
 import { MilestoneController } from './milestone/milestone.controller';
 import { MilestoneService } from './milestone/milestone.service';
+import { PromiseController } from './promise/promise.controller';
+import { PromiseService } from './promise/promise.service';
 import { BibleReadinessController } from './readiness/bible-readiness.controller';
 import { BibleReadinessService } from './readiness/bible-readiness.service';
 import { VolumeActionRegistrar } from './volume/volume-action.registrar';
@@ -18,8 +20,8 @@ import { VolumeService } from './volume/volume.service';
 
 @Module({
   imports: [DatabaseModule, StorageModule, RefinementModule],
-  controllers: [EntityController, VolumeController, BibleDocumentController, FactController, MilestoneController, BibleReadinessController],
-  providers: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, BibleReadinessService, VolumeActionRegistrar],
-  exports: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, BibleReadinessService],
+  controllers: [EntityController, VolumeController, BibleDocumentController, FactController, MilestoneController, PromiseController, BibleReadinessController],
+  providers: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService, VolumeActionRegistrar],
+  exports: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService],
 })
 export class BibleModule {}

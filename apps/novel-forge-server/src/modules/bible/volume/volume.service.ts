@@ -4,12 +4,21 @@ import { OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { deriveVolumeStats, EMPTY_VOLUME_STATS, nextVolumeToActivate, volumeContentHash, type VolumeStats } from '@server/common';
+import {
+  deriveVolumePlanRange,
+  deriveVolumeStats,
+  EMPTY_VOLUME_PLAN_RANGE,
+  EMPTY_VOLUME_STATS,
+  nextVolumeToActivate,
+  volumeContentHash,
+  type VolumePlanRange,
+  type VolumeStats,
+} from '@server/common';
 import { type Plan, type PrimaryDatabase, schema } from '@server/database';
 
 import { type ListVolumesQuery } from './volume.dto';
 
-export type VolumeWithStats = Plan.Volume & VolumeStats;
+export type VolumeWithStats = Plan.Volume & VolumeStats & VolumePlanRange;
 
 export interface VolumeAdvanceResult {
   completed: VolumeWithStats;
@@ -38,12 +47,45 @@ export class VolumeService {
     return new Map(volumeKeys.map(key => [key, deriveVolumeStats(byVolume.get(key) ?? [])]));
   }
 
+  private async planRangeByVolume(projectId: bigint, volumeKeys: readonly string[]): Promise<Map<string, VolumePlanRange>> {
+    if (volumeKeys.length === 0) return new Map();
+    const [chapterRows, draftRows, briefRows] = await Promise.all([
+      this.db.query.chapters.findMany({
+        columns: { number: true, volumeKey: true },
+        where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.volumeKey, [...volumeKeys])),
+      }),
+      this.db.query.drafts.findMany({
+        columns: { chapter: true, volumeKey: true },
+        where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.volumeKey, [...volumeKeys])),
+      }),
+      this.db.query.briefs.findMany({
+        columns: { chapter: true, volumeKey: true },
+        where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.volumeKey, [...volumeKeys])),
+      }),
+    ]);
+
+    const byVolume = new Map<string, Set<number>>();
+    const claim = (volumeKey: string | null, chapter: number): void => {
+      if (!volumeKey) return;
+      const claimed = byVolume.get(volumeKey) ?? new Set<number>();
+      claimed.add(chapter);
+      byVolume.set(volumeKey, claimed);
+    };
+    for (const row of chapterRows) claim(row.volumeKey, row.number);
+    for (const row of draftRows) claim(row.volumeKey, row.chapter);
+    for (const row of briefRows) claim(row.volumeKey, row.chapter);
+
+    return new Map(volumeKeys.map(key => [key, deriveVolumePlanRange([...(byVolume.get(key) ?? [])])]));
+  }
+
   private async withStats(projectId: bigint, volumes: readonly Plan.Volume[]): Promise<VolumeWithStats[]> {
-    const stats = await this.statsByVolume(
-      projectId,
-      volumes.map(volume => volume.volumeKey),
-    );
-    return volumes.map(volume => ({ ...volume, ...(stats.get(volume.volumeKey) ?? EMPTY_VOLUME_STATS) }));
+    const volumeKeys = volumes.map(volume => volume.volumeKey);
+    const [stats, planRanges] = await Promise.all([this.statsByVolume(projectId, volumeKeys), this.planRangeByVolume(projectId, volumeKeys)]);
+    return volumes.map(volume => ({
+      ...volume,
+      ...(stats.get(volume.volumeKey) ?? EMPTY_VOLUME_STATS),
+      ...(planRanges.get(volume.volumeKey) ?? EMPTY_VOLUME_PLAN_RANGE),
+    }));
   }
 
   async list(projectId: bigint, filter: ListVolumesQuery): Promise<OffsetPaginationResult<VolumeWithStats>> {
@@ -118,11 +160,11 @@ export class VolumeService {
         }
       }
 
-      const stats = await this.statsByVolume(projectId, activated ? [completed.volumeKey, activated.volumeKey] : [completed.volumeKey]);
-      return {
-        completed: { ...completed, ...(stats.get(completed.volumeKey) ?? EMPTY_VOLUME_STATS) },
-        activated: activated ? { ...activated, ...(stats.get(activated.volumeKey) ?? EMPTY_VOLUME_STATS) } : null,
-      };
+      const withStats = await this.withStats(projectId, activated ? [completed, activated] : [completed]);
+      const byKey = new Map(withStats.map(volume => [volume.volumeKey, volume]));
+      const completedWithStats = byKey.get(completed.volumeKey);
+      if (!completedWithStats) throw AppErrorCode.VOL_003.create();
+      return { completed: completedWithStats, activated: activated ? (byKey.get(activated.volumeKey) ?? null) : null };
     });
   }
 }

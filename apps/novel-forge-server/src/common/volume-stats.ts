@@ -30,6 +30,24 @@ export function deriveVolumeStats(rows: readonly VolumeChapterRow[]): VolumeStat
   };
 }
 
+export interface VolumePlanRange {
+  planChapterCount: number;
+  planFirstChapter: number | null;
+  planLastChapter: number | null;
+}
+
+export const EMPTY_VOLUME_PLAN_RANGE: VolumePlanRange = { planChapterCount: 0, planFirstChapter: null, planLastChapter: null };
+
+/**
+ * The same range as {@link deriveVolumeStats}, but over every chapter number the volume claims anywhere in the
+ * plan — final, drafted, or only briefed — so the web can place a not-yet-written chapter without asking the
+ * author to assign a volume by hand.
+ */
+export function deriveVolumePlanRange(chapterNumbers: readonly number[]): VolumePlanRange {
+  if (chapterNumbers.length === 0) return EMPTY_VOLUME_PLAN_RANGE;
+  return { planChapterCount: chapterNumbers.length, planFirstChapter: Math.min(...chapterNumbers), planLastChapter: Math.max(...chapterNumbers) };
+}
+
 export interface VolumeOrdinalRow {
   volumeKey: string;
   ordinal: number;

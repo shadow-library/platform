@@ -1234,6 +1234,12 @@ export class DraftSummaryResponse {
 export class ListChapterRowsQuery extends OmitType(PaginationQuery(SortByTime, { limit: 25 }), ['sortBy', 'sortOrder'] as const) {
   @Field(() => ChapterRowFilter, { default: 'all' })
   filter: ChapterFilter;
+
+  @Field({ optional: true, description: "Only rows whose brief's point of view (any pooled scene) is this entity key. Covers drafts and planned chapters too." })
+  pov?: string;
+
+  @Field({ optional: true, description: 'Only rows this thread opened, closed, or was last advanced in. Covers drafts and planned chapters too.' })
+  thread?: string;
 }
 
 @Schema({ description: 'One chapter of the plan: a written draft, or a brief with no draft yet. Rows are always in chapter order.' })
@@ -1249,6 +1255,9 @@ export class ChapterRowResponse {
 
   @Field(() => BriefWriteMode, { optional: true, nullable: true, description: 'Null for a written chapter that has no brief.' })
   writeMode?: Generation.BriefWriteMode | null;
+
+  @Field({ optional: true, nullable: true, description: "The chapter's point of view: the brief's own pov, or the first pooled scene pov. Null when neither names one." })
+  pov?: string | null;
 
   @Field(() => DraftStatus, { optional: true, description: 'Written rows only.' })
   status?: Generation.DraftStatus;
@@ -1267,6 +1276,9 @@ export class ChapterRowResponse {
     description: 'Written rows only: finalize is refused until the chapter has a summary — every chapter needs one — plus, for an isolated chapter, continuation state.',
   })
   finalizeBlocked?: boolean;
+
+  @Field(() => Integer, { optional: true, description: "Written rows only: the draft's current revision." })
+  revision?: number;
 
   @Field(() => Integer, { optional: true, nullable: true, description: 'Written rows only: the last revision the author approved, null when none was.' })
   approvedRevision?: number | null;

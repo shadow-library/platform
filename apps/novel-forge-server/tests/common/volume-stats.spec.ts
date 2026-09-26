@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { deriveVolumeStats, EMPTY_VOLUME_STATS, nextVolumeToActivate, volumeToAutoActivate } from '@server/common';
+import { deriveVolumePlanRange, deriveVolumeStats, EMPTY_VOLUME_PLAN_RANGE, EMPTY_VOLUME_STATS, nextVolumeToActivate, volumeToAutoActivate } from '@server/common';
 
 describe('deriveVolumeStats', () => {
   it('should report zero counts for a volume with no chapters', () => {
@@ -18,6 +18,16 @@ describe('deriveVolumeStats', () => {
 
   it('should treat a single chapter as its own range', () => {
     expect(deriveVolumeStats([{ number: 7, wordCount: 500 }])).toEqual({ chapterCount: 1, firstChapter: 7, lastChapter: 7, wordCount: 500 });
+  });
+});
+
+describe('deriveVolumePlanRange', () => {
+  it('should report a null range for a volume with no chapters anywhere in the plan', () => {
+    expect(deriveVolumePlanRange([])).toEqual(EMPTY_VOLUME_PLAN_RANGE);
+  });
+
+  it('should widen the range with chapter numbers a final-only range would miss', () => {
+    expect(deriveVolumePlanRange([5, 2, 3])).toEqual({ planChapterCount: 3, planFirstChapter: 2, planLastChapter: 5 });
   });
 });
 

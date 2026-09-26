@@ -2,7 +2,19 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { buildChapterRows, type ChapterRow, type ChapterRowDraft, firstUnwrittenChapter, isBlank, isFinalizable, pageChapterRows, summarizeChapterRows } from '@server/common';
+import {
+  buildChapterRows,
+  chapterNumbersMatchingPov,
+  type ChapterRow,
+  type ChapterRowBrief,
+  type ChapterRowDraft,
+  firstUnwrittenChapter,
+  isBlank,
+  isFinalizable,
+  pageChapterRows,
+  resolveThreadChapterNumbers,
+  summarizeChapterRows,
+} from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type ListChapterRowsQuery, type ListChapterRowsResponse } from './generation.dto';
@@ -21,12 +33,23 @@ export class ChapterRowsService {
   }
 
   async list(projectId: bigint, query: ListChapterRowsQuery): Promise<ListChapterRowsResponse> {
-    const { rows, nextWritableChapter } = await this.loadRows(projectId);
+    const { rows: allRows, briefRows, nextWritableChapter } = await this.loadRows(projectId);
+    const rows = await this.narrowByPovAndThread(projectId, allRows, briefRows, query);
     const page = pageChapterRows(rows, query.filter, query.limit, query.offset);
-    return { ...summarizeChapterRows(rows), nextWritableChapter, ...page, limit: query.limit, offset: query.offset };
+    return { ...summarizeChapterRows(allRows), nextWritableChapter, ...page, limit: query.limit, offset: query.offset };
   }
 
-  private async loadRows(projectId: bigint): Promise<{ rows: ChapterRow[]; nextWritableChapter: number }> {
+  private async narrowByPovAndThread(projectId: bigint, rows: ChapterRow[], briefRows: readonly ChapterRowBrief[], query: ListChapterRowsQuery): Promise<ChapterRow[]> {
+    if (!query.pov && !query.thread) return rows;
+    const sets: Set<number>[] = [];
+    if (query.pov) sets.push(chapterNumbersMatchingPov(briefRows, query.pov));
+    if (query.thread) sets.push(await resolveThreadChapterNumbers(this.db, projectId, query.thread));
+    const [first, ...rest] = sets;
+    const kept = rest.reduce((kept, next) => new Set([...kept].filter(number => next.has(number))), first ?? new Set<number>());
+    return rows.filter(row => kept.has(row.chapter));
+  }
+
+  private async loadRows(projectId: bigint): Promise<{ rows: ChapterRow[]; briefRows: ChapterRowBrief[]; nextWritableChapter: number }> {
     const [draftRows, briefRows, finalizedRows] = await Promise.all([
       this.db
         .select({
@@ -39,6 +62,7 @@ export class ChapterRowsService {
           summary: drafts.summary,
           state: drafts.state,
           judgeNote: drafts.judgeNote,
+          revision: drafts.revision,
           approvedRevision: drafts.approvedRevision,
           wordCount,
         })
@@ -47,7 +71,7 @@ export class ChapterRowsService {
         .orderBy(asc(drafts.chapter)),
       this.db.query.briefs.findMany({
         where: eq(schema.briefs.projectId, projectId),
-        columns: { chapter: true, title: true, writeMode: true },
+        columns: { chapter: true, title: true, writeMode: true, pov: true, scenes: true },
         orderBy: asc(schema.briefs.chapter),
       }),
       this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } }),
@@ -58,6 +82,6 @@ export class ChapterRowsService {
       finalizeBlocked: !isFinalizable({ isolated: draft.isolated, summary, state }) || (!draft.isolated && isBlank(summary)),
     }));
     const nextWritableChapter = firstUnwrittenChapter(new Set(draftRows.map(draft => draft.chapter)), new Set(finalizedRows.map(chapter => chapter.number)));
-    return { rows: buildChapterRows(written, briefRows), nextWritableChapter };
+    return { rows: buildChapterRows(written, briefRows), briefRows, nextWritableChapter };
   }
 }

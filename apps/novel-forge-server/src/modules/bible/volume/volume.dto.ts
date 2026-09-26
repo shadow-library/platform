@@ -63,6 +63,15 @@ export class VolumeResponse {
   @Field(() => Integer, { description: 'Sum of word counts across the volume’s chapters.' })
   wordCount: number;
 
+  @Field(() => Integer, { description: 'Chapters this volume claims anywhere in the plan — final, drafted, or briefed only — so a not-yet-written chapter still places into it.' })
+  planChapterCount: number;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'Lowest chapter number claimed anywhere in the plan; null when it has none.' })
+  planFirstChapter?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'Highest chapter number claimed anywhere in the plan; null when it has none.' })
+  planLastChapter?: number | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 

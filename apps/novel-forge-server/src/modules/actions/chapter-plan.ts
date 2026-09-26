@@ -7,6 +7,7 @@ import {
   planUnlockContext,
   type PlanWorld,
   renderBriefBody,
+  resolvePromiseDueStanding,
   type RevealFact,
   revealRequirements,
 } from '@server/common';
@@ -113,22 +114,20 @@ function candidate(
   milestoneStates: ReadonlyMap<string, Knowledge.MilestoneState> | undefined,
   volumeStates: ReadonlyMap<string, Plan.VolumeState> | undefined,
 ): PromiseCandidate {
+  const standing = resolvePromiseDueStanding(row, chapter, milestoneStates, volumeStates);
   const dueByChapter = row.payoffWindow !== null && row.payoffWindow <= chapter;
   const dueByMilestone = row.payoffMilestoneKey !== null && milestoneStates?.get(row.payoffMilestoneKey) === 'reached';
   // P4-41b: the payoff volume being the one now underway is the reminder to close the promise before it wraps; the volume already having
   // met its goal is the promise having missed that window — overdue, not merely due.
-  const volumeState = row.payoffVolumeKey !== null ? volumeStates?.get(row.payoffVolumeKey) : undefined;
-  const dueByVolume = volumeState === 'active';
-  const overdueByVolume = volumeState === 'goal_met';
-  const dueBy: PromiseDueBy = dueByChapter ? 'chapter' : dueByMilestone ? 'milestone' : dueByVolume || overdueByVolume ? 'volume' : null;
+  const dueBy: PromiseDueBy = dueByChapter ? 'chapter' : dueByMilestone ? 'milestone' : standing !== 'not_due' ? 'volume' : null;
   return {
     ref: `${kind}:${key}`,
     label,
     quietSince: row.lastAdvancedChapter ?? row.openedChapter ?? 0,
     payoffWindow: row.payoffWindow,
-    due: dueBy !== null,
+    due: standing !== 'not_due',
     dueBy,
-    overdue: dueByChapter || overdueByVolume,
+    overdue: standing === 'overdue',
   };
 }
 
