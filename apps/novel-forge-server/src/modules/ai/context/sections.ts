@@ -16,11 +16,14 @@ export interface ContextSection {
   rendered: string;
   /** Survives budget pressure: the pack is meaningless without it, so it is reserved before anything else fits. */
   required?: boolean;
+  /** An optional section's claim on the budget left after the required ones: lower is served first, whatever the render order. */
+  priority?: number;
 }
 
-interface OmittedSection {
+export interface OmittedSection {
   key: string;
   reason: 'budget' | 'unresolved';
+  tokens?: number;
 }
 
 export interface AssembledPack {
@@ -45,6 +48,8 @@ const SECTION_LABELS: Record<string, string> = {
   continuation_state: '## CONTINUATION STATE',
   brief: '## CHAPTER BRIEF',
   volume_objective: '## VOLUME OBJECTIVE',
+  completed_volumes: '## EARLIER VOLUMES',
+  open_canon: '## BOOK RULES (OPEN CANON)',
   character_state: '## CHARACTER STATE (CURRENT)',
   relationships: '## CHARACTER RELATIONSHIPS (CURRENT)',
   memory: '## RECENT SUMMARIES',

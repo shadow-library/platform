@@ -6,3 +6,4 @@ export * from './plugin-sections';
 export * from './sections';
 export * from './token-budget';
 export * from './writer-brief';
+export * from './writer-context';

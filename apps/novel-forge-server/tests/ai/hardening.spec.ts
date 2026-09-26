@@ -52,7 +52,7 @@ describe('applyBudget — edge cases', () => {
     // Only first is force-included; the rest still cannot fit.
     expect(fitting[0]?.key).toBe('alpha');
     expect(fitting.every(s => s.key !== 'beta')).toBe(true);
-    expect(omitted).toEqual([{ key: 'beta', reason: 'budget' }]);
+    expect(omitted).toEqual([{ key: 'beta', reason: 'budget', tokens: 100 }]);
   });
 
   it('returns empty array when sections list is empty', () => {

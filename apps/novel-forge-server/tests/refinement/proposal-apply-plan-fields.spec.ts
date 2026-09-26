@@ -218,6 +218,15 @@ describe('ProposalApplyService — fact unlock and allowed clues', () => {
     expect(rows(schema.canonFacts)[0]).toMatchObject({ allowedClues: null });
   });
 
+  it('should apply an edit that leaves a stored clue and its terms as they were', async () => {
+    const saved = { ...fact, terms: ['vault key'], allowedClues: ['the vault key hums'] };
+    const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', body: 'The vault opens only at low tide.' }], { facts: [saved] });
+
+    await service.apply(7n, 300n);
+
+    expect(rows(schema.canonFacts)[0]).toMatchObject({ text: 'The vault opens only at low tide.', allowedClues: ['the vault key hums'] });
+  });
+
   it('should trim and de-duplicate the clues it writes', async () => {
     const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', allowedClues: [' a cold draught ', 'a cold draught', 'salt on the sill'] }], {
       facts: [fact],

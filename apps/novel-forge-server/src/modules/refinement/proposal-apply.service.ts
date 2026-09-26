@@ -7,7 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import {
   assertMilestoneSubject,
   briefContentHash,
-  cluesNamingTerms,
+  changedCluesNamingTerms,
   computeBibleDocHash,
   enforcePlanWrite,
   findMilestoneReferences,
@@ -894,7 +894,7 @@ export class ProposalApplyService {
       unlock: op.unlock === undefined ? (existing?.unlock ?? null) : op.unlock,
       allowedClues: op.allowedClues === undefined ? (existing?.allowedClues ?? null) : op.allowedClues && normalizeStringList(op.allowedClues),
     };
-    const giveaways = cluesNamingTerms(merged.allowedClues, merged.terms);
+    const giveaways = changedCluesNamingTerms(existing, merged);
     if (giveaways.length > 0) throw AppErrorCode.FCT_006.create({ reason: giveaways.join('; ') });
 
     if (existing) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { AIMessage } from '@langchain/core/messages';
 
 import { PRODUCTION_DEFAULTS, type ResolvedModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
+import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
 
 import { type DraftRow, draftRow, fakeGenerationDb, makeGenerationService } from './generation-fixtures';
@@ -19,9 +20,11 @@ interface SetupOptions {
   draft: DraftRow;
   raised?: boolean;
   unrestrictedModel?: ResolvedModel;
+  /** The writer's required material is over its limits, so an enforcing pack request fails. */
+  overCaps?: boolean;
 }
 
-function setup({ draft, raised = false, unrestrictedModel }: SetupOptions) {
+function setup({ draft, raised = false, unrestrictedModel, overCaps = false }: SetupOptions) {
   const fake = fakeGenerationDb({ draftReads: [draft], draftWriteResult: [{ ...draft, revision: draft.revision + 1 }] });
   const policyBaselines: (string | null | undefined)[] = [];
   const modelCalls: RoutedCall[] = [];
@@ -40,7 +43,12 @@ function setup({ draft, raised = false, unrestrictedModel }: SetupOptions) {
         return { invoke: async () => new AIMessage('{"verdict":"consistent","findings":[]}') };
       },
     },
-    contextAssembler: { forChapter: async () => ({ rendered: '' }) },
+    contextAssembler: {
+      forChapter: async (_projectId: bigint, _chapter: number, opts?: { enforceWriterReservations?: boolean }) => {
+        if (overCaps && opts?.enforceWriterReservations) throw AppErrorCode.CTX_002.create({ detail: 'the chapter plan is over its limit' });
+        return { rendered: '' };
+      },
+    },
     toolRegistry: { forNode: () => [], getRaw: () => [] },
     pluginPolicy: {
       resolve: async (_projectId: bigint, _call: unknown, baseline?: { contentMode?: string | null }) => {
@@ -149,5 +157,24 @@ describe('GenerationService.reviewChapter containment', () => {
     expect(run.modelCalls).toEqual([
       { role: 'review', project: expect.objectContaining({ contentMode: 'standard' }), policy: expect.objectContaining({ writerClass: 'standard' }) },
     ]);
+  });
+});
+
+describe('GenerationService — required writer material over its limits', () => {
+  it('should judge and review from the pack as it is, without failing', async () => {
+    const judged = setup({ draft: draftRow(), overCaps: true });
+    const reviewed = setup({ draft: draftRow(), overCaps: true });
+
+    await judged.service.judgeDraft(1n, 4);
+    await reviewed.service.reviewChapter(1n, 4);
+
+    expect([...judged.modelCalls, ...reviewed.modelCalls].map(call => call.role)).toEqual(['judge', 'review']);
+  });
+
+  it('should refuse a revision, which writes from the pack, with the readable failure', async () => {
+    const run = setup({ draft: draftRow(), overCaps: true });
+
+    await expect(run.service.reviseDraft(1n, 4, { note: 'Tighten the ending.' })).rejects.toMatchObject({ code: 'CTX_002' });
+    expect(run.modelCalls).toEqual([]);
   });
 });

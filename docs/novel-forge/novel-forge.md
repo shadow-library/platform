@@ -105,6 +105,14 @@
   count is flagged on the brief (`densityRisk`) for the author to merge or enrich, NEVER padded at planning time; a hand edit clears the flag.
 - The drafter MUST see only the mandatory serial core plus refs its brief declared; broad canon access belongs to the outliner (a catalog of citable refs, each with a short description) and the judge. Retrieval
   runs only at outline time, in verification and chat-hub tools, and in search.
+- The writer's required material is reserved in its budget before anything else and NEVER silently dropped: the plan (brief, scenes, ending contract), the previous
+  chapter's ending with the continuation state and the last three summaries, the sheets of the POV cast and of every character the plan cites, what the POV cast
+  knows, open canon, the goal of the chapter's volume, a deterministic summary of each earlier volume built from its finalized chapter summaries, the style guide and
+  the author's writer lines. Each has a limit. Material that grows with the book — story text, sheets, continuation state, open canon, known facts and behavioural
+  constraints — is cut to it (the chapter's own cast first, then open canon, then the latest learned) and NEVER fails a chapter; the plan, its reveals and clues, the
+  volume goal and the writer lines are not cut, and a call that writes or revises the chapter fails with a message naming the section and the overage when one is over
+  its limit or the required material is over the budget. Readers of the pack (judge, review, previews) take it as it is. Optional material — cited pages first, then
+  cast state, other entity sheets and plugin sections — fills what is left, and everything cut is recorded with its size in the stored pack's omitted list.
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. Plugin policy digest MUST be in any
   `llm_cache` key; only deterministic roles are cacheable, creative roles NEVER. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic
   code over AI wherever code can decide.
@@ -139,10 +147,11 @@
   author note, key and give-away terms, the ending and ending question (until the chapter planned as the ending) and later volumes' goals and notes are withheld
   wherever they were copied — previous prose, summaries, continuation state, entity sheets, Bible pages, cited refs and their headings, style, writer lines, the brief,
   feedback, guidance and findings. The planner-only pages' lines are withheld only from what copies authored canon (pages, entity sheets, cited refs, plugin sections),
-  because their opening lines are what the chapter's own plan says. It is lexical: it catches copies, not paraphrase, and a passage under three words or twelve
-  characters is caught only by give-away terms. For the writer a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an
-  earlier chapter, a thread or mystery only once opened, and the volume-plan and escalation-map pages never. A locked fact's allowed clues reach the writer
-  unscrubbed, and a clue may not name its fact's give-away terms. A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one.
+  because their opening lines are what the chapter's own plan says. It is lexical: it catches copies, not paraphrase, and a passage of one word, of two words
+  under twelve characters, or under six characters in a script written without spaces, is caught only by give-away terms. For the writer a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an
+  earlier chapter, a thread or mystery only once opened (one with no opening chapter, made by hand or imported, always), and the volume-plan and escalation-map pages never. A locked fact's allowed clues reach the writer
+  unscrubbed, and a clue may not name its fact's give-away terms (checked when the clues or terms are written, so an older fact stays editable; one that
+  still does is dropped from the writer's clues). A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one.
   Planner and chat packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule

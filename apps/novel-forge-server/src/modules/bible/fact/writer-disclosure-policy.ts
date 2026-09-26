@@ -1,6 +1,8 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { Logger } from '@shadow-library/common';
 
-import { escapeRegExp, nearestVolumeKey, revealTermPattern } from '@server/common';
+import { cluesNamingTerms, escapeRegExp, nearestVolumeKey, revealTermPattern } from '@server/common';
+import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { isPlannerOnlyBibleDoc, isWriterExcludedBibleDoc, OPEN_QUESTIONS_DOC, ORGANISED_TIMELINE_DOC } from '../../ai/context/bible-docs';
@@ -33,14 +35,20 @@ interface Withholding {
 
 type PassageFloor = 'truth' | 'passage' | 'sentence';
 
+const logger = Logger.getLogger(APP_NAME, 'writer-disclosure-policy');
+
 const WITHHELD = '[withheld]';
 const COPY_FIELDS: ReadonlySet<WriterField> = new Set(['bible_page', 'entity', 'reference', 'plugin']);
 const MIN_TRUTH_LENGTH = 3;
-// A passage shorter than this ("None", "Bittersweet") would wipe a common word from every field; its give-away terms still catch it.
+// A single word ("None", "Reconciliation") would be wiped from every field, and a short pair nearly as often; give-away terms still catch them.
 const MIN_PASSAGE_WORDS = 3;
-const MIN_PASSAGE_LENGTH = 12;
+const MIN_PAIR_LENGTH = 12;
 // A sentence shorter than this is too likely to recur in ordinary prose to be withheld on its own; the whole passage still is.
 const MIN_SENTENCE_LENGTH = 20;
+// Scripts written without spaces between words: a whitespace word count says nothing there, so their floors count characters.
+const MIN_UNSPACED_PASSAGE_LENGTH = 6;
+const MIN_UNSPACED_SENTENCE_LENGTH = 12;
+const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
 const LEAK_NOTE_SEPARATOR = ' — ';
 const PRESCAN_LEAK = /^"(.+?)" exposes \[([^\]]+)\]/;
 const SENTENCE_BREAK = /(?<=[.!?。！？])\s+|\n+/u;
@@ -63,8 +71,11 @@ function charPattern(char: string): string {
 
 function longEnough(text: string, floor: PassageFloor): boolean {
   if (floor === 'truth') return text.length >= MIN_TRUTH_LENGTH;
+  if (UNSPACED_SCRIPT.test(text)) return text.length >= (floor === 'sentence' ? MIN_UNSPACED_SENTENCE_LENGTH : MIN_UNSPACED_PASSAGE_LENGTH);
+  const words = text.split(/\s+/).length;
+  if (words < 2) return false;
   if (floor === 'sentence') return text.length >= MIN_SENTENCE_LENGTH;
-  return text.split(/\s+/).length >= MIN_PASSAGE_WORDS || text.length >= MIN_PASSAGE_LENGTH;
+  return words >= MIN_PASSAGE_WORDS || text.length >= MIN_PAIR_LENGTH;
 }
 
 /** A literal passage as a case-insensitive whole-word pattern that tolerates re-wrapping, markdown emphasis, quote and dash variants and a different sentence end. */
@@ -219,15 +230,24 @@ export class WriterDisclosurePolicy {
     return true;
   }
 
-  /** A thread or mystery the story has not opened by this chapter belongs to the plan, not to the writer. */
+  /**
+   * A thread or mystery the story has not opened by this chapter belongs to the plan, not to the writer. One with no opening chapter was
+   * made by hand or imported, never scheduled, so it is the author's to show.
+   */
   opensBy(openedChapter: number | null | undefined): boolean {
-    if (!this.restricts) return true;
-    return typeof openedChapter === 'number' && openedChapter <= this.chapter;
+    if (!this.restricts || openedChapter == null) return true;
+    return openedChapter <= this.chapter;
   }
 
-  /** The observable signs the author allows for the locked facts, never scrubbed: suspense needs clues the writer may show. */
+  /**
+   * The observable signs the author allows for the locked facts, never scrubbed: suspense needs clues the writer may show. A clue naming its
+   * fact's give-away term (stored before that rule, or written around it) is dropped rather than passed through.
+   */
   allowedClues(): string[] {
-    return [...new Set(this.lockedFacts.flatMap(fact => fact.allowedClues ?? []).map(clue => clue.trim()))].filter(Boolean);
+    const clues = this.lockedFacts.flatMap(fact => (fact.allowedClues ?? []).filter(clue => cluesNamingTerms([clue], fact.terms).length === 0));
+    const naming = this.lockedFacts.filter(fact => cluesNamingTerms(fact.allowedClues, fact.terms).length > 0).map(fact => fact.factKey);
+    if (naming.length > 0) logger.warn('allowed clues dropped for naming a give-away term', { chapter: this.chapter, factKeys: naming });
+    return [...new Set(clues.map(clue => clue.trim()))].filter(Boolean);
   }
 
   /** The give-away terms of the locked facts that `body` uses, as the writer-safe lines a revision works from. */

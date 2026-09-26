@@ -8,6 +8,49 @@ export function countTokens(text: string): number {
   return enc.encode(text).length;
 }
 
+/** The longest run of `text`'s leading characters within `maxTokens`, found by bisection: the cut for a word longer than the limit, or for a script written without spaces. */
+export function leadingChars(text: string, maxTokens: number): string {
+  const chars = Array.from(text);
+  let fits = 0;
+  let over = chars.length + 1;
+  while (over - fits > 1) {
+    const middle = Math.floor((fits + over) / 2);
+    if (countTokens(chars.slice(0, middle).join('')) <= maxTokens) fits = middle;
+    else over = middle;
+  }
+  return chars.slice(0, fits).join('');
+}
+
+/** `leadingChars` from the end of the text. */
+export function trailingChars(text: string, maxTokens: number): string {
+  const chars = Array.from(text);
+  let fits = 0;
+  let over = chars.length + 1;
+  while (over - fits > 1) {
+    const middle = Math.floor((fits + over) / 2);
+    if (countTokens(chars.slice(chars.length - middle).join('')) <= maxTokens) fits = middle;
+    else over = middle;
+  }
+  return chars.slice(chars.length - fits).join('');
+}
+
+/**
+ * The longest run of whole words from one end of a paragraph within `maxTokens`, found by bisection; when not even one word fits (a
+ * script written without spaces), that word is cut by character instead.
+ */
+function wordRun(words: string[], maxTokens: number, end: 'head' | 'tail'): string {
+  const take = (count: number): string[] => (end === 'head' ? words.slice(0, count) : words.slice(words.length - count));
+  let fits = 0;
+  let over = words.length + 1;
+  while (over - fits > 1) {
+    const middle = Math.floor((fits + over) / 2);
+    if (countTokens(take(middle).join(' ')) <= maxTokens) fits = middle;
+    else over = middle;
+  }
+  if (fits > 0) return take(fits).join(' ');
+  return end === 'head' ? leadingChars(words[0] ?? '', maxTokens) : trailingChars(words.at(-1) ?? '', maxTokens);
+}
+
 export function truncateAtParagraph(text: string, maxTokens: number): { text: string; truncated: boolean } {
   if (maxTokens === 0) return { text: '', truncated: true };
 
@@ -24,14 +67,7 @@ export function truncateAtParagraph(text: string, maxTokens: number): { text: st
       accumulated += separator + para;
       usedTokens += separatorTokens + paraTokens;
     } else if (accumulated === '') {
-      const words = para.split(/\s+/);
-      let wordAccumulated = '';
-      for (const word of words) {
-        const candidate = wordAccumulated ? wordAccumulated + ' ' + word : word;
-        if (countTokens(candidate) <= maxTokens) wordAccumulated = candidate;
-        else break;
-      }
-      return { text: wordAccumulated, truncated: true };
+      return { text: wordRun(para.split(/\s+/), maxTokens, 'head'), truncated: true };
     } else {
       return { text: accumulated, truncated: true };
     }
@@ -59,15 +95,7 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
       accumulated = para + separator + accumulated;
       usedTokens += separatorTokens + paraTokens;
     } else if (accumulated === '') {
-      const words = para.split(/\s+/);
-      let wordAccumulated = '';
-      for (let w = words.length - 1; w >= 0; w--) {
-        const word = words[w] ?? '';
-        const candidate = wordAccumulated ? word + ' ' + wordAccumulated : word;
-        if (countTokens(candidate) <= maxTokens) wordAccumulated = candidate;
-        else break;
-      }
-      return { text: wordAccumulated, truncated: true };
+      return { text: wordRun(para.split(/\s+/), maxTokens, 'tail'), truncated: true };
     } else {
       return { text: accumulated, truncated: true };
     }
@@ -79,6 +107,7 @@ export function truncateAtParagraphTail(text: string, maxTokens: number): { text
 interface BudgetOmission {
   key: string;
   reason: 'budget' | 'unresolved';
+  tokens?: number;
 }
 
 export interface BudgetResult<T> {
@@ -86,31 +115,39 @@ export interface BudgetResult<T> {
   omitted: BudgetOmission[];
 }
 
-export function applyBudget<T extends { key: string; tokens: number; required?: boolean }>(sections: T[], budgetTokens: number): BudgetResult<T> {
-  const fitting: T[] = [];
+interface BudgetedSection {
+  key: string;
+  tokens: number;
+  required?: boolean;
+  /** Lower claims the leftover budget first; unprioritised sections compete after every prioritised one, in list order. */
+  priority?: number;
+}
+
+/** Decides which sections fit; the survivors keep their list order, which is the order they render in. */
+export function applyBudget<T extends BudgetedSection>(sections: T[], budgetTokens: number): BudgetResult<T> {
+  const kept = new Set<T>();
   const omitted: BudgetOmission[] = [];
   // Required sections are charged against the budget before anything competes for it, so a pack whose
   // meaning depends on one section (a round's own input) can never lose it to a long prefix.
   let used = sections.reduce((sum, section) => sum + (section.required ? section.tokens : 0), 0);
-  for (const section of sections) {
+  const byPriority = [...sections].sort((left, right) => (left.priority ?? Number.MAX_SAFE_INTEGER) - (right.priority ?? Number.MAX_SAFE_INTEGER));
+  for (const section of byPriority) {
     if (section.required) {
-      fitting.push(section);
+      kept.add(section);
     } else if (used + section.tokens <= budgetTokens) {
-      fitting.push(section);
+      kept.add(section);
       used += section.tokens;
     } else {
-      omitted.push({ key: section.key, reason: 'budget' });
+      omitted.push({ key: section.key, reason: 'budget', tokens: section.tokens });
     }
   }
   // Guarantee at least one section so the LLM always has context to work with.
   // If nothing fit (budget > 0 but every section overshoots), force-include the first.
-  if (fitting.length === 0 && sections.length > 0 && budgetTokens > 0) {
-    const first = sections[0];
-    if (first !== undefined) {
-      fitting.push(first);
-      const idx = omitted.findIndex(o => o.key === first.key);
-      if (idx !== -1) omitted.splice(idx, 1);
-    }
+  const first = sections[0];
+  if (kept.size === 0 && first !== undefined && budgetTokens > 0) {
+    kept.add(first);
+    const idx = omitted.findIndex(o => o.key === first.key);
+    if (idx !== -1) omitted.splice(idx, 1);
   }
-  return { fitting, omitted };
+  return { fitting: sections.filter(section => kept.has(section)), omitted };
 }

@@ -95,7 +95,7 @@ describe('applyBudget', () => {
     expect(fitting.length).toBe(2);
     expect(fitting[0]?.label).toBe('a');
     expect(fitting[1]?.label).toBe('c');
-    expect(omitted).toEqual([{ key: 'b', reason: 'budget' }]);
+    expect(omitted).toEqual([{ key: 'b', reason: 'budget', tokens: 20 }]);
   });
 
   it('returns empty array when budget is 0', () => {
@@ -118,7 +118,7 @@ describe('applyBudget', () => {
       { key: 'overflow', tokens: 50 },
     ];
     const { omitted } = applyBudget(sections, 10);
-    expect(omitted).toEqual([{ key: 'overflow', reason: 'budget' }]);
+    expect(omitted).toEqual([{ key: 'overflow', reason: 'budget', tokens: 50 }]);
   });
 });
 
@@ -1153,8 +1153,8 @@ describe('ContextAssembler.forChapter — dynamic cast state', () => {
   });
 });
 
-describe('ContextAssembler — memory budget trimming', () => {
-  it('applies budget and excludes sections that would overflow', async () => {
+describe('ContextAssembler.forChapter — required material over the budget', () => {
+  it('should fail naming the chapter plan instead of dropping what the writer needs', async () => {
     const dbOverrides = {
       query: {
         projects: {
@@ -1178,14 +1178,13 @@ describe('ContextAssembler — memory budget trimming', () => {
     };
 
     const assembler = makeAssembler(dbOverrides);
-    const pack = await assembler.forChapter(1n, 1, { dryRun: true, budgetTokens: 100 });
 
-    // usedTokens may exceed budgetTokens only when the first section is force-included
-    // to guarantee a non-empty context pack (at-least-one guarantee in applyBudget).
-    expect(pack.sections.length).toBeLessThan(3);
-    expect(pack.sections.length).toBeGreaterThan(0);
-    expect(pack.omitted.length).toBeGreaterThan(0);
-    expect(pack.omitted.every(o => o.reason === 'budget')).toBe(true);
+    await expect(assembler.forChapter(1n, 1, { dryRun: true, budgetTokens: 100, enforceWriterReservations: true })).rejects.toMatchObject({
+      code: 'CTX_002',
+      message: expect.stringContaining('with the chapter plan the required material reaches'),
+    });
+    const judged = await assembler.forChapter(1n, 1, { dryRun: true, budgetTokens: 100 });
+    expect(judged.sections.some(section => section.key === 'writing_style')).toBe(true);
   });
 });
 
@@ -1222,7 +1221,11 @@ describe('ContextAssembler.forChapter — knowledge sections', () => {
         chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
         drafts: { findFirst: mock(async () => null), findMany: mock(async () => []) },
-        entities: { findMany: mock(async () => [{ id: 10n, entityKey: 'amara' }]) },
+        entities: {
+          findMany: mock(async () => [
+            { id: 10n, entityKey: 'amara', name: 'Amara', type: 'character', status: 'active', body: 'Amara keeps the accounts.', notes: null, aliases: [] },
+          ]),
+        },
         canonFacts: { findMany: mock(async () => facts) },
         characterKnowledge: { findMany: mock(async () => [{ factId: 1n, entityId: 10n, learnedInChapter: 3 }]) },
         contextPacks: { findFirst: mock(async () => null) },

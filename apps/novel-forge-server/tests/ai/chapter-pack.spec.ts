@@ -106,7 +106,7 @@ function makeAssembler(db: ReturnType<typeof chapterOneDb>): ContextAssembler {
 describe('ContextAssembler.forChapter — chapter pack assembly', () => {
   beforeAll(() => countTokens('warm'));
 
-  it('should render the POV card uncapped and in authored order', async () => {
+  it('should render the POV card whole and in authored order when it is within its own limit', async () => {
     const pack = await makeAssembler(chapterOneDb()).forChapter(1n, 1, { dryRun: true });
 
     const pov = pack.sections.find(s => s.key === 'ref:entity:wren');
@@ -205,7 +205,7 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     expect(pack.sections.some(s => s.key === 'ref:entity:wren')).toBe(true);
   });
 
-  it('should warn with unresolved refs and non-routine omissions on a persisted pack', async () => {
+  it('should warn about unresolved refs and log every cut section at info on a persisted pack', async () => {
     const extras = Array.from({ length: 3 }, (_, i) => ({
       ...guild,
       id: BigInt(10 + i),
@@ -216,22 +216,24 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
     }));
     const refs = [...baseRefs, ...extras.map(e => `entity:${e.entityKey}`), 'bible_doc:world/ledger', 'nocolon', 'unknown:thing'];
     const assembler = makeAssembler(chapterOneDb({ contextRefs: refs, extraEntities: extras }));
-    const warn = spyOn((assembler as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger, 'warn').mockImplementation(() => undefined);
+    const logger = (assembler as unknown as { logger: { warn: (...args: unknown[]) => void; info: (...args: unknown[]) => void } }).logger;
+    const warn = spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const info = spyOn(logger, 'info').mockImplementation(() => undefined);
 
     const pack = await assembler.forChapter(1n, 1, { budgetTokens: 4_500 });
-    const calls = [...warn.mock.calls];
+    const warnings = [...warn.mock.calls];
+    const infos = [...info.mock.calls];
     warn.mockRestore();
+    info.mockRestore();
 
-    const omittedKeys = pack.omitted.map(o => o.key);
-    const routine = omittedKeys.filter(key => key.startsWith('ref:entity:crew_'));
     expect([wren, tobin, guild, ...extras].length).toBeGreaterThan(FULL_CAST_MAX);
-    expect(routine).toEqual(['ref:entity:crew_2']);
-    expect(calls).toHaveLength(1);
-    const [message, payload] = calls[0] as [string, { unresolvedRefs: string[]; omitted: string[] }];
-    expect(message).toBe('chapter pack dropped context');
+    expect(warnings).toHaveLength(1);
+    const [message, payload] = warnings[0] as [string, { unresolvedRefs: string[] }];
+    expect(message).toBe('chapter pack could not resolve refs');
     expect(payload.unresolvedRefs).toEqual(expect.arrayContaining(['volume:volume_missing', 'world_fact:harbor_customs/missing', 'nocolon', 'unknown:thing']));
-    expect(payload.omitted).toContain('ref:bible_doc:world/ledger');
-    for (const key of routine) expect(payload.omitted).not.toContain(key);
+    const cut = infos.find(([text]) => text === 'chapter pack cut context')?.[1] as { omitted: { key: string }[] } | undefined;
+    expect(cut?.omitted).toEqual(pack.omitted);
+    expect(pack.omitted.map(o => o.key)).toContain('ref:bible_doc:world/ledger');
   });
 
   it('should not warn for a dry-run pack', async () => {

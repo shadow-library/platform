@@ -1,16 +1,17 @@
 import { createHash } from 'node:crypto';
 
-import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, between, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { nearestVolumeKey } from '@server/common';
+import { isOpenCanon, nearestVolumeKey } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
+  type FactLike,
   loadKnowledgeView,
   loadWriterHiddenFactKeys,
   parseKnowledgeContract,
@@ -36,11 +37,14 @@ import {
   type ContextSegment,
   type ContextTier,
   joinSections,
+  type OmittedSection,
   renderLabeledSection,
   renderSection,
   splitSegments,
 } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
+import { loadWriterBrief } from './writer-brief';
+import { assertWriterContextFits, renderCompletedVolumes, WRITER_OPTIONAL_PRIORITY, WRITER_SECTION_CAPS, type WriterReservation } from './writer-context';
 
 export interface PackPolicyOptions {
   /** The policy of the roles that will read this pack, resolved ahead of assembly so the writer class is already fixed when sections are chosen. */
@@ -64,6 +68,11 @@ export interface ChapterPackOptions extends PackOptions {
   dryRun?: boolean;
   /** The run's disclosure policy, so the pack and the brief the writer reads beside it are scrubbed against one snapshot. */
   disclosure?: WriterDisclosurePolicy;
+  /**
+   * Fails with CTX_002 when the writer's required material is over its limits or the budget. Only the calls that write or revise the
+   * chapter enforce it; readers of the pack (judge, review, previews) take it with its omissions.
+   */
+  enforceWriterReservations?: boolean;
 }
 
 interface ResolvedRefs {
@@ -71,6 +80,8 @@ interface ResolvedRefs {
   unresolved: string[];
   /** Refs the chapter's disclosure policy refused on purpose — later volumes, chapters, threads and mysteries, excluded pages. */
   withheld: string[];
+  /** The resolved `entity:` refs whose entity is a character. */
+  characters: string[];
 }
 
 export interface ChatScopeInput {
@@ -82,6 +93,7 @@ export const DEFAULT_BUDGET = 24_000;
 export const PREV_ENDING_TAIL = 500;
 export const FULL_CAST_MAX = 5;
 const RECENT_SUMMARY_COUNT = 3;
+const RECENT_SUMMARY_MAX = 400;
 const ESTABLISHED_FACTS_MAX = 15;
 // A stale draft is labelled, not dropped: an ancestor changed under it, but it is still the only continuity the next writer has.
 const STALE_LABEL = '[STALE — may not match the current plan]';
@@ -125,7 +137,57 @@ function asStable(section: ContextSection): ContextSection {
   return { ...section, segment: 'stable' };
 }
 
+/** The finished section cut at its paragraphs to `cap` tokens, heading included, when it is longer — whatever made it long. */
+function fitToCap(section: ContextSection, cap: number): ContextSection {
+  if (section.tokens <= cap) return section;
+  const split = section.rendered.indexOf('\n\n');
+  const heading = split === -1 ? '' : section.rendered.slice(0, split + 2);
+  const body = split === -1 ? section.rendered : section.rendered.slice(split + 2);
+  const room = Math.max(0, cap - countTokens(heading) - SIZED_SECTION_MARGIN);
+  const rendered = `${heading}${truncateAtParagraph(body, room).text}`;
+  return { ...section, rendered, tokens: countTokens(rendered), truncated: true };
+}
+
+interface FactCut {
+  kept: FactLike[];
+  omitted: OmittedSection[];
+}
+
+/** Keeps facts in the order given while their lines fit `maxTokens`; each one left out is recorded with the size of its line. */
+function fitFacts(facts: readonly FactLike[], line: (fact: FactLike) => string, maxTokens: number): FactCut {
+  const kept: FactLike[] = [];
+  const omitted: OmittedSection[] = [];
+  let used = 0;
+  for (const fact of facts) {
+    const tokens = countTokens(line(fact)) + 1;
+    if (used + tokens <= maxTokens || kept.length === 0) {
+      kept.push(fact);
+      used += tokens;
+    } else {
+      omitted.push({ key: `fact:${fact.factKey}`, reason: 'budget', tokens });
+    }
+  }
+  return { kept, omitted };
+}
+
+/** The chapter's own facts first — those about its cast — then the rest in the order given. */
+function subjectsFirst(facts: readonly FactLike[], castKeys: ReadonlySet<string>): FactLike[] {
+  const about = (fact: FactLike): boolean => (fact.subjects ?? []).some(subject => castKeys.has(subject));
+  return [...facts.filter(about), ...facts.filter(fact => !about(fact))];
+}
+
+/** What a section is about, from its heading: the name after `## LABEL:`, or the whole heading. */
+function sectionSubject(section: Pick<ContextSection, 'rendered'>): string {
+  const heading = (section.rendered.split('\n', 1)[0] ?? '').replace(/^#+\s*/, '');
+  const colon = heading.indexOf(':');
+  return colon === -1 ? heading : heading.slice(colon + 1).trim();
+}
+
 export const ENTITY_CARD_BUDGET = 800;
+// Room for the card's own heading, name, alias and status lines inside the POV card's limit.
+const POV_CARD_BODY_MAX = WRITER_SECTION_CAPS.povCard - 200;
+// The "earlier volumes not shown" line the completed-volume summary may add after it is sized.
+const COMPLETED_VOLUMES_NOTE_MARGIN = 20;
 // Writing style is reserved ahead of every other section, so an oversized instructions text must not be
 // able to claim the budget the rest of the pack needs.
 export const WRITING_STYLE_BUDGET = 4_000;
@@ -187,12 +249,12 @@ function guidanceFirst(body: string): string {
   return [...blocks.filter(b => b.guidance), ...blocks.filter(b => !b.guidance)].flatMap(b => b.paragraphs).join('\n\n');
 }
 
-/** `maxTokens` omitted renders the entity's body in full and in its authored order — reserved for the POV character's card. */
-function renderEntityCard(entity: EntityCardRow, maxTokens?: number): RenderedCard {
+/** A body over `maxTokens` leads with its guidance and prohibitions before it is cut; one within it keeps its authored order. */
+function renderEntityCard(entity: EntityCardRow, maxTokens: number): RenderedCard {
   const aliasLine = entity.aliases.length > 0 ? `\nAliases: ${entity.aliases.map(a => a.alias).join(', ')}` : '';
   const statusLine = entity.status != null ? `\nStatus: ${entity.status}` : '';
   const bodyRaw = entity.body ?? entity.notes ?? '';
-  const overBudget = maxTokens !== undefined && countTokens(bodyRaw) > maxTokens;
+  const overBudget = countTokens(bodyRaw) > maxTokens;
   const { text: body, truncated } = overBudget ? truncateAtParagraph(guidanceFirst(bodyRaw), maxTokens) : { text: bodyRaw, truncated: false };
   return { text: `**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})\n${body}${aliasLine}${statusLine}`, truncated };
 }
@@ -314,8 +376,35 @@ function renderCarriedState(state: unknown, disclosure: WriterDisclosurePolicy):
   return typeof state === 'string' ? disclosure.scrub(state, 'state') : JSON.stringify(disclosure.scrubState(state, ESTABLISHED_FACTS_MAX));
 }
 
-function renderIsolatedEnding(summary: string | null, state: unknown, disclosure: WriterDisclosurePolicy): string {
-  return `Summary: ${disclosure.scrub(summary ?? '', 'summary')}\nState: ${state ? renderCarriedState(state, disclosure) : 'null'}`;
+/**
+ * Continuation state within `maxTokens`, shortened a whole entry at a time so it stays valid JSON: the largest entry goes first, and a
+ * list loses its last item rather than all of them. A state stored as a list loses items from its end.
+ */
+function fittedState(state: unknown, disclosure: WriterDisclosurePolicy, maxTokens: number): string {
+  const scrubbed = typeof state === 'string' ? null : disclosure.scrubState(state, ESTABLISHED_FACTS_MAX);
+  if (Array.isArray(scrubbed)) {
+    const items = [...scrubbed];
+    while (items.length > 0 && countTokens(JSON.stringify(items)) > maxTokens) items.pop();
+    return JSON.stringify(items);
+  }
+  if (scrubbed === null || typeof scrubbed !== 'object') return renderCarriedState(state, disclosure);
+  const entries = Object.entries(scrubbed);
+  let text = JSON.stringify(scrubbed);
+  while (countTokens(text) > maxTokens && entries.length > 0) {
+    const largest = entries.reduce((top, entry) => (JSON.stringify(entry[1]).length > JSON.stringify(top[1]).length ? entry : top));
+    if (Array.isArray(largest[1]) && largest[1].length > 1) largest[1] = largest[1].slice(0, -1);
+    else entries.splice(entries.indexOf(largest), 1);
+    text = JSON.stringify(Object.fromEntries(entries));
+  }
+  return text;
+}
+
+/** With `maxTokens`, the summary takes at most half and the state is shortened whole entries at a time into the rest, so no cut ever lands inside its JSON. */
+function renderIsolatedEnding(summary: string | null, state: unknown, disclosure: WriterDisclosurePolicy, maxTokens?: number): string {
+  const scrubbed = disclosure.scrub(summary ?? '', 'summary');
+  if (maxTokens === undefined) return `Summary: ${scrubbed}\nState: ${state ? renderCarriedState(state, disclosure) : 'null'}`;
+  const head = `Summary: ${truncateAtParagraph(scrubbed, Math.floor(maxTokens / 2)).text}\nState: `;
+  return `${head}${state ? fittedState(state, disclosure, maxTokens - countTokens(head)) : 'null'}`;
 }
 
 // `entity_relationships` is append-only — one row per chapter that observed the pair — so current state
@@ -463,7 +552,8 @@ export class ContextAssembler {
       else unresolved.push(ref);
     }
 
-    return { resolved, unresolved, withheld };
+    const characters = uniqueRefs.filter(ref => ref.startsWith('entity:') && entityMap.get(ref.slice('entity:'.length))?.type === 'character');
+    return { resolved, unresolved, withheld, characters };
   }
 
   /**
@@ -564,151 +654,325 @@ export class ContextAssembler {
       }),
     ]);
 
+    const currentVolumeKey = brief?.volumeKey ?? (await nearestVolumeKey(this.db, projectId, chapter));
     const [disclosure, ledger, currentVolume] = await Promise.all([
       opts?.disclosure ?? loadWriterDisclosurePolicy(this.db, projectId, chapter),
       loadActiveLedger(this.db, projectId),
-      this.volumeByKey(projectId, brief?.volumeKey),
+      this.volumeByKey(projectId, currentVolumeKey),
+    ]);
+    const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
+    const pov = brief?.pov ?? null;
+    const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
+    const castRefs = [...new Set(knowledgeContract?.pov ?? [])].filter(key => key !== pov).map(key => `entity:${key}`);
+    const chapterCast = new Set([
+      ...(pov ? [pov] : []),
+      ...(knowledgeContract?.pov ?? []),
+      ...contextRefs.filter(ref => ref.startsWith('entity:')).map(ref => ref.slice('entity:'.length)),
+    ]);
+    const [writerBrief, completedVolumes, openCanon] = await Promise.all([
+      loadWriterBrief(this.db, projectId, chapter, brief, disclosure),
+      this.completedVolumesSection(projectId, chapter, currentVolume, disclosure),
+      knowledgeContract ? null : this.openCanonSection(projectId, disclosure, chapterCast),
     ]);
     const prevStale = staleDraftPrefix(prevDraft);
+    const prevRefs = [`chapter:${chapter - 1}`];
+    const derivedCuts: OmittedSection[] = [...(openCanon?.omitted ?? [])];
 
+    const planTokens = countTokens(writerBrief.chapterBrief) + countTokens(writerBrief.endingContract);
+    const reservations: WriterReservation[] = [{ name: 'the chapter plan', tokens: planTokens, cap: WRITER_SECTION_CAPS.chapterPlan, fromPlan: true }];
     const sections: ContextSection[] = [];
+    const reserve = (section: ContextSection, name: string, cap: number, fromPlan = false): void => {
+      sections.push({ ...section, required: true });
+      reservations.push({ name, tokens: section.tokens, cap, fromPlan });
+    };
+    const reserveDerived = (section: ContextSection, name: string, cap: number, fromPlan = false): void => reserve(fitToCap(section, cap), name, cap, fromPlan);
+    const isolatedEndingRoom = sizedSectionCeiling('prev_ending', WRITER_SECTION_CAPS.prevEnding);
+    const reservePrevEnding = (section: ContextSection): void => reserveDerived(section, "the previous chapter's ending", WRITER_SECTION_CAPS.prevEnding);
 
     if (prevChapter) {
-      const isIsolated = prevChapter.isolated;
-      const isFinal = prevChapter.status === 'done';
-      const tier: ContextTier = isFinal ? 'canonical' : 'working';
-      if (isIsolated) {
-        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure), tier, [`chapter:${chapter - 1}`]));
+      const tier: ContextTier = prevChapter.status === 'done' ? 'canonical' : 'working';
+      if (prevChapter.isolated) {
+        reservePrevEnding(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure, isolatedEndingRoom), tier, prevRefs));
       } else {
-        sections.push(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        reservePrevEnding(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, prevRefs));
       }
     } else if (prevDraft?.isolated) {
-      sections.push(
-        makeSection('prev_ending', `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevDraft.state, disclosure)}`, 'working', [
-          `chapter:${chapter - 1}`,
-        ]),
+      reservePrevEnding(
+        makeSection(
+          'prev_ending',
+          `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevDraft.state, disclosure, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
+          'working',
+          prevRefs,
+        ),
       );
     } else if (prevDraft?.body) {
       // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
       // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
       const { text, truncated } = truncateAtParagraphTail(scrubbedTail(prevDraft.body, disclosure), PREV_ENDING_TAIL);
-      const content = `[DRAFT — not yet canon]\n${prevStale}${text}`;
-      const rendered = renderSection('prev_ending', content);
-      sections.push({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [`chapter:${chapter - 1}`], rendered });
+      const rendered = renderSection('prev_ending', `[DRAFT — not yet canon]\n${prevStale}${text}`);
+      reservePrevEnding({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: prevRefs, rendered });
     }
 
     const prevState = prevDraft?.state;
-    if (prevState != null) sections.push(makeSection('continuation_state', `${prevStale}${renderCarriedState(prevState, disclosure)}`, 'working', [`chapter:${chapter - 1}`]));
+    if (prevState != null) {
+      const cap = WRITER_SECTION_CAPS.continuationState;
+      const state = fittedState(prevState, disclosure, sizedSectionCeiling('continuation_state', cap) - countTokens(prevStale));
+      reserveDerived(makeSection('continuation_state', `${prevStale}${state}`, 'working', prevRefs), 'the continuation state', cap);
+    }
 
     if (currentVolume?.objective) {
       const content = disclosure.scrub(currentVolume.objective, 'plan');
-      sections.push(asStable(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`])));
+      reserve(
+        asStable(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`])),
+        "the current volume's goal",
+        WRITER_SECTION_CAPS.volumeGoal,
+      );
     }
+    if (completedVolumes) reserveDerived(completedVolumes, 'the earlier volumes', WRITER_SECTION_CAPS.completedVolumes);
+    if (openCanon) reserveDerived(openCanon.section, 'the book rules (open canon)', WRITER_SECTION_CAPS.openCanon);
 
     // Only the POV cast's ledgered facts enter the drafting pack; still-hidden facts surface as their writer
     // notes, never as text. Absent a contract the feature is off and nothing changes. With a contract
     // the known-facts section is always present, so a cast that knows nothing is told so rather than left
-    // to infer it from a missing heading.
-    const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
+    // to infer it from a missing heading. Facts accumulate with the book, so what the cast knows and the
+    // constraints are cut to their limits — the chapter's own cast first — and never fail a chapter.
     if (knowledgeContract) {
       const view = await loadKnowledgeView(this.db, projectId, chapter, knowledgeContract);
-      sections.push(
-        makeSection(
-          'known_facts',
-          disclosure.scrub(renderKnownFacts(view.known), 'knowledge'),
-          'canonical',
-          view.known.map(f => `fact:${f.factKey}`),
+      const learnedIn = view.learnedIn ?? new Map<string, number>();
+      const open = (fact: FactLike): boolean => !learnedIn.has(fact.factKey);
+      const known = fitFacts(
+        subjectsFirst(
+          [...view.known.filter(open), ...view.known.filter(fact => !open(fact)).sort((a, b) => (learnedIn.get(b.factKey) ?? 0) - (learnedIn.get(a.factKey) ?? 0))],
+          chapterCast,
         ),
+        fact => renderKnownFacts([fact]),
+        sizedSectionCeiling('known_facts', WRITER_SECTION_CAPS.knownFacts),
       );
+      derivedCuts.push(...known.omitted);
+      const knownSection = makeSection(
+        'known_facts',
+        disclosure.scrub(renderKnownFacts(known.kept), 'knowledge'),
+        'canonical',
+        known.kept.map(f => `fact:${f.factKey}`),
+      );
+      reserveDerived(knownSection, 'what the point-of-view cast knows', WRITER_SECTION_CAPS.knownFacts);
       if (view.reveals.length > 0) {
-        sections.push(
-          makeSection(
-            'chapter_reveals',
-            disclosure.scrub(renderChapterReveals(view.reveals), 'knowledge'),
-            'approved_intent',
-            view.reveals.map(f => `fact:${f.factKey}`),
-          ),
+        const reveals = makeSection(
+          'chapter_reveals',
+          disclosure.scrub(renderChapterReveals(view.reveals), 'knowledge'),
+          'approved_intent',
+          view.reveals.map(f => `fact:${f.factKey}`),
         );
+        reserve(reveals, "this chapter's reveals", WRITER_SECTION_CAPS.chapterReveals);
       }
-      const constraints = disclosure.scrub(renderHiddenConstraints(view.hidden), 'knowledge');
+      const hidden = fitFacts(
+        subjectsFirst(withWriterNotes(view.hidden), chapterCast),
+        fact => renderHiddenConstraints([fact]),
+        sizedSectionCeiling('hidden_constraints', WRITER_SECTION_CAPS.hiddenConstraints),
+      );
+      derivedCuts.push(...hidden.omitted);
+      const constraints = disclosure.scrub(renderHiddenConstraints(hidden.kept), 'knowledge');
       if (constraints) {
-        sections.push(
-          makeSection(
-            'hidden_constraints',
-            constraints,
-            'approved_intent',
-            withWriterNotes(view.hidden).map(f => `fact:${f.factKey}`),
-          ),
+        const section = makeSection(
+          'hidden_constraints',
+          constraints,
+          'approved_intent',
+          hidden.kept.map(f => `fact:${f.factKey}`),
         );
+        reserveDerived(section, 'the behavioural constraints', WRITER_SECTION_CAPS.hiddenConstraints);
       }
     }
     const clues = allowedCluesSection(disclosure);
-    if (clues) sections.push(clues);
+    if (clues) reserve(clues, 'the allowed clues', WRITER_SECTION_CAPS.allowedClues);
 
-    const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
+    const refs = [...contextRefs, ...castRefs.filter(ref => !contextRefs.includes(ref))];
     let unresolvedRefs: string[] = [];
     let withheldRefs: string[] = [];
     let refSections: ContextSection[] = [];
+    let characterRefs = new Set<string>();
+    let requiredCharacters = new Set<string>();
 
-    if (contextRefs.length > 0) {
-      const { resolved, unresolved, withheld } = await this.resolveRefsFor(projectId, contextRefs, chapter, disclosure);
-      const constrained = new Set(sections.find(s => s.key === 'hidden_constraints')?.sourceRefs ?? []);
+    if (refs.length > 0) {
+      const { resolved, unresolved, withheld, characters } = await this.resolveRefsFor(projectId, refs, chapter, disclosure);
+      const carriedKeys = new Set(['hidden_constraints', 'open_canon', 'volume_objective', 'completed_volumes']);
+      const carried = new Set(sections.filter(s => carriedKeys.has(s.key)).flatMap(s => s.sourceRefs));
       unresolvedRefs = unresolved;
       withheldRefs = withheld;
-      refSections = resolved.filter(section => !section.sourceRefs.some(ref => constrained.has(ref)));
+      characterRefs = new Set(characters.map(ref => `ref:${ref}`));
+      requiredCharacters = new Set(
+        characters
+          .filter(ref => contextRefs.includes(ref) && ref !== `entity:${pov}` && !castRefs.includes(ref))
+          .slice(0, FULL_CAST_MAX)
+          .map(ref => `ref:${ref}`),
+      );
+      refSections = resolved.filter(section => !section.sourceRefs.some(ref => carried.has(ref)));
     }
 
-    const pov = brief?.pov ?? null;
     const povSection = pov ? await this.povEntitySection(projectId, pov, disclosure) : null;
     if (pov && !povSection && !unresolvedRefs.includes(`entity:${pov}`)) unresolvedRefs = [...unresolvedRefs, `entity:${pov}`];
 
-    // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory
-    // and style. The POV card leads that slice — whose head the chapter is in outranks every other card,
-    // and the outliner does not always remember to list it in contextRefs at all.
-    const resolvedEntitySections = refSections.filter(s => s.key.startsWith('ref:entity:'));
-    const entityRefSections = povSection ? [povSection, ...resolvedEntitySections.filter(s => s.key !== povSection.key)] : resolvedEntitySections;
+    // Only the first FULL_CAST_MAX entity cards render ahead of memory and style; the rest move below them. The POV card leads,
+    // then the rest of the POV cast — whose heads the chapter is in outrank every other card, and the outliner does not always list them.
+    // The first FULL_CAST_MAX characters the plan cites are required and cut to their limit; later ones and other entities compete for what is left.
+    const castKeys = new Set(castRefs.map(ref => `ref:${ref}`));
+    const entityCards = refSections.filter(s => s.key.startsWith('ref:entity:') && s.key !== povSection?.key);
+    const entityRefSections = [...(povSection ? [povSection] : []), ...entityCards.filter(s => castKeys.has(s.key)), ...entityCards.filter(s => !castKeys.has(s.key))];
     const nonEntityRefSections = refSections.filter(s => !s.key.startsWith('ref:entity:'));
-    const priorityEntitySections = entityRefSections.slice(0, FULL_CAST_MAX).map(asStable);
-    const excessEntitySections = entityRefSections.slice(FULL_CAST_MAX).map(asStable);
+    const placeCard = (card: ContextSection, optionalPriority: number): void => {
+      const stable = asStable(card);
+      const sheet = `${sectionSubject(card)}'s character sheet`;
+      if (card === povSection) reserveDerived(stable, sheet, WRITER_SECTION_CAPS.povCard, true);
+      else if (castKeys.has(card.key) || requiredCharacters.has(card.key)) reserveDerived(stable, sheet, WRITER_SECTION_CAPS.castCard, true);
+      else sections.push({ ...stable, priority: characterRefs.has(card.key) ? WRITER_OPTIONAL_PRIORITY.castCard : optionalPriority });
+    };
 
-    for (const s of [...priorityEntitySections, ...nonEntityRefSections.map(asStable)]) sections.push(s);
+    for (const card of entityRefSections.slice(0, FULL_CAST_MAX)) placeCard(card, WRITER_OPTIONAL_PRIORITY.castCard);
+    for (const s of nonEntityRefSections) sections.push({ ...asStable(s), priority: WRITER_OPTIONAL_PRIORITY.citedPage });
 
-    for (const s of await this.dynamicCastSections(projectId, entityRefSections, brief?.pov ?? null, disclosure)) sections.push(s);
+    for (const s of await this.dynamicCastSections(projectId, entityRefSections, pov, disclosure)) sections.push({ ...s, priority: WRITER_OPTIONAL_PRIORITY.castState });
 
     const recent = recentSummaries(recentChapters, recentDrafts);
     if (recent.length > 0) {
-      const lines = recent.map(recentSummaryLine);
+      const lines = recent.map((entry, index) =>
+        recentSummaryLine({ ...entry, summary: truncateAtParagraph(disclosure.scrub(entry.summary, 'summary'), RECENT_SUMMARY_MAX).text }, index),
+      );
       const tier: ContextTier = recent.some(entry => entry.draft) ? 'working' : 'canonical';
-      sections.push(makeSection('memory', disclosure.scrub(lines.join('\n'), 'summary'), tier, []));
+      reserveDerived(makeSection('memory', lines.join('\n'), tier, []), 'the recent chapter summaries', WRITER_SECTION_CAPS.recentSummaries);
     }
 
-    // Writing style is the generator's only source for voice, craft, and length, so it is required: the
-    // budget reserves it before the refs listed ahead of it can crowd it out.
-    sections.push({ ...asStable(writingStyleSection(project?.instructions, disclosure)), required: true });
+    reserveDerived(asStable(writingStyleSection(project?.instructions, disclosure)), 'the style guide', WRITER_SECTION_CAPS.writingStyle);
 
-    for (const s of excessEntitySections) sections.push(s);
+    for (const card of entityRefSections.slice(FULL_CAST_MAX)) placeCard(card, WRITER_OPTIONAL_PRIORITY.excessCard);
 
     // Pushed after every other core section so the author's decisions render next to the brief, which the template appends after the pack.
     const writerLines = writerLinesSection(ledger, disclosure);
-    if (writerLines) sections.push(writerLines);
+    if (writerLines) reserve(writerLines, "the author's decisions for the writer", WRITER_SECTION_CAPS.writerLines);
 
-    const pack = await this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, { ...opts, disclosure, withheldRefs });
-    const excessKeys = new Set(excessEntitySections.map(s => s.key));
-    const omitted = pack.omitted.filter(o => !excessKeys.has(o.key)).map(o => o.key);
-    if (!opts?.dryRun && (pack.unresolvedRefs.length > 0 || omitted.length > 0))
-      this.logger.warn('chapter pack dropped context', { projectId, chapter, unresolvedRefs: pack.unresolvedRefs, omitted });
+    const plugins = pluginContextSections(opts?.policy, sections, disclosure).map(section =>
+      section.required ? section : { ...section, priority: WRITER_OPTIONAL_PRIORITY.pluginSection },
+    );
+    for (const section of plugins.filter(s => s.required)) {
+      reservations.push({ name: `the plugin section "${sectionSubject(section)}"`, tokens: section.tokens, cap: WRITER_SECTION_CAPS.pluginSection });
+    }
+    if (opts?.enforceWriterReservations) assertWriterContextFits(reservations, budgetTokens);
+
+    // The plan reaches the writer beside the pack rather than in it, so the pack gets the budget the plan leaves.
+    const pack = await this.finalize(projectId, 'generation', chapter, [...sections, ...plugins], unresolvedRefs, Math.max(0, budgetTokens - planTokens), {
+      dryRun: opts?.dryRun,
+      disclosure,
+      withheldRefs,
+      omitted: derivedCuts,
+    });
+    if (!opts?.dryRun && pack.unresolvedRefs.length > 0) this.logger.warn('chapter pack could not resolve refs', { projectId, chapter, unresolvedRefs: pack.unresolvedRefs });
+    if (!opts?.dryRun && pack.omitted.length > 0) this.logger.info('chapter pack cut context', { projectId, chapter, omitted: pack.omitted });
     if (!opts?.dryRun && (disclosure.withheld.size > 0 || withheldRefs.length > 0))
       this.logger.info('chapter pack withheld material', { projectId, chapter, withheld: Object.fromEntries(disclosure.withheld), withheldRefs });
     return pack;
   }
 
+  /**
+   * Open canon is every rule the whole book obeys; without a knowledge contract nothing else carries it all to the writer. Rules about the
+   * chapter's cast come first, and those past the section's limit are cut and recorded rather than failing the chapter.
+   */
+  private async openCanonSection(
+    projectId: bigint,
+    disclosure: WriterDisclosurePolicy,
+    chapterCast: ReadonlySet<string>,
+  ): Promise<{ section: ContextSection; omitted: OmittedSection[] } | null> {
+    const facts = await this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), orderBy: schema.canonFacts.factKey });
+    const locked = new Set(disclosure.lockedFacts.map(fact => fact.factKey));
+    const open = facts.filter(fact => isOpenCanon(fact.revealChapter) && !fact.unlock && !locked.has(fact.factKey));
+    if (open.length === 0) return null;
+    const fitted = fitFacts(subjectsFirst(open, chapterCast), fact => renderKnownFacts([fact]), sizedSectionCeiling('open_canon', WRITER_SECTION_CAPS.openCanon));
+    // The cast decides which rules survive a cut, never their order: this is a stable section, so it renders by key whatever the chapter.
+    const kept = [...fitted.kept].sort((left, right) => left.factKey.localeCompare(right.factKey));
+    const omitted = fitted.omitted;
+    const content = disclosure.scrub(renderKnownFacts(kept), 'knowledge');
+    const section = asStable(
+      makeSection(
+        'open_canon',
+        content,
+        'canonical',
+        kept.map(fact => `fact:${fact.factKey}`),
+      ),
+    );
+    return { section, omitted };
+  }
+
+  /**
+   * The volumes behind the chapter's own: every earlier volume when the chapter's volume is known, otherwise every volume whose goal is
+   * met. A chapter belongs to the volume its plan names, or else the one it was imported into.
+   */
+  private async completedVolumesSection(
+    projectId: bigint,
+    chapter: number,
+    current: schema.Plan.Volume | undefined,
+    disclosure: WriterDisclosurePolicy,
+  ): Promise<ContextSection | null> {
+    const volumes = await this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal });
+    const completed = volumes.filter(
+      volume =>
+        volume.volumeKey !== current?.volumeKey &&
+        (current ? volume.ordinal < current.ordinal : volume.state === 'goal_met') &&
+        disclosure.canResolve(`volume:${volume.volumeKey}`),
+    );
+    if (completed.length === 0) return null;
+
+    const keys = new Set(completed.map(volume => volume.volumeKey));
+    const planned = await this.db.query.briefs.findMany({
+      columns: { chapter: true, volumeKey: true },
+      where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.volumeKey), lt(schema.briefs.chapter, chapter)),
+    });
+    const plannedIn = new Map(planned.filter(row => row.volumeKey !== null).map(row => [row.chapter, row.volumeKey as string]));
+    const plannedChapters = [...plannedIn].filter(([, volumeKey]) => keys.has(volumeKey)).map(([number]) => number);
+    const importedIn = inArray(schema.chapters.volumeKey, [...keys]);
+    const rows = await this.db.query.chapters.findMany({
+      columns: { number: true, summary: true, volumeKey: true },
+      where: and(
+        eq(schema.chapters.projectId, projectId),
+        eq(schema.chapters.status, 'done'),
+        lt(schema.chapters.number, chapter),
+        plannedChapters.length > 0 ? or(importedIn, inArray(schema.chapters.number, plannedChapters)) : importedIn,
+      ),
+      orderBy: schema.chapters.number,
+    });
+
+    const byVolume = new Map<string, { number: number; summary: string }[]>();
+    for (const row of [...rows].sort((left, right) => left.number - right.number)) {
+      const volumeKey = plannedIn.get(row.number) ?? row.volumeKey;
+      if (!volumeKey || !keys.has(volumeKey) || row.number >= chapter || !row.summary?.trim()) continue;
+      byVolume.set(volumeKey, [...(byVolume.get(volumeKey) ?? []), { number: row.number, summary: row.summary }]);
+    }
+
+    const rendered = renderCompletedVolumes(
+      completed.map(volume => ({
+        ordinal: volume.ordinal,
+        title: disclosure.scrub(volume.title ?? volume.volumeKey, 'heading'),
+        goal: volume.objective ? disclosure.scrub(volume.objective, 'plan') : null,
+        chapters: byVolume.get(volume.volumeKey) ?? [],
+      })),
+      sizedSectionCeiling('completed_volumes', WRITER_SECTION_CAPS.completedVolumes) - COMPLETED_VOLUMES_NOTE_MARGIN,
+      summary => disclosure.scrub(summary, 'summary'),
+    );
+    if (!rendered) return null;
+    return asStable(
+      makeSection(
+        'completed_volumes',
+        rendered,
+        'canonical',
+        completed.filter(volume => byVolume.has(volume.volumeKey)).map(volume => `volume:${volume.volumeKey}`),
+      ),
+    );
+  }
+
   // The POV character's card is the one entity card that never pays the shared ENTITY_CARD_BUDGET cap: the
-  // drafter writes from inside this head, so a truncated card is a truncated narrator.
+  // drafter writes from inside this head, so a truncated card is a truncated narrator. Only its own, far larger limit cuts it.
   private async povEntitySection(projectId: bigint, pov: string, disclosure: WriterDisclosurePolicy): Promise<ContextSection | null> {
     const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, pov)), with: { aliases: true } });
     if (!entity) return null;
     const label = disclosure.scrub(entityLabel(entity, true), 'heading');
-    return makeRefSection(`entity:${pov}`, label, disclosure.scrub(renderEntityCard(entity).text, 'entity'), entityCardTier(entity.status));
+    const card = renderEntityCard(entity, POV_CARD_BODY_MAX);
+    return makeRefSection(`entity:${pov}`, label, disclosure.scrub(card.text, 'entity'), entityCardTier(entity.status), card.truncated);
   }
 
   // Per-chapter dynamic state — never stable, and never project-wide: it is scoped to the cast the brief
@@ -1164,10 +1428,12 @@ export class ContextAssembler {
     sections: ContextSection[],
     unresolvedRefs: string[],
     budgetTokens: number,
-    opts?: { dryRun?: boolean; policy?: ForgeCallPolicy; disclosure?: WriterDisclosurePolicy; withheldRefs?: string[] },
+    opts?: { dryRun?: boolean; policy?: ForgeCallPolicy; disclosure?: WriterDisclosurePolicy; withheldRefs?: string[]; omitted?: OmittedSection[] },
   ): Promise<AssembledPack & { id: bigint | null }> {
     const contributed = [...sections, ...pluginContextSections(opts?.policy, sections, opts?.disclosure)];
-    const { fitting: fittingSections, omitted } = applyBudget(contributed, budgetTokens);
+    const budgeted = applyBudget(contributed, budgetTokens);
+    const fittingSections = budgeted.fitting;
+    const omitted = [...(opts?.omitted ?? []), ...budgeted.omitted];
     // Stable sections render first so the prefix stays byte-identical across calls with unchanged
     // canon (the provider prompt-cache contract); callers list stable sections first, so for the
     // legacy all-volatile purposes this is a no-op.

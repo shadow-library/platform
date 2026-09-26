@@ -98,6 +98,17 @@ describe('FactService.upsert — unlock condition and allowed clues', () => {
     expect(writes).toEqual([]);
   });
 
+  it('should let a fact saved before the clue rule be edited in its other fields, and judge its clues once they change', async () => {
+    const saved = { ...stored, terms: ['memory tithe'], allowedClues: ['the Memory Tithe comes due'] };
+    const { service, writes } = createService(saved);
+
+    await service.upsert(1n, 'lamp_rank_3', { text: 'the third rank spends memory as fuel' });
+    await service.upsert(1n, 'lamp_rank_3', { text: 'the third rank spends memory as fuel', terms: ['memory tithe'], allowedClues: ['the Memory Tithe comes due'] });
+    await expect(service.upsert(1n, 'lamp_rank_3', { text: 'x', allowedClues: ['the Memory Tithe comes due', 'frost on the wick'] })).rejects.toMatchObject({ code: 'FCT_006' });
+
+    expect(writes).toHaveLength(2);
+  });
+
   it('should refuse a structurally malformed unlock condition before writing', async () => {
     const { service, writes } = createService(stored);
     const body = { text: 'x', unlock: { all: [{ ending: false }] } } as unknown as UpsertFactBody;

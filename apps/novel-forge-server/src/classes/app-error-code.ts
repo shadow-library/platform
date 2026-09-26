@@ -203,6 +203,7 @@ export class AppErrorCode extends ServerErrorCode {
    * Context Errors
    */
   static readonly CTX_001 = AppErrorCode.notFound('CTX_001', 'No context pack is linked to this run');
+  static readonly CTX_002 = AppErrorCode.badRequest('CTX_002', "The writer's required material does not fit — {detail}.");
 
   /*!
    * Premise Errors

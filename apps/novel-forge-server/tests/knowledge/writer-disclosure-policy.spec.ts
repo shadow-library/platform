@@ -111,11 +111,34 @@ describe('WriterDisclosurePolicy.scrub — planner-only material', () => {
     for (const field of ['plan', 'prose', 'bible_page'] as const) expect(disclosure.scrub('At last the keeper lets the lamp go dark.', field)).toBe('At last [withheld].');
   });
 
-  it('should withhold a whole planner-only passage of three words or twelve characters, and no shorter one', () => {
-    const disclosure = policy({ plannerOnly: ['He lives on.', 'Bittersweet', 'None'], lockedFacts: [{ ...debtFact, constraintNote: 'None' }] });
+  it('should withhold a whole planner-only passage of three words or two words and twelve characters, and no shorter one', () => {
+    const disclosure = policy({ plannerOnly: ['He lives on.', 'Bittersweet', 'None', 'Quiet harbour'], lockedFacts: [{ ...debtFact, constraintNote: 'None' }] });
 
     expect(disclosure.scrub('In the end he lives on.', 'plan')).toBe('In the end [withheld].');
     expect(disclosure.scrub('None of it was bittersweet. Nobody said none.', 'summary')).toBe('None of it was bittersweet. Nobody said none.');
+    expect(disclosure.scrub('They reach the quiet harbour.', 'prose')).toBe('They reach the [withheld].');
+  });
+
+  it('should never withhold a single long word as a passage, while a one-word locked truth stays withheld', () => {
+    const truth: FactLike = { factKey: 'true_name', text: 'Ashwright', writerNote: null };
+    const disclosure = policy({ plannerOnly: ['Reconciliation'], lockedFacts: [{ ...truth, constraintNote: 'Extraordinarily' }] });
+
+    expect(disclosure.scrub('Reconciliation came slowly, extraordinarily slowly, to Ashwright.', 'prose')).toBe(
+      'Reconciliation came slowly, extraordinarily slowly, to [withheld].',
+    );
+  });
+
+  it('should measure a passage in a script written without spaces by its length', () => {
+    const disclosure = policy({ plannerOnly: ['灯塔守护者最终熄灭了灯火'] });
+
+    expect(disclosure.scrub('灯塔守护者最终熄灭了灯火。', 'plan')).toBe('[withheld]。');
+  });
+
+  it('should never withhold a one- or two-character passage in a script written without spaces', () => {
+    const disclosure = policy({ plannerOnly: ['重逢', '别', '灯火'] });
+
+    for (const text of ['重逢', '别', '灯火'] as const) expect(disclosure.scrub(text, 'plan')).toBe(text);
+    expect(disclosure.scrub('重逢。别。', 'prose')).toBe('重逢。别。');
   });
 
   it('should match a copy whose quotes, apostrophes, dashes or emphasis differ', () => {
@@ -169,8 +192,8 @@ describe('WriterDisclosurePolicy.canResolve', () => {
 });
 
 describe('WriterDisclosurePolicy.opensBy', () => {
-  it('should admit a thread or mystery opened at or before the chapter only', () => {
-    expect([3, 5, 6, null, undefined].map(opened => policy().opensBy(opened))).toEqual([true, true, false, false, false]);
+  it('should admit a thread or mystery opened at or before the chapter, and one with no opening chapter', () => {
+    expect([3, 5, 6, null, undefined].map(opened => policy().opensBy(opened))).toEqual([true, true, false, true, true]);
     expect(WriterDisclosurePolicy.planner().opensBy(null)).toBe(true);
   });
 });
@@ -194,11 +217,11 @@ describe('WriterDisclosurePolicy.planner', () => {
 });
 
 describe('WriterDisclosurePolicy.allowedClues', () => {
-  it("should list the locked facts' clues once each, unscrubbed", () => {
-    const clued = { ...ledgerFact, allowedClues: ['Ink smudges on the forgery.', ' ', 'Elias avoids the study.'] };
+  it("should list the locked facts' clues once each, unscrubbed, and drop one naming its fact's give-away term", () => {
+    const clued = { ...ledgerFact, allowedClues: ['Ink smudges on the ledger.', 'Ink smudges on the forgery.', ' ', 'Elias avoids the study.'] };
     const disclosure = locked(clued, { ...debtFact, allowedClues: ['Elias avoids the study.'] });
 
-    expect(disclosure.allowedClues()).toEqual(['Ink smudges on the forgery.', 'Elias avoids the study.']);
+    expect(disclosure.allowedClues()).toEqual(['Ink smudges on the ledger.', 'Elias avoids the study.']);
   });
 });
 

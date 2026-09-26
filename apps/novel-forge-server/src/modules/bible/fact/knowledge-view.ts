@@ -13,6 +13,7 @@ export interface FactLike {
   writerNote?: string | null;
   terms?: string[] | null;
   allowedClues?: string[] | null;
+  subjects?: string[] | null;
   source?: Knowledge.FactSource;
 }
 
@@ -21,6 +22,8 @@ export interface KnowledgeView {
   known: FactLike[];
   reveals: FactLike[];
   hidden: FactLike[];
+  /** The latest chapter before this one in which a POV-cast member learned each known fact, for facts the ledger records. */
+  learnedIn?: ReadonlyMap<string, number>;
 }
 
 export interface KnowledgeLeakIssue {
@@ -70,6 +73,7 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   });
 
   const knownKeys = new Set<string>();
+  const learnedIn = new Map<string, number>();
   if (povEntities.length > 0) {
     const ledger = await db.query.characterKnowledge.findMany({
       where: and(
@@ -84,7 +88,9 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
     const keyById = new Map(facts.map(f => [f.id, f.factKey]));
     for (const row of ledger) {
       const key = keyById.get(row.factId);
-      if (key) knownKeys.add(key);
+      if (!key) continue;
+      knownKeys.add(key);
+      learnedIn.set(key, Math.max(learnedIn.get(key) ?? 0, row.learnedInChapter));
     }
   }
 
@@ -106,7 +112,7 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   for (const fact of facts) {
     if (isOpenCanon(fact.revealChapter) && !fact.unlock && !learnKeys.has(fact.factKey)) knownKeys.add(fact.factKey);
   }
-  return splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys);
+  return { ...splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys), learnedIn };
 }
 
 function mustNotResolveKeys(endingContract: unknown): Set<string> {

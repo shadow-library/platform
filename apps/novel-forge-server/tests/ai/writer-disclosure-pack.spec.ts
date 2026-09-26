@@ -133,9 +133,10 @@ describe('the writer disclosure policy across every writer-bound field', () => {
     expect(lockedPack.unresolvedRefs).toEqual(['entity:ghost']);
     expect([...(lockedPack.withheldRefs ?? [])].sort()).toEqual([...refused, 'volume:v2'].sort());
     expect([...(unlockedPack.withheldRefs ?? [])].sort()).toEqual(refused);
-    expect(section(unlockedPack, 'ref:volume:v2')).toContain(V2_GOAL);
+    expect(section(unlockedPack, 'ref:volume:v2')).toBe('');
     expect(section(unlockedPack, 'volume_objective')).toContain(V2_GOAL);
-    expect(section(lockedPack, 'ref:volume:v1')).toContain('[withheld]');
+    expect(section(lockedPack, 'ref:volume:v1')).toBe('');
+    expect(section(lockedPack, 'volume_objective')).toContain('[withheld]');
   });
 
   it('should drop an established fact carrying a locked give-away term from the continuation state', async () => {

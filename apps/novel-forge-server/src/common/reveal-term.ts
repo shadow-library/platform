@@ -23,3 +23,20 @@ export function cluesNamingTerms(clues: readonly string[] | null | undefined, te
   });
   return (clues ?? []).flatMap(clue => patterns.filter(({ pattern }) => pattern.test(clue)).map(({ term }) => `"${clue}" names "${term}"`));
 }
+
+interface ClueTermFields {
+  allowedClues?: readonly string[] | null;
+  terms?: readonly string[] | null;
+}
+
+function sameList(left: readonly string[] | null | undefined, right: readonly string[] | null | undefined): boolean {
+  const a = left ?? [];
+  const b = right ?? [];
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+/** `cluesNamingTerms` for a write: a fact whose clues and terms the write leaves as they were is not re-judged, so its other fields stay editable. */
+export function changedCluesNamingTerms(before: ClueTermFields | null | undefined, after: ClueTermFields): string[] {
+  if (before && sameList(before.allowedClues, after.allowedClues) && sameList(before.terms, after.terms)) return [];
+  return cluesNamingTerms(after.allowedClues, after.terms);
+}

@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { cluesNamingTerms, lockProjectPlan, normalizeStringList, reconcilePlanState, validateUnlockCondition } from '@server/common';
+import { changedCluesNamingTerms, lockProjectPlan, normalizeStringList, reconcilePlanState, validateUnlockCondition } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
 
@@ -82,7 +82,7 @@ export class FactService {
       unlock: body.unlock === undefined ? (existing?.unlock ?? null) : body.unlock,
       allowedClues: body.allowedClues === undefined ? (existing?.allowedClues ?? null) : body.allowedClues && normalizeStringList(body.allowedClues),
     };
-    const giveaways = cluesNamingTerms(merged.allowedClues, merged.terms);
+    const giveaways = changedCluesNamingTerms(existing, merged);
     if (giveaways.length > 0) throw AppErrorCode.FCT_006.create({ reason: giveaways.join('; ') });
 
     if (existing) {

@@ -469,7 +469,7 @@ export class GenerationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'revision', chapter }, project);
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure, enforceWriterReservations: true });
 
     const ctx = {
       projectId,
@@ -894,7 +894,7 @@ export class GenerationService {
       project as ProjectConfig | undefined,
     );
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
-    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure, enforceWriterReservations: true });
     const ctx = { projectId, chapter, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
     const promptVars = {
       stableContext: pack.renderedStable,
