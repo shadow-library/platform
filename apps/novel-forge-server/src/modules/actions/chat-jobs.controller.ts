@@ -50,11 +50,11 @@ export class ChatJobsController {
     private readonly reader: ChatJobReader,
   ) {}
 
-  /** What a reopened chat shows as still running, and the cursor to follow it from. */
+  /** What a reopened chat shows: jobs still running plus those that settled in the last hour, and the cursor to follow it from. */
   @Get()
   @RespondFor(200, ListChatJobsResponse)
   async listJobs(@Params() params: ChatJobsParams): Promise<ListChatJobsResponse> {
-    const { items, cursor } = await this.reader.listActive(params.projectId, params.sessionId);
+    const { items, cursor } = await this.reader.listRecent(params.projectId, params.sessionId);
     return { items: items.map(serialiseJob), cursor };
   }
 

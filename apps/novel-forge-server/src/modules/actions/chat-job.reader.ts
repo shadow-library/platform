@@ -53,10 +53,15 @@ export class ChatJobReader {
     return session.seq;
   }
 
-  listActive(projectId: bigint, sessionId: string): Promise<ChatJobs> {
+  /**
+   * What a reopened chat shows: every job still running, plus one this session started that settled within
+   * `RECENTLY_SETTLED_MS` — the same window `replay` uses, read from the same snapshot as the cursor.
+   */
+  listRecent(projectId: bigint, sessionId: string, now = Date.now()): Promise<ChatJobs> {
     return this.db.transaction(async tx => {
       const cursor = await this.sessionCursor(projectId, sessionId, tx);
-      const items = await this.activeJobs(tx, projectId, sessionId);
+      const [active, settled] = await Promise.all([this.activeJobs(tx, projectId, sessionId), this.settledJobs(tx, projectId, sessionId, now)]);
+      const items = [...active, ...settled].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       return { items, cursor };
     }, SNAPSHOT);
   }
@@ -86,33 +91,11 @@ export class ChatJobReader {
     return this.db.transaction(async tx => {
       const cursor = await this.sessionCursor(projectId, sessionId, tx);
       const active = (await this.activeJobs(tx, projectId, sessionId)).map(job => job.id);
-      const settled = await tx
-        .select({ id: schema.jobs.id })
-        .from(schema.jobs)
-        .where(
-          and(
-            eq(schema.jobs.projectId, projectId),
-            inArray(schema.jobs.status, SETTLED_STATUSES),
-            gte(schema.jobs.updatedAt, new Date(now - RECENTLY_SETTLED_MS)),
-            startedFrom(sessionId),
-          ),
-        );
+      const settled = (await this.settledJobs(tx, projectId, sessionId, now)).map(job => job.id);
       const inSession = and(eq(schema.jobEvents.projectId, projectId), eq(schema.jobEvents.sessionId, sessionId), lte(schema.jobEvents.seq, cursor));
       const running = active.length === 0 ? [] : await this.events(tx, and(inSession, inArray(schema.jobEvents.jobId, active)));
       const endings =
-        settled.length === 0
-          ? []
-          : await this.events(
-              tx,
-              and(
-                inSession,
-                inArray(
-                  schema.jobEvents.jobId,
-                  settled.map(job => job.id),
-                ),
-                inArray(schema.jobEvents.type, [...TERMINAL_JOB_EVENTS]),
-              ),
-            );
+        settled.length === 0 ? [] : await this.events(tx, and(inSession, inArray(schema.jobEvents.jobId, settled), inArray(schema.jobEvents.type, [...TERMINAL_JOB_EVENTS])));
       const lastEnding = new Map(endings.map(event => [event.jobId, event]));
       const events = [...running, ...lastEnding.values()].sort((a, b) => a.seq - b.seq);
       return { events, cursor, activeJobIds: active };
@@ -124,6 +107,21 @@ export class ChatJobReader {
       .select()
       .from(schema.jobs)
       .where(and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ACTIVE_STATUSES), startedFrom(sessionId)))
+      .orderBy(asc(schema.jobs.createdAt));
+  }
+
+  private settledJobs(db: DbExecutor, projectId: bigint, sessionId: string, now: number): Promise<Job.Row[]> {
+    return db
+      .select()
+      .from(schema.jobs)
+      .where(
+        and(
+          eq(schema.jobs.projectId, projectId),
+          inArray(schema.jobs.status, SETTLED_STATUSES),
+          gte(schema.jobs.updatedAt, new Date(now - RECENTLY_SETTLED_MS)),
+          startedFrom(sessionId),
+        ),
+      )
       .orderBy(asc(schema.jobs.createdAt));
   }
 

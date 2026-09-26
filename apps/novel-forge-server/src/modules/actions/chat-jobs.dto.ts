@@ -89,7 +89,7 @@ export class ChatJobResponse {
 
 @Schema()
 export class ListChatJobsResponse {
-  @Field(() => [ChatJobResponse], { description: 'Jobs this chat started that are still queued or running.' })
+  @Field(() => [ChatJobResponse], { description: 'Jobs this chat started that are still running, plus those that finished within the last hour, each with its status.' })
   items: ChatJobResponse[];
 
   @Field(() => Integer, { description: "The session's latest job event seq as of `items`: open the event stream after it to follow these jobs from here." })
