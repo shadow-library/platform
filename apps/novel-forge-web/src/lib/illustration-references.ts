@@ -294,6 +294,12 @@ export function referenceErrorMessage(error: Pick<ApiError, 'code' | 'message'>)
       return 'A reference image is not PNG, JPEG or WebP, so it cannot be sent.';
     case 'ILL_015':
       return 'The image being edited is already sent as the edit source and cannot be attached again.';
+    case 'ILL_016':
+      return `Chapter ${numbers[0]} isn’t finalized yet — the latest final chapter is ${numbers[1]}. Pick that one or earlier.`;
+    case 'ILL_017':
+      return 'Only an entity can be drawn as of a chapter.';
+    case 'ILL_018':
+      return `A reference image depicts chapter ${numbers[0]}, later than chapter ${numbers[1]} this image is drawn as of. Pick an earlier reference or date this image later.`;
     case 'AI_010':
       return tooManyMessage(numbers.at(-2), numbers.at(-1));
     default:

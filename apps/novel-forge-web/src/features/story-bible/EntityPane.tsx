@@ -6,20 +6,8 @@ import { Avatar, Button, IconButton, toast, Tooltip } from '@shadow-library/ui';
 import { ChevronLeftIcon, LockIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { Markdown, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
-import { ImageGallery } from '@/components/nf/ImageGallery';
-import { ImageUpload } from '@/components/nf/ImageUpload';
-import {
-  type BibleDocListItem,
-  type EntityResponse,
-  type FactResponse,
-  type UpdateEntityBody,
-  useAddEntityImageMutation,
-  useDeleteEntityImageByIdMutation,
-  useDeleteEntityImageMutation,
-  useEntityQuery,
-  useUpdateEntityMutation,
-  useUploadEntityImageMutation,
-} from '@/lib/apis';
+import { EntityImages } from '@/features/illustrations/EntityImages';
+import { type BibleDocListItem, type EntityResponse, type FactResponse, type UpdateEntityBody, useUpdateEntityMutation } from '@/lib/apis';
 import { docAddress } from '@/lib/bible-documents';
 import { guidesMentioning, leadSection } from '@/lib/bible-entries';
 import { type BibleSearch } from '@/lib/bible-search';
@@ -230,48 +218,6 @@ export function EntityPane({ novelId, entity, topic, facts, docs, names, backSea
         novelId={novelId}
         scope={{ type: 'novel', title: entity.name }}
         placeholder={`Ask Forge to update ${entity.name} — add a detail, change a trait, note a new relationship…`}
-      />
-    </section>
-  );
-}
-
-interface EntityImagesProps {
-  novelId: string;
-  entity: EntityResponse;
-}
-
-function EntityImages({ novelId, entity }: EntityImagesProps): ReactElement {
-  const entityKey = entity.entityKey;
-  const full = useEntityQuery(novelId, entityKey).data;
-  const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
-  const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
-  const addGalleryImage = useAddEntityImageMutation(novelId, entityKey);
-  const removeGalleryImage = useDeleteEntityImageByIdMutation(novelId, entityKey);
-  const hasPortrait = Boolean(entity.imageUrl);
-
-  return (
-    <section className={styles.imagesSection} aria-label="Portrait and gallery">
-      <h3 className={styles.label}>Portrait &amp; gallery</h3>
-      <ImageGallery
-        leading={
-          <ImageUpload
-            variant="tile"
-            src={entity.imageUrl ?? undefined}
-            alt={entity.name}
-            label="Portrait"
-            emptyLabel="Add portrait"
-            uploading={uploadImage.isPending || removeImage.isPending}
-            onUpload={image => uploadImage.mutate(image, { onSuccess: () => toast.success(`Updated ${entity.name}’s image`), onError: e => toast.danger(e.message) })}
-            onRemove={() => removeImage.mutate(undefined, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
-          />
-        }
-        images={(full?.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, caption: img.caption }))}
-        busy={addGalleryImage.isPending || removeGalleryImage.isPending || !full}
-        showAdd={hasPortrait}
-        addLabel="Add more"
-        addAriaLabel="Add another image"
-        onAdd={image => addGalleryImage.mutate(image, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
-        onRemove={id => removeGalleryImage.mutate(id, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
       />
     </section>
   );

@@ -17,6 +17,7 @@ import {
   listIllustrationsQueryOptions,
   type ReferenceWarningResponse,
   type RefineIllustrationBody,
+  useChapterRowsQuery,
   useDiscardIllustrationMutation,
   useListEntitiesQuery,
   useListIllustrationsQuery,
@@ -31,8 +32,12 @@ import { relativeTime } from '@/lib/format';
 import {
   candidateSlots,
   countBySubject,
+  depictsChapterLabel,
+  depictsChapterOptions,
+  depictsChapterVisibilityNote,
   FILTER_LABEL,
   filterIllustrations,
+  FRONTIER_ROWS,
   identityMeta,
   illustrationCaption,
   parseSubjectType,
@@ -135,11 +140,14 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
   const start = useStartIllustrationMutation(novelId);
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = entitiesQuery.data?.items ?? [];
+  const frontierQuery = useChapterRowsQuery(novelId, FRONTIER_ROWS, open);
+  const frontier = frontierQuery.data?.frontier ?? 0;
   const [subjectType, setSubjectType] = useState(initial.subjectType);
   const [subjectKey, setSubjectKey] = useState(initial.subjectKey);
   const [instruction, setInstruction] = useState('');
   const [references, setReferences] = useState<DraftReference[]>([]);
   const [autoReferences, setAutoReferences] = useState(true);
+  const [depictsChapter, setDepictsChapter] = useState<number>();
 
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
@@ -150,6 +158,7 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
       setInstruction('');
       setReferences([]);
       setAutoReferences(true);
+      setDepictsChapter(undefined);
     }
   }
 
@@ -176,6 +185,7 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
         instruction: instruction.trim() || undefined,
         references: payload.length > 0 ? payload : undefined,
         autoReferences: subjectType === 'cover' ? undefined : autoReferences,
+        depictsChapter: subjectType === 'entity' ? depictsChapter : undefined,
       },
       {
         onSuccess: created => {
@@ -207,6 +217,17 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
                   {entities.map(entity => (
                     <Select.Item key={entity.entityKey} value={entity.entityKey}>
                       {entity.name}
+                    </Select.Item>
+                  ))}
+                </Select>
+              </FormField>
+            )}
+            {subjectType === 'entity' && (
+              <FormField label="As of which chapter" helper={depictsChapterVisibilityNote(depictsChapter ?? frontier, frontier)}>
+                <Select value={String(depictsChapter ?? frontier)} onValueChange={v => setDepictsChapter(Number(v))} disabled={frontierQuery.isLoading}>
+                  {depictsChapterOptions(frontier).map(option => (
+                    <Select.Item key={option.value} value={String(option.value)}>
+                      {option.label}
                     </Select.Item>
                   ))}
                 </Select>
@@ -495,6 +516,8 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
   const save = useSaveIllustrationMutation(novelId, illustrationId);
   const discard = useDiscardIllustrationMutation(novelId, illustrationId);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const frontierQuery = useChapterRowsQuery(novelId, FRONTIER_ROWS, illustration.subjectType === 'entity');
+  const frontier = frontierQuery.data?.frontier ?? 0;
 
   const name = subjectLabel(illustration);
   const active = illustration.status === 'active';
@@ -524,6 +547,12 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
               {illustration.status}
             </StatusChip>
             <span className={styles.identityMeta}>{identityMeta(illustration, relativeTime(illustration.updatedAt))}</span>
+            {illustration.subjectType === 'entity' && (
+              <span className={styles.identityMeta}>
+                {illustration.depictsChapter !== null && `${depictsChapterLabel(illustration.depictsChapter, frontier)} · `}
+                {depictsChapterVisibilityNote(illustration.depictsChapter, frontier)}
+              </span>
+            )}
           </DetailPage.Identity>
         }
         pager={<ItemPager ids={ids} currentId={illustrationId} onSelect={onSelect} itemNoun="illustration" jump={jump} />}

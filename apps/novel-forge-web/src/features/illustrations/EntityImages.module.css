@@ -1,0 +1,53 @@
+.imagesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.dateField {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+}
+
+.dateLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.dateSelect {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.futureRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.futureInput {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.dateNote {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.dateNoteError {
+  font-size: 12px;
+  color: var(--sh-danger-text);
+}

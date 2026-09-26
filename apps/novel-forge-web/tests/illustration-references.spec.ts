@@ -285,6 +285,10 @@ describe('describeReferenceWarning', () => {
     expect(describeReferenceWarning(merged, meta)).toBe('Chapter 3 scene image is the image being edited, so it is sent once as the edit source, and its note was not used');
   });
 
+  it('should explain a reference skipped for depicting a later chapter', () => {
+    expect(describeReferenceWarning(warning({ code: 'later-chapter', sourceId: 'milo' }), meta)).toBe('Portrait of Milo skipped: it shows a later chapter than this image');
+  });
+
   it('should explain skipped files and fall back to a generic label for unknown images', () => {
     expect(describeReferenceWarning(warning({ code: 'missing-file', source: 'gallery', sourceId: '99' }), meta)).toBe('A gallery image skipped: the image no longer exists');
     expect(describeReferenceWarning(warning({ code: 'too-large', source: 'cover', sourceId: undefined }), meta)).toBe(
@@ -319,11 +323,29 @@ describe('referenceErrorMessage', () => {
   });
 
   it('should give a friendly message for every reference error code', () => {
-    for (const code of ['ILL_009', 'ILL_010', 'ILL_014', 'ILL_015']) {
+    for (const code of ['ILL_009', 'ILL_010', 'ILL_014', 'ILL_015', 'ILL_017']) {
       const message = referenceErrorMessage({ code, message: 'raw server text' });
       expect(message).not.toBe('raw server text');
       expect(message.length).toBeGreaterThan(0);
     }
+  });
+
+  it('should name the finalized chapter a depiction was refused past', () => {
+    const message = referenceErrorMessage({
+      code: 'ILL_016',
+      message: 'Chapter 5 is not final — an image can depict the story only up to its latest final chapter, 3',
+    });
+
+    expect(message).toBe('Chapter 5 isn’t finalized yet — the latest final chapter is 3. Pick that one or earlier.');
+  });
+
+  it('should name both chapters in a reference-depicts-later-chapter refusal', () => {
+    const message = referenceErrorMessage({
+      code: 'ILL_018',
+      message: 'Reference for portrait depicts chapter 6, later than chapter 2 this image is drawn as of',
+    });
+
+    expect(message).toBe('A reference image depicts chapter 6, later than chapter 2 this image is drawn as of. Pick an earlier reference or date this image later.');
   });
 
   it('should fall back to the server message for unrelated errors', () => {

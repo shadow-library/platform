@@ -14,7 +14,7 @@ import {
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-const illustrationKeys = {
+export const illustrationKeys = {
   all: (projectId: string) => ['projects', projectId, 'illustrations'] as const,
   list: (projectId: string, params?: ListIllustrationsQueryParams) => [...illustrationKeys.all(projectId), 'list', params] as const,
   referenceOptions: (projectId: string, params?: ListReferenceOptionsQueryParams) => [...illustrationKeys.all(projectId), 'reference-options', params] as const,

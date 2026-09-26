@@ -3,6 +3,7 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 import {
   type AddEntityImageBody,
   type CreateEntityBody,
+  type DateEntityImageBody,
   type EntityResponse,
   type ListEntitiesQueryParams,
   type ListEntityResponse,
@@ -10,18 +11,8 @@ import {
   type UpdateEntityBody,
   type UploadImageBody,
 } from './api-types.gen';
+import { illustrationKeys } from './illustration.api';
 import { ApiError, APIRequest } from './transport';
-
-// The gallery of additional reference images an entity carries, alongside its single `imageUrl`
-// portrait. Hand-authored until the generated OpenAPI types pick up the new fields on redeploy.
-interface EntityImage {
-  id: string;
-  imageUrl: string;
-  caption?: string | null;
-  sortOrder: number;
-}
-
-export type EntityWithImages = EntityResponse & { images?: EntityImage[] };
 
 const entityKeys = {
   all: (projectId: string) => ['projects', projectId, 'entities'] as const,
@@ -43,8 +34,8 @@ export function useListEntitiesQuery(projectId: string, params?: ListEntitiesQue
   return useQuery({ ...listEntitiesQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
-export function useEntityQuery(projectId: string, entityKey: string, enabled = true): UseQueryResult<EntityWithImages, ApiError> {
-  return useQuery<EntityWithImages, ApiError>({
+export function useEntityQuery(projectId: string, entityKey: string, enabled = true): UseQueryResult<EntityResponse, ApiError> {
+  return useQuery<EntityResponse, ApiError>({
     queryKey: entityKeys.detail(projectId, entityKey),
     queryFn: () => APIRequest.get(`/projects/${projectId}/entities/${entityKey}`).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(entityKey),
@@ -99,18 +90,41 @@ export function useDeleteEntityImageMutation(projectId: string, entityKey: strin
   });
 }
 
-export function useAddEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityWithImages, ApiError, AddEntityImageBody> {
+/** Re-dates the portrait; allows a future chapter, unlike generating or dating a gallery image against it. */
+export function useDatePortraitMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, DateEntityImageBody> {
   const queryClient = useQueryClient();
-  return useMutation<EntityWithImages, ApiError, AddEntityImageBody>({
+  return useMutation<EntityResponse, ApiError, DateEntityImageBody>({
+    mutationFn: data => APIRequest.patch(`/projects/${projectId}/entities/${entityKey}/image`).body(data).execute(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) });
+      queryClient.invalidateQueries({ queryKey: illustrationKeys.all(projectId) });
+    },
+  });
+}
+
+export function useAddEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, AddEntityImageBody> {
+  const queryClient = useQueryClient();
+  return useMutation<EntityResponse, ApiError, AddEntityImageBody>({
     mutationFn: data => APIRequest.post(`/projects/${projectId}/entities/${entityKey}/images`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) }),
   });
 }
 
-export function useDeleteEntityImageByIdMutation(projectId: string, entityKey: string): UseMutationResult<EntityWithImages, ApiError, string> {
+export function useDeleteEntityImageByIdMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, string> {
   const queryClient = useQueryClient();
-  return useMutation<EntityWithImages, ApiError, string>({
+  return useMutation<EntityResponse, ApiError, string>({
     mutationFn: imageId => APIRequest.delete(`/projects/${projectId}/entities/${entityKey}/images/${imageId}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) }),
+  });
+}
+
+export function useDateEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, { imageId: string } & DateEntityImageBody> {
+  const queryClient = useQueryClient();
+  return useMutation<EntityResponse, ApiError, { imageId: string } & DateEntityImageBody>({
+    mutationFn: ({ imageId, ...data }) => APIRequest.patch(`/projects/${projectId}/entities/${entityKey}/images/${imageId}`).body(data).execute(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) });
+      queryClient.invalidateQueries({ queryKey: illustrationKeys.all(projectId) });
+    },
   });
 }

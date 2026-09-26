@@ -4,9 +4,14 @@ import {
   type BoardIllustration,
   candidateSlots,
   countBySubject,
+  depictsChapterLabel,
+  depictsChapterOptions,
+  depictsChapterVisibilityNote,
   filterIllustrations,
+  futureChapterError,
   identityMeta,
   illustrationCaption,
+  parseFutureChapter,
   parseSubjectType,
   subjectLabel,
   thumbnailOf,
@@ -124,5 +129,92 @@ describe('candidateSlots', () => {
 
   it('should keep more than a pair when a round returned extra candidates', () => {
     expect(candidateSlots(['one', 'two', 'three'], false)).toHaveLength(3);
+  });
+});
+
+describe('depictsChapterOptions', () => {
+  it('should list every chapter from the frontier down to before-the-story, newest first', () => {
+    expect(depictsChapterOptions(3)).toEqual([
+      { value: 3, label: 'Chapter 3 · latest final' },
+      { value: 2, label: 'Chapter 2' },
+      { value: 1, label: 'Chapter 1' },
+      { value: 0, label: 'Before the story' },
+    ]);
+  });
+
+  it('should offer only "before the story" when nothing has been finalized yet', () => {
+    expect(depictsChapterOptions(0)).toEqual([{ value: 0, label: 'Before the story' }]);
+  });
+
+  it('should never include a chapter past the frontier', () => {
+    const options = depictsChapterOptions(5);
+    expect(options.every(option => option.value <= 5)).toBe(true);
+    expect(options).toHaveLength(6);
+  });
+});
+
+describe('depictsChapterLabel', () => {
+  it('should mark the frontier chapter as the latest final one', () => {
+    expect(depictsChapterLabel(4, 4)).toBe('Chapter 4 · latest final');
+  });
+
+  it('should name an earlier chapter plainly and chapter 0 as before the story', () => {
+    expect(depictsChapterLabel(2, 4)).toBe('Chapter 2');
+    expect(depictsChapterLabel(0, 4)).toBe('Before the story');
+  });
+});
+
+describe('depictsChapterVisibilityNote', () => {
+  it('should name the chapter readers see it from', () => {
+    expect(depictsChapterVisibilityNote(3, 4)).toBe('Readers see this from chapter 3 on.');
+  });
+
+  it('should call out chapter 0 as the very start', () => {
+    expect(depictsChapterVisibilityNote(0, 4)).toBe('Readers see this from the very start.');
+  });
+
+  it('should explain a future chapter stays hidden until it publishes', () => {
+    expect(depictsChapterVisibilityNote(7, 4)).toBe('Hidden from readers until chapter 7 is finalized and published.');
+  });
+
+  it('should keep a legacy undated image visible to everyone', () => {
+    expect(depictsChapterVisibilityNote(null, 4)).toBe('Shown to all readers (dated before this change).');
+  });
+});
+
+describe('parseFutureChapter', () => {
+  it('should accept a whole number past the frontier', () => {
+    expect(parseFutureChapter('7', 4)).toBe(7);
+    expect(parseFutureChapter(' 5 ', 4)).toBe(5);
+  });
+
+  it('should reject a number at or below the frontier', () => {
+    expect(parseFutureChapter('4', 4)).toBeUndefined();
+    expect(parseFutureChapter('1', 4)).toBeUndefined();
+  });
+
+  it('should reject a fractional chapter', () => {
+    expect(parseFutureChapter('5.5', 4)).toBeUndefined();
+  });
+
+  it('should reject an empty or non-numeric draft', () => {
+    expect(parseFutureChapter('', 4)).toBeUndefined();
+    expect(parseFutureChapter('   ', 4)).toBeUndefined();
+    expect(parseFutureChapter('abc', 4)).toBeUndefined();
+  });
+});
+
+describe('futureChapterError', () => {
+  it('should say nothing for a valid future chapter', () => {
+    expect(futureChapterError('7', 4)).toBeUndefined();
+  });
+
+  it('should name the frontier for a chapter at or below it', () => {
+    expect(futureChapterError('4', 4)).toBe('Enter a whole chapter number after 4');
+  });
+
+  it('should give the same message for a fractional or empty draft', () => {
+    expect(futureChapterError('5.5', 4)).toBe('Enter a whole chapter number after 4');
+    expect(futureChapterError('', 4)).toBe('Enter a whole chapter number after 4');
   });
 });
