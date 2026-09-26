@@ -17,10 +17,11 @@ import { ChapterRowsController } from './chapter-rows.controller';
 import { ChapterRowsService } from './chapter-rows.service';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
+import { WriterSnapshotController } from './writer-snapshot.controller';
 
 @Module({
   imports: [DatabaseModule, AiModule, AuthoringClaimModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
-  controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController, ChapterRowsController],
+  controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController, ChapterRowsController, WriterSnapshotController],
   providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
 })

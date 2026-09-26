@@ -64,6 +64,7 @@ function makeService(fixture: GateFixture = {}) {
     noop,
     noop,
     claims.asService(),
+    noop,
   );
   return { service, enqueued };
 }
@@ -275,7 +276,7 @@ describe('GenerationService.updateBrief', () => {
     };
     const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
     const noop = {} as never;
-    const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
     return { service, inserted };
   }
 

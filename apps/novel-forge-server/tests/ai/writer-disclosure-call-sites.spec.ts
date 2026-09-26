@@ -46,6 +46,7 @@ function graphNodes() {
     toolRegistry: {} as never,
     indexingService: {} as never,
     pluginPolicy: { scoped: async () => ({ for: () => POLICY, forPack: () => POLICY }) } as never,
+    writerSnapshots: { onMessages: () => () => {} } as never,
   });
   return { nodes, calls };
 }

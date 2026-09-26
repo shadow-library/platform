@@ -42,6 +42,8 @@ import { type CallRoute, type UnrestrictedRouteDeps } from '../unrestricted-rout
 import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics } from './mechanical-check';
 import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
+import { bibleHashOf, keptBackOf } from './writer-snapshot-capture';
+import { type WriterSnapshotService } from '../writer-snapshot.service';
 
 export interface GraphServices {
   db: PrimaryDatabase;
@@ -51,6 +53,7 @@ export interface GraphServices {
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
   pluginPolicy: PluginPolicyService;
+  writerSnapshots: WriterSnapshotService;
   checkpointer: BaseCheckpointSaver;
 }
 
@@ -317,7 +320,33 @@ export function parseJudgeOutput(raw: string): JudgeOutput | null {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterGenerationNodes(services: Omit<GraphServices, 'checkpointer'>) {
-  const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy } = services;
+  const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy, writerSnapshots } = services;
+
+  // The revision a chapter's next persisted draft will carry, so every attempt in one run's repair ladder is
+  // recorded against the same target revision `persistGeneratedDraft` will actually write.
+  const targetRevisions = new Map<number, Promise<number>>();
+  function targetRevisionFor(projectId: bigint, chapter: number): Promise<number> {
+    let revision = targetRevisions.get(chapter);
+    if (!revision) {
+      revision = db.query.drafts
+        .findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)), columns: { revision: true } })
+        .then(row => (row ? row.revision + 1 : 0));
+      targetRevisions.set(chapter, revision);
+    }
+    return revision;
+  }
+
+  const briefRevisions = new Map<number, Promise<number | null>>();
+  function briefRevisionFor(projectId: bigint, chapter: number): Promise<number | null> {
+    let revision = briefRevisions.get(chapter);
+    if (!revision) {
+      revision = db.query.briefs
+        .findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)), columns: { revision: true } })
+        .then(row => row?.revision ?? null);
+      briefRevisions.set(chapter, revision);
+    }
+    return revision;
+  }
 
   // The graph is built per run, so this closure is the run's scope: one `project_plugins` read per baseline feeds every
   // node's policy instead of one read per model call. The baseline is the chapter's mode, not the project's.
@@ -416,6 +445,27 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const guidance = writerSafeGuidance(disclosure, state.guidance);
     const wordTarget = resolveWordTarget(projectRow);
+
+    const [targetRevision, pack] = await Promise.all([
+      targetRevisionFor(projectId, state.chapter),
+      state.contextPackId ? db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : Promise.resolve(undefined),
+    ]);
+    ctx.onMessages = writerSnapshots.onMessages({
+      projectId,
+      chapter: state.chapter,
+      draftRevision: targetRevision,
+      attempt: state.attempt,
+      role: 'draft',
+      contextPackId: state.contextPackId ? BigInt(state.contextPackId) : null,
+      keptBack: keptBackOf(disclosure, pack?.omitted),
+      planRevision: brief?.revision ?? null,
+      bibleHash: bibleHashOf(stableContext || volatileContext || pack?.rendered),
+      promptKey: PROMPT_REGISTRY.generation.key,
+      promptVersion: PROMPT_REGISTRY.generation.version,
+      isolated: Boolean(chapterContainment(state.contentMode ?? 'standard', policy).isolated),
+      runId: state.runId,
+    });
+
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },
@@ -663,6 +713,22 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     };
 
     const { policy, project } = await routeFor(projectId, 'repair', state, projectRow as ProjectConfig | undefined);
+    const [targetRevision, planRevision] = await Promise.all([targetRevisionFor(projectId, state.chapter), briefRevisionFor(projectId, state.chapter)]);
+    ctx.onMessages = writerSnapshots.onMessages({
+      projectId,
+      chapter: state.chapter,
+      draftRevision: targetRevision,
+      attempt: state.attempt + 1,
+      role: 'repair',
+      contextPackId: state.contextPackId ? BigInt(state.contextPackId) : null,
+      keptBack: keptBackOf(await disclosureFor(projectId, state.chapter), null),
+      planRevision,
+      bibleHash: bibleHashOf(renderedPack),
+      promptKey: PROMPT_REGISTRY.fix.key,
+      promptVersion: PROMPT_REGISTRY.fix.version,
+      isolated: Boolean(chapterContainment(state.contentMode ?? 'standard', policy).isolated),
+      runId: state.runId,
+    });
     const result = (await modelRouter.structured(PROMPT_REGISTRY.fix, { contextPack: renderedPack, prose: state.prose, findings: findingsStr }, ctx, project, policy)) as FixOutput;
 
     logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
@@ -733,6 +799,27 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const { policy, project } = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const wordTarget = resolveWordTarget(projectRow);
+
+    const [targetRevision, pack] = await Promise.all([
+      targetRevisionFor(projectId, state.chapter),
+      state.contextPackId ? db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : Promise.resolve(undefined),
+    ]);
+    ctx.onMessages = writerSnapshots.onMessages({
+      projectId,
+      chapter: state.chapter,
+      draftRevision: targetRevision,
+      attempt: state.attempt + 1,
+      role: 'rewrite',
+      contextPackId: state.contextPackId ? BigInt(state.contextPackId) : null,
+      keptBack: keptBackOf(disclosure, pack?.omitted),
+      planRevision: brief?.revision ?? null,
+      bibleHash: bibleHashOf(stableContext || volatileContext || pack?.rendered),
+      promptKey: PROMPT_REGISTRY.generation.key,
+      promptVersion: PROMPT_REGISTRY.generation.version,
+      isolated: Boolean(chapterContainment(state.contentMode ?? 'standard', policy).isolated),
+      runId: state.runId,
+    });
+
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },

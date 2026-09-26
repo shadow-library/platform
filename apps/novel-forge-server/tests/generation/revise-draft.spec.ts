@@ -8,23 +8,55 @@ import { type DraftRow, draftRow, fakeGenerationDb, makeGenerationService, rende
 const REVISED = { title: 'The Tide Clerk', body: 'The keeper counts the ships twice and writes neither number down.', summary: 'The keeper hides the count.' };
 const NOTE = { note: 'Slow the count down.' };
 
+interface CapturedSnapshot {
+  meta: { role: string; draftRevision: number; chapter: number };
+  messages: { role: string; content: string }[];
+}
+
+function fakeWriterSnapshots() {
+  const captured: CapturedSnapshot[] = [];
+  return {
+    captured,
+    service: {
+      onMessages: (meta: CapturedSnapshot['meta']) => {
+        let called = false;
+        return (messages: CapturedSnapshot['messages']) => {
+          if (called) return;
+          called = true;
+          captured.push({ meta, messages });
+        };
+      },
+    },
+  };
+}
+
 function setup(draftReads: (DraftRow | undefined)[], updated?: DraftRow) {
   const fake = fakeGenerationDb({ draftReads, draftWriteResult: updated ? [updated] : [] });
+  const { service: writerSnapshots, captured } = fakeWriterSnapshots();
   let modelCalls = 0;
   const service = makeGenerationService(fake.db, {
     modelRouter: {
-      structured: async () => {
+      structured: async (_prompt: unknown, _vars: unknown, ctx: { onMessages?: (messages: CapturedSnapshot['messages'], route: unknown) => void }) => {
         modelCalls++;
+        ctx.onMessages?.(
+          [
+            { role: 'system', content: 'the writer’s system prompt' },
+            { role: 'human', content: `feedback: ${NOTE.note}` },
+          ],
+          { provider: 'openrouter', model: 'test-writer-model' },
+        );
         return REVISED;
       },
     },
     contextAssembler: { forChapter: async () => ({ rendered: '' }) },
     pluginPolicy: { resolve: async () => ({ raised: false }) },
+    writerSnapshots,
   });
   const draftUpdates = () => fake.writesTo(schema.drafts, 'update');
   return {
     service,
     modelCalls: () => modelCalls,
+    captured,
     proseUpdate: () => draftUpdates().find(write => write.values && 'body' in write.values),
     staleMarks: () => draftUpdates().filter(write => write.values && !('body' in write.values)),
     revisions: () => fake.writesTo(schema.draftRevisions),
@@ -81,5 +113,21 @@ describe('GenerationService.reviseDraft', () => {
       expect.objectContaining({ values: expect.objectContaining({ draftId: 11n, revision: 3, source: 'revised', body: REVISED.body, feedbackId: 7n }) }),
     ]);
     expect(run.staleMarks().length).toBeGreaterThan(0);
+  });
+
+  it('should capture a revise attempt with the exact messages the fake router received', async () => {
+    const updated = { ...draftRow({ revision: 3 }), body: REVISED.body };
+    const run = setup([draftRow()], updated);
+
+    await run.service.reviseDraft(1n, 4, NOTE);
+
+    expect(run.captured).toHaveLength(1);
+    expect(run.captured[0]?.meta.role).toBe('revise');
+    expect(run.captured[0]?.meta.chapter).toBe(4);
+    expect(run.captured[0]?.meta.draftRevision).toBe(3);
+    expect(run.captured[0]?.messages).toEqual([
+      { role: 'system', content: 'the writer’s system prompt' },
+      { role: 'human', content: `feedback: ${NOTE.note}` },
+    ]);
   });
 });

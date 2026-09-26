@@ -441,6 +441,13 @@ export class ModelRouterService {
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
     const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route) });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
+    if (ctx.onMessages) {
+      try {
+        ctx.onMessages(messages, { provider: resolveProvider(resolved), model: resolved.model });
+      } catch (err) {
+        this.logger.warn('onMessages callback failed — the call proceeds unsnapshotted', { role, runId: ctx.runId, err });
+      }
+    }
     const refuses = route.contentMode === 'unrestricted' ? (text: string) => findHardLine([text], outputScope(role)) !== null : undefined;
     const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err }), refuses) : null;
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug

@@ -106,6 +106,13 @@
       "when": 1790435238882,
       "tag": "0014_ledger_idea_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790436042019,
+      "tag": "0015_writer_snapshots",
+      "breakpoints": true
     }
   ]
 }

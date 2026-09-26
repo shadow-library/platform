@@ -44,7 +44,7 @@ function fakeDb(opts: FakeDbOptions = {}): FakeDb {
 function makeService({ db }: FakeDb): GenerationService {
   const databaseService = { getPostgresClient: () => db } as never;
   const noop = {} as never;
-  return new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  return new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
 }
 
 describe('GenerationService.getChapterCost', () => {

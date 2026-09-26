@@ -37,6 +37,7 @@ import { loadWriterBrief } from '../ai/context/writer-brief';
 import { applyContinuityDelta, continuityHasHeldEntries, filterToHeldEntries } from '../ai/graphs/apply-continuity';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { expandShortDraft } from '../ai/graphs/draft-expansion';
+import { bibleHashOf, keptBackOf } from '../ai/graphs/writer-snapshot-capture';
 import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
@@ -48,9 +49,10 @@ import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
 import { isolatedContinuityProposal, isolatedExtractionContext, standardReadableExtraction } from '../ai/isolation-read-policy';
-import { TelemetryHandler } from '../ai/telemetry.handler';
+import { type TelemetryContext, TelemetryHandler } from '../ai/telemetry.handler';
 import { type CallRoute } from '../ai/unrestricted-route';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeCallUsage, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
+import { WriterSnapshotService } from '../ai/writer-snapshot.service';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { AuthoringClaimService } from '../jobs/authoring-claim.service';
@@ -200,6 +202,7 @@ export class GenerationService {
     private readonly pluginPolicy: PluginPolicyService,
     private readonly pluginProposals: PluginProposalService,
     private readonly claims: AuthoringClaimService,
+    private readonly writerSnapshots: WriterSnapshotService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -475,12 +478,27 @@ export class GenerationService {
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure, enforceWriterReservations: true });
 
-    const ctx = {
+    const ctx: TelemetryContext = {
       projectId,
       chapter,
       promptKey: PROMPT_REGISTRY.revision.key,
       promptVersion: PROMPT_REGISTRY.revision.version,
       role: PROMPT_REGISTRY.revision.key,
+      onMessages: this.writerSnapshots.onMessages({
+        projectId,
+        chapter,
+        draftRevision: draft.revision + 1,
+        attempt: 1,
+        role: 'revise',
+        contextPackId: pack.id,
+        keptBack: keptBackOf(disclosure, pack.omitted),
+        planRevision: brief?.revision ?? null,
+        bibleHash: bibleHashOf(pack.rendered),
+        promptKey: PROMPT_REGISTRY.revision.key,
+        promptVersion: PROMPT_REGISTRY.revision.version,
+        isolated: Boolean(draft.isolated || chapterContainment(mode, policy).isolated),
+        runId: null,
+      }),
     };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,

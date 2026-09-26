@@ -144,6 +144,7 @@ describe('WorkflowRunService.settleJobRuns', () => {
       {
         publish: () => undefined,
       } as never,
+      {} as never,
     );
 
     await service.settleJobRuns('job-r', 'failed', new Error('refused'));

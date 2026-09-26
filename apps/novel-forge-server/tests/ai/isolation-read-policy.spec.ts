@@ -120,6 +120,7 @@ function graph(mode5: 'standard' | 'unrestricted' | null) {
         return { for: () => policy, forPack: () => policy };
       },
     } as never,
+    writerSnapshots: { onMessages: () => () => {} } as never,
   });
   return { nodes, calls };
 }

@@ -18,6 +18,7 @@ import { IndexingService } from '../retrieval/indexing.service';
 import { type GenerationState } from '../schemas';
 import { TelemetryHandler } from '../telemetry.handler';
 import { ToolRegistryService } from '../tools/tool-registry.service';
+import { WriterSnapshotService } from '../writer-snapshot.service';
 import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
 import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
@@ -119,6 +120,7 @@ export class WorkflowRunService {
     private readonly indexingService: IndexingService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
+    private readonly writerSnapshots: WriterSnapshotService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
     this.checkpointer = PostgresSaver.fromConnString(DB_URL);
@@ -138,6 +140,7 @@ export class WorkflowRunService {
       toolRegistry: this.toolRegistry,
       indexingService: this.indexingService,
       pluginPolicy: this.pluginPolicy,
+      writerSnapshots: this.writerSnapshots,
       checkpointer: this.checkpointer,
     };
   }

@@ -52,6 +52,7 @@ function generation(tables: ReturnType<typeof planTables>): GenerationService {
     noop,
     noop,
     new FakeAuthoringClaims().asService(),
+    noop,
   );
 }
 

@@ -63,6 +63,12 @@ export interface GenerationDeps {
   chapterImages?: object;
   pluginPolicy?: object;
   claims?: FakeAuthoringClaims;
+  writerSnapshots?: object;
+}
+
+/** A `WriterSnapshotService` that never touches a database — `onMessages` returns a no-op, once-guarded like the real one. */
+export function fakeWriterSnapshots(): { onMessages: () => () => void } {
+  return { onMessages: () => () => {} };
 }
 
 const dialect = new PgDialect();
@@ -204,5 +210,6 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     (deps.pluginPolicy ?? absent) as never,
     absent,
     (deps.claims ?? new FakeAuthoringClaims()).asService(),
+    (deps.writerSnapshots ?? fakeWriterSnapshots()) as never,
   );
 }

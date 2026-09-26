@@ -12,7 +12,7 @@ function makeService(run: RunRow | undefined, live: boolean): { service: Generat
   const databaseService = { getPostgresClient: () => db } as never;
   const workflowRunService = { cancel: (runId: string) => (cancelCalls.push(runId), live) } as never;
   const noop = {} as never;
-  const service = new GenerationService(databaseService, workflowRunService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const service = new GenerationService(databaseService, workflowRunService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   return { service, cancelCalls };
 }
 

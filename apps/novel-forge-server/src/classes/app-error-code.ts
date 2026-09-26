@@ -363,4 +363,9 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PLG_003 = AppErrorCode.badRequest('PLG_003', 'Plugin configuration was rejected — {reason}');
   static readonly PLG_004 = AppErrorCode.conflict('PLG_004', 'Another enabled plugin already claims an exclusive decision point this plugin claims: {decisionPoint}');
   static readonly PLG_005 = AppErrorCode.badRequest('PLG_005', 'Plugin proposed a change it is not allowed to propose — {reason}');
+
+  /*!
+   * Writer snapshot errors
+   */
+  static readonly WSN_001 = AppErrorCode.notFound('WSN_001', 'Writer snapshot not found');
 }

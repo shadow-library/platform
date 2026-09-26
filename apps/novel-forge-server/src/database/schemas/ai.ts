@@ -1,9 +1,37 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { type AnyPgColumn, bigint, bigserial, customType, index, integer, numeric, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  type AnyPgColumn,
+  bigint,
+  bigserial,
+  boolean,
+  customType,
+  index,
+  integer,
+  numeric,
+  pgEnum,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 import { drafts } from './generation';
 import { jsonb } from './jsonb';
 import { contentMode, costTier, projects } from './projects';
+
+/** One message as the model router sent it — the exact role and content of a `BaseMessage`, never re-derived. */
+export interface WriterSnapshotMessage {
+  role: string;
+  content: string;
+}
+
+export interface WriterSnapshotModelRoute {
+  provider: string;
+  model: string;
+}
 
 export namespace Ai {
   export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
@@ -14,6 +42,7 @@ export namespace Ai {
   export type UserFeedback = InferSelectModel<typeof userFeedback>;
   export type LlmCache = InferSelectModel<typeof llmCache>;
   export type LoreChunk = InferSelectModel<typeof loreChunks>;
+  export type WriterSnapshot = InferSelectModel<typeof writerSnapshots>;
   export type WorkflowRunStatus = InferEnum<typeof workflowRunStatus>;
   export type ModelCallStatus = InferEnum<typeof modelCallStatus>;
   export type ToolCallStatus = InferEnum<typeof toolCallStatus>;
@@ -21,6 +50,7 @@ export namespace Ai {
   export type UserFeedbackArtifactType = InferEnum<typeof userFeedbackArtifactType>;
   export type UserFeedbackDisposition = InferEnum<typeof userFeedbackDisposition>;
   export type CostSource = InferEnum<typeof costSource>;
+  export type WriterAttemptRole = InferEnum<typeof writerAttemptRole>;
 }
 
 const EMBEDDING_DIM = 1024;
@@ -53,6 +83,7 @@ export const userFeedbackArtifactType = pgEnum('user_feedback_artifact_type', [
 ]);
 export const costSource = pgEnum('cost_source', ['provider', 'gateway', 'estimate']);
 export const userFeedbackDisposition = pgEnum('user_feedback_disposition', ['revision_requested', 'approved', 'rejected', 'comment']);
+export const writerAttemptRole = pgEnum('writer_attempt_role', ['draft', 'repair', 'rewrite', 'revise']);
 
 export const workflowRuns = pgTable(
   'workflow_runs',
@@ -163,6 +194,43 @@ export const contextPacks = pgTable(
   t => [unique('context_packs_project_id_hash_unique').on(t.projectId, t.hash)],
 );
 
+// One row per writer attempt (draft, repair, rewrite, revise): the exact messages the model router sent, captured at the
+// router call boundary rather than reassembled later, so a later Story Bible or brief edit can never change what a row says
+// the writer read. Retention keeps every attempt for a chapter's current `draftRevision` plus its `RETAINED_PRIOR_REVISIONS`
+// (writer-snapshot.service.ts) earlier revisions; older revisions are pruned as newer attempts land, never by finalize or approve.
+export const writerSnapshots = pgTable(
+  'writer_snapshots',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    chapter: integer('chapter').notNull(),
+    draftRevision: integer('draft_revision').notNull(),
+    attempt: integer('attempt').notNull(),
+    role: writerAttemptRole('role').notNull(),
+    contextPackId: bigint('context_pack_id', { mode: 'bigint' }),
+    messages: jsonb('messages').$type<WriterSnapshotMessage[]>().notNull(),
+    // What the disclosure policy withheld (counts by field — never the withheld text) and what the context pack cut for
+    // budget, so the record shows what was kept back and why without smuggling a locked fact's truth into a diagnostic.
+    keptBack: jsonb('kept_back').$type<Record<string, unknown>>(),
+    planRevision: integer('plan_revision'),
+    bibleHash: varchar('bible_hash'),
+    promptKey: varchar('prompt_key').notNull(),
+    promptVersion: varchar('prompt_version').notNull(),
+    modelRoute: jsonb('model_route').$type<WriterSnapshotModelRoute>().notNull(),
+    // Captured at attempt time, independent of the draft's current `isolated` flag, so a Writer's view read of an old
+    // snapshot walls off its prose exactly as the isolation read policy required when the attempt was made.
+    isolated: boolean('isolated').notNull().default(false),
+    runId: varchar('run_id'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [
+    index('writer_snapshots_project_id_chapter_idx').on(t.projectId, t.chapter),
+    index('writer_snapshots_project_id_chapter_draft_revision_idx').on(t.projectId, t.chapter, t.draftRevision),
+  ],
+);
+
 export const draftRevisions = pgTable(
   'draft_revisions',
   {
@@ -257,6 +325,10 @@ export const modelCallsRelations = relations(modelCalls, ({ one }) => ({
 
 export const contextPacksRelations = relations(contextPacks, ({ one }) => ({
   project: one(projects, { fields: [contextPacks.projectId], references: [projects.id] }),
+}));
+
+export const writerSnapshotsRelations = relations(writerSnapshots, ({ one }) => ({
+  project: one(projects, { fields: [writerSnapshots.projectId], references: [projects.id] }),
 }));
 
 export const draftRevisionsRelations = relations(draftRevisions, ({ one }) => ({

@@ -22,6 +22,7 @@ import { IndexingService } from './retrieval/indexing.service';
 import { RetrievalService } from './retrieval/retrieval.service';
 import { TelemetryHandler } from './telemetry.handler';
 import { ToolRegistryService } from './tools/tool-registry.service';
+import { WriterSnapshotService } from './writer-snapshot.service';
 
 @Module({
   imports: [ActorModule, DatabaseModule, EventsModule, FastifyModule, PluginsModule],
@@ -41,6 +42,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     ContextAssembler,
     ToolRegistryService,
     WorkflowRunService,
+    WriterSnapshotService,
   ],
   exports: [
     AccountSettingsService,
@@ -56,6 +58,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     ContextAssembler,
     ToolRegistryService,
     WorkflowRunService,
+    WriterSnapshotService,
   ],
 })
 export class AiModule {}

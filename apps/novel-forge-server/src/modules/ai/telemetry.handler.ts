@@ -1,5 +1,6 @@
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { type Serialized } from '@langchain/core/load/serializable';
+import { type BaseMessage } from '@langchain/core/messages';
 import { type LLMResult } from '@langchain/core/outputs';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -23,6 +24,13 @@ export interface TelemetryContext {
   role: string;
   /** The chapter this call was made on behalf of, for calls scoped to exactly one. */
   chapter?: number;
+  /**
+   * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the provider/model it
+   * resolved to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received
+   * without reassembling it later. A ctx spread onto a follow-up call (draft expansion, title) carries the same reference,
+   * so the writer-snapshot capture built from it must ignore every call after its first.
+   */
+  onMessages?: (messages: BaseMessage[], modelRoute: { provider: string; model: string }) => void;
 }
 
 interface PendingCall {
