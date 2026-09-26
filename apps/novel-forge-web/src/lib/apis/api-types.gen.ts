@@ -1199,6 +1199,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Undo Impact */
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId_undo_impact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/revert': {
     parameters: {
       query?: never;
@@ -3561,6 +3578,27 @@ export interface components {
       artifactRef: string;
       newRevision?: null | number;
     };
+    /** @description What undoing an applied change would affect, listed before the author confirms the revert. */
+    UndoImpactResponse: {
+      proposalId: string;
+      dependents: components['schemas']['UndoDependentItem'][];
+      /** @description Finalized plans and drafts that relied only on an updated record: the undo leaves them as they are, so they are counted, not listed. */
+      finalUnaffected: number;
+    };
+    /** @description A record that relies on something an undo would take back. */
+    UndoDependentItem: {
+      kind: components['schemas']['UndoDependentKind'];
+      /** @description The dependent record: `chapter:<n>` for a plan, `draft:<n>` for a draft, `knowledge:<entityKey>/<factKey>` for what a character knows, `proposal:<id>` for a pending suggestion. */
+      ref: string;
+      /** @description The chapter the record belongs to, or where the character learned the fact. */
+      chapter?: null | number;
+      /** @description The undone record this one relies on, as a change-set ref. */
+      because: string;
+      /** @description Finalized history: undo never rewrites it, so the record stays as it is after the revert. */
+      final: boolean;
+    };
+    /** @enum {string} */
+    UndoDependentKind: 'plan' | 'draft' | 'knowledge' | 'suggestion';
     RevertProposalResponse: {
       proposal: components['schemas']['ProposalResponse'];
       reverted: components['schemas']['AppliedArtifactItem'][];
@@ -3653,7 +3691,10 @@ export interface components {
       ordinal: number;
       role: string;
       content: string;
+      /** @description The turn's suggestion cards: a pending proposal the author accepts or declines op by op. */
       proposalId?: null | string;
+      /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
+      appliedProposalId?: null | string;
       runId?: null | string;
       modelProvider?: null | string;
       modelId?: null | string;
@@ -3708,6 +3749,8 @@ export interface components {
       content: string;
       /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
       proseEdits?: boolean;
+      /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
+      justDiscussing?: boolean;
       /** @description Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode. */
       contentMode?: components['schemas']['ContentMode'];
       /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
@@ -3716,10 +3759,13 @@ export interface components {
     ChatTurnResponse: {
       userMessage: components['schemas']['ChatMessageResponse'];
       assistantMessage: components['schemas']['ChatMessageResponse'];
+      /** @description The turn's suggestion cards, pending the author's per-op accept or decline. */
       proposal?: components['schemas']['ProposalResponse'];
-      /** @description present when the session runs in auto mode and this turn applied its change-set */
+      /** @description The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable. */
+      appliedProposal?: components['schemas']['ProposalResponse'];
+      /** @description present when this turn applied the changes taken from the author’s own words */
       applied?: components['schemas']['TurnAppliedResult'];
-      /** @description why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure) */
+      /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
       applyNote?: string;
       runId: string;
     };
@@ -8408,6 +8454,47 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_proposals_proposalId_undo_impact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UndoImpactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_proposals_proposalId_revert: {
     parameters: {
       query?: never;
@@ -12389,6 +12476,9 @@ export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
 export type ApplyProposalBody = components['schemas']['ApplyProposalBody'];
 export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
 export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
+export type UndoImpactResponse = components['schemas']['UndoImpactResponse'];
+export type UndoDependentItem = components['schemas']['UndoDependentItem'];
+export type UndoDependentKind = components['schemas']['UndoDependentKind'];
 export type RevertProposalResponse = components['schemas']['RevertProposalResponse'];
 export type ListChangesResponse = components['schemas']['ListChangesResponse'];
 export type ChangeItemResponse = components['schemas']['ChangeItemResponse'];
@@ -12609,6 +12699,7 @@ export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['par
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
+export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
 export type ListChangesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['query'], undefined>;
 export type ListChangesPathParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['path'], undefined>;
 export type ListSessionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['query'], undefined>;

@@ -888,6 +888,7 @@ function ChatColumn({ novelId, session, onOpenHistory, onNewChat, onStart, start
                   <div className={styles.assistantCol}>
                     <Markdown content={m.content} className={styles.assistantBubble} />
                     <MessageModelTag message={m} />
+                    {m.appliedProposalId && <TurnProposalCard novelId={novelId} proposalId={m.appliedProposalId} />}
                     {m.proposalId && <TurnProposalCard novelId={novelId} proposalId={m.proposalId} />}
                   </div>
                 </div>
