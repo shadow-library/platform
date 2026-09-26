@@ -20,6 +20,8 @@ export interface TelemetryContext {
   promptKey: string;
   promptVersion: string;
   role: string;
+  /** The chapter this call was made on behalf of, for calls scoped to exactly one. */
+  chapter?: number;
 }
 
 interface PendingCall {
@@ -271,6 +273,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         costSource,
         tier: call.tier ?? null,
         contentMode: call.contentMode ?? null,
+        chapter: call.ctx.chapter ?? null,
         latencyMs,
         attempt: call.attempt,
         rawOutput,
@@ -303,6 +306,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         reasoningEffort: call.reasoningEffort ?? null,
         tier: call.tier ?? null,
         contentMode: call.contentMode ?? null,
+        chapter: call.ctx.chapter ?? null,
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',

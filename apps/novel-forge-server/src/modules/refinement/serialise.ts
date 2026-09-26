@@ -1,5 +1,6 @@
 import { type Project, type Refinement } from '@server/database';
 
+import { type CallUsageTotals } from '../ai/usage/call-usage';
 import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
 import { type ProposalResponse } from './refinement.dto';
@@ -91,4 +92,10 @@ export function serialiseTurn(result: ChatTurnResult): ChatTurnResponse {
     applyNote: result.applyNote,
     runId: result.runId,
   };
+}
+
+/** Folds a `TurnCostService` figure onto an already-serialised message; a message with no figure (a user message, or a reply that made no run-linked call) is returned unchanged. */
+export function withTurnCost(message: ChatMessageResponse, usage: CallUsageTotals | undefined): ChatMessageResponse {
+  if (!usage) return message;
+  return { ...message, costUsd: usage.costUsd, inputTokens: usage.inputTokens, cachedInputTokens: usage.cachedInputTokens, outputTokens: usage.outputTokens };
 }

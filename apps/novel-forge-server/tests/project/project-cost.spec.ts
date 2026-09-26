@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type CostUsageRow, summarizeCost } from '@modules/project/project/project-cost';
+import { type CostUsageRow, type DayCostRow, summarizeByDay, summarizeCost } from '@modules/project/project/project-cost';
 
 function row(overrides: Partial<CostUsageRow> = {}): CostUsageRow {
   return {
@@ -77,5 +77,48 @@ describe('summarizeCost', () => {
     const summary = summarizeCost([row({ status: 'transport_error', costSource: null, recordedCostUsd: 0 }), row({ status: 'ok', costSource: null })]);
 
     expect(summary.byCostSource.map(item => item.key).sort()).toEqual(['error', 'unknown']);
+  });
+});
+
+function dayRow(overrides: Partial<DayCostRow> = {}): DayCostRow {
+  return {
+    day: '2026-09-01',
+    model: 'anthropic/claude-sonnet-5',
+    status: 'ok',
+    costSource: 'provider',
+    calls: 1,
+    recordedCostUsd: 0,
+    unpricedInputTokens: 0,
+    unpricedOutputTokens: 0,
+    ...overrides,
+  };
+}
+
+describe('summarizeByDay', () => {
+  it('should return no days for no rows', () => {
+    expect(summarizeByDay([])).toEqual([]);
+  });
+
+  it('should sum multiple rows on the same day into one entry', () => {
+    const days = summarizeByDay([dayRow({ recordedCostUsd: 0.01 }), dayRow({ recordedCostUsd: 0.02, calls: 2 })]);
+
+    expect(days).toEqual([{ day: '2026-09-01', calls: 3, costUsd: 0.03 }]);
+  });
+
+  it('should price a legacy (cost_source null) day row from its own model, not another day’s', () => {
+    const days = summarizeByDay([
+      dayRow({ day: '2026-09-01', model: 'no-such-model', costSource: null, unpricedInputTokens: 1_000_000 }),
+      dayRow({ day: '2026-09-02', costSource: null, unpricedInputTokens: 1_000_000 }),
+    ]);
+
+    const [day1, day2] = days;
+    expect(day1?.costUsd).toBe(0);
+    expect(day2?.costUsd).toBeGreaterThan(0);
+  });
+
+  it('should sort days oldest first', () => {
+    const days = summarizeByDay([dayRow({ day: '2026-09-03' }), dayRow({ day: '2026-09-01' }), dayRow({ day: '2026-09-02' })]);
+
+    expect(days.map(d => d.day)).toEqual(['2026-09-01', '2026-09-02', '2026-09-03']);
   });
 });

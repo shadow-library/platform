@@ -144,7 +144,7 @@ export class WorkflowRunService {
   // Create a workflow_run row, or reuse the one left behind by a crashed prior attempt of the same
   // job/target. Reusing its id (used as the checkpoint thread_id) is what lets a retried job resume
   // from the last completed graph node instead of re-executing — and re-calling — the LLM.
-  private async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string): Promise<string> {
+  private async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string, parentRunId?: string): Promise<string> {
     if (jobId) {
       const existing = await this.db.query.workflowRuns.findFirst({
         where: and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.graph, graph), eq(schema.workflowRuns.target, target), eq(schema.workflowRuns.status, 'running')),
@@ -158,13 +158,18 @@ export class WorkflowRunService {
 
     const [run] = await this.db
       .insert(schema.workflowRuns)
-      .values({ projectId, graph, target, status: 'running', input: toJsonSafe(input) as never, jobId: jobId ?? null, nodeTrace: [] })
+      .values({ projectId, graph, target, status: 'running', input: toJsonSafe(input) as never, jobId: jobId ?? null, parentRunId: parentRunId ?? null, nodeTrace: [] })
       .returning({ id: schema.workflowRuns.id });
     if (!run) throw AppError.internal(`[WorkflowRunService] Failed to create workflow_run row`);
-    this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId });
+    this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId, parentRunId });
     this.events.publish(projectId, { type: 'run', runId: run.id, graph, target, status: 'running' });
     this.logger.debug('workflow run input', { runId: run.id, graph, input });
     return run.id;
+  }
+
+  /** Links a run created before its parent existed (compaction runs before the turn run) — every other run names its parent at creation. */
+  async setParentRun(runId: string, parentRunId: string): Promise<void> {
+    await this.db.update(schema.workflowRuns).set({ parentRunId }).where(eq(schema.workflowRuns.id, runId));
   }
 
   // Every settle carries the `running` predicate: a run is written once, by whichever path reaches it
@@ -258,8 +263,16 @@ export class WorkflowRunService {
    * gets a fresh runId that correlates its model_calls and context pack, and failures land in the
    * same audit trail as graph runs.
    */
-  async runChain<T>(projectId: bigint, graph: string, target: string, input: unknown, fn: (runId: string) => Promise<T>, jobId?: string): Promise<{ runId: string; result: T }> {
-    const runId = await this.createRun(projectId, graph, target, input, jobId);
+  async runChain<T>(
+    projectId: bigint,
+    graph: string,
+    target: string,
+    input: unknown,
+    fn: (runId: string) => Promise<T>,
+    jobId?: string,
+    parentRunId?: string,
+  ): Promise<{ runId: string; result: T }> {
+    const runId = await this.createRun(projectId, graph, target, input, jobId, parentRunId);
     const signal = this.modelRouter.bindRunSignal(runId);
     try {
       const result = await fn(runId);

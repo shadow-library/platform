@@ -455,7 +455,7 @@ export class ChatService {
 
     const project = (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) })) as ProjectConfig | undefined;
     const turnSelection = chatSelection(options, session, project);
-    await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
+    const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
     const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
     const [pack, history] = await Promise.all([
@@ -477,6 +477,9 @@ export class ChatService {
     const { runId, result } = await this.workflowRunService.runChain(projectId, CHAT_TURN_GRAPH, `session:${sessionId}`, { content, ...selection }, async runId => {
       relay?.runId(runId);
       await this.workflowRunService.linkContextPack(runId, pack.id);
+      // Compaction, when it ran, always precedes this run's creation — it cannot name this run as its
+      // parent at its own creation time, so the link is completed here instead, as soon as the id exists.
+      if (compactionRunId) await this.workflowRunService.setParentRun(compactionRunId, runId);
       // Persist the user's message before the model call: the running chat-turn run plus this
       // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
       // (design recovery). The reply lands in persistAssistantTurn once the model returns.
@@ -484,7 +487,7 @@ export class ChatService {
       relay?.userMessage(userMessage);
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
-      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed);
+      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed, runId);
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
@@ -568,29 +571,37 @@ export class ChatService {
   }
 
   /** Names a session from its opening message alone. */
-  private nameSession(projectId: bigint, session: Refinement.ChatSession, content: string, project: ProjectConfig | undefined): void {
+  private nameSession(projectId: bigint, session: Refinement.ChatSession, content: string, project: ProjectConfig | undefined, turnRunId: string): void {
     if (session.title !== null) return;
     const message = content.trim();
     if (message.length < CHAT_TITLE_MIN_CONTENT_LENGTH) return;
-    this.runNameSession(projectId, session.id, message, project).catch(err => this.logger.warn('chat session naming failed', { projectId, sessionId: session.id, err }));
+    this.runNameSession(projectId, session.id, message, project, turnRunId).catch(err => this.logger.warn('chat session naming failed', { projectId, sessionId: session.id, err }));
   }
 
-  private async runNameSession(projectId: bigint, sessionId: string, message: string, project: ProjectConfig | undefined): Promise<void> {
+  private async runNameSession(projectId: bigint, sessionId: string, message: string, project: ProjectConfig | undefined, turnRunId: string): Promise<void> {
     const prompt = PROMPT_REGISTRY['chat-title'];
-    const { result: named } = await this.workflowRunService.runChain(projectId, CHAT_TITLE_GRAPH, `session:${sessionId}`, { message }, async runId => {
-      const ctx = { projectId, runId, node: CHAT_TITLE_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'title' };
-      const output = (await this.modelRouter.structured(prompt, { message }, ctx, project)) as ChatTitleOutput;
-      const title = output.title.trim();
-      if (!title) return false;
+    const { result: named } = await this.workflowRunService.runChain(
+      projectId,
+      CHAT_TITLE_GRAPH,
+      `session:${sessionId}`,
+      { message },
+      async runId => {
+        const ctx = { projectId, runId, node: CHAT_TITLE_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'title' };
+        const output = (await this.modelRouter.structured(prompt, { message }, ctx, project)) as ChatTitleOutput;
+        const title = output.title.trim();
+        if (!title) return false;
 
-      // Guarded in the query, not read-then-write: a rename the author makes mid-turn must never be clobbered.
-      const [written] = await this.db
-        .update(schema.chatSessions)
-        .set({ title, updatedAt: new Date() })
-        .where(and(eq(schema.chatSessions.id, sessionId), isNull(schema.chatSessions.title)))
-        .returning({ id: schema.chatSessions.id });
-      return Boolean(written);
-    });
+        // Guarded in the query, not read-then-write: a rename the author makes mid-turn must never be clobbered.
+        const [written] = await this.db
+          .update(schema.chatSessions)
+          .set({ title, updatedAt: new Date() })
+          .where(and(eq(schema.chatSessions.id, sessionId), isNull(schema.chatSessions.title)))
+          .returning({ id: schema.chatSessions.id });
+        return Boolean(written);
+      },
+      undefined,
+      turnRunId,
+    );
     if (named) this.events.publish(projectId, { type: 'chat', sessionId });
   }
 

@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
+
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -49,10 +51,12 @@ import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
+import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeCallUsage, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { AuthoringClaimService } from '../jobs/authoring-claim.service';
-import { redactJobForResponse } from '../jobs/job-response';
+import { redactJobForResponse, toJobUsageResponse } from '../jobs/job-response';
+import { type JobUsageResponse } from '../jobs/jobs.dto';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PluginPolicyService, raisedContainment } from '../plugins/plugin-policy.service';
@@ -62,15 +66,21 @@ import { ProposalService } from '../refinement/proposal.service';
 import { ChapterImageService } from './chapter-image.service';
 import {
   type ApproveDraftBody,
+  AUTHOR_FACING_GRAPHS,
   type CancelJobResponse,
   type CancelRunResponse,
+  type ChapterCostResponse,
   type ChapterSummarizeResponse,
   type FeedbackBody,
   type FinalizeBody,
   type GenerateBody,
   type GenerateUnrestrictedBody,
   type ImportDraftBody,
+  type ListRunsQuery,
+  type ListWorkflowRunResponse,
   type ReviseDraftBody,
+  type RunUsageDetailResponse,
+  type RunUsageResponse,
   type SeedFromBriefBody,
   type UpdateBriefBody,
   type UpdateContinuityBody,
@@ -101,6 +111,19 @@ export interface JudgeResult {
 export interface ReviewQueueResult {
   drafts: Generation.Draft[];
   proposals: Generation.ContinuityProposal[];
+}
+
+function toRunUsageResponse(totals: CallUsageTotals, run: { startedAt: Date; endedAt: Date | null } | null): RunUsageResponse {
+  return {
+    calls: totals.calls,
+    inputTokens: totals.inputTokens,
+    cachedInputTokens: totals.cachedInputTokens,
+    outputTokens: totals.outputTokens,
+    costUsd: totals.costUsd,
+    estimatedCostUsd: totals.estimatedCostUsd,
+    durationMs: run?.endedAt ? run.endedAt.getTime() - run.startedAt.getTime() : null,
+    byCostSource: totals.byCostSource.map(({ costSource, calls, costUsd }) => ({ costSource, calls, costUsd })),
+  };
 }
 
 export type PresentedRun = Omit<Ai.WorkflowRun, 'nodeTrace'> & RunTrace;
@@ -145,24 +168,6 @@ export interface JobEnqueueResult {
   /** Set when a chapter with neither a draft nor finalized prose truncated the batch before its limit. */
   stoppedAtUnwrittenChapter?: number;
 }
-
-/**
- * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
- * An allowlist rather than a denylist of background graphs (`chat-title`, `chat-compact` —
- * fire-and-forget metadata graphs no `turn()` caller awaits or reports through) because a
- * forgotten entry then fails closed: a new background graph stays off this list by default and never
- * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
- */
-const AUTHOR_FACING_GRAPHS = [
-  'chat-turn',
-  'premise-enhance',
-  'bible-audit',
-  'illustration',
-  'chapter-generation',
-  'chapter-finalization',
-  'bible-builder',
-  'novel-validation',
-] as const;
 
 @Injectable()
 export class GenerationService {
@@ -466,7 +471,13 @@ export class GenerationService {
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
 
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
+    const ctx = {
+      projectId,
+      chapter,
+      promptKey: PROMPT_REGISTRY.revision.key,
+      promptVersion: PROMPT_REGISTRY.revision.version,
+      role: PROMPT_REGISTRY.revision.key,
+    };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,
       {
@@ -543,8 +554,10 @@ export class GenerationService {
 
     const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'judge', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
-    const runId = `judge-${projectId}-${chapter}-${Date.now()}`;
-    const telemetry = { projectId, runId, node: 'judge', promptKey: PROMPT_REGISTRY.judge.key, promptVersion: PROMPT_REGISTRY.judge.version, role: 'judge' };
+    // A fresh id per invocation, not shared across judge calls on the same chapter — a shared id would
+    // merge unrelated invocations' tool_calls (not FK-tied to workflow_runs, so any unique string works).
+    const runId = randomUUID();
+    const telemetry = { projectId, runId, node: 'judge', promptKey: PROMPT_REGISTRY.judge.key, promptVersion: PROMPT_REGISTRY.judge.version, role: 'judge', chapter };
     const model = await this.modelRouter.chatFor('judge', telemetry, routedProject, policy);
     const tools = this.toolRegistry.forNode('judge', { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId });
     const rawTools = this.toolRegistry.getRaw('judge');
@@ -882,7 +895,7 @@ export class GenerationService {
     );
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
+    const ctx = { projectId, chapter, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
     const promptVars = {
       stableContext: pack.renderedStable,
       volatileContext: pack.renderedVolatile,
@@ -967,6 +980,7 @@ export class GenerationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const ctx = {
       projectId,
+      chapter,
       promptKey: PROMPT_REGISTRY['chapter-summarize'].key,
       promptVersion: PROMPT_REGISTRY['chapter-summarize'].version,
       role: PROMPT_REGISTRY['chapter-summarize'].key,
@@ -987,7 +1001,13 @@ export class GenerationService {
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'continuity', chapter }, project);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.continuity.key, promptVersion: PROMPT_REGISTRY.continuity.version, role: PROMPT_REGISTRY.continuity.key };
+    const ctx = {
+      projectId,
+      chapter,
+      promptKey: PROMPT_REGISTRY.continuity.key,
+      promptVersion: PROMPT_REGISTRY.continuity.version,
+      role: PROMPT_REGISTRY.continuity.key,
+    };
     const proposal = await this.modelRouter.structured(
       PROMPT_REGISTRY.continuity,
       { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
@@ -1022,7 +1042,7 @@ export class GenerationService {
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const promptModule = PROMPT_REGISTRY['chapter-extract'];
-    const ctx = { projectId, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
+    const ctx = { projectId, chapter, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
     const output = (await this.modelRouter.structured(
       promptModule,
       { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
@@ -1120,7 +1140,7 @@ export class GenerationService {
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
     ]);
 
-    const ctx = { projectId, promptKey: PROMPT_REGISTRY.review.key, promptVersion: PROMPT_REGISTRY.review.version, role: PROMPT_REGISTRY.review.key };
+    const ctx = { projectId, chapter, promptKey: PROMPT_REGISTRY.review.key, promptVersion: PROMPT_REGISTRY.review.version, role: PROMPT_REGISTRY.review.key };
     const review = (await this.modelRouter.structured(
       PROMPT_REGISTRY.review,
       { contextPack: pack.rendered, chapterBrief: brief?.body ?? '', draftBody: draft.body },
@@ -1149,17 +1169,35 @@ export class GenerationService {
     return { drafts, proposals };
   }
 
-  // The runs screen is a reference view — only the latest 20 matter; older runs stay queryable by id.
-  async listRuns(projectId: bigint): Promise<PresentedRun[]> {
-    const runs = await this.db.query.workflowRuns.findMany({
-      where: and(eq(schema.workflowRuns.projectId, projectId), inArray(schema.workflowRuns.graph, AUTHOR_FACING_GRAPHS)),
-      orderBy: [desc(schema.workflowRuns.startedAt)],
-      limit: 20,
-    });
-    return runs.map(presentRun);
+  async listRuns(projectId: bigint, query: ListRunsQuery): Promise<ListWorkflowRunResponse> {
+    // `date:parse` turns unparsable input into an Invalid Date rather than throwing — checked here so a bad filter is a typed 400, not a 500 from Postgres.
+    if ((query.from && Number.isNaN(query.from.getTime())) || (query.to && Number.isNaN(query.to.getTime())) || (query.from && query.to && query.from > query.to)) {
+      throw AppErrorCode.AI_014.create();
+    }
+
+    const conditions = [eq(schema.workflowRuns.projectId, projectId), inArray(schema.workflowRuns.graph, AUTHOR_FACING_GRAPHS)];
+    if (query.graph) conditions.push(eq(schema.workflowRuns.graph, query.graph));
+    if (query.from) conditions.push(gte(schema.workflowRuns.startedAt, query.from));
+    if (query.to) conditions.push(lte(schema.workflowRuns.startedAt, query.to));
+    const where = and(...conditions);
+
+    const [runs, [totalRow]] = await Promise.all([
+      this.db.query.workflowRuns.findMany({ where, orderBy: [desc(schema.workflowRuns.startedAt)], limit: query.limit, offset: query.offset }),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(schema.workflowRuns)
+        .where(where),
+    ]);
+
+    const totals = await this.runUsageTotals(projectId, runs);
+    const items = runs.map(run => ({ ...presentRun(run), totals: totals.get(run.id) ?? toRunUsageResponse(emptyCallUsageTotals(), run) }));
+    return { items, total: totalRow?.total ?? 0, limit: query.limit, offset: query.offset };
   }
 
-  async getRun(projectId: bigint, runId: string): Promise<PresentedRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
+  async getRun(
+    projectId: bigint,
+    runId: string,
+  ): Promise<PresentedRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary; totals: RunUsageResponse }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw AppErrorCode.PRJ_001.create();
     const [modelCalls, toolCalls, contextPack] = await Promise.all([
@@ -1170,8 +1208,114 @@ export class GenerationService {
       this.db.query.toolCalls.findMany({ where: eq(schema.toolCalls.runId, runId), orderBy: asc(schema.toolCalls.createdAt) }),
       this.loadPackSummary(run.contextPackId),
     ]);
+    const totals = toRunUsageResponse(summarizeCallUsage(modelCalls), run);
     // Omitted (never null) when unlinked — the route serialiser cannot build nullable nested objects.
-    return { ...presentRun(run), modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
+    return { ...presentRun(run), modelCalls, toolCalls, totals, ...(contextPack ? { contextPack } : {}) };
+  }
+
+  /** The non-admin projection of a run: totals and calls' role/model/tier/mode/tokens/cost — `columns` selection, not schema stripping, is what keeps `rawOutput`/`error`/`input` out of the returned object. */
+  async getRunUsage(projectId: bigint, runId: string): Promise<RunUsageDetailResponse> {
+    const run = await this.db.query.workflowRuns.findFirst({
+      where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)),
+      columns: { id: true, projectId: true, jobId: true, graph: true, target: true, status: true, outcome: true, nodeTrace: true, startedAt: true, endedAt: true },
+    });
+    if (!run) throw AppErrorCode.PRJ_001.create();
+    const modelCalls = await this.db.query.modelCalls.findMany({
+      where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId)),
+      orderBy: asc(schema.modelCalls.createdAt),
+      columns: {
+        id: true,
+        node: true,
+        role: true,
+        provider: true,
+        model: true,
+        promptKey: true,
+        promptVersion: true,
+        status: true,
+        inputTokens: true,
+        cachedInputTokens: true,
+        outputTokens: true,
+        latencyMs: true,
+        costUsd: true,
+        costSource: true,
+        tier: true,
+        contentMode: true,
+        reasoningEffort: true,
+        attempt: true,
+        createdAt: true,
+      },
+    });
+    const { nodeTrace: _nodeTrace, ...runSummary } = { ...run, ...splitRunTrace(run.nodeTrace) };
+    return { ...runSummary, totals: toRunUsageResponse(summarizeCallUsage(modelCalls), run), calls: modelCalls };
+  }
+
+  /** Every model call any action has made against chapter N (generation, finalization, judge, review, revision, continuity, extraction, summarize) — tagged directly on `model_calls.chapter`. */
+  async getChapterCost(projectId: bigint, chapter: number): Promise<ChapterCostResponse> {
+    const calls = await this.db.query.modelCalls.findMany({
+      where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.chapter, chapter)),
+      columns: {
+        role: true,
+        model: true,
+        status: true,
+        costSource: true,
+        costUsd: true,
+        inputTokens: true,
+        cachedInputTokens: true,
+        outputTokens: true,
+        latencyMs: true,
+      },
+    });
+
+    const byRole = new Map<string, { role: string; calls: number; costUsd: number }>();
+    for (const call of calls) {
+      const { costUsd } = summarizeCallUsage([call]);
+      const entry = byRole.get(call.role) ?? { role: call.role, calls: 0, costUsd: 0 };
+      entry.calls += 1;
+      entry.costUsd += costUsd;
+      byRole.set(call.role, entry);
+    }
+
+    return {
+      chapter,
+      totals: toRunUsageResponse(summarizeCallUsage(calls), null),
+      byRole: [...byRole.values()].sort((a, b) => b.costUsd - a.costUsd),
+    };
+  }
+
+  /** Totals for a page of already-loaded runs — grouped in SQL, not by reading every underlying model_calls row, since a page can hold many runs. */
+  private async runUsageTotals(projectId: bigint, runs: readonly { id: string; startedAt: Date; endedAt: Date | null }[]): Promise<Map<string, RunUsageResponse>> {
+    const result = new Map<string, RunUsageResponse>();
+    if (runs.length === 0) return result;
+    const runIds = runs.map(r => r.id);
+    const calls = schema.modelCalls;
+    const rows = await this.db
+      .select({
+        runId: calls.runId,
+        model: calls.model,
+        status: calls.status,
+        costSource: calls.costSource,
+        calls: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
+        cachedInputTokens: sql<number>`coalesce(sum(${calls.cachedInputTokens}), 0)::bigint`.mapWith(Number),
+        outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
+        latencyMs: sql<number>`coalesce(sum(${calls.latencyMs}), 0)::bigint`.mapWith(Number),
+        recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}) filter (where ${calls.costUsd} is not null), 0)`.mapWith(Number),
+        unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+        unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+      })
+      .from(calls)
+      .where(and(eq(calls.projectId, projectId), inArray(calls.runId, runIds)))
+      .groupBy(calls.runId, calls.model, calls.status, calls.costSource);
+
+    const rowsByRun = new Map<string, GroupedUsageRow[]>();
+    for (const row of rows) {
+      if (!row.runId) continue;
+      const list = rowsByRun.get(row.runId) ?? [];
+      list.push(row);
+      rowsByRun.set(row.runId, list);
+    }
+    for (const run of runs) result.set(run.id, toRunUsageResponse(summarizeGroupedCallUsage(rowsByRun.get(run.id) ?? []), run));
+    return result;
   }
 
   // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local,
@@ -1247,9 +1391,10 @@ export class GenerationService {
     return { markdown };
   }
 
-  async listJobs(projectId: bigint): Promise<Job.Row[]> {
+  async listJobs(projectId: bigint): Promise<(Job.Row & { usage: JobUsageResponse })[]> {
     const jobs = await this.jobService.listByProject(projectId);
-    return jobs.map(redactJobForResponse);
+    const usage = await this.jobService.usageForJobs(jobs.map(j => j.id));
+    return jobs.map(job => ({ ...redactJobForResponse(job), usage: toJobUsageResponse(usage.get(job.id) ?? emptyCallUsageTotals()) }));
   }
 
   async backfill(projectId: bigint): Promise<JobEnqueueResult> {

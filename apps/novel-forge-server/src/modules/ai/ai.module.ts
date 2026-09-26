@@ -10,6 +10,7 @@ import { AccountSettingsService } from './account-settings.service';
 import { AppearanceDescriberService } from './appearance-describer.service';
 import { AiController } from './ai.controller';
 import { AiQuotaService } from './ai-quota.service';
+import { AiUsageService } from './ai-usage.service';
 import { CatalogService } from './context/catalog.service';
 import { ContextAssembler } from './context/context-assembler.service';
 import { WorkflowRunService } from './graphs/workflow-run.service';
@@ -31,6 +32,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     ModelRouterService,
     ModelCatalogService,
     AiQuotaService,
+    AiUsageService,
     AppearanceDescriberService,
     EmbeddingService,
     IndexingService,
@@ -44,6 +46,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
     AccountSettingsService,
     ModelRouterService,
     AiQuotaService,
+    AiUsageService,
     AppearanceDescriberService,
     TelemetryHandler,
     EmbeddingService,

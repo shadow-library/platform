@@ -15,6 +15,13 @@
       "when": 1790408626285,
       "tag": "0001_chat_first_foundations",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790414741057,
+      "tag": "0002_usage_links",
+      "breakpoints": true
     }
   ]
 }

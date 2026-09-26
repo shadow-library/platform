@@ -4,6 +4,7 @@ import { Transform } from '@shadow-library/fastify';
 import { ContentMode, CostTier } from '@server/common';
 import { type Project } from '@server/database';
 
+import { CostResponse } from '../project/project/project.dto';
 import { type ModelSource } from './model-router.service';
 
 @Schema()
@@ -201,4 +202,51 @@ export class AccountSettingsResponse {
 export class UpdateAccountSettingsBody {
   @Field(() => AccountModelDefaults, { description: 'The full set of defaults; a group left out goes back to the platform default.' })
   models: AccountModelDefaults;
+}
+
+@Schema({ description: "Spend on one of the signed-in author's novels." })
+export class ProjectCostItem {
+  @Field(() => String)
+  projectId: bigint;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => Integer)
+  calls: number;
+
+  @Field()
+  costUsd: number;
+}
+
+@Schema({ description: "Cost, tokens and calls across every novel the signed-in author owns — the same shaping as a single project's cost, plus a per-novel breakdown." })
+export class AccountUsageResponse extends CostResponse {
+  @Field(() => [ProjectCostItem], { description: 'By novel, highest spend first.' })
+  byProject: ProjectCostItem[];
+}
+
+@Schema({ description: 'The rolling spend window an author’s calls are throttled against.' })
+export class AiQuotaResponse {
+  @Field(() => Integer)
+  calls: number;
+
+  @Field()
+  costUsd: number;
+
+  @Field(() => Integer, { description: 'Calls allowed in the window; 0 or below means the rate dimension is disabled.' })
+  maxCalls: number;
+
+  @Field({ description: 'Spend allowed in the window, in USD; 0 or below means the spend dimension is disabled.' })
+  maxCostUsd: number;
+
+  @Field(() => Integer, { description: 'Width of the rolling window, in milliseconds.' })
+  windowMs: number;
+
+  @Field(() => String, {
+    format: 'date-time',
+    optional: true,
+    nullable: true,
+    description: 'When the oldest call counted in the window ages out and the window first frees capacity. Null when nothing is counted in the window right now.',
+  })
+  resetsAt?: Date | null;
 }

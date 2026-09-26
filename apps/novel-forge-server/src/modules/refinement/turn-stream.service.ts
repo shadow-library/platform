@@ -5,7 +5,8 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { ChatService, type ChatTurnEmitter, type ChatTurnOptions } from './chat.service';
-import { serialiseMessage, serialiseTurn } from './serialise';
+import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
+import { TurnCostService } from './turn-cost.service';
 
 export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'reset' | 'done' | 'error';
 
@@ -60,7 +61,10 @@ export class TurnStreamService {
   private readonly logger = Logger.getLogger(APP_NAME, TurnStreamService.name);
   private readonly runs = new Map<string, TurnStreamRun>();
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly turnCost: TurnCostService,
+  ) {}
 
   /** Starts a turn and resolves with its run id as soon as the run exists — the turn goes on running behind the answer. */
   async start(projectId: bigint, sessionId: string, content: string, options: ChatTurnOptions = {}): Promise<string> {
@@ -84,11 +88,13 @@ export class TurnStreamService {
     };
 
     this.chatService.turn(projectId, sessionId, content, emitter, options).then(
-      result => {
+      async result => {
         // `onRunId` is the only thing that answers the POST, and `EmitterRelay` swallows a throw from it —
         // without this a turn that succeeded anyway would leave the request hanging forever.
         settle(result.runId);
-        this.finish(sink.run, 'done', serialiseTurn(result));
+        const turn = serialiseTurn(result);
+        const cost = await this.turnCost.forMessages(projectId, [result.assistantMessage]);
+        this.finish(sink.run, 'done', { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost.get(result.assistantMessage.id)) });
       },
       (err: unknown) => {
         this.logger.warn('chat turn stream failed', { projectId, sessionId, runId: sink.run?.runId, err });

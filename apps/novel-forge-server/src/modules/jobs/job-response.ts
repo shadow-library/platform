@@ -1,5 +1,20 @@
 import { type Job } from '@server/database';
 
+import { type CallUsageTotals } from '../ai/usage/call-usage';
+import { type JobUsageResponse } from './jobs.dto';
+
+export function toJobUsageResponse(totals: CallUsageTotals): JobUsageResponse {
+  return {
+    calls: totals.calls,
+    inputTokens: totals.inputTokens,
+    cachedInputTokens: totals.cachedInputTokens,
+    outputTokens: totals.outputTokens,
+    costUsd: totals.costUsd,
+    estimatedCostUsd: totals.estimatedCostUsd,
+    byCostSource: totals.byCostSource.map(({ costSource, calls, costUsd }) => ({ costSource, calls, costUsd })),
+  };
+}
+
 /**
  * `import` jobs carry the whole bundle (every chapter's prose plus a base64 cover, up to the
  * novel-import size limit) in `payload` — real novel content, not job bookkeeping like every other

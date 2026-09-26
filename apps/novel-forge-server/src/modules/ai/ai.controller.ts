@@ -1,8 +1,12 @@
 import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Put, RespondFor } from '@shadow-library/fastify';
 
+import { ActorService } from '@modules/actor';
+
+import { AiQuotaService } from './ai-quota.service';
+import { AiUsageService } from './ai-usage.service';
 import { ACCOUNT_MODEL_GROUPS, AccountSettingsService } from './account-settings.service';
-import { AccountSettingsResponse, AiModelOption, AiModelsResponse, UpdateAccountSettingsBody } from './ai.dto';
+import { AccountSettingsResponse, AccountUsageResponse, AiModelOption, AiModelsResponse, AiQuotaResponse, UpdateAccountSettingsBody } from './ai.dto';
 import { PRODUCTION_GROUP_DEFAULTS, UNRESTRICTED_GROUP_DEFAULTS, UNRESTRICTED_IMAGE_ALLOWLIST, UNRESTRICTED_LLM_ALLOWLIST } from './defaults';
 import { tierCatalog } from './model-catalog.service';
 import { MODEL_REGISTRY } from './models';
@@ -10,7 +14,12 @@ import { MODEL_REGISTRY } from './models';
 @Authenticated()
 @HttpController('/api/v1/ai')
 export class AiController {
-  constructor(private readonly accountSettings: AccountSettingsService) {}
+  constructor(
+    private readonly accountSettings: AccountSettingsService,
+    private readonly actorService: ActorService,
+    private readonly aiUsage: AiUsageService,
+    private readonly aiQuota: AiQuotaService,
+  ) {}
 
   @Get('/settings')
   @RespondFor(200, AccountSettingsResponse)
@@ -53,5 +62,17 @@ export class AiController {
       unrestrictedAllowlist: [...UNRESTRICTED_LLM_ALLOWLIST, ...UNRESTRICTED_IMAGE_ALLOWLIST],
       tiers: tierCatalog(),
     };
+  }
+
+  @Get('/usage')
+  @RespondFor(200, AccountUsageResponse)
+  usage(): Promise<AccountUsageResponse> {
+    return this.aiUsage.usage(this.actorService.current());
+  }
+
+  @Get('/quota')
+  @RespondFor(200, AiQuotaResponse)
+  quota(): Promise<AiQuotaResponse> {
+    return this.aiQuota.currentWindowStatus(this.actorService.current());
   }
 }

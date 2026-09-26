@@ -368,6 +368,18 @@ export class CostBreakdownItem {
   estimatedCostUsd: number;
 }
 
+@Schema({ description: 'Spend on one UTC calendar day.' })
+export class DayCostItem {
+  @Field({ description: 'UTC calendar day, YYYY-MM-DD.' })
+  day: string;
+
+  @Field(() => Integer)
+  calls: number;
+
+  @Field()
+  costUsd: number;
+}
+
 @Schema()
 export class CostResponse {
   @Field()
@@ -408,4 +420,7 @@ export class CostResponse {
 
   @Field(() => [CostBreakdownItem], { description: "By content mode at call time — 'standard' or 'unrestricted' — highest spend first." })
   byContentMode: CostBreakdownItem[];
+
+  @Field(() => [DayCostItem], { description: 'Spend by UTC calendar day over the last 30 days, oldest first. A day with no calls is omitted rather than zero-filled.' })
+  byDay: DayCostItem[];
 }

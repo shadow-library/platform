@@ -245,6 +245,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       promptKey: 'continuity',
       promptVersion: PROMPT_REGISTRY.continuity.version,
       role: 'continuity',
+      chapter: state.chapter,
     };
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 

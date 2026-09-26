@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -18,7 +18,7 @@ import { resolveWritingInstructions, writingInstructionAdditions } from '../../a
 import { setProjectCover } from '../../illustration/uploaded-cover';
 import { AuthoringClaimService } from '../../jobs/authoring-claim.service';
 import { clearLedgerBriefLinks } from '../../ledger/ledger-entries';
-import { type CostWindow, summarizeCost } from './project-cost';
+import { type CostWindow, summarizeByDay, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
@@ -414,25 +414,41 @@ export class ProjectService {
   async cost(projectId: bigint): Promise<CostResponse> {
     const calls = schema.modelCalls;
     const window = sql<CostWindow>`case when ${calls.createdAt} >= now() - interval '7 days' then 'last7Days' when ${calls.createdAt} >= now() - interval '30 days' then 'last30Days' else 'older' end`;
-    const rows = await this.db
-      .select({
-        role: calls.role,
-        model: calls.model,
-        window,
-        status: calls.status,
-        costSource: calls.costSource,
-        tier: calls.tier,
-        contentMode: calls.contentMode,
-        calls: sql<number>`count(*)::int`,
-        inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
-        outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
-        recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}), 0)`.mapWith(Number),
-        unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
-        unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
-      })
-      .from(calls)
-      .where(eq(calls.projectId, projectId))
-      .groupBy(calls.role, calls.model, window, calls.status, calls.costSource, calls.tier, calls.contentMode);
-    return summarizeCost(rows);
+    const [rows, dayRows] = await Promise.all([
+      this.db
+        .select({
+          role: calls.role,
+          model: calls.model,
+          window,
+          status: calls.status,
+          costSource: calls.costSource,
+          tier: calls.tier,
+          contentMode: calls.contentMode,
+          calls: sql<number>`count(*)::int`,
+          inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
+          outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
+          recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}), 0)`.mapWith(Number),
+          unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+          unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+        })
+        .from(calls)
+        .where(eq(calls.projectId, projectId))
+        .groupBy(calls.role, calls.model, window, calls.status, calls.costSource, calls.tier, calls.contentMode),
+      this.db
+        .select({
+          day: sql<string>`to_char(${calls.createdAt}, 'YYYY-MM-DD')`,
+          model: calls.model,
+          status: calls.status,
+          costSource: calls.costSource,
+          calls: sql<number>`count(*)::int`,
+          recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}), 0)`.mapWith(Number),
+          unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+          unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+        })
+        .from(calls)
+        .where(and(eq(calls.projectId, projectId), gte(calls.createdAt, sql`date_trunc('day', now() - interval '30 days')`)))
+        .groupBy(sql`1`, calls.model, calls.status, calls.costSource),
+    ]);
+    return { ...summarizeCost(rows), byDay: summarizeByDay(dayRows) };
   }
 }

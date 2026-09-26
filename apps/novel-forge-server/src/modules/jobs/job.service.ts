@@ -10,6 +10,7 @@ import { type DbExecutor, type Job, type PrimaryDatabase, type Project, schema }
 
 import { scopedCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
+import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { ProjectEventService } from '../events/project-event.service';
 import { AuthoringClaimService } from './authoring-claim.service';
 
@@ -32,6 +33,10 @@ export interface JobCancelResult {
   status: Job.Status;
   outcome: 'cancelled' | 'stopping' | 'already_settled';
 }
+
+// Bounds the `IN (...)` list `usageForJobs` builds — a defensive cap independent of how many ids a caller
+// passes, since `listByProject` names every job for a project with no limit of its own.
+const MAX_USAGE_JOB_IDS = 200;
 
 // A job outlives the request that enqueued it, so the tier a chat turn's action runs at travels on the payload; JobExecutor restores it.
 function withScopedCostTier(payload: unknown): unknown {
@@ -260,5 +265,44 @@ export class JobService {
       .set({ status: 'pending', updatedAt: new Date() })
       .where(where)
       .returning({ id: schema.jobs.id, kind: schema.jobs.kind, target: schema.jobs.target });
+  }
+
+  /** Cost/token totals per job id across every run it drove (`workflow_runs.job_id`) — zeroed, never absent, for a job with no model calls. */
+  async usageForJobs(jobIds: readonly string[]): Promise<Map<string, CallUsageTotals>> {
+    const ids = jobIds.slice(0, MAX_USAGE_JOB_IDS);
+    const result = new Map<string, CallUsageTotals>(ids.map(id => [id, emptyCallUsageTotals()]));
+    if (ids.length === 0) return result;
+
+    const calls = schema.modelCalls;
+    const runs = schema.workflowRuns;
+    const rows = await this.db
+      .select({
+        jobId: runs.jobId,
+        model: calls.model,
+        status: calls.status,
+        costSource: calls.costSource,
+        calls: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${calls.inputTokens}), 0)::bigint`.mapWith(Number),
+        cachedInputTokens: sql<number>`coalesce(sum(${calls.cachedInputTokens}), 0)::bigint`.mapWith(Number),
+        outputTokens: sql<number>`coalesce(sum(${calls.outputTokens}), 0)::bigint`.mapWith(Number),
+        latencyMs: sql<number>`coalesce(sum(${calls.latencyMs}), 0)::bigint`.mapWith(Number),
+        recordedCostUsd: sql<number>`coalesce(sum(${calls.costUsd}) filter (where ${calls.costUsd} is not null), 0)`.mapWith(Number),
+        unpricedInputTokens: sql<number>`coalesce(sum(${calls.inputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+        unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
+      })
+      .from(calls)
+      .innerJoin(runs, eq(runs.id, calls.runId))
+      .where(inArray(runs.jobId, ids as string[]))
+      .groupBy(runs.jobId, calls.model, calls.status, calls.costSource);
+
+    const rowsByJob = new Map<string, GroupedUsageRow[]>();
+    for (const row of rows) {
+      if (!row.jobId) continue;
+      const list = rowsByJob.get(row.jobId) ?? [];
+      list.push(row);
+      rowsByJob.set(row.jobId, list);
+    }
+    for (const jobId of ids) result.set(jobId, summarizeGroupedCallUsage(rowsByJob.get(jobId) ?? []));
+    return result;
   }
 }

@@ -1,5 +1,5 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, customType, index, integer, numeric, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, bigint, bigserial, customType, index, integer, numeric, pgEnum, pgTable, smallint, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { drafts } from './generation';
 import { jsonb } from './jsonb';
@@ -70,10 +70,16 @@ export const workflowRuns = pgTable(
     error: jsonb('error').$type<Record<string, unknown>>(),
     nodeTrace: jsonb('node_trace').$type<string[]>(),
     contextPackId: bigint('context_pack_id', { mode: 'bigint' }),
+    // The chat turn a chat-title or chat-compact run belongs to; null for every other graph.
+    parentRunId: uuid('parent_run_id').references((): AnyPgColumn => workflowRuns.id, { onDelete: 'set null' }),
     startedAt: timestamp('started_at').notNull().defaultNow(),
     endedAt: timestamp('ended_at'),
   },
-  t => [index('workflow_runs_project_id_graph_status_idx').on(t.projectId, t.graph, t.status), index('workflow_runs_job_id_idx').on(t.jobId)],
+  t => [
+    index('workflow_runs_project_id_graph_status_idx').on(t.projectId, t.graph, t.status),
+    index('workflow_runs_job_id_idx').on(t.jobId),
+    index('workflow_runs_parent_run_id_idx').on(t.parentRunId),
+  ],
 );
 
 export const modelCalls = pgTable(
@@ -107,12 +113,15 @@ export const modelCalls = pgTable(
     // Null on every plugin-free call, which is what keeps the pre-host rows and the pre-host generate path identical.
     plugins: jsonb('plugins').$type<{ id: string; version: string; configHash: string }[]>(),
     policyDigest: varchar('policy_digest'),
+    // The chapter this call was made on behalf of; null for a call with no single chapter (chat, bible-builder, …) or predating this column.
+    chapter: integer('chapter'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [
     index('model_calls_project_id_created_at_idx').on(t.projectId, t.createdAt),
     index('model_calls_run_id_idx').on(t.runId),
     index('model_calls_prompt_key_prompt_version_idx').on(t.promptKey, t.promptVersion),
+    index('model_calls_project_id_chapter_idx').on(t.projectId, t.chapter),
   ],
 );
 

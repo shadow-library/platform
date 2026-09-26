@@ -365,6 +365,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       promptKey: 'generation',
       promptVersion: PROMPT_REGISTRY.generation.version,
       role: 'generation',
+      chapter: state.chapter,
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
@@ -495,6 +496,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       promptKey: PROMPT_REGISTRY.judge.key,
       promptVersion: PROMPT_REGISTRY.judge.version,
       role: 'judge',
+      chapter: state.chapter,
     };
     const model = await modelRouter.chatFor('judge', judgeTelemetry, judgeProject, judgePolicy);
 
@@ -615,7 +617,15 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     }
 
     const findingsStr = writerFacingFindings(state, await disclosureFor(projectId, state.chapter));
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: PROMPT_REGISTRY.fix.version, role: 'fix' };
+    const ctx: TelemetryContext = {
+      projectId,
+      runId: state.runId,
+      node: 'repairPatch',
+      promptKey: 'fix',
+      promptVersion: PROMPT_REGISTRY.fix.version,
+      role: 'fix',
+      chapter: state.chapter,
+    };
 
     const { policy, project } = await routeFor(projectId, { role: 'fix', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
     const result = (await modelRouter.structured(PROMPT_REGISTRY.fix, { contextPack: renderedPack, prose: state.prose, findings: findingsStr }, ctx, project, policy)) as FixOutput;
@@ -682,6 +692,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       promptKey: 'generation',
       promptVersion: PROMPT_REGISTRY.generation.version,
       role: 'generation',
+      chapter: state.chapter,
     };
 
     const { policy, project } = await routeFor(projectId, { role: 'generation', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);

@@ -16,13 +16,24 @@ import { RefineController } from './refine.controller';
 import { RefineService } from './refine.service';
 import { BibleTidyController } from './tidy/bible-tidy.controller';
 import { BibleTidyService } from './tidy/bible-tidy.service';
+import { TurnCostService } from './turn-cost.service';
 import { TurnStreamController } from './turn-stream.controller';
 import { TurnStreamService } from './turn-stream.service';
 
 @Module({
   imports: [DatabaseModule, AiModule, EventsModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
-  providers: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, BibleTidyService],
-  exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService],
+  providers: [
+    ActionExecutorRegistry,
+    ProposalService,
+    ProposalApplyService,
+    ChatCompactionService,
+    ChatService,
+    RefineService,
+    TurnStreamService,
+    BibleTidyService,
+    TurnCostService,
+  ],
+  exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, TurnCostService],
 })
 export class RefinementModule {}

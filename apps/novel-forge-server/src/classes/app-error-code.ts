@@ -115,6 +115,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_011 = AppErrorCode.badRequest('AI_011', 'Model {model} does not accept image input');
   static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'Appearance description needs the reference image as an inline base64 data: URL');
   static readonly AI_013 = AppErrorCode.conflict('AI_013', 'Workflow run was cancelled');
+  static readonly AI_014 = AppErrorCode.badRequest('AI_014', 'Invalid date range — from and to must be valid dates, and from must not be after to');
 
   /*!
    * Illustration Errors

@@ -170,6 +170,22 @@ export class ChatMessageResponse {
   @Field(() => CostTier, { optional: true, nullable: true, description: 'The cost tier the reply was written at; null on user messages and on replies older than the selection.' })
   costTier?: Project.CostTier | null;
 
+  @Field({
+    optional: true,
+    nullable: true,
+    description: "This reply's model cost, folding in its title and compaction runs; null on user messages and on a reply that carries no run.",
+  })
+  costUsd?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  inputTokens?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  cachedInputTokens?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  outputTokens?: number | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 }

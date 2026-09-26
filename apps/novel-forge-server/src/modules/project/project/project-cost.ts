@@ -2,7 +2,7 @@ import { type Ai, type Project } from '@server/database';
 
 import { type AiRole, ROLE_GROUP } from '../../ai/defaults';
 import { MODEL_MAP } from '../../ai/models';
-import { estimateCallCostUsd } from '../../ai/quota';
+import { classifyRowCost } from '../../ai/quota';
 import { type CostBreakdownItem, type CostResponse } from './project.dto';
 
 export type CostWindow = 'last7Days' | 'last30Days' | 'older';
@@ -52,6 +52,40 @@ function bySpend(items: Accumulator): CostBreakdownItem[] {
   return [...items.values()].sort((a, b) => b.costUsd - a.costUsd || b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
 }
 
+export interface DayCostRow {
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: string;
+  model: string;
+  status: Ai.ModelCallStatus;
+  costSource: Ai.CostSource | null;
+  calls: number;
+  recordedCostUsd: number;
+  unpricedInputTokens: number;
+  unpricedOutputTokens: number;
+}
+
+export interface DayCostItem {
+  day: string;
+  calls: number;
+  costUsd: number;
+}
+
+// Grouped by (day, model, cost_source, status) rather than just day, for the same reason `summarizeCost`
+// groups by model: a legacy pre-classification row's list-price estimate depends on its own model's price,
+// so folding two models' unpriced tokens into one day before pricing them would use the wrong price for one.
+export function summarizeByDay(rows: readonly DayCostRow[]): DayCostItem[] {
+  const byDay = new Map<string, DayCostItem>();
+  for (const row of rows) {
+    const { costUsd } = classifyRowCost(row);
+    const entry = byDay.get(row.day) ?? { day: row.day, calls: 0, costUsd: 0 };
+    entry.calls += row.calls;
+    entry.costUsd += costUsd;
+    byDay.set(row.day, entry);
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+// `byDay` is populated by a separate query and left empty here — a caller that needs it merges in `summarizeByDay`'s result.
 export function summarizeCost(rows: readonly CostUsageRow[]): CostResponse {
   const groups: Accumulator = new Map();
   const roles: Accumulator = new Map();
@@ -60,6 +94,7 @@ export function summarizeCost(rows: readonly CostUsageRow[]): CostResponse {
   const tiers: Accumulator = new Map();
   const contentModes: Accumulator = new Map();
   const summary: CostResponse = {
+    byDay: [],
     totalCostUsd: 0,
     estimatedCostUsd: 0,
     last7DaysCostUsd: 0,
@@ -76,13 +111,7 @@ export function summarizeCost(rows: readonly CostUsageRow[]): CostResponse {
   };
 
   for (const row of rows) {
-    // A row already classified `estimate` has its list-price estimate frozen into `cost_usd` at write time —
-    // recomputing it here would drift from the recorded figure whenever registry prices change since. Only a
-    // row with no `cost_source` at all (written before this classification existed) still needs a fresh
-    // estimate, and only for the unpriced share `cost_usd IS NULL` left uncounted.
-    const legacyEstimate = row.costSource === null ? estimateCallCostUsd(row.model, row.unpricedInputTokens, row.unpricedOutputTokens) : 0;
-    const estimatedPortion = row.costSource === 'estimate' ? row.recordedCostUsd : legacyEstimate;
-    const costUsd = row.recordedCostUsd + legacyEstimate;
+    const { costUsd, estimatedCostUsd: estimatedPortion } = classifyRowCost(row);
 
     summary.totalCostUsd += costUsd;
     summary.estimatedCostUsd += estimatedPortion;

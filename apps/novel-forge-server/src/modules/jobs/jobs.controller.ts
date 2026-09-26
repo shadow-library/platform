@@ -5,7 +5,8 @@ import { ActorService } from '@modules/actor';
 import { AppErrorCode } from '@server/classes';
 import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
-import { redactJobForResponse } from './job-response';
+import { emptyCallUsageTotals } from '../ai/usage/call-usage';
+import { redactJobForResponse, toJobUsageResponse } from './job-response';
 import { JobService } from './job.service';
 import { JobIdParams, JobResponse } from './jobs.dto';
 
@@ -25,6 +26,7 @@ export class JobsController {
     // read by the caller here. A job the caller does not own is reported as not found (NF-BOLA-02).
     const job = await this.jobService.getForOwner(params.jobId, this.actorService.current());
     if (!job) throw AppErrorCode.JOB_001.create();
-    return redactJobForResponse(job);
+    const usage = await this.jobService.usageForJobs([job.id]);
+    return { ...redactJobForResponse(job), usage: toJobUsageResponse(usage.get(job.id) ?? emptyCallUsageTotals()) };
   }
 }

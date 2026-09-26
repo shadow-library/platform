@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { redactJobForResponse } from '@modules/jobs/job-response';
+import { emptyCallUsageTotals } from '@modules/ai/usage/call-usage';
+import { redactJobForResponse, toJobUsageResponse } from '@modules/jobs/job-response';
 import { type Job } from '@server/database';
 
 function baseJob(overrides: Partial<Job.Row> = {}): Job.Row {
@@ -58,5 +59,25 @@ describe('redactJobForResponse', () => {
     const snapshot = JSON.parse(JSON.stringify(original.payload));
     redactJobForResponse(original);
     expect(original.payload).toEqual(snapshot);
+  });
+});
+
+describe('toJobUsageResponse', () => {
+  it('should shape zeroed totals for a job with no model calls', () => {
+    expect(toJobUsageResponse(emptyCallUsageTotals())).toEqual({
+      calls: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      estimatedCostUsd: 0,
+      byCostSource: [],
+    });
+  });
+
+  it('should drop internal fields (totalLatencyMs) that the response never carries', () => {
+    const totals = { ...emptyCallUsageTotals(), calls: 3, costUsd: 0.05, totalLatencyMs: 900, byCostSource: [{ costSource: 'provider', calls: 3, costUsd: 0.05 }] };
+
+    expect(toJobUsageResponse(totals)).not.toHaveProperty('totalLatencyMs');
   });
 });

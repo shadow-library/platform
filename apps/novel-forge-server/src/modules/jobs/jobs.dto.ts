@@ -8,6 +8,42 @@ export class JobIdParams {
   jobId: string;
 }
 
+@Schema({ description: "Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none." })
+export class JobCostSourceItem {
+  @Field()
+  costSource: string;
+
+  @Field(() => Integer)
+  calls: number;
+
+  @Field()
+  costUsd: number;
+}
+
+@Schema({ description: 'Cost and token totals across every run this job drove — empty (zero calls) for a job kind that makes no model calls, such as publish.' })
+export class JobUsageResponse {
+  @Field(() => Integer)
+  calls: number;
+
+  @Field(() => Integer)
+  inputTokens: number;
+
+  @Field(() => Integer)
+  cachedInputTokens: number;
+
+  @Field(() => Integer)
+  outputTokens: number;
+
+  @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
+  costUsd: number;
+
+  @Field({ description: 'The part of costUsd estimated from registry list prices because the call recorded no cost.' })
+  estimatedCostUsd: number;
+
+  @Field(() => [JobCostSourceItem])
+  byCostSource: JobCostSourceItem[];
+}
+
 @Schema()
 export class JobResponse {
   @Field()
@@ -55,4 +91,7 @@ export class JobResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+
+  @Field(() => JobUsageResponse)
+  usage: JobUsageResponse;
 }

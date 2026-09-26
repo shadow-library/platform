@@ -10,6 +10,7 @@ export const OwnerKind = EnumType.create('OwnerKind', schema.ownerKind.enumValue
 export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
 export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);
 export const CostTier = EnumType.create('CostTier', schema.costTier.enumValues);
+export const CostSource = EnumType.create('CostSource', schema.costSource.enumValues);
 export const VolumeState = EnumType.create('VolumeState', schema.volumeState.enumValues);
 export const KnowledgeStatus = EnumType.create('KnowledgeStatus', schema.knowledgeStatus.enumValues);
 export const MilestoneKind = EnumType.create('MilestoneKind', schema.milestoneKind.enumValues);

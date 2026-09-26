@@ -10,6 +10,7 @@ import {
   BriefResponse,
   CancelJobResponse,
   CancelRunResponse,
+  ChapterCostResponse,
   ChapterParams,
   ChapterReviewResponse,
   ChapterSummarizeResponse,
@@ -29,6 +30,7 @@ import {
   ListDraftResponse,
   ListDraftRevisionResponse,
   ListGenerationJobResponse,
+  ListRunsQuery,
   ListWorkflowRunResponse,
   MarkdownResponse,
   ProjectParams,
@@ -39,6 +41,7 @@ import {
   RunContextResponse,
   RunModelCallDetailResponse,
   RunParams,
+  RunUsageDetailResponse,
   SearchQuery,
   SearchResponse,
   SeedFromBriefBody,
@@ -299,9 +302,8 @@ export class GenerationController {
 
   @Get('/runs')
   @RespondFor(200, ListWorkflowRunResponse)
-  async listRuns(@Params() params: ProjectParams): Promise<ListWorkflowRunResponse> {
-    const items = await this.generationService.listRuns(params.projectId);
-    return { items };
+  listRuns(@Params() params: ProjectParams, @Query() query: ListRunsQuery): Promise<ListWorkflowRunResponse> {
+    return this.generationService.listRuns(params.projectId, query);
   }
 
   @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
@@ -309,6 +311,18 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunDetailResponse)
   getRun(@Params() params: RunParams): Promise<WorkflowRunDetailResponse> {
     return this.generationService.getRun(params.projectId, params.runId);
+  }
+
+  @Get('/runs/:runId/usage')
+  @RespondFor(200, RunUsageDetailResponse)
+  getRunUsage(@Params() params: RunParams): Promise<RunUsageDetailResponse> {
+    return this.generationService.getRunUsage(params.projectId, params.runId);
+  }
+
+  @Get('/chapters/:n/cost')
+  @RespondFor(200, ChapterCostResponse)
+  getChapterCost(@Params() params: ChapterParams): Promise<ChapterCostResponse> {
+    return this.generationService.getChapterCost(params.projectId, params.n);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

@@ -19,13 +19,17 @@ import {
   UpdateSessionModelBody,
 } from './chat.dto';
 import { ChatService } from './chat.service';
-import { serialiseMessage, serialiseTurn } from './serialise';
+import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
+import { TurnCostService } from './turn-cost.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chat/sessions')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly turnCost: TurnCostService,
+  ) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post()
@@ -53,7 +57,8 @@ export class ChatController {
       this.chatService.listMessages(params.projectId, params.sessionId, query),
       this.chatService.turnStatus(params.projectId, params.sessionId),
     ]);
-    return { messages: messages.map(serialiseMessage), pendingTurn, failedTurn };
+    const cost = await this.turnCost.forMessages(params.projectId, messages);
+    return { messages: messages.map(m => withTurnCost(serialiseMessage(m), cost.get(m.id))), pendingTurn, failedTurn };
   }
 
   /** What a client polls while a turn runs: whether it is still running and how far the transcript has got, without the transcript. */
@@ -73,7 +78,9 @@ export class ChatController {
       contentMode: body.contentMode,
       costTier: body.costTier,
     });
-    return serialiseTurn(result);
+    const turn = serialiseTurn(result);
+    const cost = await this.turnCost.forMessages(params.projectId, [result.assistantMessage]);
+    return { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost.get(result.assistantMessage.id)) };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

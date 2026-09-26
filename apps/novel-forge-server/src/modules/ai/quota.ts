@@ -53,6 +53,36 @@ export function classifyCostSource(providerCostUsd: number | undefined, gateway:
   return 'gateway';
 }
 
+export interface CostClassifiableRow {
+  model: string;
+  /** Null on a row written before `cost_source` existed, or on any row this classification does not cover. */
+  costSource: Ai.CostSource | null;
+  /** Sum of `cost_usd` for the rows this figure aggregates that recorded a cost. */
+  recordedCostUsd: number;
+  /** Tokens of the aggregated rows that recorded no cost at all — the only share a legacy estimate must still cover. */
+  unpricedInputTokens: number;
+  unpricedOutputTokens: number;
+}
+
+export interface ClassifiedCost {
+  /** Recorded cost plus the list-price estimate for the share that recorded none. */
+  costUsd: number;
+  /** The part of `costUsd` estimated from registry list prices rather than recorded by the provider or gateway. */
+  estimatedCostUsd: number;
+}
+
+// Shared by every cost aggregation (project, chapter, run, job, chat turn, account) so a legacy
+// pre-classification row is priced identically everywhere: a row already classified `estimate` has its
+// list-price estimate frozen into `recordedCostUsd` at write time — recomputing it here would drift from
+// the recorded figure whenever registry prices change since. Only a row with no `cost_source` at all still
+// needs a fresh estimate, and only for the unpriced share left uncounted.
+export function classifyRowCost(row: CostClassifiableRow): ClassifiedCost {
+  const legacyEstimate = row.costSource === null ? estimateCallCostUsd(row.model, row.unpricedInputTokens, row.unpricedOutputTokens) : 0;
+  const estimatedCostUsd = row.costSource === 'estimate' ? row.recordedCostUsd : legacyEstimate;
+  const costUsd = row.recordedCostUsd + legacyEstimate;
+  return { costUsd, estimatedCostUsd };
+}
+
 // A row's `recordedCostUsd` (provider-reported or frozen-at-write-time estimate, for any call kind)
 // is authoritative over recomputing it here; the token-based estimate only ever covers rows that
 // still carry no recorded cost, so a call is never counted twice.

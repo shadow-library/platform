@@ -74,12 +74,19 @@ export class ChatCompactionService {
    * The model type only ever rises: the fold runs unrestricted when the novel, the chat, this turn, the prior summary or any folded
    * reply is unrestricted, and the summary it writes is recorded as unrestricted so standard turns never read it.
    */
-  async compactIfNeeded(projectId: bigint, session: Refinement.ChatSession, historyBudget: number, project: ProjectConfig | undefined, turn: ChatSelection): Promise<void> {
+  /** Returns the compaction run's id (undefined if nothing needed folding) so the caller can link it to the turn run once that run exists — compaction always runs before it. */
+  async compactIfNeeded(
+    projectId: bigint,
+    session: Refinement.ChatSession,
+    historyBudget: number,
+    project: ProjectConfig | undefined,
+    turn: ChatSelection,
+  ): Promise<string | undefined> {
     const verbatim = await this.verbatimWindow(session);
-    if (verbatim.length <= KEEP_VERBATIM_TURNS) return;
+    if (verbatim.length <= KEEP_VERBATIM_TURNS) return undefined;
 
     const totalTokens = verbatim.reduce((sum, m) => sum + (m.tokens ?? countTokens(m.content)), 0);
-    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return;
+    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return undefined;
 
     const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
     const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;
@@ -94,7 +101,7 @@ export class ChatCompactionService {
 
     const prompt = PROMPT_REGISTRY['chat-compact'];
     const target = `session:${session.id}`;
-    const { result: summary } = await this.workflowRunService.runChain(projectId, CHAT_COMPACT_GRAPH, target, { watermark, contentMode }, async runId => {
+    const { runId: compactionRunId, result: summary } = await this.workflowRunService.runChain(projectId, CHAT_COMPACT_GRAPH, target, { watermark, contentMode }, async runId => {
       const ctx = { projectId, runId, node: CHAT_COMPACT_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'compact' };
       const route = raised
         ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, { role: 'compact' }, selected)
@@ -108,6 +115,7 @@ export class ChatCompactionService {
     session.summary = summary;
     session.summaryThroughOrdinal = watermark;
     this.logger.debug(`compacted session ${session.id} through ordinal ${watermark}`, { contentMode });
+    return compactionRunId;
   }
 
   // A reply whose turn recorded no selection predates selections and ran in the novel's mode, which is the best evidence left.
