@@ -1,0 +1,47 @@
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border-bottom: var(--sh-border-width) solid var(--strip-border);
+  background: var(--strip-bg);
+  color: var(--strip-text);
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+}
+
+.strip[data-tone='success'] {
+  --strip-bg: var(--sh-success-bg-subtle);
+  --strip-border: var(--sh-success-border);
+  --strip-text: var(--sh-success-text-on-subtle);
+}
+
+.strip[data-tone='warning'] {
+  --strip-bg: var(--sh-warning-bg-subtle);
+  --strip-border: var(--sh-warning-border);
+  --strip-text: var(--sh-warning-text-on-subtle);
+}
+
+.strip[data-tone='danger'] {
+  --strip-bg: var(--sh-danger-bg-subtle);
+  --strip-border: var(--sh-danger-border);
+  --strip-text: var(--sh-danger-text-on-subtle);
+}
+
+.message {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.detail {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

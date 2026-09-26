@@ -9,27 +9,16 @@ import {
   type ImportDraftBody,
   type InsertChapterBody,
   type InsertChapterResponse,
-  type JobEnqueueResponse,
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-export function isIsolated(draft: DraftResponse): boolean {
+export function isIsolated(draft: Pick<DraftResponse, 'isolated'>): boolean {
   return draft.isolated;
 }
 
 /** Isolated prose is invisible downstream, so finalize refuses it (`CHP_005`) without both fields. */
-export function isFinalizeBlocked(draft: DraftResponse): boolean {
+export function isFinalizeBlocked(draft: Pick<DraftResponse, 'isolated' | 'summary' | 'state'>): boolean {
   return isIsolated(draft) && (!draft.summary?.trim() || !draft.state || Object.keys(draft.state).length === 0);
-}
-
-/** Names the external-write slot that truncated the last generate batch, if any. */
-export function externalStopChapter(job: JobEnqueueResponse): number | undefined {
-  return job.stoppedAtExternalChapter;
-}
-
-/** Names the undrafted chapter that truncated the last generate batch, if any. */
-export function unwrittenStopChapter(job: JobEnqueueResponse): number | undefined {
-  return job.stoppedAtUnwrittenChapter;
 }
 
 function invalidateChapterViews(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {

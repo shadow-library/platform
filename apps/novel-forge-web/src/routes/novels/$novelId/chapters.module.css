@@ -443,6 +443,8 @@
 
 .chapterNav {
   width: auto;
+  min-width: 0;
+  flex-shrink: 1;
   gap: 10px;
   padding: 7px 12px 7px 6px;
 }
@@ -454,6 +456,9 @@
 }
 
 .chapterNavTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--sh-text-body);
   font-weight: 600;
   white-space: nowrap;
@@ -463,8 +468,18 @@
   color: var(--sh-text-tertiary);
 }
 
+.headStatus {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .statusPill {
   display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 7px;
   height: 34px;
@@ -670,4 +685,33 @@
 
 .drawerStatus {
   margin-bottom: 16px;
+}
+
+.titleField {
+  margin-bottom: 12px;
+}
+
+.wideActions {
+  display: contents;
+}
+
+.narrowActions {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .wideActions {
+    display: none;
+  }
+
+  .narrowActions {
+    display: contents;
+  }
+}
+
+.finalNote {
+  margin: 26px 0 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-secondary);
 }

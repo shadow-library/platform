@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { approveDraftRequest, draftMovedUnderneath } from '../src/lib/apis/draft.api';
+import { approveDraftRequest, draftMovedUnderneath, nextDraftPath } from '../src/lib/apis/draft.api';
 import { ApiError } from '../src/lib/apis/transport';
 
 function apiError(code: string, status = 409): ApiError {
@@ -14,6 +14,13 @@ describe('approveDraftRequest', () => {
       body: { draftId: '12', revision: 7, saveSeq: 3 },
     });
   });
+
+  it('should approve a stale draft as written with the stale reason the author read', () => {
+    expect(approveDraftRequest('p1', { id: '12', chapter: 4, revision: 7, saveSeq: 3, keptStaleReason: 'ancestor chapter 3 was hand_edited' })).toEqual({
+      path: '/projects/p1/drafts/4/approve',
+      body: { draftId: '12', revision: 7, saveSeq: 3, keepStale: true, staleReason: 'ancestor chapter 3 was hand_edited' },
+    });
+  });
 });
 
 describe('draftMovedUnderneath', () => {
@@ -23,5 +30,11 @@ describe('draftMovedUnderneath', () => {
 
   it('should leave any other failure to the toast alone', () => {
     expect(draftMovedUnderneath(apiError('DRF_001', 404))).toBe(false);
+  });
+});
+
+describe('nextDraftPath', () => {
+  it('should ask the server to start the next chapter without naming a number', () => {
+    expect(nextDraftPath('p1')).toBe('/projects/p1/drafts/next');
   });
 });

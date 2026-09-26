@@ -2,10 +2,13 @@ import { keepPreviousData, queryOptions, useMutation, type UseMutationResult, us
 
 import {
   type ApproveDraftBody,
+  type ConflictingDraftResponse,
   type ContinuityProposalResponse,
+  type DraftConflictResponse,
   type DraftResponse,
   type DraftSummaryResponse,
   type FeedbackBody,
+  type FinalizeReadinessResponse,
   type GenerateBody,
   type JobEnqueueResponse,
   type JudgeResponse,
@@ -92,6 +95,65 @@ export function useUpdateDraftMutation(projectId: string, n: number): UseMutatio
   });
 }
 
+/** A save refused because the draft moved past the base it was made against; `current` is what the chapter holds now, absent when it has no draft. */
+export class DraftSaveConflict extends ApiError {
+  readonly current?: ConflictingDraftResponse;
+
+  constructor(conflict: DraftConflictResponse & { type?: string }) {
+    super(409, { code: conflict.code, type: conflict.type ?? 'CONFLICT', message: conflict.message, fields: conflict.fields });
+    this.current = conflict.current;
+  }
+}
+
+/** A PUT answers 409 with a body, not a throw, so the current draft it carries reaches the editor. */
+export function savedDraftOrThrow(payload: DraftResponse | DraftConflictResponse): DraftResponse {
+  if (isConflictBody(payload)) throw new DraftSaveConflict(payload);
+  return payload;
+}
+
+// `modeled` hands back the body without its status, so the refusal is told apart from a draft by its own fields.
+function isConflictBody(payload: DraftResponse | DraftConflictResponse): payload is DraftConflictResponse {
+  return 'current' in payload || ('code' in payload && typeof payload.code === 'string' && !('id' in payload));
+}
+
+/** The editor's own write: it puts the saved draft in the cache itself rather than refetching the whole draft list after every autosave. */
+export function useSaveDraftMutation(projectId: string, n: number): UseMutationResult<DraftResponse, ApiError, UpdateDraftBody> {
+  const queryClient = useQueryClient();
+  return useMutation<DraftResponse, ApiError, UpdateDraftBody>({
+    mutationFn: async data => {
+      const payload = await APIRequest.put(`/projects/${projectId}/drafts/${n}`).body(data).modeled(409).execute<DraftResponse | DraftConflictResponse>();
+      return savedDraftOrThrow(payload);
+    },
+    onSuccess: saved => {
+      queryClient.invalidateQueries({ queryKey: draftKeys.all(projectId), refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: draftKeys.reviewQueue(projectId), refetchType: 'none' });
+      queryClient.setQueryData(draftKeys.detail(projectId, n), saved);
+    },
+    onError: error => refetchMovedDraft(queryClient, projectId, error),
+  });
+}
+
+export function nextDraftPath(projectId: string): string {
+  return `/projects/${projectId}/drafts/next`;
+}
+
+/** Starts the one chapter the server allows next; the server picks the number. */
+export function useStartNextDraftMutation(projectId: string): UseMutationResult<DraftResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<DraftResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(nextDraftPath(projectId)).body({}).execute(),
+    onSuccess: () => invalidateDraft(queryClient, projectId),
+  });
+}
+
+export function useFinalizeReadinessQuery(projectId: string, n: number, enabled = true): UseQueryResult<FinalizeReadinessResponse, ApiError> {
+  return useQuery<FinalizeReadinessResponse, ApiError>({
+    queryKey: [...draftKeys.detail(projectId, n), 'finalize-readiness'],
+    queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/${n}/finalize-readiness`).execute(),
+    enabled: enabled && Boolean(projectId),
+  });
+}
+
 export function useDeleteDraftMutation(projectId: string): UseMutationResult<undefined, ApiError, number> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, number>({
@@ -100,12 +162,17 @@ export function useDeleteDraftMutation(projectId: string): UseMutationResult<und
   });
 }
 
-export type ApprovedDraft = Pick<DraftResponse, 'id' | 'chapter' | 'revision' | 'saveSeq'>;
+export interface ApprovedDraft extends Pick<DraftResponse, 'id' | 'chapter' | 'revision' | 'saveSeq'> {
+  /** Approve a stale draft as written; carries the stale reason the author read, so a draft that went stale again since is refused. */
+  keptStaleReason?: string;
+}
 
 const DRAFT_MOVED_CODES: ReadonlySet<string> = new Set(['DRF_002', 'DRF_007', 'DRF_013']);
 
 export function approveDraftRequest(projectId: string, draft: ApprovedDraft): { path: string; body: ApproveDraftBody } {
-  return { path: `/projects/${projectId}/drafts/${draft.chapter}/approve`, body: { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq } };
+  const bound: ApproveDraftBody = { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq };
+  const body: ApproveDraftBody = draft.keptStaleReason ? { ...bound, keepStale: true, staleReason: draft.keptStaleReason } : bound;
+  return { path: `/projects/${projectId}/drafts/${draft.chapter}/approve`, body };
 }
 
 /** The write was refused because the draft on screen is no longer the one the server holds. */
@@ -126,6 +193,14 @@ export function useApproveDraftMutation(projectId: string): UseMutationResult<Dr
     },
     onSuccess: () => invalidateDraft(queryClient, projectId),
     onError: error => refetchMovedDraft(queryClient, projectId, error),
+  });
+}
+
+export function useFinalizeChapterMutation(projectId: string): UseMutationResult<WorkflowRunResponse, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<WorkflowRunResponse, ApiError, number>({
+    mutationFn: chapter => APIRequest.post(`/projects/${projectId}/finalize`).body({ chapter }).execute(),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId] }),
   });
 }
 

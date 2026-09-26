@@ -1,0 +1,9 @@
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
