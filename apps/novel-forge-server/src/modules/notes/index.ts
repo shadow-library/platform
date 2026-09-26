@@ -6,3 +6,5 @@ export * from './organise-plan';
 export * from './organise-reconcile';
 export * from './organise-round';
 export * from './organised-pages';
+export * from './notes-store.module';
+export * from './notes-store.service';

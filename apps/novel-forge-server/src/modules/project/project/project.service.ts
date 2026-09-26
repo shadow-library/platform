@@ -8,7 +8,7 @@ import { DatabaseService, StorageService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { briefContentHash, lockProjectPlan, ownedBy, reconcilePlanState } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
-import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type PrimaryTransaction, type Project, schema } from '@server/database';
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
@@ -98,13 +98,15 @@ export class ProjectService {
     return { ...rest, config: project.config ?? undefined, instructions, wordTarget, coverUrl };
   }
 
-  async create(body: CreateProjectBody): Promise<Project.Presented> {
+  /** The project-cap check always reads outside `tx`, so a caller composing this into a larger transaction still counts against committed rows. */
+  async create(body: CreateProjectBody, tx?: PrimaryTransaction): Promise<Project.Presented> {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
+    const executor = tx ?? this.db;
 
-    const [project] = await this.db
+    const [project] = await executor
       .insert(schema.projects)
       .values({
         ...projectOwnerColumns(actor),
@@ -120,9 +122,10 @@ export class ProjectService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!project) throw AppErrorCode.S001.create();
-    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
+    // Logged only outside a caller's transaction: inside one, the row isn't committed yet, and the caller logs once it is.
+    if (!tx) this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
 
-    await this.db
+    await executor
       .insert(schema.bibleDocuments)
       .values(BIBLE_SECTIONS.map(section => ({ projectId: project.id, section, slug: 'default' })))
       .catch(err => this.databaseService.translateError(err));

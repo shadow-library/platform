@@ -5,7 +5,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { isOpenCanon, nearestVolumeKey } from '@server/common';
+import { computeProgress, isOpenCanon, nearestVolumeKey, progressFieldsFrom, progressOverridesFrom } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -45,6 +45,7 @@ import {
   renderNotebook,
   renderNotesPointer,
   renderNovelStory,
+  renderProgress,
   renderPromises,
   renderVolumeGoals,
 } from './novel-chat-context';
@@ -1240,6 +1241,14 @@ export class ContextAssembler {
     const volatile = [section('handoff', renderHandoff(chapters, drafts, handoffBriefs), 'working', caps.handoff, { required: true })];
     volatile.push(section('pipeline_status', pipelineStatus, 'working', caps.changedSince, { priority: 0 }));
     if (changed.length > 0) volatile.push(section('changed_since', changed.join('\n'), 'working', caps.changedSince, { priority: 1 }));
+    if (project) {
+      const nextBrief = handoffBriefs.find(brief => brief.chapter === next);
+      const overrides = progressOverridesFrom(ledger);
+      const fields = progressFieldsFrom(project, volumes, { chapter: next, brief: nextBrief ? { staleReason: nextBrief.staleReason } : undefined });
+      const progress = computeProgress(fields, overrides);
+      const progressText = renderProgress(progress, fields.chapterOneWritten);
+      if (progressText) volatile.push(section('progress', progressText, 'working', caps.progress, { priority: 2 }));
+    }
     const plugins = pluginContextSections(opts.policy, [...stable, ...volatile]).map(plugin => ({ ...plugin, segment: 'volatile' as const }));
 
     const stableRoom = Math.max(NOVEL_CHAT_PACK_FLOOR, NOVEL_CHAT_REQUEST_BUDGET - opts.promptTokens - NOVEL_CHAT_HISTORY_ALLOWANCE) - NOVEL_CHAT_PACK_MARGIN;

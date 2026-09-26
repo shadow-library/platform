@@ -46,6 +46,16 @@ describe('the author’s notes', () => {
   });
 });
 
+describe('progress checklist overrides', () => {
+  it('should stay out of the rendered ledger, never appearing as a decision or a system entry', () => {
+    const override = entry({ kind: 'system', decidedBy: 'system', topic: 'progress.ending', statement: 'Dismissed from the checklist.' });
+    const section = ledgerSection([...ledger, override]);
+
+    expect(renderLedger([...ledger, override])).not.toContain('progress.ending');
+    expect(section.sourceRefs).not.toContain('ledger:progress.ending');
+  });
+});
+
 describe('renderLedger', () => {
   it('should list decisions in ledger order with their why and writer line', () => {
     const rendered = renderLedger(ledger);

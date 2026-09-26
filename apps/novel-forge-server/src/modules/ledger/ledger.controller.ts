@@ -1,6 +1,7 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
+import { PROGRESS_TOPIC_PREFIX } from '@server/common';
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 import { type Ledger } from '@server/database';
 
@@ -15,10 +16,16 @@ import {
   SupersedeLedgerEntryBody,
   WithdrawLedgerEntryBody,
 } from './ledger.dto';
+import { AUTHOR_BRIEF_TOPIC } from './ledger-sections';
 import { ledgerEntryStatus, LedgerService } from './ledger.service';
 
 function toResponse(entry: Ledger.Entry): LedgerEntryResponse {
   return { ...entry, status: ledgerEntryStatus(entry) };
+}
+
+/** The Notebook view; an explicit `topics` filter opts back into these (the notes brief, the checklist's server-owned overrides). */
+function isNotebookVisible(entry: Ledger.Entry): boolean {
+  return entry.topic !== AUTHOR_BRIEF_TOPIC && !entry.topic.startsWith(PROGRESS_TOPIC_PREFIX);
 }
 
 @BotPermission(PROJECTS_READ_PERMISSION)
@@ -31,7 +38,8 @@ export class LedgerController {
   @RespondFor(200, ListLedgerEntriesResponse)
   async listActive(@Params() params: LedgerProjectParams, @Query() query: ListLedgerQuery): Promise<ListLedgerEntriesResponse> {
     const entries = await this.ledgerService.listActive(params.projectId, query);
-    return { entries: entries.map(toResponse) };
+    const visible = query.topics ? entries : entries.filter(isNotebookVisible);
+    return { entries: visible.map(toResponse) };
   }
 
   @Get('/topics/:topic')

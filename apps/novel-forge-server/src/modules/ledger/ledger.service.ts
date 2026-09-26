@@ -8,6 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Ledger, type PrimaryDatabase, type PrimaryTransaction, schema } from '@server/database';
 
 import { filterLedgerEntries, loadActiveLedger, mergeLedgerLinks } from './ledger-entries';
+import { isReservedTopic } from './ledger-sections';
 import { type AuthorLedgerEntry, type AuthorSupersession, type LedgerFilter, type NewLedgerEntry, type SupersedingEntry, TOPIC_KEY_PATTERN } from './ledger.types';
 
 function clearable(value: string | undefined, inherited: string | null): string | null {
@@ -90,7 +91,8 @@ export class LedgerService {
     return rows;
   }
 
-  appendByAuthor(projectId: bigint, entry: AuthorLedgerEntry): Promise<Ledger.Entry> {
+  async appendByAuthor(projectId: bigint, entry: AuthorLedgerEntry): Promise<Ledger.Entry> {
+    if (isReservedTopic(entry.topic)) throw AppErrorCode.LDG_005.create({ topic: entry.topic });
     return this.append(projectId, [{ ...entry, decidedBy: 'author' }]).then(([row]) => row as Ledger.Entry);
   }
 

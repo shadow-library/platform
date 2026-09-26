@@ -27,6 +27,9 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
   static readonly PRJ_011 = AppErrorCode.conflict('PRJ_011', 'A chapter is being written or planned for this novel — cancel that job before resetting');
+  static readonly PRJ_012 = AppErrorCode.badRequest('PRJ_012', 'The notes are {words} words; keep them to {max} words or fewer');
+  static readonly PRJ_013 = AppErrorCode.badRequest('PRJ_013', 'Unknown checklist item {key}');
+  static readonly PRJ_014 = AppErrorCode.badRequest('PRJ_014', 'The title cannot be blank');
 
   /*!
    * Export Errors
@@ -259,6 +262,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly LDG_002 = AppErrorCode.conflict('LDG_002', 'Ledger entry is already superseded or withdrawn — change the active entry on its topic instead');
   static readonly LDG_003 = AppErrorCode.badRequest('LDG_003', 'Only a decision or a system detail can be rewritten as a decision');
   static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
+  static readonly LDG_005 = AppErrorCode.badRequest('LDG_005', 'Topic "{topic}" is reserved for the server; the author cannot write to it directly');
 
   /*!
    * Notes Errors

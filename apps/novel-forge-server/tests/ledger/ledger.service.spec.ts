@@ -215,6 +215,20 @@ describe('LedgerService author paths', () => {
     expect(inserted[0]).toMatchObject({ kind: 'backlog', decidedBy: 'author', topic: 'places', stepKey: null });
   });
 
+  it('should refuse to create a second start.brief through the generic author route', async () => {
+    const { service, inserted } = fakeLedger();
+
+    await expect(service.appendByAuthor(7n, { kind: 'direction', topic: 'start.brief', statement: 'A second brief' })).rejects.toMatchObject({ code: 'LDG_005' });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it('should refuse a progress override written through the generic author route', async () => {
+    const { service, inserted } = fakeLedger();
+
+    await expect(service.appendByAuthor(7n, { kind: 'backlog', topic: 'progress.ending', statement: 'Forged' })).rejects.toMatchObject({ code: 'LDG_005' });
+    expect(inserted).toHaveLength(0);
+  });
+
   it('should refuse a malformed topic key', async () => {
     const { service, inserted } = fakeLedger();
 

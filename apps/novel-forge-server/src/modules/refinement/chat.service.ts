@@ -8,7 +8,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
@@ -238,13 +238,14 @@ export class ChatService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  async createSession(projectId: bigint, input: CreateSessionInput): Promise<Refinement.ChatSession> {
-    const [session] = await this.db
+  async createSession(projectId: bigint, input: CreateSessionInput, tx?: PrimaryTransaction): Promise<Refinement.ChatSession> {
+    const [session] = await (tx ?? this.db)
       .insert(schema.chatSessions)
       .values({ projectId, scopeType: 'project', scopeRef: null, title: null, mode: input.mode ?? 'auto' })
       .returning();
     if (!session) throw AppErrorCode.CHT_001.create();
-    this.logger.info('chat session created', { projectId, sessionId: session.id, mode: session.mode });
+    // Logged only outside a caller's transaction: inside one, the row isn't committed yet, and the caller logs once it is.
+    if (!tx) this.logger.info('chat session created', { projectId, sessionId: session.id, mode: session.mode });
     return session;
   }
 

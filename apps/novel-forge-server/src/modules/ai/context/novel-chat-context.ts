@@ -1,4 +1,4 @@
-import { firstUnwrittenChapter } from '@server/common';
+import { firstUnwrittenChapter, PROGRESS_TOPIC_PREFIX, type ProgressItem } from '@server/common';
 import { type Chapter, type Generation, type Knowledge, type Ledger, type Plan, type Project, type Story } from '@server/database';
 
 import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
@@ -22,6 +22,7 @@ export const NOVEL_CHAT_SECTION_CAPS = {
   chapterIndex: 1_500,
   handoff: 3_500,
   changedSince: 600,
+  progress: 500,
 } as const;
 
 const STORY_FIELD_CAPS = { premise: 1_200, field: 150, ending: 300, instructions: 400 } as const;
@@ -152,7 +153,7 @@ function isAuthorsOwn(entry: NovelChatLedgerEntry): boolean {
 
 /** The author's decisions and directions claim the budget first, then what never to propose, then what the system decided, then the backlog. */
 export function renderNotebook(all: readonly NovelChatLedgerEntry[], maxTokens: number = NOVEL_CHAT_SECTION_CAPS.notebook): string {
-  const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC);
+  const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC && !entry.topic.startsWith(PROGRESS_TOPIC_PREFIX));
   if (entries.length === 0) return 'Nothing has been decided yet.';
   const decided = entries.filter(entry => DECIDED_KINDS.has(entry.kind));
   const groups: LineGroup[] = [
@@ -186,6 +187,13 @@ export function renderNotesPointer(notes: string): string | null {
   if (paragraphs.length === 0) return null;
   const words = paragraphs.reduce((sum, paragraph) => sum + paragraph.split(/\s+/).length, 0);
   return `The author's own notes: ${paragraphs.length} paragraphs, about ${words} words. They are the author's words and outrank every summary; read them with get_notes before quoting, organising or critiquing them.`;
+}
+
+export function renderProgress(items: readonly ProgressItem[], chapterOneWritten: boolean): string | null {
+  const open = items.filter(item => item.status === 'open');
+  if (open.length === 0) return null;
+  const heading = chapterOneWritten ? 'Story basics still open' : 'Ready for chapter 1';
+  return `${heading} — advice only, never a reason to refuse planning or writing:\n${open.map(item => `- ${item.label}: ${item.why}`).join('\n')}`;
 }
 
 const VOLUME_STATE_LABELS: Record<Plan.Volume['state'], string> = { not_started: 'not started', active: 'active', goal_met: 'goal met' };

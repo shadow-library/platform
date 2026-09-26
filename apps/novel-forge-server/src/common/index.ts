@@ -21,6 +21,7 @@ export * from './open-canon';
 export * from './owner';
 export * from './plan-state';
 export * from './plan-world';
+export * from './progress';
 export * from './provisional-knowledge';
 export * from './publish-token';
 export * from './reveal-rule';

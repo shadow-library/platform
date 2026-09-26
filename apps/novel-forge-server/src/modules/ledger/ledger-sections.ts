@@ -1,3 +1,4 @@
+import { PROGRESS_TOPIC_PREFIX } from '@server/common';
 import { type Ledger } from '@server/database';
 
 import { type ContextSection, type ContextSegment, renderSection } from '../ai/context/sections';
@@ -13,6 +14,11 @@ export const WRITER_LINES_BUDGET = 1_200;
 
 /** The author's own notes, kept whole. They are too long to ride along with every decision, so the rendered ledger leaves them to the passes that read them. */
 export const AUTHOR_BRIEF_TOPIC = 'start.brief';
+
+/** Written only by the notes store and the progress checklist, never by the generic author-facing ledger routes. */
+export function isReservedTopic(topic: string): boolean {
+  return topic === AUTHOR_BRIEF_TOPIC || topic.startsWith(PROGRESS_TOPIC_PREFIX);
+}
 
 function tagged(entry: LedgerContextEntry): string {
   const why = entry.why ? ` — ${entry.why}` : '';
@@ -41,7 +47,7 @@ function doNotPropose(entries: LedgerContextEntry[]): string[] {
 }
 
 export function renderLedger(all: LedgerContextEntry[]): string {
-  const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC);
+  const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC && !entry.topic.startsWith(PROGRESS_TOPIC_PREFIX));
   const blocks = [
     renderList('Decisions', entries.filter(entry => DECIDED_KINDS.has(entry.kind)).map(renderDecision)),
     renderList('Author directions', entries.filter(entry => entry.kind === 'direction').map(tagged)),
@@ -92,7 +98,12 @@ function ledgerRefs(entries: LedgerContextEntry[]): string[] {
 
 /** The active ledger carries the author's decisions and do-not-propose list, so it is required and never evicted to fit a budget. */
 export function ledgerSection(entries: LedgerContextEntry[], segment: ContextSegment = 'stable'): ContextSection {
-  return requiredSection('ledger', renderLedger(entries), segment, ledgerRefs(entries.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC)));
+  return requiredSection(
+    'ledger',
+    renderLedger(entries),
+    segment,
+    ledgerRefs(entries.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC && !entry.topic.startsWith(PROGRESS_TOPIC_PREFIX))),
+  );
 }
 
 export function writerLinesSection(entries: LedgerContextEntry[], disclosure: WriterScrub): ContextSection | null {

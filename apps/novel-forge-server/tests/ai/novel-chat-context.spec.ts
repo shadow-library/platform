@@ -13,12 +13,14 @@ import {
   renderHandoff,
   renderNotebook,
   renderNovelStory,
+  renderProgress,
   renderPromises,
   renderVolumeGoals,
 } from '@modules/ai/context/novel-chat-context';
 import { type AssembledPack } from '@modules/ai/context/sections';
 import { countTokens } from '@modules/ai/context/token-budget';
 import { AUTHOR_BRIEF_TOPIC } from '@modules/ledger/ledger-sections';
+import { type ProgressItem } from '@server/common';
 
 type Rows = Record<string, Record<string, unknown>[]>;
 
@@ -123,6 +125,15 @@ describe('renderNotebook', () => {
   });
 });
 
+describe('renderNotebook and the progress checklist', () => {
+  it('should never show a checklist override as a system decision or in the backlog', () => {
+    const notebook = renderNotebook([ledgerEntry('Dismissed from the checklist.', 'system', 'system', 'progress.ending'), ledgerEntry('Mira is left-handed.', 'author')] as never);
+
+    expect(notebook).not.toContain('progress.ending');
+    expect(notebook).not.toContain('Dismissed from the checklist.');
+  });
+});
+
 describe('renderNotebook with one oversized entry', () => {
   it('should cut a line longer than its share of the cap instead of leaving it out', () => {
     const notebook = renderNotebook([ledgerEntry(`Correction: ${'the tide court keeps its ledgers in salt '.repeat(200)}`, 'author', 'direction')] as never, 600);
@@ -130,6 +141,35 @@ describe('renderNotebook with one oversized entry', () => {
     expect(notebook).toContain('- [cast.mira] Correction: the tide court');
     expect(notebook).toContain('[…]');
     expect(countTokens(notebook)).toBeLessThanOrEqual(600);
+  });
+});
+
+function progressItem(overrides: Partial<ProgressItem>): ProgressItem {
+  return { key: 'premise', label: 'Premise', why: 'Why it matters.', status: 'open', ...overrides };
+}
+
+describe('renderProgress', () => {
+  it('should list only the open items, each with why it matters', () => {
+    const rendered = renderProgress([progressItem({ key: 'premise', label: 'Premise', why: 'Why it matters.' }), progressItem({ key: 'theme', status: 'answered' })], false);
+
+    expect(rendered).toContain('- Premise: Why it matters.');
+    expect(rendered).not.toContain('Theme');
+  });
+
+  it('should return null once every item is answered, undecided or dismissed', () => {
+    const rendered = renderProgress(
+      [progressItem({ status: 'answered' }), progressItem({ key: 'ending', status: 'undecided' }), progressItem({ key: 'opposition', status: 'dismissed' })],
+      false,
+    );
+
+    expect(rendered).toBeNull();
+  });
+
+  it('should title the checklist for a book already underway differently from a brand-new one', () => {
+    const items = [progressItem({})];
+
+    expect(renderProgress(items, false)).toContain('Ready for chapter 1');
+    expect(renderProgress(items, true)).toContain('Story basics still open');
   });
 });
 
@@ -222,6 +262,28 @@ describe('ContextAssembler.forNovelChat', () => {
 
     expect(section(pack, 'author_notes')).toContain("The author's own notes: 2 paragraphs");
     expect(pack.rendered).not.toContain('Second paragraph of notes.');
+  });
+
+  it('should carry the progress checklist as a volatile section that never changes the stable prefix', async () => {
+    const opts = { promptTokens: PROMPT_TOKENS, requestTokens: 0 };
+    const override = {
+      kind: 'system',
+      topic: 'progress.first_volume_goal',
+      statement: 'Dismissed from the checklist.',
+      why: null,
+      rejectedAlternatives: [],
+      writerLine: null,
+      decidedBy: 'system',
+      payload: { status: 'dismissed' },
+    };
+    const withoutOverride = await assembler({}).forNovelChat(1n, new Date(0), opts);
+    const withOverride = await assembler({ decisionLedgerEntries: [override] }).forNovelChat(1n, new Date(0), opts);
+
+    const progressSection = withoutOverride.sections.find(candidate => candidate.key === 'progress');
+    expect(progressSection?.segment).toBe('volatile');
+    expect(section(withoutOverride, 'progress')).toContain('First volume goal');
+    expect(section(withOverride, 'progress')).not.toContain('First volume goal');
+    expect(withoutOverride.renderedStable).toBe(withOverride.renderedStable);
   });
 });
 
