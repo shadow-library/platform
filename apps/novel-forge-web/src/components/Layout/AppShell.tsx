@@ -14,11 +14,9 @@ import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
-import { PROJECT_SCREENS, type ProjectScreen, SCREEN_LABEL } from './screens';
+import { PROJECT_SCREENS, type ProjectScreen, topBarCrumbs } from './screens';
 
 const PROJECT_LIMIT = 50;
-
-const ACCOUNT_CRUMBS: Record<string, string> = { '/settings': 'Settings', '/usage': 'Usage & charges' };
 
 function ThemeToggle(): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
@@ -174,12 +172,13 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
 
   const paletteView = resolvePaletteView(palette, commands);
 
-  const segments = pathname.split('/').filter(Boolean);
-  const leafSegment = segments.at(-1);
-  const crumbLeaf = !inProject || leafSegment == null ? undefined : SCREEN_LABEL.get(leafSegment);
-  const crumbRoot = inProject && project ? projectTitle(project) : (ACCOUNT_CRUMBS[pathname] ?? 'Projects');
-
-  const breadcrumb = crumbLeaf != null ? `${crumbRoot} / ${crumbLeaf}` : crumbRoot;
+  const crumbs = topBarCrumbs({ pathname, inProject, projectName: project ? projectTitle(project) : undefined });
+  const breadcrumb = (
+    <>
+      {crumbs.root}
+      {crumbs.leaf != null && <span className={styles.crumbLeaf}> / {crumbs.leaf}</span>}
+    </>
+  );
 
   return (
     <CommandScopeProvider onOpenScope={openScope} onScopeGone={dropScope}>
@@ -198,7 +197,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         breadcrumb={breadcrumb}
         search={
           <>
-            <button className={`nf-search ${styles.search}`} onClick={() => setPalette({ kind: 'global' })}>
+            <button className={styles.search} aria-label="Search or run a command" onClick={() => setPalette({ kind: 'global' })}>
               <SearchIcon size={15} />
               <span className={styles.searchLabel}>Search or run a command…</span>
               <Kbd keys="mod+k" />

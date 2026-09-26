@@ -333,28 +333,3 @@
   font-size: 10px;
   color: var(--sh-text-tertiary);
 }
-
-/* Phone: the header's icon buttons and continue button no longer fit beside a 144px cover, and a 1.4:1 grid
-   leaves the usage card too narrow for its figures. */
-@media (max-width: 760px) {
-  .header {
-    flex-wrap: wrap;
-  }
-
-  .headerActions {
-    flex-basis: 100%;
-    flex-wrap: wrap;
-  }
-
-  .projectTitle {
-    overflow-wrap: anywhere;
-  }
-
-  .nextStepRow {
-    flex-wrap: wrap;
-  }
-
-  .mainGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}

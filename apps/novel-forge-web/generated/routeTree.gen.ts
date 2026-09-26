@@ -29,6 +29,7 @@ import { Route as NovelsNovelIdIllustrationsRouteImport } from './../src/routes/
 import { Route as NovelsNovelIdChatRouteImport } from './../src/routes/novels/$novelId/chat'
 import { Route as NovelsNovelIdChaptersRouteImport } from './../src/routes/novels/$novelId/chapters'
 import { Route as NovelsNovelIdCanonFactsRouteImport } from './../src/routes/novels/$novelId/canon-facts'
+import { Route as NovelsNovelIdSplatRouteImport } from './../src/routes/novels/$novelId/$'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -130,6 +131,11 @@ const NovelsNovelIdCanonFactsRoute = NovelsNovelIdCanonFactsRouteImport.update({
   path: '/canon-facts',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
+const NovelsNovelIdSplatRoute = NovelsNovelIdSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/usage': typeof AppUsageRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
+  '/novels/$novelId/$': typeof NovelsNovelIdSplatRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/usage': typeof AppUsageRoute
   '/': typeof AppIndexRoute
+  '/novels/$novelId/$': typeof NovelsNovelIdSplatRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/_app/usage': typeof AppUsageRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
+  '/novels/$novelId/$': typeof NovelsNovelIdSplatRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/usage'
     | '/novels/$novelId'
+    | '/novels/$novelId/$'
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/usage'
     | '/'
+    | '/novels/$novelId/$'
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -246,6 +257,7 @@ export interface FileRouteTypes {
     | '/_app/usage'
     | '/novels/$novelId'
     | '/_app/'
+    | '/novels/$novelId/$'
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -409,6 +421,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdCanonFactsRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
+    '/novels/$novelId/$': {
+      id: '/novels/$novelId/$'
+      path: '/$'
+      fullPath: '/novels/$novelId/$'
+      preLoaderRoute: typeof NovelsNovelIdSplatRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
   }
 }
 
@@ -429,6 +448,7 @@ const AppRouteChildren: AppRouteChildren = {
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface NovelsNovelIdRouteChildren {
+  NovelsNovelIdSplatRoute: typeof NovelsNovelIdSplatRoute
   NovelsNovelIdCanonFactsRoute: typeof NovelsNovelIdCanonFactsRoute
   NovelsNovelIdChaptersRoute: typeof NovelsNovelIdChaptersRoute
   NovelsNovelIdChatRoute: typeof NovelsNovelIdChatRoute
@@ -445,6 +465,7 @@ interface NovelsNovelIdRouteChildren {
 }
 
 const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
+  NovelsNovelIdSplatRoute: NovelsNovelIdSplatRoute,
   NovelsNovelIdCanonFactsRoute: NovelsNovelIdCanonFactsRoute,
   NovelsNovelIdChaptersRoute: NovelsNovelIdChaptersRoute,
   NovelsNovelIdChatRoute: NovelsNovelIdChatRoute,

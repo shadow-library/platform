@@ -125,20 +125,3 @@
     display: none;
   }
 }
-
-/* Phone: the publication cell moves under the title so the title keeps a readable width. */
-@media (max-width: 760px) {
-  .headerRow,
-  .row {
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-  }
-
-  .headerRow > :nth-child(5) {
-    display: none;
-  }
-
-  .row > :nth-child(5) {
-    grid-column: 2 / -1;
-    grid-row: 2;
-  }
-}

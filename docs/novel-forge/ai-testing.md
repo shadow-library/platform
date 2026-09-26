@@ -335,10 +335,11 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 novel" form (working title + content mode) posts to `POST /api/v1/projects` with `kind: 'new_novel'` and
 opens straight into the Workspace chat (`projectHomeRoute()`, `/novels/$novelId/chat`); there is no second
 door — continuing an existing manuscript is the separate **Import novel** screen (Part 4). Screens are
-declared once in `apps/novel-forge-web/src/components/Layout/screens.tsx:25-35` — there is only one project
-kind now, so the list is no longer filtered — and the visible labels are **Overview**, **Story Bible**,
-**Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Workflow Runs** (admin-only,
-`adminOnly: true` at `:32`), **Publish**, **Project Settings**. There is no standalone **Volumes & Arcs**
+declared once in `apps/novel-forge-web/src/components/Layout/screens.tsx` (`PROJECT_SCREENS`) — there is only one project
+kind now, so the list is no longer filtered — and the visible labels are **Chat**, **Overview**, **Story Bible**,
+**Chapters**, **Review Queue**, **Illustrations**, **Workflow Runs** (admin-only, `adminOnly: true`), **Publish**,
+**Usage & charges**, **Project Settings**. Old links to the retired Blueprint and the other kinds' screens
+(`isRetiredScreen`) open the project's home. There is no standalone **Volumes & Arcs**
 screen and no standalone **Proposals** screen any more: continuity and refinement proposals are both a
 view inside **Review Queue** (`review.tsx`), and `/novels/$novelId/proposals` only redirects old links there.
 
@@ -1481,7 +1482,7 @@ Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), 
 
 #### 1.1 Manual hub turn: materialise canon as a staged proposal
 
-- **Entry:** UI "Refinement Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`.
+- **Entry:** UI "Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`.
 - **Preconditions:** empty new_novel project.
 - **Input** (`content`):
   > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes, each with the goal it works towards. Do not run generation.

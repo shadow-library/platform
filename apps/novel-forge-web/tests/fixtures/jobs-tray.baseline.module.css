@@ -4,19 +4,6 @@
   position: relative;
 }
 
-/* ≥44×44 tap target on touch, as ui's IconButton beside it: an invisible hit area on coarse pointers only. */
-@media (pointer: coarse) {
-  .bellBtn::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: var(--sh-tap-target);
-    height: var(--sh-tap-target);
-    transform: translate(-50%, -50%);
-  }
-}
-
 .bellBadge {
   position: absolute;
   top: 5px;

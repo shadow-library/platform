@@ -51,34 +51,6 @@
   text-align: left;
 }
 
-/* Phone top bar (Phone.dc.html l.33-37): menu, the novel's title, a 44px search icon, the account. The ui bar
-   centres its search column in a fixed 1:2:1 grid, which leaves the title a sliver at 360px; the title takes
-   the slack instead. Shell breakpoint: the hamburger and the nav drawer take over below 768. */
-@media (max-width: 767px) {
-  .shellRoot :global(header[data-layout='centred']) {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .crumbLeaf {
-    display: none;
-  }
-
-  .search {
-    justify-content: center;
-    width: var(--sh-tap-target);
-    height: var(--sh-tap-target);
-    min-width: 0;
-    padding: 0;
-    border-color: transparent;
-    background: transparent;
-    color: var(--sh-text-secondary);
-  }
-
-  .search > :not(:first-child) {
-    display: none;
-  }
-}
-
 .lifecycle {
   padding: 2px 0;
 }

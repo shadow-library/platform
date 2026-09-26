@@ -53,12 +53,6 @@ a:hover {
   background-clip: content-box;
 }
 
-@media (max-width: 767px) {
-  .nf-search {
-    min-width: 0 !important;
-  }
-}
-
 .nf-nav {
   display: flex;
   align-items: center;
