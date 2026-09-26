@@ -1145,6 +1145,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List */
+    get: operations['get_api_v1_projects_projectId_chapters_n_writer_snapshots'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots/{snapshotId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get */
+    get: operations['get_api_v1_projects_projectId_chapters_n_writer_snapshots_snapshotId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/jobs/{jobId}': {
     parameters: {
       query?: never;
@@ -4016,6 +4050,55 @@ export interface components {
       judgeNote?: string | null;
       /** @description How many chapters are flagged in total. */
       count: number;
+    };
+    ListWriterSnapshotResponse: {
+      items: components['schemas']['WriterSnapshotSummaryResponse'][];
+    };
+    /** @description One writer attempt's metadata — no messages or kept-back detail, just enough to pick one for the Writer's view. */
+    WriterSnapshotSummaryResponse: {
+      id: string;
+      chapter: number;
+      draftRevision: number;
+      attempt: number;
+      role: components['schemas']['WriterAttemptRole'];
+      promptKey: string;
+      promptVersion: string;
+      modelRoute: {
+        [key: string]: unknown;
+      };
+      isolated: boolean;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    WriterAttemptRole: 'draft' | 'repair' | 'rewrite' | 'revise';
+    /** @description The Writer's view of one attempt: the exact messages the model router sent, what was kept back and why, and the plan and Story Bible state it was written against. An isolated chapter reads this walled off, like any other standard read. */
+    WriterSnapshotDetailResponse: {
+      id: string;
+      chapter: number;
+      draftRevision: number;
+      attempt: number;
+      role: components['schemas']['WriterAttemptRole'];
+      promptKey: string;
+      promptVersion: string;
+      modelRoute: {
+        [key: string]: unknown;
+      };
+      isolated: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      contextPackId?: null | string;
+      messages: components['schemas']['WriterSnapshotMessageResponse'][];
+      keptBack?: null | {
+        [key: string]: unknown;
+      };
+      planRevision?: null | number;
+      bibleHash?: null | string;
+    };
+    /** @description One message as the model router sent it. */
+    WriterSnapshotMessageResponse: {
+      role: string;
+      content: string;
     };
     JobResponse: {
       id: string;
@@ -9141,6 +9224,89 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ListChapterRowsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapters_n_writer_snapshots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListWriterSnapshotResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapters_n_writer_snapshots_snapshotId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        snapshotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WriterSnapshotDetailResponse'];
         };
       };
       /** @description Default Response */
@@ -14430,6 +14596,11 @@ export type ChapterRowResponse = components['schemas']['ChapterRowResponse'];
 export type ChapterRowKind = components['schemas']['ChapterRowKind'];
 export type ChapterRowCountsResponse = components['schemas']['ChapterRowCountsResponse'];
 export type ChapterContradictionResponse = components['schemas']['ChapterContradictionResponse'];
+export type ListWriterSnapshotResponse = components['schemas']['ListWriterSnapshotResponse'];
+export type WriterSnapshotSummaryResponse = components['schemas']['WriterSnapshotSummaryResponse'];
+export type WriterAttemptRole = components['schemas']['WriterAttemptRole'];
+export type WriterSnapshotDetailResponse = components['schemas']['WriterSnapshotDetailResponse'];
+export type WriterSnapshotMessageResponse = components['schemas']['WriterSnapshotMessageResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
 export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type SortOrder = components['schemas']['SortOrder'];
@@ -14718,6 +14889,8 @@ export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId
 export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
 export type ListChapterRowsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['query'], undefined>;
 export type ListChapterRowsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['path'], undefined>;
+export type ListPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots']['get']['parameters']['path'], undefined>;
+export type GetPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/writer-snapshots/{snapshotId}']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
