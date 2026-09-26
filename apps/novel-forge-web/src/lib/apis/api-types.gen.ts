@@ -567,23 +567,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/drafts/{n}/judge': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Judge Draft */
-    post: operations['post_api_v1_projects_projectId_drafts_n_judge'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/drafts/{n}/feedback': {
     parameters: {
       query?: never;
@@ -851,23 +834,6 @@ export interface paths {
     put?: never;
     /** Validate Continuity */
     post: operations['post_api_v1_projects_projectId_validate'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chapters/{n}/review': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Review Chapter */
-    post: operations['post_api_v1_projects_projectId_chapters_n_review'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1521,6 +1487,93 @@ export interface paths {
     put?: never;
     /** Apply Bible Tidy */
     post: operations['post_api_v1_projects_projectId_bible_tidy'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/reviews': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Reviews */
+    get: operations['get_api_v1_projects_projectId_chapters_n_reviews'];
+    put?: never;
+    /** Run Review */
+    post: operations['post_api_v1_projects_projectId_chapters_n_reviews'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Review */
+    get: operations['get_api_v1_projects_projectId_chapters_n_reviews_reviewId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}/findings/{findingId}/remedy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Remedy Finding */
+    post: operations['post_api_v1_projects_projectId_chapters_n_reviews_reviewId_findings_findingId_remedy'];
+    /** Clear Remedy */
+    delete: operations['delete_api_v1_projects_projectId_chapters_n_reviews_reviewId_findings_findingId_remedy'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/judge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Judge Draft */
+    post: operations['post_api_v1_projects_projectId_drafts_n_judge'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/review': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Review Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_n_review'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2826,7 +2879,7 @@ export interface components {
       usage: components['schemas']['JobUsageResponse'];
     };
     /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan';
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
     /** @description Cost and token totals across every run this job drove — empty (zero calls) for a job kind that makes no model calls, such as publish. */
@@ -2882,6 +2935,8 @@ export interface components {
       contentRating?: components['schemas']['ContentRatingInput'] | null;
       judge?: null | string;
       judgeNote?: null | string;
+      /** @description Set by an approval: how many blocking review findings still open on the approved text the approval recorded as overridden ("approved by the author"). */
+      overriddenFindings?: number;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -2937,14 +2992,6 @@ export interface components {
     };
     ReviseDraftBody: {
       note: string;
-    };
-    JudgeResponse: {
-      verdict: string;
-      findings: components['schemas']['JudgeFindingResponse'][];
-    };
-    JudgeFindingResponse: {
-      severity: string;
-      text: string;
     };
     FeedbackBody: {
       note: string;
@@ -3108,17 +3155,13 @@ export interface components {
         [key: string]: unknown;
       };
     };
-    ChapterReviewResponse: {
-      disposition: string;
-      note?: null | string;
-      findings?: null | components['schemas']['JudgeFindingResponse'][];
-    };
     ReviewQueueResponse: {
       drafts: components['schemas']['DraftResponse'][];
       proposals: components['schemas']['ContinuityProposalResponse'][];
     };
     /** @enum {string} */
-    RunGraph: 'chat-turn' | 'premise-enhance' | 'bible-audit' | 'illustration' | 'chapter-generation' | 'chapter-finalization' | 'bible-builder' | 'novel-validation';
+    RunGraph:
+      'chat-turn' | 'premise-enhance' | 'bible-audit' | 'illustration' | 'chapter-generation' | 'chapter-finalization' | 'chapter-review' | 'bible-builder' | 'novel-validation';
     ListWorkflowRunResponse: {
       total: number;
       limit: number;
@@ -3799,6 +3842,123 @@ export interface components {
       id: string;
       /** @description split only: overrides the suggested entity type. */
       entityType?: components['schemas']['EntityType'];
+    };
+    ListChapterReviewsResponse: {
+      chapter: number;
+      /** @description The draft revision the chapter is at now; null when it has no draft. */
+      currentRevision?: null | number;
+      /** @description The newest review of each kind. */
+      latest: components['schemas']['ChapterReviewRecordResponse'][];
+      /** @description Every review of this chapter, newest first, up to the most recent 50. */
+      history: components['schemas']['ChapterReviewRecordResponse'][];
+    };
+    /** @description One review of one chapter text. It never changes the prose; the author acts on its findings. */
+    ChapterReviewRecordResponse: {
+      id: string;
+      chapter: number;
+      kind: components['schemas']['ChapterReviewKind'];
+      /** @description clear renders as "No issue detected · revision N"; failed means the review could not be read and checked nothing. */
+      disposition: components['schemas']['ChapterReviewDisposition'];
+      /** @description The model's own verdict: consistent / contradiction / evaluation_failed for the judge, approve / revision_requested for the editor. */
+      verdict?: null | string;
+      /** @description The editor's overall note to the author. */
+      note?: null | string;
+      /** @description The draft revision that was reviewed; null for finalized prose that has no draft. */
+      draftRevision?: null | number;
+      /** @description True once the chapter text has changed since this review; its findings then describe an older text. */
+      stale: boolean;
+      /** @description The reviewed chapter is isolated or written unrestricted; its findings may quote prose a standard model must not read. */
+      isolated: boolean;
+      findings: components['schemas']['ReviewFindingResponse'][];
+      /** @description Findings not yet dismissed or overridden. */
+      openFindings: number;
+      /** @description Blocking findings not yet dismissed or overridden. */
+      openBlocking: number;
+      /** @description What this review checked, in plain words, for the "No issue detected" line. */
+      checked: string[];
+      briefCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
+      readabilityCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
+      endingCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
+      knowledgeCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
+      /** @description Deterministic measurements (word count, readability averages). */
+      metrics?: null | {
+        [key: string]: unknown;
+      };
+      /** @description The run that made the model calls; its usage is readable, its prompts stay admin-only. */
+      runId?: null | string;
+      costTier?: components['schemas']['CostTier'] | null;
+      contentMode?: components['schemas']['ContentMode'] | null;
+      modelProvider?: null | string;
+      model?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    ChapterReviewKind: 'judge' | 'editorial' | 'mechanics' | 'readability';
+    /** @enum {string} */
+    ChapterReviewDisposition: 'clear' | 'issues' | 'blocking' | 'failed';
+    ReviewFindingResponse: {
+      /** @description Stable within its review; remedies address the finding by it. */
+      id: string;
+      /** @description blocking: a contradiction or must-fix; warning: worth fixing; note: for information. */
+      severity: components['schemas']['ReviewFindingSeverity'];
+      category: components['schemas']['ReviewFindingCategory'];
+      text: string;
+      /** @description The passage the finding rests on, verified to appear verbatim in the reviewed text. */
+      evidence?: null | string;
+      /** @description The author’s answer to this finding, if any. */
+      remedy?: components['schemas']['ReviewRemedyResponse'] | null;
+    };
+    /** @enum {string} */
+    ReviewFindingSeverity: 'blocking' | 'warning' | 'note';
+    /** @enum {string} */
+    ReviewFindingCategory: 'continuity' | 'brief' | 'ending' | 'knowledge' | 'readability' | 'mechanics' | 'editorial';
+    ReviewRemedyResponse: {
+      action: components['schemas']['ReviewRemedyAction'];
+      reason?: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ReviewRemedyAction: 'dismissed' | 'fixing_myself' | 'overridden';
+    ReviewComplianceResponse: {
+      compliant: boolean;
+      issues: string[];
+    };
+    RunChapterReviewBody: {
+      /** @description judge: continuity, the plan, the ending contract, kept-back secrets and readability. editorial: an editor’s read against the plan, canon and style. mechanics and readability are deterministic and make no model call. */
+      kind: components['schemas']['ChapterReviewKind'];
+      /** @description Runs this review at this tier instead of the one the chat turn or project would use. Ignored by mechanics and readability. */
+      costTier?: components['schemas']['CostTier'];
+      /** @description unrestricted routes this review to the unrestricted models. It can only raise: a chapter written unrestricted or isolated is always reviewed unrestricted. */
+      contentMode?: components['schemas']['ContentMode'];
+    };
+    /** @description A model review queued as a job; the review appears in the chapter’s reviews when the job is done. */
+    ChapterReviewJobResponse: {
+      jobId: string;
+      /** @description The run the review’s model calls are recorded under; its usage is readable while it runs. */
+      runId: string;
+      kind: components['schemas']['ChapterReviewKind'];
+      status: components['schemas']['JobStatus'];
+    };
+    ReviewRemedyBody: {
+      /** @description dismissed: the finding is wrong (needs a reason). fixing_myself: the author will change the text by hand. overridden: the contradiction is intended (blocking findings only). A dismissal or override is remembered for this text and not raised again. */
+      action: components['schemas']['ReviewRemedyAction'];
+      /** @description Why. Required to dismiss. */
+      reason?: string;
+    };
+    JudgeResponse: {
+      verdict: string;
+      findings: components['schemas']['JudgeFindingResponse'][];
+    };
+    JudgeFindingResponse: {
+      severity: string;
+      text: string;
+    };
+    ChapterReviewResponse: {
+      disposition: string;
+      note?: null | string;
+      findings?: null | components['schemas']['JudgeFindingResponse'][];
     };
     StartIllustrationBody: {
       subjectType: components['schemas']['IllustrationSubjectType'];
@@ -6552,47 +6712,6 @@ export interface operations {
       };
     };
   };
-  post_api_v1_projects_projectId_drafts_n_judge: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        n: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JudgeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   post_api_v1_projects_projectId_drafts_n_feedback: {
     parameters: {
       query?: never;
@@ -7291,47 +7410,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chapters_n_review: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        n: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChapterReviewResponse'];
         };
       };
       /** @description Default Response */
@@ -9255,6 +9333,315 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplyProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapters_n_reviews: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChapterReviewsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_n_reviews: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RunChapterReviewBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewRecordResponse'];
+        };
+      };
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewJobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chapters_n_reviews_reviewId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        reviewId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewRecordResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_n_reviews_reviewId_findings_findingId_remedy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        reviewId: string;
+        findingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReviewRemedyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewRecordResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_chapters_n_reviews_reviewId_findings_findingId_remedy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        reviewId: string;
+        findingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewRecordResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_judge: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JudgeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_n_review: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterReviewResponse'];
         };
       };
       /** @description Default Response */
@@ -11941,8 +12328,6 @@ export type DraftSummaryResponse = components['schemas']['DraftSummaryResponse']
 export type DraftSummaryItem = components['schemas']['DraftSummaryItem'];
 export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
 export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
-export type JudgeResponse = components['schemas']['JudgeResponse'];
-export type JudgeFindingResponse = components['schemas']['JudgeFindingResponse'];
 export type FeedbackBody = components['schemas']['FeedbackBody'];
 export type UserFeedbackDisposition = components['schemas']['UserFeedbackDisposition'];
 export type UserFeedbackResponse = components['schemas']['UserFeedbackResponse'];
@@ -11963,7 +12348,6 @@ export type RefinementProposalStatus = components['schemas']['RefinementProposal
 export type ChangeOpItem = components['schemas']['ChangeOpItem'];
 export type OpResultItem = components['schemas']['OpResultItem'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
-export type ChapterReviewResponse = components['schemas']['ChapterReviewResponse'];
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type RunGraph = components['schemas']['RunGraph'];
 export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
@@ -12043,6 +12427,22 @@ export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
+export type ListChapterReviewsResponse = components['schemas']['ListChapterReviewsResponse'];
+export type ChapterReviewRecordResponse = components['schemas']['ChapterReviewRecordResponse'];
+export type ChapterReviewKind = components['schemas']['ChapterReviewKind'];
+export type ChapterReviewDisposition = components['schemas']['ChapterReviewDisposition'];
+export type ReviewFindingResponse = components['schemas']['ReviewFindingResponse'];
+export type ReviewFindingSeverity = components['schemas']['ReviewFindingSeverity'];
+export type ReviewFindingCategory = components['schemas']['ReviewFindingCategory'];
+export type ReviewRemedyResponse = components['schemas']['ReviewRemedyResponse'];
+export type ReviewRemedyAction = components['schemas']['ReviewRemedyAction'];
+export type ReviewComplianceResponse = components['schemas']['ReviewComplianceResponse'];
+export type RunChapterReviewBody = components['schemas']['RunChapterReviewBody'];
+export type ChapterReviewJobResponse = components['schemas']['ChapterReviewJobResponse'];
+export type ReviewRemedyBody = components['schemas']['ReviewRemedyBody'];
+export type JudgeResponse = components['schemas']['JudgeResponse'];
+export type JudgeFindingResponse = components['schemas']['JudgeFindingResponse'];
+export type ChapterReviewResponse = components['schemas']['ChapterReviewResponse'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
 export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
@@ -12221,6 +12621,8 @@ export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/t
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
+export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
+export type GetReviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
 export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
 export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;
