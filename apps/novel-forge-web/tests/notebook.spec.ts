@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { groupEntriesByPhase, isWithdrawable, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from '../src/features/notebook/notebook';
+import { groupEntriesByKind, isWithdrawable, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from '../src/features/notebook/notebook';
 import { type LedgerEntryResponse } from '../src/lib/apis';
 
 function entry(id: string, overrides: Partial<LedgerEntryResponse> = {}): LedgerEntryResponse {
@@ -8,7 +8,6 @@ function entry(id: string, overrides: Partial<LedgerEntryResponse> = {}): Ledger
     id,
     projectId: 'p1',
     kind: 'decision',
-    phase: 'idea',
     topic: 'premise',
     statement: `statement ${id}`,
     why: null,
@@ -45,27 +44,38 @@ describe('notebookCounts', () => {
   });
 });
 
-describe('groupEntriesByPhase', () => {
-  it('should lead with the phase holding the newest entry and keep each group newest first', () => {
-    const groups = groupEntriesByPhase([
-      entry('old', { phase: 'idea', createdAt: '2026-01-01T00:00:00.000Z' }),
-      entry('newest', { phase: 'heart', createdAt: '2026-01-03T00:00:00.000Z' }),
-      entry('middle', { phase: 'idea', createdAt: '2026-01-02T00:00:00.000Z' }),
+describe('groupEntriesByKind', () => {
+  it('should order the groups decisions, directions, not this, later, system notes', () => {
+    const groups = groupEntriesByKind([
+      entry('backlog-1', { kind: 'backlog' }),
+      entry('rejected-1', { kind: 'rejected' }),
+      entry('system-1', { kind: 'system' }),
+      entry('direction-1', { kind: 'direction' }),
+      entry('decision-1', { kind: 'decision' }),
     ]);
 
-    expect(groups.map(group => group.label)).toEqual(['Heart', 'Idea']);
-    expect(groups[1]?.entries.map(item => item.id)).toEqual(['middle', 'old']);
+    expect(groups.map(group => group.label)).toEqual(['Decisions', 'Directions', 'Not this', 'Later', 'System notes']);
   });
 
-  it('should collect entries with no phase under one heading', () => {
-    const groups = groupEntriesByPhase([entry('gate', { phase: null, kind: 'system', topic: 'gate' })]);
+  it('should keep each group newest first', () => {
+    const groups = groupEntriesByKind([
+      entry('old', { kind: 'decision', createdAt: '2026-01-01T00:00:00.000Z' }),
+      entry('newest', { kind: 'decision', createdAt: '2026-01-03T00:00:00.000Z' }),
+      entry('middle', { kind: 'decision', createdAt: '2026-01-02T00:00:00.000Z' }),
+    ]);
+
+    expect(groups[0]?.entries.map(item => item.id)).toEqual(['newest', 'middle', 'old']);
+  });
+
+  it('should skip a kind with no entries', () => {
+    const groups = groupEntriesByKind([entry('a', { kind: 'system' })]);
 
     expect(groups).toHaveLength(1);
-    expect(groups[0]?.label).toBe('Across the novel');
+    expect(groups[0]?.label).toBe('System notes');
   });
 
   it('should return no groups for an empty ledger', () => {
-    expect(groupEntriesByPhase([])).toEqual([]);
+    expect(groupEntriesByKind([])).toEqual([]);
   });
 });
 
@@ -104,7 +114,7 @@ describe('ledgerTopicLabel', () => {
   it('should name the topics the author meets most', () => {
     expect(ledgerTopicLabel('promise')).toBe('Reader promise');
     expect(ledgerTopicLabel('start')).toBe('Starting point');
-    expect(ledgerTopicLabel('concepts.corrected')).toBe('Your idea, corrected');
+    expect(ledgerTopicLabel('start.brief')).toBe('Your starting text');
   });
 
   it('should turn an unnamed key into words rather than show the slug', () => {
@@ -112,9 +122,7 @@ describe('ledgerTopicLabel', () => {
     expect(ledgerTopicLabel('check.pacing-1')).toBe('Check pacing 1');
   });
 
-  it('should name the start and organise sub-topics', () => {
-    expect(ledgerTopicLabel('start.brief')).toBe('Your starting text');
-    expect(ledgerTopicLabel('start.later')).toBe('Later in the story');
+  it('should name the organise sub-topics', () => {
     expect(ledgerTopicLabel('organise.ruled_out')).toBe('Suggestions you turned down');
     expect(ledgerTopicLabel('organise')).toBe('Your notes, organised');
   });

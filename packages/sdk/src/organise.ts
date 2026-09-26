@@ -37,8 +37,6 @@ export const ORGANISE_RULES_TOPIC = 'organise.rules';
 export const ORGANISE_ACCEPTED_TOPIC = 'organise.accepted';
 export const ORGANISE_RULED_OUT_TOPIC = 'organise.ruled_out';
 export const ORGANISE_REASON_MAX = 400;
-/** What a Blueprint round that failed on its model call says, so a screen can tell that failure from every other and advise on it. */
-export const ROUND_MODEL_CALL_FAILED = 'The model call did not finish.';
 
 export function isTimelineBand(value: unknown): value is TimelineBand {
   return typeof value === 'string' && TIMELINE_BANDS.includes(value as TimelineBand);

@@ -1164,42 +1164,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/ledger': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Active */
-    get: operations['get_api_v1_projects_projectId_ledger'];
-    put?: never;
-    /** Create */
-    post: operations['post_api_v1_projects_projectId_ledger'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/topics/{topic}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** History */
-    get: operations['get_api_v1_projects_projectId_ledger_topics_topic'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/{entryId}/supersede': {
+  '/api/v1/projects/{projectId}/plugins/{pluginId}/augment': {
     parameters: {
       query?: never;
       header?: never;
@@ -1208,25 +1173,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Supersede */
-    post: operations['post_api_v1_projects_projectId_ledger_entryId_supersede'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/{entryId}/withdraw': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Withdraw */
-    post: operations['post_api_v1_projects_projectId_ledger_entryId_withdraw'];
+    /** Augment */
+    post: operations['post_api_v1_projects_projectId_plugins_pluginId_augment'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1590,23 +1538,6 @@ export interface paths {
     put?: never;
     /** Apply Bible Tidy */
     post: operations['post_api_v1_projects_projectId_bible_tidy'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/plugins/{pluginId}/augment': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Augment */
-    post: operations['post_api_v1_projects_projectId_plugins_pluginId_augment'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2241,6 +2172,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Active */
+    get: operations['get_api_v1_projects_projectId_ledger'];
+    put?: never;
+    /** Create */
+    post: operations['post_api_v1_projects_projectId_ledger'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/topics/{topic}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** History */
+    get: operations['get_api_v1_projects_projectId_ledger_topics_topic'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/supersede': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Supersede */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_supersede'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_withdraw'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/import': {
     parameters: {
       query?: never;
@@ -2362,126 +2362,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/blueprint': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** State */
-    get: operations['get_api_v1_projects_projectId_blueprint'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/gate': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Gate Readiness */
-    get: operations['get_api_v1_projects_projectId_blueprint_gate'];
-    put?: never;
-    /** Open Workspace */
-    post: operations['post_api_v1_projects_projectId_blueprint_gate'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/steps/{step}/rounds': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Start Round */
-    post: operations['post_api_v1_projects_projectId_blueprint_steps_step_rounds'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/steps/{step}/rounds/cancel': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Cancel Round */
-    post: operations['post_api_v1_projects_projectId_blueprint_steps_step_rounds_cancel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/premise/preview': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Preview Premise */
-    post: operations['post_api_v1_projects_projectId_blueprint_premise_preview'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/title/checks': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Check Titles */
-    post: operations['post_api_v1_projects_projectId_blueprint_title_checks'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/blueprint/steps/{step}/lock': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Lock */
-    post: operations['post_api_v1_projects_projectId_blueprint_steps_step_lock'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2557,8 +2437,6 @@ export interface components {
       helper?: components['schemas']['AccountModelRef'];
       /** @description Cover and scene art; must name an image model. */
       image?: components['schemas']['AccountModelRef'];
-      /** @description The Blueprint’s small, one-screen steps. */
-      ideation?: components['schemas']['AccountModelRef'];
     };
     AccountModelRef: {
       provider: string;
@@ -2916,7 +2794,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'blueprint';
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
     CancelJobResponse: {
@@ -3148,7 +3026,7 @@ export interface components {
     /** @enum {string} */
     ChatScope: 'project' | 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'plugin' | 'blueprint';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract' | 'plugin';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
@@ -3486,100 +3364,10 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    ListLedgerEntriesResponse: {
-      entries: components['schemas']['LedgerEntryResponse'][];
-    };
-    LedgerEntryResponse: {
-      id: string;
-      projectId: string;
-      kind: components['schemas']['LedgerEntryKind'];
-      phase: components['schemas']['BlueprintPhase'] | null;
-      topic: string;
-      statement: string;
-      why: null | string;
-      rejectedAlternatives: string[];
-      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
-      writerLine: null | string;
-      decidedBy: components['schemas']['LedgerDecidedBy'];
-      /** @description The Blueprint step whose lock wrote the entry; null for what the author wrote directly or while steering. */
-      stepKey: null | string;
-      /** @description Structured detail whose fields depend on the topic. */
-      payload: null | {
-        [key: string]: unknown;
-      };
-      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
-      links: components['schemas']['LedgerLinksResponse'];
-      supersedesId: null | string;
-      /**
-       * Format: date-time
-       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
-       */
-      supersededAt: null | string;
-      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
-      withdrawnReason: null | string;
-      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
-      status: components['schemas']['LedgerEntryStatus'];
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @enum {string} */
-    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
-    /** @enum {string} */
-    BlueprintPhase: 'idea' | 'heart' | 'core' | 'world' | 'spine' | 'volume_one' | 'opening';
-    /** @enum {string} */
-    LedgerDecidedBy: 'author' | 'system';
-    LedgerLinksResponse: {
-      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
-      entityKeys?: string[];
-      factKeys?: string[];
-      volumeKeys?: string[];
-      arcKeys?: string[];
-      briefChapters?: number[];
-    };
-    LedgerBibleDocumentLinkResponse: {
-      section: components['schemas']['BibleSection'];
-      slug: string;
-    };
-    /** @enum {string} */
-    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
-    /** @enum {string} */
-    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
-    CreateLedgerEntryBody: {
-      /** @description Decisions come from locking a Blueprint step; the author writes directions, rejected ideas and backlog entries directly. */
-      kind: components['schemas']['AuthorLedgerKind'];
-      phase?: components['schemas']['BlueprintPhase'] | null;
-      /** @description Stable topic key, e.g. `premise`, `world.rules`, `check.<id>`. */
-      topic: string;
-      statement: string;
-      /** @description For a rejected entry, the reason the author gave for killing it. */
-      why?: string;
-      /** @description Structured detail whose fields depend on the topic. */
-      payload?: {
-        [key: string]: unknown;
-      };
-    };
-    /** @enum {string} */
-    AuthorLedgerKind: 'direction' | 'rejected' | 'backlog';
-    SupersedeLedgerEntryBody: {
-      /** @description Kind of the successor; defaults to the superseded entry’s kind (a system detail becomes a decision). Only a decision or a system detail can become a decision. */
-      kind?: components['schemas']['AuthorSupersedeLedgerKind'];
-      statement: string;
-      /** @description Omit to keep the superseded entry’s value when the kind is kept; send an empty string to clear it. */
-      why?: string;
-      /** @description What the decision means for the chapter writer. Omit to keep, empty string to clear. */
-      writerLine?: string;
-      /** @description Omit to keep the superseded entry’s alternatives when the kind is kept. */
-      rejectedAlternatives?: string[];
-      /** @description Omit to keep the superseded entry’s payload when the kind is kept. */
-      payload?: {
-        [key: string]: unknown;
-      };
-    };
-    /** @enum {string} */
-    AuthorSupersedeLedgerKind: 'decision' | 'direction' | 'rejected' | 'backlog';
-    WithdrawLedgerEntryBody: {
-      /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
-      reason: string;
+    /** @description The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing. */
+    PluginAugmentResponse: {
+      /** @description Id of the pending proposal holding the proposed canon changes, for review through the proposal surface. */
+      proposalId: string;
     };
     ListProposalResponse: {
       total: number;
@@ -3875,6 +3663,8 @@ export interface components {
     /** @enum {string} */
     BibleTidyKind: 'remove_empty' | 'retitle' | 'split' | 'move_ai_notes';
     /** @enum {string} */
+    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
+    /** @enum {string} */
     EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
     ApplyBibleTidyBody: {
       /** @description The preview items to apply; everything left out stays as it is. */
@@ -3884,11 +3674,6 @@ export interface components {
       id: string;
       /** @description split only: overrides the suggested entity type. */
       entityType?: components['schemas']['EntityType'];
-    };
-    /** @description The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing. */
-    PluginAugmentResponse: {
-      /** @description Id of the pending proposal holding the proposed canon changes, for review through the proposal surface. */
-      proposalId: string;
     };
     CreateEntityBody: {
       entityKey: string;
@@ -4526,59 +4311,6 @@ export interface components {
       draftsFinal?: number;
       planApproved?: boolean;
       volumesTotal?: number;
-      /** @description The Blueprint stage and phases; null for every kind but an original novel. */
-      blueprint?: components['schemas']['BlueprintProgressResponse'] | null;
-    };
-    BlueprintProgressResponse: {
-      /** @description `workspace` once the gate entry exists, or for an import (chapter briefs and no entry a Blueprint step wrote). */
-      stage: components['schemas']['BlueprintStage'];
-      /** @description The seven phases in order. */
-      phases: components['schemas']['BlueprintPhaseProgressResponse'][];
-      /** @description Present only for an import: what its content already covers, phase by phase. */
-      importCoverage?: components['schemas']['ImportCoverageResponse'];
-    };
-    /** @enum {string} */
-    BlueprintStage: 'blueprint' | 'workspace';
-    BlueprintPhaseProgressResponse: {
-      phase: components['schemas']['BlueprintPhase'];
-      label: string;
-      /** @description `done` once every applicable required step is done; `current` for the first unfinished phase; `locked` behind an unfinished phase above it; `open` for an unfinished phase in the Workspace, where nothing is locked. */
-      status: components['schemas']['BlueprintPhaseStatus'];
-      /** @description Why a locked phase is locked, for the author. */
-      lockReason?: string;
-      steps: components['schemas']['BlueprintStepProgressResponse'][];
-    };
-    /** @enum {string} */
-    BlueprintPhaseStatus: 'done' | 'current' | 'locked' | 'open';
-    BlueprintStepProgressResponse: {
-      key: string;
-      /** @description Whether the step counts towards its phase; an optional step never holds a phase back. */
-      required: boolean;
-      /** @description Whether the active decisions call for the step at all (a power ladder only when progression drives the novel). */
-      applies: boolean;
-      /** @description A required step is done when every completion topic has an active decision or system entry; an optional one when any active entry exists. */
-      done: boolean;
-    };
-    ImportCoverageResponse: {
-      phases: components['schemas']['ImportPhaseCoverageResponse'][];
-      /** @description Whether a voice or pacing and tone page exists; a recommendation, never a blocker. */
-      voice: components['schemas']['CoverageItemResponse'];
-      /** @description Whether any gap stops generation. */
-      blocking: boolean;
-    };
-    ImportPhaseCoverageResponse: {
-      covered: boolean;
-      /** @description One line naming what the coverage was read from, or what is missing. */
-      evidence: string;
-      phase: components['schemas']['BlueprintPhase'];
-      label: string;
-      /** @description True only for a missing chapter brief, the one gap that stops generation; every other gap is a recommendation. */
-      blocking: boolean;
-    };
-    CoverageItemResponse: {
-      covered: boolean;
-      /** @description One line naming what the coverage was read from, or what is missing. */
-      evidence: string;
     };
     UpdateProjectBody: {
       /** @description The working title. Trimmed; a blank title clears it. */
@@ -4645,6 +4377,95 @@ export interface components {
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
+    };
+    ListLedgerEntriesResponse: {
+      entries: components['schemas']['LedgerEntryResponse'][];
+    };
+    LedgerEntryResponse: {
+      id: string;
+      projectId: string;
+      kind: components['schemas']['LedgerEntryKind'];
+      topic: string;
+      statement: string;
+      why: null | string;
+      rejectedAlternatives: string[];
+      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
+      writerLine: null | string;
+      decidedBy: components['schemas']['LedgerDecidedBy'];
+      /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
+      stepKey: null | string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload: null | {
+        [key: string]: unknown;
+      };
+      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
+      links: components['schemas']['LedgerLinksResponse'];
+      supersedesId: null | string;
+      /**
+       * Format: date-time
+       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
+       */
+      supersededAt: null | string;
+      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
+      withdrawnReason: null | string;
+      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
+      status: components['schemas']['LedgerEntryStatus'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
+    /** @enum {string} */
+    LedgerDecidedBy: 'author' | 'system';
+    LedgerLinksResponse: {
+      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
+      entityKeys?: string[];
+      factKeys?: string[];
+      volumeKeys?: string[];
+      arcKeys?: string[];
+      briefChapters?: number[];
+    };
+    LedgerBibleDocumentLinkResponse: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+    };
+    /** @enum {string} */
+    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
+    CreateLedgerEntryBody: {
+      /** @description The author writes directions, rejected ideas and backlog entries directly; a decision only ever supersedes one. */
+      kind: components['schemas']['AuthorLedgerKind'];
+      /** @description Stable topic key, e.g. `premise`, `world.rules`, `organise.rules`. */
+      topic: string;
+      statement: string;
+      /** @description For a rejected entry, the reason the author gave for killing it. */
+      why?: string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorLedgerKind: 'direction' | 'rejected' | 'backlog';
+    SupersedeLedgerEntryBody: {
+      /** @description Kind of the successor; defaults to the superseded entry’s kind (a system detail becomes a decision). Only a decision or a system detail can become a decision. */
+      kind?: components['schemas']['AuthorSupersedeLedgerKind'];
+      statement: string;
+      /** @description Omit to keep the superseded entry’s value when the kind is kept; send an empty string to clear it. */
+      why?: string;
+      /** @description What the decision means for the chapter writer. Omit to keep, empty string to clear. */
+      writerLine?: string;
+      /** @description Omit to keep the superseded entry’s alternatives when the kind is kept. */
+      rejectedAlternatives?: string[];
+      /** @description Omit to keep the superseded entry’s payload when the kind is kept. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorSupersedeLedgerKind: 'decision' | 'direction' | 'rejected' | 'backlog';
+    WithdrawLedgerEntryBody: {
+      /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
+      reason: string;
     };
     ImportNovelBody: {
       bundle: components['schemas']['NovelBundle'];
@@ -5131,172 +4952,6 @@ export interface components {
     WikiReconcileFailureItem: {
       entryKey: string;
       error: string;
-    };
-    BlueprintStateResponse: {
-      steps: components['schemas']['BlueprintStepStateResponse'][];
-    };
-    BlueprintStepStateResponse: {
-      key: string;
-      /** @description A pass is one generation feeding several screens; it is never shown or locked itself. */
-      kind: components['schemas']['BlueprintStepKind'];
-      /** @description The pass this screen draws its rounds from; screens sharing a pass share one round and one progress indicator. */
-      source: null | string;
-      phase: components['schemas']['BlueprintPhase'];
-      /** @description Whether locking the step counts towards its phase’s completion. */
-      required: boolean;
-      /** @description Ledger topics whose active decisions mean the step is done. */
-      completionTopics: string[];
-      nudges: string[];
-      /** @description The latest round of the step (of its pass, for a sourced screen, with options narrowed to this screen); absent before its first round. Earlier rounds are history. */
-      latestRound?: components['schemas']['BlueprintRoundResponse'];
-      /** @description The latest ready round, sent only while the latest round is not ready: a round still running, cancelled or failed leaves the last good options on screen and lockable. */
-      lastReadyRound?: components['schemas']['BlueprintRoundResponse'];
-      /** @description The screen is locked and a later whole-pass rerun moved the options it was locked from, so its answer no longer matches what is on screen. */
-      sliceMoved: boolean;
-    };
-    /** @enum {string} */
-    BlueprintStepKind: 'screen' | 'pass';
-    BlueprintRoundResponse: {
-      id: string;
-      stepKey: string;
-      round: number;
-      /** @description A round whose job settled without it reports the job’s outcome. */
-      status: components['schemas']['BlueprintRoundStatus'];
-      jobId: null | string;
-      steer: null | string;
-      nudges: string[];
-      keepAsDirection: boolean;
-      feedback: components['schemas']['BlueprintOptionFeedbackResponse'][];
-      /** @description The step’s own input for this round. */
-      input: null | {
-        [key: string]: unknown;
-      };
-      /** @description On a pass round, the screen it was started from; that screen’s slice is reworked and the rest kept. */
-      focus: null | string;
-      /** @description The options the round produced, in the shape the step defines; null until the round is ready. */
-      options: null | {
-        [key: string]: unknown;
-      };
-      /** @description The coach’s short reply, shown in the steer thread. */
-      coachMessage: null | string;
-      error: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @enum {string} */
-    BlueprintRoundStatus: 'pending' | 'running' | 'ready' | 'failed' | 'cancelled';
-    BlueprintOptionFeedbackResponse: {
-      optionId: string;
-      verdict: components['schemas']['BlueprintFeedbackVerdict'];
-      reason?: string;
-    };
-    /** @enum {string} */
-    BlueprintFeedbackVerdict: 'more' | 'not' | 'mix';
-    BlueprintGateResponse: {
-      /** @description Whether every required step that applies to this novel is done. Checked without a model. */
-      ready: boolean;
-      /** @description Whether the gate entry already exists — the project is in the Workspace. */
-      opened: boolean;
-      /** @description Required, applicable steps still waiting on a lock; the gate refuses while any remain. */
-      unfinished: components['schemas']['GateStepGapResponse'][];
-      /** @description What the author should see before opening the Workspace. None of them blocks the gate. */
-      warnings: components['schemas']['GateWarningResponse'][];
-    };
-    GateStepGapResponse: {
-      phase: components['schemas']['BlueprintPhase'];
-      phaseLabel: string;
-      /** @description The step to open; the client holds its wording. */
-      step: string;
-    };
-    GateWarningResponse: {
-      kind: components['schemas']['GateWarningKind'];
-      title: string;
-      detail: string;
-      /** @description The step whose lock settles the warning. */
-      step: string;
-      /** @description Other steps the warning is about, by key; the client holds their wording. */
-      steps: string[];
-    };
-    /** @enum {string} */
-    GateWarningKind: 'arc_stale' | 'arc_brief_range' | 'brief_stale' | 'check_outdated';
-    StartBlueprintRoundBody: {
-      /** @description Applies to this round only unless `keepAsDirection` is set. */
-      steer?: string;
-      /** @description Short steers the author picked from the step’s nudge chips. */
-      nudges?: string[];
-      /** @description Records the steer as a direction entry every later step reads. */
-      keepAsDirection?: boolean;
-      feedback?: components['schemas']['BlueprintOptionFeedbackBody'][];
-      /** @description The step’s own input, whose shape depends on the step; refused by a step that takes none. */
-      input?: {
-        [key: string]: unknown;
-      };
-    };
-    BlueprintOptionFeedbackBody: {
-      /** @description An option of the step’s latest ready round. */
-      optionId: string;
-      /** @description `not` with a reason also records a rejected ledger entry naming the option. */
-      verdict: components['schemas']['BlueprintFeedbackVerdict'];
-      reason?: string;
-    };
-    CancelBlueprintRoundResponse: {
-      outcome: components['schemas']['BlueprintCancelOutcome'];
-      round: components['schemas']['BlueprintRoundResponse'];
-    };
-    /** @enum {string} */
-    BlueprintCancelOutcome: 'cancelled' | 'stopping' | 'already_settled';
-    PremisePreviewBody: {
-      /** @description The premise sentence as it stands on screen; it need not be locked. */
-      premise: string;
-    };
-    PremisePreviewResponse: {
-      /** @description A sample opening paragraph. It is never stored, never a decision and never the novel’s voice. */
-      paragraph: string;
-    };
-    TitleChecksBody: {
-      /** @description The titles to check, at most one batch of 8. Each is trimmed, blanks and repeats are dropped, and one longer than 120 characters is refused. */
-      titles: string[];
-    };
-    TitleChecksListResponse: {
-      results: components['schemas']['TitleChecksResponse'][];
-    };
-    TitleChecksResponse: {
-      /** @description The title as it was checked, trimmed. */
-      title: string;
-      catalogFit: components['schemas']['TitleCheckResponse'];
-      library: components['schemas']['TitleCheckResponse'];
-      published: components['schemas']['TitleCheckResponse'];
-    };
-    TitleCheckResponse: {
-      /**
-       * @description `unknown` means the check did not run; it is never reported as a pass.
-       * @enum {string}
-       */
-      status: 'ok' | 'warn' | 'unknown';
-      /** @description What the check found, or why it could not be made. */
-      detail: string;
-    };
-    LockBlueprintStepBody: {
-      /** @description The chosen option ids and the author’s edits, in the shape the step defines. */
-      selection: {
-        [key: string]: unknown;
-      };
-    };
-    LockBlueprintStepResponse: {
-      /** @description The entries the lock appended or superseded into place. */
-      entries: components['schemas']['LedgerEntryResponse'][];
-      /** @description Entries an earlier lock of this step left that the new lock replaced without a successor. */
-      withdrawn: components['schemas']['LedgerEntryResponse'][];
-      /** @description The applied change that materialised the step’s content; revertible from the change history. */
-      proposalId: null | string;
-      /** @description The outcome of work the step runs after the lock commits; a failure there leaves the lock saved. */
-      followUp: components['schemas']['BlueprintLockFollowUpResponse'] | null;
-    };
-    BlueprintLockFollowUpResponse: {
-      ok: boolean;
-      error?: string;
     };
   };
   responses: never;
@@ -8436,19 +8091,13 @@ export interface operations {
       };
     };
   };
-  get_api_v1_projects_projectId_ledger: {
+  post_api_v1_projects_projectId_plugins_pluginId_augment: {
     parameters: {
-      query?: {
-        /** @description Comma-separated entry kinds to keep. */
-        kinds?: string;
-        /** @description Comma-separated Blueprint phases to keep. */
-        phases?: string;
-        /** @description Comma-separated topic keys to keep; a key ending in `.*` keeps every topic under that prefix. */
-        topics?: string;
-      };
+      query?: never;
       header?: never;
       path: {
         projectId: string;
+        pluginId: string;
       };
       cookie?: never;
     };
@@ -8460,182 +8109,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ListLedgerEntriesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_ledger_topics_topic: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        topic: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListLedgerEntriesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger_entryId_supersede: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entryId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SupersedeLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger_entryId_withdraw: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entryId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['WithdrawLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
+          'application/json': components['schemas']['PluginAugmentResponse'];
         };
       };
       /** @description Default Response */
@@ -9812,47 +9286,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplyProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_plugins_pluginId_augment: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        pluginId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PluginAugmentResponse'];
         };
       };
       /** @description Default Response */
@@ -12073,6 +11506,226 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated entry kinds to keep. */
+        kinds?: string;
+        /** @description Comma-separated topic keys to keep; a key ending in `.*` keeps every topic under that prefix. */
+        topics?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_ledger_topics_topic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        topic: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_supersede: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SupersedeLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_withdraw: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WithdrawLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_import: {
     parameters: {
       query?: never;
@@ -12453,345 +12106,6 @@ export interface operations {
       };
     };
   };
-  get_api_v1_projects_projectId_blueprint: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BlueprintStateResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_blueprint_gate: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BlueprintGateResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_gate: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_steps_step_rounds: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        step: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['StartBlueprintRoundBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BlueprintRoundResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_steps_step_rounds_cancel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        step: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CancelBlueprintRoundResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_premise_preview: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PremisePreviewBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['PremisePreviewResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_title_checks: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['TitleChecksBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TitleChecksListResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_blueprint_steps_step_lock: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        step: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['LockBlueprintStepBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LockBlueprintStepResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
 }
 export type AccessResponse = components['schemas']['AccessResponse'];
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
@@ -12919,20 +12233,7 @@ export type ChapterRowKind = components['schemas']['ChapterRowKind'];
 export type ChapterRowCountsResponse = components['schemas']['ChapterRowCountsResponse'];
 export type ChapterContradictionResponse = components['schemas']['ChapterContradictionResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
-export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
-export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
-export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
-export type BlueprintPhase = components['schemas']['BlueprintPhase'];
-export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
-export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
-export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
-export type BibleSection = components['schemas']['BibleSection'];
-export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
-export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
-export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
-export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
-export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
-export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
+export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type ListProposalResponse = components['schemas']['ListProposalResponse'];
 export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
 export type ApplyProposalBody = components['schemas']['ApplyProposalBody'];
@@ -12975,10 +12276,10 @@ export type OmittedSectionPreview = components['schemas']['OmittedSectionPreview
 export type BibleTidyPreviewResponse = components['schemas']['BibleTidyPreviewResponse'];
 export type BibleTidyItem = components['schemas']['BibleTidyItem'];
 export type BibleTidyKind = components['schemas']['BibleTidyKind'];
+export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
-export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type CreateEntityBody = components['schemas']['CreateEntityBody'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];
 export type EntityOrigin = components['schemas']['EntityOrigin'];
@@ -13058,14 +12359,6 @@ export type ProjectModelRef = components['schemas']['ProjectModelRef'];
 export type ListProjectResponse = components['schemas']['ListProjectResponse'];
 export type ProjectDetailResponse = components['schemas']['ProjectDetailResponse'];
 export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
-export type BlueprintProgressResponse = components['schemas']['BlueprintProgressResponse'];
-export type BlueprintStage = components['schemas']['BlueprintStage'];
-export type BlueprintPhaseProgressResponse = components['schemas']['BlueprintPhaseProgressResponse'];
-export type BlueprintPhaseStatus = components['schemas']['BlueprintPhaseStatus'];
-export type BlueprintStepProgressResponse = components['schemas']['BlueprintStepProgressResponse'];
-export type ImportCoverageResponse = components['schemas']['ImportCoverageResponse'];
-export type ImportPhaseCoverageResponse = components['schemas']['ImportPhaseCoverageResponse'];
-export type CoverageItemResponse = components['schemas']['CoverageItemResponse'];
 export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
 export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
@@ -13073,6 +12366,18 @@ export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
 export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];
 export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
+export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
+export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
+export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
+export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
+export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
+export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
+export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
+export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
+export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
+export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
+export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
+export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
 export type ImportNovelBody = components['schemas']['ImportNovelBody'];
 export type NovelBundle = components['schemas']['NovelBundle'];
 export type NovelImportMode = components['schemas']['NovelImportMode'];
@@ -13113,30 +12418,6 @@ export type ReconcileResponse = components['schemas']['ReconcileResponse'];
 export type ReconcileFailureItem = components['schemas']['ReconcileFailureItem'];
 export type WikiReconcileResult = components['schemas']['WikiReconcileResult'];
 export type WikiReconcileFailureItem = components['schemas']['WikiReconcileFailureItem'];
-export type BlueprintStateResponse = components['schemas']['BlueprintStateResponse'];
-export type BlueprintStepStateResponse = components['schemas']['BlueprintStepStateResponse'];
-export type BlueprintStepKind = components['schemas']['BlueprintStepKind'];
-export type BlueprintRoundResponse = components['schemas']['BlueprintRoundResponse'];
-export type BlueprintRoundStatus = components['schemas']['BlueprintRoundStatus'];
-export type BlueprintOptionFeedbackResponse = components['schemas']['BlueprintOptionFeedbackResponse'];
-export type BlueprintFeedbackVerdict = components['schemas']['BlueprintFeedbackVerdict'];
-export type BlueprintGateResponse = components['schemas']['BlueprintGateResponse'];
-export type GateStepGapResponse = components['schemas']['GateStepGapResponse'];
-export type GateWarningResponse = components['schemas']['GateWarningResponse'];
-export type GateWarningKind = components['schemas']['GateWarningKind'];
-export type StartBlueprintRoundBody = components['schemas']['StartBlueprintRoundBody'];
-export type BlueprintOptionFeedbackBody = components['schemas']['BlueprintOptionFeedbackBody'];
-export type CancelBlueprintRoundResponse = components['schemas']['CancelBlueprintRoundResponse'];
-export type BlueprintCancelOutcome = components['schemas']['BlueprintCancelOutcome'];
-export type PremisePreviewBody = components['schemas']['PremisePreviewBody'];
-export type PremisePreviewResponse = components['schemas']['PremisePreviewResponse'];
-export type TitleChecksBody = components['schemas']['TitleChecksBody'];
-export type TitleChecksListResponse = components['schemas']['TitleChecksListResponse'];
-export type TitleChecksResponse = components['schemas']['TitleChecksResponse'];
-export type TitleCheckResponse = components['schemas']['TitleCheckResponse'];
-export type LockBlueprintStepBody = components['schemas']['LockBlueprintStepBody'];
-export type LockBlueprintStepResponse = components['schemas']['LockBlueprintStepResponse'];
-export type BlueprintLockFollowUpResponse = components['schemas']['BlueprintLockFollowUpResponse'];
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
@@ -13170,9 +12451,6 @@ export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{proje
 export type ListChapterRowsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['query'], undefined>;
 export type ListChapterRowsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
-export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
-export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
-export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
@@ -13209,7 +12487,8 @@ export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
 export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
+export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
+export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
+export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
-export type StatePathParams = Exclude<paths['/api/v1/projects/{projectId}/blueprint']['get']['parameters']['path'], undefined>;
-export type GateReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/blueprint/gate']['get']['parameters']['path'], undefined>;

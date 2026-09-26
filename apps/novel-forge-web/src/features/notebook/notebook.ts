@@ -2,19 +2,6 @@ import { ORGANISE_ACCEPTED_TOPIC, ORGANISE_RULED_OUT_TOPIC, ORGANISE_RULES_TOPIC
 
 import { type LedgerEntryKind, type LedgerEntryResponse, type LedgerEntryStatus } from '@/lib/apis';
 
-/** The design phase a ledger entry was decided in, kept local rather than importing the generated Blueprint enum a server module this outlived defined it for. */
-export type DesignPhase = 'idea' | 'heart' | 'core' | 'world' | 'spine' | 'volume_one' | 'opening';
-
-const PHASE_LABELS: Record<DesignPhase, string> = {
-  idea: 'Idea',
-  heart: 'Heart',
-  core: 'Core',
-  world: 'World',
-  spine: 'Spine',
-  volume_one: 'Volume one',
-  opening: 'Opening',
-};
-
 export interface NotebookCounts {
   decided: number;
   directions: number;
@@ -36,32 +23,31 @@ export function notebookCounts(entries: LedgerEntryResponse[]): NotebookCounts {
 }
 
 export interface NotebookGroup {
-  phase: DesignPhase | null;
+  kind: LedgerEntryKind;
   label: string;
   entries: LedgerEntryResponse[];
 }
 
-const ACROSS_THE_NOVEL = 'Across the novel';
+const KIND_GROUP_ORDER: LedgerEntryKind[] = ['decision', 'direction', 'rejected', 'backlog', 'system'];
 
-/**
- * Newest first, then grouped by the phase that decided it — so the phase the author just worked in leads,
- * and an entry with no phase (the gate, anything written outside a step) collects under one heading.
- */
-export function groupEntriesByPhase(entries: LedgerEntryResponse[]): NotebookGroup[] {
+const KIND_GROUP_LABELS: Record<LedgerEntryKind, string> = {
+  decision: 'Decisions',
+  direction: 'Directions',
+  rejected: 'Not this',
+  backlog: 'Later',
+  system: 'System notes',
+};
+
+/** Newest first within each kind, then the kinds in a fixed reading order: decided, still open, ruled out, deferred, the system's own. */
+export function groupEntriesByKind(entries: LedgerEntryResponse[]): NotebookGroup[] {
   const newestFirst = [...entries].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const groups: NotebookGroup[] = [];
-  const byPhase = new Map<DesignPhase | null, NotebookGroup>();
+  const byKind = new Map<LedgerEntryKind, LedgerEntryResponse[]>();
   for (const entry of newestFirst) {
-    const existing = byPhase.get(entry.phase);
-    if (existing) {
-      existing.entries.push(entry);
-      continue;
-    }
-    const group: NotebookGroup = { phase: entry.phase, label: entry.phase ? PHASE_LABELS[entry.phase] : ACROSS_THE_NOVEL, entries: [entry] };
-    byPhase.set(entry.phase, group);
-    groups.push(group);
+    const bucket = byKind.get(entry.kind);
+    if (bucket) bucket.push(entry);
+    else byKind.set(entry.kind, [entry]);
   }
-  return groups;
+  return KIND_GROUP_ORDER.filter(kind => byKind.has(kind)).map(kind => ({ kind, label: KIND_GROUP_LABELS[kind], entries: byKind.get(kind) as LedgerEntryResponse[] }));
 }
 
 /**
@@ -83,7 +69,6 @@ export function isWithdrawable(entry: LedgerEntryResponse): boolean {
 const TOPIC_WORD_BREAK = /[._-]+/;
 
 const TOPIC_LABELS: Record<string, string> = {
-  gate: 'The gate',
   promise: 'Reader promise',
   [ORGANISE_TOPIC]: 'Your notes, organised',
   [ORGANISE_ACCEPTED_TOPIC]: 'Suggestions you accepted',
@@ -91,8 +76,6 @@ const TOPIC_LABELS: Record<string, string> = {
   [ORGANISE_RULED_OUT_TOPIC]: 'Suggestions you turned down',
   start: 'Starting point',
   'start.brief': 'Your starting text',
-  'start.later': 'Later in the story',
-  'concepts.corrected': 'Your idea, corrected',
   volume_one: 'Volume one',
 };
 

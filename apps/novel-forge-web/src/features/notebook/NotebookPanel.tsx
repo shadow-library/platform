@@ -5,7 +5,7 @@ import { SidePanel, StatusChip } from '@/components/nf';
 import { type LedgerEntryResponse, useLedgerEntriesQuery, useLedgerTopicQuery, useWithdrawLedgerEntryMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
-import { groupEntriesByPhase, isWithdrawable, LEDGER_KIND_LABELS, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from './notebook';
+import { groupEntriesByKind, isWithdrawable, LEDGER_KIND_LABELS, LEDGER_STATUS_LABELS, ledgerTopicLabel, newLedgerEntryIds, notebookCounts } from './notebook';
 import styles from './NotebookPanel.module.css';
 
 const KIND_INTENT = { decision: 'success', system: 'info', direction: 'accent', rejected: 'danger', backlog: 'neutral' } as const;
@@ -147,15 +147,14 @@ export interface NotebookPanelProps {
 }
 
 /**
- * The Notebook: the active ledger, newest first and grouped by the phase that decided it. Entries that
- * landed since the panel last looked are marked new, which is the only signal the author gets that a lock
- * or a kept steer reached the record.
+ * The Notebook: the active ledger, newest first and grouped by kind. Entries that landed since the panel
+ * last looked are marked new, which is the only signal the author gets that a change reached the record.
  */
 export function NotebookPanel({ projectId, className }: NotebookPanelProps): ReactElement {
   const entriesQuery = useLedgerEntriesQuery(projectId);
   const entries = entriesQuery.data?.entries ?? NO_ENTRIES;
   const counts = notebookCounts(entries);
-  const groups = groupEntriesByPhase(entries);
+  const groups = groupEntriesByKind(entries);
 
   const [topic, setTopic] = useState<string | null>(null);
   const [newIds, setNewIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -204,7 +203,7 @@ export function NotebookPanel({ projectId, className }: NotebookPanelProps): Rea
             </div>
           </div>
           {groups.map(group => (
-            <section key={group.label} className={styles.nbGroup}>
+            <section key={group.kind} className={styles.nbGroup}>
               <h3 className={styles.nbGroupLabel}>
                 {group.label} · {group.entries.length}
               </h3>
