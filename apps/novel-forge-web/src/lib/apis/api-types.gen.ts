@@ -2711,7 +2711,7 @@ export interface components {
       organisationId: string;
     };
     ListChatJobsResponse: {
-      /** @description Jobs this chat started that are still queued or running. */
+      /** @description Jobs this chat started that are still running, plus those that finished within the last hour, each with its status. */
       items: components['schemas']['ChatJobResponse'][];
       /** @description The session's latest job event seq as of `items`: open the event stream after it to follow these jobs from here. */
       cursor: number;
