@@ -80,6 +80,7 @@ export function serialiseProposal(proposal: Refinement.Proposal): ProposalRespon
     revertedAt: proposal.revertedAt,
     error: proposal.error as Record<string, unknown> | null,
     warnings: proposal.warnings ?? [],
+    diagnostics: proposal.diagnostics ?? (proposal.warnings ?? []).map(message => ({ kind: 'other' as const, message })),
     createdAt: proposal.createdAt,
     updatedAt: proposal.updatedAt,
   };

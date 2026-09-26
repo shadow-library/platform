@@ -216,6 +216,16 @@ describe('BibleAuditService.decide', () => {
     expect(decided.selection).toEqual([0, 1]);
   });
 
+  it('should refuse to discard a card that something else settled while the decision was being made', async () => {
+    const { service, proposals, settleAfterNextLock } = auditHarness(TWO_FINDINGS);
+    const { report } = await service.run(1n);
+    await service.decide(1n, report.id, 'f1', { decision: 'skipped' });
+    settleAfterNextLock('applied');
+
+    await expect(service.decide(1n, report.id, 'f2', { decision: 'skipped' })).rejects.toMatchObject({ code: 'RFN_002' });
+    expect(proposals.at(-1)?.status).toBe('applied');
+  });
+
   it('should discard the card once every finding on it is skipped, and restage it when one is kept again', async () => {
     const { service, proposals } = auditHarness(TWO_FINDINGS);
     const { report, proposal } = await service.run(1n);

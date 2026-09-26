@@ -16,6 +16,11 @@ export interface PlanState extends PlanWorld {
   frontier: number;
 }
 
+/** A chapter's plan as a staged card would leave it, read in place of its stored row, so a preview judges the card and never writes it. */
+export interface PlanOverlay extends PlanRow {
+  endingContract: unknown;
+}
+
 /** Serialises plan writes per project on the row chapter insert also locks first, so rule checks and derived state never race. */
 export async function lockProjectPlan(tx: DbExecutor, projectId: bigint): Promise<void> {
   await tx.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.id, projectId)).for('update');
@@ -77,14 +82,15 @@ export async function plannedUnlockContexts(db: PlanReader, projectId: bigint, c
  * The reveal rule's view of `chapter`: its own plan's claims, volume and ending, or a bare plan when it has none yet. Only a condition
  * reads the plans, so without one (`conditioned` false) nothing is loaded.
  */
-export async function chapterUnlockContext(db: PlanReader, projectId: bigint, chapter: number, conditioned: boolean): Promise<UnlockContext> {
+export async function chapterUnlockContext(db: PlanReader, projectId: bigint, chapter: number, conditioned: boolean, overlay?: PlanOverlay): Promise<UnlockContext> {
   if (!conditioned) return bareContext(chapter);
   const state = await loadPlanState(db, projectId);
-  const plan = state.plans.find(candidate => candidate.chapter === chapter) ?? {
-    chapter,
-    volumeKey: await nearestVolumeKey(db, projectId, chapter),
-    isEnding: false,
-    claimedMilestones: [],
-  };
+  const plan = overlay ??
+    state.plans.find(candidate => candidate.chapter === chapter) ?? {
+      chapter,
+      volumeKey: await nearestVolumeKey(db, projectId, chapter),
+      isEnding: false,
+      claimedMilestones: [],
+    };
   return planUnlockContext(plan, state);
 }

@@ -11,7 +11,7 @@ import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '
 import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
 import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
-import { planCardDiagnostics } from './plan-diagnostics';
+import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';
@@ -54,6 +54,9 @@ export interface CreateProposalInput {
   organiseRecord?: unknown;
 }
 
+/** An apply or revert that lands between the read and the write settles the card, so the write re-checks the status itself. */
+export const DISCARDABLE: Refinement.ProposalStatus[] = ['pending', 'conflicted'];
+
 function pickBaseline(states: Readonly<Record<string, ArtifactState>>, refs: readonly string[]): Record<string, ArtifactState> {
   return Object.fromEntries(refs.map(ref => [ref, states[ref] ?? MISSING_ARTIFACT]));
 }
@@ -74,6 +77,18 @@ function supersessionOwner(input: CreateProposalInput): SQL | undefined {
 function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
   if (kind === 'plugin') return validatePluginChangeSet(changeSet);
   return validateChangeSet(changeSet, allowedOps, options);
+}
+
+/**
+ * `startedEmpty` is the server's mark on a plan card it opened empty, never a model's or a client's to set: it is dropped from whatever
+ * arrives, and an edited card keeps the mark its stored plan carried for the same chapter.
+ */
+function stampStartedEmpty(ops: readonly ChangeOp[], stamped: readonly ChangeOp[] = []): ChangeOp[] {
+  const marked = new Set(stamped.flatMap(op => (op.op === 'brief.update' && op.startedEmpty === true ? [op.chapter] : [])));
+  return ops.map(op => {
+    const { startedEmpty: _startedEmpty, ...rest } = op;
+    return op.op === 'brief.update' && marked.has(op.chapter) ? ({ ...rest, startedEmpty: true } as ChangeOp) : (rest as ChangeOp);
+  });
 }
 
 /**
@@ -118,16 +133,20 @@ export class ProposalService {
     const errors = validateOps(input.kind, input.changeSet, input.allowedOps, { entityMaterialization: input.entityMaterialization });
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const changeSet = await stampApprovalRevisions(executor, projectId, input.changeSet, false);
+    const trusted = input.kind === 'chapter_plan' ? input.changeSet : stampStartedEmpty(input.changeSet);
+    const changeSet = await stampApprovalRevisions(executor, projectId, trusted, false);
     const refs = changeSetRefs(changeSet);
     const baseline = input.baseline ? pickBaseline(input.baseline, refs) : await loadArtifactStates(executor, projectId, refs);
     // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
-    const warnings = [
-      ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
-      ...(await this.revealClearWarnings(executor, projectId, input.changeSet)),
-      ...(input.sourceIsolated ? [ISOLATED_SOURCE_WARNING] : []),
-      ...(await this.planWarnings(executor, projectId, input.kind, changeSet)),
-    ];
+    const diagnostics = proposalDiagnostics(
+      [
+        ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
+        ...(await this.revealClearWarnings(executor, projectId, input.changeSet)),
+        ...(input.sourceIsolated ? [ISOLATED_SOURCE_WARNING] : []),
+      ],
+      await this.planDiagnostics(executor, projectId, input.kind, changeSet),
+    );
+    const warnings = diagnostics.map(diagnostic => diagnostic.message);
 
     const [proposal] = await executor
       .insert(schema.refinementProposals)
@@ -145,6 +164,7 @@ export class ProposalService {
         runId: input.runId,
         warnings: warnings.length > 0 ? warnings : null,
         organiseRecord: input.organiseRecord,
+        diagnostics: diagnostics.length > 0 ? diagnostics : null,
       })
       .returning();
     if (!proposal) throw AppErrorCode.RFN_001.create();
@@ -165,7 +185,7 @@ export class ProposalService {
   }
 
   /** A plan pass card's pooling, point-of-view and density diagnostics, judged on the card as it now stands. */
-  private async planWarnings(executor: DbExecutor, projectId: bigint, kind: Refinement.Kind, ops: ChangeOp[]): Promise<string[]> {
+  private async planDiagnostics(executor: DbExecutor, projectId: bigint, kind: Refinement.Kind, ops: ChangeOp[]): Promise<Refinement.Diagnostic[]> {
     if (kind !== 'chapter_plan') return [];
     try {
       return await planCardDiagnostics(executor, projectId, ops);
@@ -274,19 +294,20 @@ export class ProposalService {
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const ops = await stampApprovalRevisions(this.db, projectId, changeSet as ChangeOp[], true);
+    const ops = await stampApprovalRevisions(this.db, projectId, stampStartedEmpty(changeSet as ChangeOp[], existing.changeSet as ChangeOp[]), true);
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
-    const warnings = [
-      ...(await this.reviewWarnings(this.db, projectId, ops)),
-      ...(await this.revealClearWarnings(this.db, projectId, ops)),
-      ...(await this.planWarnings(this.db, projectId, existing.kind, ops)),
-    ];
+    const diagnostics = proposalDiagnostics(
+      [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))],
+      await this.planDiagnostics(this.db, projectId, existing.kind, ops),
+    );
+    const warnings = diagnostics.map(diagnostic => diagnostic.message);
     const [updated] = await this.db
       .update(schema.refinementProposals)
-      .set({ changeSet: ops, baseline, warnings: warnings.length > 0 ? warnings : null, updatedAt: new Date() })
-      .where(eq(schema.refinementProposals.id, existing.id))
+      .set({ changeSet: ops, baseline, warnings: warnings.length > 0 ? warnings : null, diagnostics: diagnostics.length > 0 ? diagnostics : null, updatedAt: new Date() })
+      .where(and(eq(schema.refinementProposals.id, existing.id), eq(schema.refinementProposals.status, 'pending')))
       .returning();
-    if (!updated) throw AppErrorCode.RFN_001.create();
+    // An apply or discard that landed while the edit was being judged has settled the card; the edit must not rewrite it.
+    if (!updated) throw AppErrorCode.RFN_002.create();
     return updated;
   }
 
@@ -301,14 +322,14 @@ export class ProposalService {
 
   async discard(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {
     const existing = await this.get(projectId, proposalId);
-    if (existing.status !== 'pending' && existing.status !== 'conflicted') throw AppErrorCode.RFN_002.create();
+    if (!DISCARDABLE.includes(existing.status)) throw AppErrorCode.RFN_002.create();
 
     const [updated] = await this.db
       .update(schema.refinementProposals)
       .set({ status: 'discarded', updatedAt: new Date() })
-      .where(eq(schema.refinementProposals.id, existing.id))
+      .where(and(eq(schema.refinementProposals.id, existing.id), inArray(schema.refinementProposals.status, DISCARDABLE)))
       .returning();
-    if (!updated) throw AppErrorCode.RFN_001.create();
+    if (!updated) throw AppErrorCode.RFN_002.create();
     return updated;
   }
 }

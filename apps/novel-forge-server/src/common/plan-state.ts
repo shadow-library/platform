@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, RevealRuleError } from '@server/classes';
 import { type DbExecutor, schema } from '@server/database';
 
 import { markDescendantDraftsStale, REVEAL_STALE_PREFIX } from './draft-staleness';
@@ -15,8 +15,15 @@ import {
   milestonePlanStates,
   planUnlockContexts,
   renderRevealRuleViolations,
+  type RevealRuleViolation,
 } from './reveal-rule';
+import { secretTitle } from './secret-title';
 import { isUnlockCondition } from './unlock-condition';
+
+function revealRuleError(errorCode: typeof AppErrorCode.PLN_001, chapter: number, violations: readonly RevealRuleViolation[]): RevealRuleError {
+  const details = violations.map(violation => ({ factKey: violation.factKey, label: secretTitle(violation), missing: violation.missing }));
+  return new RevealRuleError(errorCode, { chapter, violations: renderRevealRuleViolations(violations) }, details);
+}
 
 /**
  * The reveal rule, milestone claims and the single ending, checked on the plans just written as they now stand, then the state
@@ -33,7 +40,7 @@ export async function enforcePlanWrite(tx: DbExecutor, projectId: bigint, chapte
     const rivalEnding = findRivalEnding(plan, state);
     if (rivalEnding !== null) throw AppErrorCode.PLN_002.create({ chapter: rivalEnding });
     const violations = findPlanRevealViolations(plan, state.facts, state, contexts.get(plan));
-    if (violations.length > 0) throw AppErrorCode.PLN_001.create({ chapter, violations: renderRevealRuleViolations(violations) });
+    if (violations.length > 0) throw revealRuleError(AppErrorCode.PLN_001, chapter, violations);
   }
   await reconcilePlanState(tx, projectId, state);
 }
@@ -52,7 +59,7 @@ export async function planRevealsRefusal(tx: DbExecutor, projectId: bigint, chap
   const plan = state.plans.find(candidate => candidate.chapter === chapter);
   if (!plan || chapter <= state.frontier) return null;
   const violations = findPlanRevealViolations(plan, state.facts, state);
-  return violations.length > 0 ? AppErrorCode.PLN_004.create({ chapter, violations: renderRevealRuleViolations(violations) }) : null;
+  return violations.length > 0 ? revealRuleError(AppErrorCode.PLN_004, chapter, violations) : null;
 }
 
 /**

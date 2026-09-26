@@ -1,9 +1,9 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-import { cluesNamingTerms, escapeRegExp, nearestVolumeKey, revealTermPattern } from '@server/common';
+import { cluesNamingTerms, escapeRegExp, nearestVolumeKey, type PlanOverlay, revealTermPattern } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema } from '@server/database';
+import { type Bible, type PrimaryDatabase, schema } from '@server/database';
 
 import { isPlannerOnlyBibleDoc, isWriterExcludedBibleDoc, OPEN_QUESTIONS_DOC, ORGANISED_TIMELINE_DOC } from '../../ai/context/bible-docs';
 import { type FactLike, KNOWLEDGE_LEAK_PREFIX, type KnowledgeLeakIssue, loadWriterForbiddenFacts, scanKnowledgeLeaks, writerSafeLeakLines } from './knowledge-view';
@@ -298,44 +298,87 @@ export class WriterDisclosurePolicy {
 
 type DisclosureDb = Pick<PrimaryDatabase, 'query'>;
 
+type PlannerPage = Pick<Bible.Document, 'section' | 'slug' | 'frontmatter' | 'body'>;
+
+interface LaterVolume {
+  volumeKey: string;
+  title: string | null;
+  objective: string | null;
+  body: string | null;
+}
+
+/** What the writer of a chapter is kept from, as named records: the policy is built from these, and a plan card's writer preview lists them. */
+export interface WriterDisclosureSources {
+  chapter: number;
+  lockedFacts: FactLike[];
+  /** Null once the chapter is at or after the one planned as the ending, or when the author left it blank. */
+  ending: string | null;
+  endingQuestion: string | null;
+  laterVolumes: LaterVolume[];
+  plannerPages: PlannerPage[];
+  volumeOrdinals: ReadonlyMap<string, number>;
+  currentVolumeOrdinal: number | null;
+}
+
+function present(text: string | null | undefined): text is string {
+  return typeof text === 'string' && text.trim() !== '';
+}
+
+export function writerDisclosurePolicy(sources: WriterDisclosureSources): WriterDisclosurePolicy {
+  return new WriterDisclosurePolicy({
+    chapter: sources.chapter,
+    lockedFacts: sources.lockedFacts,
+    plannerOnly: [sources.ending, sources.endingQuestion, ...sources.laterVolumes.flatMap(volume => [volume.objective, volume.body])].filter(present),
+    plannerPages: sources.plannerPages.map(page => page.body).filter(present),
+    volumeOrdinals: sources.volumeOrdinals,
+    currentVolumeOrdinal: sources.currentVolumeOrdinal,
+  });
+}
+
 /**
- * The policy for the writer of `chapter`. The ending and the ending question are planner-only until the chapter planned as the ending
- * (and any epilogue after it), whose plan may state the ending's beats.
+ * What the writer of `chapter` is kept from. The ending and the ending question are planner-only until the chapter planned as the ending
+ * (and any epilogue after it), whose plan may state the ending's beats. An `overlay` stands in for the chapter's stored plan.
  */
-export async function loadWriterDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
+export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: bigint, chapter: number, overlay?: PlanOverlay): Promise<WriterDisclosureSources> {
   const briefs = schema.briefs;
-  const [lockedFacts, project, plan, endingPlan, plannerPages, volumes] = await Promise.all([
-    loadWriterForbiddenFacts(db, projectId, chapter),
+  const [lockedFacts, project, plan, storedEnding, plannerPages, volumes] = await Promise.all([
+    loadWriterForbiddenFacts(db, projectId, chapter, overlay),
     db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) }),
-    db.query.briefs.findFirst({ columns: { volumeKey: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.chapter, chapter)) }),
+    overlay ?? db.query.briefs.findFirst({ columns: { volumeKey: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.chapter, chapter)) }),
     db.query.briefs.findFirst({ columns: { chapter: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.isEnding, true)) }),
     db.query.bibleDocuments.findMany({
-      columns: { section: true, slug: true, body: true },
+      columns: { section: true, slug: true, frontmatter: true, body: true },
       where: and(
         eq(schema.bibleDocuments.projectId, projectId),
         eq(schema.bibleDocuments.section, ORGANISED_TIMELINE_DOC.section),
         inArray(schema.bibleDocuments.slug, [ORGANISED_TIMELINE_DOC.slug, OPEN_QUESTIONS_DOC.slug]),
       ),
     }),
-    db.query.volumes.findMany({ columns: { volumeKey: true, ordinal: true, objective: true, body: true }, where: eq(schema.volumes.projectId, projectId) }),
+    db.query.volumes.findMany({ columns: { volumeKey: true, ordinal: true, title: true, objective: true, body: true }, where: eq(schema.volumes.projectId, projectId) }),
   ]);
 
+  const endingPlan = overlay && storedEnding?.chapter === chapter ? undefined : storedEnding;
   const volumeKey = plan?.volumeKey ?? (await nearestVolumeKey(db, projectId, chapter));
   const volumeOrdinals = new Map(volumes.map(volume => [volume.volumeKey, volume.ordinal]));
   const currentVolumeOrdinal = volumeKey === null ? null : (volumeOrdinals.get(volumeKey) ?? null);
   const atEnding = plan?.isEnding === true || (endingPlan?.isEnding === true && chapter >= endingPlan.chapter);
-  const laterVolumes = volumes.filter(volume => currentVolumeOrdinal === null || volume.ordinal > currentVolumeOrdinal);
-  const present = (text: string | null | undefined): text is string => typeof text === 'string' && text.trim() !== '';
+  const laterVolumes = volumes
+    .filter(volume => currentVolumeOrdinal === null || volume.ordinal > currentVolumeOrdinal)
+    .sort((left, right) => left.ordinal - right.ordinal)
+    .map(volume => ({ volumeKey: volume.volumeKey, title: volume.title, objective: volume.objective, body: volume.body }));
 
-  return new WriterDisclosurePolicy({
+  return {
     chapter,
     lockedFacts,
-    plannerOnly: [...(atEnding ? [] : [project?.ending, project?.endingQuestion]), ...laterVolumes.flatMap(volume => [volume.objective, volume.body])].filter(present),
-    plannerPages: plannerPages
-      .filter(isPlannerOnlyBibleDoc)
-      .map(page => page.body)
-      .filter(present),
+    ending: !atEnding && present(project?.ending) ? project.ending : null,
+    endingQuestion: !atEnding && present(project?.endingQuestion) ? project.endingQuestion : null,
+    laterVolumes,
+    plannerPages: plannerPages.filter(isPlannerOnlyBibleDoc),
     volumeOrdinals,
     currentVolumeOrdinal,
-  });
+  };
+}
+
+export async function loadWriterDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
+  return writerDisclosurePolicy(await loadWriterDisclosureSources(db, projectId, chapter));
 }

@@ -91,6 +91,11 @@ export function isWriterExcludedBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slu
   return isPlannerOnlyBibleDoc(doc) || listed(WRITER_EXCLUDED_DOCS, doc);
 }
 
+/** Who reads the page, as the API reports it: derived from the reserved addresses here so no client keeps its own copy. */
+export function bibleDocAccess(doc: Pick<BibleDocRow, 'section' | 'slug'>): { writerExcluded: boolean; plannerOnly: boolean } {
+  return { writerExcluded: isWriterExcludedBibleDoc(doc), plannerOnly: isPlannerOnlyBibleDoc(doc) };
+}
+
 export function isCoreBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
   return CORE_SECTIONS.has(doc.section) || (doc.section === 'project' && CORE_PROJECT_SLUGS.includes(doc.slug));
 }

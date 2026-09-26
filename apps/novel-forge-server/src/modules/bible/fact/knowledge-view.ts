@@ -1,7 +1,16 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import { Config } from '@shadow-library/common';
 
-import { chapterUnlockContext, evaluateUnlock, isOpenCanon, type KnowledgeContract, parseKnowledgeContract, revealRequirements, revealTermPattern } from '@server/common';
+import {
+  chapterUnlockContext,
+  evaluateUnlock,
+  isOpenCanon,
+  type KnowledgeContract,
+  parseKnowledgeContract,
+  type PlanOverlay,
+  revealRequirements,
+  revealTermPattern,
+} from '@server/common';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 export { type KnowledgeContract, parseKnowledgeContract } from '@server/common';
@@ -44,6 +53,8 @@ export interface KnowledgeView {
 export interface KnowledgeViewOptions {
   /** Hands the writer facts the reader knows and the POV cast does not, labelled as such; defaults to `knowledge.reader-knows-label`. */
   readerKnows?: boolean;
+  /** The chapter's plan as a staged card would leave it, read in place of its stored row. */
+  overlay?: PlanOverlay;
 }
 
 export interface KnowledgeLeakIssue {
@@ -137,6 +148,7 @@ export async function loadKnowledgeView(
       projectId,
       chapter,
       learned.some(fact => fact.unlock),
+      options.overlay,
     );
     for (const fact of learned) {
       if (revealRequirements(fact, ctx).length > 0) learnKeys.delete(fact.factKey);
@@ -150,7 +162,9 @@ export async function loadKnowledgeView(
   const shownToReader = (fact: FactLike): boolean => fact.disclosedInChapter != null && fact.disclosedInChapter < chapter;
   if (!(options.readerKnows ?? readerKnowsLabelEnabled()) || !hidden.some(shownToReader)) return { known, reveals, hidden, readerKnows: [], pooledPov, learnedIn };
 
-  const brief = await db.query.briefs.findFirst({ columns: { endingContract: true }, where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
+  const brief =
+    options.overlay ??
+    (await db.query.briefs.findFirst({ columns: { endingContract: true }, where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }));
   const mustNotResolve = mustNotResolveKeys(brief?.endingContract);
   const labelled = (fact: FactLike): boolean => shownToReader(fact) && !mustNotResolve.has(fact.factKey);
   return { known, reveals, hidden: hidden.filter(fact => !labelled(fact)), readerKnows: hidden.filter(labelled), pooledPov, learnedIn };
@@ -185,13 +199,15 @@ function mustNotResolveKeys(endingContract: unknown): Set<string> {
  * does not hold there or, when unscheduled, that no brief has revealed on the page yet — a manual ledger row can record a character's private knowledge, so it
  * never unlocks the writer. A fact the brief's ending contract forbids resolving is hidden either way.
  */
-export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[]): Promise<Set<string>> {
-  const brief = await db.query.briefs.findFirst({
-    columns: { knowledgeContract: true, endingContract: true },
-    where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)),
-  });
+export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[], overlay?: PlanOverlay): Promise<Set<string>> {
+  const brief =
+    overlay ??
+    (await db.query.briefs.findFirst({
+      columns: { knowledgeContract: true, endingContract: true },
+      where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)),
+    }));
   const forbidden = mustNotResolveKeys(brief?.endingContract);
-  const visible = await writerVisibleFactKeys(db, projectId, chapter, facts, parseKnowledgeContract(brief?.knowledgeContract));
+  const visible = await writerVisibleFactKeys(db, projectId, chapter, facts, parseKnowledgeContract(brief?.knowledgeContract), overlay);
   return new Set(facts.filter(fact => forbidden.has(fact.factKey) || !visible.has(fact.factKey)).map(fact => fact.factKey));
 }
 
@@ -201,9 +217,10 @@ export async function writerVisibleFactKeys(
   chapter: number,
   facts: Knowledge.CanonFact[],
   contract: KnowledgeContract | null,
+  overlay?: PlanOverlay,
 ): Promise<Set<string>> {
   if (contract) {
-    const view = await loadKnowledgeView(db, projectId, chapter, contract);
+    const view = await loadKnowledgeView(db, projectId, chapter, contract, { overlay });
     return new Set([...view.known, ...view.reveals, ...view.readerKnows].map(fact => fact.factKey));
   }
   const unscheduled = facts.filter(fact => fact.revealChapter === null);
@@ -228,16 +245,17 @@ export async function writerVisibleFactKeys(
     projectId,
     chapter,
     facts.some(fact => fact.revealChapter !== null && fact.unlock),
+    overlay,
   );
   const scheduled = (fact: Knowledge.CanonFact, revealChapter: number): boolean => revealChapter <= chapter && (!fact.unlock || evaluateUnlock(fact.unlock, ctx).holds);
   return new Set(facts.filter(fact => (fact.revealChapter === null ? revealedOnPage.has(fact.id) : scheduled(fact, fact.revealChapter))).map(fact => fact.factKey));
 }
 
 /** The chapter's writer-hidden facts, minus seed reader promises (which the book obeys openly) — what writer-bound text must never carry. */
-export async function loadWriterForbiddenFacts(db: KnowledgeDb, projectId: bigint, chapter: number): Promise<FactLike[]> {
+export async function loadWriterForbiddenFacts(db: KnowledgeDb, projectId: bigint, chapter: number, overlay?: PlanOverlay): Promise<FactLike[]> {
   const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), orderBy: schema.canonFacts.factKey });
   if (facts.length === 0) return [];
-  const hidden = await loadWriterHiddenFactKeys(db, projectId, chapter, facts);
+  const hidden = await loadWriterHiddenFactKeys(db, projectId, chapter, facts, overlay);
   return facts.filter(fact => fact.source !== 'seed' && hidden.has(fact.factKey));
 }
 

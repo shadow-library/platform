@@ -38,7 +38,7 @@ import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { loadCurrentRecords } from '../refinement/artifact-state';
 import { type ChangeOp, changeSetRefs } from '../refinement/change-set';
 import { ProposalApplyService } from '../refinement/proposal-apply.service';
-import { ProposalService } from '../refinement/proposal.service';
+import { DISCARDABLE, ProposalService } from '../refinement/proposal.service';
 import { type StageOptions, stageTurnChangeSet, type TurnProposalPort } from '../refinement/turn-proposals';
 import { cardOwner, ORGANISE_GRAPH, stagedByJob, stageOnce } from './action-jobs';
 
@@ -165,7 +165,12 @@ export class OrganiseJobService {
       apply: proposalId => tx.transaction(savepoint => this.applier.apply(projectId, proposalId, { autoApplied: true, tx: savepoint })),
       linkApplied: async () => undefined,
       discard: async proposalId => {
-        await tx.update(schema.refinementProposals).set({ status: 'discarded', updatedAt: new Date() }).where(eq(schema.refinementProposals.id, proposalId));
+        const discarded = await tx
+          .update(schema.refinementProposals)
+          .set({ status: 'discarded', updatedAt: new Date() })
+          .where(and(eq(schema.refinementProposals.id, proposalId), inArray(schema.refinementProposals.status, DISCARDABLE)))
+          .returning({ id: schema.refinementProposals.id });
+        if (discarded.length === 0) throw AppErrorCode.RFN_002.create();
       },
     };
   }

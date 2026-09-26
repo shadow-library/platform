@@ -68,6 +68,8 @@ interface Stored {
   /** The call to `create` that fails, counted from 1. */
   failCreate?: number;
   failApply?: boolean;
+  /** Whether a discard still finds the card waiting, or something else settled it first. */
+  settledFirst?: boolean;
 }
 
 function organiser(stored: Stored) {
@@ -88,7 +90,12 @@ function organiser(stored: Stored) {
     },
     select: () => ({ from: () => ({ innerJoin: () => ({ where: () => rows(stored.staged ?? []) }), where: () => rows([]) }) }),
     update: (table: unknown) => ({
-      set: (values: Record<string, unknown>) => ({ where: async () => void updates.push({ table: table === schema.refinementProposals ? 'proposals' : 'other', ...values }) }),
+      set: (values: Record<string, unknown>) => ({
+        where: () => {
+          updates.push({ table: table === schema.refinementProposals ? 'proposals' : 'other', ...values });
+          return Object.assign(Promise.resolve(), { returning: async () => (stored.settledFirst ? [] : [{ id: 42n }]) });
+        },
+      }),
     }),
     transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
   };
@@ -170,6 +177,12 @@ describe('OrganiseJobService', () => {
 
     expect(progress.at(-1)).toMatchObject({ phase: 'staged', proposalId: '43', applyNote: expect.stringContaining('refused') });
     expect(progress.at(-1)).not.toHaveProperty('appliedProposalId');
+  });
+
+  it('should refuse to discard the applied side once something else has settled it', async () => {
+    const { service } = organiser({ ledger: notes(), outputs: [QUOTED], failApply: true, settledFirst: true });
+
+    await expect(service.run(job())).rejects.toMatchObject({ code: 'RFN_002' });
   });
 
   it('should replace an organise card still waiting from an older round', async () => {

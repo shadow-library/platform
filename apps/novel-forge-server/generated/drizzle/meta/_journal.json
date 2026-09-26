@@ -64,6 +64,13 @@
       "when": 1790427760539,
       "tag": "0008_organise_record",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790430241141,
+      "tag": "0009_proposal_diagnostics",
+      "breakpoints": true
     }
   ]
 }

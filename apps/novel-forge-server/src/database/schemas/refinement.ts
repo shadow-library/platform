@@ -4,6 +4,8 @@ import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, time
 import { jsonb } from './jsonb';
 import { contentMode, costTier, projects } from './projects';
 
+export const DIAGNOSTIC_KINDS = ['pooling', 'give_away', 'pov', 'density', 'other'] as const;
+
 export namespace Refinement {
   export type ChatSession = InferSelectModel<typeof chatSessions>;
   export type ChatMessage = InferSelectModel<typeof chatMessages>;
@@ -13,6 +15,50 @@ export namespace Refinement {
   export type ChatMode = InferEnum<typeof chatMode>;
   export type Kind = InferEnum<typeof refinementKind>;
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;
+
+  export type DiagnosticKind = (typeof DIAGNOSTIC_KINDS)[number];
+
+  export interface DiagnosticPov {
+    entityKey: string;
+    name: string;
+  }
+
+  export interface DiagnosticFact {
+    factKey: string;
+    label: string;
+  }
+
+  export interface PoolingData {
+    knowing: DiagnosticPov[];
+    unaware: DiagnosticPov[];
+    /** Every pooled secret, where the message lists only the first few. */
+    facts: DiagnosticFact[];
+    knowingScenes: number[];
+    unawareScenes: number[];
+    /** Zero-based: the scene whose point of view learns the secret on the page, set only on a learned-on-the-page finding. */
+    learnedInScene?: number;
+  }
+
+  export interface GiveAwayData extends DiagnosticFact {
+    /** Null when the term sits outside the scenes. */
+    sceneIndex: number | null;
+    /** The scene field that names the term: `summary`, `beats`, … */
+    field: string;
+    beatIndex?: number;
+  }
+
+  export interface PovData {
+    sceneIndex: number;
+    pov: string | null;
+  }
+
+  /** A finding beside a proposal: `warnings` carries the same messages, in the same order, for older clients. */
+  export type Diagnostic =
+    | { kind: 'pooling'; message: string; data: PoolingData }
+    | { kind: 'give_away'; message: string; data: GiveAwayData }
+    | { kind: 'pov'; message: string; data: PovData }
+    | { kind: 'density'; message: string }
+    | { kind: 'other'; message: string };
 }
 
 export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume', 'brief']);
@@ -119,6 +165,7 @@ export const refinementProposals = pgTable(
     // An organise proposal's own record: what applying it records on the ledger, and once applied, the ledger rows that apply wrote so an
     // undo can restore the chain. Cards staged before the record existed carry `{"legacy": true}`.
     organiseRecord: jsonb('organise_record'),
+    diagnostics: jsonb('diagnostics').$type<Refinement.Diagnostic[]>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

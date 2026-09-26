@@ -1,6 +1,7 @@
 import { Authenticated, BotPermission, RequirePermission } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
+import { RevealRuleErrorResponse } from '@server/common';
 import { ADMIN_PERMISSION, GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ProposalResponse } from '../refinement/refinement.dto';
@@ -86,6 +87,7 @@ export class GenerationController {
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/briefs/:n')
   @RespondFor(200, BriefResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
   updateBrief(@Params() params: ChapterParams, @Body() body: UpdateBriefBody): Promise<BriefResponse> {
     return this.generationService.updateBrief(params.projectId, params.n, body);
   }
@@ -177,6 +179,7 @@ export class GenerationController {
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/approve')
   @RespondFor(200, DraftResponse)
+  @RespondFor(409, DraftConflictResponse)
   approveDraft(@Params() params: ChapterParams, @Body() body: ApproveDraftBody): Promise<DraftResponse> {
     return this.generationService.approveDraft(params.projectId, params.n, body);
   }
@@ -218,6 +221,7 @@ export class GenerationController {
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/finalize')
   @RespondFor(200, WorkflowRunResponse)
+  @RespondFor(409, DraftConflictResponse)
   finalizeChapters(@Params() params: ProjectParams, @Body() body: FinalizeBody): Promise<WorkflowRunResponse> {
     return this.generationService.finalize(params.projectId, body);
   }

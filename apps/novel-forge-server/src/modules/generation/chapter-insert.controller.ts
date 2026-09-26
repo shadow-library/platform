@@ -1,6 +1,7 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
+import { RevealRuleErrorResponse } from '@server/common';
 import { GENERATION_RUN_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ChapterInsertService } from './chapter-insert.service';
@@ -15,6 +16,7 @@ export class ChapterInsertController {
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/insert')
   @RespondFor(200, InsertChapterResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
   insertChapter(@Params() params: ChapterInsertParams, @Body() body: InsertChapterBody): Promise<InsertChapterResponse> {
     return this.chapterInsertService.insertAfter(params.projectId, params.afterChapter, body);
   }

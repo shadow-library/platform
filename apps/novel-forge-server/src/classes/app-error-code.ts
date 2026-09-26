@@ -230,6 +230,7 @@ export class AppErrorCode extends ServerErrorCode {
     'RFN_012',
     'This chapter is isolated — chat cannot see its prose, so it cannot rewrite it. Edit the prose in the chapter editor.',
   );
+  static readonly RFN_013 = AppErrorCode.badRequest('RFN_013', 'A writer preview is only for a pending chapter plan card');
 
   /*!
    * Context Errors

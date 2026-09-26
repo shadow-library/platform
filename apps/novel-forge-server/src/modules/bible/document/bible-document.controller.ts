@@ -1,6 +1,8 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
+import { bibleDocAccess } from '@modules/ai/context/bible-docs';
+
 import { AppErrorCode } from '@server/classes';
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
@@ -25,13 +27,13 @@ export class BibleDocumentController {
   async getBibleDoc(@Params() params: BibleDocParams): Promise<BibleDocResponse> {
     const doc = await this.bibleDocumentService.get(params.projectId, params.section, params.slug);
     if (!doc) throw AppErrorCode.DOC_001.create();
-    return doc;
+    return { ...doc, ...bibleDocAccess(doc) };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/:section/:slug')
   @RespondFor(200, BibleDocResponse)
   upsertBibleDoc(@Params() params: BibleDocParams, @Body() body: UpsertBibleDocBody): Promise<BibleDocResponse> {
-    return this.bibleDocumentService.upsert(params.projectId, params.section, params.slug, body);
+    return this.bibleDocumentService.upsert(params.projectId, params.section, params.slug, body).then(doc => ({ ...doc, ...bibleDocAccess(doc) }));
   }
 }

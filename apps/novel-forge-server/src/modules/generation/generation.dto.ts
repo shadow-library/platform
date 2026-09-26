@@ -18,6 +18,7 @@ import {
   DraftStatus,
   JobKind,
   JobStatus,
+  RevealRuleDetails,
   SexualContentRating,
   SortByTime,
   UserFeedbackDisposition,
@@ -559,6 +560,12 @@ export class ConflictingDraftResponse {
 export class DraftConflictResponse extends ErrorResponseDto {
   @Field(() => ConflictingDraftResponse, { optional: true, description: 'Present on DRF_013 when the chapter still has a draft: what it holds now.' })
   current?: ConflictingDraftResponse;
+
+  @Field(() => RevealRuleDetails, {
+    optional: true,
+    description: 'Present on PLN_004, when an approval or finalize would ledger a plan that reveals a locked secret: each such secret and what it still needs.',
+  })
+  details?: RevealRuleDetails;
 }
 
 @Schema()

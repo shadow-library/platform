@@ -6,7 +6,7 @@ export interface BibleDocTitleSource {
 
 const TOP_HEADING = /^#\s+(.+)$/m;
 
-function humaniseSlug(slug: string): string {
+export function humaniseSlug(slug: string): string {
   const words = slug.replace(/[-_]+/g, ' ').trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

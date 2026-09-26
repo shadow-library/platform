@@ -261,8 +261,8 @@ describe('chapterPlanOp', () => {
 });
 
 describe('emptyPlanOp', () => {
-  it('should open an empty plan the author fills in', () => {
-    expect(emptyPlanOp({ chapter: 4, steer: null })).toEqual({ op: 'brief.update', chapter: 4, body: '', scenes: [], claimedMilestones: [] });
+  it('should open an empty plan the author fills in, marked as started empty', () => {
+    expect(emptyPlanOp({ chapter: 4, steer: null })).toEqual({ op: 'brief.update', chapter: 4, body: '', scenes: [], claimedMilestones: [], startedEmpty: true });
   });
 });
 
@@ -327,6 +327,7 @@ describe('ChapterPlanService', () => {
       body: '',
       scenes: [],
       claimedMilestones: [],
+      startedEmpty: true,
       direction: 'Mara sells the lamp',
       rationale: 'What the story owes now:\n- Chapter 3 ends on "Who waits inside?"\n- The longest-quiet promise (quiet since chapter 1): The debt thread',
     });

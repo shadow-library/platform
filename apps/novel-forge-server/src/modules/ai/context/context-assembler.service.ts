@@ -5,7 +5,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { computeProgress, isOpenCanon, nearestVolumeKey, progressFieldsFrom, progressOverridesFrom } from '@server/common';
+import { computeProgress, isOpenCanon, nearestVolumeKey, type PlanOverlay, progressFieldsFrom, progressOverridesFrom } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -102,6 +102,30 @@ interface ResolvedRefs {
   withheld: string[];
   /** The resolved `entity:` refs whose entity is a character. */
   characters: string[];
+  /** The resolved `fact:` refs the writer reads as a writing constraint: a locked secret's cover note in place of its truth. */
+  constraints: string[];
+}
+
+export interface WriterRefs {
+  /** The refs the plan cites that resolve to a section the writer may read, in the plan's order — before any budget cut the pack makes. */
+  included: string[];
+  unresolved: string[];
+  withheld: string[];
+  constraints: string[];
+}
+
+interface ChapterRefSource {
+  contextRefs?: unknown;
+  pov?: string | null;
+  knowledgeContract?: unknown;
+}
+
+/** The refs a chapter's writer pack resolves: the plan's own, then the point-of-view cast's cards the plan does not already cite. */
+export function chapterWriterRefs(plan: ChapterRefSource | null | undefined): string[] {
+  const contextRefs = Array.isArray(plan?.contextRefs) ? (plan.contextRefs as string[]) : [];
+  const pov = plan?.pov ?? null;
+  const castRefs = [...new Set(parseKnowledgeContract(plan?.knowledgeContract)?.pov ?? [])].filter(key => key !== pov).map(key => `entity:${key}`);
+  return [...contextRefs, ...castRefs.filter(ref => !contextRefs.includes(ref))];
 }
 
 export interface NovelChatPackOptions extends PackPolicyOptions {
@@ -458,7 +482,14 @@ export class ContextAssembler {
     return this.resolveRefsFor(projectId, refs, chapter, disclosure);
   }
 
-  private async resolveRefsFor(projectId: bigint, refs: string[], chapter: number | undefined, disclosure: WriterDisclosurePolicy): Promise<ResolvedRefs> {
+  /** Which refs the writer of `chapter` would read under `disclosure`, by ref alone: a preview never carries their content. */
+  async writerRefs(projectId: bigint, refs: string[], chapter: number, disclosure: WriterDisclosurePolicy, overlay?: PlanOverlay): Promise<WriterRefs> {
+    if (refs.length === 0) return { included: [], unresolved: [], withheld: [], constraints: [] };
+    const { resolved, unresolved, withheld, constraints } = await this.resolveRefsFor(projectId, refs, chapter, disclosure, overlay);
+    return { included: resolved.flatMap(section => section.sourceRefs), unresolved, withheld, constraints };
+  }
+
+  private async resolveRefsFor(projectId: bigint, refs: string[], chapter: number | undefined, disclosure: WriterDisclosurePolicy, overlay?: PlanOverlay): Promise<ResolvedRefs> {
     const refused = refs.filter(ref => !disclosure.canResolve(ref));
     const uniqueRefs = [...new Set(refs)].filter(ref => disclosure.canResolve(ref));
     const entityKeys: string[] = [];
@@ -541,11 +572,12 @@ export class ContextAssembler {
     const volumeMap = new Map(volumeRows.map(v => [v.volumeKey, v]));
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
-    const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows) : null;
+    const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows, overlay) : null;
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
     const withheld: string[] = [...new Set(refused)];
+    const constraints: string[] = [];
 
     for (const ref of uniqueRefs) {
       const colon = ref.indexOf(':');
@@ -559,12 +591,13 @@ export class ContextAssembler {
       }
       const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, disclosure };
       const section = this.resolveRef(ref, prefix, value, rows);
-      if (section) resolved.push(section);
-      else unresolved.push(ref);
+      if (!section) unresolved.push(ref);
+      else resolved.push(section);
+      if (section && prefix === 'fact' && hiddenFactKeys?.has(value)) constraints.push(ref);
     }
 
     const characters = uniqueRefs.filter(ref => ref.startsWith('entity:') && entityMap.get(ref.slice('entity:'.length))?.type === 'character');
-    return { resolved, unresolved, withheld, characters };
+    return { resolved, unresolved, withheld, characters, constraints };
   }
 
   /**
@@ -812,7 +845,7 @@ export class ContextAssembler {
     const clues = allowedCluesSection(disclosure);
     if (clues) reserve(clues, 'the allowed clues', WRITER_SECTION_CAPS.allowedClues);
 
-    const refs = [...contextRefs, ...castRefs.filter(ref => !contextRefs.includes(ref))];
+    const refs = chapterWriterRefs(brief);
     let unresolvedRefs: string[] = [];
     let withheldRefs: string[] = [];
     let refSections: ContextSection[] = [];

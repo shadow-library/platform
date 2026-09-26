@@ -142,7 +142,13 @@ describe('GenerationService — approval and plans at the frontier', () => {
     const tables = revealedAfterClaim({ drafts: [{ id: 55n, chapter: 5, revision: 2 }] });
     Object.assign(tables.brief(4) as object, { claimedMilestones: null });
 
-    await expect(generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n })).rejects.toMatchObject({ code: 'PLN_004' });
+    const refusal = await generation(tables)
+      .approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n })
+      .then(
+        () => null,
+        (err: { toResponse: () => unknown }) => err.toResponse(),
+      );
+    expect(refusal).toMatchObject({ code: 'PLN_004', details: { violations: [expect.objectContaining({ missing: expect.any(Array) })] } });
     expect(tables.draft(5)?.['reviewStatus']).toBe('needs_review');
   });
 

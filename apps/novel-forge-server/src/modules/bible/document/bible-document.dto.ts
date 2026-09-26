@@ -53,6 +53,12 @@ export class BibleDocListItem {
   @Field({ optional: true, description: 'First prose sentence or two, omitted for an empty document.' })
   excerpt?: string;
 
+  @Field({ description: 'The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page.' })
+  writerExcluded: boolean;
+
+  @Field({ description: 'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review.' })
+  plannerOnly: boolean;
+
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
 }
@@ -82,6 +88,12 @@ export class BibleDocResponse {
 
   @Field({ optional: true, nullable: true })
   body?: string | null;
+
+  @Field({ description: 'The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page.' })
+  writerExcluded: boolean;
+
+  @Field({ description: 'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review.' })
+  plannerOnly: boolean;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

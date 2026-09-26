@@ -73,3 +73,4 @@ export const DarkContentRating = EnumType.create('DarkContentRating', [...CONTEN
 export const ProgressItemKey = EnumType.create('ProgressItemKey', [...PROGRESS_ITEM_KEYS]);
 export const ProgressItemStatus = EnumType.create('ProgressItemStatus', ['open', 'answered', 'undecided', 'dismissed']);
 export const ProgressOverrideStatus = EnumType.create('ProgressOverrideStatus', ['undecided', 'dismissed']);
+export const ProposalDiagnosticKind = EnumType.create('ProposalDiagnosticKind', [...schema.DIAGNOSTIC_KINDS]);

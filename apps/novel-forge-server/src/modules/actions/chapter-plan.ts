@@ -40,7 +40,7 @@ export type PlanFact = RevealFact & Pick<Knowledge.CanonFact, 'terms' | 'writerN
 
 export type PlanMilestone = Pick<Knowledge.Milestone, 'milestoneKey' | 'label' | 'subjectEntityKey' | 'state'>;
 
-export type PlanCardOp = BriefUpdateOp & { rationale?: string };
+export type PlanCardOp = BriefUpdateOp & { rationale?: string; startedEmpty?: boolean };
 
 export interface VettedPlan {
   plan: ChapterPlanOutput & { chapter: number };
@@ -220,7 +220,7 @@ export interface ExistingPlan {
 
 /** The empty plan the author fills in, only ever for a chapter with no plan; its content mode is left to the project default. */
 export function emptyPlanOp(input: PlanOpInput): PlanCardOp {
-  const op: PlanCardOp = { op: 'brief.update', chapter: input.chapter, body: '', scenes: [], claimedMilestones: [] };
+  const op: PlanCardOp = { op: 'brief.update', chapter: input.chapter, body: '', scenes: [], claimedMilestones: [], startedEmpty: true };
   if (input.steer) op.direction = input.steer;
   if (input.rationale) op.rationale = input.rationale;
   return op;

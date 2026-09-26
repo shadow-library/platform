@@ -3,7 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { bibleDocExcerpt, bibleDocLabel, hasBibleContent } from '@modules/ai/context/bible-docs';
+import { bibleDocAccess, bibleDocExcerpt, bibleDocLabel, hasBibleContent } from '@modules/ai/context/bible-docs';
 import { countWords } from '@modules/eval/deterministic-metrics';
 
 import { computeBibleDocHash, ensureBibleDocTitle } from '@server/common';
@@ -38,6 +38,7 @@ export class BibleDocumentService {
         wordCount: countWords(row.body ?? ''),
         isEmpty,
         excerpt: isEmpty ? undefined : bibleDocExcerpt(row, LIST_EXCERPT_CHARS) || undefined,
+        ...bibleDocAccess(row),
         updatedAt: row.updatedAt,
       };
     });

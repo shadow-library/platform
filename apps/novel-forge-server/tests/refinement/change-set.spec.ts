@@ -186,6 +186,14 @@ describe('epistemic ops', () => {
   });
 });
 
+describe('the started-empty mark on a plan card', () => {
+  it('should accept it on a plan and never show it to a model', () => {
+    expect(validateChangeSet([{ op: 'brief.update', chapter: 4, body: '', startedEmpty: true }])).toEqual([]);
+    expect(validateChangeSet([{ op: 'volume.upsert', volumeKey: 'v1', startedEmpty: true }])).not.toEqual([]);
+    expect(renderOpVocabulary(['brief.update'])).not.toContain('startedEmpty');
+  });
+});
+
 describe('the rationale every op may carry', () => {
   it('should accept a rationale on content ops, action ops, and scope-restricted ops alike', () => {
     const ops: ChangeOp[] = [

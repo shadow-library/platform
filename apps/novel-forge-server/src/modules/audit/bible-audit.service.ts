@@ -30,7 +30,7 @@ import { JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp, type OpType } from '../refinement/change-set';
 import { type ArtifactState, loadArtifactStates } from '../refinement/artifact-state';
-import { ProposalService } from '../refinement/proposal.service';
+import { DISCARDABLE, ProposalService } from '../refinement/proposal.service';
 import { type AuditRows, currentRecords, describeChecked, renderAuditMaterial, secretFacts } from './bible-audit-material';
 import { buildAuditReport, renderReportSummary } from './bible-audit-report';
 
@@ -376,10 +376,12 @@ export class BibleAuditService {
   }
 
   private async discardCard(tx: PrimaryTransaction, proposalId: bigint): Promise<void> {
-    await tx
+    const discarded = await tx
       .update(schema.refinementProposals)
       .set({ status: 'discarded', updatedAt: new Date() })
-      .where(and(eq(schema.refinementProposals.id, proposalId), eq(schema.refinementProposals.status, 'pending')));
+      .where(and(eq(schema.refinementProposals.id, proposalId), inArray(schema.refinementProposals.status, DISCARDABLE)))
+      .returning({ id: schema.refinementProposals.id });
+    if (discarded.length === 0) throw AppErrorCode.RFN_002.create();
   }
 
   /**

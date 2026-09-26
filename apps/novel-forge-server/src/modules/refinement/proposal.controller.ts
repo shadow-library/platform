@@ -1,6 +1,7 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
+import { RevealRuleErrorResponse } from '@server/common';
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ProposalApplyService } from './proposal-apply.service';
@@ -16,8 +17,10 @@ import {
   RevertProposalResponse,
   UndoImpactResponse,
   UpdateProposalBody,
+  WriterPreviewResponse,
 } from './refinement.dto';
 import { serialiseProposal, startedJobs } from './serialise';
+import { WriterPreviewService } from './writer-preview.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
@@ -26,6 +29,7 @@ export class ProposalController {
   constructor(
     private readonly proposalService: ProposalService,
     private readonly proposalApplyService: ProposalApplyService,
+    private readonly writerPreviewService: WriterPreviewService,
   ) {}
 
   @Get()
@@ -50,6 +54,7 @@ export class ProposalController {
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:proposalId/apply')
   @RespondFor(200, ApplyProposalResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
   applyProposal(@Params() params: ProposalIdParams, @Body() body: ApplyProposalBody): Promise<ApplyProposalResponse> {
     return this.proposalApplyService
       .apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes })
@@ -63,9 +68,16 @@ export class ProposalController {
     return { proposalId: params.proposalId, ...impact };
   }
 
+  @Get('/:proposalId/writer-preview')
+  @RespondFor(200, WriterPreviewResponse)
+  writerPreview(@Params() params: ProposalIdParams): Promise<WriterPreviewResponse> {
+    return this.writerPreviewService.preview(params.projectId, params.proposalId);
+  }
+
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:proposalId/revert')
   @RespondFor(200, RevertProposalResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
   revertProposal(@Params() params: ProposalIdParams): Promise<RevertProposalResponse> {
     return this.proposalApplyService.revert(params.projectId, params.proposalId).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
   }

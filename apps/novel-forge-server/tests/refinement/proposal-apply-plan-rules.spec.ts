@@ -36,6 +36,22 @@ describe('ProposalApplyService — reveal rule on brief.update', () => {
     expect(project.proposal(id)?.['status']).toBe('pending');
   });
 
+  it('should name each locked secret on the refusal by its title and what it still needs, never by its truth', async () => {
+    const project = engine({ milestones: [RANK_FOUR], facts: [RANK_FOUR_RULE], briefs: [{ chapter: 5, body: 'Mira climbs.' }] });
+    const id = await project.propose([{ op: 'brief.update', chapter: 5, knowledgeContract: learns('lamp_rank_4_rule') }]);
+
+    const refusal = await project.service.apply(7n, id).then(
+      () => null,
+      (err: { toResponse: () => unknown }) => err.toResponse(),
+    );
+
+    expect(refusal).toMatchObject({
+      code: 'PLN_001',
+      details: { violations: [{ factKey: 'lamp_rank_4_rule', label: 'Lamp rank 4 rule', missing: ['milestone lamp_rank_4 reached'] }] },
+    });
+    expect(JSON.stringify(refusal)).not.toContain(RANK_FOUR_RULE.text);
+  });
+
   it('should accept a change-set that creates the milestone, claims it and reveals the fact it unlocks, in any order', async () => {
     const project = engine({ facts: [RANK_FOUR_RULE], briefs: [{ chapter: 5, body: 'Mira climbs.' }] });
     const id = await project.propose([

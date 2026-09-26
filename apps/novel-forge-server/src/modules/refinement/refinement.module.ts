@@ -20,6 +20,7 @@ import { BibleTidyService } from './tidy/bible-tidy.service';
 import { TurnCostService } from './turn-cost.service';
 import { TurnStreamController } from './turn-stream.controller';
 import { TurnStreamService } from './turn-stream.service';
+import { WriterPreviewService } from './writer-preview.service';
 
 @Module({
   imports: [DatabaseModule, AiModule, EventsModule, NotesStoreModule, PluginsModule],
@@ -34,6 +35,7 @@ import { TurnStreamService } from './turn-stream.service';
     TurnStreamService,
     BibleTidyService,
     TurnCostService,
+    WriterPreviewService,
   ],
   exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, TurnCostService],
 })

@@ -28,6 +28,8 @@ export interface AuditHarness {
   /** Cancels the audit's run, as a cancel request reaching this replica would. */
   cancel: () => void;
   runRegisteredJob: (job: object) => Promise<void>;
+  /** Settles the card right after the next lock is taken on it, as a write the lock did not guard would. */
+  settleAfterNextLock: (status: Refinement.ProposalStatus) => void;
 }
 
 export const GEOGRAPHY = { section: 'world', slug: 'geography', body: 'The harbour of Saltgate keeps ten lanterns lit every night.', revision: 1 };
@@ -45,6 +47,7 @@ export function auditHarness(options: AuditFakeOptions = {}): AuditHarness {
   const controller = new AbortController();
   let handler: ((job: object) => Promise<void>) | undefined;
   let nextId = 7n;
+  let settleAfterLock: Refinement.ProposalStatus | undefined;
 
   const proposalById = (id: unknown) => proposals.find(proposal => proposal.id === id);
   const addProposal = (values: Record<string, unknown>): Refinement.Proposal => {
@@ -80,7 +83,10 @@ export function auditHarness(options: AuditFakeOptions = {}): AuditHarness {
             if (table === schema.refinementProposals) {
               locks.push('card');
               const card = proposalById(id);
-              return card ? [{ ...card }] : [];
+              const locked = card ? [{ ...card }] : [];
+              if (card && settleAfterLock) card.status = settleAfterLock;
+              settleAfterLock = undefined;
+              return locked;
             }
             locks.push('report');
             return reports.some(report => report.id === id) ? [{ id }] : [];
@@ -106,10 +112,13 @@ export function auditHarness(options: AuditFakeOptions = {}): AuditHarness {
     }),
     update: (table: unknown) => ({
       set: (values: Record<string, unknown>) => ({
-        where: async (where: never) => {
-          const [id] = render(where).params;
-          if (table === schema.refinementProposals) Object.assign(proposalById(id) ?? {}, values);
+        where: (where: never) => {
+          const [id, ...statuses] = render(where).params;
+          const card = table === schema.refinementProposals ? proposalById(id) : undefined;
+          const changed = card && (statuses.length === 0 || statuses.includes(card.status)) ? [card] : [];
+          for (const row of changed) Object.assign(row, values);
           if (table === schema.validationReports) Object.assign(reports.find(report => report.id === id) ?? {}, values);
+          return Object.assign(Promise.resolve(), { returning: async () => changed.map(row => ({ id: row.id })) });
         },
       }),
     }),
@@ -176,6 +185,7 @@ export function auditHarness(options: AuditFakeOptions = {}): AuditHarness {
     isolation,
     queued,
     cancel: () => controller.abort(),
+    settleAfterNextLock: status => void (settleAfterLock = status),
     runRegisteredJob: async job => {
       service.onModuleInit();
       await handler?.(job);

@@ -3,14 +3,13 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, RevealRuleError } from '@server/classes';
 import {
   assertMilestoneSubject,
   assertStartsNextChapter,
   auditCardSelection,
   briefContentHash,
   changedCluesNamingTerms,
-  composePlanBody,
   computeBibleDocHash,
   enforcePlanWrite,
   findMilestoneReferences,
@@ -18,7 +17,6 @@ import {
   markDescendantDraftsStale,
   nearestVolumeKey,
   nextWritableChapter,
-  normalizeBriefScenes,
   normalizeStringList,
   planFrontier,
   refusedDraftWriteError,
@@ -36,6 +34,7 @@ import { writingInstructionAdditions } from '../ai/prompts/writing-instructions'
 import { hasOrganiseUndo, recordOrganiseDecision, revertOrganiseDecision, wholeOrganiseSelection } from '../notes/organise-record';
 import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
+import { mergeBriefUpdate } from './brief-merge';
 import { CHAT_TURN_GRAPH } from './chat-selection';
 import {
   type ActionOp,
@@ -738,26 +737,12 @@ export class ProposalApplyService {
     // without one there is nothing for the chapter author to draft from.
     if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
 
-    const merged = {
-      title: op.title ?? existing?.title ?? null,
-      body: op.body ?? existing?.body ?? '',
-      writeMode: op.writeMode ?? existing?.writeMode ?? 'standard',
-      volumeKey: op.volumeKey !== undefined ? op.volumeKey : existing ? existing.volumeKey : await nearestVolumeKey(ctx.tx, ctx.projectId, op.chapter),
-      contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
-      pov: op.pov !== undefined ? op.pov?.trim() || null : (existing?.pov ?? null),
-      chapterPurpose: op.chapterPurpose ?? existing?.chapterPurpose ?? null,
-      readerValue: op.readerValue ?? existing?.readerValue ?? null,
-      repetitionRisks: op.repetitionRisks !== undefined ? op.repetitionRisks : (existing?.repetitionRisks ?? null),
-      densityRisk: op.densityRisk !== undefined ? op.densityRisk?.trim() || null : (existing?.densityRisk ?? null),
-      endingContract: op.endingContract ?? existing?.endingContract ?? null,
-      knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
-      direction: op.direction !== undefined ? op.direction?.trim() || null : (existing?.direction ?? null),
-      contentMode: op.contentMode !== undefined ? op.contentMode : existing ? existing.contentMode : await defaultChapterMode(ctx.tx, ctx.projectId),
-      scenes: op.scenes !== undefined ? op.scenes && normalizeBriefScenes(op.scenes) : (existing?.scenes ?? null),
-      claimedMilestones: op.claimedMilestones !== undefined ? op.claimedMilestones && normalizeStringList(op.claimedMilestones) : (existing?.claimedMilestones ?? null),
-      isEnding: op.isEnding ?? existing?.isEnding ?? false,
+    const creates = (field: unknown): boolean => !existing && field === undefined;
+    const defaults = {
+      volumeKey: creates(op.volumeKey) ? await nearestVolumeKey(ctx.tx, ctx.projectId, op.chapter) : null,
+      contentMode: creates(op.contentMode) ? await defaultChapterMode(ctx.tx, ctx.projectId) : null,
     };
-    if (op.scenes !== undefined) merged.body = composePlanBody(merged.body, merged.scenes ?? []);
+    const merged = mergeBriefUpdate(existing, op, defaults);
     const contentHash = briefContentHash({ ...existing, chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;
 
@@ -1070,7 +1055,8 @@ export class ProposalApplyService {
         result.reverted.push({ proposalId: proposal.id, artifacts: reverted.reverted });
       } catch (err) {
         result.stoppedAt = proposal.id;
-        if (AppError.is(err)) result.conflict = { code: err.code, message: err.message };
+        if (err instanceof RevealRuleError) result.conflict = { code: err.code, message: err.message, details: { violations: err.violations } };
+        else if (AppError.is(err)) result.conflict = { code: err.code, message: err.message };
         else result.conflict = { message: err instanceof Error ? err.message : String(err) };
         break;
       }
