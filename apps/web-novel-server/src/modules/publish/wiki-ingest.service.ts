@@ -58,7 +58,11 @@ export class WikiIngestService {
         await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
         return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
       }
-      if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash) {
+      const headline = isImageRef(body.imageRef) ? body.imageRef : null;
+      // The gate is stored as sent even when a malformed ref is dropped, so the manifest echoes what the forge projected and never reads as drift.
+      const imageVisibleFromOrdinal = body.imageVisibleFromOrdinal ?? null;
+      // The stored gate joins the no-op test because a rolled-back reader rewrites entries without it, leaving a stale gate under a matching hash.
+      if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash && imageVisibleFromOrdinal === stored.imageVisibleFromOrdinal) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
         return { outcome: 'noop', novelId: novel.id, revision: stored.revision } satisfies UpsertResult;
       }
@@ -66,7 +70,9 @@ export class WikiIngestService {
       const values = {
         type: body.type,
         name: body.name,
-        imageRef: isImageRef(body.imageRef) ? body.imageRef : null,
+        imageRef: imageVisibleFromOrdinal === null ? headline : null,
+        gatedImageRef: imageVisibleFromOrdinal === null ? null : headline,
+        imageVisibleFromOrdinal,
         firstVisibleOrdinal: body.firstVisibleOrdinal,
         contentHash: body.contentHash,
         revision: body.revision,
@@ -144,11 +150,17 @@ export class WikiIngestService {
 
   async getManifest(slug: string): Promise<WikiManifestItem[]> {
     const novel = await loadReadableNovel(this.db, slug, this.caller());
-    return this.db
-      .select({ entryKey: schema.wikiEntries.entryKey, revision: schema.wikiEntries.revision, contentHash: schema.wikiEntries.contentHash })
+    const rows = await this.db
+      .select({
+        entryKey: schema.wikiEntries.entryKey,
+        revision: schema.wikiEntries.revision,
+        contentHash: schema.wikiEntries.contentHash,
+        imageVisibleFromOrdinal: schema.wikiEntries.imageVisibleFromOrdinal,
+      })
       .from(schema.wikiEntries)
       .where(eq(schema.wikiEntries.novelId, novel.id))
       .orderBy(asc(schema.wikiEntries.entryKey));
+    return rows.map(({ imageVisibleFromOrdinal, ...row }) => (imageVisibleFromOrdinal === null ? row : { ...row, imageVisibleFromOrdinal }));
   }
 
   private entryFilter(novelId: bigint, entryKey: string): SQL {

@@ -2,6 +2,7 @@ import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { type APIResponse, Logger } from '@shadow-library/common';
 import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { APP_NAME } from '@server/constants';
 
@@ -68,6 +69,7 @@ export interface WikiPushBody {
   type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
   name: string;
   imageRef?: string;
+  imageVisibleFromOrdinal?: number;
   firstVisibleOrdinal: number;
   contentHash: string;
   revision: number;
@@ -79,6 +81,13 @@ export interface WikiManifestItem {
   entryKey: string;
   revision: number;
   contentHash: string;
+  /** The headline gate the reader stores, echoed only by a reader advertising the headline-gate capability. */
+  imageVisibleFromOrdinal?: number;
+}
+
+export interface WikiManifest {
+  items: WikiManifestItem[];
+  headlineGate: boolean;
 }
 
 /** Identity service name of the reader — resolves via `SERVICE_URL_WEB_NOVEL_SERVER` or in-cluster svc DNS */
@@ -149,6 +158,12 @@ export class PayloadHashMismatchError extends Error {
 const STALE_REVISION_CODE = 'WBN_003';
 const SLUG_TAKEN_CODE = 'WBN_010';
 const HASH_MISMATCH_CODE = 'WBN_011';
+
+function readCapabilities(headers: Record<string, string | string[] | undefined> | undefined): Set<string> {
+  const raw = headers?.[WIKI_CAPABILITIES_HEADER];
+  const values = Array.isArray(raw) ? raw : [raw ?? ''];
+  return new Set(values.flatMap(value => value.split(',')).map(value => value.trim()));
+}
 
 /** The reader's error handler sends the `AppError` object as the whole response body — `{ code, message }`, with no envelope around it */
 function readErrorCode(data: unknown): string | undefined {
@@ -235,11 +250,11 @@ export class ReaderPushClient {
   }
 
   /** The wiki reconciliation primitive — an unknown novel reads as an empty wiki, since the next entry push creates it */
-  async getWikiManifest(slug: string): Promise<WikiManifestItem[]> {
+  async getWikiManifest(slug: string): Promise<WikiManifest> {
     const response = await this.send<WikiManifestItem[]>('GET', `/internal/novels/${slug}/wiki/manifest`);
-    if (response.statusCode === 404) return [];
+    if (response.statusCode === 404) return { items: [], headlineGate: false };
     if (response.statusCode >= 400) throw new ReaderPushError(`reader wiki manifest answered http ${response.statusCode}`, response.statusCode);
-    return response.data ?? [];
+    return { items: response.data ?? [], headlineGate: readCapabilities(response.headers).has(WIKI_HEADLINE_GATE_CAPABILITY) };
   }
 
   private async send<T = unknown>(method: string, path: string, body?: unknown): Promise<APIResponse<T>> {

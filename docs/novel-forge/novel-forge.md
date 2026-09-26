@@ -145,8 +145,9 @@
 - The ledger row is the outbox: failed pushes are retried, except stale, hash and slug conflicts, which wait for an explicit reconcile; `reconcile` diffs reader against ledger. Wiping the reader and reconverging MUST yield identical state.
 - The wiki is derived, never authored on the reader: entities and canon facts are projected into facets gated by `visibleFromOrdinal`. Hidden entities, never-revealed facts and
   fragments of unpublished chapters are never sent. Every image is dated with the chapter it depicts (the latest final chapter unless the author names an earlier one,
-  never a later one) and reaches readers, caption included, only from that chapter; a portrait later than its entry rides the per-image gated gallery, never the
-  top-level `imageRef`. Rows from before dating keep their old visibility. An entity is drawn from canon up to its chapter under that chapter's writer disclosure policy.
+  never a later one) and reaches readers, caption included, only from that chapter; a portrait later than its entry stays the top-level `imageRef` under its own
+  `imageVisibleFromOrdinal`: a reader short of it gets the latest gallery image they have reached as the list thumbnail and no portrait on the entry page. A reader that does
+  not advertise the headline-gate capability gets that portrait in the gated gallery instead. Rows from before dating keep their old visibility. An entity is drawn from canon up to its chapter under that chapter's writer disclosure policy.
 
 ## Hard rules
 

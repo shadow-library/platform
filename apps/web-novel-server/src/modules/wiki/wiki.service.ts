@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { and, asc, count, eq, gt, lte, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, lte, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
@@ -11,6 +11,7 @@ import { APP_NAME } from '@server/constants';
 import { CatalogService } from '@server/modules/catalog';
 import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
 
+import { type GalleryCandidate, listThumbnailRef, visibleHeadlineRef } from './wiki-headline';
 import { type WikiEntryDetailResponse, type WikiListResponse } from './wiki.dto';
 
 /**
@@ -48,10 +49,21 @@ export class WikiService {
     const gate = await this.resolveGate(novel.id, principal);
 
     const entries = await this.db
-      .select({ entryKey: schema.wikiEntries.entryKey, type: schema.wikiEntries.type, name: schema.wikiEntries.name, imageRef: schema.wikiEntries.imageRef })
+      .select({
+        id: schema.wikiEntries.id,
+        entryKey: schema.wikiEntries.entryKey,
+        type: schema.wikiEntries.type,
+        name: schema.wikiEntries.name,
+        imageRef: this.headlineRef(gate),
+        imageVisibleFromOrdinal: schema.wikiEntries.imageVisibleFromOrdinal,
+      })
       .from(schema.wikiEntries)
       .where(and(eq(schema.wikiEntries.novelId, novel.id), lte(schema.wikiEntries.firstVisibleOrdinal, gate)))
       .orderBy(asc(schema.wikiEntries.name));
+    const galleries = await this.fallbackGalleries(
+      entries.filter(entry => entry.imageVisibleFromOrdinal !== null && entry.imageVisibleFromOrdinal > gate).map(entry => entry.id),
+      gate,
+    );
 
     const [stats] = await this.db
       .select({
@@ -65,7 +77,7 @@ export class WikiService {
       entryKey: entry.entryKey,
       type: entry.type as WikiListResponse['items'][number]['type'],
       name: entry.name,
-      imageUrl: this.catalogService.imageUrl(entry.imageRef),
+      imageUrl: this.catalogService.imageUrl(listThumbnailRef(entry, galleries.get(entry.id) ?? [], gate)),
     }));
     const body: WikiListResponse = { items, lockedCount: stats?.locked ?? 0 };
     return { body, etag: this.etag(novel.accessRevision, stats?.maxRevision ?? 0, gate), visibility: novel.visibility, personalized: this.isPersonalized(principal) };
@@ -76,7 +88,15 @@ export class WikiService {
     const gate = await this.resolveGate(novel.id, principal);
 
     const [entry] = await this.db
-      .select()
+      .select({
+        id: schema.wikiEntries.id,
+        entryKey: schema.wikiEntries.entryKey,
+        type: schema.wikiEntries.type,
+        name: schema.wikiEntries.name,
+        revision: schema.wikiEntries.revision,
+        imageRef: this.headlineRef(gate),
+        imageVisibleFromOrdinal: schema.wikiEntries.imageVisibleFromOrdinal,
+      })
       .from(schema.wikiEntries)
       .where(and(eq(schema.wikiEntries.novelId, novel.id), eq(schema.wikiEntries.entryKey, entryKey), lte(schema.wikiEntries.firstVisibleOrdinal, gate)));
     if (!entry) throw AppErrorCode.WBN_009.create();
@@ -102,7 +122,7 @@ export class WikiService {
       entryKey: entry.entryKey,
       type: entry.type as WikiEntryDetailResponse['type'],
       name: entry.name,
-      imageUrl: this.catalogService.imageUrl(entry.imageRef),
+      imageUrl: this.catalogService.imageUrl(visibleHeadlineRef(entry, gate)),
       facets: facets.map(facet => ({ facetKey: facet.facetKey, content: facet.content, sortOrder: facet.sortOrder })),
       images: images.flatMap(image => {
         const imageUrl = this.catalogService.imageUrl(image.imageRef);
@@ -111,6 +131,28 @@ export class WikiService {
       hiddenFacetCount: hidden?.value ?? 0,
     };
     return { body, etag: this.etag(novel.accessRevision, entry.revision, gate), visibility: novel.visibility, personalized: this.isPersonalized(principal) };
+  }
+
+  /** A headline past the gate is masked here, in SQL, so its ref is never loaded for a reader who may not see it. */
+  private headlineRef(gate: number): SQL<string | null> {
+    const { imageRef, gatedImageRef, imageVisibleFromOrdinal } = schema.wikiEntries;
+    return sql<string | null>`coalesce(${imageRef}, case when ${imageVisibleFromOrdinal} <= ${gate} then ${gatedImageRef} end)`;
+  }
+
+  private async fallbackGalleries(entryIds: bigint[], gate: number): Promise<Map<bigint, GalleryCandidate[]>> {
+    const galleries = new Map<bigint, GalleryCandidate[]>();
+    if (entryIds.length === 0) return galleries;
+    const images = await this.db
+      .select({
+        entryId: schema.wikiEntryImages.entryId,
+        imageRef: schema.wikiEntryImages.imageRef,
+        sortOrder: schema.wikiEntryImages.sortOrder,
+        visibleFromOrdinal: schema.wikiEntryImages.visibleFromOrdinal,
+      })
+      .from(schema.wikiEntryImages)
+      .where(and(inArray(schema.wikiEntryImages.entryId, entryIds), lte(schema.wikiEntryImages.visibleFromOrdinal, gate)));
+    for (const image of images) galleries.set(image.entryId, [...(galleries.get(image.entryId) ?? []), image]);
+    return galleries;
   }
 
   /** Anonymous readers and those with no progress row gate at 0 — the pre-reading public view. */

@@ -85,6 +85,13 @@
       "when": 1788625208698,
       "tag": "0011_square_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790442992215,
+      "tag": "0012_wiki_image_gate",
+      "breakpoints": true
     }
   ]
 }

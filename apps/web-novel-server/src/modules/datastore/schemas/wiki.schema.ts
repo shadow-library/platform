@@ -32,6 +32,13 @@ export const wikiEntries = pgTable(
     name: varchar('name', { length: 256 }).notNull(),
     /** Content-addressed storage reference (e.g. `<sha256>.webp`); resolved to a public URL at read time. */
     imageRef: varchar('image_ref', { length: 512 }),
+    /**
+     * A headline under a gate lives here, never in `imageRef`, so reader code that predates the gate — which reads only `imageRef` — cannot
+     * serve it; a rollback hides gated headlines rather than leaking them.
+     */
+    gatedImageRef: varchar('gated_image_ref', { length: 512 }),
+    /** Reader ordinal from which `gatedImageRef` may be served; null when the headline is ungated. */
+    imageVisibleFromOrdinal: integer('image_visible_from_ordinal'),
     /** Reader ordinal at which the entry first appears; below it the entry does not exist for that reader. */
     firstVisibleOrdinal: integer('first_visible_ordinal').notNull(),
     contentHash: varchar('content_hash', { length: 128 }).notNull(),

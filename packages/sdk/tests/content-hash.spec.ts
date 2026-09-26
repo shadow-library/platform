@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chapterContentHash, computeContentHash } from '@shadow-library/sdk/publishing';
+import { chapterContentHash, computeContentHash, wikiEntryContentHash, type WikiEntryHashInput } from '@shadow-library/sdk/publishing';
 
 describe('computeContentHash', () => {
   it('should return a stable sha256 hex digest', () => {
@@ -81,5 +81,53 @@ describe('chapterContentHash', () => {
     const unrated = chapterContentHash({ title: 'Chapter 2', content: 'Silence.', contentRating: { violence: 'mild' } });
     const none = chapterContentHash({ title: 'Chapter 2', content: 'Silence.', contentRating: { violence: 'mild', sexualContent: 'none' } });
     expect(none).not.toBe(unrated);
+  });
+});
+
+describe('wikiEntryContentHash', () => {
+  const legacy: WikiEntryHashInput = {
+    type: 'character',
+    name: 'Amara',
+    imageRef: 'legacy.png',
+    firstVisibleOrdinal: 1,
+    facets: [{ facetKey: 'profile', content: 'A detective.', sortOrder: 0, visibleFromOrdinal: 1 }],
+    images: [{ imageRef: 'sketch.png', sortOrder: 0, visibleFromOrdinal: 1 }],
+  };
+
+  it('should keep an ungated entry on the historical digest of its bare payload', () => {
+    const hash = wikiEntryContentHash(legacy);
+    expect(hash).toBe(computeContentHash({ ...legacy }));
+    expect(hash).toBe('ac72d14ba91746d96bc50d18ab5e8749c072fc9fd1a97a6da49c12d7537e0b59');
+  });
+
+  it('should treat an omitted, undefined and null headline gate identically', () => {
+    const base = wikiEntryContentHash(legacy);
+    expect(wikiEntryContentHash({ ...legacy, imageVisibleFromOrdinal: undefined })).toBe(base);
+    expect(wikiEntryContentHash({ ...legacy, imageVisibleFromOrdinal: null })).toBe(base);
+  });
+
+  it('should treat a null or blank image caption as omitted', () => {
+    for (const caption of [null, '', '   ']) {
+      const images = [{ imageRef: 'sketch.png', caption, sortOrder: 0, visibleFromOrdinal: 1 }];
+      expect(wikiEntryContentHash({ ...legacy, images })).toBe(wikiEntryContentHash(legacy));
+    }
+  });
+
+  it('should hash a padded caption as its trimmed text', () => {
+    const image = { imageRef: 'sketch.png', sortOrder: 0, visibleFromOrdinal: 1 };
+    const trimmed = wikiEntryContentHash({ ...legacy, images: [{ ...image, caption: 'Old sketch' }] });
+    expect(wikiEntryContentHash({ ...legacy, images: [{ ...image, caption: '  Old sketch \n' }] })).toBe(trimmed);
+    expect(trimmed).toBe(computeContentHash({ ...legacy, images: [{ ...image, caption: 'Old sketch' }] }));
+  });
+
+  it('should change the digest when a headline gate is carried', () => {
+    const base = wikiEntryContentHash(legacy);
+    expect(wikiEntryContentHash({ ...legacy, imageVisibleFromOrdinal: 50 })).not.toBe(base);
+    expect(wikiEntryContentHash({ ...legacy, imageVisibleFromOrdinal: 50 })).not.toBe(wikiEntryContentHash({ ...legacy, imageVisibleFromOrdinal: 49 }));
+  });
+
+  it('should ignore a gate on an entry with no headline', () => {
+    const headless = { ...legacy, imageRef: undefined };
+    expect(wikiEntryContentHash({ ...headless, imageVisibleFromOrdinal: 50 })).toBe(wikiEntryContentHash(headless));
   });
 });

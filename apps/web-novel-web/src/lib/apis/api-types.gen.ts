@@ -800,6 +800,8 @@ export interface components {
       name: string;
       /** @description Content-addressed storage reference, such as <sha256>.webp. */
       imageRef?: string;
+      /** @description First reader ordinal at which imageRef may be shown; absent shows it whenever the entry is visible. Below it the entry page shows no headline and only the list thumbnail falls back to the latest visible gallery image. */
+      imageVisibleFromOrdinal?: number;
       /** @description First reader ordinal at which this entry appears; 0 exposes it before reading. */
       firstVisibleOrdinal: number;
       contentHash: string;
@@ -833,6 +835,8 @@ export interface components {
       entryKey: string;
       revision: number;
       contentHash: string;
+      /** @description The stored headline gate, absent when the headline shows whenever the entry does. */
+      imageVisibleFromOrdinal?: number;
     };
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';

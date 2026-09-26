@@ -11,7 +11,16 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
 import { PublishingService, SLUG_ATTEMPT_LIMIT } from './publishing.service';
-import { type AccessPushBody, type AccessState, type ChapterPushBody, type ManifestItem, ReaderPushClient, SlugConflictError, type WikiManifestItem } from './reader-push.client';
+import {
+  type AccessPushBody,
+  type AccessState,
+  type ChapterPushBody,
+  type ManifestItem,
+  ReaderPushClient,
+  SlugConflictError,
+  type WikiManifest,
+  type WikiManifestItem,
+} from './reader-push.client';
 import { type WikiEntryProjection } from './wiki-projection';
 import { WikiPublishingService } from './wiki-publishing.service';
 
@@ -77,6 +86,16 @@ class SlugExhaustedError extends Error {
 
 function isUnsweepable(error: string | null | undefined): boolean {
   return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
+}
+
+/**
+ * A pushed entry the reader no longer serves as ledgered. A matching hash is not enough on a gate-capable reader: a rollback's old code
+ * rewrites entries without touching the stored gate column, so after the next upgrade an entry can carry the right hash and a stale gate.
+ */
+export function isWikiDrifted(row: Publishing.WikiPublication, served: WikiManifestItem | undefined, projection: WikiEntryProjection | undefined, headlineGate: boolean): boolean {
+  if (row.state !== 'pushed') return false;
+  if (!served || served.contentHash !== row.contentHash) return true;
+  return headlineGate && (served.imageVisibleFromOrdinal ?? undefined) !== projection?.payload.imageVisibleFromOrdinal;
 }
 
 /**
@@ -297,16 +316,15 @@ export class PublishRunner {
    * "prose drifted, republish" guard. Never throws: failures are ledgered soft and the job fails on their count.
    */
   private async convergeWiki(projectId: bigint, slug: string, options: ConvergeOptions, result: ConvergeResult): Promise<void> {
-    const projections = await this.wikiService.computeProjections(projectId);
-    const ledger = await this.wikiService.reconcileLedger(projectId, projections);
-    const byKey = new Map(projections.map(projection => [projection.entryKey, projection]));
-
-    let manifest: Map<string, WikiManifestItem>;
+    // The manifest comes first because the projection depends on what the reader can gate: a capability that appears or disappears with a
+    // reader upgrade or rollback changes the affected entries' hashes, so the ledger re-pends and re-pushes exactly those. Without a manifest
+    // the capability is unknown, so the ledger is left as it stands rather than reconciled against a guess.
+    let manifest: WikiManifest;
     try {
-      const items = await this.pushClient.getWikiManifest(slug);
-      manifest = new Map(items.map(item => [item.entryKey, item]));
+      manifest = await this.pushClient.getWikiManifest(slug);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      const ledger = await this.wikiService.loadLedger(projectId);
       const due = ledger.filter(row => row.state !== 'deleted' && this.isWikiDue(row, options));
       for (const row of due) await this.markWikiFailed(row, message);
       result.wiki.failed.push(...due.map(row => ({ entryKey: row.entryKey, error: message })));
@@ -314,21 +332,25 @@ export class PublishRunner {
       return;
     }
 
+    const projections = await this.wikiService.computeProjections(projectId, manifest.headlineGate);
+    const ledger = await this.wikiService.reconcileLedger(projectId, projections);
+    const byKey = new Map(projections.map(projection => [projection.entryKey, projection]));
+    const served = new Map(manifest.items.map(item => [item.entryKey, item]));
+
     const ledgerKeys = new Set(ledger.map(row => row.entryKey));
-    result.wiki.unknownEntries = [...manifest.keys()].filter(entryKey => !ledgerKeys.has(entryKey)).sort();
+    result.wiki.unknownEntries = [...served.keys()].filter(entryKey => !ledgerKeys.has(entryKey)).sort();
 
     for (const row of ledger) {
-      const served = manifest.get(row.entryKey);
+      const item = served.get(row.entryKey);
       if (row.state === 'deleted') {
-        if (served) await this.deleteWiki(slug, row, result);
+        if (item) await this.deleteWiki(slug, row, result);
         else result.wiki.skipped.push(row.entryKey);
         continue;
       }
 
       const due = this.isWikiDue(row, options);
-      const drifted = row.state === 'pushed' && (!served || served.contentHash !== row.contentHash);
       const projection = byKey.get(row.entryKey);
-      if ((due || drifted) && projection) await this.pushWiki(slug, row, projection, result);
+      if ((due || isWikiDrifted(row, item, projection, manifest.headlineGate)) && projection) await this.pushWiki(slug, row, projection, result);
       else result.wiki.skipped.push(row.entryKey);
     }
   }

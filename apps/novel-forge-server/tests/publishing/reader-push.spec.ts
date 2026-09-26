@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { type AuthClient } from '@shadow-library/auth';
+import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
-import { HASH_MISMATCH_ERROR_PREFIX, STALE_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX, UNSWEEPABLE_ERROR_PREFIXES } from '@modules/publishing/publish-runner';
+import { type Publishing } from '@server/database';
+import { HASH_MISMATCH_ERROR_PREFIX, isWikiDrifted, STALE_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX, UNSWEEPABLE_ERROR_PREFIXES } from '@modules/publishing/publish-runner';
 import {
   PayloadHashMismatchError,
   ReaderPushClient,
@@ -11,9 +13,10 @@ import {
   StaleRevisionError,
   UnknownConflictError,
 } from '@modules/publishing/reader-push.client';
+import { type WikiEntryProjection } from '@modules/publishing/wiki-projection';
 
-function clientAnswering(statusCode: number, data: unknown): ReaderPushClient {
-  const authClient = { fetchService: () => Promise.resolve({ statusCode, headers: {}, data }) } as unknown as AuthClient;
+function clientAnswering(statusCode: number, data: unknown, headers: Record<string, string> = {}): ReaderPushClient {
+  const authClient = { fetchService: () => Promise.resolve({ statusCode, headers, data }) } as unknown as AuthClient;
   return new ReaderPushClient(authClient);
 }
 
@@ -92,5 +95,44 @@ describe('ReaderPushClient', () => {
       const wiki = { type: 'character' as const, name: 'Rin', firstVisibleOrdinal: 1, contentHash: 'hash', revision: 1, facets: [], images: [] };
       await expect(stale.upsertWiki('runner-slug', 'char.rin', wiki)).rejects.toBeInstanceOf(StaleRevisionError);
     });
+  });
+
+  describe('wiki manifest capabilities', () => {
+    const items = [{ entryKey: 'amara', revision: 1, contentHash: 'hash', imageVisibleFromOrdinal: 50 }];
+
+    it('should read the headline-gate capability from the manifest header', async () => {
+      const manifest = await clientAnswering(200, items, { [WIKI_CAPABILITIES_HEADER]: `other, ${WIKI_HEADLINE_GATE_CAPABILITY}` }).getWikiManifest('slug');
+      expect(manifest).toEqual({ items, headlineGate: true });
+    });
+
+    it('should assume no headline gate from a reader that advertises nothing', async () => {
+      expect((await clientAnswering(200, items).getWikiManifest('slug')).headlineGate).toBe(false);
+      expect(await clientAnswering(404, null).getWikiManifest('slug')).toEqual({ items: [], headlineGate: false });
+    });
+  });
+});
+
+describe('isWikiDrifted', () => {
+  const row = { state: 'pushed', contentHash: 'hash' } as Publishing.WikiPublication;
+  const projection = (imageVisibleFromOrdinal?: number): WikiEntryProjection =>
+    ({ entryKey: 'amara', contentHash: 'hash', payload: imageVisibleFromOrdinal === undefined ? {} : { imageVisibleFromOrdinal } }) as WikiEntryProjection;
+
+  it('should treat a matching hash and gate as converged', () => {
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'hash', imageVisibleFromOrdinal: 50 }, projection(50), true)).toBe(false);
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'hash' }, projection(), true)).toBe(false);
+  });
+
+  it('should re-push a stale stored gate under a matching hash on a gate-capable reader', () => {
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'hash', imageVisibleFromOrdinal: 50 }, projection(), true)).toBe(true);
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'hash' }, projection(50), true)).toBe(true);
+  });
+
+  it('should ignore the gate echo of a reader without the capability', () => {
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'hash', imageVisibleFromOrdinal: 50 }, projection(), false)).toBe(false);
+  });
+
+  it('should re-push a missing or differently hashed entry', () => {
+    expect(isWikiDrifted(row, undefined, projection(), false)).toBe(true);
+    expect(isWikiDrifted(row, { entryKey: 'amara', revision: 1, contentHash: 'other' }, projection(), false)).toBe(true);
   });
 });

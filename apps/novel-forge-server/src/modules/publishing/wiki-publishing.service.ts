@@ -24,8 +24,8 @@ export class WikiPublishingService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /** Recomputes every entity's spoiler-gated wiki payload from the current bible, ledger, and published ordinals. */
-  async computeProjections(projectId: bigint): Promise<WikiEntryProjection[]> {
+  /** Recomputes every entity's spoiler-gated wiki payload from the current bible, ledger, and published ordinals, shaped for what the reader can gate. */
+  async computeProjections(projectId: bigint, headlineGate: boolean): Promise<WikiEntryProjection[]> {
     const entities = await this.db.query.entities.findMany({
       where: eq(schema.entities.projectId, projectId),
       with: {
@@ -65,6 +65,7 @@ export class WikiPublishingService {
       })),
       facts: facts.map(fact => ({ factKey: fact.factKey, text: fact.text, subjects: fact.subjects ?? [], learnedInChapters: fact.knowledge.map(row => row.learnedInChapter) })),
       ordinalByChapter,
+      headlineGate,
     });
   }
 

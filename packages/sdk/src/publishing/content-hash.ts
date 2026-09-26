@@ -46,3 +46,55 @@ export function chapterContentHash({ title, content, authorNote, contentRating }
   if (rating) payload.contentRating = rating;
   return computeContentHash(payload);
 }
+
+export interface WikiFacetHashInput {
+  facetKey: string;
+  content: string;
+  sortOrder: number;
+  visibleFromOrdinal: number;
+}
+
+export interface WikiImageHashInput {
+  imageRef: string;
+  caption?: string | null;
+  sortOrder: number;
+  visibleFromOrdinal: number;
+}
+
+export interface WikiEntryHashInput {
+  type: string;
+  name: string;
+  imageRef?: string | null;
+  /** The reader ordinal from which the headline `imageRef` may be shown; absent means it shows whenever the entry does. */
+  imageVisibleFromOrdinal?: number | null;
+  firstVisibleOrdinal: number;
+  facets: WikiFacetHashInput[];
+  images: WikiImageHashInput[];
+}
+
+/**
+ * The reader advertises what its wiki ingest understands on the wiki manifest response, as a comma-separated list in this header. The forge
+ * sends a headline gate only to a reader advertising {@link WIKI_HEADLINE_GATE_CAPABILITY}: a reader without it would serve the gated
+ * headline to everyone.
+ */
+export const WIKI_CAPABILITIES_HEADER = 'x-wiki-capabilities';
+
+export const WIKI_HEADLINE_GATE_CAPABILITY = 'headline-gate';
+
+/**
+ * The wiki-entry digest the forge's ledger compares to decide republish-vs-no-op, under the same rule as the chapter digest: an absent optional
+ * field is omitted rather than hashed as null, so the headline gate moves only the digest of an entry that carries one. A caption is trimmed,
+ * and a blank one omitted, exactly as the forge sends it.
+ */
+export function wikiEntryContentHash({ type, name, imageRef, imageVisibleFromOrdinal, firstVisibleOrdinal, facets, images }: WikiEntryHashInput): string {
+  const payload: Record<string, unknown> = {
+    type,
+    name,
+    firstVisibleOrdinal,
+    facets,
+    images: images.map(({ caption, ...image }) => (caption?.trim() ? { ...image, caption: caption.trim() } : image)),
+  };
+  if (imageRef) payload.imageRef = imageRef;
+  if (imageRef && imageVisibleFromOrdinal !== null && imageVisibleFromOrdinal !== undefined) payload.imageVisibleFromOrdinal = imageVisibleFromOrdinal;
+  return computeContentHash(payload);
+}

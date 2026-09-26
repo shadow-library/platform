@@ -37,6 +37,8 @@
 - Content ratings are independent ordered dimensions; an absent dimension means unrated and is NEVER equal to `none`. Sources that cannot determine a rating MUST omit the field.
 - The chapter content hash is a cross-service contract (Web Novel recomputes and rejects mismatches; Forge uses it for republish vs no-op). No change may move the digest of
   unchanged content; new hashed fields must be additive and absent-by-default, or ship as a versioned hash.
+- The wiki-entry hash follows the same rule for Forge's republish vs no-op; the headline gate `imageVisibleFromOrdinal` is omitted unless an entry carries one, and a
+  blank image caption is omitted. The wiki headline-gate capability header is part of the same contract.
 - The root entrypoint is browser-safe and dependency-free; only the `publishing` subpath uses `node:crypto`.
 
 ## Auth SDK integration contract (`auth`)

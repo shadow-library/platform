@@ -41,6 +41,9 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
   blobs for novel-forge, web-novel and memoir.
 - Web Novel's catalog, chapter and wiki tables are a projection of Forge content, rebuilt by re-pushing; its reader tables (library, progress) and publish audit are native and
   cannot be rebuilt from Forge.
+- Forge shapes the wiki push to the capabilities Web Novel's wiki manifest advertises, and an upgrade or rollback heals on the next converge. A gated headline is stored apart
+  from `image_ref`, so a rolled-back reader hides it rather than leaking it; a reconcile restores those thumbnails. After an upgrade, a reconcile promotes late portraits to
+  headlines; skipping it is safe, and they stay in the gated gallery until then.
 
 ## Deploy shape
 

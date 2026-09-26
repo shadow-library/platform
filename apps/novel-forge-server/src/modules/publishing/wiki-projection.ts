@@ -1,4 +1,5 @@
-import { computeContentHash } from '@server/common';
+import { wikiEntryContentHash } from '@shadow-library/sdk/publishing';
+
 import { type Knowledge } from '@server/database';
 
 /** The reader wiki-entry types, matching web-novel-server's ingest contract (a superset-equal of forge's `entity_type`). */
@@ -24,6 +25,8 @@ interface WikiEntryPayload {
   type: WikiEntryType;
   name: string;
   imageRef?: string;
+  /** Present only on a dated portrait later than the entry itself; the reader shows the headline from this ordinal. */
+  imageVisibleFromOrdinal?: number;
   firstVisibleOrdinal: number;
   facets: WikiFacet[];
   images: WikiImage[];
@@ -83,6 +86,8 @@ export interface BuildWikiProjectionsInput {
   facts: WikiFactInput[];
   /** Forge chapter number → reader `publishedOrdinal`, for **published** chapters only (scheduled/failed/unpublished excluded). */
   ordinalByChapter: Map<number, number>;
+  /** Whether the reader advertises that it gates the headline image; without it a portrait later than its entry is demoted to the gallery. */
+  headlineGate?: boolean;
 }
 
 /** The reader's wiki entry-key route pattern; a key that cannot satisfy it can never be pushed, so it is skipped. */
@@ -196,7 +201,13 @@ function buildFactFacets(entityKey: string, facts: WikiFactInput[], ordinalByCha
   return facets;
 }
 
-function projectEntity(entity: WikiEntityInput, facts: WikiFactInput[], ordinalByChapter: Map<number, number>, nameByKey: Map<string, string>): WikiEntryProjection | null {
+function projectEntity(
+  entity: WikiEntityInput,
+  facts: WikiFactInput[],
+  ordinalByChapter: Map<number, number>,
+  nameByKey: Map<string, string>,
+  headlineGate: boolean,
+): WikiEntryProjection | null {
   // The entity's own first-visible ordinal. `null` means it is first seen in an unpublished chapter, so its
   // profile/alias facets (and any fragment gated on that first sighting) are withheld until the chapter lands.
   const baseOrdinal = ordinalOf(entity.firstSeenChapter, ordinalByChapter);
@@ -223,19 +234,24 @@ function projectEntity(entity: WikiEntityInput, facts: WikiFactInput[], ordinalB
     return depictsChapter === 0 ? 0 : ordinalOf(depictsChapter, ordinalByChapter);
   };
 
-  // The reader shows the top-level portrait whenever the entry is visible, so only a portrait no later than the entry itself rides there;
-  // a later one joins the gallery, the one place the reader gates per image. Every dated image, with its caption, waits for its chapter.
-  const legacyPortrait = entity.imageDepictsChapter === null || entity.imageDepictsChapter === undefined;
+  // A dated portrait later than its entry heads it under its own gate, so a caught-up reader keeps the list thumbnail. A reader that cannot
+  // gate the headline would show it to everyone, so for one the portrait joins the per-image gated gallery instead. Only a gate later than the
+  // entry is ever sent: an earlier-dated or undated portrait keeps the payload, and so the hash, it always had.
   const portraitOrdinal = entity.imageRef ? depictedOrdinal(entity.imageDepictsChapter) : null;
-  const headline = entity.imageRef && portraitOrdinal !== null && (legacyPortrait || portraitOrdinal <= firstVisibleOrdinal) ? entity.imageRef : undefined;
-  const gatedPortrait: RawImage[] = entity.imageRef && !headline && portraitOrdinal !== null ? [{ imageRef: entity.imageRef, visibleFromOrdinal: portraitOrdinal }] : [];
+  const datedPortrait = entity.imageDepictsChapter !== null && entity.imageDepictsChapter !== undefined;
+  const latePortraitOrdinal = datedPortrait && portraitOrdinal !== null && portraitOrdinal > firstVisibleOrdinal ? portraitOrdinal : undefined;
+  const demoted = latePortraitOrdinal !== undefined && !headlineGate;
+  const headline = entity.imageRef && portraitOrdinal !== null && !demoted ? entity.imageRef : undefined;
+  const imageVisibleFromOrdinal = headline && headlineGate ? latePortraitOrdinal : undefined;
+  const demotedPortrait: RawImage[] =
+    entity.imageRef && latePortraitOrdinal !== undefined && demoted ? [{ imageRef: entity.imageRef, visibleFromOrdinal: latePortraitOrdinal }] : [];
   const gallery = [...entity.images]
     .sort((a, b) => a.sortOrder - b.sortOrder || a.imageRef.localeCompare(b.imageRef))
     .flatMap((image): RawImage[] => {
       const visibleFromOrdinal = depictedOrdinal(image.depictsChapter);
       return visibleFromOrdinal === null ? [] : [{ imageRef: image.imageRef, caption: image.caption, visibleFromOrdinal }];
     });
-  const images: WikiImage[] = [...gatedPortrait, ...gallery].map((image, index) => ({
+  const images: WikiImage[] = [...demotedPortrait, ...gallery].map((image, index) => ({
     imageRef: image.imageRef,
     ...(image.caption?.trim() ? { caption: image.caption.trim() } : {}),
     sortOrder: index,
@@ -246,11 +262,12 @@ function projectEntity(entity: WikiEntityInput, facts: WikiFactInput[], ordinalB
     type: entity.type,
     name: entity.name,
     ...(headline ? { imageRef: headline } : {}),
+    ...(imageVisibleFromOrdinal === undefined ? {} : { imageVisibleFromOrdinal }),
     firstVisibleOrdinal,
     facets,
     images,
   };
-  return { entryKey: entity.entityKey, contentHash: computeContentHash(payload as unknown as Record<string, unknown>), payload };
+  return { entryKey: entity.entityKey, contentHash: wikiEntryContentHash(payload), payload };
 }
 
 /**
@@ -265,7 +282,7 @@ export function buildWikiProjections(input: BuildWikiProjectionsInput): WikiEntr
   for (const entity of [...input.entities].sort((a, b) => a.entityKey.localeCompare(b.entityKey))) {
     if (entity.wikiVisibility === 'hidden') continue;
     if (!ENTRY_KEY_PATTERN.test(entity.entityKey)) continue;
-    const projection = projectEntity(entity, input.facts, input.ordinalByChapter, nameByKey);
+    const projection = projectEntity(entity, input.facts, input.ordinalByChapter, nameByKey, input.headlineGate ?? false);
     if (projection) projections.push(projection);
   }
   return projections;

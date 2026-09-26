@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { computeContentHash } from '@shadow-library/sdk/publishing';
 
 import { buildWikiProjections, type BuildWikiProjectionsInput, type WikiEntityInput, type WikiFactInput } from '@modules/publishing/wiki-projection';
 
@@ -181,33 +182,57 @@ describe('buildWikiProjections', () => {
       [50, 50],
     ]);
 
-    // What web-novel-server serves at `gate`: the entry once it is visible, then its images and their captions gated one by one.
+    // What web-novel-server serves at `gate`: the entry once it is visible, its headline once past its own gate, then its images and captions gated one by one.
     function readerView(projection: ReturnType<typeof buildWikiProjections>[number] | undefined, gate: number): { imageRef?: string; images: string[]; captions: string[] } {
       if (!projection || projection.payload.firstVisibleOrdinal > gate) return { images: [], captions: [] };
       const images = projection.payload.images.filter(image => image.visibleFromOrdinal <= gate);
-      return { imageRef: projection.payload.imageRef, images: images.map(image => image.imageRef), captions: images.flatMap(image => (image.caption ? [image.caption] : [])) };
+      const headlineShown = (projection.payload.imageVisibleFromOrdinal ?? 0) <= gate;
+      return {
+        imageRef: headlineShown ? projection.payload.imageRef : undefined,
+        images: images.map(image => image.imageRef),
+        captions: images.flatMap(image => (image.caption ? [image.caption] : [])),
+      };
     }
 
-    it('should keep a chapter-50 portrait and gallery image, with its caption, from chapter-1 readers', () => {
-      const [projection] = build({
-        entities: [
-          entity({
-            imageRef: 'scarred.png',
-            imageDepictsChapter: 50,
-            images: [{ imageRef: 'crowned.png', caption: 'Crowned after the siege', sortOrder: 0, depictsChapter: 50 }],
-          }),
-        ],
-        ordinalByChapter: ordinals,
-      });
+    const lateCharacter = entity({
+      imageRef: 'scarred.png',
+      imageDepictsChapter: 50,
+      images: [{ imageRef: 'crowned.png', caption: 'Crowned after the siege', sortOrder: 0, depictsChapter: 50 }],
+    });
 
+    it('should keep a chapter-50 portrait as the headline gated at chapter 50 for a gate-capable reader, hidden with its gallery from chapter-1 readers', () => {
+      const [projection] = build({ entities: [lateCharacter], ordinalByChapter: ordinals, headlineGate: true });
+
+      expect(projection?.payload).toMatchObject({ imageRef: 'scarred.png', imageVisibleFromOrdinal: 50, firstVisibleOrdinal: 1 });
+      expect(readerView(projection, 1)).toEqual({ imageRef: undefined, images: [], captions: [] });
+      expect(readerView(projection, 50)).toEqual({ imageRef: 'scarred.png', images: ['crowned.png'], captions: ['Crowned after the siege'] });
+    });
+
+    it('should demote a chapter-50 portrait to the gated gallery for a reader that cannot gate the headline', () => {
+      const [projection] = build({ entities: [lateCharacter], ordinalByChapter: ordinals });
+
+      expect(projection?.payload.imageRef).toBeUndefined();
+      expect(projection?.payload).not.toHaveProperty('imageVisibleFromOrdinal');
+      expect(projection?.payload.images[0]).toEqual({ imageRef: 'scarred.png', sortOrder: 0, visibleFromOrdinal: 50 });
       expect(readerView(projection, 1)).toEqual({ imageRef: undefined, images: [], captions: [] });
       expect(readerView(projection, 50)).toEqual({ imageRef: undefined, images: ['scarred.png', 'crowned.png'], captions: ['Crowned after the siege'] });
     });
 
-    it('should keep a portrait no later than the entry itself as the top-level image', () => {
+    it('should move the hash of a late-portrait entry, and only that entry, when the reader gains the capability', () => {
+      const early = entity({ entityKey: 'boone', imageRef: 'young.png', imageDepictsChapter: 1 });
+      const without = build({ entities: [lateCharacter, early], ordinalByChapter: ordinals });
+      const withGate = build({ entities: [lateCharacter, early], ordinalByChapter: ordinals, headlineGate: true });
+
+      expect(withGate.map(projection => projection.entryKey)).toEqual(['amara', 'boone']);
+      expect(withGate[0]?.contentHash).not.toBe(without[0]?.contentHash);
+      expect(withGate[1]?.contentHash).toBe(without[1]?.contentHash ?? '');
+    });
+
+    it('should keep a portrait no later than the entry itself as the top-level image, without a gate', () => {
       const [projection] = build({ entities: [entity({ imageRef: 'young.png', imageDepictsChapter: 1 })], ordinalByChapter: ordinals });
 
       expect(projection?.payload.imageRef).toBe('young.png');
+      expect(projection?.payload).not.toHaveProperty('imageVisibleFromOrdinal');
       expect(projection?.payload.images).toEqual([]);
     });
 
@@ -235,6 +260,7 @@ describe('buildWikiProjections', () => {
       });
 
       expect(projection?.payload.imageRef).toBe('legacy.png');
+      expect(projection?.payload).not.toHaveProperty('imageVisibleFromOrdinal');
       expect(projection?.payload.images).toEqual([{ imageRef: 'sketch.png', caption: 'Old sketch', sortOrder: 0, visibleFromOrdinal: 3 }]);
     });
 
@@ -274,6 +300,12 @@ describe('buildWikiProjections', () => {
 
       expect(undated[0]?.payload.imageRef).toBe('legacy.png');
       expect(undated[0]?.contentHash).toBe(datedAtFirstSighting[0]?.contentHash ?? '');
+    });
+
+    it('should keep the historical digest of an undated portrait', () => {
+      const [projection] = build({ entities: [entity({ imageRef: 'legacy.png' })] });
+
+      expect(projection?.contentHash).toBe(computeContentHash({ ...projection?.payload }));
     });
   });
 

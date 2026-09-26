@@ -57,6 +57,15 @@ export class WikiEntryUpsertBody {
   @Field(() => String, { optional: true, maxLength: 512, description: 'Content-addressed storage reference, such as <sha256>.webp.' })
   imageRef?: string;
 
+  @Field(() => Integer, {
+    optional: true,
+    minimum: 0,
+    maximum: INT4_MAX,
+    description:
+      'First reader ordinal at which imageRef may be shown; absent shows it whenever the entry is visible. Below it the entry page shows no headline and only the list thumbnail falls back to the latest visible gallery image.',
+  })
+  imageVisibleFromOrdinal?: number;
+
   @Field(() => Integer, { minimum: 0, maximum: INT4_MAX, description: 'First reader ordinal at which this entry appears; 0 exposes it before reading.' })
   firstVisibleOrdinal: number;
 
@@ -83,6 +92,9 @@ export class WikiManifestItem {
 
   @Field()
   contentHash: string;
+
+  @Field(() => Integer, { optional: true, minimum: 0, description: 'The stored headline gate, absent when the headline shows whenever the entry does.' })
+  imageVisibleFromOrdinal?: number;
 }
 
 @Schema()

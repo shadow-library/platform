@@ -1,5 +1,6 @@
 import { RequireScope } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, type HttpResponse, HttpStatus, Params, Put, Res, RespondFor } from '@shadow-library/fastify';
+import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { PUBLISH_SCOPE } from '@server/constants';
 
@@ -31,7 +32,8 @@ export class WikiIngestController {
 
   @Get('/:slug/wiki/manifest')
   @RespondFor(200, [WikiManifestItem])
-  getManifest(@Params() params: NovelSlugParams): Promise<WikiManifestItem[]> {
+  getManifest(@Params() params: NovelSlugParams, @Res() response: HttpResponse): Promise<WikiManifestItem[]> {
+    response.header(WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY);
     return this.wikiIngestService.getManifest(params.slug);
   }
 }
