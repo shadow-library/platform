@@ -48,7 +48,7 @@ function setup(draft: Record<string, unknown> = {}) {
   const enqueued: bigint[] = [];
   const generation = { prepareFinalizeReview: async (_projectId: bigint, _chapter: number, reviewId: bigint) => void enqueued.push(reviewId) };
   const router = { structured: async () => EXTRACTION };
-  const service = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, router as never, { registerHandler: () => undefined } as never, generation as never);
+  const service = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, router as never, { register: () => undefined } as never, generation as never);
   return { tables, service, enqueued };
 }
 

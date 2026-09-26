@@ -6,7 +6,7 @@ import { EventsModule } from '../events/events.module';
 import { LedgerModule } from '../ledger/ledger.module';
 import { NotesStoreModule } from '../notes/notes-store.module';
 import { PluginsModule } from '../plugins/plugins.module';
-import { ActionExecutorRegistry } from './action-registry';
+import { ActionRegistryModule } from './action-registry.module';
 import { ChangeHistoryController } from './change-history.controller';
 import { ChatCompactionService } from './chat-compaction.service';
 import { ChatController } from './chat.controller';
@@ -25,10 +25,9 @@ import { TurnStreamService } from './turn-stream.service';
 import { WriterPreviewService } from './writer-preview.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, EventsModule, LedgerModule, NotesStoreModule, PluginsModule],
+  imports: [ActionRegistryModule, DatabaseModule, AiModule, EventsModule, LedgerModule, NotesStoreModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
   providers: [
-    ActionExecutorRegistry,
     ProposalService,
     ProposalApplyService,
     ChatCompactionService,
@@ -40,6 +39,6 @@ import { WriterPreviewService } from './writer-preview.service';
     TurnCostService,
     WriterPreviewService,
   ],
-  exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, TurnCostService],
+  exports: [ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, TurnCostService],
 })
 export class RefinementModule {}

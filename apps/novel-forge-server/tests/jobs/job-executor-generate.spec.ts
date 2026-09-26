@@ -4,6 +4,7 @@ import type { Job } from '@server/database';
 
 import type { JobProgress } from '@modules/jobs/job.service';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 import type { WorkflowRunResult } from '@modules/ai/graphs/workflow-run.service';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
@@ -22,7 +23,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const publishRunner = {} as never;
   const storage = {} as never;
 
-  const executor = new JobExecutor(jobService, claims, workflowRunService, indexingService, databaseService, publishRunner, storage);
+  const executor = new JobExecutor(jobService, claims, workflowRunService, indexingService, databaseService, publishRunner, storage, new JobHandlerRegistry());
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }
 

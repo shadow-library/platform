@@ -15,6 +15,7 @@ import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { AuthoringClaimService } from './authoring-claim.service';
+import { JobHandlerRegistry } from './job-handler.registry';
 import { JobService, payloadCostTier, type TransitionedJob } from './job.service';
 
 interface GeneratePayload {
@@ -49,8 +50,6 @@ const RETRY_BACKOFF_MS = 30_000;
 const CLAIM_REFUSED_MESSAGE = 'Another chapter was being written, planned or finalized for this novel, so this job did not start';
 const CLAIM_LOST_MESSAGE = 'This job stopped responding and another job took over the novel, so its result was not kept as finished';
 
-export type JobHandler = (job: Job.Row) => Promise<void>;
-
 type SettleOutcome =
   { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'retry'; error: string; cause: unknown; nextAttemptAt: Date } | { status: 'cancelled' };
 
@@ -76,7 +75,6 @@ export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
   private readonly db: PrimaryDatabase;
   private readonly cancelWatches = new Map<string, JobWatch>();
-  private readonly handlers = new Map<Job.Kind, JobHandler>();
   private readonly retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
@@ -87,6 +85,7 @@ export class JobExecutor {
     private readonly databaseService: DatabaseService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
+    private readonly jobHandlers: JobHandlerRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -104,11 +103,6 @@ export class JobExecutor {
   onModuleDestroy(): void {
     for (const timer of this.retryTimers.values()) clearTimeout(timer);
     this.retryTimers.clear();
-  }
-
-  /** Lets a module above this one run its own job kind, since this module cannot depend on it. */
-  registerHandler(kind: Job.Kind, handler: JobHandler): void {
-    this.handlers.set(kind, handler);
   }
 
   async dispatch(jobId: string): Promise<void> {
@@ -130,7 +124,7 @@ export class JobExecutor {
     if (wait > 0) return this.dispatchLater(jobId, wait);
 
     // Left pending rather than failed: a handler missing here is a wiring fault, and the next dispatch after it is fixed runs the job.
-    if (!BUILT_IN_KINDS.has(job.kind) && !this.handlers.has(job.kind)) {
+    if (!BUILT_IN_KINDS.has(job.kind) && !this.jobHandlers.has(job.kind)) {
       this.logger.error('dispatch: no handler is registered for this job kind — leaving the job pending', { jobId, kind: job.kind });
       return;
     }
@@ -305,7 +299,7 @@ export class JobExecutor {
       case 'import':
         return this.runImport(job);
       default: {
-        const handler = this.handlers.get(job.kind);
+        const handler = this.jobHandlers.get(job.kind);
         if (!handler) throw AppError.internal(`Unsupported job kind: ${job.kind}`);
         return handler(job);
       }

@@ -5,6 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { type Job } from '@server/database';
 
 import { JobExecutor, retryAfter } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
 
@@ -71,9 +72,19 @@ function executorOver(jobs: FakeJobs, claims = new FakeAuthoringClaims()) {
   const settled: unknown[][] = [];
   const workflowRunService = { cancel: () => undefined, settleJobRuns: async (...args: unknown[]) => void settled.push(args) };
   const db = { select: () => ({ from: () => ({ where: async () => [] }) }) };
-  const executor = new JobExecutor(jobs as never, claims.asService(), workflowRunService as never, {} as never, { getPostgresClient: () => db } as never, {} as never, {} as never);
+  const jobHandlers = new JobHandlerRegistry();
+  const executor = new JobExecutor(
+    jobs as never,
+    claims.asService(),
+    workflowRunService as never,
+    {} as never,
+    { getPostgresClient: () => db } as never,
+    {} as never,
+    {} as never,
+    jobHandlers,
+  );
   executors.push(executor);
-  return { executor, claims, settled };
+  return { executor, claims, settled, jobHandlers };
 }
 
 afterEach(() => {
@@ -108,8 +119,8 @@ describe('JobExecutor — retry on timeout', () => {
   it('should put a timed-out organise job back in the queue, holding the novel for it, and publish that once settled', async () => {
     const jobs = new FakeJobs();
     jobs.add('job-o');
-    const { executor, claims, settled } = executorOver(jobs);
-    executor.registerHandler('organise', async () => {
+    const { executor, claims, settled, jobHandlers } = executorOver(jobs);
+    jobHandlers.register('organise', async () => {
       throw timeout();
     });
 
@@ -126,8 +137,8 @@ describe('JobExecutor — retry on timeout', () => {
     const jobs = new FakeJobs();
     jobs.add('job-o');
     jobs.cancelBeforeRetry = true;
-    const { executor, claims, settled } = executorOver(jobs);
-    executor.registerHandler('organise', async () => {
+    const { executor, claims, settled, jobHandlers } = executorOver(jobs);
+    jobHandlers.register('organise', async () => {
       throw timeout();
     });
 
@@ -143,8 +154,8 @@ describe('JobExecutor — retry on timeout', () => {
     const jobs = new FakeJobs();
     jobs.add('job-o', { attempts: 1 });
     jobs.add('job-p', { projectId: 2n });
-    const { executor, claims } = executorOver(jobs);
-    executor.registerHandler('organise', async job => {
+    const { executor, claims, jobHandlers } = executorOver(jobs);
+    jobHandlers.register('organise', async job => {
       throw job.id === 'job-o' ? timeout() : refused();
     });
 
@@ -160,9 +171,9 @@ describe('JobExecutor — retry on timeout', () => {
   it('should not start a job before its retry is due', async () => {
     const jobs = new FakeJobs();
     jobs.add('job-o', { attempts: 1, nextAttemptAt: new Date(Date.now() + 60_000) });
-    const { executor } = executorOver(jobs);
+    const { executor, jobHandlers } = executorOver(jobs);
     const handled: string[] = [];
-    executor.registerHandler('organise', async job => void handled.push(job.id));
+    jobHandlers.register('organise', async job => void handled.push(job.id));
 
     await executor.dispatch('job-o');
 

@@ -184,7 +184,8 @@ export class IntegrityWorld {
     const contextAssembler = { forChapter: async () => ({ id: null, rendered: '', omitted: null }) };
     const pluginPolicy = { resolve: async () => ({ raised: false }) };
     const writerSnapshots = { onMessages: () => () => undefined };
-    const executor = { dispatch: async () => undefined, registerHandler: () => undefined };
+    const executor = { dispatch: async () => undefined };
+    const jobHandlers = { register: () => undefined };
     const indexing = { addProse: async () => undefined, deleteProse: async () => undefined };
     const workflow = { runChapterFinalization: (input: Row) => runFinalization(this.store, input) };
     this.generation = new GenerationService(
@@ -204,7 +205,7 @@ export class IntegrityWorld {
       this.claims.asService(),
       writerSnapshots as never,
     );
-    this.reviews = new FinalizeReviewService(database, this.desk as never, executor as never, this.generation);
+    this.reviews = new FinalizeReviewService(database, this.desk as never, jobHandlers as never, this.generation);
     this.versions = new DraftVersionService(database);
     this.passages = new PassageRewriteService(database, this.desk as never, contextAssembler as never, pluginPolicy as never, writerSnapshots as never);
     this.amends = new ChapterAmendService(database, indexing as never);

@@ -4,6 +4,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 import { JobService } from '@modules/jobs/job.service';
 import { schema } from '@server/database';
 
@@ -38,6 +39,7 @@ function executorOver(job: ReturnType<typeof reviewJob>) {
   const settled: unknown[][] = [];
   const workflowRunService = { cancel: () => undefined, settleJobRuns: async (...args: unknown[]) => void settled.push(args) };
   const db = { select: () => ({ from: () => ({ where: async () => [] }) }) };
+  const jobHandlers = new JobHandlerRegistry();
   const executor = new JobExecutor(
     jobService as never,
     new FakeAuthoringClaims().asService(),
@@ -46,17 +48,18 @@ function executorOver(job: ReturnType<typeof reviewJob>) {
     { getPostgresClient: () => db } as never,
     {} as never,
     {} as never,
+    jobHandlers,
   );
-  return { executor, jobService, settled };
+  return { executor, jobService, settled, jobHandlers };
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 describe('JobExecutor — a job kind another module handles', () => {
   it('should dispatch a review job left pending at boot to the handler registered during module init', async () => {
-    const { executor, jobService } = executorOver(reviewJob());
+    const { executor, jobService, jobHandlers } = executorOver(reviewJob());
     const handled: string[] = [];
-    executor.registerHandler('review', async job => void handled.push(job.id));
+    jobHandlers.register('review', async job => void handled.push(job.id));
 
     await executor.onApplicationReady();
     await settle();
@@ -75,9 +78,9 @@ describe('JobExecutor — a job kind another module handles', () => {
   });
 
   it('should fail the run a job opened when the job fails before reaching it', async () => {
-    const { executor, jobService, settled } = executorOver(reviewJob());
+    const { executor, jobService, settled, jobHandlers } = executorOver(reviewJob());
     const refusal = new Error('Chapter 4 has no prose to review yet');
-    executor.registerHandler('review', async () => {
+    jobHandlers.register('review', async () => {
       throw refusal;
     });
 
@@ -88,8 +91,8 @@ describe('JobExecutor — a job kind another module handles', () => {
   });
 
   it('should cancel the run a job opened when the job is cancelled before it starts', async () => {
-    const { executor, jobService, settled } = executorOver(reviewJob({ cancelRequestedAt: new Date() }));
-    executor.registerHandler('review', async () => undefined);
+    const { executor, jobService, settled, jobHandlers } = executorOver(reviewJob({ cancelRequestedAt: new Date() }));
+    jobHandlers.register('review', async () => undefined);
 
     await executor.dispatch('job-r');
 

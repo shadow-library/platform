@@ -25,7 +25,7 @@ import { ModelRouterService, type ProjectConfig } from '../ai/model-router.servi
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { GenerationService } from '../generation/generation.service';
-import { JobExecutor } from '../jobs/job.executor';
+import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { hashReviewedBody } from '../review/review-findings';
 import { dropBriefClaims, isReviewCurrent, loadChapterReviews, revealsStrandedByRevert, revertedMilestoneKeys, type ReviewWithItems } from './finalize-review-gate';
 import { buildReviewItems, editedChange, type ProposedChange, sameProposal } from './finalize-review-items';
@@ -180,14 +180,14 @@ export class FinalizeReviewService {
   constructor(
     databaseService: DatabaseService,
     private readonly modelRouter: ModelRouterService,
-    private readonly jobExecutor: JobExecutor,
+    private readonly jobHandlers: JobHandlerRegistry,
     private readonly generationService: GenerationService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   onModuleInit(): void {
-    this.jobExecutor.registerHandler('finalize_review', job => this.runJob(job));
+    this.jobHandlers.register('finalize_review', job => this.runJob(job));
   }
 
   async get(projectId: bigint, chapter: number): Promise<FinalizeReviewView> {

@@ -2,6 +2,8 @@ export * from './authoring-claim.module';
 export * from './authoring-claim.service';
 export * from './authoring-job.janitor';
 export * from './checkpoint.janitor';
+export * from './job-handler-registry.module';
+export * from './job-handler.registry';
 export * from './job.executor';
 export * from './job.service';
 export * from './jobs.controller';

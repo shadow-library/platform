@@ -25,6 +25,7 @@ import { CONTRADICTION_OPS, PROMPT_REGISTRY } from '../ai/prompts';
 import { type BibleAuditOutput, type BibleContradictionOutput } from '../ai/schemas';
 import { type InventoryDoc, renderDocInventory, renderEntityInventory } from '../bible/bible-inventory';
 import { renderManifest } from '../bible/bible-manifest';
+import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
@@ -109,12 +110,13 @@ export class BibleAuditService {
     private readonly proposalService: ProposalService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
+    private readonly jobHandlers: JobHandlerRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   onModuleInit(): void {
-    this.jobExecutor.registerHandler('audit', job => this.runJob(job));
+    this.jobHandlers.register('audit', job => this.runJob(job));
   }
 
   async start(projectId: bigint): Promise<QueuedBibleAudit> {

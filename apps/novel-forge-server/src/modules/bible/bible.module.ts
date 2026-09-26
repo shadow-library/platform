@@ -1,6 +1,7 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
+import { ActionRegistryModule } from '../refinement/action-registry.module';
 import { RefinementModule } from '../refinement/refinement.module';
 import { BibleDocumentController } from './document/bible-document.controller';
 import { BibleDocumentService } from './document/bible-document.service';
@@ -19,7 +20,7 @@ import { VolumeController } from './volume/volume.controller';
 import { VolumeService } from './volume/volume.service';
 
 @Module({
-  imports: [DatabaseModule, StorageModule, RefinementModule],
+  imports: [ActionRegistryModule, DatabaseModule, StorageModule, RefinementModule],
   controllers: [EntityController, VolumeController, BibleDocumentController, FactController, MilestoneController, PromiseController, BibleReadinessController],
   providers: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService, VolumeActionRegistrar],
   exports: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService],

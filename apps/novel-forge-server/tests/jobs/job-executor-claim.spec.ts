@@ -5,6 +5,7 @@ import { type Job } from '@server/database';
 import { type WorkflowRunResult } from '@modules/ai/graphs/workflow-run.service';
 import { AuthoringJobJanitor } from '@modules/jobs/authoring-job.janitor';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
 
@@ -65,7 +66,16 @@ function worker(jobs: FakeJobs, claims: FakeAuthoringClaims, runChapter: Chapter
     settleJobRuns: async () => undefined,
   };
   const databaseService = { getPostgresClient: () => ({ select: () => ({ from: () => ({ where: async () => [] }) }) }) };
-  const executor = new JobExecutor(jobs as never, claims.asService(), workflowRunService as never, {} as never, databaseService as never, {} as never, {} as never);
+  const executor = new JobExecutor(
+    jobs as never,
+    claims.asService(),
+    workflowRunService as never,
+    {} as never,
+    databaseService as never,
+    {} as never,
+    {} as never,
+    new JobHandlerRegistry(),
+  );
   return { executor, chapters };
 }
 
@@ -190,7 +200,16 @@ describe('JobExecutor — authoring claim', () => {
     const workflowRunService = { cancel: () => undefined, settleJobRuns: async () => undefined };
     const indexing = { backfill: async () => undefined };
     const databaseService = { getPostgresClient: () => ({}) };
-    const executor = new JobExecutor(jobs as never, claims.asService(), workflowRunService as never, indexing as never, databaseService as never, {} as never, {} as never);
+    const executor = new JobExecutor(
+      jobs as never,
+      claims.asService(),
+      workflowRunService as never,
+      indexing as never,
+      databaseService as never,
+      {} as never,
+      {} as never,
+      new JobHandlerRegistry(),
+    );
 
     await executor.dispatch('job-index');
 

@@ -1,4 +1,5 @@
 export * from './action-registry';
+export * from './action-registry.module';
 export * from './change-set';
 export * from './artifact-state';
 export * from './proposal.service';

@@ -7,6 +7,7 @@ import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { loadActiveLedger } from '../ledger/ledger-entries';
@@ -34,13 +35,14 @@ export class ActionJobService {
     private readonly organiseJobs: OrganiseJobService,
     private readonly planJobs: PlanJobService,
     private readonly registry: ActionExecutorRegistry,
+    private readonly jobHandlers: JobHandlerRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   onModuleInit(): void {
-    this.jobExecutor.registerHandler('organise', job => this.organiseJobs.run(job));
-    this.jobExecutor.registerHandler('plan', job => this.planJobs.run(job));
+    this.jobHandlers.register('organise', job => this.organiseJobs.run(job));
+    this.jobHandlers.register('plan', job => this.planJobs.run(job));
 
     this.registry.register('action.organise_notes', async (projectId, _action, context) => {
       const { jobId, runId, deduped } = await this.organise(projectId, context);

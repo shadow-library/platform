@@ -166,9 +166,9 @@ export function auditHarness(options: AuditFakeOptions = {}): AuditHarness {
     { resolve: async () => ({ writerClass: 'standard' }) } as never,
     proposalService as never,
     { enqueue: async (...args: unknown[]) => (queued.push(['enqueue', ...args]), 'job-1'), get: async () => ({ status: 'pending' }) } as never,
+    { dispatch: async () => undefined } as never,
     {
-      dispatch: async () => undefined,
-      registerHandler: (kind: string, registered: (job: object) => Promise<void>) => {
+      register: (kind: string, registered: (job: object) => Promise<void>) => {
         registeredKinds.push(kind);
         handler = registered;
       },

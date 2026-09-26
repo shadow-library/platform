@@ -46,7 +46,7 @@ function setup() {
     revertedAt: null,
   });
   const modelRouter: { structured: () => Promise<ContinuityOutput> } = { structured: async () => EXTRACTION };
-  const service = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, modelRouter as never, { registerHandler: () => undefined } as never, {} as never);
+  const service = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, modelRouter as never, { register: () => undefined } as never, {} as never);
   const prepare = () => service.runJob({ payload: { reviewId: '500' } } as never);
   const review = () => tables.rows(schema.finalizeReviews)[0] as Record<string, unknown>;
   return { tables, service, prepare, review, modelRouter };

@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { runWithCostTier, scopedCostTier } from '@modules/ai/cost-tier-scope';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 import { JobService, payloadCostTier } from '@modules/jobs/job.service';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
@@ -73,6 +74,7 @@ describe('JobExecutor.dispatch', () => {
       { getPostgresClient: () => ({}) } as never,
       {} as never,
       {} as never,
+      new JobHandlerRegistry(),
     );
     return { executor, seen, jobService };
   }

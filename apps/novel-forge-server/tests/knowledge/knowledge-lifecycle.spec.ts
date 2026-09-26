@@ -250,7 +250,7 @@ describe('knowledge lifecycle — finalize', () => {
     await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
     expect(tables.milestone('lamp_rank_4')?.['state']).toBe('reached');
-    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { register: () => undefined } as never, {} as never);
 
     tables.rows(schema.chapters).push({ id: 600n, projectId: 7n, number: 6, status: 'done' });
     await expect(reviews.revert(7n, 5)).rejects.toMatchObject({ code: 'FRV_012' });
@@ -270,7 +270,7 @@ describe('knowledge lifecycle — finalize', () => {
     await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
     expect(await planRevealsRefusal(tables.db as never, 7n, 6)).toBeNull();
-    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { register: () => undefined } as never, {} as never);
 
     await reviews.revert(7n, 5);
 
@@ -284,7 +284,7 @@ describe('knowledge lifecycle — finalize', () => {
     const tables = chapterFive();
     await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
-    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { register: () => undefined } as never, {} as never);
 
     await expect(reviews.revert(7n, 5)).rejects.toMatchObject({ code: 'FRV_013' });
     expect(tables.milestone('lamp_rank_4')).toMatchObject({ state: 'reached', reachedChapter: 5 });

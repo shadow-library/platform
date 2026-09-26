@@ -237,9 +237,9 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     },
   };
   const jobService = { enqueue: async (...args: unknown[]) => (enqueued.push(args), 'job-1'), get: async () => ({ status: options.jobStatus ?? 'pending' }) };
-  const jobExecutor = {
-    dispatch: async () => undefined,
-    registerHandler: (_kind: string, registered: (job: object) => Promise<void>) => {
+  const jobExecutor = { dispatch: async () => undefined };
+  const jobHandlers = {
+    register: (_kind: string, registered: (job: object) => Promise<void>) => {
       handler = registered;
     },
   };
@@ -254,6 +254,7 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     pluginPolicy as never,
     jobService as never,
     jobExecutor as never,
+    jobHandlers as never,
   );
 
   return {

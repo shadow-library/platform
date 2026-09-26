@@ -26,6 +26,7 @@ import { type CallRoute } from '../ai/unrestricted-route';
 import { type FactLike, loadKnowledgeView, scanKnowledgeLeaks, writerVisibleFactKeys } from '../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
+import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
@@ -130,12 +131,13 @@ export class ChapterReviewService {
     private readonly pluginPolicy: PluginPolicyService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
+    private readonly jobHandlers: JobHandlerRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   onModuleInit(): void {
-    this.jobExecutor.registerHandler('review', job => this.runJob(job));
+    this.jobHandlers.register('review', job => this.runJob(job));
   }
 
   /** Model reviews run as a durable job; the deterministic kinds are quick and answer at once. */

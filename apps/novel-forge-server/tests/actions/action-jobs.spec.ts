@@ -7,6 +7,7 @@ import { ActionJobService } from '@modules/actions/action-job.service';
 import { PlanJobService } from '@modules/actions/plan-job.service';
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from '@modules/ai/prompts/scope-playbooks';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { startedJobs } from '@modules/refinement/serialise';
 
@@ -189,9 +190,19 @@ describe('ActionJobService', () => {
         return { id: 'job-1', outcome: stored.dedupe ? 'deduped' : 'inserted' };
       },
     };
-    const jobExecutor = { dispatch: async (jobId: string) => void dispatched.push(jobId), registerHandler: (kind: Job.Kind, handler: unknown) => handlers.set(kind, handler) };
+    const jobExecutor = { dispatch: async (jobId: string) => void dispatched.push(jobId) };
+    const jobHandlers = { register: (kind: Job.Kind, handler: unknown) => handlers.set(kind, handler) };
     const workflowRunService = { createRun: async (...args: unknown[]) => (runs.push(args), 'run-1') };
-    const service = new ActionJobService(databaseOver(stored) as never, jobService as never, jobExecutor as never, workflowRunService as never, {} as never, {} as never, registry);
+    const service = new ActionJobService(
+      databaseOver(stored) as never,
+      jobService as never,
+      jobExecutor as never,
+      workflowRunService as never,
+      {} as never,
+      {} as never,
+      registry,
+      jobHandlers as never,
+    );
     service.onModuleInit();
     return { service, registry, enqueued, runs, dispatched, handlers };
   }
@@ -310,6 +321,7 @@ describe('ActionJobService', () => {
       succeed: async () => undefined,
     };
     const ran: string[] = [];
+    const jobHandlers = new JobHandlerRegistry();
     const executor = new JobExecutor(
       jobs as never,
       new FakeAuthoringClaims().asService(),
@@ -318,10 +330,20 @@ describe('ActionJobService', () => {
       { getPostgresClient: () => ({ select: () => ({ from: () => ({ where: async () => [] }) }) }) } as never,
       {} as never,
       {} as never,
+      jobHandlers,
     );
     const organiseJobs = { run: async (row: Job.Row) => void ran.push(row.kind) };
     const planJobs = { run: async (row: Job.Row) => void ran.push(row.kind) };
-    new ActionJobService(databaseOver({}) as never, {} as never, executor, {} as never, organiseJobs as never, planJobs as never, new ActionExecutorRegistry()).onModuleInit();
+    new ActionJobService(
+      databaseOver({}) as never,
+      {} as never,
+      executor,
+      {} as never,
+      organiseJobs as never,
+      planJobs as never,
+      new ActionExecutorRegistry(),
+      jobHandlers,
+    ).onModuleInit();
 
     await executor.onApplicationReady();
     await new Promise(resolve => setTimeout(resolve, 0));
