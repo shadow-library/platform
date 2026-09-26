@@ -17,6 +17,7 @@ import { type ChatCompactOutput } from '../ai/schemas';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChatSelection, loadTurnSelections } from './chat-selection';
+import { renderQuestionForHistory } from './chat-question';
 
 // Compaction thresholds: fold history once the verbatim window outgrows its token
 // budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
@@ -61,8 +62,16 @@ export class ChatCompactionService {
     }
     for (const message of verbatim) {
       if (message.role !== 'assistant' && !standard && findHardLine([message.content])) continue;
-      if (message.role !== 'assistant') history.push(new HumanMessage(message.content));
-      else history.push(new AIMessage(unrestricted.has(message.id) ? UNRESTRICTED_REPLY_PLACEHOLDER : message.content));
+      if (message.role !== 'assistant') {
+        history.push(new HumanMessage(message.content));
+        continue;
+      }
+      if (unrestricted.has(message.id)) {
+        history.push(new AIMessage(UNRESTRICTED_REPLY_PLACEHOLDER));
+        continue;
+      }
+      const askedLine = renderQuestionForHistory(message.question);
+      history.push(new AIMessage(askedLine ? `${message.content}\n\n${askedLine}` : message.content));
     }
     return history;
   }

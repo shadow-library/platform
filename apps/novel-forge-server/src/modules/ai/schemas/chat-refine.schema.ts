@@ -19,6 +19,23 @@ export class ChatRefineSchema {
 
   @Field(() => [ChatLookupItem], { optional: true, description: 'lookups to run before answering — hub scope only, never alongside a changeSet' })
   lookups?: { tool: string; args?: Record<string, unknown> }[];
+
+  // class-schema has no "any JSON value" type: every declared field is ajv-validated against its declared
+  // shape whenever it's present, optional or not — `question: null`, `answers` sent as a string, a numeric
+  // `why`, a string `recommended`, any of it would fail ajv validation for the WHOLE schema and take a
+  // perfectly good reply and changeSet down with it into the repair ladder. `type: undefined` isn't exposed
+  // by @Field's typed overloads, but it does reach the underlying JSON Schema merge — the field ends up with
+  // no `type` keyword at all, so ajv accepts literally anything here. sanitizeChatQuestion (chat-question.ts)
+  // is the only real validator, run once the model's output has already parsed.
+  @Field({
+    optional: true,
+    type: undefined,
+    description:
+      "An identity decision the author has not made yet: 2-4 example answers with trade-offs and a recommendation, 'undecided for now' always accepted. Never alongside lookups. " +
+      '{ question: string, why?: string, answers: [{ title: string, why?: string, tradeOff?: string, recommended?: boolean }], progressKey?: string } — any shape is accepted here, ' +
+      "the server drops what doesn't fit.",
+  } as never)
+  question?: unknown;
 }
 
 export type ChatRefineOutput = ChatRefineSchema;

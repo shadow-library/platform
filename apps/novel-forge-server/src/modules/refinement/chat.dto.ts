@@ -131,6 +131,40 @@ export class ListChatMessagesQuery {
   limit?: number;
 }
 
+@Schema({ description: 'One concrete example answer to a question card, with the reasoning to accept or decline it.' })
+export class ChatQuestionAnswerResponse {
+  @Field()
+  title: string;
+
+  @Field({ optional: true, nullable: true })
+  why?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  tradeOff?: string | null;
+
+  @Field({ optional: true, description: 'true on the one answer Forge recommends' })
+  recommended?: boolean;
+}
+
+@Schema({
+  description:
+    "An identity decision the author hasn't made yet, put to them as 2-4 concrete answers with trade-offs and a recommendation. " +
+    '"Undecided for now" is always an accepted answer and is not one of these cards.',
+})
+export class ChatQuestionResponse {
+  @Field()
+  question: string;
+
+  @Field({ optional: true, nullable: true })
+  why?: string | null;
+
+  @Field(() => [ChatQuestionAnswerResponse], { minItems: 2, maxItems: 4 })
+  answers: ChatQuestionAnswerResponse[];
+
+  @Field({ optional: true, nullable: true, description: 'The progress checklist key this question settles, when it settles one.' })
+  progressKey?: string | null;
+}
+
 @Schema()
 export class ChatMessageResponse {
   @Field(() => String)
@@ -198,6 +232,9 @@ export class ChatMessageResponse {
     description: 'A message of the author’s long enough to keep as notes, which the notes do not hold yet: offer "Save this as notes?", answered by `POST /notes/from-message`.',
   })
   offersNotes?: boolean;
+
+  @Field(() => ChatQuestionResponse, { optional: true, nullable: true, description: "This turn's question card, when Forge raised one; null on every other message." })
+  question?: ChatQuestionResponse | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

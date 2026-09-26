@@ -18,6 +18,7 @@ import {
   AppearanceDescribeSchema,
   BibleStageSchema,
   ChapterSummarizeSchema,
+  type ChatRefineOutput,
   ChatRefineSchema,
   ContinuitySchema,
   EndingContractSchema,
@@ -252,7 +253,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.10.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.11.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -261,6 +262,7 @@ describe('Prompt modules', () => {
       expect(hub).toContain("accept 'undecided for now'");
       expect(hub).toContain('ending is PLANNER-ONLY');
       expect(hub).toContain('outrank every summary');
+      expect(hub).toContain('raise it as a `question` card');
     });
 
     it('should accept epistemic ops on every scope, since they all share the hub playbook', () => {
@@ -275,6 +277,46 @@ describe('Prompt modules', () => {
     it('validates chat-refine output shape', () => {
       expect(parseSchema(ChatRefineSchema, { reply: 'thoughts on pacing' }).success).toBe(true);
       expect(parseSchema(ChatRefineSchema, { changeSet: [] }).success).toBe(false);
+    });
+
+    it('accepts a question card, well-formed or not — sanitizeChatQuestion is what drops a bad one', () => {
+      const wellFormed = {
+        reply: 'Who should oppose Mira?',
+        question: {
+          question: 'Who opposes Mira?',
+          why: 'the reader needs someone to root against',
+          answers: [
+            { title: 'A rival guild', tradeOff: 'crowds out the court politics', recommended: true },
+            { title: 'A corrupt council', why: 'raises the stakes citywide' },
+          ],
+          progressKey: 'opposition',
+        },
+      };
+      expect(parseSchema(ChatRefineSchema, wellFormed).success).toBe(true);
+
+      // Only one answer, no question text, an unknown progressKey — every one of these would fail
+      // ajv validation if the fields were strict, taking a perfectly good reply down with it.
+      const malformed = { reply: 'still thinking', question: { answers: [{ title: 'only one' }], progressKey: 'not-a-real-key' } };
+      expect(parseSchema(ChatRefineSchema, malformed).success).toBe(true);
+    });
+
+    it('never lets a mistyped question fail the whole turn — reply and changeSet still parse', () => {
+      const changeSet = [{ op: 'premise.update', premise: 'x' }];
+      const shapes = [
+        null,
+        'just a string, not a card',
+        { question: 'x', answers: 'not an array' },
+        { question: 'x', answers: [{ title: 'a', recommended: 'yes' }] },
+        { why: 123 },
+      ];
+      for (const question of shapes) {
+        const result = parseSchema<ChatRefineOutput>(ChatRefineSchema, { reply: 'here is the plan', changeSet, question });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.reply).toBe('here is the plan');
+          expect(result.data.changeSet).toEqual(changeSet);
+        }
+      }
     });
   });
 

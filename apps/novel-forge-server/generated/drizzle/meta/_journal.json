@@ -85,6 +85,13 @@
       "when": 1790432274226,
       "tag": "0011_character_events_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790432499257,
+      "tag": "0012_chat_question_card",
+      "breakpoints": true
     }
   ]
 }

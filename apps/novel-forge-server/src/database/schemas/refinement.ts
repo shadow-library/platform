@@ -124,6 +124,9 @@ export const chatMessages = pgTable(
     tokens: integer('tokens'),
     appliedProposalId: bigint('applied_proposal_id', { mode: 'bigint' }).references(() => refinementProposals.id, { onDelete: 'set null' }),
     suggestions: jsonb('suggestions').$type<string[]>(),
+    // A hub turn's structured question card (an identity decision the author hasn't made): question, why, 2-4 answers, optional progressKey.
+    // Null on every message but a chat-refine reply that raised one; the server drops a malformed shape before it ever reaches this column.
+    question: jsonb('question').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal), index('chat_messages_applied_proposal_id_idx').on(t.appliedProposalId)],

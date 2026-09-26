@@ -7,6 +7,7 @@ import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
+import { PROGRESS_ITEM_KEYS } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
@@ -27,6 +28,7 @@ import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-pol
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
+import { sanitizeChatQuestion } from './chat-question';
 import { requestedNegations } from './negation-echo';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
@@ -202,7 +204,11 @@ function withheldProse(output: ChatRefineOutput, proseEdits: boolean): ChatRefin
   if (proseEdits || !output.changeSet?.length) return output;
   const { kept, withheld } = withoutProseEditOps(output.changeSet);
   if (withheld === 0) return output;
-  return { reply: `${output.reply}\n\n${PROSE_EDIT_WITHHELD_NOTE}`, ...(kept.length > 0 ? { changeSet: kept } : {}) };
+  return {
+    reply: `${output.reply}\n\n${PROSE_EDIT_WITHHELD_NOTE}`,
+    ...(kept.length > 0 ? { changeSet: kept } : {}),
+    ...(output.question ? { question: output.question } : {}),
+  };
 }
 
 function negationFixRequest(warnings: string[]): string {
@@ -536,7 +542,7 @@ export class ChatService {
         relay?.supersedeOnNextDelta();
         output = await invoke();
       }
-      // A model that still asks for lookups after the budget note answers with its reply alone.
+      // A model that still asks for lookups after the budget note answers with its reply alone, dropping any changeSet or question sent alongside it.
       if ((output.lookups?.length ?? 0) > 0) output = { reply: output.reply };
 
       // A removal written as "no X" gets one chance to be rewritten as a deletion; whatever survives is kept and flagged for review.
@@ -705,6 +711,7 @@ export class ChatService {
     warnings: string[],
     justDiscussing: boolean,
   ): Promise<Omit<ChatTurnResult, 'runId'>> {
+    const question = sanitizeChatQuestion(output.question, PROGRESS_ITEM_KEYS);
     const [assistantMessage] = await this.db
       .insert(schema.chatMessages)
       .values({
@@ -717,6 +724,7 @@ export class ChatService {
         modelProvider: model.provider,
         modelId: model.model,
         tokens: countTokens(output.reply),
+        question: question as Record<string, unknown> | undefined,
       })
       .returning()
       .catch(err => this.databaseService.translateError(err));

@@ -10,16 +10,17 @@ interface Scenario {
   summaryMode?: string | null;
   summary?: string | null;
   sessionMode?: 'standard' | 'unrestricted' | null;
+  questions?: Record<number, unknown>;
 }
 
-function message(ordinal: number) {
+function message(ordinal: number, questions: Record<number, unknown> = {}) {
   const turn = `t${Math.ceil(ordinal / 2)}`;
   const role = ordinal % 2 === 1 ? 'user' : 'assistant';
-  return { id: BigInt(ordinal), ordinal, role, content: `${role} ${turn}`, runId: turn, tokens: 10 };
+  return { id: BigInt(ordinal), ordinal, role, content: `${role} ${turn}`, runId: turn, tokens: 10, question: questions[ordinal] ?? null };
 }
 
 function fakeCompaction(scenario: Scenario = {}) {
-  const messages = [1, 2, 3, 4, 5, 6, 7, 8].map(message);
+  const messages = [1, 2, 3, 4, 5, 6, 7, 8].map(ordinal => message(ordinal, scenario.questions));
   const turnModes = scenario.turnModes ?? {};
   const runs: unknown[] = [];
   const calls: { project: ProjectConfig; policy: unknown }[] = [];
@@ -122,5 +123,24 @@ describe('ChatCompactionService.buildHistory', () => {
     expect(history[0]?.content).toBe('Conversation so far (compacted summary):\nearlier');
     expect(history.map(entry => entry.content)).toContain('assistant t1');
     expect(history.map(entry => entry.content)).not.toContain(UNRESTRICTED_REPLY_PLACEHOLDER);
+  });
+
+  const QUESTION = { question: 'Who opposes Mira?', answers: [{ title: 'A rival guild' }, { title: 'A corrupt council' }] };
+
+  it('should append a short "[Asked: …]" line to a standard reply that raised a question', async () => {
+    const { service, session } = fakeCompaction({ turnModes: { t2: 'standard' }, questions: { 4: QUESTION } });
+
+    const history = await service.buildHistory(session, standardNovel, 'standard');
+
+    expect(history.map(entry => entry.content)).toContain('assistant t2\n\n[Asked: Who opposes Mira? — options: A rival guild / A corrupt council]');
+  });
+
+  it('should drop the question along with the reply when the reply was written unrestricted', async () => {
+    const { service, session } = fakeCompaction({ turnModes: { t1: 'unrestricted' }, questions: { 2: QUESTION } });
+
+    const history = await service.buildHistory(session, standardNovel, 'standard');
+
+    expect(history.map(entry => entry.content)).toContain(UNRESTRICTED_REPLY_PLACEHOLDER);
+    expect(history.map(entry => entry.content).join('\n')).not.toContain('Who opposes Mira?');
   });
 });
