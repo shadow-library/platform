@@ -7,6 +7,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
+import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
@@ -43,6 +44,8 @@ export interface CreateProposalInput {
   runId?: string | null;
   /** Precomputed by a caller that already ran the checks with more context (the chat turn knows the author's words); computed here otherwise. */
   warnings?: string[];
+  /** Read from an isolated chapter: the proposal carries a warning saying so, which also holds it from any automatic apply. */
+  sourceIsolated?: boolean;
 }
 
 type ApproveDraftOp = Extract<ChangeOp, { op: 'action.approve_draft' }>;
@@ -112,6 +115,7 @@ export class ProposalService {
     const warnings = [
       ...(input.warnings ?? (await this.reviewWarnings(executor, projectId, input.changeSet))),
       ...(await this.revealClearWarnings(executor, projectId, input.changeSet)),
+      ...(input.sourceIsolated ? [ISOLATED_SOURCE_WARNING] : []),
     ];
 
     const [proposal] = await executor

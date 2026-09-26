@@ -146,6 +146,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
         const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
         const findings = tryParseValidation(rawContent);
         if (!findings) throw new Error(`unable to parse validation output for window ${window.from}-${window.to}`);
+        await modelRouter.screenOutput('validation', findings, telemetry, projectRow as ProjectConfig | undefined, policy);
         allFindings.push(findings);
         succeededWindows.push(window);
       } catch (err) {

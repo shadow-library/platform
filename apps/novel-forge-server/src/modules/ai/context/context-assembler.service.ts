@@ -25,6 +25,8 @@ import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
+import { hardLineError, screenTexts, sectionScreens } from '../hard-line';
+import { standardReadableState } from '../isolation-read-policy';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { isWriterExcludedBibleDoc } from './bible-docs';
@@ -696,11 +698,13 @@ export class ContextAssembler {
     const reserveDerived = (section: ContextSection, name: string, cap: number, fromPlan = false): void => reserve(fitToCap(section, cap), name, cap, fromPlan);
     const isolatedEndingRoom = sizedSectionCeiling('prev_ending', WRITER_SECTION_CAPS.prevEnding);
     const reservePrevEnding = (section: ContextSection): void => reserveDerived(section, "the previous chapter's ending", WRITER_SECTION_CAPS.prevEnding);
+    const prevIsolated = Boolean(prevChapter?.isolated || prevDraft?.isolated);
+    const prevState = prevIsolated && opts?.policy?.writerClass !== 'permissive' ? standardReadableState(prevDraft?.state, await this.rosterKeys(projectId)) : prevDraft?.state;
 
     if (prevChapter) {
       const tier: ContextTier = prevChapter.status === 'done' ? 'canonical' : 'working';
       if (prevChapter.isolated) {
-        reservePrevEnding(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure, isolatedEndingRoom), tier, prevRefs));
+        reservePrevEnding(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevState, disclosure, isolatedEndingRoom), tier, prevRefs));
       } else {
         reservePrevEnding(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, prevRefs));
       }
@@ -708,7 +712,7 @@ export class ContextAssembler {
       reservePrevEnding(
         makeSection(
           'prev_ending',
-          `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevDraft.state, disclosure, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
+          `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevState, disclosure, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
           'working',
           prevRefs,
         ),
@@ -721,7 +725,6 @@ export class ContextAssembler {
       reservePrevEnding({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: prevRefs, rendered });
     }
 
-    const prevState = prevDraft?.state;
     if (prevState != null) {
       const cap = WRITER_SECTION_CAPS.continuationState;
       const state = fittedState(prevState, disclosure, sizedSectionCeiling('continuation_state', cap) - countTokens(prevStale));
@@ -1105,83 +1108,6 @@ export class ContextAssembler {
     return this.finalize(projectId, 'outline', chapter, sections, [], budgetTokens, opts);
   }
 
-  async forRevision(projectId: bigint, chapter: number, feedbackId: bigint, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
-
-    const [project, brief, prevChapter, recentChapters, prevDraft, currentDraft, feedbackRows] = await Promise.all([
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
-      this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter - 1)) }),
-      this.db.query.chapters.findMany({
-        where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
-        orderBy: sql`${schema.chapters.number} DESC`,
-        limit: 3,
-      }),
-      this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter - 1)) }),
-      this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) }),
-      this.db.query.userFeedback.findMany({
-        where: and(eq(schema.userFeedback.projectId, projectId), sql`${schema.userFeedback.artifactRef} like ${'draft:' + chapter}`),
-        orderBy: sql`${schema.userFeedback.createdAt} DESC`,
-        limit: 5,
-      }),
-    ]);
-
-    void feedbackId; // Used for audit context, not for filtering here.
-    const sections: ContextSection[] = [];
-    const [disclosure, currentVolume] = await Promise.all([loadWriterDisclosurePolicy(this.db, projectId, chapter), this.volumeByKey(projectId, brief?.volumeKey)]);
-
-    if (prevChapter) {
-      const isIsolated = prevChapter.isolated;
-      const isFinal = prevChapter.status === 'done';
-      const tier: ContextTier = isFinal ? 'canonical' : 'working';
-      if (isIsolated) {
-        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure), tier, [`chapter:${chapter - 1}`]));
-      } else {
-        sections.push(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
-      }
-    }
-
-    const prevState = prevDraft?.state;
-    if (prevState != null)
-      sections.push(makeSection('continuation_state', `${staleDraftPrefix(prevDraft)}${renderCarriedState(prevState, disclosure)}`, 'working', [`chapter:${chapter - 1}`]));
-
-    if (brief) sections.push(makeSection('brief', disclosure.scrub(brief.body, 'plan'), 'approved_intent', [`chapter:${chapter}`]));
-    if (currentVolume?.objective) {
-      const content = disclosure.scrub(currentVolume.objective, 'plan');
-      sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
-    }
-
-    const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
-    let unresolvedRefs: string[] = [];
-    let withheldRefs: string[] = [];
-    if (contextRefs.length > 0) {
-      const { resolved, unresolved, withheld } = await this.resolveRefsFor(projectId, contextRefs, chapter, disclosure);
-      unresolvedRefs = unresolved;
-      withheldRefs = withheld;
-      for (const s of resolved) sections.push(s);
-    }
-
-    if (currentDraft?.body) {
-      sections.push(makeSection('current_draft', currentDraft.body, 'working', [`chapter:${chapter}`]));
-    }
-
-    if (feedbackRows.length > 0) {
-      const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ? disclosure.scrub(f.note, 'note') : f.disposition}`).join('\n');
-      sections.push(makeSection('feedback', notes, 'working', []));
-    }
-
-    if (recentChapters.length > 0) {
-      const lines = recentChapters
-        .slice()
-        .reverse()
-        .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
-      sections.push(makeSection('memory', disclosure.scrub(lines.join('\n'), 'summary'), 'canonical', []));
-    }
-    sections.push(writingStyleSection(project?.instructions, disclosure));
-
-    return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, { ...opts, disclosure, withheldRefs });
-  }
-
   async forValidationWindow(projectId: bigint, from: number, to: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
@@ -1493,6 +1419,11 @@ export class ContextAssembler {
     return this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) });
   }
 
+  private async rosterKeys(projectId: bigint): Promise<Set<string>> {
+    const rows = await this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } });
+    return new Set(rows.map(row => row.entityKey));
+  }
+
   private async finalize(
     projectId: bigint,
     purpose: ContextPurpose,
@@ -1505,6 +1436,10 @@ export class ContextAssembler {
     const contributed = [...sections, ...pluginContextSections(opts?.policy, sections, opts?.disclosure)];
     const budgeted = applyBudget(contributed, budgetTokens);
     const fittingSections = budgeted.fitting;
+    if (opts?.policy?.writerClass === 'permissive') {
+      const hit = screenTexts(sectionScreens(fittingSections));
+      if (hit) throw hardLineError(hit);
+    }
     const omitted = [...(opts?.omitted ?? []), ...budgeted.omitted];
     // Stable sections render first so the prefix stays byte-identical across calls with unchanged
     // canon (the provider prompt-cache contract); callers list stable sections first, so for the

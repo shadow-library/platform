@@ -12,7 +12,7 @@ Return the full state for the revised chapter: carry forward the incoming "## CO
 
 export const revisionPrompt: PromptModule<GenerationOutput> = {
   key: 'revision',
-  version: '1.4.0',
+  version: '1.5.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

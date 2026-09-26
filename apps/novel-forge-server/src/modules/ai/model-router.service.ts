@@ -14,7 +14,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
-import { GatewayChatOpenAI } from './gateway-chat-openai';
+import { GatewayChatOpenAI, type RequestGuard } from './gateway-chat-openai';
 import {
   type AiRole,
   COST_TIER_DEFAULTS,
@@ -29,6 +29,18 @@ import {
 import { type AccountModelGroup, AccountSettingsService } from './account-settings.service';
 import { AiQuotaService } from './ai-quota.service';
 import { scopedCostTier } from './cost-tier-scope';
+import {
+  findHardLine,
+  HARD_LINE_SYSTEM_LINE,
+  hardLineError,
+  inputScreens,
+  isHardLineRefusal,
+  outputScope,
+  outputScreens,
+  type ScreenedText,
+  screenTexts,
+  wireMessageTexts,
+} from './hard-line';
 import { extractJsonCandidates, tryParseJson } from './json-extract';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
@@ -77,6 +89,10 @@ export interface GeneratedImage {
 interface OpenRouterImageResponse {
   data?: { b64_json?: string; media_type?: string }[];
   usage?: { cost?: number };
+}
+
+function pluginScreens(policy: ForgeCallPolicy | undefined): ScreenedText[] {
+  return (policy?.systemMessages ?? []).map(message => ({ text: message.content, scope: 'background', source: "A plugin's instructions" }));
 }
 
 // Deterministic verification/extraction roles: identical input must yield identical output, so their
@@ -153,14 +169,26 @@ function streamChunkText(content: MessageContent): string {
 
 // Display-only sink. A handler that throws — an SSE write to a connection the browser already dropped —
 // must never fail the model call, so the first failure retires the sink and the turn finishes unstreamed.
+const SENTENCE_END = /[.!?\n]["'”’)\]]*/g;
+
+function lastSentenceEnd(text: string): number {
+  let end = 0;
+  for (const match of text.matchAll(SENTENCE_END)) end = match.index + match[0].length;
+  return end;
+}
+
 class ReplyStreamRelay {
   private scanner = new ReplyStreamScanner();
   private streamed = '';
   private retired = false;
+  private held = '';
+  private withheld = false;
 
+  /** `refuses`: an unrestricted reply is released a whole sentence at a time, each screened first, so refused text never reaches the client. */
   constructor(
     private readonly handlers: ReplyStreamHandlers,
     private readonly onSinkError: (err: unknown) => void,
+    private readonly refuses?: (text: string) => boolean,
   ) {}
 
   get replyFound(): boolean {
@@ -171,19 +199,41 @@ class ReplyStreamRelay {
     const text = this.scanner.push(chunk);
     if (!text) return;
     this.streamed += text;
-    this.emit(() => this.handlers.onDelta(text));
+    this.forward(text, false);
   }
 
   restart(): void {
     this.scanner = new ReplyStreamScanner();
+    this.held = '';
+    this.withheld = false;
     if (!this.streamed) return;
     this.streamed = '';
     this.emit(() => this.handlers.onReset?.());
   }
 
   settle(rawResponse: string): void {
+    this.forward('', true);
     if (!this.streamed || this.streamed === new ReplyStreamScanner().push(rawResponse)) return;
     this.emit(() => this.handlers.onReset?.());
+  }
+
+  private forward(text: string, final: boolean): void {
+    if (!this.refuses) {
+      if (text) this.emit(() => this.handlers.onDelta(text));
+      return;
+    }
+    if (this.withheld) return;
+    this.held += text;
+    const cut = final ? this.held.length : lastSentenceEnd(this.held);
+    if (cut === 0) return;
+    const ready = this.held.slice(0, cut);
+    this.held = this.held.slice(cut);
+    if (this.refuses(ready)) {
+      this.withheld = true;
+      this.held = '';
+      return;
+    }
+    this.emit(() => this.handlers.onDelta(ready));
   }
 
   private emit(send: () => void): void {
@@ -295,7 +345,7 @@ export class ModelRouterService {
   // Every vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client covers them
   // all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the same wire
   // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
-  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig }): BaseChatModel {
+  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard }): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
     // design (see resolveProvider) and must not silently route to the platform's OpenRouter key.
@@ -314,15 +364,18 @@ export class ModelRouterService {
     // OpenRouter's `usage.cost` is dropped by @langchain/openai's parser; `__includeRawResponse` keeps it on
     // `additional_kwargs.__raw_response` for TelemetryHandler. It must be a constructor field: ChatOpenAI delegates to a
     // completions client built from its fields, and `bindTools` rebuilds from them too, so assigning it afterwards is lost.
-    return new GatewayChatOpenAI({
-      model: resolved.model,
-      apiKey,
-      maxRetries: 0,
-      configuration: { baseURL: Config.get('ai.openrouter.api.url') },
-      __includeRawResponse: true,
-      ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
-      ...opts?.telemetry,
-    });
+    return new GatewayChatOpenAI(
+      {
+        model: resolved.model,
+        apiKey,
+        maxRetries: 0,
+        configuration: { baseURL: Config.get('ai.openrouter.api.url') },
+        __includeRawResponse: true,
+        ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
+        ...opts?.telemetry,
+      },
+      opts?.guard,
+    );
   }
 
   // `ctx` is optional only for the smoke harness, which has no project. Telemetry is bound into the client rather than
@@ -332,7 +385,7 @@ export class ModelRouterService {
     const route = await this.routeFor(role, project, ctx?.projectId, policy);
     const { resolved } = route;
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
-    return this.buildClient(resolved, { role, ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}) });
+    return this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}) });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
@@ -384,9 +437,11 @@ export class ModelRouterService {
     const route = await this.routeFor(role, project, ctx.projectId, policy);
     const { resolved } = route;
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
-    const llm = this.buildClient(resolved, { role });
+    await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
+    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route) });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
-    const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err })) : null;
+    const refuses = route.contentMode === 'unrestricted' ? (text: string) => findHardLine([text], outputScope(role)) !== null : undefined;
+    const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err }), refuses) : null;
     // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
     // (dev-only) as a full snapshot to reproduce the exact model call locally.
     this.logger.debug('structured: invoking model', {
@@ -409,7 +464,9 @@ export class ModelRouterService {
         const parsedCached = this.parseOutput(promptModule, tryParseJson(cached.response));
         if (parsedCached.success) {
           this.logger.debug('LLM cache hit — skipping model call', { role, requestHash });
+          await this.refuseOutput(route, role, parsedCached.data, ctx, relay);
           relay?.push(cached.response);
+          relay?.settle(cached.response);
           return parsedCached.data;
         }
         this.logger.debug('LLM cache row present but no longer parses — re-invoking', { role, requestHash });
@@ -439,9 +496,7 @@ export class ModelRouterService {
     const { parsed: parsed1, usable: usable1 } = this.parseFirstAttempt(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
       this.logger.debug('structured: parsed on first attempt', { role, runId: ctx.runId, outputLength: rawOutput1.length });
-      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
-      relay?.settle(rawOutput1);
-      return parsed1.data;
+      return this.acceptOutput(route, role, ctx, relay, parsed1.data, { requestHash, promptModule, raw: rawOutput1 });
     }
 
     // The issue strings are structural field paths and validator messages — no author prose — so they ride
@@ -464,9 +519,7 @@ export class ModelRouterService {
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
-      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput2);
-      relay?.settle(rawOutput2);
-      return parsed2.data;
+      return this.acceptOutput(route, role, ctx, relay, parsed2.data, { requestHash, promptModule, raw: rawOutput2 });
     }
 
     const issues2 = renderSchemaIssues(parsed2.issues);
@@ -490,16 +543,12 @@ export class ModelRouterService {
       if (!parsedExtracted.success) continue;
       this.logger.debug('structured: parsed via tolerant extraction', { role, runId: ctx.runId, source });
       const extractedRaw = JSON.stringify(extracted);
-      await this.cacheResponse(requestHash, ctx, resolved, promptModule, extractedRaw);
-      relay?.settle(extractedRaw);
-      return parsedExtracted.data;
+      return this.acceptOutput(route, role, ctx, relay, parsedExtracted.data, { requestHash, promptModule, raw: extractedRaw });
     }
 
     if (usable1 !== undefined) {
       this.logger.warn('Repair unusable — keeping attempt 1 despite its advisory issues', { role, runId: ctx.runId, promptKey: promptModule.key, advisory: true, issues2 });
-      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
-      relay?.settle(rawOutput1);
-      return usable1;
+      return this.acceptOutput(route, role, ctx, relay, usable1, { requestHash, promptModule, raw: rawOutput1 });
     }
 
     this.logger.error('All parse attempts failed', {
@@ -528,6 +577,7 @@ export class ModelRouterService {
     await this.quota.enforce(ctx.projectId);
     const route = await this.routeFor('image', project, ctx.projectId);
     const { resolved } = route;
+    await this.refuseHardLine(route, [{ text: request.prompt, scope: 'supplied', source: 'The image prompt' }], ctx);
     const maxInputReferences = MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
     const referenceCount = request.inputReferences?.length ?? 0;
     if (referenceCount > maxInputReferences) throw AppErrorCode.AI_010.create({ model: resolved.model, max: maxInputReferences, count: referenceCount });
@@ -651,6 +701,86 @@ export class ModelRouterService {
     ];
   }
 
+  /** The parsed answer of a `chatFor` client (judge, validation), screened for its role before the caller keeps or forwards it. */
+  async screenOutput(role: AiRole, output: unknown, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<void> {
+    const route = await this.routeFor(role, project, ctx.projectId, policy);
+    await this.refuseHardLine(route, outputScreens(output, role), ctx, false);
+  }
+
+  private hardLineGuard(route: ModelRoute): RequestGuard | undefined {
+    if (route.contentMode !== 'unrestricted') return undefined;
+    return {
+      systemLine: HARD_LINE_SYSTEM_LINE,
+      screen: messages => {
+        const hit = screenTexts(wireMessageTexts(messages).map(text => ({ text, scope: 'background', source: 'The request' })));
+        if (hit) throw hardLineError(hit);
+      },
+    };
+  }
+
+  // Unrestricted routes only: a standard model holds this line itself, and screening its traffic would put the lexicon's false refusals in
+  // front of every author. The refusal is recorded as a `refused` call so the run's trail shows why no model answered.
+  // `record`: a refused request writes its own `refused` row; a refused output's call already has its row from the telemetry handler.
+  private async refuseHardLine(route: ModelRoute, screens: readonly ScreenedText[], ctx: TelemetryContext, record = true): Promise<void> {
+    if (route.contentMode !== 'unrestricted') return;
+    const hit = screenTexts(screens);
+    if (!hit) return;
+    this.logger.warn('hard line refused an unrestricted call', {
+      projectId: ctx.projectId,
+      runId: ctx.runId,
+      role: ctx.role,
+      rule: hit.rule,
+      source: hit.source,
+      sourceRefs: hit.sourceRefs,
+    });
+    if (!record) throw hardLineError(hit);
+    await this.db
+      .insert(schema.modelCalls)
+      .values({
+        projectId: ctx.projectId,
+        runId: ctx.runId,
+        node: ctx.node,
+        role: ctx.role,
+        provider: resolveProvider(route.resolved),
+        model: route.resolved.model,
+        tier: route.costTier,
+        contentMode: route.contentMode,
+        promptKey: ctx.promptKey,
+        promptVersion: ctx.promptVersion,
+        chapter: ctx.chapter ?? null,
+        status: 'refused',
+        latencyMs: 0,
+        attempt: 0,
+        error: { code: AppErrorCode.AI_015.code, rule: hit.rule, source: hit.source, sourceRefs: hit.sourceRefs },
+      })
+      .catch(err => this.logger.warn('Failed to write the model_calls row for a refused call', { err }));
+    throw hardLineError(hit);
+  }
+
+  // What an unrestricted model wrote is held to the full rule before it is cached or handed back, so a refused output is never persisted.
+  private async refuseOutput(route: ModelRoute, role: AiRole, output: unknown, ctx: TelemetryContext, relay: ReplyStreamRelay | null): Promise<void> {
+    try {
+      await this.refuseHardLine(route, outputScreens(output, role), ctx, false);
+    } catch (err) {
+      relay?.restart();
+      throw err;
+    }
+  }
+
+  private async acceptOutput<T>(
+    route: ModelRoute,
+    role: AiRole,
+    ctx: TelemetryContext,
+    relay: ReplyStreamRelay | null,
+    output: T,
+    cache: { requestHash: string | null; promptModule: PromptModule<T>; raw: string },
+  ): Promise<T> {
+    await this.refuseOutput(route, role, output, ctx, relay);
+    await this.cacheResponse(cache.requestHash, ctx, route.resolved, cache.promptModule, cache.raw);
+    relay?.settle(cache.raw);
+    return output;
+  }
+
   // Invoke config: telemetry callback + attribution metadata, all read by the telemetry handler; `costTier` and `contentMode` sit beside
   // `nfTelemetry` and become `model_calls.tier` / `model_calls.content_mode`.
   private invokeConfig(ctx: TelemetryContext, route: ModelRoute, role: AiRole, attempt: number, policy?: ForgeCallPolicy): TelemetryConfig {
@@ -688,6 +818,7 @@ export class ModelRouterService {
         return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
       } catch (err) {
         if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
+        if (isHardLineRefusal(err)) throw err;
         lastErr = err;
         if (attempt < this.llmMaxRetries) {
           const backoff = this.llmBackoffMs * 2 ** attempt;
@@ -723,6 +854,7 @@ export class ModelRouterService {
       } catch (err) {
         abandon.abort();
         if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
+        if (isHardLineRefusal(err)) throw err;
         lastErr = err;
         if (attempt < this.llmMaxRetries) {
           const backoff = this.llmBackoffMs * 2 ** attempt;

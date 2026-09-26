@@ -5,7 +5,7 @@ import { Logger } from '@shadow-library/common';
 
 import { markDescendantDraftsStale, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Generation, type PrimaryDatabase } from '@server/database';
+import { type Generation, type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
@@ -21,8 +21,9 @@ import {
 } from '../../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy, type WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../../eval/deterministic-metrics';
-import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
+import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, type ProjectBaseline, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { recordGenerationJudge } from '../../review/review-records';
+import { chapterContainment, chapterContentMode, type ChapterRole, routeChapterCall } from '../chapter-route';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ContextSection, splitSegments } from '../context/sections';
 import { loadWriterBrief } from '../context/writer-brief';
@@ -37,7 +38,7 @@ import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handl
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
-import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall, type UnrestrictedRouteDeps } from '../unrestricted-route';
+import { type CallRoute, type UnrestrictedRouteDeps } from '../unrestricted-route';
 import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics } from './mechanical-check';
 import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
@@ -86,6 +87,8 @@ const ChapterGenAnnotation = Annotation.Root({
   // Sticky, not last-write-wins: any call a plugin routed permissively during the run shapes the prose
   // that lands, so once raised the run stays contained however many later nodes resolve an unraised policy.
   writerClassRaised: Annotation<boolean>({ reducer: (a, n) => a || n, default: () => false }),
+  // Settled once from the plan when the run starts, so a plan edited mid-run cannot move later nodes off the route the prose was written on.
+  contentMode: Annotation<Project.ContentMode | null>({ reducer: (_, n) => n, default: () => null }),
   // outcome
   draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
@@ -98,7 +101,8 @@ type ChapterGenState = typeof ChapterGenAnnotation.State;
 export type PersistDraftInput = Pick<
   ChapterGenState,
   'projectId' | 'chapter' | 'volumeKey' | 'runId' | 'attempt' | 'repairMode' | 'writerClassRaised' | 'title' | 'prose' | 'summary' | 'continuationState'
->;
+> &
+  Partial<Pick<ChapterGenState, 'contentMode'>>;
 export type JudgeFinding = JudgeOutput['findings'][number];
 
 const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
@@ -107,16 +111,23 @@ export interface RunRouteDeps extends UnrestrictedRouteDeps {
   runPolicy: (projectId: bigint, call: PolicyCall) => Promise<ForgeCallPolicy>;
 }
 
+export interface RunCall {
+  role: ChapterRole;
+  chapter: number;
+  mode: Project.ContentMode;
+  raised: boolean;
+}
+
 // A raised run's prose is persisted as an isolated draft, so every later call that reads it stays on the unrestricted map whatever its own role resolves to.
-export async function routeRunCall(deps: RunRouteDeps, projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined, raised: boolean): Promise<CallRoute> {
-  if (raised) return resolveUnrestrictedRoute(deps, projectId, call, project);
-  return { policy: await deps.runPolicy(projectId, call), project };
+export function routeRunCall(deps: RunRouteDeps, projectId: bigint, call: RunCall, project: ProjectConfig | undefined): Promise<CallRoute> {
+  const mode = call.raised ? 'unrestricted' : call.mode;
+  return routeChapterCall({ ...deps, standardPolicy: deps.runPolicy }, projectId, { role: call.role, chapter: call.chapter, mode }, project);
 }
 
 export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistDraftInput): Promise<Generation.Draft> {
   const projectId = BigInt(state.projectId);
   const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
-  const containment = raisedContainment({ raised: state.writerClassRaised });
+  const containment = chapterContainment(state.contentMode ?? 'standard', { raised: state.writerClassRaised });
 
   // Upsert the draft and record its revision in one transaction: the revision log must never
   // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
@@ -308,18 +319,27 @@ export function parseJudgeOutput(raw: string): JudgeOutput | null {
 export function createChapterGenerationNodes(services: Omit<GraphServices, 'checkpointer'>) {
   const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy } = services;
 
-  // The graph is built per run, so this closure is the run's scope: one `project_plugins` read feeds every
-  // node's policy instead of one read per model call.
-  let resolver: Promise<ScopedPolicyResolver> | undefined;
-  async function policyFor(projectId: bigint, call: PolicyCall): Promise<ForgeCallPolicy> {
-    resolver ??= pluginPolicy.scoped(projectId);
-    return (await resolver).for(call);
+  // The graph is built per run, so this closure is the run's scope: one `project_plugins` read per baseline feeds every
+  // node's policy instead of one read per model call. The baseline is the chapter's mode, not the project's.
+  const resolvers = new Map<Project.ContentMode, Promise<ScopedPolicyResolver>>();
+  function resolverFor(projectId: bigint, mode: Project.ContentMode): Promise<ScopedPolicyResolver> {
+    let resolver = resolvers.get(mode);
+    if (!resolver) resolvers.set(mode, (resolver = pluginPolicy.scoped(projectId, { contentMode: mode })));
+    return resolver;
   }
 
-  async function packPolicyFor(projectId: bigint, call: PolicyCall): Promise<ForgeCallPolicy> {
-    resolver ??= pluginPolicy.scoped(projectId);
-    return (await resolver).forPack(call, CHAPTER_PACK_CONSUMERS);
+  async function policyFor(projectId: bigint, mode: Project.ContentMode, call: PolicyCall): Promise<ForgeCallPolicy> {
+    return (await resolverFor(projectId, mode)).for(call);
   }
+
+  async function packPolicyFor(projectId: bigint, mode: Project.ContentMode, call: PolicyCall): Promise<ForgeCallPolicy> {
+    return (await resolverFor(projectId, mode)).forPack(call, CHAPTER_PACK_CONSUMERS);
+  }
+
+  const runPluginPolicy = {
+    resolve: (projectId: bigint, call: PolicyCall, baseline?: ProjectBaseline) =>
+      policyFor(projectId, baseline?.contentMode === 'unrestricted' ? 'unrestricted' : 'standard', call),
+  };
 
   // One snapshot per run and chapter, so the pack, the brief and every repair prompt withhold the same material.
   const disclosures = new Map<number, Promise<WriterDisclosurePolicy>>();
@@ -329,22 +349,42 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     return disclosure;
   }
 
-  function routeFor(projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined, raised: boolean): Promise<CallRoute> {
-    return routeRunCall({ pluginPolicy, modelRouter, runPolicy: policyFor }, projectId, call, project, raised);
+  const settledModes = new Map<number, Promise<Project.ContentMode>>();
+  function chapterModeFor(projectId: bigint, chapter: number): Promise<Project.ContentMode> {
+    let mode = settledModes.get(chapter);
+    if (!mode) {
+      const brief = db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)), columns: { contentMode: true } });
+      settledModes.set(chapter, (mode = brief.then(row => chapterContentMode({ brief: row }))));
+    }
+    return mode;
+  }
+
+  // A state without a mode (a node entered directly, or a checkpoint older than the field) re-reads the plan rather than assuming standard.
+  async function routeFor(
+    projectId: bigint,
+    role: ChapterRole,
+    state: Pick<ChapterGenState, 'chapter' | 'writerClassRaised'> & Partial<Pick<ChapterGenState, 'contentMode'>>,
+    project: ProjectConfig | undefined,
+  ): Promise<CallRoute> {
+    const mode = state.contentMode ?? (await chapterModeFor(projectId, state.chapter));
+    const runPolicy = (id: bigint, call: PolicyCall) => policyFor(id, mode, call);
+    const call = { role, chapter: state.chapter, mode, raised: state.writerClassRaised };
+    return routeRunCall({ pluginPolicy: runPluginPolicy, modelRouter, runPolicy }, projectId, call, project);
   }
 
   async function assembleContext(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
+    const contentMode = await chapterModeFor(projectId, state.chapter);
     const call: PolicyCall = { role: 'generation', chapter: state.chapter };
-    const policy = await policyFor(projectId, call);
+    const policy = await policyFor(projectId, contentMode, call);
     const pack = await contextAssembler.forChapter(projectId, state.chapter, {
-      policy: await packPolicyFor(projectId, call),
+      policy: await packPolicyFor(projectId, contentMode, call),
       disclosure: await disclosureFor(projectId, state.chapter),
       enforceWriterReservations: true,
     });
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
     if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
-    return { contextPackId: pack.id ? String(pack.id) : null, writerClassRaised: policy.raised, nodeTrace: ['assembleContext'] };
+    return { contextPackId: pack.id ? String(pack.id) : null, contentMode, writerClassRaised: policy.raised, nodeTrace: ['assembleContext'] };
   }
 
   async function draftChapter(state: ChapterGenState) {
@@ -371,7 +411,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
+    const { policy, project } = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
     const disclosure = await disclosureFor(projectId, state.chapter);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const guidance = writerSafeGuidance(disclosure, state.guidance);
@@ -380,22 +420,16 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       PROMPT_REGISTRY.generation,
       { stableContext, volatileContext, chapterBrief, endingContract, guidance, ...generationWordTargetVars(wordTarget) },
       ctx,
-      projectRow as ProjectConfig | undefined,
+      project,
       policy,
     )) as { title: string; body: string; summary: string; state?: GenerationState };
-    const expansion = await expandShortDraft(
-      modelRouter,
-      { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance },
-      ctx,
-      projectRow as ProjectConfig | undefined,
-      policy,
-    );
+    const expansion = await expandShortDraft(modelRouter, { body: result.body, stableContext, volatileContext, chapterBrief, endingContract, guidance }, ctx, project, policy);
 
     let title = result.title ?? '';
-    let raised = policy.raised;
+    let raised = state.writerClassRaised || policy.raised;
     if (!title) {
       const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
-      const titleRoute = await routeFor(projectId, { role: 'title', chapter: state.chapter }, undefined, raised);
+      const titleRoute = await routeFor(projectId, 'title', { ...state, writerClassRaised: raised }, undefined);
       raised ||= titleRoute.policy.raised;
       const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx, titleRoute.project, titleRoute.policy)) as {
         title: string;
@@ -424,7 +458,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
   }
 
   async function persistDraft(state: ChapterGenState) {
-    const draft = await persistGeneratedDraft(db, state);
+    const contentMode = state.contentMode ?? (await chapterModeFor(BigInt(state.projectId), state.chapter));
+    const draft = await persistGeneratedDraft(db, { ...state, contentMode });
     return { draftId: String(draft.id), nodeTrace: ['persistDraft'] };
   }
 
@@ -486,12 +521,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
     const tools = toolRegistry.forNode('judge', toolCtx);
     const rawTools = toolRegistry.getRaw('judge');
-    const { policy: judgePolicy, project: judgeProject } = await routeFor(
-      projectId,
-      { role: 'judge', chapter: state.chapter },
-      projectRow as ProjectConfig | undefined,
-      state.writerClassRaised,
-    );
+    const { policy: judgePolicy, project: judgeProject } = await routeFor(projectId, 'judge', state, projectRow as ProjectConfig | undefined);
     const judgeTelemetry = {
       projectId,
       runId: state.runId || undefined,
@@ -545,6 +575,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       logger.warn('generation judge: could not parse judge output — retrying once', { runId: state.runId, chapter: state.chapter });
       judgeResult = await runJudgeModel();
     }
+    if (judgeResult) await modelRouter.screenOutput('judge', judgeResult, judgeTelemetry, judgeProject, judgePolicy);
 
     const evaluationFailed = !judgeResult;
     const verdict = judgeResult?.verdict ?? 'evaluation_failed';
@@ -631,7 +662,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const { policy, project } = await routeFor(projectId, { role: 'fix', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
+    const { policy, project } = await routeFor(projectId, 'repair', state, projectRow as ProjectConfig | undefined);
     const result = (await modelRouter.structured(PROMPT_REGISTRY.fix, { contextPack: renderedPack, prose: state.prose, findings: findingsStr }, ctx, project, policy)) as FixOutput;
 
     logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
@@ -699,7 +730,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const { policy, project } = await routeFor(projectId, { role: 'generation', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
+    const { policy, project } = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(

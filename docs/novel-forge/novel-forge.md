@@ -10,7 +10,7 @@
 ## Concepts
 
 - **Every project is the author's own novel** (`kind` is always `new_novel`). A finished manuscript arrives through novel import and lands as locked, human-authored
-  chapters. `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
+  chapters. `contentMode` (standard or unrestricted) is copied onto each new plan as its content mode; changing it never re-routes an existing chapter.
 - **Decision ledger (the Notebook)**: the author's decisions, directions, rejected ideas and backlog, append-only. An entry is superseded (a successor on the same topic)
   or withdrawn (with the author's reason), never edited in place; only the active set is read. A decision's writer line reaches the chapter writer, scrubbed of hidden
   facts; rejected ideas and the alternatives a decision passed over are the do-not-propose list.
@@ -154,12 +154,24 @@
 
 ### Canon, containment and knowledge
 
-- Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints all
-  skip isolated chapters. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A downstream chapter sees an isolated predecessor only as summary plus
-  continuation state; finalizing an isolated draft requires both. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
+- Draft and isolated content MUST NEVER be indexed or retrieved. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. Continuity and canon extraction
+  route by containment: standard prose on the standard map, an isolated chapter on the unrestricted one, told to describe non-graphically, its result staged for the author
+  (finalize NEVER applies it, nor reopens one the author settled) with every quoted excerpt withheld and `sourceIsolated` stamped on it. A standard chapter sees an isolated
+  predecessor only as its summary plus its structured positions (roster keys and places of at most 60 characters; no last beat, conflict, feelings or established facts);
+  finalizing an isolated draft requires a summary and a state. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
   there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary and cannot rewrite its body.
 - A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
   so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
+- A chapter's content mode is its plan's (none is standard; an isolated draft counts as unrestricted) and MUST route every call on that chapter's prose through the one
+  role table in `chapter-route.ts`. An unrestricted chapter runs the normal writer → judge → repair graph on the unrestricted route, is written isolated, and NEVER falls back to
+  a standard model. Anything feeding a standard call (chat lookups, plugins, art, packs) reads an isolated chapter through `isolation-read-policy.ts`: never its prose, free-text
+  state or judge note.
+- Every unrestricted call MUST pass the deterministic hard line (`hard-line.ts`) before it is sent, and its output before it is kept. A prompt variable not explicitly listed
+  as background, what the author or plan supplied, and what a creative role (writing, repair, revision, chat) wrote are held to the full rule; background context and derived
+  roles' output (summaries, extraction, judging, compaction) to a narrow explicit list. A refusal is `AI_015` naming the record, never quoting it; no model is called, nothing
+  is saved (a refused chat message included), a streamed reply is released only a screened sentence at a time, and a refused request's `refused` model-call row carries the
+  rule and source refs. A refused compaction is skipped, never failing the turn. Every unrestricted request also carries a system line forbidding such content. Standard
+  calls are not screened; the standard model holds that line itself.
 - Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, rewrites the chapter's final draft to match under a new `amended` revision (the replaced prose stays in its history, the judge verdict is cleared), and republishes only when the reader-visible hash moves; the chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
@@ -274,4 +286,7 @@
 - Cancellation is process-local: a cancel reaches only the replica running the work.
 - The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered
   `DRF_013` until the cascade locks them in chapter order.
-- A brief's content mode is stored but not yet routed: chapter writing follows the project's content mode until per-chapter routing lands with its isolation read policy.
+- The isolated chapter's bridge is its summary until the reviewed, structured bridge lands; the hard line is a lexical screen, so it refuses conservatively and can be evaded by wording.
+- Policy P4-27 (conservative, for the owner to revisit): "sex" and "molest" pair with a minor on the author's own text, so a survivor's backstory written in plain words
+  in a plan, a note or a chat message on the unrestricted route is refused.
+- Chapter reviews of an isolated chapter quote its prose, and nothing redacts them for a standard call yet; that policy lands with the chat's review lookup.

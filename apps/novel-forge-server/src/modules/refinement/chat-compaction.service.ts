@@ -10,6 +10,7 @@ import { type PrimaryDatabase, type Project, type Refinement, schema } from '@se
 import { countTokens } from '../ai/context/token-budget';
 import { isContentMode } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { findHardLine, isHardLineRefusal } from '../ai/hard-line';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ChatCompactOutput } from '../ai/schemas';
@@ -59,6 +60,7 @@ export class ChatCompactionService {
       history.push(new HumanMessage(`Conversation so far (compacted summary):\n${summary}`));
     }
     for (const message of verbatim) {
+      if (message.role !== 'assistant' && !standard && findHardLine([message.content])) continue;
       if (message.role !== 'assistant') history.push(new HumanMessage(message.content));
       else history.push(new AIMessage(unrestricted.has(message.id) ? UNRESTRICTED_REPLY_PLACEHOLDER : message.content));
     }
@@ -90,7 +92,10 @@ export class ChatCompactionService {
 
     const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
     const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;
-    const transcript = toFold.map(m => `${m.role}: ${m.content}`).join('\n\n');
+    const transcript = toFold
+      .filter(m => m.role === 'assistant' || !findHardLine([m.content]))
+      .map(m => `${m.role}: ${m.content}`)
+      .join('\n\n');
 
     const fallback = modeOf(project?.contentMode);
     const folded = await this.unrestrictedReplies(toFold, fallback);
@@ -101,7 +106,7 @@ export class ChatCompactionService {
 
     const prompt = PROMPT_REGISTRY['chat-compact'];
     const target = `session:${session.id}`;
-    const { runId: compactionRunId, result: summary } = await this.workflowRunService.runChain(projectId, CHAT_COMPACT_GRAPH, target, { watermark, contentMode }, async runId => {
+    const folding = this.workflowRunService.runChain(projectId, CHAT_COMPACT_GRAPH, target, { watermark, contentMode }, async runId => {
       const ctx = { projectId, runId, node: CHAT_COMPACT_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'compact' };
       const route = raised
         ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, { role: 'compact' }, selected)
@@ -110,6 +115,19 @@ export class ChatCompactionService {
       const output = (await this.modelRouter.structured(prompt, input, ctx, route?.project ?? selected, route?.policy)) as ChatCompactOutput;
       return output.summary;
     });
+    // A refused fold is skipped, not failed: the turn runs on the uncompacted window and the next turn tries again.
+    const compacted = await folding.catch((err: unknown) => {
+      if (!isHardLineRefusal(err)) throw err;
+      this.logger.warn('chat compaction refused by the hard line — keeping the verbatim window', {
+        projectId,
+        sessionId: session.id,
+        rule: err.data?.['rule'],
+        source: err.data?.['source'],
+      });
+      return null;
+    });
+    if (!compacted) return undefined;
+    const { runId: compactionRunId, result: summary } = compacted;
 
     await this.db.update(schema.chatSessions).set({ summary, summaryThroughOrdinal: watermark, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
     session.summary = summary;

@@ -14,6 +14,7 @@ import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-ass
 import { countTokens } from '../ai/context/token-budget';
 import { isRegisteredModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { hardLineError, screenTexts } from '../ai/hard-line';
 import { type ModelRoute, ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
 import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
@@ -461,6 +462,12 @@ export class ChatService {
     const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
     const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
+    // Refused before it is saved: a stored message would ride every later turn's history and refuse the session with it.
+    const refused = route.contentMode === 'unrestricted' ? screenTexts([{ text: content, scope: 'supplied', source: 'Your message' }]) : null;
+    if (refused) {
+      this.logger.warn('chat turn refused by the hard line before it was saved', { projectId, sessionId, rule: refused.rule, source: refused.source });
+      throw hardLineError(refused);
+    }
     const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
     const justDiscussing = options.justDiscussing === true;

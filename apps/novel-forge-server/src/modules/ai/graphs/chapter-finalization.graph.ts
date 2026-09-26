@@ -16,7 +16,9 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { chapterProjectConfig } from '../chapter-route';
 import { type ContextAssembler } from '../context/context-assembler.service';
+import { isolatedContinuityProposal, isolatedExtractionContext } from '../isolation-read-policy';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
@@ -24,6 +26,48 @@ import { type ContinuityOutput, type GenerationState } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { applyContinuityDelta, continuityHasHeldEntries, type ContinuityTransaction, filterToHeldEntries } from './apply-continuity';
+
+export interface IsolatedContinuityInput {
+  projectId: bigint;
+  chapter: number;
+  prose: string;
+  contextPack: string;
+}
+
+/**
+ * Walled-off prose is read only on the unrestricted route, and what it yields waits for the author as a pending proposal with its excerpts
+ * withheld: finalize never applies it, and a replay never reopens one the author already settled. Staging is advisory, so a failure is
+ * logged and the chapter still finalizes.
+ */
+export async function stageIsolatedContinuity(
+  services: { db: PrimaryDatabase; modelRouter: Pick<ModelRouterService, 'structured' | 'resolveFor'> },
+  input: IsolatedContinuityInput,
+  ctx: TelemetryContext,
+): Promise<void> {
+  const { db, modelRouter } = services;
+  try {
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, input.projectId) });
+    const routed = chapterProjectConfig(projectRow as ProjectConfig | undefined, 'unrestricted');
+    const extracted = (await modelRouter.structured(
+      PROMPT_REGISTRY.continuity,
+      { contextPack: isolatedExtractionContext(input.contextPack), chapterNumber: input.chapter, chapterProse: input.prose },
+      ctx,
+      routed,
+    )) as ContinuityOutput;
+    const proposal = isolatedContinuityProposal(extracted);
+    const resolvedModel = await modelRouter.resolveFor('continuity', routed, input.projectId);
+    await db
+      .insert(schema.continuityProposals)
+      .values({ projectId: input.projectId, chapter: input.chapter, proposal: proposal as never, model: resolvedModel.model, status: 'pending' })
+      .onConflictDoUpdate({
+        target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
+        set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, updatedAt: new Date() },
+        setWhere: eq(schema.continuityProposals.status, 'pending'),
+      });
+  } catch (err) {
+    logger.warn('finalization: isolated continuity not staged', { projectId: input.projectId, chapter: input.chapter, err });
+  }
+}
 
 export interface FinalizationServices {
   db: PrimaryDatabase;
@@ -210,10 +254,45 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     if (!owned) throw AppError.internal(`[${node}] Lost the continuity claim for chapter ${chapter}; another run took ownership`);
   }
 
-  async function extractContinuity(state: FinalizationState) {
-    if (state.isolated) return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
+  async function continuityRoster(projectId: bigint): Promise<string> {
+    const entityRows = await db.query.entities.findMany({
+      where: eq(schema.entities.projectId, projectId),
+      with: { aliases: true },
+      columns: { entityKey: true, name: true, type: true },
+    });
+    const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
 
+    // Thread and mystery keys are model-authored and upserted by key, so without the existing vocabulary the
+    // extractor coins a fresh key for a thread it already tracks and the same thread splits into two records.
+    const threadRows = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId), columns: { threadKey: true, status: true, summary: true } });
+    const mysteryRows = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId), columns: { mysteryKey: true, status: true, question: true } });
+    const threadRoster = threadRows.map(t => `${t.threadKey} (${t.status}): ${t.summary ?? ''}`).join('\n');
+    const mysteryRoster = mysteryRows.map(m => `${m.mysteryKey} (${m.status}): ${m.question}`).join('\n');
+    return [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join('\n\n');
+  }
+
+  function continuityContext(state: FinalizationState, projectId: bigint): TelemetryContext {
+    return {
+      projectId,
+      runId: state.runId,
+      node: 'extractContinuity',
+      promptKey: 'continuity',
+      promptVersion: PROMPT_REGISTRY.continuity.version,
+      role: 'continuity',
+      chapter: state.chapter,
+    };
+  }
+
+  async function extractContinuity(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
+    if (state.isolated) {
+      await stageIsolatedContinuity(
+        { db, modelRouter },
+        { projectId, chapter: state.chapter, prose: state.prose, contextPack: await continuityRoster(projectId) },
+        continuityContext(state, projectId),
+      );
+      return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
+    }
     const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));
 
     // Claiming the row is the only thing that grants the right to extract. A plain `continuityApplied` read
@@ -235,33 +314,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
     }
 
-    const entityRows = await db.query.entities.findMany({
-      where: eq(schema.entities.projectId, projectId),
-      with: { aliases: true },
-      columns: { entityKey: true, name: true, type: true },
-    });
-    const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
-
-    // Thread and mystery keys are model-authored and upserted by key, so without the existing vocabulary the
-    // extractor coins a fresh key for a thread it already tracks and the same thread splits into two records.
-    const threadRows = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId), columns: { threadKey: true, status: true, summary: true } });
-    const mysteryRows = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId), columns: { mysteryKey: true, status: true, question: true } });
-    const threadRoster = threadRows.map(t => `${t.threadKey} (${t.status}): ${t.summary ?? ''}`).join('\n');
-    const mysteryRoster = mysteryRows.map(m => `${m.mysteryKey} (${m.status}): ${m.question}`).join('\n');
-    const contextPack = [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join(
-      '\n\n',
-    );
-
-    const ctx: TelemetryContext = {
-      projectId,
-      runId: state.runId,
-      node: 'extractContinuity',
-      promptKey: 'continuity',
-      promptVersion: PROMPT_REGISTRY.continuity.version,
-      role: 'continuity',
-      chapter: state.chapter,
-    };
+    const contextPack = await continuityRoster(projectId);
+    const ctx = continuityContext(state, projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    // Containment decides the route here, not the plan: this prose is not walled off, so it goes to the standard map.
+    const routed = chapterProjectConfig(projectRow as ProjectConfig | undefined, 'standard');
 
     // A failure that surfaces fast releases the claim immediately, so the next retry starts at once instead of
     // waiting out the whole lease; only a worker that dies without unwinding leaves the lease to expire.
@@ -270,11 +327,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         PROMPT_REGISTRY.continuity,
         { contextPack, chapterNumber: state.chapter, chapterProse: state.prose },
         ctx,
-        projectRow as ProjectConfig | undefined,
+        routed,
       )) as ContinuityOutput;
 
       // Upsert continuity proposal.
-      const resolvedModel = await modelRouter.resolveFor('continuity', projectRow as ProjectConfig | undefined, projectId);
+      const resolvedModel = await modelRouter.resolveFor('continuity', routed, projectId);
       await db.transaction(async tx => {
         await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
         await tx

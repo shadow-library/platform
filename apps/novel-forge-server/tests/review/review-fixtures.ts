@@ -202,6 +202,7 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
       costTier: scopedCostTier() ?? 'balanced',
       contentMode: project?.contentMode === 'unrestricted' ? 'unrestricted' : 'standard',
     }),
+    screenOutput: async () => undefined,
     chatFor: async (role: string, _ctx: unknown, project?: { contentMode?: string }) => ({
       invoke: async (messages: BaseMessage[]) => {
         record(role, project, promptText(messages));

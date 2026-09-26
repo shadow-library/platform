@@ -6,6 +6,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
+import { standardReadableDraft } from '../ai/isolation-read-policy';
 import { type LoadedPlugin, loadPlugins, validateManifest } from './plugin-loader';
 import { type ForgePlugin, type PluginHostApi, type ScopedPluginHost } from './plugin.types';
 
@@ -119,8 +120,12 @@ export class ScopedPluginHostFactory {
     return this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
   }
 
-  private readDraft(projectId: bigint, chapter: number): Promise<unknown> {
-    return this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+  // A plugin's contributions reach standard calls, so it reads an isolated draft the way a standard call does.
+  private async readDraft(projectId: bigint, chapter: number): Promise<unknown> {
+    const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+    if (!draft?.isolated) return draft;
+    const roster = await this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } });
+    return standardReadableDraft(draft, new Set(roster.map(row => row.entityKey)));
   }
 
   private readEntities(projectId: bigint): Promise<unknown[]> {

@@ -36,6 +36,13 @@
       "when": 1790420290210,
       "tag": "0004_draft_approved_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790423467625,
+      "tag": "0005_brief_content_mode_backfill",
+      "breakpoints": true
     }
   ]
 }

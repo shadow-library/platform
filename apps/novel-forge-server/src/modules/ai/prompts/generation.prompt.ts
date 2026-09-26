@@ -34,7 +34,7 @@ When the context pack contains a "## KNOWN FACTS (POV CAST)" section, the chapte
 // with the per-chapter volatile segment and the brief last.
 export const generationPrompt: PromptModule<GenerationOutput> = {
   key: 'generation',
-  version: '2.8.0',
+  version: '2.9.0',
   kind: 'authoring',
   cacheStrategy: { stableVars: ['stableContext'] },
   system,

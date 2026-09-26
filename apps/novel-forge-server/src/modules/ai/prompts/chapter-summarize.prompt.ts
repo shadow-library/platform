@@ -10,7 +10,7 @@ const system =
 
 export const chapterSummarizePrompt: PromptModule<ChapterSummarizeOutput> = {
   key: 'chapter-summarize',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'analytical',
   role: 'continuity',
   system,

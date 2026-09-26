@@ -1,7 +1,7 @@
 import { type CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { type BaseMessage } from '@langchain/core/messages';
 import { type ChatGenerationChunk } from '@langchain/core/outputs';
-import { ChatOpenAI, ChatOpenAICompletions, type ChatOpenAIFields, type OpenAIClient } from '@langchain/openai';
+import { ChatOpenAI, ChatOpenAICompletions, type ChatOpenAIFields, ChatOpenAIResponses, type OpenAIClient } from '@langchain/openai';
 
 export interface RawGatewayInfo {
   served_by?: string;
@@ -13,6 +13,13 @@ export type GatewayFrame = Record<string, unknown> & { gateway?: RawGatewayInfo 
 
 interface GatewayBox {
   gateway?: RawGatewayInfo;
+}
+
+export interface RequestGuard {
+  /** Runs on the outgoing wire messages immediately before the request is sent, and throws to stop it being sent at all. */
+  screen: (messages: readonly { content?: unknown }[]) => void;
+  /** Sent as the first system message of every request. */
+  systemLine: string;
 }
 
 const GATEWAY_BOX = Symbol('gatewayBox');
@@ -49,6 +56,13 @@ export function stampGatewayOnUsageChunk(chunk: ChatGenerationChunk, gateway: Ra
  * concurrent streams sharing this one delegate can never cross-wire.
  */
 class GatewayTappingCompletions extends ChatOpenAICompletions {
+  constructor(
+    fields: ChatOpenAIFields | undefined,
+    private readonly guard?: RequestGuard,
+  ) {
+    super(fields);
+  }
+
   override completionWithRetry(
     request: OpenAIClient.Chat.ChatCompletionCreateParamsStreaming,
     requestOptions?: OpenAIClient.RequestOptions,
@@ -61,6 +75,10 @@ class GatewayTappingCompletions extends ChatOpenAICompletions {
     request: OpenAIClient.Chat.ChatCompletionCreateParamsStreaming | OpenAIClient.Chat.ChatCompletionCreateParamsNonStreaming,
     requestOptions?: OpenAIClient.RequestOptions,
   ): Promise<AsyncIterable<OpenAIClient.Chat.Completions.ChatCompletionChunk> | OpenAIClient.Chat.Completions.ChatCompletion> {
+    if (this.guard) {
+      this.guard.screen(request.messages);
+      request = { ...request, messages: [{ role: 'system', content: this.guard.systemLine }, ...request.messages] };
+    }
     if (!request.stream) return super.completionWithRetry(request, requestOptions);
     const result = await super.completionWithRetry(request, requestOptions);
     const box = (requestOptions as Record<symbol, GatewayBox> | undefined)?.[GATEWAY_BOX];
@@ -81,9 +99,37 @@ class GatewayTappingCompletions extends ChatOpenAICompletions {
   }
 }
 
+// ChatOpenAI switches a call to the Responses API on its own for some models and options, so the guard has to sit on that delegate too.
+class GuardedResponses extends ChatOpenAIResponses {
+  constructor(
+    fields: ChatOpenAIFields | undefined,
+    private readonly guard: RequestGuard,
+  ) {
+    super(fields);
+  }
+
+  override completionWithRetry(
+    request: OpenAIClient.Responses.ResponseCreateParamsStreaming,
+    requestOptions?: OpenAIClient.RequestOptions,
+  ): Promise<AsyncIterable<OpenAIClient.Responses.ResponseStreamEvent>>;
+  override completionWithRetry(
+    request: OpenAIClient.Responses.ResponseCreateParamsNonStreaming,
+    requestOptions?: OpenAIClient.RequestOptions,
+  ): Promise<OpenAIClient.Responses.Response>;
+  override completionWithRetry(
+    request: OpenAIClient.Responses.ResponseCreateParamsStreaming | OpenAIClient.Responses.ResponseCreateParamsNonStreaming,
+    requestOptions?: OpenAIClient.RequestOptions,
+  ): Promise<AsyncIterable<OpenAIClient.Responses.ResponseStreamEvent> | OpenAIClient.Responses.Response> {
+    const input = typeof request.input === 'string' ? [{ content: request.input }] : ((request.input ?? []) as { content?: unknown }[]);
+    this.guard.screen([...input, { content: request.instructions ?? '' }]);
+    const instructions = [this.guard.systemLine, request.instructions].filter(Boolean).join('\n\n');
+    return super.completionWithRetry({ ...request, instructions } as OpenAIClient.Responses.ResponseCreateParamsNonStreaming, requestOptions);
+  }
+}
+
 /** A `ChatOpenAI` whose `completions` delegate recovers the CLI gateway's `gateway` object on a streamed call — see `GatewayTappingCompletions`. */
 export class GatewayChatOpenAI extends ChatOpenAI {
-  constructor(fields?: ChatOpenAIFields) {
-    super({ ...fields, completions: new GatewayTappingCompletions(fields) });
+  constructor(fields?: ChatOpenAIFields, guard?: RequestGuard) {
+    super({ ...fields, completions: new GatewayTappingCompletions(fields, guard), ...(guard ? { responses: new GuardedResponses(fields, guard) } : {}) });
   }
 }

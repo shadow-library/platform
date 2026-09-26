@@ -12,6 +12,7 @@ import * as schema from '@server/database/schemas';
 import { ProjectEventService } from '../../events/project-event.service';
 import { PluginPolicyService } from '../../plugins/plugin-policy.service';
 import { ContextAssembler } from '../context/context-assembler.service';
+import { isHardLineRefusal } from '../hard-line';
 import { ModelRouterService } from '../model-router.service';
 import { IndexingService } from '../retrieval/indexing.service';
 import { type GenerationState } from '../schemas';
@@ -189,7 +190,8 @@ export class WorkflowRunService {
 
   private async failRun(runId: string, err: unknown, node?: string): Promise<void> {
     const code = err instanceof AppError ? err.code : undefined;
-    const error = err instanceof Error ? { class: err.constructor.name, message: err.message, code, node } : { class: 'UnknownError', message: String(err), node };
+    const details = isHardLineRefusal(err) ? { details: err.data } : {};
+    const error = err instanceof Error ? { class: err.constructor.name, message: err.message, code, node, ...details } : { class: 'UnknownError', message: String(err), node };
     this.logger.debug('persisting workflow run failure', { runId, node, error });
     const [run] = await this.db
       .update(schema.workflowRuns)

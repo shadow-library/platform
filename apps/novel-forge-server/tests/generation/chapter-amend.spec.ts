@@ -102,6 +102,7 @@ function amendFake(options: AmendFakeOptions = {}) {
   const db = {
     query: {
       projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard' }) },
+      briefs: { findFirst: async () => undefined },
       chapters: { findFirst: async () => ({ ...chapter }) },
       chapterPublications: { findFirst: async () => undefined },
       drafts: {

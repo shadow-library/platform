@@ -4,6 +4,7 @@ import { type CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { assertWriterContextFits, type CompletedVolume, renderCompletedVolumes, WRITER_SECTION_CAPS } from '@modules/ai/context/writer-context';
+import { emptyPolicy } from '@modules/plugins/plugin-policy.service';
 
 type Row = Record<string, unknown>;
 
@@ -68,6 +69,8 @@ async function requiredTokens(fixture: Fixture): Promise<number> {
 const oren = { id: 2n, entityKey: 'oren', name: 'Oren Vale', type: 'character', status: 'active', body: sentence('Oren', 40), notes: null, aliases: [] };
 const guild = { id: 3n, entityKey: 'salt_guild', name: 'Salt Guild', type: 'faction', status: 'active', body: sentence('The guild', 40), notes: null, aliases: [] };
 const saltPage = { section: 'world', slug: 'salt-flats', body: 'The salt flats flood at the spring tide.' };
+
+const UNRESTRICTED_READER = emptyPolicy('permissive');
 
 describe('ContextAssembler.forChapter — optional material', () => {
   beforeAll(() => countTokens('warm'));
@@ -263,7 +266,7 @@ describe('ContextAssembler.forChapter — stability and bounds', () => {
     );
   });
 
-  it('should fit an isolated predecessor state into the previous ending by whole entries, never by a cut inside its JSON', async () => {
+  it('should fit an isolated predecessor state into an unrestricted reader’s previous ending by whole entries, never by a cut inside its JSON', async () => {
     const state = { conflict: sentence('The quarrel', 200), lastAction: 'Ines seals the ledger.' };
     const isolated = (value: unknown): Fixture => ({ prevDraft: { chapter: 4, body: null, summary: 'Four ends at the weir.', state: value, isolated: true, staleReason: null } });
 
@@ -271,7 +274,7 @@ describe('ContextAssembler.forChapter — stability and bounds', () => {
       [state, { lastAction: 'Ines seals the ledger.' }],
       [['The weir holds.', sentence('A long list item', 200)], ['The weir holds.']],
     ] as const) {
-      const pack = await assembler(isolated(value)).forChapter(1n, 5, { dryRun: true, enforceWriterReservations: true });
+      const pack = await assembler(isolated(value)).forChapter(1n, 5, { dryRun: true, enforceWriterReservations: true, policy: UNRESTRICTED_READER });
       const ending = pack.sections.find(section => section.key === 'prev_ending');
       expect(ending?.truncated).toBe(false);
       expect(ending?.tokens).toBeLessThanOrEqual(WRITER_SECTION_CAPS.prevEnding);

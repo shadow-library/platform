@@ -26,6 +26,7 @@ import {
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
 
+import { defaultChapterMode } from '../ai/chapter-route';
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
@@ -725,7 +726,7 @@ export class ProposalApplyService {
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
       knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
       direction: op.direction !== undefined ? op.direction?.trim() || null : (existing?.direction ?? null),
-      contentMode: op.contentMode !== undefined ? op.contentMode : (existing?.contentMode ?? null),
+      contentMode: op.contentMode !== undefined ? op.contentMode : existing ? existing.contentMode : await defaultChapterMode(ctx.tx, ctx.projectId),
       scenes: op.scenes !== undefined ? op.scenes && normalizeBriefScenes(op.scenes) : (existing?.scenes ?? null),
       claimedMilestones: op.claimedMilestones !== undefined ? op.claimedMilestones && normalizeStringList(op.claimedMilestones) : (existing?.claimedMilestones ?? null),
       isEnding: op.isEnding ?? existing?.isEnding ?? false,

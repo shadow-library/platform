@@ -1,12 +1,21 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
+export class CharacterPosition {
+  @Field({ minLength: 1, description: "the character's entity key, exactly as the story context's roster lists it" })
+  entityKey: string;
+
+  @Field({ minLength: 1, maxLength: 60, description: 'where the character is at the cutoff, as a place only — "the lamp room", "on the north pier"' })
+  location: string;
+}
+
+@Schema()
 export class GenerationState {
   @Field({ optional: true, description: 'the unresolved conflict/tension active at chapter end, if any' })
   openConflict?: string;
 
-  @Field({ optional: true, description: 'where each on-scene character is, physically, at the cutoff' })
-  characterPositions?: string;
+  @Field(() => [CharacterPosition], { optional: true, description: 'where each on-scene character is, physically, at the cutoff — one entry per character' })
+  characterPositions?: CharacterPosition[];
 
   @Field({ optional: true, description: 'the exact last action, line, or decision — what the next chapter must resume from' })
   lastBeat?: string;

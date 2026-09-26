@@ -18,6 +18,7 @@ import {
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type PrimaryDatabase, schema } from '@server/database';
 
+import { defaultChapterMode } from '../ai/chapter-route';
 import { loadRevealGuard, sanitiseBriefReveals } from '../ai/context/canon-guard';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
@@ -206,6 +207,7 @@ export class ChapterInsertService {
           repetitionRisks: planned.repetitionRisks ?? null,
           densityRisk: planned.densityRisk?.trim() || null,
           writeMode: 'external',
+          contentMode: await defaultChapterMode(tx, projectId),
           handEdited: true,
           insertedAt: new Date(),
         })

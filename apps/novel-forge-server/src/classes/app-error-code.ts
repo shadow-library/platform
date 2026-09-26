@@ -78,7 +78,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_005 = AppErrorCode.badRequest('DRF_005', 'Chapter adds no new canon to the bible');
   static readonly DRF_006 = AppErrorCode.notFound('DRF_006', 'Chapter scene image not found');
   static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — something it was written against changed; regenerate or edit it, or approve it as written');
-  static readonly DRF_008 = AppErrorCode.badRequest('DRF_008', 'Chapter is isolated — continuity proposals and bible extraction are unavailable for isolated chapters');
   static readonly DRF_009 = AppErrorCode.badRequest('DRF_009', 'Draft approval is never applied automatically — select the approval step and apply it deliberately');
   static readonly DRF_010 = AppErrorCode.conflict('DRF_010', 'A generation job is already running for this project — wait for it to finish before regenerating a chapter');
   static readonly DRF_011 = AppErrorCode.badRequest('DRF_011', 'Chapter {chapter} cannot be generated before chapter {blocker} is drafted — chapters are generated in order');
@@ -134,6 +133,11 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'Appearance description needs the reference image as an inline base64 data: URL');
   static readonly AI_013 = AppErrorCode.conflict('AI_013', 'Workflow run was cancelled');
   static readonly AI_014 = AppErrorCode.badRequest('AI_014', 'Invalid date range — from and to must be valid dates, and from must not be after to');
+  static readonly AI_015 = AppErrorCode.badRequest(
+    'AI_015',
+    'This request was declined before it reached a model: {source} appears to involve sexual content with a minor, which Novel Forge never writes in any mode',
+    422,
+  );
 
   /*!
    * Illustration Errors

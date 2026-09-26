@@ -9,6 +9,7 @@ import { parseKnowledgeContract, revokeProvisionalReveals } from '@server/common
 import { APP_NAME } from '@server/constants';
 import { type ChapterReviewFinding, type Generation, type Job, type PrimaryDatabase, type PrimaryTransaction, type Project, type Review, schema } from '@server/database';
 
+import { chapterContentMode, routeChapterCall } from '../ai/chapter-route';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { loadWriterBrief } from '../ai/context/writer-brief';
 import { runWithCostTier } from '../ai/cost-tier-scope';
@@ -21,7 +22,7 @@ import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ReviewOutput } from '../ai/schemas/review.schema';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
-import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
+import { type CallRoute } from '../ai/unrestricted-route';
 import { type FactLike, loadKnowledgeView, scanKnowledgeLeaks, writerVisibleFactKeys } from '../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
@@ -92,7 +93,7 @@ interface ReviewSource extends ReviewedText {
 interface ChapterSetting {
   project: Project.Row | undefined;
   brief: Generation.Brief | undefined;
-  unrestricted: boolean;
+  mode: Project.ContentMode;
 }
 
 interface ModelKindContext {
@@ -153,7 +154,7 @@ export class ChapterReviewService {
     if (!MODEL_KINDS.has(request.kind)) return { queued: false, review: await this.run(projectId, chapter, request) };
     const source = await this.reviewableSource(projectId, chapter);
     const setting = await this.chapterSetting(projectId, chapter, source, request.contentMode);
-    await this.routeFor(projectId, { role: request.kind === 'judge' ? 'judge' : 'review', chapter }, setting);
+    await this.routeFor(projectId, request.kind === 'judge' ? 'judge' : 'review', chapter, setting);
     const payload: ReviewJobPayload & { costTier?: Project.CostTier } = { chapter, kind: request.kind, contentMode: request.contentMode, costTier: request.costTier };
     const jobId = await this.jobService.enqueue(projectId, 'review', `chapter-${chapter}-${request.kind}`, payload);
     const runId = await this.workflowRunService.createRun(projectId, REVIEW_GRAPH, `chapter-${chapter}`, { kind: request.kind, chapter }, jobId);
@@ -268,7 +269,7 @@ export class ChapterReviewService {
           chapter,
           draftRevision: source.draftRevision,
           bodyHash: source.bodyHash,
-          isolated: setting.unrestricted,
+          isolated: setting.mode === 'unrestricted',
           kind: request.kind,
           ...outcome,
           runId,
@@ -297,7 +298,7 @@ export class ChapterReviewService {
     jobId?: string,
   ): Promise<{ runId: string; result: { outcome: ReviewOutcome; model: UsedModel } }> {
     const role = kind === 'judge' ? 'judge' : 'review';
-    const route = await this.routeFor(projectId, { role, chapter }, setting);
+    const route = await this.routeFor(projectId, role, chapter, setting);
     const input = { kind, chapter, draftRevision: source.draftRevision, contentMode: route.project?.contentMode ?? 'standard' };
     return this.workflowRunService.runChain(
       projectId,
@@ -362,6 +363,7 @@ export class ChapterReviewService {
       this.logger.warn('judge answer unparseable — asking once more', { projectId, chapter, runId });
       output = await ask();
     }
+    if (output) await this.modelRouter.screenOutput('judge', output, telemetry, route.project, route.policy);
 
     return judgeOutcome(source.body, {
       output,
@@ -408,14 +410,12 @@ export class ChapterReviewService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
     ]);
-    const chapterMode = brief?.contentMode ?? project?.contentMode;
-    return { project, brief, unrestricted: source.isolated || chapterMode === 'unrestricted' || override === 'unrestricted' };
+    return { project, brief, mode: override === 'unrestricted' ? 'unrestricted' : chapterContentMode({ brief, isolated: source.isolated }) };
   }
 
-  private async routeFor(projectId: bigint, call: RoutedCall, setting: ChapterSetting): Promise<CallRoute> {
-    const config = setting.project as ProjectConfig | undefined;
-    if (setting.unrestricted) return resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, config);
-    return { policy: await this.pluginPolicy.resolve(projectId, call, setting.project), project: config };
+  private routeFor(projectId: bigint, role: 'judge' | 'review', chapter: number, setting: ChapterSetting): Promise<CallRoute> {
+    const deps = { pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter };
+    return routeChapterCall(deps, projectId, { role, chapter, mode: setting.mode }, setting.project as ProjectConfig | undefined);
   }
 
   private async reviewableSource(projectId: bigint, chapter: number): Promise<ReviewSource> {

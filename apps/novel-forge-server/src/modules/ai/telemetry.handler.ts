@@ -10,6 +10,7 @@ import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
+import { isHardLineRefusal } from './hard-line';
 import { type ReasoningEffort } from './models';
 import { classifyCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
 
@@ -300,7 +301,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         model: call.model,
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
-        status: 'transport_error',
+        status: isHardLineRefusal(err) ? 'refused' : 'transport_error',
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
         reasoningEffort: call.reasoningEffort ?? null,
@@ -310,7 +311,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',
-        error: { class: err.constructor.name, message: err.message },
+        error: { class: err.constructor.name, message: err.message, ...(isHardLineRefusal(err) ? err.data : {}) },
       });
     } catch (writeErr) {
       this.logger.error('Failed to write model_call error telemetry row', { writeErr });

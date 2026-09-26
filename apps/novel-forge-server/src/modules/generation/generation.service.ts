@@ -29,6 +29,7 @@ import {
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
 
+import { chapterContainment, chapterContentMode, type ChapterRole, defaultChapterMode, routeChapterCall } from '../ai/chapter-route';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { loadWriterBrief } from '../ai/context/writer-brief';
@@ -45,8 +46,9 @@ import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema'
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
+import { isolatedContinuityProposal, isolatedExtractionContext, standardReadableExtraction } from '../ai/isolation-read-policy';
 import { TelemetryHandler } from '../ai/telemetry.handler';
-import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
+import { type CallRoute } from '../ai/unrestricted-route';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeCallUsage, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
@@ -55,7 +57,7 @@ import { redactJobForResponse, toJobUsageResponse } from '../jobs/job-response';
 import { type JobUsageResponse } from '../jobs/jobs.dto';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
-import { PluginPolicyService, raisedContainment } from '../plugins/plugin-policy.service';
+import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { PluginProposalService } from '../plugins/plugin-proposal.service';
 import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
@@ -260,10 +262,11 @@ export class GenerationService {
       const approvedTerms = existing && { knowledgeContract: existing.knowledgeContract, claimedMilestones: existing.claimedMilestones };
       const revision = (existing?.revision ?? 0) + 1;
       const volumeKey = existing ? existing.volumeKey : await nearestVolumeKey(tx, projectId, chapter);
-      const contentHash = briefContentHash({ ...existing, chapter, volumeKey, ...edits });
+      const created = existing ? {} : { contentMode: await defaultChapterMode(tx, projectId) };
+      const contentHash = briefContentHash({ ...existing, ...created, chapter, volumeKey, ...edits });
       const [upserted] = await tx
         .insert(schema.briefs)
-        .values({ knowledgeContract: null, ...edits, projectId, chapter, volumeKey, body: body.body, revision, contentHash, handEdited: true })
+        .values({ knowledgeContract: null, ...created, ...edits, projectId, chapter, volumeKey, body: body.body, revision, contentHash, handEdited: true })
         .onConflictDoUpdate({
           target: [schema.briefs.projectId, schema.briefs.chapter],
           set: { ...edits, revision, contentHash, handEdited: true, updatedAt: new Date() },
@@ -456,7 +459,8 @@ export class GenerationService {
 
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'revision', chapter }, project);
+    const mode = chapterContentMode({ brief, isolated: draft.isolated });
+    const { policy, project: routedProject } = await this.chapterRoute(projectId, { role: 'revise', chapter, mode }, project);
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure, enforceWriterReservations: true });
 
@@ -491,7 +495,7 @@ export class GenerationService {
           revision: sql`${schema.drafts.revision} + 1`,
           reviewStatus: disclosure.leakLines(revised.body).length > 0 ? 'contradiction' : 'needs_review',
           staleReason: null,
-          ...(draft.isolated ? { isolated: true } : raisedContainment(policy)),
+          ...(draft.isolated ? { isolated: true } : chapterContainment(mode, policy)),
           updatedAt: new Date(),
         })
         .where(
@@ -726,12 +730,7 @@ export class GenerationService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
 
-    const { policy, project: routedProject } = await resolveUnrestrictedRoute(
-      { pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter },
-      projectId,
-      { role: 'generation', chapter },
-      project as ProjectConfig | undefined,
-    );
+    const { policy, project: routedProject } = await this.chapterRoute(projectId, { role: 'draft', chapter, mode: 'unrestricted' }, project);
     const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure, enforceWriterReservations: true });
     const ctx = { projectId, chapter, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
@@ -816,7 +815,8 @@ export class GenerationService {
     const draft = await this.getDraft(projectId, chapter);
     if (!draft.body || draft.body.trim().length === 0) throw AppErrorCode.CHP_007.create();
 
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const { project, mode } = await this.chapterSetting(projectId, chapter, draft);
+    const route = await this.chapterRoute(projectId, { role: 'summary', chapter, mode }, project);
     const ctx = {
       projectId,
       chapter,
@@ -825,19 +825,18 @@ export class GenerationService {
       role: PROMPT_REGISTRY['chapter-summarize'].key,
     };
 
-    const result = (await this.modelRouter.structured(PROMPT_REGISTRY['chapter-summarize'], { chapterProse: draft.body }, ctx, {
-      ...project,
-      contentMode: 'unrestricted',
-    } as never)) as { summary: string; state: Record<string, unknown> };
+    const result = (await this.modelRouter.structured(PROMPT_REGISTRY['chapter-summarize'], { chapterProse: draft.body }, ctx, route.project, route.policy)) as {
+      summary: string;
+      state: Record<string, unknown>;
+    };
 
     return { summary: result.summary, state: result.state };
   }
 
   async proposeContinuity(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {
     const draft = await this.getDraft(projectId, chapter);
-    if (draft.isolated) throw AppErrorCode.DRF_008.create();
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'continuity', chapter }, project);
+    const projectRow = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const { policy, project } = await this.chapterRoute(projectId, { role: 'continuity', chapter, mode: containmentMode(draft) }, projectRow);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const ctx = {
@@ -847,13 +846,15 @@ export class GenerationService {
       promptVersion: PROMPT_REGISTRY.continuity.version,
       role: PROMPT_REGISTRY.continuity.key,
     };
-    const proposal = await this.modelRouter.structured(
+    const contextPack = draft.isolated ? isolatedExtractionContext(pack.rendered) : pack.rendered;
+    const extracted = (await this.modelRouter.structured(
       PROMPT_REGISTRY.continuity,
-      { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
+      { contextPack, chapterNumber: chapter, chapterProse: draft.body },
       ctx,
-      project as never,
+      project,
       policy,
-    );
+    )) as object;
+    const proposal = draft.isolated ? isolatedContinuityProposal(extracted) : extracted;
 
     const [row] = await this.db
       .insert(schema.continuityProposals)
@@ -871,24 +872,26 @@ export class GenerationService {
    * Folds the canon a (usually hand-authored) chapter establishes back into the story bible. Runs the
    * chapter-extract prompt to derive a change-set of entity/bible ops, then stages it as a normal
    * refinement proposal so the author reviews it on the Proposals page alongside every other canon edit
-   * — rather than the parallel continuity-proposal path. Throws DRF_005 when the chapter adds nothing new.
+   * — rather than the parallel continuity-proposal path. Throws DRF_005 when the chapter adds nothing new. An isolated chapter is read on
+   * the unrestricted route and its excerpts are withheld from what is staged.
    */
   async extractChapterToBible(projectId: bigint, chapter: number): Promise<Refinement.Proposal> {
     const draft = await this.getDraft(projectId, chapter);
-    if (draft.isolated) throw AppErrorCode.DRF_008.create();
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    const policy = await this.pluginPolicy.resolve(projectId, { role: 'extraction', chapter }, project);
+    const projectRow = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const { policy, project } = await this.chapterRoute(projectId, { role: 'extraction', chapter, mode: containmentMode(draft) }, projectRow);
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const promptModule = PROMPT_REGISTRY['chapter-extract'];
     const ctx = { projectId, chapter, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
-    const output = (await this.modelRouter.structured(
+    const contextPack = draft.isolated ? isolatedExtractionContext(pack.rendered) : pack.rendered;
+    const extracted = (await this.modelRouter.structured(
       promptModule,
-      { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
+      { contextPack, chapterNumber: chapter, chapterProse: draft.body },
       ctx,
-      project as never,
+      project,
       policy,
     )) as ChapterExtractOutput;
+    const output = draft.isolated ? standardReadableExtraction(extracted) : extracted;
 
     const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
     this.logger.debug('extractChapterToBible: derived change-set', { projectId, chapter, ops: changeSet.length });
@@ -901,7 +904,8 @@ export class GenerationService {
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
       allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
-      model: (await this.modelRouter.resolveFor(promptModule.role ?? 'extraction', project as never, projectId, policy)).model,
+      model: (await this.modelRouter.resolveFor(promptModule.role ?? 'extraction', project, projectId, policy)).model,
+      sourceIsolated: draft.isolated,
     });
   }
 
@@ -1219,8 +1223,19 @@ export class GenerationService {
     return { jobId, kind: 'backfill', status: 'pending', target: 'all' };
   }
 
-  private async draftRoute(projectId: bigint, draft: { isolated: boolean }, call: RoutedCall, project: Project.Row | undefined): Promise<CallRoute> {
-    if (draft.isolated) return resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, project as ProjectConfig | undefined);
-    return { policy: await this.pluginPolicy.resolve(projectId, call, project), project: project as ProjectConfig | undefined };
+  private chapterRoute(projectId: bigint, call: { role: ChapterRole; chapter: number; mode: Project.ContentMode }, project: Project.Row | undefined): Promise<CallRoute> {
+    return routeChapterCall({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, project as ProjectConfig | undefined);
   }
+
+  private async chapterSetting(projectId: bigint, chapter: number, draft: { isolated: boolean }): Promise<{ project: Project.Row | undefined; mode: Project.ContentMode }> {
+    const [project, brief] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)), columns: { contentMode: true } }),
+    ]);
+    return { project, mode: chapterContentMode({ brief, isolated: draft.isolated }) };
+  }
+}
+
+function containmentMode(draft: { isolated: boolean }): Project.ContentMode {
+  return draft.isolated ? 'unrestricted' : 'standard';
 }

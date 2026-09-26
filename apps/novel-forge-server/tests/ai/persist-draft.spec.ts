@@ -76,6 +76,21 @@ describe('persistGeneratedDraft', () => {
     expect(run.fake.writesTo(schema.characterKnowledge)).toEqual([]);
   });
 
+  it('should wall off a draft written for an unrestricted chapter and leave a standard one open', async () => {
+    const unrestricted = setup([draftRow()], draftRow({ revision: 3 }));
+    const standard = setup([draftRow()], draftRow({ revision: 3 }));
+
+    await persistGeneratedDraft(unrestricted.db, { ...INPUT, contentMode: 'unrestricted' });
+    await persistGeneratedDraft(standard.db, { ...INPUT, contentMode: 'standard' });
+
+    const containment = (run: ReturnType<typeof setup>) => {
+      const values = run.fake.writesTo(schema.drafts, 'upsert')[0]?.values;
+      return { generator: values?.['generator'], isolated: values?.['isolated'] };
+    };
+    expect(containment(unrestricted)).toEqual({ generator: 'unrestricted', isolated: true });
+    expect(containment(standard)).toEqual({ generator: 'standard', isolated: false });
+  });
+
   it('should record the persisted revision against the run that wrote it', async () => {
     const run = setup([draftRow()], draftRow({ revision: 3 }));
 

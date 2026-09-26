@@ -5,6 +5,7 @@ import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/c
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
+import { emptyPolicy } from '@modules/plugins/plugin-policy.service';
 
 describe('countTokens', () => {
   it('returns a positive integer for a non-empty string', () => {
@@ -414,16 +415,23 @@ describe('ContextAssembler.forChapter — established state carry', () => {
     expect(continuation).not.toContain('salt vault');
   });
 
-  it('should render an isolated unfinalized predecessor as scrubbed summary and state, never its prose tail', async () => {
-    const drafts = [{ chapter: 4, body: 'ISOLATED_PROSE_TAIL', summary: `Four. ${HIDDEN_TEXT}.`, state: { lastBeat: 'She shuts the gate.' }, isolated: true }];
-    const pack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true });
+  it('should render an isolated unfinalized predecessor as scrubbed summary, dropping its free-text state for a standard reader, never its prose tail', async () => {
+    const state = { lastBeat: 'She shuts the gate.', characterPositions: 'Mara at the gate.' };
+    const drafts = [{ chapter: 4, body: 'ISOLATED_PROSE_TAIL', summary: `Four. ${HIDDEN_TEXT}.`, state, isolated: true }];
+    const unrestricted = emptyPolicy('permissive');
+    const standardPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true });
+    const unrestrictedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true, policy: unrestricted });
 
-    const ending = pack.sections.find(s => s.key === 'prev_ending')?.rendered ?? '';
+    const ending = standardPack.sections.find(s => s.key === 'prev_ending')?.rendered ?? '';
     expect(ending).toContain('[DRAFT — not yet canon]');
     expect(ending).toContain('Summary: Four. [withheld].');
-    expect(ending).toContain('She shuts the gate.');
-    expect(pack.rendered).not.toContain('ISOLATED_PROSE_TAIL');
-    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+    expect(ending).not.toContain('Mara at the gate.');
+    expect(standardPack.rendered).not.toContain('She shuts the gate.');
+    expect(unrestrictedPack.sections.find(s => s.key === 'prev_ending')?.rendered).toContain('She shuts the gate.');
+    for (const pack of [standardPack, unrestrictedPack]) {
+      expect(pack.rendered).not.toContain('ISOLATED_PROSE_TAIL');
+      expect(pack.rendered).not.toContain(HIDDEN_TEXT);
+    }
   });
 
   it('should scrub the isolated finalized predecessor summary and the prose tail of a finalized one', async () => {
@@ -677,19 +685,6 @@ describe('ContextAssembler — writer-pack scrub', () => {
 
     const assigned = await makeAssembler(fixture).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true, insertAfter: 4, volumeKey: 'vol_1' } as never);
     expect(sectionOf(assigned, 'volume_objective')).toContain('Win back the ferry.');
-  });
-
-  it('should scrub the revision pack brief, volume objective and carried state keys and label a stale predecessor', async () => {
-    const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { [HIDDEN_TEXT]: 'yes' }, staleReason: 'ancestor chapter 3 was regenerated' }];
-    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: `Win back the ${TERM}.` };
-    const fixture = scrubDb({ brief: { body: `Hint that ${HIDDEN_TEXT}.`, volumeKey: 'vol_1' }, drafts, volume });
-    const pack = await makeAssembler(fixture).forRevision(1n, 5, 0n, { dryRun: true } as never);
-
-    expect(sectionOf(pack, 'brief')).toContain('Hint that [withheld].');
-    expect(sectionOf(pack, 'volume_objective')).toContain('Win back the [withheld].');
-    expect(sectionOf(pack, 'continuation_state')).toContain('[STALE — may not match the current plan]\n{"[withheld]":"yes"}');
-    expect(pack.rendered).not.toContain(HIDDEN_TEXT);
-    expect(pack.rendered).not.toContain(TERM);
   });
 });
 
