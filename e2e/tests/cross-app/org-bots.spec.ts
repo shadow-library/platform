@@ -9,6 +9,7 @@ import { type APIRequestContext, type APIResponse, type BrowserContext, expect, 
 import {
   apiContext,
   createIdentitySession,
+  findApplicationRoleId,
   identityDb,
   type IdentitySession,
   identitySessionContext,
@@ -99,9 +100,11 @@ interface ProjectItem {
 /** Identity's application name for Novel Forge — the key the bot permission catalog is indexed by. */
 const NOVEL_FORGE_APPLICATION = 'novel-forge';
 
-/** The catalog resource each Novel Forge role is claimed under; `curated-ingest` write is the `novel-forge:curate` role. */
+/** The catalog resource the Novel Forge projects roles are claimed under. */
 const PROJECTS_RESOURCE = 'projects';
-const CURATE_RESOURCE = 'curated-ingest';
+
+/** The Novel Forge role carrying `novel-forge:curate`; people only, so it is absent from the bot permission catalog. */
+const CURATOR_ROLE = 'NovelForgeCurator';
 
 /** A bot key is exchanged for a short-lived token the SDK caches for at most 60s, so a revocation lands within that window. */
 const REVOCATION_WINDOW_MS = 90_000;
@@ -227,13 +230,14 @@ test.describe('organisation bots across identity and Novel Forge', () => {
     expect(write?.eligible, 'the projects writer role is bot-grantable here').toBe(true);
     expect(write?.heldByYou, 'the granting admin holds what it is about to grant — the ceiling a grant is checked against').toBe(true);
 
-    const curate = novelForge!.resources.find(resource => resource.resource === CURATE_RESOURCE)?.levels.find(level => level.level === 'write');
-    expect(curate, 'the curate role is catalogued under curated-ingest').toBeTruthy();
+    const curatorRoleId = await findApplicationRoleId(NOVEL_FORGE_APPLICATION, CURATOR_ROLE);
+    const botGrantableRoleIds = novelForge!.resources.flatMap(resource => resource.levels.map(level => level.roleId));
+    expect(botGrantableRoleIds, 'the curate role is never offered to a bot').not.toContain(curatorRoleId);
 
     // `novel-forge:curate` is not part of the default authoring role, and no self-service surface grants an
     // application role to a person — identity's platform admin is the only one who can make the owner a curator.
     const assigned = await scopedMutate(adminIdentity, identityUrl, 'post', '/api/v1/admin/role-assignments', {
-      data: { principalType: 'USER', principalId: users.user1.userId, roleId: curate!.roleId, organisationId },
+      data: { principalType: 'USER', principalId: users.user1.userId, roleId: curatorRoleId, organisationId },
       seedPath: '/api/v1/me',
     });
     expect(assigned.status(), `assign the curator role — body ${await assigned.text()}`).toBe(200);

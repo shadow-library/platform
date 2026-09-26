@@ -12,7 +12,6 @@ import { BlueprintRoundRunner } from '../blueprint/engine/blueprint-round.runner
 import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
-import { RecombineService } from '../source/recombine.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 
@@ -23,15 +22,10 @@ interface GeneratePayload {
   guidance?: string;
 }
 
-interface ExtractPayload {
-  chapters: number[];
-}
-
 // Staged on `jobs.payload` by `NovelImportService.import` inside the same transaction that creates the
 // project — kept as a local shape (not imported from the novel-import module) exactly like every other
 // payload interface above, so JobExecutor never depends on the enqueuing feature module.
 interface ImportPayload {
-  mode: 'final' | 'source';
   chapters: { title: string; content: string }[];
   cover?: { mimeType: string; dataBase64: string };
 }
@@ -53,7 +47,6 @@ export class JobExecutor {
     private readonly workflowRunService: WorkflowRunService,
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
-    private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
     private readonly blueprintRoundRunner: BlueprintRoundRunner,
@@ -167,8 +160,6 @@ export class JobExecutor {
     switch (job.kind) {
       case 'generate':
         return this.runGenerate(job);
-      case 'extract':
-        return this.runExtract(job);
       case 'backfill':
         return this.runBackfill(job);
       case 'publish':
@@ -215,22 +206,6 @@ export class JobExecutor {
     await this.jobService.progress(job.id, { done: 1, total: 1, current: job.target, phase: 'blueprint' });
   }
 
-  private async runExtract(job: Job.Row): Promise<void> {
-    const { chapters = [] } = (job.payload ?? {}) as ExtractPayload;
-    const total = chapters.length;
-    this.logger.debug('runExtract: starting', { jobId: job.id, chapters, total });
-
-    for (const [i, chapter] of chapters.entries()) {
-      if (await this.cancelRequested(job.id)) return;
-      await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'extracting' });
-      this.logger.debug('runExtract: extracting chapter', { jobId: job.id, chapter, index: i, total });
-      const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter, jobId: job.id });
-      this.logger.debug('runExtract: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
-      if (result.status === 'cancelled') return;
-      if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} extraction failed (run ${result.runId})`);
-    }
-  }
-
   private async runBackfill(job: Job.Row): Promise<void> {
     this.logger.info('runBackfill: reindexing project', { jobId: job.id, projectId: job.projectId });
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'all', phase: 'embedding' });
@@ -260,29 +235,24 @@ export class JobExecutor {
   }
 
   // The project row already exists (created transactionally with this job by NovelImportService); this
-  // job only writes chapters, the cover, and — for `source` mode — triggers the same auto-recombine
-  // hook that used to run on ingest completion. A mid-batch failure leaves the project and whatever
-  // chapters already landed in place (job marked failed, matching every other executor) rather than
-  // rolling back — the caller can inspect, retry manually, or delete the project.
+  // job only writes chapters and the cover. A mid-batch failure leaves the project and whatever chapters
+  // already landed in place (job marked failed, matching every other executor) rather than rolling back —
+  // the caller can inspect, retry manually, or delete the project.
   private async runImport(job: Job.Row): Promise<void> {
-    const { mode, chapters, cover } = (job.payload ?? {}) as ImportPayload;
+    const { chapters, cover } = (job.payload ?? {}) as ImportPayload;
     const projectId = job.projectId;
     const total = chapters.length;
-    this.logger.info('runImport: starting', { jobId: job.id, projectId, mode, total, hasCover: !!cover });
+    this.logger.info('runImport: starting', { jobId: job.id, projectId, total, hasCover: !!cover });
 
-    // `final` mode is the finished novel: human-authored, immutable, publishable from chapter 1
-    // (PUB_002/PUB_003). `source` mode explicitly writes the column's own default so a later
-    // extract pass treats it exactly like any other source project's chapters.
+    // The finished novel: human-authored, immutable, publishable from chapter 1 (PUB_002/PUB_003).
     await landFinalChapters(this.db, projectId, chapters, {
-      mode,
       onBatch: async (done, chapterTotal) => {
         await this.jobService.progress(job.id, { done, total: chapterTotal, current: done === chapterTotal ? 'chapters' : String(done + 1), phase: 'inserting' });
       },
     });
 
-    // The only boundary an import has: the chapters are landed and kept, the cover and the
-    // recombine pass are abandoned. The payload is still compacted, so a cancelled import never leaves
-    // the whole bundle's prose sitting on the row.
+    // The only boundary an import has: the chapters are landed and kept, the cover is abandoned. The
+    // payload is still compacted, so a cancelled import never leaves the whole bundle's prose sitting on the row.
     if (await this.cancelRequested(job.id)) return this.compactImportPayload(job.id, total, !!cover);
 
     if (cover) {
@@ -292,16 +262,8 @@ export class JobExecutor {
       await setProjectCover(this.db, projectId, ref);
     }
 
-    if (mode === 'source') {
-      // Re-homes the auto-recombine hook that used to run on remote-ingest completion;
-      // autoRecombine already no-ops quietly when there is nothing to merge.
-      this.logger.info('runImport: source mode — running auto-recombine', { jobId: job.id, projectId });
-      await this.jobService.progress(job.id, { done: total, total, current: 'recombine', phase: 'recombining' });
-      await this.recombineService.autoRecombine(projectId);
-    }
-
     await this.compactImportPayload(job.id, total, !!cover);
-    this.logger.info('runImport: complete', { jobId: job.id, projectId, mode, chapters: total });
+    this.logger.info('runImport: complete', { jobId: job.id, projectId, chapters: total });
   }
 
   // The chapters/cover are now durably in the `chapters`/`projects` tables — the full bundle prose

@@ -1,6 +1,6 @@
 export const APP_NAME = 'novel-forge';
 
-/** The identity permission that authorises curation and the ingest surface; a bot reaches it through the `curated-ingest` grant. */
+/** The identity permission that opens an organisation's shared projects to a member and lets a publish attribute a third-party author. */
 export const CURATE_PERMISSION = 'novel-forge:curate';
 
 export const PROJECTS_READ_PERMISSION = 'novel-forge:projects:read';

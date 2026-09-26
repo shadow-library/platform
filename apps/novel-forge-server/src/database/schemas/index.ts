@@ -14,6 +14,5 @@ export * from './illustration';
 export * from './jobs';
 export * from './vectors';
 export * from './ai';
-export * from './ingest-audit';
 export * from './plugins';
 export * from './account-settings';

@@ -102,9 +102,6 @@ export class ProjectModelOverrides {
   plan?: ProjectModelRef;
 
   @Field(() => ProjectModelRef, { optional: true })
-  skeleton?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
   bible?: ProjectModelRef;
 
   @Field(() => ProjectModelRef, { optional: true })
@@ -242,12 +239,6 @@ export class UpdateProjectBody {
 
   @Field(() => ProjectWordTarget, { optional: true, nullable: true, description: 'Chapter word-count target; send `null` to restore the application default (1,800–2,600 words).' })
   wordTarget?: ProjectWordTarget | null;
-
-  @Field(() => ProjectKind, {
-    optional: true,
-    description: 'Switches the project workflow. Only `curated` to `new_novel` is accepted.',
-  })
-  kind?: Project.Kind;
 }
 
 @Schema()

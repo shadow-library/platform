@@ -36,7 +36,7 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
     { name: PROJECTS_WRITE_PERMISSION, description: 'Create and edit projects and the chapters, bible, planning and pipeline material under them' },
     { name: ILLUSTRATIONS_WRITE_PERMISSION, description: 'Upload, attach and manage project illustrations' },
     { name: GENERATION_RUN_PERMISSION, description: 'Run AI generation — drafting, planning, design and image generation — which incurs model spend' },
-    { name: CURATE_PERMISSION, description: 'Publish third-party novels under their original author and push them through the curated-ingest surface' },
+    { name: CURATE_PERMISSION, description: "Reach projects shared with the organisation and publish a novel under its original author's name" },
     { name: ADMIN_PERMISSION, description: 'Inspect workflow runs: prompt anatomy, context packs, per-call latency and raw model output' },
   ],
   roles: [
@@ -72,9 +72,8 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
     },
     {
       name: 'NovelForgeCurator',
-      description: 'Internal platform admin who brings third-party novels into the platform',
+      description: "Organisation member who works on the organisation's shared projects",
       permissions: [CURATE_PERMISSION],
-      bot: { resource: 'curated-ingest', level: 'write' },
     },
     {
       name: 'NovelForgeAdmin',

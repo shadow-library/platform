@@ -26,19 +26,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_003 = AppErrorCode.badRequest('PRJ_003', 'Operation not valid for this project kind');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
-  static readonly PRJ_005 = AppErrorCode.badRequest('PRJ_005', 'Curated projects are created by ingest');
-  static readonly PRJ_008 = AppErrorCode.badRequest('PRJ_008', 'Workflow switch not allowed — only curated to new_novel is supported');
-  static readonly PRJ_009 = AppErrorCode.badRequest('PRJ_009', 'Only original-novel or source projects run the authoring pipeline');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
-
-  /*!
-   * Source Errors
-   */
-  static readonly SRC_002 = AppErrorCode.badRequest('SRC_002', 'Recombine requires chapters to exist for this project');
-  static readonly SRC_003 = AppErrorCode.badRequest(
-    'SRC_003',
-    'Recombine is unavailable once extraction, briefs, or conversions reference chapters — renumbering would corrupt them',
-  );
 
   /*!
    * Export Errors
@@ -273,17 +261,6 @@ export class AppErrorCode extends ServerErrorCode {
   // Attribution to someone outside the platform is a curation decision, not an authoring one: it is what tells readers
   // the work is not the author's own, so an ordinary publisher may clear it but never assert one.
   static readonly PUB_010 = AppErrorCode.forbidden('PUB_010', 'Naming an original author requires the curate permission');
-
-  /*!
-   * Curated Ingest Errors
-   */
-  // A source reference another curator already holds is answered exactly as one that was never
-  // pushed, mirroring PRJ_001: the ingest surface must not be an oracle for what else is in the forge.
-  static readonly ING_001 = AppErrorCode.notFound('ING_001', 'Ingested novel not found');
-  static readonly ING_002 = AppErrorCode.conflict('ING_002', 'Chapters must be pushed in source order with no gaps');
-  // The forge owns the prose once it has landed, so a changed push is refused rather than applied — the
-  // curator amends the finalized chapter in the forge, which keeps the amendment trail intact.
-  static readonly ING_003 = AppErrorCode.conflict('ING_003', 'A different chapter has already been ingested at this source ordinal');
 
   /*!
    * Plugin Errors

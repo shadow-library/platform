@@ -99,12 +99,6 @@ describe('LedgerService.supersede', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('should refuse a curated project', async () => {
-    const { service } = fakeLedger({ projectKind: 'curated', marked: [entry()] });
-
-    await expect(service.supersede(7n, 1n, { kind: 'decision', decidedBy: 'author', statement: 'Anything' })).rejects.toMatchObject({ code: 'PRJ_009' });
-  });
-
   it('should refuse the author a second supersede of the same entry through the read guard', async () => {
     const { service, inserted } = fakeLedger({ stored: entry({ supersededAt: new Date(1) }) });
 

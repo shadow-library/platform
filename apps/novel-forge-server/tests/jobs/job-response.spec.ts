@@ -26,7 +26,6 @@ describe('redactJobForResponse', () => {
   it('should collapse a full in-flight import payload to a chapter count and cover flag', () => {
     const job = baseJob({
       payload: {
-        mode: 'final',
         chapters: [
           { title: 'A', content: 'x'.repeat(1000) },
           { title: 'B', content: 'y'.repeat(1000) },
@@ -44,7 +43,7 @@ describe('redactJobForResponse', () => {
   });
 
   it('should report no cover when the payload carries none', () => {
-    const job = baseJob({ payload: { mode: 'source', chapters: [{ title: 'A', content: 'x' }] } });
+    const job = baseJob({ payload: { chapters: [{ title: 'A', content: 'x' }] } });
     expect(redactJobForResponse(job).payload).toEqual({ chapters: 1, hasCover: false });
   });
 
@@ -55,7 +54,7 @@ describe('redactJobForResponse', () => {
   });
 
   it('should never mutate the original job row', () => {
-    const original = baseJob({ payload: { mode: 'final', chapters: [{ title: 'A', content: 'x' }] } });
+    const original = baseJob({ payload: { chapters: [{ title: 'A', content: 'x' }] } });
     const snapshot = JSON.parse(JSON.stringify(original.payload));
     redactJobForResponse(original);
     expect(original.payload).toEqual(snapshot);

@@ -53,7 +53,7 @@ export class PublishNovelBody {
     nullable: true,
     maxLength: 256,
     description:
-      'The work’s own author, shown to readers alongside the title; null clears it, omission keeps the stored one and otherwise adopts the project’s. ' +
+      'The work’s own author, shown to readers alongside the title; null clears it, omission keeps the stored one. ' +
       'Setting a non-null value requires the novel-forge:curate permission — the forge only attributes work it did not write.',
   })
   originalAuthor?: string | null;

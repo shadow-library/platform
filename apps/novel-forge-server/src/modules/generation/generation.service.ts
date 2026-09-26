@@ -6,7 +6,6 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import {
-  assertAuthoringProject,
   briefContentHash,
   type BriefSceneInput,
   declaredDraftFields,
@@ -176,7 +175,6 @@ export const PLAN_BIBLE_DOC_TOKENS = 4_000;
  * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
  */
 const AUTHOR_FACING_GRAPHS = [
-  'recombine',
   'chat-turn',
   'premise-enhance',
   'bible-audit',
@@ -185,7 +183,6 @@ const AUTHOR_FACING_GRAPHS = [
   'chapter-generation',
   'chapter-finalization',
   'bible-builder',
-  'source-extraction',
   'novel-validation',
 ] as const;
 
@@ -221,16 +218,15 @@ export class GenerationService {
   }
 
   async seedFromBrief(projectId: bigint, body: SeedFromBriefBody): Promise<WorkflowRunResult> {
-    await this.assertAuthoring(projectId);
+    await this.assertProjectExists(projectId);
     const result = await this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
     if (result.outcome === 'completed') await this.stagePluginCanon(projectId);
     return result;
   }
 
-  private async assertAuthoring(projectId: bigint): Promise<void> {
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { kind: true } });
+  private async assertProjectExists(projectId: bigint): Promise<void> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringProject(project);
   }
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
@@ -240,9 +236,8 @@ export class GenerationService {
       this.contextAssembler.activeLedger(projectId),
     ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringProject(project);
 
-    // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
+    // A novel with no skeleton is the norm; a blank "Novel skeleton:" line makes weak models
     // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.
     const derived = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
     const skeleton = body.skeleton ?? (derived || 'No skeleton available — derive the character arcs and escalation curve from the brief.');
@@ -327,7 +322,7 @@ export class GenerationService {
   }
 
   async outline(projectId: bigint, body: OutlineBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertAuthoring(projectId);
+    await this.assertProjectExists(projectId);
     const volumes = await this.db.query.volumes.findMany({
       where: and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'draft')),
       orderBy: asc(schema.volumes.ordinal),
@@ -433,7 +428,7 @@ export class GenerationService {
    * boundary. Gated on the whole volume's arcs being approved.
    */
   async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
-    await this.assertAuthoring(projectId);
+    await this.assertProjectExists(projectId);
     const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
     if (!arc) throw AppErrorCode.ARC_001.create();
     if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
@@ -660,7 +655,7 @@ export class GenerationService {
   }
 
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
-    await this.assertAuthoring(projectId);
+    await this.assertProjectExists(projectId);
     const limit = body.limit ?? 1;
 
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
@@ -714,7 +709,7 @@ export class GenerationService {
    * at or before this one blocks it, and only one generation job runs at a time.
    */
   async regenerateChapter(projectId: bigint, chapter: number): Promise<JobEnqueueResult> {
-    await this.assertAuthoring(projectId);
+    await this.assertProjectExists(projectId);
 
     const [approvedVolumes, brief, draft, activeJob, otherContradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
       this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) }),

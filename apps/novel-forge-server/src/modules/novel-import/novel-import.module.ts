@@ -11,7 +11,7 @@ import { NovelImportService } from './novel-import.service';
 // JobsModule is imported here (for JobExecutor, used to fire-and-forget dispatch) rather than the
 // other way around: JobExecutor.runImport needs nothing from this module — it inserts chapters and the
 // cover directly via DatabaseService/StorageService, exactly like runPublish — so there is no cycle to
-// avoid, unlike the Publishing split (see PipelineModule).
+// avoid, unlike the Publishing split (see PublishingHttpModule).
 @Module({
   imports: [ActorModule, DatabaseModule, JobsModule, FastifyModule],
   controllers: [NovelImportController],

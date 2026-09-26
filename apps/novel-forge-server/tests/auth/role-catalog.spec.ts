@@ -49,7 +49,7 @@ describe('novel forge role catalog', () => {
 
   it('should expose one bot-grantable role per resource and level', () => {
     const grants = NOVEL_FORGE_ROLE_CATALOG.roles.filter(role => role.bot).map(role => `${role.bot?.resource}:${role.bot?.level}`);
-    expect(grants.sort()).toEqual(['curated-ingest:write', 'generation:write', 'illustrations:write', 'projects:read', 'projects:write'].sort());
+    expect(grants.sort()).toEqual(['generation:write', 'illustrations:write', 'projects:read', 'projects:write'].sort());
     expect(new Set(grants).size).toBe(grants.length);
   });
 
@@ -68,8 +68,8 @@ describe('novel forge role catalog', () => {
     expect(sensitive).toEqual(['NovelForgeGenerator']);
   });
 
-  it('should keep the curator role bot-grantable and outside the default role', () => {
-    expect(roleNamed('NovelForgeCurator').bot).toEqual({ resource: 'curated-ingest', level: 'write' });
+  it('should keep the curator role out of bot reach and outside the default role', () => {
+    expect(roleNamed('NovelForgeCurator').bot).toBeUndefined();
     expect(roleNamed('NovelForgeAuthor').permissions).not.toContain(CURATE_PERMISSION);
   });
 

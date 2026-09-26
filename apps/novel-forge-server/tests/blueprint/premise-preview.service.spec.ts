@@ -7,8 +7,8 @@ import { round } from './blueprint-fixtures';
 
 const PREMISE = 'A clerk who audits the dead finds his own childhood on a manifest.';
 
-function fakeService(state: { projectKind?: string; latest?: RoundWithJob } = {}) {
-  const db = { query: { projects: { findFirst: mock(async () => ({ id: 7n, kind: state.projectKind ?? 'new_novel' })) } } };
+function fakeService(state: { latest?: RoundWithJob } = {}) {
+  const db = { query: { projects: { findFirst: mock(async () => ({ id: 7n, kind: 'new_novel' })) } } };
   const rounds = { latestForStep: mock(async () => state.latest) };
   const structured = mock(async () => ({ paragraph: '  The manifest was thirty years old and still warm from the press.  ' }));
   const modelRouter = { structured };
@@ -45,11 +45,6 @@ describe('PremisePreviewService', () => {
     const { service, structured } = fakeService({ latest: { round: round({ stepKey: 'premise', status: 'running' }), jobStatus: 'in_progress' } as RoundWithJob });
     await expect(service.preview(7n, PREMISE)).rejects.toThrow(expect.objectContaining({ code: 'BPR_002' }));
     expect(structured).not.toHaveBeenCalled();
-  });
-
-  it('should refuse a project the Blueprint does not design', async () => {
-    const { service } = fakeService({ projectKind: 'curated' });
-    await expect(service.preview(7n, PREMISE)).rejects.toThrow(expect.objectContaining({ code: 'BPR_003' }));
   });
 
   it('should let the author try again straight away when the call itself failed', async () => {

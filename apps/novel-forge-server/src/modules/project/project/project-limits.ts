@@ -10,7 +10,7 @@ export function isProjectCapReached(currentCount: number, cap: number): boolean 
   return cap > 0 && currentCount >= cap;
 }
 
-// Shared by every project-creation path (create, clone, import, curated ingest) so the per-owner cap
+// Shared by every project-creation path (create, clone, import) so the per-owner cap
 // holds regardless of which surface mints the project. Counts against the owner the new project is
 // attributed to, and is a pre-check outside any enclosing transaction — a small race is acceptable for
 // a ceiling, and `projects.max-per-owner` raises it for legitimate bulk owners.

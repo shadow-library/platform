@@ -13,7 +13,6 @@ export type AiRole =
   | 'validation'
   | 'review'
   | 'plan'
-  | 'skeleton'
   | 'bible'
   | 'premise'
   | 'audit'
@@ -45,7 +44,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   plan: 'planning',
   arc: 'planning',
   outline: 'planning',
-  skeleton: 'planning',
   bible: 'planning',
   extraction: 'planning',
   judge: 'review',

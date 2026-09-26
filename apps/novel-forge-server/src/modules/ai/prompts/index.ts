@@ -31,7 +31,6 @@ import { chatTitlePrompt } from './chat-title.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
 import { epitomePrompt } from './epitome.prompt';
-import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
 import { generationPrompt } from './generation.prompt';
 import { illustrationComposePrompt } from './illustration-compose.prompt';
@@ -40,16 +39,13 @@ import { newNovelPrompt } from './new-novel.prompt';
 import { outlinePrompt } from './outline.prompt';
 import { planPrompt } from './plan.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
-import { recombinePrompt } from './recombine.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
-import { skeletonPrompt } from './skeleton.prompt';
 import { titlePrompt } from './title.prompt';
 import { type PromptKey, type PromptModule } from './types';
 import { validationPrompt } from './validation.prompt';
 
 export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
-  extraction: extractionPrompt as PromptModule<unknown>,
   generation: generationPrompt as PromptModule<unknown>,
   'chapter-expand': chapterExpandPrompt as PromptModule<unknown>,
   judge: judgePrompt as PromptModule<unknown>,
@@ -64,7 +60,6 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   review: reviewPrompt as PromptModule<unknown>,
   'new-novel': newNovelPrompt as PromptModule<unknown>,
   plan: planPrompt as PromptModule<unknown>,
-  skeleton: skeletonPrompt as PromptModule<unknown>,
   'bible:foundation': foundationPrompt as PromptModule<unknown>,
   'bible:world': worldPrompt as PromptModule<unknown>,
   'bible:power': powerPrompt as PromptModule<unknown>,
@@ -79,7 +74,6 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
-  recombine: recombinePrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
   'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,

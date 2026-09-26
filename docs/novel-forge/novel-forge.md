@@ -9,9 +9,8 @@
 
 ## Concepts
 
-- **Project `kind` is the workflow.** `new_novel` original authoring; `source` imported English manuscript being adapted; `curated` finished English manuscript held for
-  publishing (never created directly; minted by curated ingest, and also reachable by cloning).
-  A project's `kind` can change via workflow switch, clone or reset; `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
+- **Every project is the author's own novel** (`kind` is always `new_novel`). A finished manuscript arrives through novel import and lands as locked, human-authored
+  chapters. `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
 - **Blueprint and Workspace** (`blueprint.md`): a new novel is a project from the first click. It opens in the Blueprint, a guided top-down design flow whose decisions live in
   an append-only decision ledger and materialise as ordinary pages, entities, facts, volumes, arcs and briefs; a gate switches the same project into the Workspace, where
   chapters are written. The stage is computed from data, never stored. Imports land in the Workspace.
@@ -31,8 +30,8 @@
 ## Capabilities
 
 - Blueprint design (idea to arc one briefs), bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
-- Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, curated ingest, per-novel plugins, per-account AI quota.
-- Source pipeline (extract, consolidate, skeleton, recombine) and publishing (scheduling, access control, reconcile, spoiler-gated wiki).
+- Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, per-novel plugins, per-account AI quota.
+- Publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 
 ## Architecture
 
@@ -70,7 +69,6 @@
   it, one generation job at a time, finalized chapters change only through amend — and replaces the prose in place. Whatever the draft held, however it was written, stays in
   the revision history; its continuity review is dropped and later drafts are marked stale only when the new draft lands, keeping any more specific stale reason they carry.
 - **Plugins**: operator-loaded (off unless `plugins.dir` is set), per project, answering only five fixed decision points (canon augment, brief policy, call routing, context/prompt contribution).
-- **Curated ingest**: an organisation bot creates `curated` projects and pushes chapters by source reference.
 
 ## Publish boundary
 
@@ -102,13 +100,13 @@
 
 ### Canon, containment and knowledge
 
-- Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints, and the source-extraction graph all
+- Draft and isolated content MUST NEVER be indexed or retrieved; the finalize path, the manual continuity and extract-to-bible endpoints all
   skip isolated chapters. Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A downstream chapter sees an isolated predecessor only as summary plus
   continuation state; finalizing an isolated draft requires both. An isolated draft's raw prose MUST reach only the unrestricted route: revising, judging or reviewing it routes
   there (refusing rather than falling back when that route resolves off the allowlist) and keeps it isolated, and the chat sees only its header and summary and cannot rewrite its body.
 - A call whose writer class a plugin raised (or an unrestricted fill) MUST write `generator: unrestricted` and `isolated: true`; raising and isolating are one act, sticky for the run,
   so every later call in that run that reads its prose (judge, repair, title) stays on the unrestricted route.
-- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, rewrites the chapter's final draft to match under a new `amended` revision (the replaced prose stays in its history, the judge verdict is cleared), and republishes only when the reader-visible hash moves; the source-chapter PATCH/DELETE routes refuse a locked chapter.
+- Finalized prose (`chapters.locked`) MUST NEVER change except through amend, which never unlocks, never touches the bible, rewrites the chapter's final draft to match under a new `amended` revision (the replaced prose stays in its history, the judge verdict is cleared), and republishes only when the reader-visible hash moves; the chapter PATCH/DELETE routes refuse a locked chapter.
   Proposals NEVER edit briefs at or before the story cursor or prose of a final draft.
 - Generation context MUST NEVER contain an unrevealed canon fact. Spoilers live in `canon_facts`, NEVER in bible prose or entity sheets, and canon facts are NEVER indexed. The
   drafter sees only open canon, facts ledgered to the POV cast, this chapter's planned reveals and hidden facts' `writerNote` — never their text or author-only `constraintNote`,
@@ -125,7 +123,7 @@
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
-  and never while a generate job is active. Recombine does not shift; it refuses once anything references chapter numbers.
+  and never while a generate job is active.
 - Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only: it never demotes an approved plan artifact, but a stale brief
   blocks generation and a stale draft cannot be approved.
 
@@ -148,8 +146,7 @@
 
 ### Pipelines
 
-- Recombine MUST refuse non-`source` projects; generation, planning and outlining refuse `curated` via `assertAuthoringProject` (unrestricted fill and `/skeleton` are not guarded).
-- Extract and generate stop at the first failed chapter.
+- Generate stops at the first failed chapter.
 
 ### Publishing
 

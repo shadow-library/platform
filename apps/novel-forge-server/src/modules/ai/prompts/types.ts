@@ -5,7 +5,6 @@ import { type SchemaClass } from '@shadow-library/class-schema';
 import { type AiRole } from '../defaults';
 
 export type PromptKey =
-  | 'extraction'
   | 'generation'
   | 'chapter-expand'
   | 'judge'
@@ -20,7 +19,6 @@ export type PromptKey =
   | 'review'
   | 'new-novel'
   | 'plan'
-  | 'skeleton'
   | 'bible:foundation'
   | 'bible:world'
   | 'bible:power'
@@ -38,7 +36,6 @@ export type PromptKey =
   | 'blueprint-briefs'
   | 'blueprint-voice'
   | 'blueprint-check'
-  | 'recombine'
   | 'illustration-compose'
   | 'appearance-describe'
   | 'blueprint-start'

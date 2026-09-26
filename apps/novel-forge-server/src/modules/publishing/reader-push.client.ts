@@ -11,7 +11,7 @@ export interface NovelPushBody {
   /** The publication's per-project token the reader binds trust-on-first-use; optional so a reader that predates it simply drops it. Hardens the guessable `sourceRef`, not a guard-gap control on its own. */
   publishToken?: string;
   title: string;
-  /** The work's own author for a curated import; omitted rather than empty — the reader's schema rejects a blank one. */
+  /** The work's own author when the publishing account did not write it; omitted rather than empty — the reader's schema rejects a blank one. */
   originalAuthor?: string;
   blurb?: string;
   coverPath?: string;

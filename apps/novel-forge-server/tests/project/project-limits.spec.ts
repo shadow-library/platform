@@ -30,7 +30,7 @@ describe('isProjectCapReached', () => {
   });
 });
 
-// Every project-creation surface (create, clone, import, curated ingest) routes through this guard, so
+// Every project-creation surface (create, clone, import) routes through this guard, so
 // exercising it with a stubbed counter proves the cap trips on all of them without a live DB; the
 // per-surface wiring is covered behaviourally by the Postgres-backed suites in CI.
 describe('assertUnderProjectCap', () => {

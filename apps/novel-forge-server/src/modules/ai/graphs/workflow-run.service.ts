@@ -21,7 +21,6 @@ import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-buil
 import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
-import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
 
 export interface ChapterGenerationInput {
   projectId: bigint;
@@ -51,12 +50,6 @@ export interface BibleBuilderInput {
   projectId: bigint;
   brief: string;
   force?: boolean;
-  jobId?: string;
-}
-
-export interface SourceExtractionInput {
-  projectId: bigint;
-  chapter: number;
   jobId?: string;
 }
 
@@ -342,18 +335,6 @@ export class WorkflowRunService {
 
       const finalState = rawState as unknown as { nodeTrace?: string[]; skippedStages?: string[] };
       return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [], skippedStages: finalState.skippedStages ?? [] };
-    });
-  }
-
-  async runSourceExtraction(input: SourceExtractionInput): Promise<WorkflowRunResult> {
-    const runId = await this.createRun(input.projectId, 'source-extraction', `chapter-${input.chapter}`, input, input.jobId);
-
-    return this.runGraph(runId, 'runSourceExtraction', async () => {
-      const graph = createSourceExtractionGraph(this.graphServices as ExtractionServices);
-      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
-
-      const finalState = rawState as unknown as { nodeTrace?: string[] };
-      return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };
     });
   }
 

@@ -7,7 +7,7 @@ function buildBundle(): NovelBundle {
   return {
     format: 'novel-import',
     schemaVersion: 1,
-    mode: 'source',
+    mode: 'final',
     novel: { title: 'The Lantern Keeper', synopsis: 'A retired lighthouse keeper strikes a bargain with the tide.' },
     volumes: [
       {

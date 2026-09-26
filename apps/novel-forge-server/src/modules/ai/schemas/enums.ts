@@ -12,4 +12,3 @@ export type HookTypeValue = (typeof HOOK_TYPES)[number];
 export const HookType = EnumType.create<HookTypeValue>('HookType', [...HOOK_TYPES]);
 export const AuditAction = EnumType.create('AuditAction', ['add', 'revise', 'remove', 'keep']);
 export const ExtractionConfidence = EnumType.create('ExtractionConfidence', ['high', 'low']);
-export const RecombineVerdict = EnumType.create('RecombineVerdict', ['merge', 'split']);

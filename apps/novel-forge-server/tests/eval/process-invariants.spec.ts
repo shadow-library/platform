@@ -86,7 +86,7 @@ describe('computeBatchHaltStats', () => {
     const jobs = [
       { kind: 'generate', progress: { phase: 'awaiting_review', skipped: [3, 4, 5] } },
       { kind: 'generate', progress: { phase: 'generating' } },
-      { kind: 'extract', progress: { phase: 'awaiting_review', skipped: [1] } },
+      { kind: 'import', progress: { phase: 'awaiting_review', skipped: [1] } },
     ];
     const stats = computeBatchHaltStats(jobs);
     expect(stats).toMatchObject({ totalGenerateJobs: 2, haltedBatches: 1, totalSkippedChapters: 3 });

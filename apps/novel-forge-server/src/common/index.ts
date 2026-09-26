@@ -1,5 +1,4 @@
 export * from './amend-republish';
-export * from './authoring-project';
 export * from './batch-selection';
 export * from './bible-doc-title';
 export * from './brief-body';

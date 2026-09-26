@@ -13,7 +13,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                            |
 | Part 2: Blueprint to lore bible       | The Blueprint (the guided design flow), premise enhancement, bible builder, readiness, audit, one end-to-end sample            |
 | Part 3: planning, generation          | Volume and arc planning, briefs, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
-| Part 4: manuscript pipelines          | Novel import, extraction, recombine, curated ingest                                                                            |
+| Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                                 |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)                   |
 
 ## Recipe format
@@ -28,7 +28,6 @@ Several features are reachable only through the API, and some observability is i
 - The judge and repair loop is not reachable from the UI: the client never sends `autoFix`, which defaults to off.
 - `cost_usd` is recorded only for image calls, so every cost figure understates spend.
 - The admin scope `novel-forge:admin`, needed to read prompts and context packs, is missing from the role catalog.
-- Source extraction cannot run today: its prompt needs two variables the graph never supplies.
 
 The full list is in the "Findings" sections of each part.
 
@@ -277,7 +276,7 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 
 Model selection is **code + database**, not environment.
 
-- Roles → groups: `src/modules/ai/defaults.ts:42-72`. `bible`, `plan`, `outline`, `arc`, `skeleton`, `premise`,
+- Roles → groups: `src/modules/ai/defaults.ts:42-72`. `bible`, `plan`, `outline`, `arc`, `premise`,
   `extraction` all map to **`planning`**.
 - Production group defaults (`defaults.ts:85-95`):
   `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
@@ -319,16 +318,13 @@ default maps — the quickest way to see what is selectable.
 
 Body (`project.dto.ts:16-39`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`.
 
-- `kind` enum: `source | new_novel | curated` (`src/database/schemas/projects.ts:69`).
-  `curated` is refused with `PRJ_005` (`project.service.ts:103`) — it only arrives via ingest.
-- `contentMode`: `standard | unrestricted` (`projects.ts:74`).
-- A `new_novel` create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
+- `kind` has one value, `new_novel` (`src/database/schemas/projects.ts`).
+- `contentMode`: `standard | unrestricted` (`projects.ts`).
+- A create also inserts blank placeholder bible documents (`project.service.ts:129-134`) — these carry
   no `contentHash`, which is how the plan importer tells them from authored docs
   (`src/modules/plan-import/plan-import.service.ts:114-120`).
 
-**For AI testing use `kind: "new_novel"`.** The bible builder's `assertAuthoringProject` gate
-(`src/modules/generation/generation.service.ts:189-193`) rejects anything else with `PRJ_009`, and the plan importer
-requires `new_novel` outright (`plan-import.service.ts:43`, `PRJ_003`).
+**Always send `kind: "new_novel"`**; it is the only value the enum accepts.
 
 Then set the brief — it is a separate `PATCH`, not part of create:
 
@@ -346,8 +342,7 @@ plan" creates a `new_novel` project and opens Import Plan. Screens are declared 
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
 project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Import Plan
 (deprecated)**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
-Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**. The `source` screen never appears on a `new_novel` project (`AUTHORING` is
-`['new_novel', 'source']`, `:28`).
+Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**.
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
 built by `buildFinalBundle` at `e2e/tests/novel-forge/forge-helpers.ts:119`. Useful when you need chapters to
@@ -671,9 +666,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - All API paths are relative to the server host; every route below is `@Authenticated()` and needs
   `novel-forge:projects:read`, plus `novel-forge:projects:write` + `novel-forge:generation:run` on anything that
   spends a model call.
-- `projectId` is a numeric string. Blueprint routes require `kind = 'new_novel'` (`BPR_003`); the authoring
-  pipeline behind them refuses a `curated` project with `PRJ_009` (`assertAuthoringProject`).
-  There is no project status any more — a project is authorable from the moment it is created.
+- `projectId` is a numeric string. There is no project status any more — a project is authorable from the moment it is created.
 - Observability for every recipe (one place): **Workflow Runs** screen (`/novels/$novelId/runs`, needs the
   `novel-forge:admin` scope) or `GET /api/v1/projects/{projectId}/runs` (not admin-gated), `GET …/runs/{runId}`,
   `GET …/runs/{runId}/context` (the context pack), `GET …/runs/{runId}/calls/{callId}` (raw output) — the last
@@ -821,7 +814,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
 
 - **Entry:** **Story Bible** screen → **Generate story bible** (shown **only in the empty state**, i.e. when the project
   has zero entities); `POST /api/v1/projects/{projectId}/seed-from-brief`.
-- **Preconditions:** `status='active'` and a `kind` other than `curated`. The API reads the brief from
+- **Preconditions:** none on the project. The API reads the brief from
   the **body only** and never touches `projects.brief`; the web button is what requires a non-empty `projects.brief`,
   and neither project creation nor a Blueprint lock writes it — set it in **Project Settings → “Premise / brief”**
   first (see Findings).
@@ -846,7 +839,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
   with no antagonist is the classic weak output here.
 - **Fails when:** repeated `model_calls` rows with `attempt=1` on one stage — the coverage floor was missed and the
   reply was retried; a stage silently skipped because a Blueprint lock already wrote its document (`project/premise`,
-  `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`/`PRJ_009`; an HTTP timeout at the
+  `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`; an HTTP timeout at the
   gateway while the run keeps going server-side (check `workflow_runs`, not the response).
 - **Cost:** 7 model calls (fewer if stages skip) + embeddings for `indexLore`; minutes of wall clock.
 
@@ -1048,8 +1041,7 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 ### Shared preconditions (continue the project Part 2 built)
 
-- A project of `kind: 'new_novel'` (`POST /projects` → `{name, kind:"new_novel"}`). `curated` projects
-  are refused with `PRJ_009` (`common/authoring-project.ts`). `kind: 'source'` also runs this pipeline.
+- A project (`POST /projects` → `{name, kind:"new_novel"}`).
 - A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
   Blueprint materialised, or what the bible builder wrote.
   Check with `GET /projects/:projectId/bible/readiness` → `readyToDraft: true`, and the **Story Bible** screen.
@@ -1083,7 +1075,6 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 #### Volume planning
 
 - **Entry:** **Volumes & Arcs** screen → "Generate volumes" dialog; `POST /projects/:projectId/plan`.
-  Requires `kind: new_novel|source`.
 - **Preconditions:** bible documents exist (Part 2). No volumes needed — this creates them.
 - **Input:** `{"volumeCount": 2, "chaptersPerVolume": 4}` (UI dialog defaults are 3 × 8; keep it at 2 × 4 so
   the whole chain below is 8 chapters). Optional `skeleton` overrides the derived one; omit it.
@@ -1099,7 +1090,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   three _different_ statements — a payoff that restates the objective, or a conflict that is just "she must
   survive", is the harness under-performing. `cast` should name entity keys that actually exist in `entities`.
 - **Fails when:** empty `volumes[]` (weak model read a blank skeleton — `generation.service.ts:203-213`
-  is the fallback that should prevent it); `PRJ_009` on a curated project;
+  is the fallback that should prevent it);
   log line `plan: volumes upserted` with a count below `volumeCount`.
 - **Cost:** 1 model call.
 
@@ -1580,144 +1571,14 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
 
 ---
 
-## Part 4: manuscript pipelines (source, curated)
+## Part 4: novel import
 
-Scope: novel import, source extraction, consolidation, skeleton, recombine, curated ingest.
-Code read under `apps/novel-forge-server/src/modules/...` and `apps/novel-forge-web/src/...`.
-Nothing here has been run against a live server or a model, so every AI-output expectation is a prediction from code. The deterministic parts were run
-locally: S1/S2/S4 pass `ImportNovelBody` + `validateNovelBundle`, the ingest bodies pass `IngestNovelBody`/`IngestChapterBody`; `parseTitleParts`/`buildGroupingPlan` were run on S2.
-Legend: **[AI]** = a model call, **[det]** = deterministic code (a bug there is a code bug, not a model bug). `P` = projectId. API base `http://localhost:8080`. Run endpoints need session auth, or a bot
-key carrying `novel-forge:projects:read` (class-level on every project controller) plus `novel-forge:projects:write` and `novel-forge:generation:run`; the run-detail endpoints additionally need
-`novel-forge:admin`.
+Scope: `POST /api/v1/import`, which lands a finished manuscript as a new novel. No model is called.
+Legend: **[det]** = deterministic code (a bug there is a code bug, not a model bug). `P` = projectId. API base `http://localhost:8080`.
 
-### 0. Read first
+### 1. Sample manuscript
 
-**Observe every run**
-
-- Job: `GET /api/v1/jobs/:jobId` (poll to `done|failed`; project list: `GET /api/v1/projects/:P/jobs`). Runs: UI **Workflow Runs** (`/novels/$novelId/runs`, needs `novel-forge:admin`; a non-admin gets an in-place "Workflow Runs needs the admin scope" panel, not a redirect), API `GET /api/v1/projects/:P/runs` (read scope only), admin-only `GET .../runs/:runId`, `.../runs/:runId/context` (the exact pack), `.../runs/:runId/calls/:callId`. Spend: `GET /api/v1/projects/:P/cost` (the Overview "AI Usage & Cost" card); `/ai-usage` is the older per-role view of the same rows.
-- SQL (`run_id` is a varchar equal to `workflow_runs.id`):
-  `select graph,target,status,outcome,node_trace from workflow_runs where project_id=P order by started_at;`
-  `select run_id,node,role,model,prompt_key,prompt_version,status,attempt,input_tokens,cached_input_tokens,output_tokens,latency_ms,cost_usd from model_calls where project_id=P order by id;`
-  `model_calls.raw_output` is the model's literal answer: read it for every quality check below.
-- Default routing (`ai/defaults.ts:85-88`): `extraction|skeleton|plan` -> planning `z-ai/glm-5.2`; `judge|audit` -> review `anthropic/claude-sonnet-5`. An Unrestricted-tier account uses a different map (`:101-104`: writing `x-ai/grok-4.6`, review `deepseek/deepseek-v4-pro`), and account/project overrides win, so read `model_calls.model` before judging a result.
-- **Silent cache**: roles `judge, validation, continuity, extraction, review, audit, compact` are served from `llm_cache` on an identical request (`model-router.service.ts:67,368`) and write NO `model_calls` row. A re-run on unchanged text costs nothing and looks like "no AI happened". To force a fresh call change the input or delete the `llm_cache` row. Creative roles (recombine) are never cached.
-
-**Defects found in code (they change what "pass" means; confirm at runtime)**
-
-- D1 **Source extraction cannot run.** `ai/prompts/extraction.prompt.ts:16` template needs `{contextPack}` and `{chapterNumber}`; `ai/graphs/source-extraction.graph.ts:73-78` passes only `chapterProse` and `entityRoster`, so LangChain's `formatMessages` throws `Missing value for input variable contextPack`. The throw happens in `buildMessages` (`model-router.service.ts:350,581`), which runs before the `llm_cache` probe (`:368`) and before any model call, so expect run `failed`, zero `model_calls`, job `failed` on chapter 1. `tests/ai/prompts.spec.ts` renders the templates of ~20 prompts but never `extraction`, which is how this survives CI. It also starves Skeleton (empty entities/world facts).
-- D2 `POST /consolidate` promotes relationships from `relationship_observations` (`consolidate.service.ts:47-81`), and nothing in `apps/novel-forge-server/src` ever inserts into that table (`chapter-insert.service.ts:85` only shifts its chapter numbers), so `relationshipsPromoted` is always 0. Consolidate is not AI.
-- D6 Import limits: a `final` import stores `novel.genre` in `projects.imported_meta` only when it matches a platform genre, and seeds one `source`-status volume per bundle volume carrying its title; a `source` import stores no volumes, and both cases come back as `warnings` on the response rather than being dropped silently. A `source` import always auto-recombines with `useAi: true` (`job.executor.ts:538-544` -> `recombine.service.ts:102-108`), so you cannot import a raw ladder and inspect it un-merged.
-- D9 Skeleton logs `runId: 'skeleton'` (`planning/skeleton.service.ts:55`): no `workflow_runs` row, invisible on Workflow Runs; its `model_calls.run_id` is the literal string `skeleton`, shared by every project.
-
-### 1. Sample manuscripts (original, written for these tests)
-
-**S1 "The Azure Cloud Sect"**: 5 short chapters (translated-Chinese-web-novel voice). Planted on purpose:
-
-- real-world residue: `Huaxia banner`, `Han Dynasty`, `Middle Kingdom`, `all of China`, `Chinese cultivators`, `Japanese sabre`, `Korean ginseng`; a stray CJK glyph `仙` (ch 3);
-- nationalism beat (ch 2, Zhao Feng excludes "outsiders"); copy-edit plants: wrong speaker (ch 2 `said Zhao Feng`), misspelling `Lin Xaio` (ch 4);
-- ch 4 near-duplicates ch 3 (repeated duel); ch 5 is a recap monologue with no dialogue and no new names (stall);
-- cast for extraction: Lin Xiao (ch 1-5), Zhao Feng (2-5), Master Gu (1,2,5), Elder Bai (1,3 only), Stonebridge Town (2 only).
-  Save as `s1.json`, import with `POST /api/v1/import` body `{"bundle": <s1.json>}` (validated: the bundle passes `ImportNovelBody` and `validateNovelBundle` with no issues, flattening to chapters 1-5):
-
-```json
-{
-  "format": "novel-import",
-  "schemaVersion": 1,
-  "mode": "source",
-  "novel": {
-    "title": "The Azure Cloud Sect",
-    "synopsis": "Lin Xiao, a servant boy at the Azure Cloud Sect, carries the two halves of his vanished father's sword. When a Jade Serpent Pill appears at his door, the sect leader's nephew Zhao Feng challenges him for it.",
-    "tags": ["cultivation", "sample"]
-  },
-  "volumes": [
-    {
-      "ordinal": 1,
-      "title": "Volume 1",
-      "chapters": [
-        {
-          "title": "Chapter 1: The Broken Sword",
-          "content": "Lin Xiao knelt in the mud outside the Azure Cloud Sect, clutching a sword snapped in two. Rain ran down the Huaxia banner above the gate, and the guards laughed at him.\n\n\"A servant boy with a Han Dynasty relic,\" said the taller guard. \"Go home.\" On the covered steps Master Gu watched and said nothing.\n\nThe blade had belonged to Lin Xiao's father, a wandering swordsman from the Middle Kingdom who vanished when the boy was six. Lin Xiao had carried the pieces for eight years.\n\nThat night Elder Bai brought a lantern to the woodshed. \"The sect takes no charity cases,\" he said, \"but a Jade Serpent Pill was left at your door this morning. Someone wants you alive.\"\n\nLin Xiao turned the green pill over in his fingers. Who in all of China would waste such a treasure on him?"
-        },
-        {
-          "title": "Chapter 2: Zhao Feng's Challenge",
-          "content": "By dawn the whole outer court knew about the pill. Zhao Feng, the sect leader's nephew, blocked Lin Xiao at the training yard.\n\n\"Chinese cultivators built this sect,\" he said, \"and outsiders like your father were never welcome. Give me the pill.\"\n\n\"It was left for me,\" said Zhao Feng.\n\nZhao Feng smiled. \"Then win it. Three days from now, at the Iron Kettle Inn in Stonebridge Town, where the sect settles its quarrels. Bring a sword, if you can find one.\"\n\nMaster Gu, passing by, remarked only that Korean ginseng tea was better with less honey, and walked on. Lin Xiao spent the day at the forge, gluing the halves of his father's blade with resin and iron filings. It would not hold. He knew it would not hold."
-        },
-        {
-          "title": "Chapter 3: The Duel at the Iron Kettle Inn",
-          "content": "The Iron Kettle Inn smelled of smoke and sour wine. Zhao Feng stood in the center of the room, his Japanese sabre gleaming.\n\n\"Last chance,\" he said. \"Kneel, and I break only one arm.\"\n\nLin Xiao drew the glued sword. It shattered on the first parry, and Zhao Feng's laughter filled the room.\n\nBut the last shard in Lin Xiao's hand glowed green, and when he swallowed the Jade Serpent Pill his qi surged into it. The shard cut Zhao Feng's sabre in half. Above the door, the character 仙 seemed to flicker.\n\n\"Immortal,\" Elder Bai whispered from the shadows. \"So the pill was meant for this.\" Zhao Feng fled into the rain, swearing revenge."
-        },
-        {
-          "title": "Chapter 4: The Duel Again",
-          "content": "The Iron Kettle Inn smelled of smoke and sour wine. Zhao Feng stood in the center of the room, his Japanese sabre gleaming.\n\n\"Last chance,\" he said. \"Kneel, and I break only one arm.\"\n\nLin Xiao drew a plain iron sword. It shattered on the first parry, and Zhao Feng's laughter filled the room.\n\nBut the last spark of the Jade Serpent Pill glowed green in Lin Xaio's blood, and his qi surged into the blade. The blade cut Zhao Feng's sabre in half.\n\nZhao Feng fled into the rain, swearing revenge."
-        },
-        {
-          "title": "Chapter 5: Master Gu Remembers",
-          "content": "Master Gu sat alone on the covered steps and thought about everything that had happened. He thought about the broken sword. He thought about the Jade Serpent Pill.\n\nHe thought about the first duel at the Iron Kettle Inn and the second duel at the Iron Kettle Inn, which had gone almost the same way as the first. He thought about the father of Lin Xiao, and about Zhao Feng, and about Elder Bai, and about the pill again.\n\nHe thought about the Azure Cloud Sect and how much had changed in a week and how little had truly changed. Rain fell on the banner. He thought about the sword once more, and then about the pill once more, and then about the two duels once more, until the lantern burned down."
-        }
-      ]
-    }
-  ]
-}
-```
-
-**S2 recombine ladder** (9 short chapters; passes `ImportNovelBody` and `validateNovelBundle`). `buildGroupingPlan` run on these titles gives `before 9, after 7` with ambiguous boundaries `[{afterNumber:5,reason:'bare_repeat'},{afterNumber:7,reason:'bare_repeat'},{afterNumber:8,reason:'untitled_short'}]`. Expected after AI: merge 5 (sentence continues mid-word-run), split 7 (time skip "Three winters later"), merge 8 (sentence continues) => 5 chapters; `applyBoundaryMerges(plan,[5,8])` was run and produces exactly that.
-
-```json
-{
-  "format": "novel-import",
-  "schemaVersion": 1,
-  "mode": "source",
-  "novel": {
-    "title": "Recombine Ladder Sample",
-    "synopsis": "Nine short scraped chapters that exercise every rung of the recombine title-parsing ladder."
-  },
-  "volumes": [
-    {
-      "ordinal": 1,
-      "chapters": [
-        {
-          "title": "Chapter 1: Ash Gate (1/2)",
-          "content": "The ash gate stood at the edge of the burned quarter, and no one in Corrin's family had passed through it in three generations. Corrin brought a candle anyway, because her grandmother had said the gate opened only for those who arrived with a light."
-        },
-        {
-          "title": "Chapter 1: Ash Gate (2/2)",
-          "content": "Beyond the gate the ground was warm. Corrin walked until the candle guttered, and then she kept walking, because turning back would have meant admitting the fear."
-        },
-        {
-          "title": "Chapter 2: The Salt Road - Part 1",
-          "content": "The salt road ran white under the moon. Bram loaded the last cart and checked the axle twice, as his father had taught him, before he let himself think about the toll-keeper."
-        },
-        {
-          "title": "Chapter 2: The Salt Road - Part 2",
-          "content": "The toll-keeper was asleep, or pretending to be. Bram passed him at a walk, counted to two hundred, and only then let the mule run."
-        },
-        {
-          "title": "The Lantern Fair",
-          "content": "The Lantern Fair filled the square by dusk, and Mira pushed through the crowd with her mother's brass lantern held high, trying to reach the stage before the judges lit the first flame, and just as she lifted the lantern toward the"
-        },
-        {
-          "title": "The Lantern Fair",
-          "content": "crowd, the paper flame caught, and the whole square gasped at the color of it. Mira did not lower the lantern until the judges had all stood."
-        },
-        {
-          "title": "The Cold Well",
-          "content": "Night fell over the village and the well froze. The elders agreed at last to seal it, and the story of the cold well ended there. THE END OF THE FIRST BOOK."
-        },
-        {
-          "title": "The Cold Well",
-          "content": "Three winters later, a stranger arrived in the village asking about a well. No one could remember one, and the stranger, unaccountably, did not seem surprised, and he asked whether anyone in the village still kept a"
-        },
-        {
-          "title": "Chapter 5",
-          "content": "key, because a well like that always had one. The innkeeper said she might have one somewhere, and went to look."
-        }
-      ]
-    }
-  ]
-}
-```
-
-**S4 finished English novel** (2 chapters; passes `ImportNovelBody` and `validateNovelBundle`). `final`-mode import bundle:
+**S4 finished English novel** (2 chapters; passes `ImportNovelBody` and `validateNovelBundle`):
 
 ```json
 {
@@ -1726,7 +1587,7 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
   "mode": "final",
   "novel": {
     "title": "Final Sample",
-    "synopsis": "A finished English novel pushed by a curation bot, chapter by chapter.",
+    "synopsis": "A finished English novel, imported in one bundle.",
     "tags": ["sample"]
   },
   "volumes": [
@@ -1748,93 +1609,23 @@ key carrying `novel-forge:projects:read` (class-level on every project controlle
 }
 ```
 
-Curated-ingest bodies (`PUT /api/v1/ingest/novels/test:001` gets `novel`; `PUT .../chapters/1` and `.../2` get the chapter objects). Both shapes were validated against `IngestNovelBody` and `IngestChapterBody`:
+### 2. Recipe: novel import [det]
 
-```json
-{
-  "novel": {
-    "title": "Curated Ingest Sample",
-    "synopsis": "A finished English novel pushed by a curation bot, chapter by chapter.",
-    "originalAuthor": "Sample Author"
-  },
-  "chapters": [
-    {
-      "title": "The First Tide",
-      "content": "Mira climbed the spiral stair for what she told herself was the last time.\n\nThe lamp room was cold."
-    },
-    {
-      "title": "A Voice in the Foam",
-      "content": "The voice came again with the seventh wave, the way it always did."
-    }
-  ]
-}
-```
-
-### 2. Recipes
-
-#### 2.1 Novel import (`source` and `final` modes)
-
-- **Entry:** UI screen **Import novel** at `/import` (`.json` file upload + "Import novel" button). It is not in the sidebar: reach it from the Projects home header button "Import novel" (`routes/_app/index.tsx:137`) or the Source Pipeline empty state (`source.tsx:228`). API `POST /api/v1/import` (202 `{projectId, jobId}`, route body limit 64 MB against the app-wide 12 MB). Creates the project; not nested under `/projects/:id`.
+- **Entry:** UI screen **Import novel** at `/import` (`.json` file upload + "Import novel" button), reached from the Projects home header button "Import novel". API
+  `POST /api/v1/import` (202 `{projectId, jobId, warnings}`, route body limit 64 MB against the app-wide 12 MB). Creates the project; not nested under `/projects/:id`.
 - **Preconditions:** none. Project cap (`PRJ_004`, 409) applies.
-- **Which parts are AI:** none in `final`. In `source` the only AI is the auto-recombine at the end (`job.executor.ts:538-544`) and only when the title ladder leaves an ambiguous boundary. S1 has none (every title carries a distinct `Chapter N:` prefix), so a clean S1 import must make zero model calls.
-- **Input:** S1 as `source`; for `final` use the S4 final bundle.
-- **Run:** 1. POST S1. 2. Poll the job (`phase` inserting -> recombining). 3. `GET /api/v1/projects/:P/source/chapters`. 4. Repeat with the `final` bundle. 5. Negative bodies: two volumes with `ordinal 1`; ordinals `1,3`; a whitespace-only `content`; `novel.cover` naming a missing asset.
-- **Verify:** `projects`: `kind` `source` (final: `new_novel` plus one contentless `<section>/default` `bible_documents` row per `bible_section` enum value), `name=title=novel.title`, `brief=synopsis`, `themes=tags`. `chapters`: 5 rows numbered 1..5 in flatten order, `status='done'`; source: `generator='standard', locked=false`; final: `generator='human', locked=true`; `word_count` set; `仙` and blank-line paragraphs intact (compare bytes with the bundle; only markdown sanitising may differ). `jobs` row `kind='import'`, `target='import-P'`, `payload` compacted to `{chapters:5,hasCover:false}` once the job completes or is cancelled (`job.executor.ts:555-561`) — a **failed** import never reaches the compaction, so the full bundle prose stays on the row. Invariant: `select count(*) from model_calls where project_id=P` is 0 for S1 and for any `final` import. Negatives return 400 with field paths `volumes` / `novel.cover` / `volumes[0].chapters[0].content` (the whitespace-only body clears the DTO's `minLength: 1` and is caught by `validateNovelBundle`, not AJV).
-- **Quality check:** none (deterministic). Only check that `volumes[].title` is dropped (D6) is what you expect.
-- **Fails when:** 400 `ValidationError` field errors; `PRJ_004`; job `failed` mid-batch leaves the project with partial chapters (`jobs.last_error`); a `413` past the route's 64 MB, or a 400 on field `bundle` past the validator's own 48 MB content ceiling.
-
-#### 2.2 Source extraction
-
-- **Entry:** UI **Source Pipeline** (`/novels/$novelId/source`, four stages: Extract, Consolidate, Assets, Skeleton) stage "Extract" -> "Run", which posts an empty body `{}`, so the server default `limit` of 5 chapters applies per press (`pipeline.controller.ts:39`, `extraction.service.ts:9`); `POST /api/v1/projects/:P/extract` `{"limit"?}` (202, job `extract`, target `extract-P`). `source` or `new_novel` project. Targets: `chapters.status='done' and summary is null`. The controller comment calls this a backfill tool for legacy novels; there is no other caller of `runSourceExtraction`, so it is in practice the only way chapters get extracted.
-- **Preconditions:** S1 imported (recipe 2.1). Ollama up for the embedding step (`qwen3-embedding:8b`); embedding failure is non-fatal.
-- **Input:** S1 chapters 1-5. **[AI]** 1 call per chapter: graph `source-extraction` (`loadChapter, extractKnowledge, persistKnowledge, embedProse, finish`), prompt `extraction@1.0.0`, role `extraction`, cacheable.
-- **Run:** 1. `POST /extract {}`. 2. Poll the job. 3. Inspect `workflow_runs.error` and rows below. 4. Re-run `POST /extract {}` (must pick 0 chapters).
-- **Verify (D1 present):** run `failed` with `Missing value for input variable contextPack`, job `failed` with `chapter 1 extraction failed (run <runId>)`, 0 `model_calls`. **Verify (after fix):** `chapters.summary` non-null for 1-5; `entities` (origin `extracted`, snake_case keys) contain lin_xiao, zhao_feng, master_gu, elder_bai, no duplicate person (`xiao_lin`); `entity_appearances` counts per entity (Lin Xiao >= 3 distinct chapters; the prompt asks for "new or updated" entities, so appearances undercount unless the model re-lists them); `beats` with `chapter` in 1..5; `plot_threads` (the duel/revenge, open); `mysteries` (who left the pill: open, not resolved); `world_facts`; `entity_relationships`; `chapter_chunks` rows. Invariants: every `beats.entities` key exists in `entities`; nothing references chapter 6; a second `POST /extract` enqueues an empty target list.
-- **Quality check:** each summary is 2-3 sentences and states what changed and what stays open; ch 5 summary must admit that nothing happens (no invented event); ch 1 summary must not leak ch 3's pill payoff; `Elder Bai` is minor (2 chapters).
-- **Fails when:** D1; `AI_001` unparseable after the repair ladder (`model_calls.status`, warn "Attempt 1 parse failed"); `AI_008/AI_009` quota; embedding warn `embedProse: addProse failed (non-fatal)`.
-- **Cost:** 5 calls, ~1-2k tokens in each.
-
-#### 2.3 Consolidation (deterministic, not AI)
-
-- **Entry:** Source Pipeline "Consolidate" -> "Run"; `POST /api/v1/projects/:P/consolidate` (200, sync `{significanceUpdated, relationshipsPromoted}`).
-- **Preconditions:** `entity_appearances` rows (extraction). With D1 open there are none, so seed by SQL. The only NOT NULL `entities` columns without a default are `project_id`, `entity_key`, `type` and `name`, so this insert is complete; `entity_appearances` needs `(entity_id, project_id, chapter)`:
-  `insert into entities(project_id,entity_key,type,name,origin,status) values (P,'lin_xiao','character','Lin Xiao','extracted','active'),(P,'elder_bai','character','Elder Bai','extracted','active');`
-  `insert into entity_appearances(entity_id,project_id,chapter) select e.id,P,c from entities e, generate_series(1,3) c where e.project_id=P and e.entity_key='lin_xiao';` and the same for `elder_bai` with `chapter in (1,3)`.
-- **Run:** 1. POST. 2. POST again. 3. Change Lin Xiao to exactly 2 chapters (delete one appearance) and POST.
-- **Verify:** `significanceUpdated=2` (it counts every entity that has appearances, not only those whose value changed); `entities.significance`: lin_xiao `major` (3 distinct chapters), elder_bai `minor`; drops to `minor` at 2 chapters (threshold is `>= 3`, `consolidate.service.ts:12,39`); repeat call gives identical counts; `model_calls` unchanged; `relationshipsPromoted` is always 0 (D2). UI chip: the Consolidate stage reads "done" only after a plan is approved (D10), so trust the response, not the chip.
-- **Quality check:** none.
-- **Fails when:** counts 0/0 because no appearances exist (D1); `IAM_002` 403 for a bot without `novel-forge:projects:read` + `novel-forge:projects:write` (this endpoint does not need `generation:run`).
-
-#### 2.4 Skeleton
-
-- **Entry:** Source Pipeline "Skeleton" -> "Run"; `POST /api/v1/projects/:P/skeleton` (200 sync). Not guarded by project kind.
-- **Preconditions:** S1 imported; ideally extraction summaries (else the prompt only sees the synopsis).
-- **Input:** project `brief`+`premise`, up to 50 entities, chapter summaries, `themes`. **[AI]** 1 call, `skeleton@1.0.0`, role `skeleton` (planning group), never cached. Writes `projects.skeleton_character_arcs` (jsonb) and `skeleton_power_curve` (text), overwriting.
-- **Run:** 1. POST. 2. `select skeleton_character_arcs, skeleton_power_curve from projects where id=P`. 3. `select * from model_calls where run_id='skeleton' and project_id=P` (D9: not in Workflow Runs).
-- **Verify:** response has `characterArcs` (object keyed by model-chosen ids) and `powerCurve` (string); columns match the response; one `model_calls` row `prompt_key='skeleton', prompt_version='1.0.0'`.
-- **Quality check:** arcs for Lin Xiao, Zhao Feng and Master Gu each state start state, the events that change them and end state, using S1's own events (broken sword, pill, shard cutting the sabre), and the power curve names escalation points and setbacks tied to those events. Generic cultivation boilerplate or invented characters = harness value is nil here. Run once with D1 (no summaries) and once with summaries seeded to see what context adds.
-- **Fails when:** `AI_001`; empty `characterArcs`; arcs about people not in S1.
-
-#### 2.5 Recombine (title-parsing ladder + AI boundary resolution)
-
-- **Entry:** `POST /api/v1/projects/:P/recombine` `{"dryRun"?, "useAi"?}` (200 sync; `source` only, else `PRJ_003`). No UI screen (recombine appears in the web app only in `api-types.gen.ts`); it also runs inside import(source) jobs via `autoRecombine`, which always passes `useAi: true` and swallows errors (log `autoRecombine skipped`).
-- **Preconditions:** none, but it refuses once derived data exists (summary, appearances, beats, chunks, briefs, drafts) with `SRC_003`.
-- **Input:** S2. **[det]** ladder (`title-parts.ts`): `(1/2)` part-of-total, `- Part 2`, `Chapter N:` prefix, bare repeat, untitled-short. **[AI]** only for the 3 ambiguous boundaries: 1 call, `recombine@1.0.0`, role `skeleton`, graph `recombine`/target `boundaries`, never cached.
-- **Run:** 1. Import S2 (D6: merge is applied by the import job). 2. `GET /api/v1/projects/:P/source/chapters`. 3. `POST /recombine {"dryRun":true}` (no AI). 4. `POST /recombine {"dryRun":true,"useAi":true}` for a second opinion. 5. Run extraction (or set any `chapters.summary`), then `POST /recombine {}` again.
-- **Verify:** 5 chapters after import **if the model merges 5 and 8**: titles `Ash Gate`, `The Salt Road`, `The Lantern Fair`, `The Cold Well`, `The Cold Well` (the deterministic ladder alone stops at 7, and every merge beyond that is the model's); ch 1 `merged_from = [{number:1,title:"Chapter 1: Ash Gate (1/2)",words:45},{number:2,...}]` (`recombine.service.ts:217`); content = parts joined by `\n\n` (`:216`, so the mid-sentence cut in "toward the / crowd" stays as a paragraph break, a visible seam); numbers contiguous 1..5. `model_calls`: exactly 1 row `recombine@1.0.0`; `raw_output` is `{"decisions":[{"afterChapter":5,"verdict":"merge"},{"afterChapter":7,...},{"afterChapter":8,...}]}` in pre-renumber numbers. Step 3 returns `applied:false, before:5, after:5` with `ambiguous=[{afterNumber:4,reason:'bare_repeat'}]` (the boundary the AI left split, renumbered); step 4 may report `after:4` without applying it. Step 5 returns 400 `SRC_003`. A clean S1 import must produce no `recombine` call.
-- **Quality check:** merge 5 and 8 (a sentence runs across the cut), split 7 (scene end + "Three winters later"). A merge on 7 is a false merge: the prompt says "when in doubt, answer split", and short halves bias it the wrong way.
-- **Fails when:** verdicts for boundaries not asked are ignored (invariant: the model only joins, never splits); AI failure silently falls back to the deterministic plan (warn `AI boundary resolution failed`), leaving 7 chapters; `SRC_002` on an empty project.
-- **Cost:** 1 call, ~600 tokens.
-
-#### 2.6 Curated ingest (deterministic, not AI)
-
-- **Entry:** `PUT /api/v1/ingest/novels/:sourceRef` (201 created / 200 existing), `PUT .../chapters/:sourceOrdinal` (201, 204 when nothing landed), `POST .../cover` (204), `GET .../manifest` (200) — sourceRef e.g. `test:001`. Needs permission `novel-forge:curate` (session, or bot key `sl_bot_...`). No interactive web UI.
-- **Preconditions:** a caller holding `novel-forge:curate`. Curated projects cannot be created via `POST /projects` (`PRJ_005`).
-- **Input:** S4 ingest bodies (chapter bodies also accept `authorNote`).
-- **Run:** 1. PUT novel (201, then again 200 with `created:false`). 2. PUT ordinals 1, 2. 3. Re-push ordinal 1 unchanged. 4. Re-push ordinal 1 with different text. 5. PUT ordinal 4. 6. GET manifest.
-- **Verify:** `projects.kind='curated'`, `source_ref='test:001'`; `chapters` `locked=true, generator='human', status='done'`, `source_ordinal` 1..2, `content_hash` = `chapterContentHash({title,content})`; step 3 -> 204 no-op; step 4 -> 409 `ING_003`; step 5 -> 409 `ING_002` (no gaps); manifest lists `{sourceOrdinal, contentHash}` only; `ingest_audit_log` has a row per call (`landed|noop|created|...`). Invariant: `select count(*) from model_calls where project_id=P` is 0.
-- **Quality check:** none (deterministic).
-- **Fails when:** `IAM_002` missing permission; `ING_001` foreign or unknown sourceRef (answered like absent); 409s above.
+- **Input:** S4. `mode` accepts only `final`.
+- **Run:** 1. POST S4 as `{"bundle": <s4.json>}`. 2. Poll the job (`phase` inserting). 3. `GET /api/v1/projects/:P/source/chapters`. 4. Negative bodies: two volumes with
+  `ordinal 1`; ordinals `1,3`; a whitespace-only `content`; `novel.cover` naming a missing asset; `mode: "source"`.
+- **Verify:** `projects`: `kind` `new_novel`, one contentless `<section>/default` `bible_documents` row per `bible_section` enum value, `name=title=novel.title`,
+  `brief=synopsis`, `themes=tags`; `novel.genre` lands in `projects.imported_meta` only when it matches a platform genre (otherwise a response `warning`). One
+  `source`-status volume per bundle volume, carrying its title. `chapters`: rows numbered 1..N in flatten order, `status='done'`, `generator='human'`, `locked=true`,
+  `word_count` set. `jobs` row `kind='import'`, `target='import-P'`, `payload` compacted to `{chapters:N,hasCover:false}` once the job completes or is cancelled — a
+  **failed** import never reaches the compaction, so the full bundle prose stays on the row. Invariant: `select count(*) from model_calls where project_id=P` is 0.
+  Negatives return 400 with field paths `volumes` / `novel.cover` / `volumes[0].chapters[0].content` (the whitespace-only body clears the DTO's `minLength: 1` and is
+  caught by `validateNovelBundle`, not AJV); a `mode` other than `final` is an AJV enum error.
+- **Fails when:** 400 `ValidationError` field errors; `PRJ_004`; job `failed` mid-batch leaves the project with partial chapters (`jobs.last_error`); a `413` past the
+  route's 64 MB, or a 400 on field `bundle` past the validator's own 48 MB content ceiling.
 
 ---
 
@@ -1931,7 +1722,7 @@ Ordinary hub turns run `chat-refine@2.1.0`, role `chat` (planning-group model), 
 
 #### 1.1 Manual hub turn: materialise canon as a staged proposal
 
-- **Entry:** UI "Refinement Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`. Project kind `new_novel` or `source`.
+- **Entry:** UI "Refinement Chat" (`/novels/$novelId/chat`), composer placeholder "Ask for anything — edits, prose, pipeline runs…", mode toggle Manual/Auto. API `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`.
 - **Preconditions:** empty new_novel project.
 - **Input** (`content`):
   > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes of 30 chapters. Do not run generation.

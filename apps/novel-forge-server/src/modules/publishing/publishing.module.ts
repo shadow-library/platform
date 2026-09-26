@@ -16,7 +16,7 @@ import { WikiPublishingService } from './wiki-publishing.service';
 // cross-module re-export (the framework imports a dynamic module once and resolves dependencies
 // eagerly, which makes re-exporting the guard's exact instance order-dependent). No JobsModule import
 // here — JobsModule imports THIS module for the publish executor, and the publishing controller lives
-// in PipelineModule (the HTTP-wiring seam), keeping the module graph acyclic.
+// in PublishingHttpModule (the HTTP-wiring seam), keeping the module graph acyclic.
 @Module({
   // FastifyModule supplies the ContextService the attribution gate reads the request principal from.
   imports: [DatabaseModule, FastifyModule],

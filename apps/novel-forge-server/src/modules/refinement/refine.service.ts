@@ -4,7 +4,6 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { assertAuthoringProject } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -71,7 +70,6 @@ export class RefineService {
   async enhancePremise(projectId: bigint, overview?: string): Promise<PremiseEnhanceResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringProject(project);
     const effectiveOverview = overview ?? project.brief ?? project.premise;
     if (!effectiveOverview) throw AppErrorCode.PRM_001.create();
     this.logger.info('enhancePremise: starting', {
@@ -120,7 +118,6 @@ export class RefineService {
   async auditBible(projectId: bigint): Promise<BibleAuditResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringProject(project);
 
     const prompt = PROMPT_REGISTRY['bible-audit'];
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'audit' }, project);
@@ -172,7 +169,6 @@ export class RefineService {
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId) }),
     ]);
     if (!project) throw AppErrorCode.PRJ_001.create();
-    assertAuthoringProject(project);
 
     const volume = volumes.find(v => v.volumeKey === volumeKey);
     if (!volume) throw AppErrorCode.VOL_001.create();

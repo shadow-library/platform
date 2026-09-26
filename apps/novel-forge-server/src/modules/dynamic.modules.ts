@@ -17,22 +17,19 @@ import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
 import { BlueprintHttpModule, BlueprintModule } from '@modules/blueprint';
 import { BotOwnershipModule } from '@modules/bot-ownership';
-import { CuratedIngestModule } from '@modules/curated-ingest';
+import { ChapterModule } from '@modules/chapter';
 import { EventsModule } from '@modules/events';
 import { ExportModule } from '@modules/export';
-import { ExtractionModule } from '@modules/extraction';
 import { GenerationModule } from '@modules/generation';
 import { HubActionsModule } from '@modules/hub';
 import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
 import { NovelImportModule } from '@modules/novel-import';
-import { PipelineModule } from '@modules/pipeline';
 import { PlanImportModule } from '@modules/plan-import';
-import { PlanningModule } from '@modules/planning';
 import { PluginProposalModule, PluginsModule } from '@modules/plugins';
 import { ProjectModule } from '@modules/project';
+import { PublishingHttpModule } from '@modules/publishing/publishing-http.module';
 import { RefinementModule } from '@modules/refinement';
-import { SourceModule } from '@modules/source';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
 
 /**
@@ -53,23 +50,20 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AppAuthModule,
     AiModule,
     BotOwnershipModule,
-    CuratedIngestModule,
+    ChapterModule,
     EventsModule,
     ExportModule,
-    ExtractionModule,
     GenerationModule,
     HubActionsModule,
     IllustrationModule,
     JobsModule,
     NovelImportModule,
-    PipelineModule,
     PlanImportModule,
-    PlanningModule,
     PluginsModule,
     PluginProposalModule,
     ProjectModule,
+    PublishingHttpModule,
     RefinementModule,
-    SourceModule,
     BibleModule,
     BlueprintModule,
     BlueprintHttpModule,

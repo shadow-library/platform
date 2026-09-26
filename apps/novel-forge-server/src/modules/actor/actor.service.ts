@@ -28,8 +28,8 @@ export interface ProjectOwnerColumns {
  * A bot works on its organisation's behalf and nobody can hand a record back to it — the ownership guard's
  * sharing branch admits users only — so anything a bot creates is shared with its organisation from the
  * start. Unshared, a bot-owned project would be reachable by that one bot and by no person at all. The rule
- * lives here rather than at each call site so every create path agrees: create, clone, novel import and
- * curated ingest. A user-owned project carries no organisation, so sharing it would share it with nobody.
+ * lives here rather than at each call site so every create path agrees: create, clone and novel import.
+ * A user-owned project carries no organisation, so sharing it would share it with nobody.
  */
 export function projectOwnerColumns(actor: Actor): ProjectOwnerColumns {
   const isBot = actor.kind === 'bot';

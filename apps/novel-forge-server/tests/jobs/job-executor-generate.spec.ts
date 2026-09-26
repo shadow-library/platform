@@ -17,11 +17,10 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const workflowRunService = { runChapterGeneration: runChapterGenerationMock } as never;
   const indexingService = {} as never;
   const databaseService = { getPostgresClient: () => ({}) } as never;
-  const recombineService = {} as never;
   const publishRunner = {} as never;
   const storage = {} as never;
 
-  const executor = new JobExecutor(jobService, concurrency, workflowRunService, indexingService, databaseService, recombineService, publishRunner, storage, {} as never);
+  const executor = new JobExecutor(jobService, concurrency, workflowRunService, indexingService, databaseService, publishRunner, storage, {} as never);
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }
 

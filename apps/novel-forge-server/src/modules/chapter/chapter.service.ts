@@ -67,7 +67,7 @@ export class ChapterService {
     if (result.length === 0) await this.notFoundOrLocked(projectId, number);
   }
 
-  // Finalized prose (`chapters.locked`) never changes except through amend — the source-chapter PATCH/DELETE
+  // Finalized prose (`chapters.locked`) never changes except through amend — the chapter PATCH/DELETE
   // routes exist for pre-finalize manuscript editing, so a locked chapter here is a conflict, not a 404.
   private async notFoundOrLocked(projectId: bigint, number: number): Promise<never> {
     const existing = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)) });

@@ -14,7 +14,6 @@ import { type Blueprint, type Ledger } from '@server/database';
 import { engineCoreScreen, engineOptions, enginePass, engineWorldScreen, ledgerEntry, round } from './blueprint-fixtures';
 
 interface FakeState {
-  projectKind?: string;
   latest?: RoundWithJob;
   ready?: Blueprint.Round;
   active?: Ledger.Entry[];
@@ -30,7 +29,7 @@ function fakeService(state: FakeState = {}, steps: AnyBlueprintStep[] = ALL_STEP
       projects: {
         findFirst: mock(async () => {
           calls.push('read:project');
-          return { id: 7n, kind: state.projectKind ?? 'new_novel' };
+          return { id: 7n, kind: 'new_novel' };
         }),
       },
       decisionLedgerEntries: {
@@ -143,10 +142,9 @@ describe('BlueprintStepService.openRound', () => {
     expect(calls).toEqual(['lock:start', 'read:project', 'read:ledger', 'read:latest', 'settle', 'read:ready', 'create']);
   });
 
-  it('should refuse malformed input, a nudge the step does not offer and a project that is not an original novel', async () => {
+  it('should refuse malformed input and a nudge the step does not offer', async () => {
     await expect(fakeService().service.openRound(7n, 'start', { input: { startingType: 'poem' } })).rejects.toMatchObject({ code: 'BPR_004' });
     await expect(fakeService().service.openRound(7n, 'start', { nudges: ['Make it a heist'] })).rejects.toMatchObject({ code: 'BPR_004' });
-    await expect(fakeService({ projectKind: 'curated' }).service.openRound(7n, 'start', {})).rejects.toMatchObject({ code: 'BPR_003' });
   });
 
   it('should refuse a round on a step the novel’s decisions rule out, before spending anything on it', async () => {

@@ -10,7 +10,6 @@ import {
   ChatRefineSchema,
   ContinuitySchema,
   EndingContractSchema,
-  ExtractionSchema,
   FixSchema,
   IllustrationComposeSchema,
   JudgeSchema,
@@ -687,21 +686,6 @@ describe('Prompt modules', () => {
 
       const { knowledgeChanges: _knowledgeChanges, ...withoutKnowledgeChanges } = base;
       expect(parseSchema(ContinuitySchema, withoutKnowledgeChanges).success).toBe(false);
-    });
-  });
-
-  describe('ExtractionSchema', () => {
-    it('accepts minimal valid output', () => {
-      const result = parseSchema(ExtractionSchema, {
-        entities: [],
-        relationships: [],
-        beats: [],
-        plotThreads: [],
-        worldFacts: [],
-        mysteries: [],
-        chapterSummary: 'The hero arrives in the city.',
-      });
-      expect(result.success).toBe(true);
     });
   });
 

@@ -1,9 +1,7 @@
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 
-// A hand-authored bundle picks one of two outcomes: `source` lands the
-// chapters as raw source material feeding the existing extract/consolidate pipeline;
-// `final` lands them as the finished, immediately publishable novel.
-const NOVEL_IMPORT_MODES = ['final', 'source'] as const;
+// Kept as a single-value field so bundle files written for schema version 1 stay valid.
+const NOVEL_IMPORT_MODES = ['final'] as const;
 const NovelImportMode = EnumType.create('NovelImportMode', [...NOVEL_IMPORT_MODES]);
 export type NovelImportModeValue = (typeof NOVEL_IMPORT_MODES)[number];
 
@@ -50,7 +48,7 @@ export class NovelImportVolume {
   @Field({
     optional: true,
     maxLength: VOLUME_TITLE_MAX_LENGTH,
-    description: 'Volume title; a final-mode import stores it on the volume seeded for this group, a source-mode import ignores it with a warning.',
+    description: 'Volume title, stored on the volume seeded for this group.',
   })
   title?: string;
 
@@ -91,7 +89,7 @@ export class NovelBundle {
   @Field(() => Integer, { enum: [1] })
   schemaVersion: number;
 
-  @Field(() => NovelImportMode)
+  @Field(() => NovelImportMode, { description: 'Always `final`: the chapters land as the finished, immediately publishable novel.' })
   mode: NovelImportModeValue;
 
   @Field(() => NovelImportMeta)

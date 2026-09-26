@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
@@ -8,7 +8,7 @@ import { DatabaseService, StorageService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { ownedBy } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
-import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
@@ -33,12 +33,6 @@ import {
 } from './project.dto';
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
-
-const WORKFLOW_SWITCHES: Partial<Record<Project.Kind, Project.Kind[]>> = { curated: ['new_novel'] };
-
-function assertWorkflowSwitch(from: Project.Kind, to: Project.Kind): void {
-  if (!WORKFLOW_SWITCHES[from]?.includes(to)) throw AppErrorCode.PRJ_008.create();
-}
 
 @Injectable()
 export class ProjectService {
@@ -105,7 +99,6 @@ export class ProjectService {
 
   async create(body: CreateProjectBody): Promise<Project.Presented> {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
-    if (body.kind === 'curated') throw AppErrorCode.PRJ_005.create();
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
@@ -128,12 +121,10 @@ export class ProjectService {
     if (!project) throw AppErrorCode.S001.create();
     this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
 
-    if (body.kind === 'new_novel') {
-      await this.db
-        .insert(schema.bibleDocuments)
-        .values(BIBLE_SECTIONS.map(section => ({ projectId: project.id, section, slug: 'default' })))
-        .catch(err => this.databaseService.translateError(err));
-    }
+    await this.db
+      .insert(schema.bibleDocuments)
+      .values(BIBLE_SECTIONS.map(section => ({ projectId: project.id, section, slug: 'default' })))
+      .catch(err => this.databaseService.translateError(err));
 
     return this.present(project);
   }
@@ -217,34 +208,15 @@ export class ProjectService {
     }
     delete set.wordTarget;
 
-    return this.db.transaction(async rawTx => {
-      const tx = rawTx as unknown as PrimaryDatabase;
-      const project = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-      if (!project) throw AppErrorCode.PRJ_001.create();
+    const [result] = await this.db
+      .update(schema.projects)
+      .set(set)
+      .where(eq(schema.projects.id, id))
+      .returning()
+      .catch(err => this.databaseService.translateError(err));
 
-      const switchTo = update.kind && update.kind !== project.kind ? update.kind : undefined;
-      if (switchTo) assertWorkflowSwitch(project.kind, switchTo);
-
-      const [result] = await tx
-        .update(schema.projects)
-        .set(set)
-        .where(eq(schema.projects.id, id))
-        .returning()
-        .catch(err => this.databaseService.translateError(err));
-
-      if (!result) throw AppErrorCode.PRJ_001.create();
-
-      if (switchTo === 'new_novel') {
-        await tx
-          .insert(schema.bibleDocuments)
-          .values(BIBLE_SECTIONS.map(section => ({ projectId: id, section, slug: 'default' })))
-          .onConflictDoNothing()
-          .catch(err => this.databaseService.translateError(err));
-        this.logger.info('project switched to the authoring workflow', { projectId: id, from: project.kind });
-      }
-
-      return this.present(result);
-    });
+    if (!result) throw AppErrorCode.PRJ_001.create();
+    return this.present(result);
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
@@ -272,8 +244,6 @@ export class ProjectService {
           config: body.config ?? source.config ?? null,
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
           wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
-          skeletonCharacterArcs: source.skeletonCharacterArcs,
-          skeletonPowerCurve: source.skeletonPowerCurve,
         })
         .returning()
         .catch(err => this.databaseService.translateError(err));
@@ -281,45 +251,34 @@ export class ProjectService {
       if (!newProject) throw AppErrorCode.S001.create();
 
       if (body.resetDerived !== false) {
-        if (source.kind !== 'source') {
-          const [bibleDocs, entities, volumes] = await Promise.all([
-            tx.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, id) }),
-            tx.query.entities.findMany({ where: eq(schema.entities.projectId, id) }),
-            tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, id) }),
-          ]);
+        const [bibleDocs, entities, volumes] = await Promise.all([
+          tx.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, id) }),
+          tx.query.entities.findMany({ where: eq(schema.entities.projectId, id) }),
+          tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, id) }),
+        ]);
 
-          if (bibleDocs.length > 0) {
-            const bibleRows: Omit<Bible.Document, 'id' | 'projectId'>[] = bibleDocs.map(d => utils.object.omitKeys(d, ['id', 'projectId']));
-            await tx
-              .insert(schema.bibleDocuments)
-              .values(bibleRows.map(r => ({ ...r, projectId: newProject.id })))
-              .catch(err => this.databaseService.translateError(err));
-          }
+        if (bibleDocs.length > 0) {
+          const bibleRows: Omit<Bible.Document, 'id' | 'projectId'>[] = bibleDocs.map(d => utils.object.omitKeys(d, ['id', 'projectId']));
+          await tx
+            .insert(schema.bibleDocuments)
+            .values(bibleRows.map(r => ({ ...r, projectId: newProject.id })))
+            .catch(err => this.databaseService.translateError(err));
+        }
 
-          if (entities.length > 0) {
-            const entityRows: Omit<Knowledge.Entity, 'id' | 'projectId'>[] = entities.map(e => utils.object.omitKeys(e, ['id', 'projectId']));
-            await tx
-              .insert(schema.entities)
-              .values(entityRows.map(r => ({ ...r, projectId: newProject.id })))
-              .catch(err => this.databaseService.translateError(err));
-          }
+        if (entities.length > 0) {
+          const entityRows: Omit<Knowledge.Entity, 'id' | 'projectId'>[] = entities.map(e => utils.object.omitKeys(e, ['id', 'projectId']));
+          await tx
+            .insert(schema.entities)
+            .values(entityRows.map(r => ({ ...r, projectId: newProject.id })))
+            .catch(err => this.databaseService.translateError(err));
+        }
 
-          if (volumes.length > 0) {
-            const volumeRows: Omit<Plan.Volume, 'id' | 'projectId'>[] = volumes.map(v => utils.object.omitKeys(v, ['id', 'projectId']));
-            await tx
-              .insert(schema.volumes)
-              .values(volumeRows.map(r => ({ ...r, projectId: newProject.id })))
-              .catch(err => this.databaseService.translateError(err));
-          }
-        } else {
-          const chapters = await tx.query.chapters.findMany({ where: eq(schema.chapters.projectId, id) });
-          if (chapters.length > 0) {
-            const chapterRows: Omit<Chapter.Row, 'id' | 'projectId'>[] = chapters.map(c => utils.object.omitKeys(c, ['id', 'projectId']));
-            await tx
-              .insert(schema.chapters)
-              .values(chapterRows.map(r => ({ ...r, projectId: newProject.id })))
-              .catch(err => this.databaseService.translateError(err));
-          }
+        if (volumes.length > 0) {
+          const volumeRows: Omit<Plan.Volume, 'id' | 'projectId'>[] = volumes.map(v => utils.object.omitKeys(v, ['id', 'projectId']));
+          await tx
+            .insert(schema.volumes)
+            .values(volumeRows.map(r => ({ ...r, projectId: newProject.id })))
+            .catch(err => this.databaseService.translateError(err));
         }
       }
 
@@ -350,15 +309,13 @@ export class ProjectService {
       tablesCleared.push('worldFacts');
       await this.db.delete(schema.mysteries).where(eq(schema.mysteries.projectId, id));
       tablesCleared.push('mysteries');
-      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), eq(schema.jobs.kind, 'extract')));
-      tablesCleared.push('jobs(extract)');
     }
 
     if (stage === 'plan' || stage === 'all') {
       await this.db.delete(schema.volumes).where(eq(schema.volumes.projectId, id));
-      if (!tablesCleared.includes('volumes')) tablesCleared.push('volumes');
-      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), ne(schema.jobs.kind, 'extract')));
-      if (!tablesCleared.some(t => t.startsWith('jobs'))) tablesCleared.push('jobs(plan)');
+      tablesCleared.push('volumes');
+      await this.db.delete(schema.jobs).where(eq(schema.jobs.projectId, id));
+      tablesCleared.push('jobs(plan)');
     }
 
     if (stage === 'generate' || stage === 'all') {

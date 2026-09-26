@@ -21,11 +21,11 @@ export interface ModelRef {
   readonly model: string;
 }
 
-/** The subset of `POST /api/v1/import` a `final`-mode bundle needs — enough to author a valid one by hand. */
+/** The subset of `POST /api/v1/import` a bundle needs — enough to author a valid one by hand. */
 export interface NovelBundle {
   format: 'novel-import';
   schemaVersion: 1;
-  mode: 'final' | 'source';
+  mode: 'final';
   novel: { title: string; synopsis: string; tags?: string[]; genre?: string; cover?: string };
   volumes: { ordinal: number; title?: string; chapters: { title: string; content: string }[] }[];
   assets?: { name: string; mimeType: string; dataBase64: string }[];
@@ -52,7 +52,6 @@ export const HAIKU_TEXT_ROLES = [
   'plan',
   'arc',
   'outline',
-  'skeleton',
   'bible',
   'extraction',
   'judge',
@@ -87,7 +86,7 @@ export async function jsonOrUndefined<T = Record<string, unknown>>(response: API
 /** Creates a project via the API and returns its id (as a string). `name` should already carry a unique suffix. */
 export async function createProject(
   ctx: APIRequestContext,
-  body: { name: string; kind: 'new_novel' | 'source'; title?: string; instructions?: string; contentMode?: 'standard' | 'unrestricted' },
+  body: { name: string; kind: 'new_novel'; title?: string; instructions?: string; contentMode?: 'standard' | 'unrestricted' },
 ): Promise<{ id: string; response: APIResponse }> {
   const response = await mutate(ctx, 'post', '/api/v1/projects', { data: body });
   const parsed = (await jsonOrUndefined<{ id: string }>(response)) ?? { id: '' };
@@ -105,10 +104,9 @@ export async function deleteProjectQuietly(ctx: APIRequestContext, projectId: st
 }
 
 /**
- * A minimal, valid `final`-mode novel-import bundle: one volume, three finalized chapters. `final` mode lands
- * the chapters locked/human-authored/publish-ready and never runs the source-mode recombine pass, so the three
- * distinct titles carry no merge risk. Three chapters (not two) let the publish spec exercise the
- * non-contiguous gate — publish 1, then attempt 3 → PUB_003.
+ * A minimal, valid novel-import bundle: one volume, three finalized chapters, landed locked, human-authored and
+ * publish-ready. Three chapters (not two) let the publish spec exercise the non-contiguous gate — publish 1, then
+ * attempt 3 → PUB_003.
  */
 export function buildFinalBundle(title: string): NovelBundle {
   return {

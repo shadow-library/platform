@@ -5,5 +5,4 @@ export * from './draft-expansion';
 export * from './mechanical-check';
 export * from './bible-builder.graph';
 export * from './novel-validation.graph';
-export * from './source-extraction.graph';
 export * from './workflow-run.service';

@@ -338,23 +338,7 @@ describe('PRODUCTION_DEFAULTS', () => {
   });
 
   it('covers all required roles', () => {
-    const requiredRoles = [
-      'extraction',
-      'generation',
-      'judge',
-      'fix',
-      'outline',
-      'revision',
-      'title',
-      'continuity',
-      'validation',
-      'review',
-      'plan',
-      'skeleton',
-      'bible',
-      'embedding',
-      'image',
-    ];
+    const requiredRoles = ['extraction', 'generation', 'judge', 'fix', 'outline', 'revision', 'title', 'continuity', 'validation', 'review', 'plan', 'bible', 'embedding', 'image'];
     for (const role of requiredRoles) {
       expect(PRODUCTION_DEFAULTS[role as keyof typeof PRODUCTION_DEFAULTS]).toBeDefined();
     }

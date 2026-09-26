@@ -1,5 +1,5 @@
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
-import { bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
 
 import { jsonb } from './jsonb';
@@ -25,7 +25,6 @@ interface ProjectModelOverridesData {
   validation?: ProjectModelRefData;
   review?: ProjectModelRefData;
   plan?: ProjectModelRefData;
-  skeleton?: ProjectModelRefData;
   bible?: ProjectModelRefData;
   premise?: ProjectModelRefData;
   audit?: ProjectModelRefData;
@@ -40,10 +39,9 @@ export interface ProjectConfigData {
   models?: ProjectModelOverridesData;
 }
 
-// The catalog vocabulary an import carried in — a curated ingest's source claims verbatim, or a novel-import
-// bundle's genre when it matches the platform list — kept in `projects.importedMeta`. It is a suggestion for the
-// publish step, never applied to the project itself: once landed, the forge is source of truth, and the
-// reader-facing values live on the publication.
+// The catalog vocabulary a novel-import bundle carried in (its genre, when it matches the platform list), kept in
+// `projects.importedMeta`. It is a suggestion for the publish step, never applied to the project itself: once
+// landed, the forge is source of truth, and the reader-facing values live on the publication.
 export interface ImportedNovelMetaData {
   genres?: Genre[];
   tags?: Tag[];
@@ -71,7 +69,7 @@ export namespace Project {
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
 }
 
-export const projectKind = pgEnum('project_kind', ['source', 'new_novel', 'curated']);
+export const projectKind = pgEnum('project_kind', ['new_novel']);
 export const contentMode = pgEnum('content_mode', ['standard', 'unrestricted']);
 export const contentGenerator = pgEnum('content_generator', ['standard', 'unrestricted', 'human']);
 
@@ -99,9 +97,6 @@ export const projects = pgTable(
     premise: text('premise'),
     themes: jsonb('themes'),
     instructions: text('instructions'),
-    /** The external identity a curated ingest keys on (`<source>:<id>`); null for everything the forge itself created. */
-    sourceRef: varchar('source_ref', { length: 64 }),
-    originalAuthor: varchar('original_author', { length: 256 }),
     importedMeta: jsonb('imported_meta').$type<ImportedNovelMetaData>(),
     storyCurrentChapter: integer('story_current_chapter').default(0),
     storyCurrentVolumeKey: varchar('story_current_volume_key'),
@@ -111,7 +106,6 @@ export const projects = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   t => [
-    unique('projects_source_ref_unique').on(t.sourceRef),
     index('projects_owner_kind_owner_id_idx').on(t.ownerKind, t.ownerId),
     // Backs ProjectService.list()'s sharing branch (a seq scan otherwise, once for $count and once for findMany).
     index('projects_shared_with_org_organisation_id_idx')

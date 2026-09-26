@@ -90,9 +90,8 @@ export class PublishingService {
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
     /**
      * The body always wins, including an explicit null; anything else falls back to what the row already
-     * holds, or — on the create only — to what the curated ingest claimed. The ingest seeds a publication
-     * once and is never re-consulted: a null on an existing row is the curator's decision, and re-adopting
-     * over it would make a clear un-saveable and re-trip the attribution gate on an author without `curate`.
+     * holds, or — on the create only — to what the novel-import bundle claimed. The import seeds a publication
+     * once and is never re-consulted: a null on an existing row is the author's decision.
      */
     const adopt = <T>(supplied: T | null | undefined, fallback: T | undefined): T | null => (supplied !== undefined ? supplied : (fallback ?? null));
 
@@ -102,7 +101,7 @@ export class PublishingService {
       const values = {
         projectId,
         title,
-        originalAuthor: adopt(trimmedAuthor(body), project.originalAuthor?.trim() || undefined),
+        originalAuthor: trimmedAuthor(body) ?? null,
         blurb: body.blurb ?? null,
         coverPath: body.coverPath ?? null,
         genres: adopt(body.genres, imported.genres),
@@ -374,10 +373,9 @@ export class PublishingService {
 
   /**
    * PUB_010: naming someone outside the platform as the work's author is a curation claim, so it is
-   * gated on `novel-forge:curate` wherever the value came from — the body or the project the ingest
-   * landed. Only a *move* to a non-null name is gated: clearing needs nothing, and neither does a
-   * publish that leaves the stored attribution exactly as it stands, so an ordinary author can still
-   * save metadata on a novel a curator attributed.
+   * gated on `novel-forge:curate`. Only a *move* to a non-null name is gated: clearing needs nothing,
+   * and neither does a publish that leaves the stored attribution exactly as it stands, so an ordinary
+   * author can still save metadata on a novel a curator attributed.
    */
   private async assertAttributionPermitted(projectId: bigint, next: string | null, held: string | null): Promise<void> {
     if (!next || next === held) return;

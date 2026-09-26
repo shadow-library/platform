@@ -5,7 +5,7 @@ import { type Genre, NOVEL_GENRES } from '@shadow-library/sdk';
 
 import { volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type PrimaryDatabase, schema } from '@server/database';
 
 import { ActorService, projectOwnerColumns } from '@modules/actor';
 
@@ -18,7 +18,6 @@ import { validateNovelBundle } from './novel-import.validator';
 // the bundle's chapter text and cover asset are ever staged, so the executor rereads them from here
 // rather than the request (which is long gone by the time the job runs).
 export interface ImportJobPayload {
-  mode: 'final' | 'source';
   chapters: { title: string; content: string }[];
   cover?: { mimeType: string; dataBase64: string };
 }
@@ -56,13 +55,10 @@ export class NovelImportService {
 
     const actor = this.actorService.current();
     await assertUnderProjectCap(this.db, actor);
-    const kind: Project.Kind = bundle.mode === 'final' ? 'new_novel' : 'source';
     const cover = bundle.novel.cover ? (bundle.assets ?? []).find(a => a.name === bundle.novel.cover) : undefined;
     const warnings: string[] = [];
     const genre = bundle.novel.genre?.trim() ? matchGenre(bundle.novel.genre) : undefined;
     if (bundle.novel.genre?.trim() && !genre) warnings.push(`novel.genre '${bundle.novel.genre}' is not one of the platform genres and was not stored`);
-    const titledVolumes = validation.volumes.filter(volume => volume.title !== null);
-    if (kind === 'source' && titledVolumes.length > 0) warnings.push(`volume titles are not stored for a source-mode import (${titledVolumes.length} ignored)`);
 
     const { projectId, jobId } = await this.db.transaction(async rawTx => {
       const tx = rawTx as unknown as PrimaryDatabase;
@@ -72,7 +68,7 @@ export class NovelImportService {
         .values({
           ...projectOwnerColumns(actor),
           name: bundle.novel.title,
-          kind,
+          kind: 'new_novel',
           title: bundle.novel.title,
           brief: bundle.novel.synopsis,
           themes: bundle.novel.tags ?? null,
@@ -83,27 +79,23 @@ export class NovelImportService {
         .catch(err => this.databaseService.translateError(err));
       if (!project) throw AppError.internal('novel-import: failed to create project');
 
-      // Mirrors ProjectService.create: a `new_novel` project is born with contentless `<section>/default`
-      // placeholder bible docs; a `source` project gets none (the source pipeline creates its own).
-      if (kind === 'new_novel') {
-        await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
-        await tx.insert(schema.volumes).values(
-          validation.volumes.map(volume => {
-            const values = {
-              volumeKey: `volume_${volume.ordinal}`,
-              ordinal: volume.ordinal,
-              title: volume.title,
-              startChapter: volume.startChapter,
-              endChapter: volume.endChapter,
-              targetChapterCount: volume.endChapter - volume.startChapter + 1,
-            };
-            return { projectId: project.id, ...values, status: 'source' as const, contentHash: volumeContentHash(values) };
-          }),
-        );
-      }
+      // Mirrors ProjectService.create: a project is born with contentless `<section>/default` placeholder bible docs.
+      await tx.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
+      await tx.insert(schema.volumes).values(
+        validation.volumes.map(volume => {
+          const values = {
+            volumeKey: `volume_${volume.ordinal}`,
+            ordinal: volume.ordinal,
+            title: volume.title,
+            startChapter: volume.startChapter,
+            endChapter: volume.endChapter,
+            targetChapterCount: volume.endChapter - volume.startChapter + 1,
+          };
+          return { projectId: project.id, ...values, status: 'source' as const, contentHash: volumeContentHash(values) };
+        }),
+      );
 
       const payload: ImportJobPayload = {
-        mode: bundle.mode,
         chapters: validation.chapters.map(c => ({ title: c.title, content: c.content })),
         cover: cover ? { mimeType: cover.mimeType, dataBase64: cover.dataBase64 } : undefined,
       };
@@ -117,7 +109,7 @@ export class NovelImportService {
       return { projectId: project.id, jobId: job.id };
     });
 
-    this.logger.info('novel bundle accepted', { projectId, jobId, mode: bundle.mode, chapters: validation.chapters.length, hasCover: !!cover, warnings: warnings.length });
+    this.logger.info('novel bundle accepted', { projectId, jobId, chapters: validation.chapters.length, hasCover: !!cover, warnings: warnings.length });
     return { projectId, jobId, warnings };
   }
 }
