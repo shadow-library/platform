@@ -3,10 +3,13 @@ import { Injectable } from '@shadow-library/app';
 import { type OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { mysteryPromiseItem, nextWritableChapter, type PromiseItem, threadPromiseItem } from '@server/common';
+import { type DueStanding, mysteryPromiseItem, nextWritableChapter, type PromiseItem, threadPromiseItem } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type ListPromisesQuery } from './promise.dto';
+
+/** The `sort=due` ranking: overdue, then due, then not_due. */
+const DUE_RANK: Record<DueStanding, number> = { overdue: 0, due: 1, not_due: 2 };
 
 @Injectable()
 export class PromiseService {
@@ -16,6 +19,7 @@ export class PromiseService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
+  /** `sort=due` sorts and pages in memory, bounded by the one project's threads-plus-mysteries this method already loads whole before paginating. */
   async list(projectId: bigint, filter: ListPromisesQuery): Promise<OffsetPaginationResult<PromiseItem>> {
     const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 25, offset: 0, sortBy: 'createdAt', sortOrder: 'asc' } });
 
@@ -70,7 +74,10 @@ export class PromiseService {
 
     const column = query.sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt';
     const sign = query.sortOrder === 'desc' ? -1 : 1;
-    const sorted = items.sort((left, right) => sign * (left[column].getTime() - right[column].getTime()));
+    const sorted =
+      filter.sort === 'due'
+        ? items.sort((left, right) => DUE_RANK[left.due] - DUE_RANK[right.due] || sign * (left.createdAt.getTime() - right.createdAt.getTime()))
+        : items.sort((left, right) => sign * (left[column].getTime() - right[column].getTime()));
 
     return utils.pagination.createResult(query, sorted.slice(query.offset, query.offset + query.limit), sorted.length);
   }

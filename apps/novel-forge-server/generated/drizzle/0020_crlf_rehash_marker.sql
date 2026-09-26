@@ -1,0 +1,1 @@
+ALTER TABLE "chapter_publications" ADD COLUMN "crlf_rehash_since" timestamp;

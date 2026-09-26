@@ -3,7 +3,7 @@ import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@l
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
-import { markDescendantDraftsStale, pruneDraftHistory, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
+import { markDescendantDraftsStale, normalizeLineEndings, pruneDraftHistory, refusedDraftWriteError, revokeProvisionalReveals } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Generation, type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -129,6 +129,7 @@ export function routeRunCall(deps: RunRouteDeps, projectId: bigint, call: RunCal
 
 export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistDraftInput): Promise<Generation.Draft> {
   const projectId = BigInt(state.projectId);
+  const prose = normalizeLineEndings(state.prose);
   const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
   const containment = chapterContainment(state.contentMode ?? 'standard', { raised: state.writerClassRaised });
 
@@ -164,7 +165,7 @@ export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistD
         projectId,
         chapter: state.chapter,
         title: state.title,
-        body: state.prose,
+        body: prose,
         summary: state.summary,
         state: state.continuationState as never,
         volumeKey: state.volumeKey || null,
@@ -205,7 +206,7 @@ export async function persistGeneratedDraft(db: PrimaryDatabase, state: PersistD
         revision: row.revision,
         source,
         title: row.title,
-        body: state.prose,
+        body: prose,
         summary: state.summary,
         state: state.continuationState as never,
         runId: state.runId || null,

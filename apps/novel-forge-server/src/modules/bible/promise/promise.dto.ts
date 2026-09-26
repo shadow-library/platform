@@ -7,6 +7,7 @@ import { type DueStanding, type PromiseKind, type PromiseStatus, SortByTime } fr
 const PromiseKindType = EnumType.create('PromiseKind', ['thread', 'mystery']);
 const PromiseStatusType = EnumType.create('PromiseStatus', ['open', 'closed', 'resolved', 'dropped']);
 const DueStandingType = EnumType.create('DueStanding', ['not_due', 'due', 'overdue']);
+const PromiseSortType = EnumType.create('PromiseSort', ['due']);
 
 @Schema()
 export class PromiseProjectParams {
@@ -22,6 +23,12 @@ export class ListPromisesQuery extends PaginationQuery(SortByTime) {
 
   @Field(() => PromiseStatusType, { optional: true })
   status?: PromiseStatus;
+
+  @Field(() => PromiseSortType, {
+    optional: true,
+    description: 'Orders overdue, then due, then not_due; each group keeps createdAt order (sortOrder still applies to it). Overrides sortBy.',
+  })
+  sort?: 'due';
 }
 
 @Schema({ description: "One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact (P4-38)." })

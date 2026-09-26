@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 
 import { AppErrorCode, DraftConflictError, SummaryConflictError } from '@server/classes';
-import { assertStartsNextChapter, markDescendantDraftsStale, pruneDraftHistory, revokeProvisionalReveals } from '@server/common';
+import { assertStartsNextChapter, markDescendantDraftsStale, normalizeLineEndings, pruneDraftHistory, revokeProvisionalReveals } from '@server/common';
 import { type Generation, type PrimaryTransaction, schema } from '@server/database';
 
 export const HAND_EDIT_FOLD_WINDOW_SECONDS = 600;
@@ -53,6 +53,7 @@ export function draftBaseOf(body: HandSaveBase): DraftBase | undefined {
 
 /** The author's own write to a chapter, refused unless it was made against the draft as it stands; an autosave may fold into the revision it continues. */
 export async function saveHandWrittenDraft(tx: PrimaryTransaction, save: HandSave): Promise<Generation.Draft> {
+  save = { ...save, fields: { ...save.fields, body: normalizeLineEndings(save.fields.body) } };
   const [current] = await tx
     .select()
     .from(schema.drafts)
@@ -170,6 +171,7 @@ async function startDraft(tx: PrimaryTransaction, save: HandSave): Promise<Gener
 
 /** Creates the chapter's first draft, never over one that landed first nor under an AI already writing it; the caller has settled that the chapter is next. */
 export async function insertHandWrittenDraft(tx: PrimaryTransaction, save: Omit<HandSave, 'base'>): Promise<Generation.Draft> {
+  save = { ...save, fields: { ...save.fields, body: normalizeLineEndings(save.fields.body) } };
   await assertNotBeingGenerated(tx, save.projectId, save.chapter);
   const [draft] = await tx
     .insert(schema.drafts)

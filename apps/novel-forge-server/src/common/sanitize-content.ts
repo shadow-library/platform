@@ -60,9 +60,18 @@ function rebuild(segment: string, tokens: Token[]): string {
   return out + segment.slice(cursor);
 }
 
+/** Every line ending a client or an import can send collapses to `\n`, so a body's own line count and any hash taken over it stay platform-independent. */
+export function normalizeLineEndings(content: string): string;
+export function normalizeLineEndings(content: string | null | undefined): string | null | undefined;
+export function normalizeLineEndings(content: string | null | undefined): string | null | undefined {
+  if (!content) return content;
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 export function sanitizeMarkdown(content: string): string;
 export function sanitizeMarkdown(content: string | null | undefined): string | null | undefined;
 export function sanitizeMarkdown(content: string | null | undefined): string | null | undefined {
   if (!content) return content;
-  return rebuild(content, marked.lexer(content, { gfm: true, breaks: true }));
+  const normalized = normalizeLineEndings(content);
+  return rebuild(normalized, marked.lexer(normalized, { gfm: true, breaks: true }));
 }

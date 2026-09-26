@@ -57,6 +57,15 @@ describe('GenerationService — base revision on hand saves', () => {
     ]);
   });
 
+  it('should fold CRLF line endings to LF when hand-saving a draft body', async () => {
+    const { tables, service } = novel();
+
+    const draft = await service.updateDraft(7n, 3, { ...PROSE, body: 'The ferry waits.\r\nThe tide never turns.\r\n', ...base(2, 0) });
+
+    expect(draft.body).toBe('The ferry waits.\nThe tide never turns.\n');
+    expect(tables.draft(3)?.['body']).toBe('The ferry waits.\nThe tide never turns.\n');
+  });
+
   it.each([
     ['a hand edit behind the revision', (service: ReturnType<typeof novel>['service']) => service.updateDraft(7n, 3, { ...PROSE, ...base(1, 5) })],
     ['an import behind the revision', (service: ReturnType<typeof novel>['service']) => service.importDraft(7n, 3, { prose: PROSE.body, ...base(1, 5) })],

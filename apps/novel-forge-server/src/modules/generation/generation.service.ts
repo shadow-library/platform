@@ -17,6 +17,7 @@ import {
   nearestVolumeKey,
   nextWritableChapter,
   normalizeBriefScenes,
+  normalizeLineEndings,
   normalizeStringList,
   planFrontier,
   pruneDraftHistory,
@@ -514,6 +515,7 @@ export class GenerationService {
       routedProject,
       disclosure.scrubPolicy(policy),
     )) as { title: string; body: string; summary: string; state?: GenerationState };
+    revised.body = normalizeLineEndings(revised.body);
 
     return this.db.transaction(async tx => {
       const [updated] = await tx
@@ -804,7 +806,7 @@ export class GenerationService {
       routedProject,
       writerPolicy,
     );
-    const result = { ...generated, body: expansion.body };
+    const result = { ...generated, body: normalizeLineEndings(expansion.body) };
 
     // The replacement and the descendant invalidation it forces commit together: a crash between them
     // would leave later drafts looking valid against prose that no longer exists. `setWhere` re-checks

@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte, notLike, or, type SQL, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, notLike, or, type SQL, sql } from 'drizzle-orm';
 import { type PgColumn } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -7,7 +7,8 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { UNSWEEPABLE_ERROR_PREFIXES } from '../publishing/publish-runner';
+import { renderChapterPayload } from '../publishing/publish-payload';
+import { CANONICAL_PROSE_CHANGED_PREFIX, UNSWEEPABLE_ERROR_PREFIXES } from '../publishing/publish-runner';
 import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
 
@@ -42,10 +43,37 @@ export class PublicationJanitor {
   }
 
   onModuleInit(): void {
-    this.sweep().catch(err => this.logger.warn('publication sweep failed on boot', { err }));
+    void this.boot();
+  }
+
+  private async boot(): Promise<void> {
+    await this.reconcileCrlfContentHashes().catch(err => this.logger.warn('crlf content-hash reconciliation failed on boot', { err }));
+    await this.sweep().catch(err => this.logger.warn('publication sweep failed on boot', { err }));
     this.timer = setInterval(() => this.sweep().catch(err => this.logger.warn('publication sweep failed', { err })), PUBLISH_SWEEP_INTERVAL_MS);
     // The sweep must never keep a stopping process alive.
     this.timer.unref?.();
+  }
+
+  /** Adopts the fresh `chapterContentHash` for each CRLF-migration-marked row whose chapter wasn't edited since the mark, resetting a stale-prose failure back to `scheduled`; either way the mark is cleared, so this only ever does its one-time job once. */
+  async reconcileCrlfContentHashes(): Promise<number> {
+    const marked = await this.db
+      .select({ publication: schema.chapterPublications, chapter: schema.chapters })
+      .from(schema.chapterPublications)
+      .innerJoin(schema.chapters, and(eq(schema.chapters.projectId, schema.chapterPublications.projectId), eq(schema.chapters.number, schema.chapterPublications.chapter)))
+      .where(isNotNull(schema.chapterPublications.crlfRehashSince));
+
+    let adopted = 0;
+    for (const { publication: row, chapter } of marked) {
+      const update: Partial<typeof schema.chapterPublications.$inferInsert> = { crlfRehashSince: null };
+      if (chapter.updatedAt <= (row.crlfRehashSince as Date)) {
+        update.contentHash = renderChapterPayload(chapter).contentHash;
+        if (row.status === 'failed' && row.error?.startsWith(CANONICAL_PROSE_CHANGED_PREFIX)) Object.assign(update, { status: 'scheduled' as const, error: null });
+        adopted += 1;
+      }
+      await this.db.update(schema.chapterPublications).set(update).where(eq(schema.chapterPublications.id, row.id));
+    }
+    if (adopted > 0) this.logger.info(`crlf content-hash reconciliation adopted ${adopted} chapter publication row(s)`);
+    return adopted;
   }
 
   onModuleDestroy(): void {

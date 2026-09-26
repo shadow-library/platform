@@ -73,6 +73,9 @@ export const SLUG_EXHAUSTED_ERROR_PREFIX = 'slug unassignable:';
 /** A 409 the reader attributed to no code — which of its conflicts fired is unknown, so it is handled as the fatal reading */
 export const UNKNOWN_CONFLICT_ERROR_PREFIX = 'unattributed conflict:';
 
+/** The canonical chapter moved since this row's contentHash was ledgered — matched by `PublicationJanitor` to know which failures its CRLF repair may clear */
+export const CANONICAL_PROSE_CHANGED_PREFIX = 'canonical prose changed';
+
 /** Ledgered failures an identical retry can never clear; the sweep skips them and only an explicit reconcile/republish revisits them */
 export const UNSWEEPABLE_ERROR_PREFIXES = [STALE_ERROR_PREFIX, HASH_MISMATCH_ERROR_PREFIX, SLUG_EXHAUSTED_ERROR_PREFIX, UNKNOWN_CONFLICT_ERROR_PREFIX];
 
@@ -405,7 +408,7 @@ export class PublishRunner {
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, row.chapter)) });
     if (!chapter || !chapter.content?.trim()) return `canonical chapter ${row.chapter} not found — republish from the current chapter numbering`;
     const payload = renderChapterPayload(chapter);
-    if (payload.contentHash !== row.contentHash) return `canonical prose changed since this publish was decided — republish chapter ${row.chapter}`;
+    if (payload.contentHash !== row.contentHash) return `${CANONICAL_PROSE_CHANGED_PREFIX} since this publish was decided — republish chapter ${row.chapter}`;
     return payload;
   }
 

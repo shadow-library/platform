@@ -141,6 +141,20 @@
       "when": 1790442158514,
       "tag": "0019_isolation_bridge",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790445293698,
+      "tag": "0020_crlf_rehash_marker",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790445323562,
+      "tag": "0021_normalise_line_endings",
+      "breakpoints": true
     }
   ]
 }

@@ -134,4 +134,44 @@ describe('PromiseService.list', () => {
     expect(result.total).toBe(5);
     expect(result.items.map(item => item.key)).toEqual(['t2', 't3']);
   });
+
+  it('should order overdue, then due, then not_due under sort=due', async () => {
+    const result = await service({
+      threads: [
+        { threadKey: 'not-due', status: 'open', summary: 'Not due', createdAt: new Date(2024, 0, 1) },
+        { threadKey: 'overdue', status: 'open', summary: 'Overdue', payoffWindow: 1, createdAt: new Date(2024, 0, 2) },
+      ],
+      mysteries: [{ mysteryKey: 'due', status: 'open', question: 'Due?', payoffVolumeKey: 'v1', createdAt: new Date(2024, 0, 3) }],
+      volumes: [{ volumeKey: 'v1', state: 'active' }],
+      chapters: [{ number: 1, status: 'done' }],
+    }).list(1n, query({ sort: 'due' }));
+
+    expect(result.items.map(item => item.key)).toEqual(['overdue', 'due', 'not-due']);
+  });
+
+  it('should break a sort=due tie by createdAt, respecting sortOrder', async () => {
+    const threads = [
+      { threadKey: 'older', status: 'open' as const, summary: 'Older', createdAt: new Date(2024, 0, 1) },
+      { threadKey: 'newer', status: 'open' as const, summary: 'Newer', createdAt: new Date(2024, 0, 2) },
+    ];
+
+    const ascending = await service({ threads }).list(1n, query({ sort: 'due' }));
+    expect(ascending.items.map(item => item.key)).toEqual(['older', 'newer']);
+
+    const descending = await service({ threads }).list(1n, query({ sort: 'due', sortOrder: 'desc' }));
+    expect(descending.items.map(item => item.key)).toEqual(['newer', 'older']);
+  });
+
+  it('should paginate correctly under sort=due', async () => {
+    const threads = [
+      { threadKey: 'not-due-1', status: 'open' as const, summary: 'Not due 1', createdAt: new Date(2024, 0, 1) },
+      { threadKey: 'not-due-2', status: 'open' as const, summary: 'Not due 2', createdAt: new Date(2024, 0, 2) },
+      { threadKey: 'overdue', status: 'open' as const, summary: 'Overdue', payoffWindow: 1, createdAt: new Date(2024, 0, 3) },
+    ];
+
+    const result = await service({ threads, chapters: [{ number: 1, status: 'done' }] }).list(1n, query({ sort: 'due', limit: 2, offset: 1 }));
+
+    expect(result.total).toBe(3);
+    expect(result.items.map(item => item.key)).toEqual(['not-due-1', 'not-due-2']);
+  });
 });

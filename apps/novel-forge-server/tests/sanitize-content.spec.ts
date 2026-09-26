@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { sanitizeMarkdown } from '@server/common';
+import { normalizeLineEndings, sanitizeMarkdown } from '@server/common';
 
 const LEGITIMATE_MARKDOWN = [
   '# Chapter One',
@@ -103,5 +103,33 @@ describe('sanitizeMarkdown', () => {
     expect(sanitizeMarkdown('')).toBe('');
     expect(sanitizeMarkdown(null)).toBe(null);
     expect(sanitizeMarkdown(undefined)).toBe(undefined);
+  });
+
+  it('should fold CRLF line endings to LF', () => {
+    expect(sanitizeMarkdown('Line one.\r\nLine two.\r\n')).toBe('Line one.\nLine two.\n');
+  });
+});
+
+describe('normalizeLineEndings', () => {
+  it('should fold CRLF pairs to LF', () => {
+    expect(normalizeLineEndings('one\r\ntwo\r\nthree')).toBe('one\ntwo\nthree');
+  });
+
+  it('should fold a lone CR to LF', () => {
+    expect(normalizeLineEndings('one\rtwo\rthree')).toBe('one\ntwo\nthree');
+  });
+
+  it('should fold a mix of CRLF and lone CR without doubling the CRLF newlines', () => {
+    expect(normalizeLineEndings('one\r\ntwo\rthree\r\nfour')).toBe('one\ntwo\nthree\nfour');
+  });
+
+  it('should pass through text with no carriage returns unchanged', () => {
+    expect(normalizeLineEndings('one\ntwo')).toBe('one\ntwo');
+  });
+
+  it('should pass empty and nullish input through unchanged', () => {
+    expect(normalizeLineEndings('')).toBe('');
+    expect(normalizeLineEndings(null)).toBe(null);
+    expect(normalizeLineEndings(undefined)).toBe(undefined);
   });
 });

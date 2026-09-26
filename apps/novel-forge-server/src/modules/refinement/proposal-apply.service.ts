@@ -18,6 +18,7 @@ import {
   markDescendantDraftsStale,
   nearestVolumeKey,
   nextWritableChapter,
+  normalizeLineEndings,
   normalizeStringList,
   planFrontier,
   pruneDraftHistory,
@@ -905,12 +906,13 @@ export class ProposalApplyService {
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_010.create();
 
+    const body = normalizeLineEndings(op.body);
     const existing = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
     if (existing?.status === 'final') throw AppErrorCode.RFN_010.create();
-    if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
-    if (existing?.isolated && op.body !== undefined && op.body !== existing.body) throw AppErrorCode.RFN_012.create();
+    if (!existing && body === undefined) throw AppErrorCode.RFN_004.create();
+    if (existing?.isolated && body !== undefined && body !== existing.body) throw AppErrorCode.RFN_012.create();
 
-    const merged = { title: op.title ?? existing?.title ?? null, body: op.body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
+    const merged = { title: op.title ?? existing?.title ?? null, body: body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
 
     let written: { id: bigint; revision: number; saveSeq: number } | undefined;
     if (existing) {

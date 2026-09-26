@@ -126,6 +126,8 @@ export const chapterPublications = pgTable(
     publishedAt: timestamp('published_at'),
     status: chapterPublicationStatus('status').notNull().default('scheduled'),
     error: text('error'),
+    /** Set by the CRLF line-ending backfill on a not-yet-pushed row whose chapter held CRLF, for `PublicationJanitor.reconcileCrlfContentHashes` to pick up once and clear; null the rest of this column's life. */
+    crlfRehashSince: timestamp('crlf_rehash_since'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
