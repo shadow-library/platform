@@ -29,13 +29,14 @@ import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
 import { sanitizeChatQuestion } from './chat-question';
+import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
-import { splitTurnChangeSet, stageTurnChangeSet, type TurnProposalPort, type TurnStaging } from './turn-proposals';
+import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnProposalPort, type TurnStaging } from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
@@ -751,8 +752,15 @@ export class ChatService {
     const ops = (output.changeSet ?? []) as unknown as ChangeOp[];
     if (ops.length === 0) return { appliedProposal: null, cardProposal: null };
 
-    const split = await splitTurnChangeSet(this.db, projectId, ops, { authorMessage, mode: session.mode, justDiscussing, warnings });
+    const rejectedIdeas = (ideaIds: string[]) =>
+      loadRejectedIdeas(this.db, projectId, ideaIds).catch((err: unknown) => {
+        this.logger.warn('chat turn: reading turned-down ideas failed — staging without the filter', { projectId, runId, err });
+        return new Set<string>();
+      });
+    const split = await splitTurnChangeSet(this.db, projectId, ops, { authorMessage, mode: session.mode, justDiscussing, warnings, rejectedIdeas });
     this.logger.debug('chat turn: write policy', { projectId, runId, dispositions: split.dispositions });
+    if (split.droppedIdeas.length > 0) this.logger.info('chat turn: dropped suggestions the author turned down', { projectId, runId, ideaIds: split.droppedIdeas });
+    if (split.ops.length === 0) return { appliedProposal: null, cardProposal: null, applyNote: IDEAS_DROPPED_NOTE };
 
     const port: TurnProposalPort = {
       stage: (changeSet, stageWarnings, options) =>
@@ -783,7 +791,8 @@ export class ChatService {
       discard: proposalId =>
         this.proposalService.discard(projectId, proposalId).catch(err => this.logger.warn('chat turn: discarding an unapplied proposal failed', { projectId, proposalId, err })),
     };
-    const staging = await stageTurnChangeSet(port, split, warnings);
+    const staged = await stageTurnChangeSet(port, split, warnings);
+    const staging = split.droppedIdeas.length > 0 ? { ...staged, applyNote: [staged.applyNote, IDEAS_DROPPED_NOTE].filter(Boolean).join(' ') } : staged;
     if (staging.applyNote) this.logger.info('chat turn: author-worded ops not applied as written', { projectId, runId, note: staging.applyNote });
     return staging;
   }

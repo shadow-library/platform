@@ -4,6 +4,7 @@ import { type DbExecutor, type Refinement } from '@server/database';
 
 import { loadCurrentRecords } from './artifact-state';
 import { type ChangeOp, changeSetRefs } from './change-set';
+import { dropRejectedIdeas, filterableIdeaIds } from './idea-filter';
 import { type ApplyResult } from './proposal-apply.service';
 import { type ChangeSetSplit, splitChangeSet } from './write-policy';
 
@@ -11,6 +12,7 @@ export const HELD_FOR_REVIEW_NOTE = 'Not applied automatically: review the warni
 export const APPLY_FAILED_NOTE = 'Your words could not be applied as they stand, so every change is offered as a suggestion instead.';
 export const UNLINKED_NOTE = 'Your words were applied, but this reply could not be linked to them — find the change in Change history to undo it.';
 export const CARDS_UNSAVED_NOTE = 'Your words were applied, but the suggestions that came with them could not be saved — ask again to see them.';
+export const IDEAS_DROPPED_NOTE = 'Suggestions you turned down earlier were left out.';
 
 export interface StageOptions {
   /** Off for one half of a split: the whole change-set already passed the entity-materialization check, and a half may lean on the other's records. */
@@ -39,12 +41,19 @@ export interface TurnPolicyContext {
   mode: Refinement.ChatMode;
   justDiscussing: boolean;
   warnings: readonly string[];
+  /** Which of these ideas the author turned down in a scope that still holds. */
+  rejectedIdeas?: (ideaIds: string[]) => Promise<ReadonlySet<string>>;
+}
+
+export interface TurnSplit extends ChangeSetSplit {
+  /** Ideas left out because the author turned them down, or because they leaned on one that was. */
+  droppedIdeas: string[];
 }
 
 /** The quote rule over the records as they stand when the turn stages, not when it started — a long turn may overlap other writes. */
-export async function splitTurnChangeSet(db: DbExecutor, projectId: bigint, ops: readonly ChangeOp[], context: TurnPolicyContext): Promise<ChangeSetSplit> {
+export async function splitTurnChangeSet(db: DbExecutor, projectId: bigint, ops: readonly ChangeOp[], context: TurnPolicyContext): Promise<TurnSplit> {
   const current = await loadCurrentRecords(db, projectId, changeSetRefs([...ops]));
-  return splitChangeSet({
+  const split = splitChangeSet({
     ops,
     authorMessage: context.authorMessage,
     mode: context.mode,
@@ -52,6 +61,10 @@ export async function splitTurnChangeSet(db: DbExecutor, projectId: bigint, ops:
     held: context.warnings.length > 0,
     state: { current },
   });
+  const candidates = filterableIdeaIds(split);
+  if (!context.rejectedIdeas || candidates.length === 0) return { ...split, droppedIdeas: [] };
+  const filtered = dropRejectedIdeas(split, await context.rejectedIdeas(candidates), current);
+  return { ...filtered.split, droppedIdeas: filtered.dropped };
 }
 
 function failureNote(err: unknown): string {

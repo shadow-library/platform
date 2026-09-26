@@ -17,6 +17,9 @@ export function ledgerEntry(overrides: Partial<Ledger.Entry> = {}): Ledger.Entry
     supersedesId: null,
     supersededAt: null,
     withdrawnReason: null,
+    ideaId: null,
+    rejectionScope: null,
+    rejectionAnchor: null,
     createdAt: new Date(0),
     ...overrides,
   };

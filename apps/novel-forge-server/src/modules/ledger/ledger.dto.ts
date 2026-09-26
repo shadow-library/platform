@@ -1,7 +1,7 @@
 import { EnumType, Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-import { BibleSection, LedgerDecidedBy, LedgerEntryKind } from '@server/common';
+import { BibleSection, LedgerDecidedBy, LedgerEntryKind, LedgerRejectionScope } from '@server/common';
 import { type Bible, type Ledger, schema } from '@server/database';
 
 import { AUTHOR_ENTRY_KINDS, AUTHOR_SUPERSEDE_KINDS, type AuthorEntryKind, type AuthorSupersedeKind, TOPIC_KEY_PATTERN } from './ledger.types';
@@ -182,6 +182,16 @@ export class LedgerEntryResponse {
 
   @Field({ nullable: true, description: 'The author’s reason, when the entry was withdrawn rather than superseded.' })
   withdrawnReason: string | null;
+
+  @Field({ nullable: true, description: 'The suggestion this rejection turns down, by the idea id its card op carried; null for any other entry.' })
+  ideaId: string | null;
+
+  @Field(() => LedgerRejectionScope, {
+    nullable: true,
+    description:
+      'How long a rejected idea stays turned down: `never` until withdrawn, `not_now` while the same volume is active, `not_this_version` while the records it would change are unchanged.',
+  })
+  rejectionScope: Ledger.RejectionScope | null;
 
   @Field(() => LedgerEntryStatus, { description: 'Superseded entries have a successor on the same topic; withdrawn ones do not.' })
   status: Ledger.Status;

@@ -25,6 +25,7 @@ import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
+import { withoutLapsedRejections } from '../../refinement/idea-rejections';
 import { hardLineError, screenTexts, sectionScreens } from '../hard-line';
 import { standardReadableState } from '../isolation-read-policy';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
@@ -1256,7 +1257,7 @@ export class ContextAssembler {
       const story = { ...project, authorInstructions: writingInstructionAdditions(project.instructions) || null };
       stable.push(section('story', renderNovelStory(story), 'canonical', caps.story, { required: true }));
     }
-    stable.push(section('notebook', renderNotebook(ledger), 'approved_intent', caps.notebook, { required: true }));
+    stable.push(section('notebook', renderNotebook(await withoutLapsedRejections(this.db, projectId, ledger)), 'approved_intent', caps.notebook, { required: true }));
     const notesPointer = renderNotesPointer(ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC)?.statement ?? '');
     if (notesPointer) stable.push(section('author_notes', notesPointer, 'approved_intent', caps.authorNotes, { required: true }));
     if (volumes.length > 0) stable.push(section('volume_plan', renderVolumeGoals(volumes), 'approved_intent', caps.volumes, { priority: 0 }));

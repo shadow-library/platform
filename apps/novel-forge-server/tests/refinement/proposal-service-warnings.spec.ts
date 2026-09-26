@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import { type ChangeOp, ProposalService } from '@modules/refinement';
+import { stampIdeaIds } from '@modules/refinement/idea-id';
 import { stageTurnChangeSet } from '@modules/refinement/turn-proposals';
 
 function fakeExecutor(factRows: Record<string, unknown>[]) {
@@ -52,7 +53,7 @@ describe('ProposalService.create — reveal-clear warning always runs, even with
     expect(applied).toEqual([]);
     expect(discarded).toEqual([300n]);
     expect(staging.appliedProposal).toBeNull();
-    expect(staging.cardProposal?.changeSet).toEqual(undateOp);
+    expect(staging.cardProposal?.changeSet).toEqual(stampIdeaIds(undateOp));
     expect(staging.cardProposal?.warnings?.length).toBeGreaterThan(0);
   });
 });

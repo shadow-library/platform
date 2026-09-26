@@ -15,9 +15,16 @@ export const WRITER_LINES_BUDGET = 1_200;
 /** The author's own notes, kept whole. They are too long to ride along with every decision, so the rendered ledger leaves them to the passes that read them. */
 export const AUTHOR_BRIEF_TOPIC = 'start.brief';
 
-/** Written only by the notes store and the progress checklist, never by the generic author-facing ledger routes. */
+/** One topic per suggested idea the author turned down, so recording it again supersedes the earlier scope. */
+export const IDEA_TOPIC_PREFIX = 'idea.';
+
+export function ideaTopic(ideaId: string): string {
+  return `${IDEA_TOPIC_PREFIX}${ideaId}`;
+}
+
+/** Written only by the notes store, the progress checklist and idea rejections, never by the generic author-facing ledger routes. */
 export function isReservedTopic(topic: string): boolean {
-  return topic === AUTHOR_BRIEF_TOPIC || topic.startsWith(PROGRESS_TOPIC_PREFIX);
+  return topic === AUTHOR_BRIEF_TOPIC || topic.startsWith(PROGRESS_TOPIC_PREFIX) || topic.startsWith(IDEA_TOPIC_PREFIX);
 }
 
 function tagged(entry: LedgerContextEntry): string {

@@ -2,8 +2,8 @@ import { EnumType, Field, Integer, OmitType, Schema } from '@shadow-library/clas
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ChatScope, ProposalDiagnosticKind, RefinementKind, RefinementProposalStatus, SortByTime, UndoDependentKind } from '@server/common';
-import { type Refinement } from '@server/database';
+import { ChatScope, LedgerRejectionScope, ProposalDiagnosticKind, RefinementKind, RefinementProposalStatus, SortByTime, UndoDependentKind } from '@server/common';
+import { type Ledger, type Refinement } from '@server/database';
 
 import { WRITER_KEPT_KINDS, type WriterKeptKind } from './writer-preview.service';
 
@@ -61,6 +61,39 @@ export class UpdateProposalBody {
 class ChangeOpItem {
   @Field()
   op: string;
+
+  @Field({
+    optional: true,
+    description: 'Stamped by the server on every content op: the same change proposed again carries the same id. Turn it down with the op rejection route.',
+  })
+  ideaId?: string;
+}
+
+@Schema()
+export class ProposalOpParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  proposalId: bigint;
+
+  @Field(() => Integer, { minimum: 0 })
+  @Transform('int:parse')
+  opIndex: number;
+}
+
+@Schema()
+export class RejectProposalOpBody {
+  @Field(() => LedgerRejectionScope, {
+    description:
+      '`never`: not offered again until the author withdraws the Notebook entry. `not_now`: not offered again while the active volume stays the same. `not_this_version`: not offered again while every record the change would write is unchanged — a later edit to any of them makes the idea eligible again.',
+  })
+  scope: Ledger.RejectionScope;
+
+  @Field({ optional: true, maxLength: 4000, description: "The author's reason, kept on the Notebook entry." })
+  why?: string;
 }
 
 @Schema({ additionalProperties: true, description: 'Apply-time disposition for one operation, optionally including a job, run, or proposal result.' })

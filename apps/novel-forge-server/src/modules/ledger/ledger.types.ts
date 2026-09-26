@@ -8,6 +8,13 @@ export const TOPIC_KEY_PATTERN = /^[a-z0-9][a-z0-9_.-]{0,99}$/;
 export type AuthorEntryKind = (typeof AUTHOR_ENTRY_KINDS)[number];
 export type AuthorSupersedeKind = (typeof AUTHOR_SUPERSEDE_KINDS)[number];
 
+/** A rejected suggestion, recorded against its server-assigned idea id so the same idea is not staged again while the scope holds. */
+export interface IdeaRejection {
+  ideaId: string;
+  scope: Ledger.RejectionScope;
+  anchor: Ledger.RejectionAnchor | null;
+}
+
 export interface NewLedgerEntry {
   kind: Ledger.Kind;
   topic: string;
@@ -20,6 +27,7 @@ export interface NewLedgerEntry {
   stepKey?: string | null;
   payload?: unknown;
   links?: Ledger.Links;
+  idea?: IdeaRejection;
 }
 
 /** A successor always keeps the topic of the entry it supersedes, so a topic's history is one unbroken chain. */

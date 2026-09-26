@@ -9,7 +9,15 @@ import { type DbExecutor, type Ledger, type PrimaryDatabase, type PrimaryTransac
 
 import { filterLedgerEntries, loadActiveLedger, mergeLedgerLinks } from './ledger-entries';
 import { isReservedTopic } from './ledger-sections';
-import { type AuthorLedgerEntry, type AuthorSupersession, type LedgerFilter, type NewLedgerEntry, type SupersedingEntry, TOPIC_KEY_PATTERN } from './ledger.types';
+import {
+  type AuthorLedgerEntry,
+  type AuthorSupersession,
+  type IdeaRejection,
+  type LedgerFilter,
+  type NewLedgerEntry,
+  type SupersedingEntry,
+  TOPIC_KEY_PATTERN,
+} from './ledger.types';
 
 function clearable(value: string | undefined, inherited: string | null): string | null {
   if (value === undefined) return inherited;
@@ -29,11 +37,19 @@ export function ledgerRow(projectId: bigint, entry: NewLedgerEntry, supersedesId
     stepKey: entry.stepKey ?? null,
     payload: entry.payload ?? null,
     links: entry.links ?? {},
+    ideaId: entry.idea?.ideaId ?? null,
+    rejectionScope: entry.idea?.scope ?? null,
+    rejectionAnchor: entry.idea?.anchor ?? null,
     supersedesId,
   };
 }
 
-/** An author rewords a decision or overrules a system detail into one; they never write a decision from nothing. */
+function inheritedIdea(previous: Ledger.Entry): IdeaRejection | undefined {
+  if (previous.ideaId === null || previous.rejectionScope === null) return undefined;
+  return { ideaId: previous.ideaId, scope: previous.rejectionScope, anchor: previous.rejectionAnchor };
+}
+
+/** An author rewords a decision or overrules a system detail into one; they never write a decision from nothing. A reworded rejection keeps its idea and scope. */
 export function authorSuccessor(previous: Ledger.Entry, input: AuthorSupersession): SupersedingEntry {
   const kind = input.kind ?? (previous.kind === 'system' ? 'decision' : previous.kind);
   if (kind === 'decision' && previous.kind !== 'decision' && previous.kind !== 'system') throw AppErrorCode.LDG_003.create();
@@ -49,6 +65,7 @@ export function authorSuccessor(previous: Ledger.Entry, input: AuthorSupersessio
     payload: input.payload ?? (inherits ? previous.payload : null),
     links: inherits ? previous.links : {},
     stepKey: inherits ? previous.stepKey : null,
+    idea: inherits && kind === 'rejected' ? inheritedIdea(previous) : undefined,
   };
 }
 

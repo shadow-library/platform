@@ -44,6 +44,7 @@ export const ChatMode = EnumType.create('ChatMode', schema.chatMode.enumValues);
 export const RefinementKind = EnumType.create('RefinementKind', schema.refinementKind.enumValues);
 export const LedgerEntryKind = EnumType.create('LedgerEntryKind', schema.ledgerEntryKind.enumValues);
 export const LedgerDecidedBy = EnumType.create('LedgerDecidedBy', schema.ledgerDecidedBy.enumValues);
+export const LedgerRejectionScope = EnumType.create('LedgerRejectionScope', schema.ledgerRejectionScope.enumValues);
 export const PublicationStatus = EnumType.create('PublicationStatus', schema.publicationStatus.enumValues);
 export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatus', schema.chapterPublicationStatus.enumValues);
 export const PublicationVisibility = EnumType.create('PublicationVisibility', schema.publicationVisibility.enumValues);

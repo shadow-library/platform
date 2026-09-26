@@ -12,6 +12,7 @@ import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
 import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
+import { stampIdeaIds } from './idea-id';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';
@@ -134,7 +135,7 @@ export class ProposalService {
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const trusted = input.kind === 'chapter_plan' ? input.changeSet : stampStartedEmpty(input.changeSet);
-    const changeSet = await stampApprovalRevisions(executor, projectId, trusted, false);
+    const changeSet = await stampApprovalRevisions(executor, projectId, stampIdeaIds(trusted), false);
     const refs = changeSetRefs(changeSet);
     const baseline = input.baseline ? pickBaseline(input.baseline, refs) : await loadArtifactStates(executor, projectId, refs);
     // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
@@ -294,7 +295,7 @@ export class ProposalService {
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const ops = await stampApprovalRevisions(this.db, projectId, stampStartedEmpty(changeSet as ChangeOp[], existing.changeSet as ChangeOp[]), true);
+    const ops = await stampApprovalRevisions(this.db, projectId, stampIdeaIds(stampStartedEmpty(changeSet as ChangeOp[], existing.changeSet as ChangeOp[])), true);
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
     const diagnostics = proposalDiagnostics(
       [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))],

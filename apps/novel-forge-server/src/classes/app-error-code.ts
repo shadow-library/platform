@@ -278,6 +278,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly LDG_003 = AppErrorCode.badRequest('LDG_003', 'Only a decision or a system detail can be rewritten as a decision');
   static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
   static readonly LDG_005 = AppErrorCode.badRequest('LDG_005', 'Topic "{topic}" is reserved for the server; the author cannot write to it directly');
+  static readonly LDG_006 = AppErrorCode.notFound('LDG_006', 'This suggestion has no change {opIndex} to turn down');
+  static readonly LDG_007 = AppErrorCode.badRequest('LDG_007', 'Only a suggested change can be turned down — a step that runs the pipeline is declined, not remembered');
+  static readonly LDG_008 = AppErrorCode.badRequest(
+    'LDG_008',
+    'This change touches no Story Bible record, so it cannot be turned down for this version only — choose "never" or "not now"',
+  );
 
   /*!
    * Notes Errors

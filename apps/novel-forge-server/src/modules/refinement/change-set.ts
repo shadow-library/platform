@@ -319,9 +319,10 @@ export type ActionOp =
 /**
  * Rationale and quote are metadata about the change, not part of it: they reach the author beside the op and are stripped before any
  * applier sees them, so `ContentOp` — the shape inverses are captured as — deliberately lacks them. `quote` is the author's own words
- * the op rests on; only a quote the server finds in the author's message lets the op apply without review.
+ * the op rests on; only a quote the server finds in the author's message lets the op apply without review. `ideaId` is stamped by the server
+ * when the op is staged, so a turned-down suggestion is recognised when it comes back.
  */
-export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string; quote?: string; startedEmpty?: boolean };
+export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string; quote?: string; startedEmpty?: boolean; ideaId?: string };
 export type OpType = ChangeOp['op'];
 export type ActionType = ActionOp['op'];
 
@@ -442,12 +443,14 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
 };
 
 // Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
-// `startedEmpty` marks a plan card staged as an empty plan for the author to fill in: the server stamps it, so no model is shown it.
-export const OP_METADATA_FIELDS = ['rationale', 'quote', 'startedEmpty'] as const;
+// `startedEmpty` marks a plan card staged as an empty plan for the author to fill in, and `ideaId` names a content op's idea: the server
+// stamps both, so no model is shown them.
+export const OP_METADATA_FIELDS = ['rationale', 'quote', 'startedEmpty', 'ideaId'] as const;
+const SERVER_METADATA_FIELDS: readonly string[] = ['startedEmpty', 'ideaId'];
 const OP_SPECS = Object.fromEntries(
   (Object.entries(DECLARED_OP_SPECS) as [OpType, OpSpec][]).map(([op, spec]): [OpType, OpSpec] => [
     op,
-    { ...spec, optional: { ...spec.optional, rationale: 'string', quote: 'string', ...(op === 'brief.update' ? { startedEmpty: 'boolean' } : {}) } },
+    { ...spec, optional: { ...spec.optional, rationale: 'string', quote: 'string', ideaId: 'string', ...(op === 'brief.update' ? { startedEmpty: 'boolean' } : {}) } },
   ]),
 ) as Record<OpType, OpSpec>;
 
@@ -724,7 +727,7 @@ export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabulary
     const spec = OP_SPECS[op];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
     const optional = Object.entries(spec.optional)
-      .filter(([key]) => (options.quotes || key !== 'quote') && key !== 'startedEmpty')
+      .filter(([key]) => (options.quotes || key !== 'quote') && !SERVER_METADATA_FIELDS.includes(key))
       .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}${spec.description ? ` — ${spec.description}` : ''}`;
   });
@@ -751,7 +754,7 @@ export function renderActionVocabulary(actions: readonly ActionType[]): string {
     const stamped = SERVER_STAMPED_FIELDS[action] ?? [];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
     const optional = Object.entries(spec.optional)
-      .filter(([key]) => !stamped.includes(key) && key !== 'quote')
+      .filter(([key]) => !stamped.includes(key) && key !== 'quote' && !SERVER_METADATA_FIELDS.includes(key))
       .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${action}"${[...required, ...optional].map(f => `, ${f}`).join('')}} — ${ACTION_PURPOSES[action]}`;
   });

@@ -14,6 +14,7 @@ import {
   type TurnProposalPort,
   UNLINKED_NOTE,
 } from '@modules/refinement/turn-proposals';
+import { ideaIdOf } from '@modules/refinement/idea-id';
 import { type ChangeSetSplit } from '@modules/refinement/write-policy';
 
 const quoted: ChangeOp = { op: 'entity.upsert', entityKey: 'mira', type: 'character', name: 'Mira', quote: 'Mira is a thief' };
@@ -203,5 +204,28 @@ describe('splitTurnChangeSet', () => {
     expect(held.held).toBe(true);
     expect(held.direct).toEqual([]);
     expect(discussing.dispositions.slice(0, 2).map(d => d.reason)).toEqual(['just_discussing', 'just_discussing']);
+  });
+
+  it('should drop a re-proposed card the author turned down and ask only about the model-authored cards', async () => {
+    const db = fakeDb({ premise: '' });
+    const asked: string[][] = [];
+    const rejectedIdeas = async (ideaIds: string[]) => (asked.push(ideaIds), new Set(ideaIds));
+
+    const split = await splitTurnChangeSet(db as never, 7n, ops, { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: [], rejectedIdeas });
+
+    expect(asked).toEqual([[ideaIdOf(ops[2] as ChangeOp)]]);
+    expect(split.ops).toEqual(ops.slice(0, 2));
+    expect(split.cards).toEqual([]);
+    expect(split.droppedIdeas).toEqual([ideaIdOf(ops[2] as ChangeOp)]);
+  });
+
+  it('should not filter the author’s own words even when every idea is turned down', async () => {
+    const db = fakeDb({ premise: '' });
+    const rejectedIdeas = async () => new Set(ops.map(ideaIdOf));
+
+    const split = await splitTurnChangeSet(db as never, 7n, ops, { authorMessage: MESSAGE, mode: 'auto', justDiscussing: true, warnings: [], rejectedIdeas });
+
+    expect(split.ops).toEqual(ops.slice(0, 2));
+    expect(split.cards).toEqual(ops.slice(0, 2));
   });
 });

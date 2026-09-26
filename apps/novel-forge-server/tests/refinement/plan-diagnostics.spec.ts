@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { schema } from '@server/database';
 
 import { type BriefUpdateOp, type ChangeOp } from '@modules/refinement/change-set';
+import { ideaIdOf } from '@modules/refinement/idea-id';
 import {
   densityFindings,
   findPoolingDiagnostics,
@@ -258,7 +259,8 @@ describe('ProposalService — plan card diagnostics', () => {
     const edited = { ...PLAN, scenes: PLAN.scenes?.map(scene => ({ ...scene, pov: 'mara' })) };
 
     await expect(service.updateChangeSet(7n, card.id, [edited])).rejects.toMatchObject({ code: 'RFN_002' });
-    expect(row['changeSet']).toEqual([PLAN]);
+    expect(row['changeSet']).toEqual(card.changeSet);
+    expect(row['changeSet']).toEqual([{ ...PLAN, ideaId: ideaIdOf(PLAN as ChangeOp) }]);
     expect(row['status']).toBe('applied');
   });
 });

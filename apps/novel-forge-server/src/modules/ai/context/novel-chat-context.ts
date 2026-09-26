@@ -41,7 +41,8 @@ export type NovelChatStory = Pick<
   'title' | 'premise' | 'brief' | 'themes' | 'theme' | 'endingQuestion' | 'ending' | 'readerPromise' | 'protagonistKey' | 'opposition'
 > & { authorInstructions: string | null };
 
-export type NovelChatLedgerEntry = Pick<Ledger.Entry, 'kind' | 'topic' | 'statement' | 'why' | 'rejectedAlternatives' | 'writerLine' | 'decidedBy'>;
+export type NovelChatLedgerEntry = Pick<Ledger.Entry, 'kind' | 'topic' | 'statement' | 'why' | 'rejectedAlternatives' | 'writerLine' | 'decidedBy'> &
+  Partial<Pick<Ledger.Entry, 'ideaId' | 'rejectionScope'>>;
 export type NovelChatVolume = Pick<Plan.Volume, 'volumeKey' | 'ordinal' | 'title' | 'objective' | 'state'>;
 export type NovelChatThread = Pick<
   Story.PlotThread,
@@ -143,6 +144,31 @@ function fitGroups(groups: readonly LineGroup[], maxTokens: number, leftOut: str
 
 const DECIDED_KINDS: ReadonlySet<Ledger.Kind> = new Set(['decision', 'system']);
 
+export const TURNED_DOWN_LIMIT = 10;
+const TURNED_DOWN_CHARS = 160;
+const TURNED_DOWN_SCOPE: Record<Ledger.RejectionScope, string> = {
+  never: 'never',
+  not_now: 'not during this volume',
+  not_this_version: 'not while what it changes stays as it is',
+};
+
+function isTurnedDownIdea(entry: NovelChatLedgerEntry): boolean {
+  return entry.kind === 'rejected' && Boolean(entry.ideaId) && Boolean(entry.rejectionScope);
+}
+
+/** Only the most recent, each cut short and without the author's reason: enough to steer away from close variants, never a transcript. */
+function turnedDownGroup(entries: readonly NovelChatLedgerEntry[]): LineGroup {
+  const ideas = entries.filter(isTurnedDownIdea);
+  const recent = ideas.slice(-TURNED_DOWN_LIMIT);
+  const shown = recent.length < ideas.length ? ` (the ${recent.length} most recent of ${ideas.length})` : '';
+  const lines = recent.map(entry => {
+    const statement = entry.statement.replace(/\s+/g, ' ').trim();
+    const cut = statement.length > TURNED_DOWN_CHARS ? `${statement.slice(0, TURNED_DOWN_CHARS - 1)}…` : statement;
+    return `- ${cut} (${TURNED_DOWN_SCOPE[entry.rejectionScope as Ledger.RejectionScope]})`;
+  });
+  return { heading: `### Suggestions the author turned down — do not offer them again, nor close variants${shown}`, lines };
+}
+
 function decisionLine(entry: NovelChatLedgerEntry): string {
   const why = entry.why ? ` — why: ${entry.why}` : '';
   const forWriter = entry.writerLine ? ` — for the writer: ${entry.writerLine}` : '';
@@ -157,7 +183,7 @@ function isAuthorsOwn(entry: NovelChatLedgerEntry): boolean {
   return entry.kind === 'direction' || (DECIDED_KINDS.has(entry.kind) && entry.decidedBy === 'author');
 }
 
-/** The author's decisions and directions claim the budget first, then what never to propose, then what the system decided, then the backlog. */
+/** The author's decisions and directions claim the budget first, then what never to propose and the turned-down suggestions, then what the system decided, then the backlog. */
 export function renderNotebook(all: readonly NovelChatLedgerEntry[], maxTokens: number = NOVEL_CHAT_SECTION_CAPS.notebook): string {
   const entries = all.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC && !entry.topic.startsWith(PROGRESS_TOPIC_PREFIX));
   if (entries.length === 0) return 'Nothing has been decided yet.';
@@ -170,10 +196,13 @@ export function renderNotebook(all: readonly NovelChatLedgerEntry[], maxTokens: 
     {
       heading: '### Do not propose',
       lines: [
-        ...entries.filter(entry => entry.kind === 'rejected').map(entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`),
+        ...entries
+          .filter(entry => entry.kind === 'rejected' && !isTurnedDownIdea(entry))
+          .map(entry => `- ${entry.statement}${entry.why ? ` (the author's reason: ${entry.why})` : ''}`),
         ...decided.flatMap(entry => entry.rejectedAlternatives.map(alternative => `- ${alternative} (passed over for ${entry.topic})`)),
       ],
     },
+    turnedDownGroup(entries),
     { heading: '### Decided by the system', lines: decided.filter(entry => entry.decidedBy === 'system').map(decisionLine) },
     { heading: '### Backlog — not yet', lines: entries.filter(entry => entry.kind === 'backlog').map(directionLine) },
   ];

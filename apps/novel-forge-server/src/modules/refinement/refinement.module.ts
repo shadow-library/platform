@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { EventsModule } from '../events/events.module';
+import { LedgerModule } from '../ledger/ledger.module';
 import { NotesStoreModule } from '../notes/notes-store.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { ActionExecutorRegistry } from './action-registry';
@@ -10,6 +11,7 @@ import { ChangeHistoryController } from './change-history.controller';
 import { ChatCompactionService } from './chat-compaction.service';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { IdeaRejectionService } from './idea-rejection.service';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
@@ -23,7 +25,7 @@ import { TurnStreamService } from './turn-stream.service';
 import { WriterPreviewService } from './writer-preview.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, EventsModule, NotesStoreModule, PluginsModule],
+  imports: [DatabaseModule, AiModule, EventsModule, LedgerModule, NotesStoreModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
   providers: [
     ActionExecutorRegistry,
@@ -31,6 +33,7 @@ import { WriterPreviewService } from './writer-preview.service';
     ProposalApplyService,
     ChatCompactionService,
     ChatService,
+    IdeaRejectionService,
     RefineService,
     TurnStreamService,
     BibleTidyService,

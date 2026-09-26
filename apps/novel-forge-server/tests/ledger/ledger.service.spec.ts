@@ -20,6 +20,9 @@ function entry(overrides: Partial<Ledger.Entry> = {}): Ledger.Entry {
     supersedesId: null,
     supersededAt: null,
     withdrawnReason: null,
+    ideaId: null,
+    rejectionScope: null,
+    rejectionAnchor: null,
     createdAt: new Date(0),
     ...overrides,
   };
@@ -176,6 +179,13 @@ describe('authorSuccessor', () => {
 
     expect(next).toMatchObject({ why: null, writerLine: null, payload: null, links: {}, rejectedAlternatives: [] });
   });
+
+  it('should keep a turned-down idea and its scope when the author rewords the rejection, and drop them when it becomes a direction', () => {
+    const turnedDown = entry({ kind: 'rejected', topic: 'idea.abc', ideaId: 'abc', rejectionScope: 'not_now', rejectionAnchor: { volumeKey: 'volume_1' } });
+
+    expect(authorSuccessor(turnedDown, { statement: 'No rival for the keeper' }).idea).toEqual({ ideaId: 'abc', scope: 'not_now', anchor: { volumeKey: 'volume_1' } });
+    expect(authorSuccessor(turnedDown, { kind: 'direction', statement: 'A rival, later' }).idea).toBeUndefined();
+  });
 });
 
 describe('LedgerService.withdraw', () => {
@@ -227,6 +237,35 @@ describe('LedgerService author paths', () => {
 
     await expect(service.appendByAuthor(7n, { kind: 'backlog', topic: 'progress.ending', statement: 'Forged' })).rejects.toMatchObject({ code: 'LDG_005' });
     expect(inserted).toHaveLength(0);
+  });
+
+  it('should keep recording a rejection the author words by hand, with no idea attached', async () => {
+    const { service, inserted } = fakeLedger();
+
+    await service.appendByAuthor(7n, { kind: 'rejected', topic: 'suggestion.kael', statement: 'Kael wants the lamp for himself' });
+    await service.appendByAuthor(7n, { kind: 'backlog', topic: 'suggestion.kael', statement: 'Set aside for now: Kael wants the lamp for himself' });
+
+    expect(inserted.map(row => [row.kind, row.ideaId, row.rejectionScope, row.rejectionAnchor])).toEqual([
+      ['rejected', null, null, null],
+      ['backlog', null, null, null],
+    ]);
+  });
+
+  it('should refuse an idea topic written through the generic author route', async () => {
+    const { service, inserted } = fakeLedger();
+
+    await expect(service.appendByAuthor(7n, { kind: 'rejected', topic: 'idea.abc', statement: 'Forged' })).rejects.toMatchObject({ code: 'LDG_005' });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it('should write an idea rejection with its scope and anchor', async () => {
+    const { service, inserted } = fakeLedger();
+
+    await service.append(7n, [
+      { kind: 'rejected', topic: 'idea.abc', statement: 'Kael (character)', decidedBy: 'author', idea: { ideaId: 'abc', scope: 'not_now', anchor: { volumeKey: null } } },
+    ]);
+
+    expect(inserted[0]).toMatchObject({ ideaId: 'abc', rejectionScope: 'not_now', rejectionAnchor: { volumeKey: null } });
   });
 
   it('should refuse a malformed topic key', async () => {
