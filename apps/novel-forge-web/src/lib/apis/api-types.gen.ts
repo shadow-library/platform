@@ -2485,6 +2485,15 @@ export interface components {
       };
       /** @description The author's standing guidance for this chapter's writer. */
       guidance?: null | string;
+      /** @description The agreed direction for the chapter. */
+      direction?: null | string;
+      /** @description How the chapter is written; null follows the project's content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      scenes?: null | components['schemas']['BriefSceneSchema'][];
+      /** @description Milestone keys this chapter claims to reach. */
+      claimedMilestones?: null | string[];
+      /** @description True for the chapter planned as the ending. */
+      isEnding: boolean;
       /** @description Set when the plan changed under this brief; generation refuses a stale brief. */
       staleReason?: null | string;
       /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
@@ -2499,6 +2508,14 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @enum {string} */
+    ContentMode: 'standard' | 'unrestricted';
+    /** @description One scene of a chapter plan. */
+    BriefSceneSchema: {
+      summary: string;
+      /** @description Entity key of the scene’s point-of-view character. */
+      pov?: null | string;
+    };
     UpdateBriefBody: {
       title?: string;
       body: string;
@@ -2512,6 +2529,16 @@ export interface components {
       endingContract?: components['schemas']['EndingContractSchema'] | null;
       /** @description Replacement knowledge contract. Omit to leave the existing contract unchanged. */
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
+      /** @description The agreed direction for the chapter. Omit to leave unchanged; null or blank clears it. */
+      direction?: string | null;
+      /** @description How the chapter is written. Omit to leave unchanged; null follows the project's content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description Replacement scene list. Omit to leave unchanged; null clears it. */
+      scenes?: components['schemas']['BriefSceneSchema'][] | null;
+      /** @description Milestone keys this chapter reaches. Omit to leave unchanged; null clears them. */
+      claimedMilestones?: string[] | null;
+      /** @description Marks the chapter planned as the ending. Omit to leave unchanged. */
+      isEnding?: boolean;
     };
     EndingContractSchema: {
       /** @description the kind of hook the closing scene must land on */
@@ -2579,7 +2606,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import';
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
     CancelJobResponse: {
@@ -2811,7 +2838,7 @@ export interface components {
     /** @enum {string} */
     ChatScope: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
     /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'chapter_extract' | 'plugin';
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'chapter_extract' | 'plugin' | 'chapter_plan' | 'organise';
     /** @enum {string} */
     RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
@@ -3747,11 +3774,15 @@ export interface components {
       revision: number;
       /** @description The author's notes on the volume. */
       body?: null | string;
+      /** @description Where the story stands against the volume goal. */
+      state: components['schemas']['VolumeState'];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @enum {string} */
+    VolumeState: 'not_started' | 'active' | 'goal_met';
     ListBibleDocResponse: {
       docs: components['schemas']['BibleDocListItem'][];
     };
@@ -3802,11 +3833,33 @@ export interface components {
       writerNote?: null | string;
       terms?: null | string[];
       revealChapter?: null | number;
+      /** @description When the fact may be revealed; absent when it has no condition. */
+      unlock?: components['schemas']['UnlockConditionSchema'];
+      /** @description The chapter whose plan currently schedules the reveal; provisional until that chapter is final. */
+      plannedChapter?: null | number;
+      /** @description The finalized chapter in which the reader learned the fact. */
+      disclosedInChapter?: null | number;
+      allowedClues?: null | string[];
       knowledge: components['schemas']['KnowledgeEntryResponse'][];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    /** @description Unlocks once every term holds. */
+    UnlockConditionSchema: {
+      all: components['schemas']['UnlockTermSchema'][];
+    };
+    /** @description Exactly one of milestone, volume, chapter or ending. */
+    UnlockTermSchema: {
+      /** @description Holds once this milestone is reached. */
+      milestone?: string;
+      /** @description Holds once the story reaches this volume. */
+      volume?: string;
+      /** @description Holds from this chapter on. */
+      chapter?: number;
+      /** @description Always true: holds only in the chapter planned as the ending. */
+      ending?: boolean;
     };
     KnowledgeEntryResponse: {
       entityKey: string;
@@ -3814,11 +3867,15 @@ export interface components {
       learnedInChapter: number;
       source: components['schemas']['FactSource'];
       note?: null | string;
+      /** @description Provisional while it rests on an approved, not yet finalized draft; committed once that chapter is final. Until the knowledge lifecycle lands every row reads committed, including reveals ledgered at approval. */
+      status: components['schemas']['KnowledgeStatus'];
       /** Format: date-time */
       createdAt: string;
     };
     /** @enum {string} */
     FactSource: 'brief' | 'manual' | 'import' | 'seed' | 'generated';
+    /** @enum {string} */
+    KnowledgeStatus: 'provisional' | 'committed';
     UpsertFactBody: {
       text: string;
       subjects?: string[];
@@ -3829,6 +3886,10 @@ export interface components {
       terms?: string[];
       /** @description Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it. */
       revealChapter?: number | null;
+      /** @description When the fact may be revealed. Omit to keep the current condition, send null to clear it. */
+      unlock?: components['schemas']['UnlockConditionSchema'] | null;
+      /** @description Observable effects the writer may show while the explanation stays hidden; trimmed, blanks dropped, duplicates removed. Omit to keep, send null to clear. */
+      allowedClues?: string[] | null;
     };
     RevealFactBody: {
       entityKey: string;
@@ -3884,8 +3945,6 @@ export interface components {
     };
     /** @enum {string} */
     ProjectKind: 'new_novel';
-    /** @enum {string} */
-    ContentMode: 'standard' | 'unrestricted';
     /** @description Chapter scene-prose word-count target — the generation prompt, length checks, and the expansion pass all read this band. */
     ProjectWordTarget: {
       /** @description Minimum word count a generated chapter must reach. */
@@ -3905,11 +3964,22 @@ export interface components {
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
       coverUrl?: null | string;
       contentMode: components['schemas']['ContentMode'];
+      /** @description The default cost tier AI work on this novel runs at. */
+      costTier: components['schemas']['CostTier'];
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
       instructions?: null | string;
       storyCurrentChapter?: null | number;
+      theme?: null | string;
+      /** @description The question the story is heading to answer. */
+      endingQuestion?: null | string;
+      /** @description The planned ending. Only the planner reads it; the chapter writer and publishing never do. */
+      ending?: null | string;
+      readerPromise?: null | string;
+      /** @description Entity key of the protagonist. */
+      protagonistKey?: null | string;
+      opposition?: null | string;
       /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
       /** Format: date-time */
@@ -3919,6 +3989,8 @@ export interface components {
     };
     /** @enum {string} */
     OwnerKind: 'user' | 'bot';
+    /** @enum {string} */
+    CostTier: 'economy' | 'balanced' | 'performant';
     ProjectConfig: {
       models?: components['schemas']['ProjectModelOverrides'];
     };
@@ -3966,11 +4038,22 @@ export interface components {
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
       coverUrl?: null | string;
       contentMode: components['schemas']['ContentMode'];
+      /** @description The default cost tier AI work on this novel runs at. */
+      costTier: components['schemas']['CostTier'];
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
       instructions?: null | string;
       storyCurrentChapter?: null | number;
+      theme?: null | string;
+      /** @description The question the story is heading to answer. */
+      endingQuestion?: null | string;
+      /** @description The planned ending. Only the planner reads it; the chapter writer and publishing never do. */
+      ending?: null | string;
+      readerPromise?: null | string;
+      /** @description Entity key of the protagonist. */
+      protagonistKey?: null | string;
+      opposition?: null | string;
       /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
       /** Format: date-time */
@@ -3996,7 +4079,20 @@ export interface components {
       title?: string;
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
+      costTier?: components['schemas']['CostTier'];
       brief?: string;
+      /** @description Trimmed; omit to keep, send null or a blank string to clear. */
+      theme?: string | null;
+      /** @description Trimmed; omit to keep, send null or a blank string to clear. */
+      endingQuestion?: string | null;
+      /** @description The planned ending, read only by the planner. Trimmed; omit to keep, send null or a blank string to clear. */
+      ending?: string | null;
+      /** @description Trimmed; omit to keep, send null or a blank string to clear. */
+      readerPromise?: string | null;
+      /** @description Entity key of the protagonist. Trimmed; omit to keep, send null or a blank string to clear. */
+      protagonistKey?: string | null;
+      /** @description Trimmed; omit to keep, send null or a blank string to clear. */
+      opposition?: string | null;
       /** @description Project additions to the built-in chapter-writing style; an empty string or null removes them. A copy of the current or an earlier built-in style inside the text, verbatim or lightly edited, is dropped. */
       instructions?: string | null;
       /** @description Chapter word-count target; send `null` to restore the application default (1,800–2,600 words). */
@@ -11109,6 +11205,8 @@ export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryRe
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type BriefWriteMode = components['schemas']['BriefWriteMode'];
 export type BriefResponse = components['schemas']['BriefResponse'];
+export type ContentMode = components['schemas']['ContentMode'];
+export type BriefSceneSchema = components['schemas']['BriefSceneSchema'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
 export type EndingContractSchema = components['schemas']['EndingContractSchema'];
 export type HookType = components['schemas']['HookType'];
@@ -11274,14 +11372,18 @@ export type UploadImageBody = components['schemas']['UploadImageBody'];
 export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
 export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
+export type VolumeState = components['schemas']['VolumeState'];
 export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
 export type BibleDocListItem = components['schemas']['BibleDocListItem'];
 export type BibleDocResponse = components['schemas']['BibleDocResponse'];
 export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
 export type ListFactsResponse = components['schemas']['ListFactsResponse'];
 export type FactResponse = components['schemas']['FactResponse'];
+export type UnlockConditionSchema = components['schemas']['UnlockConditionSchema'];
+export type UnlockTermSchema = components['schemas']['UnlockTermSchema'];
 export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryResponse'];
 export type FactSource = components['schemas']['FactSource'];
+export type KnowledgeStatus = components['schemas']['KnowledgeStatus'];
 export type UpsertFactBody = components['schemas']['UpsertFactBody'];
 export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
@@ -11292,10 +11394,10 @@ export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRo
 export type BibleStage = components['schemas']['BibleStage'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
-export type ContentMode = components['schemas']['ContentMode'];
 export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type OwnerKind = components['schemas']['OwnerKind'];
+export type CostTier = components['schemas']['CostTier'];
 export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
 export type ProjectModelRef = components['schemas']['ProjectModelRef'];
