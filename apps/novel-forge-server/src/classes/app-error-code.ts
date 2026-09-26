@@ -390,6 +390,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FRV_010 = AppErrorCode.badRequest('FRV_010', 'Say why you are skipping this update');
   static readonly FRV_011 = AppErrorCode.conflict('FRV_011', 'These updates were already applied when the chapter was finalized');
   static readonly FRV_012 = AppErrorCode.conflict('FRV_012', 'Only the updates of the latest final chapter can be undone, and only once they are applied');
+  static readonly FRV_013 = AppErrorCode.conflict(
+    'FRV_013',
+    'This chapter reveals {facts}, which needs milestone {milestone} — undoing its updates would leave the reveal without it',
+  );
 
   /*!
    * Passage rewrite errors

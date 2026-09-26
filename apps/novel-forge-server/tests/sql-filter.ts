@@ -22,6 +22,7 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
     },
   },
   { pattern: new RegExp(`^${COLUMN} is (not )?null`), build: match => row => isNullish(row[camel(match[1])]) !== Boolean(match[2]) },
+  { pattern: /^"\w+"\.xmin::text = \$(\d+)/, build: (match, params) => row => String(row['xmin']) === String(params[Number(match[1]) - 1]) },
   {
     pattern: new RegExp(`^${COLUMN} (not )?like \\$(\\d+)`),
     build: (match, params) => row => {
@@ -129,10 +130,15 @@ class FilterParser {
  * passes the row it proposed as `excluded`.
  */
 export function matchesWhere(row: Row, where: SQL | undefined, excluded?: Row): boolean {
-  if (where === undefined) return true;
+  return compileWhere(where)(row, excluded);
+}
+
+/** `matchesWhere` read once, for filtering many rows by the same `where`. */
+export function compileWhere(where: SQL | undefined): (row: Row, excluded?: Row) => boolean {
+  if (where === undefined) return () => true;
   if (!is(where, SQL)) throw new Error('sql-filter: `where` must be an SQL expression');
   const { sql, params } = dialect.sqlToQuery(where);
-  return new FilterParser(sql, params).parse()(row, excluded);
+  return new FilterParser(sql, params).parse();
 }
 
 type OrderTerm = SQL | Column;
@@ -147,7 +153,8 @@ function orderKey(term: OrderTerm): { key: string; sign: number } {
 
 /** Filters and sorts in-memory rows the way a relational `findMany`/`findFirst` query would. */
 export function queryRows<T extends Row>(rows: readonly T[], query: { where?: SQL; orderBy?: OrderTerm | OrderTerm[] } = {}): T[] {
-  const kept = rows.filter(row => matchesWhere(row, query.where));
+  const matches = compileWhere(query.where);
+  const kept = rows.filter(row => matches(row));
   if (query.orderBy === undefined) return kept;
   const keys = (Array.isArray(query.orderBy) ? query.orderBy : [query.orderBy]).map(orderKey);
   return [...kept].sort((left, right) => {

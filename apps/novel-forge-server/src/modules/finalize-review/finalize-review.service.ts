@@ -27,7 +27,7 @@ import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { GenerationService } from '../generation/generation.service';
 import { JobExecutor } from '../jobs/job.executor';
 import { hashReviewedBody } from '../review/review-findings';
-import { dropBriefClaims, isReviewCurrent, loadChapterReviews, revertedMilestoneKeys, type ReviewWithItems } from './finalize-review-gate';
+import { dropBriefClaims, isReviewCurrent, loadChapterReviews, revealsStrandedByRevert, revertedMilestoneKeys, type ReviewWithItems } from './finalize-review-gate';
 import { buildReviewItems, editedChange, type ProposedChange, sameProposal } from './finalize-review-items';
 import { type BridgePosition, decidingBridges, readBridgeCandidates } from './isolation-bridge';
 import { drizzleRowStore, revertAppliedItems } from './review-event-apply';
@@ -343,8 +343,11 @@ export class FinalizeReviewService {
         .for('update');
       // The frontier, not the story cursor: the cursor advances after finalize's commit, while a later chapter's `done` row lands inside it.
       if (!review || (await planFrontier(tx, projectId)) > chapter) throw AppErrorCode.FRV_012.create();
+      const unreached = revertedMilestoneKeys(review.applied ?? []);
+      const stranded = await revealsStrandedByRevert(tx, projectId, chapter, unreached);
+      if (stranded) throw AppErrorCode.FRV_013.create({ milestone: stranded.milestone, facts: stranded.facts.join(', ') });
       await revertAppliedItems(drizzleRowStore(tx), review.applied ?? []);
-      await dropBriefClaims(tx, projectId, chapter, revertedMilestoneKeys(review.applied ?? []));
+      await dropBriefClaims(tx, projectId, chapter, unreached);
       await tx.update(schema.finalizeReviews).set({ status: 'reverted', revertedAt: new Date(), updatedAt: new Date() }).where(eq(schema.finalizeReviews.id, review.id));
       await markDescendantDraftsStale(tx, projectId, chapter, `the Story Bible updates of chapter ${chapter} were undone`);
       await reconcilePlanState(tx, projectId);

@@ -2,9 +2,9 @@ import { and, asc, eq } from 'drizzle-orm';
 import { type AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { reconcilePlanState } from '@server/common';
+import { learnedFactKeys, loadPlanState, planUnlockContext, reconcilePlanState, revealRequirements } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type FinalizeReview, type FinalizeReviewAppliedItem, type PrimaryDatabase, type PrimaryTransaction, schema } from '@server/database';
+import { type DbExecutor, type FinalizeReview, type FinalizeReviewAppliedItem, type PrimaryDatabase, type PrimaryTransaction, schema } from '@server/database';
 
 import { hashReviewedBody } from '../review/review-findings';
 import { effectiveChange, openItems } from './finalize-review-items';
@@ -97,6 +97,40 @@ export function revertedMilestoneKeys(applied: readonly FinalizeReviewAppliedIte
   return applied.flatMap(item =>
     item.changes.flatMap(change => (change.table === 'milestones' && change.after?.['state'] === 'reached' ? [String(change.match['milestoneKey'])] : [])),
   );
+}
+
+/**
+ * The reveals a final chapter made that hold now but would not once a revert un-reaches `milestones`: the chapter's committed prose keeps
+ * revealing them, while the milestone would go back to open and a later plan could claim it after its secret is out.
+ */
+export async function revealsStrandedByRevert(
+  db: DbExecutor,
+  projectId: bigint,
+  chapter: number,
+  milestones: readonly string[],
+): Promise<{ milestone: string; facts: string[] } | null> {
+  if (milestones.length === 0) return null;
+  const undone = new Set(milestones);
+  const [state, disclosed] = await Promise.all([
+    loadPlanState(db, projectId),
+    db.query.canonFacts.findMany({
+      columns: { factKey: true },
+      where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.disclosedInChapter, chapter)),
+    }),
+  ]);
+  const plan = state.plans.find(candidate => candidate.chapter === chapter) ?? { chapter, volumeKey: null, isEnding: false, claimedMilestones: [], knowledgeContract: null };
+  const reverted = {
+    ...state,
+    plans: state.plans.map(candidate =>
+      candidate.chapter === chapter ? { ...candidate, claimedMilestones: (candidate.claimedMilestones ?? []).filter(key => !undone.has(key)) } : candidate,
+    ),
+    milestones: state.milestones.map(milestone => (undone.has(milestone.milestoneKey) ? { ...milestone, state: 'open' as const, reachedChapter: null } : milestone)),
+  };
+  const now = planUnlockContext(plan, state);
+  const after = planUnlockContext(reverted.plans.find(candidate => candidate.chapter === chapter) ?? plan, reverted);
+  const revealed = new Set([...learnedFactKeys(plan.knowledgeContract), ...disclosed.map(fact => fact.factKey)]);
+  const facts = state.facts.filter(fact => revealed.has(fact.factKey) && revealRequirements(fact, now).length === 0 && revealRequirements(fact, after).length > 0);
+  return facts.length > 0 ? { milestone: milestones.join(', '), facts: facts.map(fact => fact.factKey) } : null;
 }
 
 export interface ReviewCommit {

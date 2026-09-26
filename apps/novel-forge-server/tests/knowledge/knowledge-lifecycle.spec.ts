@@ -14,10 +14,11 @@ type Tables = ReturnType<typeof planTables>;
 
 const PROSE = 'The lamp burns cold.';
 const CONTRACT = { pov: ['mira', 'oren'], learns: [{ entityKey: 'mira', factKey: 'lamp_rank_4_rule' }] };
+const CLAIM_ONLY = { pov: ['mira', 'oren'], learns: [] };
 const RANK_FOUR_RULE = { factKey: 'lamp_rank_4_rule', text: 'The fourth rank costs a memory an hour.', unlock: { all: [{ milestone: 'lamp_rank_4' }] } };
 
 /** Chapter 5's plan claims the fourth rank and reveals what it unlocks to Mira; its draft sits at revision 2, unapproved. */
-function chapterFive(): Tables {
+function chapterFive(contract: typeof CONTRACT = CONTRACT): Tables {
   return planTables({
     milestones: [{ milestoneKey: 'lamp_rank_4', label: 'Mira reaches the fourth rank' }],
     facts: [RANK_FOUR_RULE],
@@ -25,7 +26,7 @@ function chapterFive(): Tables {
       { entityKey: 'mira', name: 'Mira' },
       { entityKey: 'oren', name: 'Oren' },
     ],
-    briefs: [{ chapter: 5, claimedMilestones: ['lamp_rank_4'], knowledgeContract: CONTRACT }],
+    briefs: [{ chapter: 5, claimedMilestones: ['lamp_rank_4'], knowledgeContract: contract }],
     drafts: [{ id: 55n, chapter: 5, revision: 2, body: PROSE }],
     storyCurrentChapter: 4,
   });
@@ -245,7 +246,7 @@ describe('knowledge lifecycle — finalize', () => {
   });
 
   it('should put a kept milestone back through the real snapshot on revert, and refuse once a later chapter is final', async () => {
-    const tables = chapterFive();
+    const tables = chapterFive(CLAIM_ONLY);
     await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
     expect(tables.milestone('lamp_rank_4')?.['state']).toBe('reached');
@@ -262,7 +263,7 @@ describe('knowledge lifecycle — finalize', () => {
   });
 
   it("should drop a reverted milestone's claim, so the next chapter cannot reveal through it and a later plan can claim it", async () => {
-    const tables = chapterFive();
+    const tables = chapterFive(CLAIM_ONLY);
     tables
       .rows(schema.briefs)
       .push({ id: 99n, projectId: 7n, chapter: 6, knowledgeContract: CONTRACT, claimedMilestones: null, staleReason: null, isEnding: false, volumeKey: null });
@@ -277,6 +278,18 @@ describe('knowledge lifecycle — finalize', () => {
     expect(await planRevealsRefusal(tables.db as never, 7n, 6)).toMatchObject({ code: 'PLN_004' });
     const state = await loadPlanState(tables.db as never, 7n);
     expect(findPlanClaimProblems({ chapter: 6, volumeKey: null, isEnding: false, claimedMilestones: ['lamp_rank_4'] }, state)).toEqual([]);
+  });
+
+  it('should refuse to undo the reach of a milestone the final chapter revealed a secret under, changing nothing', async () => {
+    const tables = chapterFive();
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    await finalize(tables, 2);
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+
+    await expect(reviews.revert(7n, 5)).rejects.toMatchObject({ code: 'FRV_013' });
+    expect(tables.milestone('lamp_rank_4')).toMatchObject({ state: 'reached', reachedChapter: 5 });
+    expect(tables.brief(5)?.['claimedMilestones']).toEqual(['lamp_rank_4']);
+    expect(tables.rows(schema.finalizeReviews)[0]?.['status']).toBe('applied');
   });
 
   it('should change nothing when a finalization is replayed', async () => {
