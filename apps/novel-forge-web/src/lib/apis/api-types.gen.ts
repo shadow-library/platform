@@ -2412,6 +2412,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/new-novel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Novel With Notes */
+    post: operations['post_api_v1_projects_new_novel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/notes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Notes */
+    get: operations['get_api_v1_projects_projectId_notes'];
+    /** Update Notes */
+    put: operations['put_api_v1_projects_projectId_notes'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/progress': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Progress */
+    get: operations['get_api_v1_projects_projectId_progress'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/progress/{key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set Progress Override */
+    put: operations['put_api_v1_projects_projectId_progress_key'];
+    post?: never;
+    /** Clear Progress Override */
+    delete: operations['delete_api_v1_projects_projectId_progress_key'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/import': {
     parameters: {
       query?: never;
@@ -5193,6 +5263,54 @@ export interface components {
       /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
       reason: string;
     };
+    CreateNovelWithNotesBody: {
+      /** @description The working title. */
+      title: string;
+      /** @description The author's own words about the novel, kept verbatim and read by the chat as the author's notes. Up to 10,000 words. */
+      notes?: string;
+      contentMode?: components['schemas']['ContentMode'];
+    };
+    CreateNovelWithNotesResponse: {
+      projectId: string;
+      /** @description The chat session created in auto mode, ready for a pending first turn. */
+      sessionId: string;
+    };
+    NotesResponse: {
+      /** @description The author's current notes; empty when none have been stored. */
+      notes: string;
+      /** @description The ledger entry backing the notes; absent when there are none yet. */
+      entryId?: string;
+      /**
+       * Format: date-time
+       * @description When the current notes were last written.
+       */
+      updatedAt?: string;
+    };
+    UpdateNotesBody: {
+      /** @description The author's own words about the novel, kept verbatim and read by the chat as the author's notes. Up to 10,000 words. A blank value clears them. */
+      notes: string;
+    };
+    ProgressResponse: {
+      items: components['schemas']['ProgressItemResponse'][];
+    };
+    ProgressItemResponse: {
+      key: string;
+      label: string;
+      why: string;
+      status: components['schemas']['ProgressItemStatus'];
+      /** @description The ledger entry backing an `undecided`/`dismissed` status; present only then. */
+      overrideEntryId?: string;
+    };
+    /** @enum {string} */
+    ProgressItemStatus: 'open' | 'answered' | 'undecided' | 'dismissed';
+    ProgressOverrideBody: {
+      /** @description 'undecided' answers the item as settled with no value; 'dismissed' hides it from the checklist. Both persist until cleared. */
+      status: components['schemas']['ProgressOverrideStatus'];
+    };
+    /** @enum {string} */
+    ProgressOverrideStatus: 'undecided' | 'dismissed';
+    /** @enum {string} */
+    ProgressItemKey: 'premise' | 'protagonist' | 'opposition' | 'theme' | 'reader_promise' | 'ending' | 'first_volume_goal' | 'next_chapter_planned';
     ImportNovelBody: {
       bundle: components['schemas']['NovelBundle'];
     };
@@ -12819,6 +12937,249 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_new_novel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateNovelWithNotesBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreateNovelWithNotesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_notes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_notes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNotesBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_progress: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProgressResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_progress_key: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        key: components['schemas']['ProgressItemKey'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProgressOverrideBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProgressResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_progress_key: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        key: components['schemas']['ProgressItemKey'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProgressResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_import: {
     parameters: {
       query?: never;
@@ -13477,6 +13838,16 @@ export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
 export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
 export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
 export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
+export type CreateNovelWithNotesBody = components['schemas']['CreateNovelWithNotesBody'];
+export type CreateNovelWithNotesResponse = components['schemas']['CreateNovelWithNotesResponse'];
+export type NotesResponse = components['schemas']['NotesResponse'];
+export type UpdateNotesBody = components['schemas']['UpdateNotesBody'];
+export type ProgressResponse = components['schemas']['ProgressResponse'];
+export type ProgressItemResponse = components['schemas']['ProgressItemResponse'];
+export type ProgressItemStatus = components['schemas']['ProgressItemStatus'];
+export type ProgressOverrideBody = components['schemas']['ProgressOverrideBody'];
+export type ProgressOverrideStatus = components['schemas']['ProgressOverrideStatus'];
+export type ProgressItemKey = components['schemas']['ProgressItemKey'];
 export type ImportNovelBody = components['schemas']['ImportNovelBody'];
 export type NovelBundle = components['schemas']['NovelBundle'];
 export type NovelImportMode = components['schemas']['NovelImportMode'];
@@ -13596,5 +13967,7 @@ export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectI
 export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
 export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
 export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;
+export type GetNotesPathParams = Exclude<paths['/api/v1/projects/{projectId}/notes']['get']['parameters']['path'], undefined>;
+export type GetProgressPathParams = Exclude<paths['/api/v1/projects/{projectId}/progress']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
 export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
