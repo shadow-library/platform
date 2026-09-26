@@ -1,5 +1,5 @@
 import { InferEnum, InferInsertModel, InferSelectModel, relations, sql } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, check, index, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, bigint, bigserial, check, index, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { type Bible } from './bible';
 import { jsonb } from './jsonb';
@@ -9,7 +9,6 @@ export namespace Ledger {
   export type Entry = InferSelectModel<typeof decisionLedgerEntries>;
   export type NewEntry = InferInsertModel<typeof decisionLedgerEntries>;
   export type Kind = InferEnum<typeof ledgerEntryKind>;
-  export type Phase = InferEnum<typeof blueprintPhase>;
   export type DecidedBy = InferEnum<typeof ledgerDecidedBy>;
   /** Superseded has a successor row; withdrawn was deactivated by the author with a reason and has none. */
   export type Status = 'active' | 'superseded' | 'withdrawn';
@@ -34,7 +33,6 @@ export namespace Ledger {
 }
 
 export const ledgerEntryKind = pgEnum('ledger_entry_kind', ['decision', 'direction', 'rejected', 'backlog', 'system']);
-export const blueprintPhase = pgEnum('blueprint_phase', ['idea', 'heart', 'core', 'world', 'spine', 'volume_one', 'opening']);
 export const ledgerDecidedBy = pgEnum('ledger_decided_by', ['author', 'system']);
 
 export const decisionLedgerEntries = pgTable(
@@ -45,7 +43,6 @@ export const decisionLedgerEntries = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     kind: ledgerEntryKind('kind').notNull(),
-    phase: blueprintPhase('phase'),
     topic: varchar('topic', { length: 100 }).notNull(),
     statement: text('statement').notNull(),
     why: text('why'),
@@ -68,10 +65,6 @@ export const decisionLedgerEntries = pgTable(
   },
   t => [
     unique('decision_ledger_entries_supersedes_id_unique').on(t.supersedesId),
-    // The gate is the project's mode switch, not a decision: one active gate or none, whatever races to write it.
-    uniqueIndex('decision_ledger_entries_project_id_gate_unique')
-      .on(t.projectId)
-      .where(sql`${t.topic} = 'gate' AND ${t.kind} = 'system' AND ${t.supersededAt} IS NULL`),
     index('decision_ledger_entries_project_id_active_idx')
       .on(t.projectId, t.createdAt)
       .where(sql`${t.supersededAt} IS NULL`),

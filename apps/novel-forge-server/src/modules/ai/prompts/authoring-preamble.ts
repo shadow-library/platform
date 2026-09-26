@@ -17,7 +17,6 @@ const VOICE_AND_CANON_RULES = `- Maintain established character voice and speech
 // Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
 // but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any
 // prose exists. Used by the bible-build, plan, outline, arc-plan, premise-enhance, and chat-refine prompts.
-// The sample-prose prompts (blueprint-voice, blueprint-premise-preview) keep the full version.
 // generation.prompt.ts uses neither constant; its craft rules come entirely from the context pack's
 // `writing_style` section.
 export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:

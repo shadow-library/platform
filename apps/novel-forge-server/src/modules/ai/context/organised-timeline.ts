@@ -2,8 +2,10 @@ import { ORGANISE_TOPIC, textDigest, TIMELINE_BAND_LABELS } from '@shadow-librar
 
 import { type Ledger } from '@server/database';
 
+import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
 import { type BibleDocRow, ORGANISED_TIMELINE_DOC } from './bible-docs';
-import { AUTHOR_BRIEF_TOPIC } from './ledger-sections';
+
+export const ORGANISED_TIMELINE_SECTION = 'organised_timeline';
 
 /** Whether the organised timeline was organised from the notes as they stand, or from an earlier version of them. */
 export type OrganisedTimelineState = 'current' | 'stale';

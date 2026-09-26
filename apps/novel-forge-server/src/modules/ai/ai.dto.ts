@@ -92,9 +92,6 @@ export class AccountModelDefaults {
 
   @Field(() => AccountModelRef, { optional: true, description: 'Cover and scene art; must name an image model.' })
   image?: AccountModelRef;
-
-  @Field(() => AccountModelRef, { optional: true, description: 'The Blueprint’s small, one-screen steps.' })
-  ideation?: AccountModelRef;
 }
 
 @Schema({ description: 'Settings that apply to every project and idea the signed-in author owns.' })

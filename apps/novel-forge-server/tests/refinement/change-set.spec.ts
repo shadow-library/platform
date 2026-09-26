@@ -72,23 +72,18 @@ describe('validateChangeSet', () => {
   });
 });
 
-describe('the working title, which only a Blueprint lock may set', () => {
-  const rename: ChangeOp[] = [{ op: 'premise.update', title: 'A Name The Chat Chose' }];
-
-  it('should refuse the title field for every other scope', () => {
-    expect(validateChangeSet(rename)).toEqual(["changeSet[0]: field 'title' is not allowed for this scope"]);
-    expect(validateChangeSet(rename, ['premise.update', 'bible_document.upsert'])).toEqual(["changeSet[0]: field 'title' is not allowed for this scope"]);
+describe('the working title, which no change-set may set', () => {
+  it('should refuse a title on premise.update for every scope', () => {
+    const rename = [{ op: 'premise.update', title: 'A Name The Chat Chose' }];
+    expect(validateChangeSet(rename)).toEqual(["changeSet[0]: unexpected field 'title'"]);
+    expect(validateChangeSet(rename, ['premise.update', 'bible_document.upsert'])).toEqual(["changeSet[0]: unexpected field 'title'"]);
   });
 
-  it('should take it from a Blueprint lock', () => {
-    expect(validateChangeSet(rename, undefined, { blueprintLock: true })).toEqual([]);
-  });
-
-  it('should leave the rest of premise.update alone either way', () => {
+  it('should leave the rest of premise.update alone', () => {
     expect(validateChangeSet([{ op: 'premise.update', premise: 'a clerk audits the dead' }])).toEqual([]);
   });
 
-  it('should not advertise a field it would refuse', () => {
+  it('should not advertise a title field', () => {
     const vocabulary = renderOpVocabulary(['premise.update']);
     expect(vocabulary).toContain('"premise": <string, optional>');
     expect(vocabulary).not.toContain('"title"');

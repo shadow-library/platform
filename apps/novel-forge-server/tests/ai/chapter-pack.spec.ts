@@ -329,13 +329,12 @@ describe('ContextAssembler.forChapter — chapter pack assembly', () => {
   const decisions = [
     {
       kind: 'decision',
-      phase: 'core',
       topic: 'protagonist',
       statement: 'Wren trusts ledgers over people.',
       writerLine: 'WRITER_LINE_MARKER Wren checks the numbers before she answers anyone.',
     },
-    { kind: 'direction', phase: 'idea', topic: 'taste', statement: 'DIRECTION_MARKER keep it quiet', writerLine: null },
-    { kind: 'system', phase: 'volume_one', topic: 'cast', statement: 'Tobin is thirty.', writerLine: 'Tobin jokes when the crew is scared.' },
+    { kind: 'direction', topic: 'taste', statement: 'DIRECTION_MARKER keep it quiet', writerLine: null },
+    { kind: 'system', topic: 'cast', statement: 'Tobin is thirty.', writerLine: 'Tobin jokes when the crew is scared.' },
   ].map(decision => ({ why: null, rejectedAlternatives: [], decidedBy: 'author', ...decision }));
 
   it('should carry the writer lines of active decisions directly ahead of the brief', async () => {

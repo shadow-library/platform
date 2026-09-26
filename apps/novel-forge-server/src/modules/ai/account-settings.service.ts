@@ -15,7 +15,7 @@ import { MODEL_MAP } from './models';
 
 export type AccountModelGroup = keyof AccountModelDefaultsData;
 
-export const ACCOUNT_MODEL_GROUPS: readonly AccountModelGroup[] = ['writing', 'planning', 'review', 'chat', 'helper', 'image', 'ideation'];
+export const ACCOUNT_MODEL_GROUPS: readonly AccountModelGroup[] = ['writing', 'planning', 'review', 'chat', 'helper', 'image'];
 
 @Injectable()
 export class AccountSettingsService {

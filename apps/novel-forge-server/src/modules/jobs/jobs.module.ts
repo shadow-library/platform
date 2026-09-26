@@ -5,7 +5,6 @@ import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 import { ActorModule } from '@modules/actor';
 
 import { AiModule } from '../ai/ai.module';
-import { BlueprintModule } from '../blueprint/blueprint.module';
 import { EventsModule } from '../events/events.module';
 import { PublishingModule } from '../publishing/publishing.module';
 import { CheckpointJanitor } from './checkpoint.janitor';
@@ -16,7 +15,7 @@ import { JobsController } from './jobs.controller';
 import { PublicationJanitor } from './publication.janitor';
 
 @Module({
-  imports: [ActorModule, DatabaseModule, AiModule, BlueprintModule, EventsModule, PublishingModule, StorageModule, FastifyModule],
+  imports: [ActorModule, DatabaseModule, AiModule, EventsModule, PublishingModule, StorageModule, FastifyModule],
   controllers: [JobsController],
   providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],

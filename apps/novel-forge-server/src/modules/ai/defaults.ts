@@ -22,16 +22,14 @@ export type AiRole =
   | 'embedding'
   | 'illustration'
   | 'image'
-  | 'vision'
-  | 'blueprint'
-  | 'blueprint_pass';
+  | 'vision';
 
 export interface ResolvedModel {
   provider: string;
   model: string;
 }
 
-export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'vision' | 'embedding' | 'ideation';
+export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'vision' | 'embedding';
 
 // Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained
 // internally (prompts + telemetry + routing); the group is only the unit the author selects a model
@@ -61,8 +59,6 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   // Not author-selectable: account and project picks for a text-only group must never strip image input from a caller that needs it.
   vision: 'vision',
   embedding: 'embedding',
-  blueprint: 'ideation',
-  blueprint_pass: 'planning',
 };
 
 // Group-level defaults are the single source of truth; the per-role maps below derive from them so the
@@ -81,13 +77,11 @@ export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   // Cheapest registered model OpenRouter lists with image input.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
-  ideation: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
 // GLM-5.2 (same structured stack as Standard); review/helper move off Claude/Luna onto DeepSeek V4 Pro.
-// Opus is not on `UNRESTRICTED_LLM_ALLOWLIST`, so the ideation group falls back to GLM-5.2 there too. Vision takes Grok 4.6: DeepSeek and GLM
-// accept no image input, and it is the cheaper of the two allowlisted models that do.
+// Vision takes Grok 4.6: DeepSeek and GLM accept no image input, and it is the cheaper of the two allowlisted models that do.
 export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   planning: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
@@ -97,7 +91,6 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   vision: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
-  ideation: { provider: 'openrouter', model: 'z-ai/glm-5.2' },
 };
 
 export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);
@@ -139,7 +132,6 @@ export const REASONING_POLICY: Record<ModelGroup, ReasoningEffort> = {
   image: 'none',
   vision: 'none',
   embedding: 'none',
-  ideation: 'low',
 };
 
 // Returns the effort to send, or undefined to omit the reasoning field entirely — which is itself how

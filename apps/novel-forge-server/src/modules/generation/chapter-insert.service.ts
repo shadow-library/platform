@@ -14,7 +14,7 @@ import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { buildOutlinePrompt, outlineWordTargetVars } from '../ai/prompts';
 import { type OutlineOutput } from '../ai/schemas';
-import { shiftLedgerBriefLinks } from '../blueprint/ledger/ledger-entries';
+import { shiftLedgerBriefLinks } from '../ledger/ledger-entries';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 

@@ -11,7 +11,7 @@ import { type DraftRow, draftRow, fakeGenerationDb, render } from '../generation
 
 function applyDraftOp(reads: (DraftRow | undefined)[], written: unknown[] = []) {
   const fake = fakeGenerationDb({ draftReads: reads, draftWriteResult: written });
-  const ctx = { tx: fake.db as never, projectId: 1n, applied: [] as { artifactRef: string; newRevision: number | null }[], staleMarked: [] as string[], blueprintLock: false };
+  const ctx = { tx: fake.db as never, projectId: 1n, applied: [] as { artifactRef: string; newRevision: number | null }[], staleMarked: [] as string[] };
   const service = new ProposalApplyService(new FakeDatabaseService(), {} as never);
   return {
     fake,

@@ -8,7 +8,6 @@ export * from './bible';
 export * from './generation';
 export * from './refinement';
 export * from './ledger';
-export * from './blueprint';
 export * from './publishing';
 export * from './illustration';
 export * from './jobs';

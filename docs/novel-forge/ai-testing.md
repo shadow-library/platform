@@ -11,7 +11,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part                                  | Features                                                                                                                       |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                            |
-| Part 2: Blueprint to lore bible       | The Blueprint (the guided design flow), premise enhancement, bible builder, readiness, audit, one end-to-end sample            |
+| Part 2: lore bible                    | Premise enhancement, bible builder, readiness, audit, proposal-only writes, one end-to-end sample                              |
 | Part 3: planning, generation          | Volume and arc planning, briefs, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
 | Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                                 |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)                   |
@@ -281,8 +281,7 @@ Model selection is **code + database**, not environment.
 - Production group defaults (`defaults.ts:85-95`):
   `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
   `chat` → `anthropic/claude-opus-5.5`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
-  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`, `ideation` → `anthropic/claude-opus-5.5`
-  (the `ideation` group is the Blueprint's small steps; its large passes run on `planning`).
+  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`.
 - Unrestricted map (`defaults.ts:101-111`) applies when `project.contentMode === 'unrestricted'`; overrides are
   clamped to `UNRESTRICTED_LLM_ALLOWLIST` (`defaults.ts:117`).
 - Reasoning effort per group: `REASONING_POLICY` (`defaults.ts:142-152`) — every authoring group asks for `low`.
@@ -336,7 +335,7 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 (`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:541-543`).
 
 **UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — every door posts to
-`POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project and opens the Blueprint; "I know the
+`POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project; "I know the
 novel" creates the same project and leaves you on Overview; "Import a
 plan" creates a `new_novel` project and opens Import Plan. Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
@@ -651,13 +650,11 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 
 ---
 
-## Part 2: Blueprint to lore bible
+## Part 2: lore bible
 
-Covers: the **Blueprint** — the guided design flow that replaced the Ideation Studio — its rounds, locks, decision
-ledger and gate, then premise enhancement, bible builder, bible readiness, bible audit, and proposal-only writes into
-bible documents / entities / canon facts. The refinement **chat hub** (`/novels/$novelId/chat`) is covered in
-Part 5 (chat hub and admin) — cross-referenced here where it is the only editor for something.
-Intent and invariants for the flow itself live in `docs/novel-forge/blueprint.md`; this part is how to exercise it.
+Covers: premise enhancement, bible builder, bible readiness, bible audit, and proposal-only writes into bible
+documents / entities / canon facts. The refinement **chat hub** (`/novels/$novelId/chat`) is covered in Part 5 (chat
+hub and admin) — cross-referenced here where it is the only editor for something.
 
 Everything below is read off current code in `apps/novel-forge-server` / `apps/novel-forge-web`.
 
@@ -684,109 +681,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 > every crime she rings back into public memory rewrites who owes what to whom. The magistrates want her hands. The
 > debtors want her voice. Each bell she sounds makes her better at hearing and worse at forgetting.
 
-Working title to reach for in the Title step: **The Bell Debt**.
-
 ---
-
-#### Blueprint — create the novel and open the design flow
-
-- **Entry:** **Projects** → **New project** → **Design a new novel**; `POST /api/v1/projects` with
-  `{"name": "Untitled novel", "kind": "new_novel", "contentMode": "standard"}`. The project exists from this call —
-  there is no separate idea artifact, and nothing has to graduate.
-- **Preconditions:** none. This is the first recipe; everything else in this file builds on its `projectId`.
-- **Run:** 1. POST. 2. `GET /api/v1/projects/{projectId}/status`. 3. `GET /api/v1/projects/{projectId}/blueprint`.
-  4. Open `/novels/{projectId}/blueprint` in the web app.
-- **Verify:** `status.blueprint.stage = 'blueprint'` and `status.blueprint.phases` holds **7** phases in order
-  (`idea`, `heart`, `core`, `world`, `spine`, `volume_one`, `opening`), each with `status` of `done|current|locked|open`,
-  a `lockReason` when locked, and its sub-steps. `GET …/blueprint` lists the 21 registered steps in registry order
-  (`steps/blueprint-steps.ts`): `start, taste, concepts, premise, heart, promise, title, engine, protagonist,
-  opposition, world, power, spine_pass, spine, volume_one_pass, cast, places, arcs, briefs, voice, check`. The three
-  generators — `engine`, `spine_pass`, `volume_one_pass` — carry `kind: 'pass'`; the other eighteen are
-  `kind: 'screen'`, and a screen fed by a pass names it in `source`. No `decision_ledger_entries` rows yet.
-  **Quality:** the sidebar groups the phases by altitude (The novel / The engine / The shape / Up close) and every
-  phase below the current one is locked with a reason the author can read.
-- **Fails when:** `status.blueprint` is `null` — the project is not `kind: new_novel`, and the Blueprint is
-  new-novel-only. A step the registry rejects answers `BPR_001`.
-
-#### Blueprint — one round on a small step (`start`)
-
-- **Entry:** the Blueprint's first screen; `POST /api/v1/projects/{projectId}/blueprint/steps/start/rounds`.
-- **Preconditions:** the project above; no round already running on that step (`BPR_002`).
-- **Input:** `{"input": {"text": "<the sample spark above>", "startingType": "book"}}`.
-  Optional on any round: `steer` (free text), `nudges` (short chips), `keepAsDirection`, and
-  `feedback: [{optionId, verdict: 'more'|'not'|'mix', reason?}]`.
-- **Run:** 1. POST → `201` with the round in `pending`. 2. Poll `GET …/blueprint` (or watch the project event stream
-  for `{"type":"job","kind":"blueprint"}`) until the round reads `ready`.
-- **Verify:** one `jobs` row of kind `blueprint`; one `workflow_runs` row with `graph='blueprint-step'` and
-  `target='start#<round>'`; one `context_packs` row with `purpose='blueprint'` whose sections are, in order,
-  `ledger` (required, stable), the step's own inputs, `step_thread` (the last **4** messages of this step only — steers,
-  nudges and coach lines, never options) and `round_input` (required). A `blueprint_rounds` row carries the step key,
-  the round number, `status`, `focus` and the options as jsonb. A kept steer writes a `direction` ledger entry on
-  `<step>.steer`; a "not this" with a reason writes a `rejected` entry on `<step>.rejected`.
-  **Quality:** the options are built from the author's own words, not genre defaults, and the coach message says what
-  the round is trying to find out.
-- **Fails when:** `BPR_002` (a round is already running), `BPR_004` (the input, selection or nudges fail the step's
-  schema — free text belongs in `steer`, not in a nudge), `BPR_003` (the project is not `new_novel`), `BPR_010` (the
-  novel's decisions rule the step out — organising notes shorter than about six hundred words, a ladder without
-  progression). `POST …/blueprint/steps/start/rounds/cancel` stops a live round; `BPR_006` when there is nothing to cancel.
-
-#### Blueprint — lock a step and read the Notebook
-
-- **Entry:** the screen's **Lock** bar; `POST /api/v1/projects/{projectId}/blueprint/steps/premise/lock`.
-- **Preconditions:** a `ready` round on `premise` (or the author's own text), and the phase above it complete.
-- **Input:** `{"selection": {"parts": [{"optionId": "p1"}, {"text": "<the author's own second clause>"}],
-  "sentence": "<the whole premise sentence>", "why": "<why this one>", "writerLine": "<what it means for the writer>"}}`.
-  `writerLine` is required and refused blank (`BPR_004`).
-- **Run:** 1. POST. 2. `GET /api/v1/projects/{projectId}/ledger`. 3. Open the bible page the lock wrote.
-- **Verify:** the response carries `entries`, `withdrawn`, `proposalId` and `followUp`. `decision_ledger_entries`
-  gains one active `decision` on topic `premise` carrying `why`, `writerLine`, every passed-over part under
-  `rejectedAlternatives`, and `links.bibleDocuments = [{section:'project', slug:'premise'}]`. Exactly one
-  `refinement_proposals` row with `kind='blueprint'`, `scope_ref='blueprint:premise'`, already `applied` — the
-  proposal is created and applied in the same transaction, so it is never observable as `pending`. `projects.premise`
-  moves and `bible_documents project/premise` is written. **No** row is updated in place: superseding writes a new
-  row and marks the old one `superseded`, and `GET …/ledger` returns only the active set.
-  **Quality:** the writer line reads as an instruction to whoever writes the prose, not as a restatement of the
-  decision; it is what rides every later chapter pack.
-- **Fails when:** `BPR_005` (an option id the round never offered), `BPR_004` (the selection fails the step schema),
-  `BPR_007` (a lock addressed to a pass rather than one of its screens), `BPR_010` (a step the novel's decisions have
-  since ruled out). `followUp.ok = false` means the lock stood
-  but its after-commit work (an approval or an outline job) failed — re-locking is the retry.
-
-#### Blueprint — a large pass and its screens (Core + World)
-
-- **Entry:** the **Protagonist** screen; `POST /api/v1/projects/{projectId}/blueprint/steps/protagonist/rounds`.
-- **Preconditions:** the Idea and Heart phases complete — `promise` in particular, because its drivers decide which
-  slices apply at all.
-- **Run:** 1. Request a round on `protagonist`. 2. Let it finish, then request one on `world`. 3. Lock each screen.
-- **Verify:** a round requested on a sourced screen runs on the **pass** (`engine`) with `focus` set to that screen
-  key, and the screen's `latestRound` is the pass round narrowed to its slice. The other three slices must come back
-  byte-identical — the runner deep-compares and fails the round if another slice moved. The four slices are
-  `protagonist`, `opposition`, `world`, `power`; `opposition` is skipped entirely for a slice-of-life promise and
-  `power` only appears when `progression` is one of the drivers, so check `status.blueprint` marks them
-  `applies: false` rather than rendering them. Locking `world` writes **two** decisions (`world.cost` and
-  `world.rules`) and mints one `canon_facts` row per rule plus one for the cost rule, each scheduled
-  `reveal_chapter = 1` — open canon, which is what makes them visible to the drafter.
-  **Quality:** re-running the whole pass after a screen is locked flags that screen with `sliceMoved: true`, and the
-  UI offers **Use the new version** rather than silently replacing the locked answer.
-- **Fails when:** a whole-pass round is running and you lock a sibling screen (`BPR_002`) — a round focused on a
-  *different* screen is allowed to run beside a lock. `AI_001` when the merged pass output is empty.
-
-#### Blueprint — the gate into the Workspace
-
-- **Entry:** the gate summary screen; `GET` then `POST /api/v1/projects/{projectId}/blueprint/gate`.
-- **Preconditions:** every **required** step locked. Five steps are optional and never block the gate: `start`,
-  `taste`, `concepts`, `title` and `voice`.
-- **Run:** 1. `GET …/gate` for readiness. 2. `POST …/gate` to open the Workspace.
-- **Verify:** `GET` reports unfinished required steps plus non-blocking warnings — `arc_stale`, `arc_brief_range`,
-  `brief_stale`, `check_outdated` (a decision was superseded or withdrawn after the final check ran). `POST` writes a
-  single ledger entry: kind `system`, `phase` null, topic `gate`, `decidedBy: system`. A partial unique index holds
-  one active gate per project, and the entry can never be superseded or withdrawn (`LDG_005`). Afterwards
-  `status.blueprint.stage` reads `workspace`, the project home route becomes Overview, and the Blueprint stays
-  reachable read-only from the Workspace sidebar.
-  **Quality:** the summary states all seven phases and the final check's counts (passed / fixed / left as they are /
-  open) from the `check` decision's payload; "0 open findings" is `payload.open`.
-- **Fails when:** `BPR_009` names the **phases** still unfinished (never step keys). Nothing re-runs the final check
-  after a later revisit — the gate only reports `check_outdated`.
 
 #### Premise enhancement (refine)
 
@@ -816,7 +711,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
   has zero entities); `POST /api/v1/projects/{projectId}/seed-from-brief`.
 - **Preconditions:** none on the project. The API reads the brief from
   the **body only** and never touches `projects.brief`; the web button is what requires a non-empty `projects.brief`,
-  and neither project creation nor a Blueprint lock writes it — set it in **Project Settings → “Premise / brief”**
+  and project creation does not write it — set it in **Project Settings → “Premise / brief”**
   first (see Findings).
 - **Input:** `{"brief": "<the sample spark, plus: open-ended serial, single POV (Tin), low-fantasy river city>", "force": false}`
   (`brief` is required and unbounded; `force` is optional and defaults to false.)
@@ -838,7 +733,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
   `project/cast` must name a protagonist, an antagonist and the relationships that generate conflict — a cast document
   with no antagonist is the classic weak output here.
 - **Fails when:** repeated `model_calls` rows with `attempt=1` on one stage — the coverage floor was missed and the
-  reply was retried; a stage silently skipped because a Blueprint lock already wrote its document (`project/premise`,
+  reply was retried; a stage silently skipped because its document already had a body (`project/premise`,
   `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`; an HTTP timeout at the
   gateway while the run keeps going server-side (check `workflow_runs`, not the response).
 - **Cost:** 7 model calls (fewer if stages skip) + embeddings for `indexLore`; minutes of wall clock.
@@ -903,8 +798,7 @@ Working title to reach for in the Title step: **The Bell Debt**.
   a baseline moved, `superseded`, `reverted` and `discarded`). The domain write and the status change are one
   transaction with a baseline conflict check —
   audit / premise / arc-plan / chat output must **never** appear in `bible_documents`, `entities` or `canon_facts`
-  without a corresponding applied proposal — a Blueprint lock is no exception: it creates and applies its own
-  `kind='blueprint'` proposal inside the lock transaction. `bible_documents.revision` and `content_hash` move on every upsert that changes the body — an upsert
+  without a corresponding applied proposal. `bible_documents.revision` and `content_hash` move on every upsert that changes the body — an upsert
   whose `content_hash` is unchanged is a no-op and leaves the revision alone. Direct author edits stay available:
   `PUT /api/v1/projects/{projectId}/bible/{section}/{slug}`, `PATCH …/entities/{entityKey}`,
   `PUT …/facts/{factKey}` (+ `POST …/facts/{factKey}/reveal`).
@@ -922,64 +816,27 @@ Run this whole sequence once against the sample idea; keep the outputs and diff 
 
 **Stage 0 — create the novel.** `POST /api/v1/projects` with
 `{"name": "Untitled novel", "kind": "new_novel", "contentMode": "standard"}` (responds `201`).
-☐ `projectId` returned ☐ `GET …/status` reports `blueprint.stage = 'blueprint'` and 7 phases ☐ `GET …/blueprint`
-lists the step registry with only `start` reachable.
+☐ `projectId` returned ☐ `GET …/status` answers with zero chapters, drafts and volumes.
 
-**Stage 1 — the Idea phase.** Round and lock `start`, `taste`, `concepts` and `premise` through
-`POST …/blueprint/steps/{step}/rounds` and `POST …/blueprint/steps/{step}/lock`. Feed the sample spark to `start`.
-Suggested answers, one per step: taste = _craft over spectacle; a city that remembers; consequences that compound_;
-concepts = keep the bell-memory card, kill anything that turns the debt into a romance (give the reason — it becomes a
-standing "do not propose"); premise = the sample spark reduced to one sentence, writer line _every bell she rings
-costs her a year she cannot name_.
-☐ `start` and `taste` write only `direction` / `rejected` entries (they are optional steps; an optional step is done
-only when a **lock** wrote an entry on its completion topic) ☐ `concepts` offers exactly 4 cards and a killed card
-never comes back ☐ `premise` writes one active `decision` on topic `premise` with a non-empty `writerLine`, plus
-`project/premise` ☐ each round's `context_packs` row opens with the `ledger` section and carries at most 4 messages
-of `step_thread`.
-
-**Stage 2 — the Heart phase.** Lock `heart` (theme + ending question), `promise` (drivers, length, tone) and,
-optionally, `title`.
-☐ `heart` writes two decisions (`theme`, `ending`) and merges `## Theme` / `## The ending question` into
-`project/premise` rather than rebuilding it ☐ `promise` writes `payload.drivers` — these are what decide which later
-steps apply at all ☐ `POST …/blueprint/title/checks` with ≤8 titles runs **no** model call and reports the
-published-titles check as `unknown` (there is no web search in this deployment) — it must never render as a pass.
-
-**Stage 3 — the engine pass (Core + World).** Round and lock `protagonist`, `opposition`, `world`, `power`.
-☐ every round runs on the `engine` pass with `focus` set to the screen, and the other slices come back untouched
-☐ `opposition` is absent for a slice-of-life promise and `power` only appears when `progression` is a driver
-☐ locking materialises `entities` (character/faction/concept/power_rule) **and** the bible pages, and every
-`canon_facts` row it mints carries `reveal_chapter = 1` — open canon the drafter is held to.
-
-**Stage 4 — the shape and the opening.** Lock `spine`, then `cast`, `places`, `arcs`, then `briefs`, `voice`, `check`.
-☐ `spine` writes the movements as volumes and pins the reveal schedule ☐ `arcs` approves volume one's arcs
-☐ `briefs` writes arc one's chapter briefs, flagged hand-edited so the Workspace's mid-arc reconciliation leaves them
-alone, and a chapter that lands a pinned reveal carries a `knowledgeContract.learns` naming it ☐ `check` runs all
-three slices (`rules`, `cast`, `shape`) before it will lock, and refuses otherwise
-☐ `POST …/blueprint/gate` writes the single `system` / `gate` ledger entry and `status.blueprint.stage` flips to
-`workspace`.
-
-**Stage 4b — give the project a brief.** `PATCH /api/v1/projects/{projectId}` with
-`{"brief": "<the sample spark plus the locked shape: open-ended, single POV, low fantasy>"}` (or Settings → “Premise /
-brief”). Nothing in the Blueprint writes `projects.brief`; the bible builder's **UI button** is what needs it, so this
-stage is required to test the screen and optional if you only drive `POST …/seed-from-brief` directly.
+**Stage 1 — give the project a brief.** `PATCH /api/v1/projects/{projectId}` with
+`{"brief": "<the sample spark plus: open-ended, single POV, low fantasy>"}` (or Settings → “Premise / brief”). The
+bible builder's **UI button** is what needs it, so this stage is required to test the screen and optional if you only
+drive `POST …/seed-from-brief` directly.
 ☐ `projects.brief` non-empty ☐ the Story Bible empty state now offers **Generate story bible** instead of **Add a
 brief in Settings**.
 
 **Stage 5 — readiness.** `GET …/bible/readiness`.
-☐ read it once after the Idea phase and once after the gate, and keep both — the delta is what the Blueprint is worth
+☐ read it once before the bible is built and keep it — the delta to Stage 7 is what the builder is worth
 ☐ `substance` judges only the roles a manifest document serves, against its word floor
 ☐ `readyToDraft` reads coverage + records only ☐ `blockingGaps` names each missing manifest chapter and each unmet
 entity floor.
-**Expect `substance: thin` straight after the gate, and do not treat it as a defect.** `project/reader-promise`
+**Expect `substance: thin` while the bible is still a pitch, and do not treat it as a defect.** `project/reader-promise`
 matches no manifest role, so it is only checked for placeholder text and counts for nothing; `project/premise` is the
-`foundation` role and the Blueprint writes it as a pitch, comfortably under that role's 100-word floor
-(`ROLE_WORD_FLOOR`, `eval/bible-readiness.ts`) — so a fully designed novel still reads thin. It is non-blocking:
-`readyToDraft` is coverage + records only.
+`foundation` role and is judged against that role's 100-word floor (`ROLE_WORD_FLOOR`, `eval/bible-readiness.ts`). It
+is non-blocking: `readyToDraft` is coverage + records only.
 
-**Stage 6 — build the bible (the other path).** `POST …/seed-from-brief` with the brief, `force: false`. A project
-the Blueprint designed already carries `project/premise`, `project/cast`, `world/setting-overview` and
-`power/system-and-limits`, so those stages **skip** — run this stage on a second `new_novel` project created without
-the Blueprint if you want to compare the builder against it.
+**Stage 6 — build the bible.** `POST …/seed-from-brief` with the brief, `force: false`. A stage whose document
+already has a body **skips**, so run it on a fresh project to see every stage.
 ☐ `node_trace` has all 8 nodes ☐ a stage whose document already had a body reports `counts[stage] = 0` and still
 appears in `stagesDone` ☐ all 7 manifest addresses present ☐ entity floors met (≥3 location/concept,
 ≥4 power_rule/concept, ≥4 faction/location, ≥3 character) ☐ character cards each have want + cost + a voice tic
@@ -1006,18 +863,14 @@ volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
 ### Findings — code vs product doc, and seams worth reporting
 
 1. **Nothing writes `projects.brief`, and the bible builder's UI button reads only that.**
-   Neither project creation nor a Blueprint lock sets `brief`;
+   Project creation does not set `brief`;
    `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx` refuses to run without one
-   (`'Add a project brief in Settings before generating the bible.'`), so the path Blueprint → bible builder has a
-   manual copy-paste step in the middle. The API itself takes the brief in the request body and never reads
-   `projects.brief`, so this is a UI-path gap only.
-2. **The Blueprint's own output barely reaches the bible builder.**
+   (`'Add a project brief in Settings before generating the bible.'`). The API itself takes the brief in the
+   request body and never reads `projects.brief`, so this is a UI-path gap only.
+2. **The bible builder reads no decision ledger.**
    `apps/novel-forge-server/src/modules/ai/graphs/bible-builder.graph.ts` templates take `projectBrief` plus
-   previously written stage bodies only — it links **no context pack**, and never reads the decision ledger, the
-   Blueprint's canon facts, or `project/reader-promise`. The one channel is indirect: because a Blueprint lock
-   already wrote `project/premise`, the `foundation` stage is skipped and the locked premise is what every later
-   stage receives as `{foundation}`. The Blueprint materialises most of the bible itself, so the builder is now the
-   path for a project that was never designed — not a follow-on stage.
+   previously written stage bodies only — it links **no context pack**, and never reads the decision ledger, canon
+   facts, or `project/reader-promise`.
 3. **`POST /api/v1/projects/{projectId}/premise/enhance` is unreachable from the web app.** Only
    `apps/novel-forge-web/src/lib/apis/api-types.gen.ts:1618` mentions it; no hook or component calls it (contrast
    `bible/audit` → `apps/novel-forge-web/src/lib/apis/refinement.api.ts:695` →
@@ -1043,7 +896,7 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 - A project (`POST /projects` → `{name, kind:"new_novel"}`).
 - A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
-  Blueprint materialised, or what the bible builder wrote.
+  bible builder wrote or you added by hand.
   Check with `GET /projects/:projectId/bible/readiness` → `readyToDraft: true`, and the **Story Bible** screen.
 - Admin scope (`novel-forge:admin`) for `GET /runs/:runId`, `/runs/:runId/context`, `/runs/:runId/calls/:callId`
   and the **Workflow Runs** screen — these are `@RequirePermission(ADMIN_PERMISSION, {highRisk:true})`
@@ -1054,8 +907,8 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 
 ### Sample material
 
-These recipes continue whichever project you designed — normally _The Bell Debt_, the sample idea
-Part 2 (Blueprint to lore bible) tells you to reuse verbatim. If you instead want a standalone project for this
+These recipes continue whichever project you built — normally the sample idea
+Part 2 (lore bible) tells you to reuse verbatim. If you instead want a standalone project for this
 doc alone, seed it with:
 
 > **The Tidewright's Ledger.** In Calder Quay, debt is paid in remembered years: a tidewright can lift a
@@ -1532,7 +1385,7 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
   (b) _Judge asymmetry_: the judge's human message carries a `## FORBIDDEN KNOWLEDGE`
   block with the full text and returns `knowledgeCompliance`. It still filters out `source='seed'` facts, but
   nothing writes that source any more — open canon is carried by `revealChapter <= OPEN_FROM_CHAPTER`
-  (`common/open-canon.ts`), which is what keeps a Blueprint-minted world rule out of the hidden set in the first
+  (`common/open-canon.ts`), which is what keeps an open world rule out of the hidden set in the first
   place. (c) _Deterministic pre-scan_:
   `scanKnowledgeLeaks` word-boundary-matches each `terms[]` entry (≥3 chars, case-insensitive) and **forces**
   non-compliance regardless of what the model said (`mergeKnowledgeCompliance`). Expect a soft finding
@@ -2068,7 +1921,7 @@ export default function createPlugin() {
 
 #### 4.1 Settings, precedence and routing
 
-- **Entry:** UI Settings (`/settings`, "Your defaults for every project you own"; rows Writing / Planning & canon / Review & QA / Refinement chat / Blueprint / Fast helpers / Illustrations; "Save changes"; alert "Unrestricted projects"). API `GET /ai/models`, `GET|PUT /ai/settings`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
+- **Entry:** UI Settings (`/settings`, "Your defaults for every project you own"; rows Writing / Planning & canon / Review & QA / Refinement chat / Fast helpers / Illustrations; "Save changes"; alert "Unrestricted projects"). API `GET /ai/models`, `GET|PUT /ai/settings`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
 - **Input:** `PUT /ai/settings {"models":{"chat":{"provider":"openrouter","model":"anthropic/claude-haiku-4.5"},"helper":{"provider":"openrouter","model":"openai/gpt-5.4-mini"}}}`.
 - **Run:**
   1. `GET /ai/models` → note `profile:'production'`, `defaults` per group and prices.

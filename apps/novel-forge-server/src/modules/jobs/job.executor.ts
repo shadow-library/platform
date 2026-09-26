@@ -8,7 +8,6 @@ import { type Job, type PrimaryDatabase, schema } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
-import { BlueprintRoundRunner } from '../blueprint/engine/blueprint-round.runner';
 import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
@@ -31,7 +30,7 @@ interface ImportPayload {
 }
 
 // A cancel request only lands in the job row, so the executor polls for it while a step is in flight.
-// Without the poll a single-run phase (a Blueprint round, one chapter's generation) would keep spending for the
+// Without the poll a single-run phase (one chapter's generation) would keep spending for the
 // whole of a model call after the author hit stop; the boundary checks alone only catch it between steps.
 const CANCEL_POLL_MS = 1000;
 
@@ -49,7 +48,6 @@ export class JobExecutor {
     private readonly databaseService: DatabaseService,
     private readonly publishRunner: PublishRunner,
     private readonly storage: StorageService,
-    private readonly blueprintRoundRunner: BlueprintRoundRunner,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -166,8 +164,6 @@ export class JobExecutor {
         return this.runPublish(job);
       case 'import':
         return this.runImport(job);
-      case 'blueprint':
-        return this.runBlueprint(job);
       default:
         throw AppError.internal(`Unsupported job kind: ${job.kind}`);
     }
@@ -198,12 +194,6 @@ export class JobExecutor {
         return;
       }
     }
-  }
-
-  private async runBlueprint(job: Job.Row): Promise<void> {
-    await this.jobService.progress(job.id, { done: 0, total: 1, current: job.target, phase: 'blueprint', startedAt: new Date().toISOString() });
-    await this.blueprintRoundRunner.run(job);
-    await this.jobService.progress(job.id, { done: 1, total: 1, current: job.target, phase: 'blueprint' });
   }
 
   private async runBackfill(job: Job.Row): Promise<void> {

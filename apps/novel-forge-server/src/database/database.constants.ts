@@ -8,15 +8,12 @@ export const constraintErrorMap: Record<string, AppError> = {
   // Two turns racing on one conversation compute the same next ordinal and the loser hits this unique
   // index; it is a lost race, not a broken request.
   chat_messages_session_id_ordinal_unique: AppErrorCode.CHT_006.create(),
-  // A Blueprint lock mints keyed facts and the fact endpoints let the author write any key they like — a
-  // collision is a conflict the caller can resolve, never a 500 that aborts the lock.
+  // The fact endpoints let the author write any key they like — a collision is a conflict the caller can
+  // resolve, never a 500 that aborts the write around it.
   canon_facts_project_id_fact_key_unique: AppErrorCode.FCT_004.create(),
   // Two projects whose titles slugify identically race for one reader URL; PublishingService walks a
   // suffix ladder off this error, so it is a retry signal there as much as a response here.
   publications_novel_slug_unique: AppErrorCode.PUB_007.create(),
   // Two supersessions of one entry that both read it as active; the row lock makes the loser see it superseded, and this is the backstop.
   decision_ledger_entries_supersedes_id_unique: AppErrorCode.LDG_002.create(),
-  // Two round requests for one step that both found no active round; the loser is told a round is already running.
-  blueprint_rounds_one_active_per_step_idx: AppErrorCode.BPR_002.create(),
-  blueprint_rounds_project_id_step_key_round_unique: AppErrorCode.BPR_002.create(),
 };

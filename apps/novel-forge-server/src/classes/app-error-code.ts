@@ -220,26 +220,14 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly LDG_001 = AppErrorCode.notFound('LDG_001', 'Ledger entry not found');
   static readonly LDG_002 = AppErrorCode.conflict('LDG_002', 'Ledger entry is already superseded or withdrawn — change the active entry on its topic instead');
-  static readonly LDG_003 = AppErrorCode.badRequest(
-    'LDG_003',
-    'Only a decision or a system detail can be rewritten as a decision — other decisions come from locking a Blueprint step',
-  );
+  static readonly LDG_003 = AppErrorCode.badRequest('LDG_003', 'Only a decision or a system detail can be rewritten as a decision');
   static readonly LDG_004 = AppErrorCode.badRequest('LDG_004', 'Ledger topic "{topic}" is not a key of lowercase words joined by dots, dashes or underscores');
-  static readonly LDG_005 = AppErrorCode.conflict('LDG_005', 'The gate records that the Workspace was opened — it cannot be superseded or withdrawn');
 
   /*!
-   * Blueprint Errors
+   * Notes Errors
    */
-  static readonly BPR_001 = AppErrorCode.notFound('BPR_001', 'Blueprint step "{step}" does not exist');
-  static readonly BPR_002 = AppErrorCode.conflict('BPR_002', 'A round is already running for this step — wait for it to finish or cancel it');
-  static readonly BPR_003 = AppErrorCode.badRequest('BPR_003', 'The Blueprint designs original novels only');
-  static readonly BPR_004 = AppErrorCode.badRequest('BPR_004', 'The {part} for this step is invalid: {issues}');
-  static readonly BPR_005 = AppErrorCode.badRequest('BPR_005', 'Option "{optionId}" is not one the latest round offered');
-  static readonly BPR_006 = AppErrorCode.notFound('BPR_006', 'This step has no running round to cancel');
-  static readonly BPR_007 = AppErrorCode.badRequest('BPR_007', 'Step "{step}" is a generation pass — lock the screens it feeds instead');
-  static readonly BPR_008 = AppErrorCode.badRequest('BPR_008', 'A preview paragraph was written moments ago — wait {seconds}s before asking for another', 429);
-  static readonly BPR_009 = AppErrorCode.conflict('BPR_009', 'The Blueprint is not finished — {phases} still needs deciding');
-  static readonly BPR_010 = AppErrorCode.conflict('BPR_010', 'This step does not apply to this novel as it stands');
+  static readonly NTS_001 = AppErrorCode.badRequest('NTS_001', 'What you kept from your organised notes cannot be written: {issues}');
+  static readonly NTS_002 = AppErrorCode.badRequest('NTS_002', 'Option "{optionId}" is not one the organised notes offered');
 
   /*!
    * Publishing Errors

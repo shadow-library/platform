@@ -104,8 +104,6 @@ interface ApplyContext {
   projectId: bigint;
   applied: AppliedArtifact[];
   staleMarked: string[];
-  /** A Blueprint lock is the author redrawing the plan itself, so it may retire the approved volumes and arcs its own earlier lock made. */
-  blueprintLock: boolean;
 }
 
 type TxResult =
@@ -240,7 +238,7 @@ export class ProposalApplyService {
         return { outcome: 'conflicted', proposal: conflicted ?? proposal };
       }
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [], blueprintLock: proposal.kind === 'blueprint' };
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
       const inverseOps: ContentOp[] = [];
       for (const { op } of contentOps) {
         const inverse = await this.captureInverse(ctx, op);
@@ -415,7 +413,6 @@ export class ProposalApplyService {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
     if (!project) return null;
     const inverse: PremiseUpdateOp = { op: 'premise.update' };
-    if (op.title !== undefined) inverse.title = project.title ?? '';
     if (op.premise !== undefined) inverse.premise = project.premise ?? '';
     if (op.brief !== undefined) inverse.brief = project.brief ?? '';
     if (op.themes !== undefined) inverse.themes = (project.themes as string[] | null) ?? [];
@@ -585,7 +582,6 @@ export class ProposalApplyService {
 
   private async applyPremiseUpdate(ctx: ApplyContext, op: PremiseUpdateOp): Promise<void> {
     const update: Record<string, unknown> = { updatedAt: new Date() };
-    if (op.title !== undefined) update['title'] = op.title.trim() || null;
     if (op.premise !== undefined) update['premise'] = op.premise;
     if (op.brief !== undefined) update['brief'] = op.brief;
     if (op.themes !== undefined) update['themes'] = op.themes;
@@ -798,7 +794,7 @@ export class ProposalApplyService {
   private async applyVolumeRemove(ctx: ApplyContext, op: VolumeRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
     if (!existing) throw AppErrorCode.VOL_001.create();
-    if (existing.status !== 'draft' && !ctx.blueprintLock) throw AppErrorCode.RFN_004.create();
+    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.volumes).where(eq(schema.volumes.id, existing.id));
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: null });
@@ -807,7 +803,7 @@ export class ProposalApplyService {
   private async applyArcRemove(ctx: ApplyContext, op: ArcRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
     if (!existing) throw AppErrorCode.ARC_001.create();
-    if (existing.status !== 'draft' && !ctx.blueprintLock) throw AppErrorCode.RFN_004.create();
+    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.arcs).where(eq(schema.arcs.id, existing.id));
     ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: null });
@@ -1038,7 +1034,7 @@ export class ProposalApplyService {
       }
       if (mismatches.length > 0) return { outcome: 'conflicted' as const, mismatches };
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [], blueprintLock: proposal.kind === 'blueprint' };
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
       for (const op of inverseOps) await this.applyOp(ctx, op);
 
       const [reverted] = await tx

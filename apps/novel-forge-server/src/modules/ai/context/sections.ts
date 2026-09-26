@@ -1,5 +1,5 @@
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'illustration' | 'blueprint';
+export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'illustration';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -76,8 +76,6 @@ const SECTION_LABELS: Record<string, string> = {
   author_brief: "## THE AUTHOR'S OWN WORDS",
   organised_timeline: "## THE AUTHOR'S ORGANISED TIMELINE",
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
-  step_thread: '## THIS STEP SO FAR',
-  round_input: '## THE AUTHOR, THIS ROUND',
 };
 
 export const CORE_SECTION_KEYS: ReadonlySet<string> = new Set(Object.keys(SECTION_LABELS));

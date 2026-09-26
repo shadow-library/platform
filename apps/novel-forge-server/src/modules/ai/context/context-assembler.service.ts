@@ -23,17 +23,16 @@ import {
   scrubPlanForWriter,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
-import { loadActiveLedger } from '../../blueprint/ledger/ledger-entries';
+import { loadActiveLedger } from '../../ledger/ledger-entries';
+import { writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { type BibleDocRow, cutToTokens, isPlannerOnlyBibleDoc, renderBibleDigest } from './bible-docs';
-import { BLUEPRINT_BUDGET, blueprintBudget, type BlueprintPackParts, blueprintSections, ORGANISED_TIMELINE_SECTION } from './blueprint-sections';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { computeDormantThreads, renderDormantThreads } from './dormant-threads';
-import { type LedgerContextEntry, ledgerSection, writerLinesSection } from './ledger-sections';
-import { organisedTimelineText } from './organised-timeline';
+import { ORGANISED_TIMELINE_SECTION, organisedTimelineText } from './organised-timeline';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -400,15 +399,6 @@ export class ContextAssembler {
   /** The active ledger, for a planner that reads the Story Bible outside a pack. */
   activeLedger(projectId: bigint): Promise<Ledger.Entry[]> {
     return loadActiveLedger(this.db, projectId);
-  }
-
-  async activeLedgerSection(projectId: bigint, segment?: ContextSegment): Promise<ContextSection> {
-    return ledgerSection(await loadActiveLedger(this.db, projectId), segment);
-  }
-
-  forBlueprint(projectId: bigint, ledger: LedgerContextEntry[], parts: BlueprintPackParts, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const sections = blueprintSections(ledger, parts);
-    return this.finalize(projectId, 'blueprint', null, sections, [], blueprintBudget(sections, opts?.budgetTokens ?? BLUEPRINT_BUDGET), opts);
   }
 
   catalog(projectId: bigint, options?: CatalogOptions): Promise<string> {

@@ -58,16 +58,7 @@ describe('ProposalApplyService.apply inside a caller transaction', () => {
     expect(result.applied).toEqual([{ artifactRef: 'premise', newRevision: null }]);
   });
 
-  it('should let a Blueprint lock retire an approved volume its own earlier lock made', async () => {
-    const { service, tx, deleted } = await fakeTransaction([{ op: 'volume.remove', volumeKey: 'volume_4' }], { kind: 'blueprint', volumes: [approvedVolume] });
-
-    const result = await service.apply(7n, 300n, { tx: tx as never });
-
-    expect(result.proposal.status).toBe('applied');
-    expect(deleted).toHaveLength(1);
-  });
-
-  it('should still refuse every other scope the approved volume', async () => {
+  it('should refuse to remove an approved volume', async () => {
     const { service, tx, deleted } = await fakeTransaction([{ op: 'volume.remove', volumeKey: 'volume_4' }], { kind: 'chat', volumes: [approvedVolume] });
 
     await expect(service.apply(7n, 300n, { tx: tx as never })).rejects.toMatchObject({ code: 'RFN_004' });

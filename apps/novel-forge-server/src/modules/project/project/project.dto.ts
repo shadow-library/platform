@@ -5,8 +5,6 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { ContentMode, OwnerKind, ProjectKind, SortByTime } from '@server/common';
 import { type Owner, type Project } from '@server/database';
 
-import { BlueprintProgressResponse } from '../../blueprint/stage/blueprint-stage.dto';
-
 // Floor keeps a chapter well above what the mechanical check would hard-reject on its own slack (see
 // `WORD_COUNT_HARD_SLACK` in `mechanical-check.ts`); ceiling is a sanity bound, not a model capability limit.
 export const WORD_TARGET_FLOOR = 500;
@@ -290,9 +288,6 @@ export class ProjectStatusResponse {
 
   @Field(() => Integer, { optional: true })
   volumesTotal?: number;
-
-  @Field(() => BlueprintProgressResponse, { optional: true, nullable: true, description: 'The Blueprint stage and phases; null for every kind but an original novel.' })
-  blueprint?: BlueprintProgressResponse | null;
 }
 
 @Schema()

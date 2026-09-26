@@ -11,9 +11,9 @@
 
 - **Every project is the author's own novel** (`kind` is always `new_novel`). A finished manuscript arrives through novel import and lands as locked, human-authored
   chapters. `contentMode` (standard or unrestricted) selects the permissive writer-class baseline.
-- **Blueprint and Workspace** (`blueprint.md`): a new novel is a project from the first click. It opens in the Blueprint, a guided top-down design flow whose decisions live in
-  an append-only decision ledger and materialise as ordinary pages, entities, facts, volumes, arcs and briefs; a gate switches the same project into the Workspace, where
-  chapters are written. The stage is computed from data, never stored. Imports land in the Workspace.
+- **Decision ledger (the Notebook)**: the author's decisions, directions, rejected ideas and backlog, append-only. An entry is superseded (a successor on the same topic)
+  or withdrawn (with the author's reason), never edited in place; only the active set is read. A decision's writer line reaches the chapter writer, scrubbed of hidden
+  facts; rejected ideas and the alternatives a decision passed over are the do-not-propose list.
 - **Volume -> arc -> chapter brief.** Approval derives chapter ranges from volume target counts. Arcs partition a volume exactly and are optional. A brief carries context refs,
   an ending contract, an optional knowledge contract, and a write mode (`standard` or `external`).
 - **Draft vs chapter.** A draft is working prose with a human review loop; finalizing writes a locked chapter and advances the story cursor.
@@ -29,7 +29,7 @@
 
 ## Capabilities
 
-- Blueprint design (idea to arc one briefs), bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
+- Bible building, audit and tidy-up (pattern-only: empty placeholders, slug titles, multi-entity pages, notes for the AI; applied as one revertible proposal), volume/arc/brief planning; chapter generation with judge and repair, revision, review, approval, finalize, amend, insert, unrestricted fill.
 - Chat hub (manual or auto), change history with revert, illustrations, export (a `.novel` zip), validation, plan/novel import, per-novel plugins, per-account AI quota.
 - Publishing (scheduling, access control, reconcile, spoiler-gated wiki).
 
@@ -61,8 +61,6 @@
   approved or final chapter that claims it, and moves there when a later claim is revoked.
 - **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted). Arcs are re-outlined periodically, protecting hand-edited, drafted and finalized briefs.
-- **Blueprint** (`blueprint.md`): each step runs rounds of options as jobs; locking a step appends decisions to the ledger and materialises their content through change-set
-  ops applied as the author's action, with change history and revert. Every step sees the active ledger plus the step's last four messages, never full history.
 - **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
 - **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
   scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
@@ -115,9 +113,9 @@
   stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone. A chapter-scoped `fact:` ref obeys the same gate (plus
   the brief's `mustNotResolve`), and outliner-written `fact:` refs are stripped before a brief is stored. Two Story Bible addresses are reserved and planner-only, whoever
   writes to them: the organised timeline (`project/timeline`) and the open questions (`project/open-questions`) say what happens later in the book, and no scheduled canon
-  fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, the lore index and the voice step's cited pages, never resolve
-  into a writer pack whatever ref names them, and are dropped from outlined refs. They are read by the Blueprint's planning passes, the Workspace volume and arc planners
-  and the final check; the chat hub may read them too, but only with review — the hub's inventory lists them by address alone, and a turn that looks one up never
+  fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, and the lore index, never resolve
+  into a writer pack whatever ref names them, and are dropped from outlined refs. They are read by the volume and arc planners;
+  the chat hub may read them too, but only with review — the hub's inventory lists them by address alone, and a turn that looks one up never
   auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
   Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
   chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.

@@ -56,13 +56,10 @@ function supersessionOwner(input: CreateProposalInput): SQL | undefined {
   return and(eq(schema.refinementProposals.kind, 'plugin'), eq(schema.refinementProposals.scopeType, input.scopeType), eq(schema.refinementProposals.scopeRef, input.scopeRef));
 }
 
-/**
- * A plugin-kind proposal carries the plugin allowlist by virtue of its kind, so a hand-edit cannot widen it either — and a
- * blueprint-kind one carries the permission to write the fields a Blueprint lock owns, which no model-authored scope can claim.
- */
+/** A plugin-kind proposal carries the plugin allowlist by virtue of its kind, so a hand-edit cannot widen it either. */
 function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
   if (kind === 'plugin') return validatePluginChangeSet(changeSet);
-  return validateChangeSet(changeSet, allowedOps, { ...options, blueprintLock: kind === 'blueprint' });
+  return validateChangeSet(changeSet, allowedOps, options);
 }
 
 /**

@@ -33,23 +33,9 @@ export type PromptKey =
   | 'chat-title'
   | 'arc-plan'
   | 'chapter-extract'
-  | 'blueprint-briefs'
-  | 'blueprint-voice'
-  | 'blueprint-check'
   | 'illustration-compose'
   | 'appearance-describe'
-  | 'blueprint-start'
-  | 'blueprint-organise'
-  | 'blueprint-taste'
-  | 'blueprint-concepts'
-  | 'blueprint-premise'
-  | 'blueprint-premise-preview'
-  | 'blueprint-heart'
-  | 'blueprint-promise'
-  | 'blueprint-title'
-  | 'blueprint-engine'
-  | 'blueprint-spine'
-  | 'blueprint-volume-one';
+  | 'notes-organise';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

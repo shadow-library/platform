@@ -18,7 +18,6 @@ export interface AccountModelDefaultsData {
   chat?: AccountModelRefData;
   helper?: AccountModelRefData;
   image?: AccountModelRefData;
-  ideation?: AccountModelRefData;
 }
 
 export namespace AccountSettings {

@@ -3,8 +3,8 @@ import { describe, expect, it, mock } from 'bun:test';
 import { type BaseMessage } from '@langchain/core/messages';
 
 import { ModelRouterService } from '@modules/ai/model-router.service';
-import { blueprintTastePrompt } from '@modules/ai/prompts/blueprint-taste.prompt';
-import { BlueprintTasteSchema } from '@modules/ai/schemas/blueprint-taste.schema';
+import { notesOrganisePrompt } from '@modules/ai/prompts/notes-organise.prompt';
+import { NotesOrganiseSchema } from '@modules/ai/schemas/notes-organise.schema';
 import { toHostedPromptSchema } from '@modules/ai/schemas/validate';
 
 function stubDatabaseService(): never {
@@ -22,19 +22,19 @@ function propertyAt(schema: Record<string, unknown>, path: string[]): Record<str
 }
 
 describe('toHostedPromptSchema', () => {
-  const hosted = toHostedPromptSchema(BlueprintTasteSchema);
+  const hosted = toHostedPromptSchema(NotesOrganiseSchema);
   const serialized = JSON.stringify(hosted);
 
   it('should retain the field descriptions a hosted model is steered by', () => {
-    expect(serialized).toContain('never repeat a pair the author has already been asked');
-    expect(serialized).toContain('never a genre word or a craft term');
-    expect(serialized).toContain('two to four words naming the taste this side stands for');
+    expect(serialized).toContain('the story as the notes place it in time, in story order');
+    expect(serialized).toContain('a hard constraint the notes state that holds from chapter one; never a secret');
+    expect(serialized).toContain('the heading of the section on that page it would go under');
   });
 
   it('should retain the value constraints AJV judges the reply against', () => {
-    const pair = propertyAt(hosted, ['pairs'])['items'] as Record<string, unknown>;
-    expect(propertyAt(hosted, ['pairs'])).toMatchObject({ minItems: 1 });
-    expect(propertyAt(pair, ['a', 'label'])).toMatchObject({ minLength: 1 });
+    const page = propertyAt(hosted, ['pages'])['items'] as Record<string, unknown>;
+    expect(propertyAt(page, ['sections'])).toMatchObject({ minItems: 1 });
+    expect(propertyAt(page, ['title'])).toMatchObject({ minLength: 1 });
   });
 
   it('should omit the keywords the AJV pass never enforces', () => {
@@ -51,19 +51,27 @@ describe('toHostedPromptSchema', () => {
 
 describe('ModelRouterService.buildMessages', () => {
   it('should show a hosted provider the descriptions and constraints it will be judged against', async () => {
-    const side = { text: 'the heir walks away from the throne room', label: 'quiet refusal' };
     const invoke = mock<(messages: BaseMessage[]) => Promise<{ content: string }>>(async () => ({
-      content: JSON.stringify({ pairs: [{ a: side, b: side }], giveUpReasons: [], coachMessage: 'ok' }),
+      content: JSON.stringify({
+        reading: 'A courier learns who owns the letters.',
+        timeline: [],
+        pages: [],
+        records: [],
+        rules: [],
+        questions: [],
+        suggestions: [],
+        coachMessage: 'ok',
+      }),
     }));
     const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService(), { defaultsFor: async () => undefined } as never);
     (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke });
 
-    const prompt = { ...blueprintTastePrompt, template: { formatMessages: async () => [] } as never, postValidate: undefined };
-    await router.structured(prompt, {}, { projectId: BigInt(1), promptKey: 'blueprint-taste', promptVersion: blueprintTastePrompt.version, role: 'blueprint' });
+    const prompt = { ...notesOrganisePrompt, template: { formatMessages: async () => [] } as never, postValidate: undefined };
+    await router.structured(prompt, {}, { projectId: BigInt(1), promptKey: 'notes-organise', promptVersion: notesOrganisePrompt.version, role: 'bible' });
 
     const schemaMessage = String(invoke.mock.calls[0]?.[0]?.at(-1)?.content);
     expect(schemaMessage).toContain('JSON schema');
-    expect(schemaMessage).toContain('never repeat a pair the author has already been asked');
+    expect(schemaMessage).toContain('the story as the notes place it in time, in story order');
     expect(schemaMessage).toContain('"minItems":1');
   });
 });

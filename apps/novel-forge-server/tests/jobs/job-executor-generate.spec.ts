@@ -20,7 +20,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const publishRunner = {} as never;
   const storage = {} as never;
 
-  const executor = new JobExecutor(jobService, concurrency, workflowRunService, indexingService, databaseService, publishRunner, storage, {} as never);
+  const executor = new JobExecutor(jobService, concurrency, workflowRunService, indexingService, databaseService, publishRunner, storage);
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }
 

@@ -1,21 +1,6 @@
 import { appearanceDescribePrompt } from './appearance-describe.prompt';
 import { arcPlanPrompt } from './arc-plan.prompt';
 import { bibleAuditPrompt } from './bible-audit.prompt';
-import { blueprintBriefsPrompt } from './blueprint-briefs.prompt';
-import { blueprintCheckPrompt } from './blueprint-check.prompt';
-import { blueprintConceptsPrompt } from './blueprint-concepts.prompt';
-import { blueprintEnginePrompt } from './blueprint-engine.prompt';
-import { blueprintHeartPrompt } from './blueprint-heart.prompt';
-import { blueprintOrganisePrompt } from './blueprint-organise.prompt';
-import { blueprintPremisePrompt } from './blueprint-premise.prompt';
-import { blueprintPremisePreviewPrompt } from './blueprint-premise-preview.prompt';
-import { blueprintPromisePrompt } from './blueprint-promise.prompt';
-import { blueprintSpinePrompt } from './blueprint-spine.prompt';
-import { blueprintStartPrompt } from './blueprint-start.prompt';
-import { blueprintTastePrompt } from './blueprint-taste.prompt';
-import { blueprintTitlePrompt } from './blueprint-title.prompt';
-import { blueprintVoicePrompt } from './blueprint-voice.prompt';
-import { blueprintVolumeOnePrompt } from './blueprint-volume-one.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
@@ -36,6 +21,7 @@ import { generationPrompt } from './generation.prompt';
 import { illustrationComposePrompt } from './illustration-compose.prompt';
 import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
+import { notesOrganisePrompt } from './notes-organise.prompt';
 import { outlinePrompt } from './outline.prompt';
 import { planPrompt } from './plan.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
@@ -76,21 +62,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
   'illustration-compose': illustrationComposePrompt as PromptModule<unknown>,
   'appearance-describe': appearanceDescribePrompt as PromptModule<unknown>,
-  'blueprint-start': blueprintStartPrompt as PromptModule<unknown>,
-  'blueprint-organise': blueprintOrganisePrompt as PromptModule<unknown>,
-  'blueprint-taste': blueprintTastePrompt as PromptModule<unknown>,
-  'blueprint-concepts': blueprintConceptsPrompt as PromptModule<unknown>,
-  'blueprint-premise': blueprintPremisePrompt as PromptModule<unknown>,
-  'blueprint-premise-preview': blueprintPremisePreviewPrompt as PromptModule<unknown>,
-  'blueprint-heart': blueprintHeartPrompt as PromptModule<unknown>,
-  'blueprint-promise': blueprintPromisePrompt as PromptModule<unknown>,
-  'blueprint-title': blueprintTitlePrompt as PromptModule<unknown>,
-  'blueprint-engine': blueprintEnginePrompt as PromptModule<unknown>,
-  'blueprint-spine': blueprintSpinePrompt as PromptModule<unknown>,
-  'blueprint-volume-one': blueprintVolumeOnePrompt as PromptModule<unknown>,
-  'blueprint-briefs': blueprintBriefsPrompt as PromptModule<unknown>,
-  'blueprint-voice': blueprintVoicePrompt as PromptModule<unknown>,
-  'blueprint-check': blueprintCheckPrompt as PromptModule<unknown>,
+  'notes-organise': notesOrganisePrompt as PromptModule<unknown>,
 };
 
 export * from './types';

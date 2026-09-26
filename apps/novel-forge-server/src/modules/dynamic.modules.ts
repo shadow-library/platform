@@ -15,7 +15,6 @@ import { HttpCoreModule } from '@shadow-library/modules';
 import { AiModule } from '@modules/ai';
 import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
-import { BlueprintHttpModule, BlueprintModule } from '@modules/blueprint';
 import { BotOwnershipModule } from '@modules/bot-ownership';
 import { ChapterModule } from '@modules/chapter';
 import { EventsModule } from '@modules/events';
@@ -24,6 +23,7 @@ import { GenerationModule } from '@modules/generation';
 import { HubActionsModule } from '@modules/hub';
 import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
+import { LedgerModule } from '@modules/ledger';
 import { NovelImportModule } from '@modules/novel-import';
 import { PlanImportModule } from '@modules/plan-import';
 import { PluginProposalModule, PluginsModule } from '@modules/plugins';
@@ -57,6 +57,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     HubActionsModule,
     IllustrationModule,
     JobsModule,
+    LedgerModule,
     NovelImportModule,
     PlanImportModule,
     PluginsModule,
@@ -65,8 +66,6 @@ export const HttpRouteModule = FastifyModule.forRoot({
     PublishingHttpModule,
     RefinementModule,
     BibleModule,
-    BlueprintModule,
-    BlueprintHttpModule,
   ],
   host: Config.get('server.host'),
   port: Config.get('server.port'),

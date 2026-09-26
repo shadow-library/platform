@@ -28,7 +28,7 @@ function fakeCtx(existing: FakeFactRow | undefined, captured: { set?: Record<str
     }),
     insert: () => ({ values: async () => undefined }),
   };
-  return { tx: tx as never, projectId: 1n, applied: [] as never[], staleMarked: [] as string[], blueprintLock: false };
+  return { tx: tx as never, projectId: 1n, applied: [] as never[], staleMarked: [] as string[] };
 }
 
 const dated: FakeFactRow = { id: 1n, text: 'the vault is empty', subjects: null, constraintNote: null, writerNote: null, terms: null, revealChapter: 12 };

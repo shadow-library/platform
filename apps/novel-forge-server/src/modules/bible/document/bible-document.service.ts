@@ -43,17 +43,16 @@ export class BibleDocumentService {
     });
   }
 
-  get(projectId: bigint, section: Bible.Section, slug: string, executor: DbExecutor = this.db): Promise<Bible.Document | null> {
-    return executor.query.bibleDocuments
+  get(projectId: bigint, section: Bible.Section, slug: string): Promise<Bible.Document | null> {
+    return this.db.query.bibleDocuments
       .findFirst({
         where: and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, section), eq(schema.bibleDocuments.slug, slug)),
       })
       .then(r => r ?? null);
   }
 
-  /** `executor` lets a caller that already owns a transaction — a Blueprint lock, say — write the document inside it. */
-  async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody, executor?: DbExecutor): Promise<Bible.Document> {
-    const existing = await this.get(projectId, section, slug, executor);
+  async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody): Promise<Bible.Document> {
+    const existing = await this.get(projectId, section, slug);
     // Hashed both ways: a title folded into a document whose stored hash predates title derivation
     // must read as the same content, not as an edit — the raw hash is what that stored hash was computed from.
     const rawHash = computeBibleDocHash(body.frontmatter, body.body);
@@ -65,7 +64,7 @@ export class BibleDocumentService {
 
     if (existing && existing.contentHash === rawHash) {
       const target = and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, section), eq(schema.bibleDocuments.slug, slug));
-      const [row] = await (executor ?? this.db).update(schema.bibleDocuments).set({ frontmatter, contentHash, updatedAt: new Date() }).where(target).returning();
+      const [row] = await this.db.update(schema.bibleDocuments).set({ frontmatter, contentHash, updatedAt: new Date() }).where(target).returning();
       if (!row) throw AppError.internal('Bible document title backfill failed unexpectedly');
       return row;
     }
@@ -87,7 +86,7 @@ export class BibleDocumentService {
 
       return row;
     };
-    const doc = executor ? await write(executor) : await this.db.transaction(write);
+    const doc = await this.db.transaction(write);
 
     if (!doc) throw AppError.internal('Bible document upsert failed unexpectedly');
     return doc;
