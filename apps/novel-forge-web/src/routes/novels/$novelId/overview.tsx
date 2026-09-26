@@ -12,7 +12,6 @@ import {
   projectCostQueryOptions,
   projectStatusQueryOptions,
   type ResetBody,
-  translationJobActive,
   useCloneProjectMutation,
   useDeleteCoverMutation,
   useDraftSummaryQuery,
@@ -28,22 +27,10 @@ import {
   useResetProjectMutation,
   useReviewQueueQuery,
   useRunStop,
-  useTranslationStatusQuery,
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import {
-  blueprintStage,
-  currentBlueprintPhase,
-  LIFECYCLE_PHASES,
-  lifecyclePhase,
-  projectKindIntent,
-  projectKindLabel,
-  projectKindTag,
-  projectTitle,
-  relativeTime,
-  translationLifecycle,
-} from '@/lib/format';
+import { blueprintStage, currentBlueprintPhase, LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
 
 import styles from './overview.module.css';
@@ -282,16 +269,11 @@ function OverviewScreen(): React.JSX.Element {
   const statusQuery = useProjectStatusQuery(novelId);
   const costQuery = useProjectCostQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
-  const isTranslation = projectQuery.data?.kind === 'translation';
-  // The Next step rule engine only covers the bible → plan → draft → arc → finalize pipeline, which is
-  // shared by these two kinds; translation and curated projects keep the simpler fallback below.
-  const isAuthoring = projectQuery.data?.kind === 'new_novel' || projectQuery.data?.kind === 'source';
-  const translationQuery = useTranslationStatusQuery(novelId, isTranslation);
-  const reviewQueueQuery = useReviewQueueQuery(novelId, isAuthoring);
-  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 }, isAuthoring);
-  const briefsQuery = useListBriefsQuery(novelId, isAuthoring);
-  const volumesQuery = useListVolumesQuery(novelId, { limit: 50 }, isAuthoring);
-  const draftsQuery = useDraftSummaryQuery(novelId, isAuthoring);
+  const reviewQueueQuery = useReviewQueueQuery(novelId);
+  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 });
+  const briefsQuery = useListBriefsQuery(novelId);
+  const volumesQuery = useListVolumesQuery(novelId, { limit: 50 });
+  const draftsQuery = useDraftSummaryQuery(novelId);
   // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
   // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
   // overview visit.
@@ -313,53 +295,33 @@ function OverviewScreen(): React.JSX.Element {
   const status = statusQuery.data;
   const cost = costQuery.data;
   const runs = runsQuery.data?.items ?? [];
-  const translation = translationQuery.data;
-  const phase = isTranslation
-    ? translationLifecycle(translation && { counts: translation.counts, glossary: translation.glossary, jobActive: translationJobActive(translation) })
-    : lifecyclePhase(status, project?.kind);
-  const isSource = project?.kind === 'source';
+  const phase = lifecyclePhase(status, project?.kind);
 
   const volumesTotal = status?.volumesTotal ?? 0;
   const draftsTotal = status?.draftsTotal ?? 0;
   const draftsFinal = status?.draftsFinal ?? 0;
-  const allFinal = draftsTotal > 0 && draftsFinal === draftsTotal;
 
   // Every input the rule engine reads has to have actually arrived — otherwise an empty brief/draft
   // list reads as "nothing outlined" and briefly recommends the wrong action until the real data lands.
   const nextStepReady = !briefsQuery.isLoading && !volumesQuery.isLoading && !reviewQueueQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
-  const nextStep =
-    isAuthoring && nextStepReady
-      ? computeNextStep(
-          deriveNextStepInput({
-            blueprintStage: blueprintStage(status),
-            blueprintPhaseLabel: currentBlueprintPhase(status)?.label,
-            blueprintComplete: blueprintComplete(status?.blueprint?.phases ?? []),
-            volumesTotal,
-            planApproved: status?.planApproved ?? false,
-            draftsTotal,
-            draftsFinal,
-            briefs: briefsQuery.data?.items ?? [],
-            volumes: volumesQuery.data?.items ?? [],
-            draftedChapters: draftsQuery.data?.items ?? [],
-            reviewDrafts: reviewQueueQuery.data?.drafts ?? [],
-            pendingContinuityCount: reviewQueueQuery.data?.proposals.length ?? 0,
-            pendingRefinementCount: proposalsQuery.data?.items.length ?? 0,
-          }),
-        )
-      : undefined;
-
-  // Translation and curated projects have no bible/plan/briefs to reason about, so they keep the
-  // original coarse "where in the lifecycle am I" fallback instead of the rule engine above.
-  const fallbackStep = !isAuthoring
-    ? volumesTotal === 0
-      ? { label: 'Open story bible →', to: '/novels/$novelId/story-bible' as const }
-      : !status?.planApproved
-        ? { label: 'Review & approve plan →', to: '/novels/$novelId/volumes' as const }
-        : draftsTotal === 0
-          ? { label: 'Start drafting →', to: '/novels/$novelId/chapters' as const }
-          : allFinal
-            ? { label: 'Review chapters →', to: '/novels/$novelId/chapters' as const }
-            : { label: 'Continue drafting →', to: '/novels/$novelId/chapters' as const }
+  const nextStep = nextStepReady
+    ? computeNextStep(
+        deriveNextStepInput({
+          blueprintStage: blueprintStage(status),
+          blueprintPhaseLabel: currentBlueprintPhase(status)?.label,
+          blueprintComplete: blueprintComplete(status?.blueprint?.phases ?? []),
+          volumesTotal,
+          planApproved: status?.planApproved ?? false,
+          draftsTotal,
+          draftsFinal,
+          briefs: briefsQuery.data?.items ?? [],
+          volumes: volumesQuery.data?.items ?? [],
+          draftedChapters: draftsQuery.data?.items ?? [],
+          reviewDrafts: reviewQueueQuery.data?.drafts ?? [],
+          pendingContinuityCount: reviewQueueQuery.data?.proposals.length ?? 0,
+          pendingRefinementCount: proposalsQuery.data?.items.length ?? 0,
+        }),
+      )
     : undefined;
 
   const goToNextStepTarget = (target: NextStepTarget): void => {
@@ -386,10 +348,9 @@ function OverviewScreen(): React.JSX.Element {
   };
 
   const nextStepAction = nextStep?.next;
-  const continueLabel = nextStepAction?.label ?? fallbackStep?.label;
+  const continueLabel = nextStepAction?.label;
   const onContinue = (): void => {
-    if (fallbackStep) navigate({ to: fallbackStep.to, params: { novelId } });
-    else if (nextStepAction) goToNextStepTarget(nextStepAction.target);
+    if (nextStepAction) goToNextStepTarget(nextStepAction.target);
   };
 
   const importJob = latestJob(jobsQuery.data?.items ?? [], 'import');
@@ -460,7 +421,6 @@ function OverviewScreen(): React.JSX.Element {
             />
             <div className={styles.headerMain}>
               <div className={styles.kindRow}>
-                <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)} project</StatusChip>
                 <span className={styles.created}>
                   {projectKindLabel(project.kind)} · created {new Date(project.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
@@ -503,60 +463,56 @@ function OverviewScreen(): React.JSX.Element {
             </div>
           </div>
 
-          {LIFECYCLE_PHASES[project.kind].length > 0 && (
+          {(LIFECYCLE_PHASES[project.kind]?.length ?? 0) > 0 && (
             <SectionCard className={styles.sectionSpacer}>
-              <LifecycleStepper labels={LIFECYCLE_PHASES[project.kind]} completed={phase.completed} />
+              <LifecycleStepper labels={LIFECYCLE_PHASES[project.kind] ?? []} completed={phase.completed} />
             </SectionCard>
           )}
 
-          {isAuthoring && (
-            <SectionCard className={styles.sectionSpacer}>
-              {nextStepReady ? (
-                <>
-                  <div className={styles.nextStepRow}>
-                    <div className={styles.nextStepBody}>
-                      <h3 className={styles.usageTitle}>Next step</h3>
-                      <p className={styles.nextStepReason}>{nextStepAction?.reason ?? 'Nothing needs your attention right now.'}</p>
-                    </div>
-                    {nextStepAction && (
-                      <Button variant="primary" onClick={() => goToNextStepTarget(nextStepAction.target)}>
-                        {nextStepAction.label}
-                      </Button>
-                    )}
-                  </div>
-                  {nextStep && nextStep.comingUp.length > 0 && (
-                    <div className={styles.comingUp}>
-                      <div className={styles.comingUpLabel}>Coming up</div>
-                      <ul className={styles.comingUpList}>
-                        {nextStep.comingUp.map(item => (
-                          <li key={item.id} className={styles.comingUpItem}>
-                            <span className={styles.comingUpDot} />
-                            {item.label}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              ) : (
+          <SectionCard className={styles.sectionSpacer}>
+            {nextStepReady ? (
+              <>
                 <div className={styles.nextStepRow}>
                   <div className={styles.nextStepBody}>
                     <h3 className={styles.usageTitle}>Next step</h3>
-                    <Skeleton width={280} height={14} />
+                    <p className={styles.nextStepReason}>{nextStepAction?.reason ?? 'Nothing needs your attention right now.'}</p>
                   </div>
-                  <Skeleton shape="rect" width={140} height={36} radius={8} />
+                  {nextStepAction && (
+                    <Button variant="primary" onClick={() => goToNextStepTarget(nextStepAction.target)}>
+                      {nextStepAction.label}
+                    </Button>
+                  )}
                 </div>
-              )}
-            </SectionCard>
-          )}
+                {nextStep && nextStep.comingUp.length > 0 && (
+                  <div className={styles.comingUp}>
+                    <div className={styles.comingUpLabel}>Coming up</div>
+                    <ul className={styles.comingUpList}>
+                      {nextStep.comingUp.map(item => (
+                        <li key={item.id} className={styles.comingUpItem}>
+                          <span className={styles.comingUpDot} />
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={styles.nextStepRow}>
+                <div className={styles.nextStepBody}>
+                  <h3 className={styles.usageTitle}>Next step</h3>
+                  <Skeleton width={280} height={14} />
+                </div>
+                <Skeleton shape="rect" width={140} height={36} radius={8} />
+              </div>
+            )}
+          </SectionCard>
 
           <div className={styles.statGrid}>
             <StatCard label="Chapters">
               <div className={styles.statBig}>
                 <span className={styles.statNum}>{status?.chaptersExtracted ?? 0}</span>
-                <span className={styles.statUnit}>
-                  / {status?.chaptersTotal ?? 0} {isSource ? 'extracted' : 'planned'}
-                </span>
+                <span className={styles.statUnit}>/ {status?.chaptersTotal ?? 0} planned</span>
               </div>
             </StatCard>
             <StatCard label="Volumes" footer={<StatusChip intent="info">{status?.volumesTotal ?? 0} total</StatusChip>}>

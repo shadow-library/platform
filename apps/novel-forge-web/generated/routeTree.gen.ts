@@ -17,15 +17,10 @@ import { Route as AppSettingsRouteImport } from './../src/routes/_app/settings'
 import { Route as AppImportRouteImport } from './../src/routes/_app/import'
 import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
 import { Route as NovelsNovelIdVolumesRouteImport } from './../src/routes/novels/$novelId/volumes'
-import { Route as NovelsNovelIdTranslationRouteImport } from './../src/routes/novels/$novelId/translation'
-import { Route as NovelsNovelIdTransformRouteImport } from './../src/routes/novels/$novelId/transform'
 import { Route as NovelsNovelIdStoryBibleRouteImport } from './../src/routes/novels/$novelId/story-bible'
-import { Route as NovelsNovelIdSourceRouteImport } from './../src/routes/novels/$novelId/source'
 import { Route as NovelsNovelIdSettingsRouteImport } from './../src/routes/novels/$novelId/settings'
 import { Route as NovelsNovelIdRunsRouteImport } from './../src/routes/novels/$novelId/runs'
 import { Route as NovelsNovelIdReviewRouteImport } from './../src/routes/novels/$novelId/review'
-import { Route as NovelsNovelIdReforgeRouteImport } from './../src/routes/novels/$novelId/reforge'
-import { Route as NovelsNovelIdRebrandRouteImport } from './../src/routes/novels/$novelId/rebrand'
 import { Route as NovelsNovelIdPublishRouteImport } from './../src/routes/novels/$novelId/publish'
 import { Route as NovelsNovelIdProposalsRouteImport } from './../src/routes/novels/$novelId/proposals'
 import { Route as NovelsNovelIdOverviewRouteImport } from './../src/routes/novels/$novelId/overview'
@@ -78,25 +73,9 @@ const NovelsNovelIdVolumesRoute = NovelsNovelIdVolumesRouteImport.update({
   path: '/volumes',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdTranslationRoute =
-  NovelsNovelIdTranslationRouteImport.update({
-    id: '/translation',
-    path: '/translation',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
-const NovelsNovelIdTransformRoute = NovelsNovelIdTransformRouteImport.update({
-  id: '/transform',
-  path: '/transform',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
 const NovelsNovelIdStoryBibleRoute = NovelsNovelIdStoryBibleRouteImport.update({
   id: '/story-bible',
   path: '/story-bible',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdSourceRoute = NovelsNovelIdSourceRouteImport.update({
-  id: '/source',
-  path: '/source',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdSettingsRoute = NovelsNovelIdSettingsRouteImport.update({
@@ -112,16 +91,6 @@ const NovelsNovelIdRunsRoute = NovelsNovelIdRunsRouteImport.update({
 const NovelsNovelIdReviewRoute = NovelsNovelIdReviewRouteImport.update({
   id: '/review',
   path: '/review',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdReforgeRoute = NovelsNovelIdReforgeRouteImport.update({
-  id: '/reforge',
-  path: '/reforge',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdRebrandRoute = NovelsNovelIdRebrandRouteImport.update({
-  id: '/rebrand',
-  path: '/rebrand',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdPublishRoute = NovelsNovelIdPublishRouteImport.update({
@@ -204,15 +173,10 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
   '/novels/$novelId/publish': typeof NovelsNovelIdPublishRoute
-  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
-  '/novels/$novelId/reforge': typeof NovelsNovelIdReforgeRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
-  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
-  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
@@ -232,15 +196,10 @@ export interface FileRoutesByTo {
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
   '/novels/$novelId/publish': typeof NovelsNovelIdPublishRoute
-  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
-  '/novels/$novelId/reforge': typeof NovelsNovelIdReforgeRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
-  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
-  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
@@ -264,15 +223,10 @@ export interface FileRoutesById {
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
   '/novels/$novelId/publish': typeof NovelsNovelIdPublishRoute
-  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
-  '/novels/$novelId/reforge': typeof NovelsNovelIdReforgeRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
-  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/transform': typeof NovelsNovelIdTransformRoute
-  '/novels/$novelId/translation': typeof NovelsNovelIdTranslationRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
   '/novels/$novelId/blueprint/$step': typeof NovelsNovelIdBlueprintStepRoute
@@ -296,15 +250,10 @@ export interface FileRouteTypes {
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
     | '/novels/$novelId/publish'
-    | '/novels/$novelId/rebrand'
-    | '/novels/$novelId/reforge'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
-    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/transform'
-    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
     | '/novels/$novelId/blueprint/$step'
@@ -324,15 +273,10 @@ export interface FileRouteTypes {
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
     | '/novels/$novelId/publish'
-    | '/novels/$novelId/rebrand'
-    | '/novels/$novelId/reforge'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
-    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/transform'
-    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId'
     | '/novels/$novelId/blueprint/$step'
@@ -355,15 +299,10 @@ export interface FileRouteTypes {
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
     | '/novels/$novelId/publish'
-    | '/novels/$novelId/rebrand'
-    | '/novels/$novelId/reforge'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
-    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/transform'
-    | '/novels/$novelId/translation'
     | '/novels/$novelId/volumes'
     | '/novels/$novelId/'
     | '/novels/$novelId/blueprint/$step'
@@ -435,32 +374,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdVolumesRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/translation': {
-      id: '/novels/$novelId/translation'
-      path: '/translation'
-      fullPath: '/novels/$novelId/translation'
-      preLoaderRoute: typeof NovelsNovelIdTranslationRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/transform': {
-      id: '/novels/$novelId/transform'
-      path: '/transform'
-      fullPath: '/novels/$novelId/transform'
-      preLoaderRoute: typeof NovelsNovelIdTransformRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
     '/novels/$novelId/story-bible': {
       id: '/novels/$novelId/story-bible'
       path: '/story-bible'
       fullPath: '/novels/$novelId/story-bible'
       preLoaderRoute: typeof NovelsNovelIdStoryBibleRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/source': {
-      id: '/novels/$novelId/source'
-      path: '/source'
-      fullPath: '/novels/$novelId/source'
-      preLoaderRoute: typeof NovelsNovelIdSourceRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/settings': {
@@ -482,20 +400,6 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/novels/$novelId/review'
       preLoaderRoute: typeof NovelsNovelIdReviewRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/reforge': {
-      id: '/novels/$novelId/reforge'
-      path: '/reforge'
-      fullPath: '/novels/$novelId/reforge'
-      preLoaderRoute: typeof NovelsNovelIdReforgeRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/rebrand': {
-      id: '/novels/$novelId/rebrand'
-      path: '/rebrand'
-      fullPath: '/novels/$novelId/rebrand'
-      preLoaderRoute: typeof NovelsNovelIdRebrandRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/publish': {
@@ -627,15 +531,10 @@ interface NovelsNovelIdRouteChildren {
   NovelsNovelIdOverviewRoute: typeof NovelsNovelIdOverviewRoute
   NovelsNovelIdProposalsRoute: typeof NovelsNovelIdProposalsRoute
   NovelsNovelIdPublishRoute: typeof NovelsNovelIdPublishRoute
-  NovelsNovelIdRebrandRoute: typeof NovelsNovelIdRebrandRoute
-  NovelsNovelIdReforgeRoute: typeof NovelsNovelIdReforgeRoute
   NovelsNovelIdReviewRoute: typeof NovelsNovelIdReviewRoute
   NovelsNovelIdRunsRoute: typeof NovelsNovelIdRunsRoute
   NovelsNovelIdSettingsRoute: typeof NovelsNovelIdSettingsRoute
-  NovelsNovelIdSourceRoute: typeof NovelsNovelIdSourceRoute
   NovelsNovelIdStoryBibleRoute: typeof NovelsNovelIdStoryBibleRoute
-  NovelsNovelIdTransformRoute: typeof NovelsNovelIdTransformRoute
-  NovelsNovelIdTranslationRoute: typeof NovelsNovelIdTranslationRoute
   NovelsNovelIdVolumesRoute: typeof NovelsNovelIdVolumesRoute
   NovelsNovelIdIndexRoute: typeof NovelsNovelIdIndexRoute
 }
@@ -650,15 +549,10 @@ const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
   NovelsNovelIdOverviewRoute: NovelsNovelIdOverviewRoute,
   NovelsNovelIdProposalsRoute: NovelsNovelIdProposalsRoute,
   NovelsNovelIdPublishRoute: NovelsNovelIdPublishRoute,
-  NovelsNovelIdRebrandRoute: NovelsNovelIdRebrandRoute,
-  NovelsNovelIdReforgeRoute: NovelsNovelIdReforgeRoute,
   NovelsNovelIdReviewRoute: NovelsNovelIdReviewRoute,
   NovelsNovelIdRunsRoute: NovelsNovelIdRunsRoute,
   NovelsNovelIdSettingsRoute: NovelsNovelIdSettingsRoute,
-  NovelsNovelIdSourceRoute: NovelsNovelIdSourceRoute,
   NovelsNovelIdStoryBibleRoute: NovelsNovelIdStoryBibleRoute,
-  NovelsNovelIdTransformRoute: NovelsNovelIdTransformRoute,
-  NovelsNovelIdTranslationRoute: NovelsNovelIdTranslationRoute,
   NovelsNovelIdVolumesRoute: NovelsNovelIdVolumesRoute,
   NovelsNovelIdIndexRoute: NovelsNovelIdIndexRoute,
 }

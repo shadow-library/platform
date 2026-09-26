@@ -41,6 +41,11 @@ function ImportNovelScreen(): React.JSX.Element {
         setParseError(`Not a supported novel-import bundle — expected format "${BUNDLE_FORMAT}" schema version ${BUNDLE_SCHEMA_VERSION}.`);
         return;
       }
+      if (parsed.mode !== 'final') {
+        setBundle(null);
+        setParseError('Only final-mode bundles can be imported.');
+        return;
+      }
       if (!parsed.novel?.title) {
         setBundle(null);
         setParseError('The bundle is missing its novel metadata (at least a title).');
@@ -78,7 +83,7 @@ function ImportNovelScreen(): React.JSX.Element {
     <PageContainer>
       <PageHeader
         title="Import novel"
-        subtitle="Load a hand-authored novel-import bundle — the project and its chapters land in one call. Source bundles feed the source pipeline; final bundles land locked and publish-ready."
+        subtitle="Load a hand-authored novel-import bundle to continue your own manuscript — the project and its chapters land in one call, locked and publish-ready."
       />
 
       <SectionCard title="Bundle">
@@ -102,10 +107,6 @@ function ImportNovelScreen(): React.JSX.Element {
             <div className={styles.preview}>
               <div className={styles.previewTitle}>{fileName}</div>
               <div className={styles.previewGrid}>
-                <div className={styles.previewCell}>
-                  <div className={styles.previewCount}>{bundle.mode}</div>
-                  <div className={styles.previewLabel}>Mode</div>
-                </div>
                 <div className={styles.previewCell}>
                   <div className={styles.previewCount}>{bundle.volumes?.length ?? 0}</div>
                   <div className={styles.previewLabel}>Volumes</div>

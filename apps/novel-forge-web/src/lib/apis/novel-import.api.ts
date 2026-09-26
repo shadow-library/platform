@@ -4,10 +4,9 @@ import { type ImportNovelResponse, type NovelBundle } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
 /**
- * Imports a hand-authored `novel-import` bundle:
- * creates the project synchronously and enqueues chapter insertion + cover storage as a background
- * `import` job. Not project-scoped — the bundle's own `mode` decides whether the created project is a
- * `source` or a locked, publish-ready `final` novel, so there is no existing project to invalidate.
+ * Imports a hand-authored `novel-import` bundle (`final` mode — "continue my own manuscript"): creates
+ * the project synchronously and enqueues chapter insertion + cover storage as a background `import` job.
+ * Not project-scoped — there is no existing project to invalidate.
  */
 export function useImportNovelMutation(): UseMutationResult<ImportNovelResponse, ApiError, NovelBundle> {
   return useMutation<ImportNovelResponse, ApiError, NovelBundle>({

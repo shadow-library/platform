@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Accordion, Alert, Button, ConfirmDialog, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
+import { Accordion, Alert, Button, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
 
-import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard, StatusChip } from '@/components/nf';
+import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import { PluginsTab } from '@/features/plugins/PluginsTab';
 import {
   aiModelsQueryOptions,
   type ContentMode,
   type ProjectConfig,
-  type ProjectKind,
   type ProjectModelOverrides,
   type ProjectWordTarget,
   useAccountSettingsQuery,
@@ -18,7 +17,7 @@ import {
   useProjectQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
-import { decodeModelRef, encodeModelRef, projectKindIntent, projectKindLabel, projectKindTag, projectTitle } from '@/lib/format';
+import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
 import { inheritedModel, modelLabel } from '@/lib/model-defaults';
 
 import styles from './settings.module.css';
@@ -36,7 +35,7 @@ type AiRole = keyof ProjectModelOverrides;
 type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image';
 
 const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
-  writing: ['generation', 'revision', 'fix', 'translate'],
+  writing: ['generation', 'revision', 'fix'],
   planning: ['premise', 'plan', 'arc', 'outline', 'skeleton', 'bible', 'extraction'],
   review: ['judge', 'validation', 'continuity', 'review', 'audit'],
   chat: ['chat'],
@@ -128,7 +127,6 @@ function SettingsScreen(): React.JSX.Element {
   const [wordTargetMax, setWordTargetMax] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [switchTarget, setSwitchTarget] = useState<Extract<ProjectKind, 'new_novel' | 'curated'> | null>(null);
 
   const unrestrictedAllowlist = modelsQuery.data?.unrestrictedAllowlist;
   const [synced, setSynced] = useState<{ project: typeof project; allowlist: typeof unrestrictedAllowlist }>({ project: undefined, allowlist: undefined });
@@ -192,20 +190,6 @@ function SettingsScreen(): React.JSX.Element {
     });
   };
 
-  const doSwitchKind = (): void => {
-    if (!switchTarget) return;
-    updateProject.mutate(
-      { kind: switchTarget },
-      {
-        onSuccess: () => {
-          toast.success(switchTarget === 'new_novel' ? 'Converted to an original novel' : 'Marked as a curated novel');
-          setSwitchTarget(null);
-        },
-        onError: err => toast.danger(err.message),
-      },
-    );
-  };
-
   // A deployment with no plugin directory answers `[]`, and the tab does not exist at all there.
   const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
   const unrestricted = contentMode === 'unrestricted';
@@ -230,33 +214,6 @@ function SettingsScreen(): React.JSX.Element {
             </Tabs.List>
 
             <Tabs.Panel value="general" className={styles.tabPanel}>
-              {project && (
-                <SectionCard title="Workflow" className={styles.sectionSpacer}>
-                  <div className={styles.roleRow}>
-                    <div className={styles.roleInfo}>
-                      <div className={styles.roleLabel}>{projectKindLabel(project.kind)}</div>
-                      <div className={styles.roleHint}>
-                        {project.kind === 'translation' && project.originalLanguage ? `Original language: ${project.originalLanguage}` : 'Switching a workflow cannot be undone.'}
-                      </div>
-                    </div>
-                    <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)}</StatusChip>
-                  </div>
-                  {(project.kind === 'curated' || project.kind === 'translation') && (
-                    <div className={styles.workflowActions}>
-                      {project.kind === 'curated' && (
-                        <Button variant="secondary" onClick={() => setSwitchTarget('new_novel')}>
-                          Convert to original novel
-                        </Button>
-                      )}
-                      {project.kind === 'translation' && (
-                        <Button variant="secondary" onClick={() => setSwitchTarget('curated')}>
-                          Mark as curated novel
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </SectionCard>
-              )}
               <SectionCard title="General">
                 <div className={styles.form}>
                   <FormField label="Working title">
@@ -420,20 +377,6 @@ function SettingsScreen(): React.JSX.Element {
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog>
-
-      <ConfirmDialog
-        open={switchTarget != null}
-        onOpenChange={open => !open && setSwitchTarget(null)}
-        title={switchTarget === 'new_novel' ? 'Convert to original novel?' : 'Mark as curated novel?'}
-        description={
-          switchTarget === 'new_novel'
-            ? 'Adds Story Bible, Volumes & Arcs, and the rest of the authoring workflow. This cannot be undone.'
-            : 'Hides Translation; Chapters stays for reading, amending, and inserting into the finalized canon. This cannot be undone.'
-        }
-        confirmLabel={switchTarget === 'new_novel' ? 'Convert' : 'Mark as curated'}
-        loading={updateProject.isPending}
-        onConfirm={doSwitchKind}
-      />
     </PageContainer>
   );
 }

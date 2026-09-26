@@ -4,21 +4,11 @@ import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useT
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import {
-  translationJobActive,
-  useListProjectsQuery,
-  useListProposalsQuery,
-  useLogoutMutation,
-  useMeQuery,
-  useProjectQuery,
-  useProjectStatusQuery,
-  useReviewQueueQuery,
-  useTranslationStatusQuery,
-} from '@/lib/apis';
+import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { blueprintNavSections } from '@/features/blueprint/blueprint-nav';
 import { blueprintStepMeta } from '@/features/blueprint/blueprint-steps';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
-import { blueprintStage, currentBlueprintPhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag, translationLifecycle } from '@/lib/format';
+import { blueprintStage, currentBlueprintPhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
 import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon } from '../icons';
@@ -60,15 +50,10 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const statusQuery = useProjectStatusQuery(novelId ?? '', inProject);
   const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
   const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: PROJECT_LIMIT }, inProject);
-  const isTranslation = projectQuery.data?.kind === 'translation';
-  const translationQuery = useTranslationStatusQuery(novelId ?? '', inProject && isTranslation);
 
   const project = projectQuery.data;
   const status = statusQuery.data;
-  const translation = translationQuery.data;
-  const phase = isTranslation
-    ? translationLifecycle(translation && { counts: translation.counts, glossary: translation.glossary, jobActive: translationJobActive(translation) })
-    : lifecyclePhase(status, project?.kind);
+  const phase = lifecyclePhase(status, project?.kind);
 
   // The Review Queue badge folds in every pending proposal type alongside queued chapters — it is the
   // one inbox count for "things awaiting the author", not just chapters.
@@ -78,7 +63,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       count: (reviewQuery.data?.drafts.length ?? 0) + (reviewQuery.data?.proposals.length ?? 0) + (proposalsQuery.data?.items.length ?? 0),
       intent: 'warning',
     },
-    translation: { count: translation?.glossary.suggested ?? 0, intent: 'warning' },
   };
 
   const options = projects.map(candidate => {

@@ -2,29 +2,10 @@ import { type ReactNode } from 'react';
 
 import { type BlueprintStage, type ProjectKind } from '@/lib/apis';
 
-import {
-  BookIcon,
-  ChatIcon,
-  ConceptIcon,
-  EditIcon,
-  GlobeIcon,
-  ImageIcon,
-  LanguageIcon,
-  ListIcon,
-  OverviewIcon,
-  ReviewIcon,
-  RunsIcon,
-  ScissorsIcon,
-  SendIcon,
-  SettingsIcon,
-  SourceIcon,
-  SparkIcon,
-  UploadIcon,
-} from '../icons';
+import { BookIcon, ChatIcon, ConceptIcon, EditIcon, ImageIcon, ListIcon, OverviewIcon, ReviewIcon, RunsIcon, SendIcon, SettingsIcon, UploadIcon } from '../icons';
 import { type ProjectRoute } from './routes';
 
-const ALL_WORKFLOWS: ProjectKind[] = ['new_novel', 'source', 'translation', 'curated'];
-const AUTHORING: ProjectKind[] = ['new_novel', 'source'];
+const WORKFLOWS: ProjectKind[] = ['new_novel'];
 
 export interface ProjectScreen {
   /** The last path segment — what the breadcrumb reads off the location. */
@@ -52,27 +33,21 @@ export interface ProjectScreen {
 
 /**
  * Every project-scoped screen, declared once. The sidebar nav, the breadcrumb's leaf label, and the
- * command palette all derive from this list — they used to keep their own copies, and had already
- * drifted (the palette was missing Rebrand and Reforge entirely).
+ * command palette all derive from this list rather than keeping their own copies, which used to drift.
  */
 export const PROJECT_SCREENS: ProjectScreen[] = [
-  { segment: 'overview', to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon />, workflows: ALL_WORKFLOWS },
-  { segment: 'blueprint', to: '/novels/$novelId/blueprint', label: 'Blueprint', icon: <ConceptIcon />, workflows: ['new_novel'] },
-  { segment: 'translation', to: '/novels/$novelId/translation', label: 'Translation', icon: <LanguageIcon />, workflows: ['translation'] },
-  { segment: 'source', to: '/novels/$novelId/source', label: 'Source Pipeline', icon: <SourceIcon />, workflows: ['source'] },
-  { segment: 'rebrand', to: '/novels/$novelId/rebrand', label: 'Rebrand', icon: <GlobeIcon />, workflows: ['source'] },
-  { segment: 'reforge', to: '/novels/$novelId/reforge', label: 'Reforge', icon: <SparkIcon />, workflows: ['source'] },
-  { segment: 'transform', to: '/novels/$novelId/transform', label: 'Transform', icon: <ScissorsIcon />, workflows: ['source'] },
-  { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon />, workflows: AUTHORING },
-  { segment: 'volumes', to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon />, workflows: AUTHORING },
-  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon />, workflows: ['new_novel'], hidden: true },
-  { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon />, workflows: ['new_novel', 'source', 'curated'] },
-  { segment: 'illustrations', to: '/novels/$novelId/illustrations', label: 'Illustrations', icon: <ImageIcon />, workflows: ALL_WORKFLOWS },
-  { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon />, workflows: AUTHORING },
-  { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon />, workflows: AUTHORING },
-  { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, workflows: ALL_WORKFLOWS, adminOnly: true },
-  { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon />, workflows: ALL_WORKFLOWS },
-  { segment: 'settings', to: '/novels/$novelId/settings', label: 'Project Settings', icon: <SettingsIcon />, workflows: ALL_WORKFLOWS, trailing: true },
+  { segment: 'overview', to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon />, workflows: WORKFLOWS },
+  { segment: 'blueprint', to: '/novels/$novelId/blueprint', label: 'Blueprint', icon: <ConceptIcon />, workflows: WORKFLOWS },
+  { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon />, workflows: WORKFLOWS },
+  { segment: 'volumes', to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon />, workflows: WORKFLOWS },
+  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon />, workflows: WORKFLOWS, hidden: true },
+  { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon />, workflows: WORKFLOWS },
+  { segment: 'illustrations', to: '/novels/$novelId/illustrations', label: 'Illustrations', icon: <ImageIcon />, workflows: WORKFLOWS },
+  { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon />, workflows: WORKFLOWS },
+  { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon />, workflows: WORKFLOWS },
+  { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, workflows: WORKFLOWS, adminOnly: true },
+  { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon />, workflows: WORKFLOWS },
+  { segment: 'settings', to: '/novels/$novelId/settings', label: 'Project Settings', icon: <SettingsIcon />, workflows: WORKFLOWS, trailing: true },
 ];
 
 export const SCREEN_LABEL = new Map(PROJECT_SCREENS.map(screen => [screen.segment, screen.label]));
@@ -90,12 +65,11 @@ export function screenVisible(segment: string, kind?: ProjectKind): boolean {
 }
 
 /**
- * Where opening a project should land — the workflow's own screen when it has one, else Overview. A novel
- * still in its Blueprint has no Overview worth showing: the Blueprint is its home until the gate opens.
- * `stage` has no default on purpose — a caller that does not know it cannot pick a home, and should send
- * the author through `/novels/$novelId`, which resolves it.
+ * Where opening a project should land. A novel still in its Blueprint has no Overview worth showing: the
+ * Blueprint is its home until the gate opens. `stage` has no default on purpose — a caller that does not
+ * know it cannot pick a home, and should send the author through `/novels/$novelId`, which resolves it.
  */
-export function projectHomeRoute(kind: ProjectKind, stage: BlueprintStage | null): ProjectRoute {
+export function projectHomeRoute(stage: BlueprintStage | null): ProjectRoute {
   if (stage === 'blueprint') return '/novels/$novelId/blueprint';
-  return kind === 'translation' ? '/novels/$novelId/translation' : '/novels/$novelId/overview';
+  return '/novels/$novelId/overview';
 }

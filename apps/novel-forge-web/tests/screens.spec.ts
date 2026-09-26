@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { PROJECT_SCREENS, projectHomeRoute, SCREEN_LABEL, screensForWorkflow, screenVisible } from '../src/components/Layout/screens';
 
-function segmentsFor(kind?: 'source' | 'new_novel' | 'translation' | 'curated'): string[] {
+function segmentsFor(kind?: 'new_novel'): string[] {
   return screensForWorkflow(kind).map(screen => screen.segment);
 }
 
@@ -18,87 +18,38 @@ describe('screensForWorkflow', () => {
   it('should show the full authoring sidebar for a new_novel project, without the hidden Import Plan entry', () => {
     expect(segmentsFor('new_novel')).toEqual(['overview', 'blueprint', 'story-bible', 'volumes', 'chapters', 'illustrations', 'review', 'chat', 'runs', 'publish', 'settings']);
   });
-
-  it('should show the source pipeline screens and hide Import Plan for a source project', () => {
-    const segments = segmentsFor('source');
-    expect(segments).toEqual([
-      'overview',
-      'source',
-      'rebrand',
-      'reforge',
-      'transform',
-      'story-bible',
-      'volumes',
-      'chapters',
-      'illustrations',
-      'review',
-      'chat',
-      'runs',
-      'publish',
-      'settings',
-    ]);
-  });
-
-  it('should show only Overview, Translation, Illustrations, Workflow Runs, Publish and Settings for a translation project', () => {
-    expect(segmentsFor('translation')).toEqual(['overview', 'translation', 'illustrations', 'runs', 'publish', 'settings']);
-  });
-
-  it('should show Overview, Chapters, Illustrations, Workflow Runs, Publish and Settings for a curated project, with no authoring screens', () => {
-    expect(segmentsFor('curated')).toEqual(['overview', 'chapters', 'illustrations', 'runs', 'publish', 'settings']);
-  });
 });
 
 describe('screenVisible', () => {
   it('should treat every screen as visible while the kind is unknown', () => {
     expect(screenVisible('story-bible', undefined)).toBe(true);
-    expect(screenVisible('translation', undefined)).toBe(true);
+    expect(screenVisible('blueprint', undefined)).toBe(true);
   });
 
-  it('should hide a workflow-specific screen from the wrong workflow', () => {
-    expect(screenVisible('story-bible', 'translation')).toBe(false);
-    expect(screenVisible('translation', 'new_novel')).toBe(false);
-    expect(screenVisible('source', 'curated')).toBe(false);
-  });
-
-  it('should offer the Blueprint only to an original novel', () => {
+  it('should show every screen for the only workflow this app has', () => {
+    expect(screenVisible('story-bible', 'new_novel')).toBe(true);
     expect(screenVisible('blueprint', 'new_novel')).toBe(true);
-    expect(screenVisible('blueprint', 'source')).toBe(false);
-    expect(screenVisible('blueprint', 'translation')).toBe(false);
-  });
-
-  it('should show a screen that lists the given workflow', () => {
-    expect(screenVisible('overview', 'curated')).toBe(true);
-    expect(screenVisible('chapters', 'curated')).toBe(true);
-    expect(screenVisible('translation', 'translation')).toBe(true);
+    expect(screenVisible('overview', 'new_novel')).toBe(true);
+    expect(screenVisible('chapters', 'new_novel')).toBe(true);
   });
 
   it('should never hide a segment that is not one of the declared project screens', () => {
-    expect(screenVisible('not-a-real-screen', 'translation')).toBe(true);
+    expect(screenVisible('not-a-real-screen', 'new_novel')).toBe(true);
   });
 
   it('should keep the hidden Import Plan screen reachable by URL for a new_novel project', () => {
     expect(screenVisible('import-plan', 'new_novel')).toBe(true);
   });
-
-  it('should still hide Import Plan by URL for workflows that never had it', () => {
-    expect(screenVisible('import-plan', 'source')).toBe(false);
-    expect(screenVisible('import-plan', 'translation')).toBe(false);
-    expect(screenVisible('import-plan', 'curated')).toBe(false);
-  });
 });
 
 describe('projectHomeRoute', () => {
   it('should open a novel still in its Blueprint on the Blueprint', () => {
-    expect(projectHomeRoute('new_novel', 'blueprint')).toBe('/novels/$novelId/blueprint');
+    expect(projectHomeRoute('blueprint')).toBe('/novels/$novelId/blueprint');
   });
 
   it('should open a novel that has passed the gate on Overview', () => {
-    expect(projectHomeRoute('new_novel', 'workspace')).toBe('/novels/$novelId/overview');
-    expect(projectHomeRoute('new_novel', null)).toBe('/novels/$novelId/overview');
-  });
-
-  it('should keep the translation workflow on its own screen', () => {
-    expect(projectHomeRoute('translation', null)).toBe('/novels/$novelId/translation');
+    expect(projectHomeRoute('workspace')).toBe('/novels/$novelId/overview');
+    expect(projectHomeRoute(null)).toBe('/novels/$novelId/overview');
   });
 });
 

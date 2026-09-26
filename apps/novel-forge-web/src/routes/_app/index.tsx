@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, SegmentedControl } from '@shadow-library/ui';
+import { Button } from '@shadow-library/ui';
 
 import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { blueprintStageLabel, projectKindIntent, projectKindLabel, projectKindTag, projectTitle, relativeTime, sharedOwnerLabel } from '@/lib/format';
+import { blueprintStageLabel, projectKindLabel, projectTitle, relativeTime, sharedOwnerLabel } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -17,8 +17,6 @@ export const Route = createFileRoute('/_app/')({
   loader: ({ context }) => context.queryClient.prefetchQuery(listProjectsQueryOptions({ limit: 50 })),
   component: Dashboard,
 });
-
-type Filter = 'all' | 'source' | 'new_novel' | 'translation' | 'curated';
 
 interface StatProps {
   value?: number;
@@ -46,7 +44,6 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
   const navigate = useNavigate();
   const statusQuery = useProjectStatusQuery(project.id);
   const status = statusQuery.data;
-  const isSource = project.kind === 'source';
   const draftsDone = (status?.draftsTotal ?? 0) > 0 && status?.draftsFinal === status?.draftsTotal;
   const stageLabel = blueprintStageLabel(status);
   const ownerLabel = sharedOwnerLabel(project);
@@ -73,7 +70,6 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
       )}
       <div className={styles.cardBody}>
         <div className={styles.chipRow}>
-          <StatusChip intent={projectKindIntent(project.kind)}>{projectKindTag(project.kind)}</StatusChip>
           <span className={styles.cardId}>#{project.id}</span>
         </div>
         {ownerLabel && (
@@ -87,7 +83,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
           {project.storyCurrentChapter ? ` · Chapter ${project.storyCurrentChapter}` : ''}
         </p>
         <div className={styles.statGrid}>
-          <Stat value={status?.chaptersExtracted} total={status?.chaptersTotal} label={isSource ? 'chapters extracted' : 'chapters planned'} />
+          <Stat value={status?.chaptersExtracted} total={status?.chaptersTotal} label="chapters planned" />
           <Stat value={status?.draftsFinal} total={status?.draftsTotal} label="drafts final" />
           <div>
             <div className={styles.planValue} data-approved={status?.planApproved ?? false}>
@@ -117,20 +113,13 @@ function Dashboard(): React.JSX.Element {
   const navigate = useNavigate();
   const projectsQuery = useListProjectsQuery({ limit: 50 });
   const projects = projectsQuery.data?.items ?? [];
-  const [filter, setFilter] = useState<Filter>('all');
   const [createOpen, setCreateOpen] = useState(false);
-
-  const sourceCount = projects.filter(p => p.kind === 'source').length;
-  const newCount = projects.filter(p => p.kind === 'new_novel').length;
-  const translationCount = projects.filter(p => p.kind === 'translation').length;
-  const curatedCount = projects.filter(p => p.kind === 'curated').length;
-  const visible = filter === 'all' ? projects : projects.filter(p => p.kind === filter);
 
   return (
     <div className={styles.page}>
       <PageHeader
         title="Projects"
-        subtitle={`${projects.length} project${projects.length === 1 ? '' : 's'} · ${sourceCount} source · ${newCount} original`}
+        subtitle={`${projects.length} project${projects.length === 1 ? '' : 's'}`}
         extra={
           <>
             <Button variant="secondary" prefix={<UploadIcon />} onClick={() => navigate({ to: '/import' })}>
@@ -144,13 +133,6 @@ function Dashboard(): React.JSX.Element {
       />
 
       <div className={styles.toolbar}>
-        <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)}>
-          <SegmentedControl.Item value="all">All {projects.length}</SegmentedControl.Item>
-          <SegmentedControl.Item value="source">Source {sourceCount}</SegmentedControl.Item>
-          <SegmentedControl.Item value="new_novel">Original {newCount}</SegmentedControl.Item>
-          <SegmentedControl.Item value="translation">Translation {translationCount}</SegmentedControl.Item>
-          <SegmentedControl.Item value="curated">Curated {curatedCount}</SegmentedControl.Item>
-        </SegmentedControl>
         <div className={styles.spacer} />
         <span className={styles.toolbarNote}>Sorted by last activity</span>
       </div>
@@ -158,13 +140,13 @@ function Dashboard(): React.JSX.Element {
       <QueryState
         isLoading={projectsQuery.isLoading}
         error={projectsQuery.error}
-        isEmpty={visible.length === 0}
+        isEmpty={projects.length === 0}
         emptyTitle="No projects yet"
         emptyDescription="Create your first novel from a premise, or import one from a novel-import bundle."
         emptyAction={{ label: 'New project', onClick: () => setCreateOpen(true) }}
       >
         <div className={styles.grid}>
-          {visible.map(project => (
+          {projects.map(project => (
             <ProjectCard key={project.id} project={project} />
           ))}
           <button onClick={() => setCreateOpen(true)} className={styles.newCard}>

@@ -32,12 +32,6 @@
   flex: 1;
 }
 
-.workflowActions {
-  display: flex;
-  gap: 8px;
-  padding: 0 20px 16px;
-}
-
 .alertWrap {
   margin-bottom: 16px;
 }

@@ -7,10 +7,9 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/overview')).toBe('overview');
   });
 
-  it('should resolve chapters, volumes and the source pipeline to the rows variant', () => {
+  it('should resolve chapters and volumes to the rows variant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/chapters')).toBe('rows');
     expect(resolveSkeletonVariant('/novels/abc123/volumes')).toBe('rows');
-    expect(resolveSkeletonVariant('/novels/abc123/source')).toBe('rows');
   });
 
   it('should resolve the refinement chat route to the chat variant', () => {
@@ -45,16 +44,6 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/publish')).toBe('form');
     expect(resolveSkeletonVariant('/novels/abc123/settings')).toBe('form');
     expect(resolveSkeletonVariant('/novels/abc123/import-plan')).toBe('form');
-  });
-
-  it('should resolve the source-project pipeline dashboards to the form variant', () => {
-    expect(resolveSkeletonVariant('/novels/abc123/rebrand')).toBe('form');
-    expect(resolveSkeletonVariant('/novels/abc123/reforge')).toBe('form');
-    expect(resolveSkeletonVariant('/novels/abc123/transform')).toBe('form');
-  });
-
-  it('should resolve the translation dashboard to the form variant', () => {
-    expect(resolveSkeletonVariant('/novels/abc123/translation')).toBe('form');
   });
 
   it('should resolve top-level account settings and import routes to the form variant', () => {

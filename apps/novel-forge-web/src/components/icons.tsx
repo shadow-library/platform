@@ -31,13 +31,6 @@ export const OverviewIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const SourceIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M4 4h11l5 5v11H4z" />
-    <path d="M15 4v5h5" />
-  </SvgIcon>
-);
-
 export const BookIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -125,20 +118,6 @@ export const SunIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <circle cx="12" cy="12" r="4" />
     <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </SvgIcon>
-);
-
-export const GlobeIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
-  </SvgIcon>
-);
-
-export const LanguageIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M4 5h9M8 3v2M11 5c-.6 3.2-2.4 5.9-5 7.8M6 9.5c1.6 1.9 3.6 3.3 5.8 4" />
-    <path d="M14 21l4.5-11L23 21M15.6 17h5.8" />
   </SvgIcon>
 );
 
@@ -230,14 +209,6 @@ export const SparkIcon = ({ rayClassName, ...p }: IconProps & { rayClassName?: s
     {SPARK_RAYS.map(ray => (
       <path key={ray} d={ray} className={rayClassName} />
     ))}
-  </SvgIcon>
-);
-
-export const ScissorsIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <circle cx="6" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12" />
   </SvgIcon>
 );
 
