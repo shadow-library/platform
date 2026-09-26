@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage, type BaseMessage, HumanMessage, type MessageContent, SystemMessage } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
@@ -15,6 +14,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
+import { GatewayChatOpenAI } from './gateway-chat-openai';
 import {
   type AiRole,
   COST_TIER_DEFAULTS,
@@ -314,7 +314,7 @@ export class ModelRouterService {
     // OpenRouter's `usage.cost` is dropped by @langchain/openai's parser; `__includeRawResponse` keeps it on
     // `additional_kwargs.__raw_response` for TelemetryHandler. It must be a constructor field: ChatOpenAI delegates to a
     // completions client built from its fields, and `bindTools` rebuilds from them too, so assigning it afterwards is lost.
-    return new ChatOpenAI({
+    return new GatewayChatOpenAI({
       model: resolved.model,
       apiKey,
       maxRetries: 0,
