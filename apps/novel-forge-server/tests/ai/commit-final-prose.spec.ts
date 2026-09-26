@@ -36,12 +36,37 @@ describe('commitFinalProse', () => {
     expect(fake.outcome()).toBe('committed');
   });
 
-  it('should keep the reveals the approval ledgered', async () => {
+  it('should commit the provisional knowledge bound to the finalized revision and drop any bound to another', async () => {
     const { fake, run } = commit({ finalized: true });
 
     await run;
 
+    const [committed] = fake.writesTo(schema.characterKnowledge, 'update');
+    expect(committed?.values).toEqual({ status: 'committed' });
+    expect(render(committed?.where)).toMatchObject({
+      sql: '(("character_knowledge"."project_id" = $1 and "character_knowledge"."source" = $2 and "character_knowledge"."learned_in_chapter" = $3 and "character_knowledge"."status" = $4) and "character_knowledge"."draft_revision" = $5)',
+      params: [1n, 'brief', 4, 'provisional', 2],
+    });
+    expect(render(fake.writesTo(schema.characterKnowledge, 'delete')[0]?.where).params).toEqual([1n, 'brief', 4, 'provisional']);
+    expect(fake.outcome()).toBe('committed');
+  });
+
+  it('should commit the knowledge again on a resumed run, where it matches only what is still provisional', async () => {
+    const { fake, run } = commit({ finalized: false, reads: [draftRow({ status: 'final' })] });
+
+    await run;
+
+    expect(render(fake.writesTo(schema.characterKnowledge, 'update')[0]?.where).params).toEqual([1n, 'brief', 4, 'provisional', 2]);
+  });
+
+  it('should commit no knowledge when an approval of a newer revision won the race', async () => {
+    const reapproved = draftRow({ revision: 3 });
+    const { fake, run } = commit({ finalized: false, reads: [reapproved, reapproved] });
+
+    await expect(run).rejects.toMatchObject({ code: 'DRF_013' });
     expect(fake.writesTo(schema.characterKnowledge)).toEqual([]);
+    expect(fake.writesTo(schema.canonFacts)).toEqual([]);
+    expect(fake.outcome()).toBe('rolled back');
   });
 
   it('should roll the chapter back when a revise moved the draft past the revision finalize read', async () => {

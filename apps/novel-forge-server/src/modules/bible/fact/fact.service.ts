@@ -130,7 +130,7 @@ export class FactService {
       .values({ projectId, factId: fact.id, entityId: entity.id, learnedInChapter: body.chapter, source: 'manual', note: body.note ?? null })
       .onConflictDoUpdate({
         target: [schema.characterKnowledge.factId, schema.characterKnowledge.entityId],
-        set: { learnedInChapter: body.chapter, source: 'manual', note: body.note ?? null },
+        set: { learnedInChapter: body.chapter, source: 'manual', note: body.note ?? null, status: 'committed', draftRevision: null },
       });
 
     this.logger.info('fact revealed', { projectId, factKey, entityKey: body.entityKey, chapter: body.chapter });

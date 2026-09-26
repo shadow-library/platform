@@ -18,6 +18,7 @@ import {
   normalizeStringList,
   planFrontier,
   refusedDraftWriteError,
+  resetApprovalForPlanChange,
   revokeProvisionalReveals,
   volumeContentHash,
 } from '@server/common';
@@ -766,6 +767,7 @@ export class ProposalApplyService {
     } else {
       await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash, handEdited: op.handEdited ?? true });
     }
+    await resetApprovalForPlanChange(ctx.tx, ctx.projectId, op.chapter, existing, merged);
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: revision });
   }
 
@@ -777,6 +779,7 @@ export class ProposalApplyService {
       .where(and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)))
       .returning();
     if (deleted.length === 0) throw AppErrorCode.RFN_004.create();
+    await resetApprovalForPlanChange(ctx.tx, ctx.projectId, op.chapter, deleted[0], {});
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: null });
   }
 

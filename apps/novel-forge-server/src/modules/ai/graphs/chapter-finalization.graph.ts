@@ -3,7 +3,15 @@ import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { assertPlanRevealsHold, lockProjectPlan, reachClaimedMilestones, refusedDraftWriteError, sanitizeMarkdown } from '@server/common';
+import {
+  assertPlanRevealsHold,
+  commitChapterKnowledge,
+  discloseChapterReveals,
+  lockProjectPlan,
+  reachClaimedMilestones,
+  refusedDraftWriteError,
+  sanitizeMarkdown,
+} from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -68,7 +76,8 @@ export interface CommitProseInput {
 /**
  * Writes the canonical chapter and marks its draft final in one transaction, bound to the draft revision finalize read and approved:
  * a revise or edit landing in between refuses the commit, so the locked chapter never holds prose the final draft does not. The commit
- * is refused while the chapter's plan reveals a locked fact, and reaches the milestones the plan claims.
+ * is refused while the chapter's plan reveals a locked fact. It commits the knowledge the approval ledgered, discloses the chapter's reveals
+ * to the reader and reaches the milestones the plan claims — again on a resumed run, where each step finds nothing left to do.
  */
 export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseInput): Promise<void> {
   const projectId = BigInt(state.projectId);
@@ -112,25 +121,30 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
         setWhere: ne(schema.chapters.locked, true),
       });
 
-    if (!state.draftId) return;
-    if (state.draftRevision === null) throw AppError.internal(`[commitProse] Finalization of chapter ${state.chapter} carries no draft revision`);
+    if (!state.draftId) return discloseChapterReveals(tx, projectId, state.chapter);
+    const draftRevision = state.draftRevision;
+    if (draftRevision === null) throw AppError.internal(`[commitProse] Finalization of chapter ${state.chapter} carries no draft revision`);
+    const commitKnowledge = async (): Promise<void> => {
+      await commitChapterKnowledge(tx, projectId, state.chapter, draftRevision);
+      await reachClaimedMilestones(tx, projectId, state.chapter, draftRevision);
+    };
     const draftId = BigInt(state.draftId);
     const [finalized] = await tx
       .update(schema.drafts)
       .set({ status: 'final', reviewStatus: 'final', updatedAt: new Date() })
-      .where(and(eq(schema.drafts.id, draftId), eq(schema.drafts.revision, state.draftRevision), eq(schema.drafts.reviewStatus, 'approved'), ne(schema.drafts.status, 'final')))
+      .where(and(eq(schema.drafts.id, draftId), eq(schema.drafts.revision, draftRevision), eq(schema.drafts.reviewStatus, 'approved'), ne(schema.drafts.status, 'final')))
       .returning({ id: schema.drafts.id });
-    if (finalized) return reachClaimedMilestones(tx, projectId, state.chapter, state.draftRevision);
+    if (finalized) return commitKnowledge();
 
     const current = await tx.query.drafts.findFirst({ columns: { status: true, revision: true }, where: eq(schema.drafts.id, draftId) });
-    if (current?.status === 'final' && current.revision === state.draftRevision) return;
+    if (current?.status === 'final' && current.revision === draftRevision) return commitKnowledge();
     logger.warn('finalization commitProse refused: the draft moved after finalize read it', {
       runId: state.runId,
       chapter: state.chapter,
-      readRevision: state.draftRevision,
+      readRevision: draftRevision,
       currentRevision: current?.revision,
     });
-    if (current && current.status !== 'final' && current.revision === state.draftRevision) throw AppErrorCode.DRF_004.create();
+    if (current && current.status !== 'final' && current.revision === draftRevision) throw AppErrorCode.DRF_004.create();
     throw await refusedDraftWriteError(tx, projectId, state.chapter);
   });
 }

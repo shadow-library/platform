@@ -29,7 +29,9 @@ function revealedAfterClaim(overrides: PlanSeed = {}) {
   });
   const [fact] = tables.rows(schema.canonFacts);
   const [mira] = tables.rows(schema.entities);
-  tables.rows(schema.characterKnowledge).push({ projectId: 7n, factId: fact?.['id'], entityId: mira?.['id'], learnedInChapter: 5, source: 'brief' });
+  tables
+    .rows(schema.characterKnowledge)
+    .push({ projectId: 7n, factId: fact?.['id'], entityId: mira?.['id'], learnedInChapter: 5, source: 'brief', status: 'provisional', draftRevision: 2 });
   return tables;
 }
 
@@ -66,6 +68,21 @@ describe('reconcilePlanState — a reveal that stops holding', () => {
     expect(tables.rows(schema.characterKnowledge)).toEqual([]);
   });
 
+  it('should mark the later drafts built on the revoked approval stale and reset their approvals', async () => {
+    const tables = revealedAfterClaim({
+      drafts: [
+        { chapter: 5, reviewStatus: 'approved', revision: 2 },
+        { chapter: 6, reviewStatus: 'approved', revision: 1 },
+      ],
+    });
+    Object.assign(tables.brief(4) as object, { claimedMilestones: null });
+
+    await reconcilePlanState(tables.db as never, 7n);
+
+    expect(tables.draft(6)?.['reviewStatus']).toBe('needs_review');
+    expect(tables.draft(6)?.['staleReason']).not.toBeNull();
+  });
+
   it('should lift only its own mark from the draft once the reveal holds again, and keep an earlier reason the draft carried', async () => {
     const tables = revealedAfterClaim({ drafts: [{ chapter: 5, staleReason: LOCKED_REASON }] });
     Object.assign(tables.brief(5) as object, { staleReason: LOCKED_REASON });
@@ -90,7 +107,7 @@ describe('ledgerBriefReveals — reveal rule', () => {
       briefs: [{ chapter: 5, knowledgeContract: learns('lamp_rank_4_rule', 'lamp_costs_memory') }],
     });
 
-    const result = await ledgerBriefReveals(tables.db as never, 7n, 5);
+    const result = await ledgerBriefReveals(tables.db as never, 7n, 5, 2);
 
     expect(result.applied).toBe(1);
     expect(tables.rows(schema.characterKnowledge).map(row => row['factId'])).toEqual([tables.fact('lamp_costs_memory')?.['id']]);

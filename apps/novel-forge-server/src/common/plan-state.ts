@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { AppErrorCode } from '@server/classes';
 import { type DbExecutor, schema } from '@server/database';
 
+import { markDescendantDraftsStale } from './draft-staleness';
 import { loadPlanState, type PlanState } from './plan-world';
 import { revokeProvisionalReveals } from './provisional-knowledge';
 import {
@@ -128,6 +129,7 @@ async function markDraftRevealStale(tx: DbExecutor, projectId: bigint, draft: Ma
     .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
     .where(and(live, eq(schema.drafts.reviewStatus, 'approved')));
   await revokeProvisionalReveals(tx, projectId, draft.chapter);
+  await markDescendantDraftsStale(tx, projectId, draft.chapter, `ancestor chapter ${draft.chapter} lost its approval`);
 }
 
 /** A milestone's subject is a character of the novel, named by its entity key. */

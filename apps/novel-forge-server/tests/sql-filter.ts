@@ -2,7 +2,7 @@ import { Column, is, SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 type Row = Record<string, unknown>;
-type Predicate = (row: Row) => boolean;
+type Predicate = (row: Row, excluded?: Row) => boolean;
 
 const dialect = new PgDialect();
 const COLUMN = String.raw`(?:"\w+"\.)?"(\w+)"`;
@@ -25,6 +25,13 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
   {
     pattern: new RegExp(`^${COLUMN} (=|<>|<=|>=|<|>) \\$(\\d+)`),
     build: (match, params) => row => compare(row[camel(match[1])], match[2] as string, params[Number(match[3]) - 1]),
+  },
+  {
+    pattern: new RegExp(`^excluded\\.(\\w+) (=|<>|<=|>=|<|>) ${COLUMN}`),
+    build: match => (row, excluded) => {
+      if (!excluded) throw new Error('sql-filter: an `excluded.` comparison needs the conflicting row');
+      return compare(excluded[camel(match[1])], match[2] as string, row[camel(match[3])]);
+    },
   },
 ];
 
@@ -72,13 +79,13 @@ class FilterParser {
   private either(): Predicate {
     const terms = [this.both()];
     while (this.take(/^or\b/)) terms.push(this.both());
-    return row => terms.some(term => term(row));
+    return (row, excluded) => terms.some(term => term(row, excluded));
   }
 
   private both(): Predicate {
     const terms = [this.atom()];
     while (this.take(/^and\b/)) terms.push(this.atom());
-    return row => terms.every(term => term(row));
+    return (row, excluded) => terms.every(term => term(row, excluded));
   }
 
   private atom(): Predicate {
@@ -104,12 +111,15 @@ class FilterParser {
   }
 }
 
-/** Evaluates a drizzle `where` against an in-memory row; a filter it cannot read fails the test instead of matching. */
-export function matchesWhere(row: Row, where: SQL | undefined): boolean {
+/**
+ * Evaluates a drizzle `where` against an in-memory row; a filter it cannot read fails the test instead of matching. An upsert's `setWhere`
+ * passes the row it proposed as `excluded`.
+ */
+export function matchesWhere(row: Row, where: SQL | undefined, excluded?: Row): boolean {
   if (where === undefined) return true;
   if (!is(where, SQL)) throw new Error('sql-filter: `where` must be an SQL expression');
   const { sql, params } = dialect.sqlToQuery(where);
-  return new FilterParser(sql, params).parse()(row);
+  return new FilterParser(sql, params).parse()(row, excluded);
 }
 
 type OrderTerm = SQL | Column;

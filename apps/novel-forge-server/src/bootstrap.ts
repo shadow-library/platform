@@ -30,6 +30,9 @@ declare module '@shadow-library/common' {
     /** How long an authoring claim survives without a heartbeat before another worker may take the project over. */
     'jobs.authoring-claim.ttl-ms': number;
 
+    /** Proposed, off by default: sends the chapter writer the facts the reader knows and the POV cast does not, labelled as such. */
+    'knowledge.reader-knows-label': boolean;
+
     /** Max projects one owner may hold; 0 disables the cap. */
     'projects.max-per-owner': number;
 
@@ -56,6 +59,8 @@ Config.load('ai.quota.max-cost-usd', { defaultValue: '50', validateType: 'number
 Config.load('ai.langsmith.api.key');
 
 Config.load('jobs.authoring-claim.ttl-ms', { defaultValue: '120000', validateType: 'number' });
+
+Config.load('knowledge.reader-knows-label', { validateType: 'boolean', defaultValue: 'false' });
 
 Config.load('projects.max-per-owner', { defaultValue: '100', validateType: 'number' });
 

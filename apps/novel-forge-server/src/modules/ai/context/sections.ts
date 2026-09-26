@@ -68,6 +68,7 @@ const SECTION_LABELS: Record<string, string> = {
   world_facts: '## WORLD FACTS',
   known_facts: '## KNOWN FACTS (POV CAST)',
   chapter_reveals: '## REVEALED THIS CHAPTER',
+  reader_knows: '## THE READER KNOWS (THE POV CAST DOES NOT)',
   hidden_constraints: '## BEHAVIORAL CONSTRAINTS',
   art_style: '## ART STYLE BIBLE',
   subject_card: '## SUBJECT',

@@ -15,6 +15,7 @@ import {
   loadKnowledgeView,
   parseKnowledgeContract,
   renderForbiddenFacts,
+  renderJudgeReaderKnows,
   scanKnowledgeLeaks,
   writerSafeLeakLines,
 } from '../../bible/fact/knowledge-view';
@@ -517,6 +518,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       forbidden.length > 0
         ? `\n\n## FORBIDDEN KNOWLEDGE\n${renderForbiddenFacts(forbidden)}\n\nThe POV cast does not know these facts — assess the draft for leaks and include knowledgeCompliance in your JSON.`
         : '';
+    const readerKnowsBlock = renderJudgeReaderKnows(knowledgeView?.readerKnows ?? []);
 
     const povLine = brief?.pov ? `POV: ${brief.pov}\n` : '';
     const readabilityBlock = state.readabilityEvidence
@@ -526,7 +528,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
-      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${briefBlock}${contractBlock}${knowledgeBlock}${readabilityBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${briefBlock}${contractBlock}${knowledgeBlock}${readerKnowsBlock}${readabilityBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
     const judgeMessages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), systemMsg, humanMsg];
 

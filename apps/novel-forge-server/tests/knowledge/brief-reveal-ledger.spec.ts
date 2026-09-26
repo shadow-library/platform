@@ -9,9 +9,15 @@ interface Brief {
   knowledgeContract: unknown;
 }
 
+interface Claimant {
+  chapter: number;
+  revision: number;
+  status: 'draft' | 'final';
+}
+
 interface LedgerFixture {
   briefs?: Brief[];
-  claimants?: number[];
+  claimants?: Claimant[];
   deleted?: { factId: bigint; entityId: bigint }[];
 }
 
@@ -50,7 +56,7 @@ function fakeLedger(fixture: LedgerFixture) {
       drafts: {
         findMany: async (config: { where: SQL }) => {
           claimantQueries.push(config.where);
-          return (fixture.claimants ?? []).map(chapter => ({ chapter }));
+          return fixture.claimants ?? [];
         },
       },
     },
@@ -70,14 +76,19 @@ function fakeLedger(fixture: LedgerFixture) {
 }
 
 describe('ledgerBriefReveals', () => {
-  it('should keep the earliest claiming chapter and never touch a manual row', async () => {
+  it('should replace the chapter’s rows with provisional ones bound to the approved revision, keeping the earliest claim and any manual row', async () => {
     const ledger = fakeLedger({ briefs: [{ chapter: 3, knowledgeContract: learns('hidden_tide', 'hidden_tide') }] });
 
-    await ledgerBriefReveals(ledger.db, 1n, 3);
+    await ledgerBriefReveals(ledger.db, 1n, 3, 4);
 
+    expect(statement(ledger.deletes[0]).params).toEqual([1n, 'brief', 3]);
     const [upsert] = ledger.upserts;
-    expect(upsert?.values).toEqual([{ projectId: 1n, factId: 31n, entityId: 41n, learnedInChapter: 3, source: 'brief' }]);
-    expect(statement(upsert?.set['learnedInChapter']).sql).toBe('excluded.learned_in_chapter');
+    expect(upsert?.values).toEqual([{ projectId: 1n, factId: 31n, entityId: 41n, learnedInChapter: 3, source: 'brief', status: 'provisional', draftRevision: 4 }]);
+    expect(Object.fromEntries(Object.entries(upsert?.set ?? {}).map(([field, value]) => [field, statement(value).sql]))).toEqual({
+      learnedInChapter: 'excluded.learned_in_chapter',
+      status: 'excluded.status',
+      draftRevision: 'excluded.draft_revision',
+    });
     expect(statement(upsert?.setWhere)).toEqual({
       sql: '("character_knowledge"."source" = $1 and excluded.learned_in_chapter < "character_knowledge"."learned_in_chapter")',
       params: ['brief'],
@@ -99,10 +110,13 @@ describe('revokeProvisionalReveals', () => {
     expect(ledger.upserts).toEqual([]);
   });
 
-  it('should re-ledger a revoked reveal at the earliest chapter that still claims it, final chapters included', async () => {
+  it('should re-ledger a revoked reveal at the earliest chapter that still claims it, committed when that chapter is final', async () => {
     const ledger = fakeLedger({
       deleted: [{ factId: 31n, entityId: 41n }],
-      claimants: [3, 7],
+      claimants: [
+        { chapter: 3, revision: 2, status: 'final' },
+        { chapter: 7, revision: 5, status: 'draft' },
+      ],
       briefs: [
         { chapter: 3, knowledgeContract: learns('hidden_tide') },
         { chapter: 7, knowledgeContract: learns('hidden_tide') },
@@ -115,19 +129,23 @@ describe('revokeProvisionalReveals', () => {
       sql: '("drafts"."project_id" = $1 and ("drafts"."review_status" = $2 or "drafts"."status" = $3) and "drafts"."chapter" not in ($4))',
       params: [1n, 'approved', 'final', 5],
     });
-    expect(ledger.upserts.map(upsert => upsert.values)).toEqual([[{ projectId: 1n, factId: 31n, entityId: 41n, learnedInChapter: 3, source: 'brief' }]]);
+    expect(ledger.upserts.map(upsert => upsert.values)).toEqual([
+      [{ projectId: 1n, factId: 31n, entityId: 41n, learnedInChapter: 3, source: 'brief', status: 'committed', draftRevision: 2 }],
+    ]);
   });
 
-  it('should restore only the pairs it revoked, so a reveal retracted by hand stays retracted', async () => {
+  it('should restore only the pairs it revoked, provisional and bound to the claiming approval', async () => {
     const ledger = fakeLedger({
       deleted: [{ factId: 32n, entityId: 41n }],
-      claimants: [7],
+      claimants: [{ chapter: 7, revision: 5, status: 'draft' }],
       briefs: [{ chapter: 7, knowledgeContract: learns('hidden_tide', 'sunken_bell') }],
     });
 
     await revokeProvisionalReveals(ledger.db, 1n, 5);
 
-    expect(ledger.upserts.map(upsert => upsert.values)).toEqual([[{ projectId: 1n, factId: 32n, entityId: 41n, learnedInChapter: 7, source: 'brief' }]]);
+    expect(ledger.upserts.map(upsert => upsert.values)).toEqual([
+      [{ projectId: 1n, factId: 32n, entityId: 41n, learnedInChapter: 7, source: 'brief', status: 'provisional', draftRevision: 5 }],
+    ]);
   });
 
   it('should leave a revoked reveal gone when no other approved or final chapter claims it', async () => {

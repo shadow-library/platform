@@ -18,6 +18,7 @@ import {
   renderChapterReveals,
   renderHiddenConstraints,
   renderKnownFacts,
+  renderReaderKnows,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
@@ -764,6 +765,21 @@ export class ContextAssembler {
           view.reveals.map(f => `fact:${f.factKey}`),
         );
         reserve(reveals, "this chapter's reveals", WRITER_SECTION_CAPS.chapterReveals);
+      }
+      if (view.readerKnows.length > 0) {
+        const readerKnows = fitFacts(
+          subjectsFirst(view.readerKnows, chapterCast),
+          fact => renderReaderKnows([fact], view.pooledPov),
+          sizedSectionCeiling('reader_knows', WRITER_SECTION_CAPS.readerKnows),
+        );
+        derivedCuts.push(...readerKnows.omitted);
+        const section = makeSection(
+          'reader_knows',
+          disclosure.scrub(renderReaderKnows(readerKnows.kept, view.pooledPov), 'knowledge'),
+          'canonical',
+          readerKnows.kept.map(f => `fact:${f.factKey}`),
+        );
+        sections.push({ ...fitToCap(section, WRITER_SECTION_CAPS.readerKnows), priority: WRITER_OPTIONAL_PRIORITY.readerKnows });
       }
       const hidden = fitFacts(
         subjectsFirst(withWriterNotes(view.hidden), chapterCast),

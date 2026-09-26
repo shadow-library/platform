@@ -9,6 +9,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import {
   assertPlanRevealsHold,
+  assertTeacherSettled,
   briefContentHash,
   declaredDraftFields,
   enforcePlanWrite,
@@ -22,8 +23,11 @@ import {
   normalizeStringList,
   planFrontier,
   refusedDraftWriteError,
+  resetApprovalForPlanChange,
+  REVEAL_STALE_PREFIX,
   revokeProvisionalReveals,
   selectGenerationBatch,
+  untilFirstTeacher,
   validateBriefScenes,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
@@ -167,7 +171,11 @@ export interface JobEnqueueResult {
   stoppedAtExternalChapter?: number;
   /** Set when a chapter with neither a draft nor finalized prose truncated the batch before its limit. */
   stoppedAtUnwrittenChapter?: number;
+  /** Set when a chapter whose plan teaches its cast something ended the batch before its limit: the next waits for its approval. */
+  stoppedAtTeachingChapter?: number;
 }
+
+const APPROVED_AS_WRITTEN_PREFIX = 'approved as written over: ';
 
 @Injectable()
 export class GenerationService {
@@ -253,6 +261,7 @@ export class GenerationService {
         .from(schema.briefs)
         .where(and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)))
         .for('update');
+      const approvedTerms = existing && { knowledgeContract: existing.knowledgeContract, claimedMilestones: existing.claimedMilestones };
       const revision = (existing?.revision ?? 0) + 1;
       const volumeKey = existing ? existing.volumeKey : await nearestVolumeKey(tx, projectId, chapter);
       const contentHash = briefContentHash({ ...existing, chapter, volumeKey, ...edits });
@@ -265,6 +274,7 @@ export class GenerationService {
         })
         .returning();
       await enforcePlanWrite(tx, projectId, [chapter]);
+      if (upserted) await resetApprovalForPlanChange(tx, projectId, chapter, approvedTerms, upserted);
       return upserted;
     });
     if (!result) throw AppErrorCode.DRF_001.create();
@@ -309,12 +319,24 @@ export class GenerationService {
     }
 
     const briefByChapter = new Map(allBriefs.map(brief => [brief.chapter, brief]));
-    const staleChapters = chapters.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
+    const [first] = chapters;
+    if (first !== undefined) await assertTeacherSettled(this.db, projectId, first);
+    const batch = untilFirstTeacher(chapters, briefByChapter);
+    const staleChapters = batch.filter(chapter => briefByChapter.get(chapter)?.staleReason != null);
     if (staleChapters.length > 0) throw AppErrorCode.BRF_002.create({ chapters: staleChapters.join(', ') });
 
-    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix, stoppedAtExternalChapter, stoppedAtUnwrittenChapter });
-    const job = await this.enqueueGeneration(projectId, chapters, body);
-    return { ...job, stoppedAtExternalChapter, stoppedAtUnwrittenChapter };
+    const stoppedAtTeachingChapter = batch.length < chapters.length ? batch.at(-1) : undefined;
+    this.logger.info('generate: enqueueing chapters', {
+      projectId,
+      chapters: batch,
+      limit,
+      autoFix: body.autoFix,
+      stoppedAtExternalChapter,
+      stoppedAtUnwrittenChapter,
+      stoppedAtTeachingChapter,
+    });
+    const job = await this.enqueueGeneration(projectId, batch, body);
+    return { ...job, stoppedAtExternalChapter, stoppedAtUnwrittenChapter, stoppedAtTeachingChapter };
   }
 
   /** Drafts one planned chapter that has no draft yet; replacing an existing draft stays with {@link regenerateChapter}, which the author starts. */
@@ -363,6 +385,7 @@ export class GenerationService {
     if (stoppedAtUnwrittenChapter !== undefined) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(stoppedAtUnwrittenChapter) });
     const [next] = chapters;
     if (next !== chapter) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(next) });
+    await assertTeacherSettled(this.db, projectId, chapter);
 
     this.logger.info('regenerate: enqueueing chapter', { projectId, chapter, hadDraft: Boolean(draft) });
     return this.enqueueGeneration(projectId, chapters, { autoFix: true });
@@ -630,28 +653,31 @@ export class GenerationService {
   async approveDraft(projectId: bigint, chapter: number, body: ApproveDraftBody): Promise<Generation.Draft> {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
-    if (draft.staleReason) throw AppErrorCode.DRF_007.create();
-    if (draft.revision !== body.revision) throw AppErrorCode.DRF_013.create();
+    const keptStale = draft.staleReason && body.keepStale ? draft.staleReason : null;
+    if (draft.staleReason && !keptStale) throw AppErrorCode.DRF_007.create();
+    if (keptStale?.startsWith(REVEAL_STALE_PREFIX)) throw AppErrorCode.DRF_017.create();
+    if (draft.revision !== body.revision || (keptStale && keptStale !== body.staleReason)) throw AppErrorCode.DRF_013.create();
 
-    // The approval, its audit row and the brief's reveals commit together, and only for the revision the author read.
+    // The approval, its audit row and the brief's provisional reveals commit together, and only for the revision the author read. Approving
+    // as written clears only the stale reason the author saw; the prose is unchanged, so nothing built on it goes stale.
     // `idempotencyKey` (unique) makes a retried approve a no-op instead of a duplicate approval row.
     const updated = await this.db.transaction(async tx => {
       await lockProjectPlan(tx, projectId);
       await assertPlanRevealsHold(tx, projectId, chapter);
       const [row] = await tx
         .update(schema.drafts)
-        .set({ reviewStatus: 'approved', updatedAt: new Date() })
+        .set({ reviewStatus: 'approved', ...(keptStale ? { staleReason: null } : {}), updatedAt: new Date() })
         .where(
           and(
             eq(schema.drafts.id, draft.id),
             eq(schema.drafts.revision, body.revision),
             ne(schema.drafts.status, 'final'),
-            isNull(schema.drafts.staleReason),
+            keptStale ? eq(schema.drafts.staleReason, keptStale) : isNull(schema.drafts.staleReason),
             ne(schema.drafts.reviewStatus, 'generating'),
           ),
         )
         .returning();
-      if (!row) throw await refusedDraftWriteError(tx, projectId, chapter, 'stale_aware');
+      if (!row) throw await refusedDraftWriteError(tx, projectId, chapter, keptStale ? 'conflict' : 'stale_aware');
 
       await tx
         .insert(schema.userFeedback)
@@ -662,11 +688,11 @@ export class GenerationService {
           disposition: 'approved',
           reviewerId: body.reviewerId ?? null,
           idempotencyKey: body.idempotencyKey ?? null,
-          note: null,
+          note: keptStale ? `${APPROVED_AS_WRITTEN_PREFIX}${keptStale}` : null,
         })
         .onConflictDoNothing({ target: schema.userFeedback.idempotencyKey });
 
-      const reveals = await ledgerBriefReveals(tx, projectId, chapter);
+      const reveals = await ledgerBriefReveals(tx, projectId, chapter, row.revision);
       if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, revision: row.revision, applied: reveals.applied });
 
       return row;
@@ -711,6 +737,7 @@ export class GenerationService {
         .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final')))
         .returning({ id: schema.drafts.id });
       if (deleted.length === 0) throw await refusedDraftWriteError(tx, projectId, chapter);
+      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was deleted`);
       await revokeProvisionalReveals(tx, projectId, chapter);
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
@@ -860,6 +887,7 @@ export class GenerationService {
       () => AppErrorCode.JOB_002.create(),
       async () => {
         await this.assertWrittenBefore(projectId, chapter);
+        await assertTeacherSettled(this.db, projectId, chapter);
         return this.generateUnrestrictedClaimed(projectId, chapter, body);
       },
     );

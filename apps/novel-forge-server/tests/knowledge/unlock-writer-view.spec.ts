@@ -35,7 +35,7 @@ describe('loadKnowledgeView — unlock conditions', () => {
     const tables = project({ briefs: [{ chapter: 5 }] });
     const [fact] = tables.rows(schema.canonFacts);
     const [mira] = tables.rows(schema.entities);
-    tables.rows(schema.characterKnowledge).push({ projectId: 7n, factId: fact?.['id'], entityId: mira?.['id'], learnedInChapter: 2, source: 'manual' });
+    tables.rows(schema.characterKnowledge).push({ projectId: 7n, factId: fact?.['id'], entityId: mira?.['id'], learnedInChapter: 2, source: 'manual', status: 'committed' });
 
     expect(keys((await loadKnowledgeView(tables.db as never, 7n, 5, { pov: ['mira'], learns: [] })).known)).toEqual(['lamp_rank_4_rule']);
   });

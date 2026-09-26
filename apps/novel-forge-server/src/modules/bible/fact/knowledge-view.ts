@@ -1,4 +1,5 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
+import { Config } from '@shadow-library/common';
 
 import { chapterUnlockContext, evaluateUnlock, isOpenCanon, type KnowledgeContract, parseKnowledgeContract, revealRequirements, revealTermPattern } from '@server/common';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
@@ -15,6 +16,13 @@ export interface FactLike {
   allowedClues?: string[] | null;
   subjects?: string[] | null;
   source?: Knowledge.FactSource;
+  disclosedInChapter?: number | null;
+}
+
+/** A member of the chapter's POV cast; `name` falls back to the key when no entity carries it. */
+export interface PovMember {
+  entityKey: string;
+  name: string;
 }
 
 /** Facts partitioned by what this chapter's POV cast may see. */
@@ -22,8 +30,20 @@ export interface KnowledgeView {
   known: FactLike[];
   reveals: FactLike[];
   hidden: FactLike[];
+  /** Facts the reader was shown before this chapter that nobody in the POV cast knows; empty unless the reader-knows label is on. */
+  readerKnows: FactLike[];
+  /**
+   * Whose knowledge `known` pools: the union of every POV character in the chapter's contract, for the whole chapter — never one character's
+   * view per scene. It holds what each member learned before this chapter, committed or ledgered by an approved earlier draft.
+   */
+  pooledPov: PovMember[];
   /** The latest chapter before this one in which a POV-cast member learned each known fact, for facts the ledger records. */
   learnedIn?: ReadonlyMap<string, number>;
+}
+
+export interface KnowledgeViewOptions {
+  /** Hands the writer facts the reader knows and the POV cast does not, labelled as such; defaults to `knowledge.reader-knows-label`. */
+  readerKnows?: boolean;
 }
 
 export interface KnowledgeLeakIssue {
@@ -35,9 +55,13 @@ export interface KnowledgeLeakIssue {
 /** The narrow database surface the loaders need — satisfied by both the client and a transaction. */
 type KnowledgeDb = Pick<PrimaryDatabase, 'query'>;
 
+type KnowledgePartition = Pick<KnowledgeView, 'known' | 'reveals' | 'hidden'>;
+
 const EXCERPT_RADIUS = 60;
 
-const EMPTY_VIEW: KnowledgeView = { known: [], reveals: [], hidden: [] };
+function readerKnowsLabelEnabled(): boolean {
+  return Config.get('knowledge.reader-knows-label') === true;
+}
 
 function excerptAround(body: string, index: number, length: number): string {
   const start = Math.max(0, index - EXCERPT_RADIUS);
@@ -46,7 +70,7 @@ function excerptAround(body: string, index: number, length: number): string {
 }
 
 /** Partitions the project's facts: ledgered before this chapter → known, contracted this chapter → reveals, everything else → hidden. */
-export function splitKnowledgeView(facts: FactLike[], knownKeys: ReadonlySet<string>, learnKeys: ReadonlySet<string>): KnowledgeView {
+export function splitKnowledgeView(facts: FactLike[], knownKeys: ReadonlySet<string>, learnKeys: ReadonlySet<string>): KnowledgePartition {
   const known: FactLike[] = [];
   const reveals: FactLike[] = [];
   const hidden: FactLike[] = [];
@@ -59,18 +83,28 @@ export function splitKnowledgeView(facts: FactLike[], knownKeys: ReadonlySet<str
 }
 
 /**
- * Recomputes the chapter's knowledge view from the ledger — deterministic, never trusted from model
- * output. "Known entering chapter N" means a POV-cast member ledgered the fact before chapter N, or the
- * fact is open canon, which nobody had to learn.
+ * Recomputes the chapter's knowledge view from the ledger — deterministic, never trusted from model output. "Known entering chapter N"
+ * means a POV-cast member's row records the fact before chapter N — committed, or provisional from an approved earlier draft that N is
+ * written against and goes stale with — or the fact is open canon, which nobody had to learn.
  */
-export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chapter: number, contract: KnowledgeContract): Promise<KnowledgeView> {
-  const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
-  if (facts.length === 0) return EMPTY_VIEW;
-
-  const povEntities = await db.query.entities.findMany({
-    columns: { id: true },
-    where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, contract.pov)),
-  });
+export async function loadKnowledgeView(
+  db: KnowledgeDb,
+  projectId: bigint,
+  chapter: number,
+  contract: KnowledgeContract,
+  options: KnowledgeViewOptions = {},
+): Promise<KnowledgeView> {
+  const povKeys = [...new Set(contract.pov)];
+  const [facts, povEntities] = await Promise.all([
+    db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) }),
+    db.query.entities.findMany({
+      columns: { id: true, entityKey: true, name: true },
+      where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, povKeys)),
+    }),
+  ]);
+  const nameByKey = new Map(povEntities.map(entity => [entity.entityKey, entity.name]));
+  const pooledPov = povKeys.map(entityKey => ({ entityKey, name: nameByKey.get(entityKey) ?? entityKey }));
+  if (facts.length === 0) return { known: [], reveals: [], hidden: [], readerKnows: [], pooledPov };
 
   const knownKeys = new Set<string>();
   const learnedIn = new Map<string, number>();
@@ -112,7 +146,31 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   for (const fact of facts) {
     if (isOpenCanon(fact.revealChapter) && !fact.unlock && !learnKeys.has(fact.factKey)) knownKeys.add(fact.factKey);
   }
-  return { ...splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys), learnedIn };
+  const { known, reveals, hidden } = splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys);
+  const shownToReader = (fact: FactLike): boolean => fact.disclosedInChapter != null && fact.disclosedInChapter < chapter;
+  if (!(options.readerKnows ?? readerKnowsLabelEnabled()) || !hidden.some(shownToReader)) return { known, reveals, hidden, readerKnows: [], pooledPov, learnedIn };
+
+  const brief = await db.query.briefs.findFirst({ columns: { endingContract: true }, where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
+  const mustNotResolve = mustNotResolveKeys(brief?.endingContract);
+  const labelled = (fact: FactLike): boolean => shownToReader(fact) && !mustNotResolve.has(fact.factKey);
+  return { known, reveals, hidden: hidden.filter(fact => !labelled(fact)), readerKnows: hidden.filter(labelled), pooledPov, learnedIn };
+}
+
+/**
+ * The reader-knows label (§4.2): what the reader already read that the POV cast has not learned, so the writer can play on it without the
+ * cast acting on it. The fact's writer note is the behaviour it still constrains.
+ */
+export function renderReaderKnows(facts: FactLike[], pov: readonly PovMember[]): string {
+  const cast = pov.length > 0 ? pov.map(member => member.name).join(', ') : 'the point-of-view cast';
+  const verb = pov.length > 1 ? 'do not' : 'does not';
+  return facts.map(fact => withWriterNote(`- [${fact.factKey}] ${fact.text} — the reader knows; ${cast} ${verb}`, fact)).join('\n');
+}
+
+/** The judge's side of the label: the facts in full, and the cast acting on one is what it flags. */
+export function renderJudgeReaderKnows(facts: FactLike[]): string {
+  if (facts.length === 0) return '';
+  const listed = facts.map(fact => `- [${fact.factKey}] ${fact.text}`).join('\n');
+  return `\n\n## THE READER KNOWS, THE POV CAST DOES NOT\n${listed}\n\nThe prose may let the reader feel these; flag any POV character who acts on, states or relies on one in knowledgeCompliance.`;
 }
 
 function mustNotResolveKeys(endingContract: unknown): Set<string> {
@@ -140,7 +198,7 @@ export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigin
 async function writerVisibleFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[], contract: KnowledgeContract | null): Promise<Set<string>> {
   if (contract) {
     const view = await loadKnowledgeView(db, projectId, chapter, contract);
-    return new Set([...view.known, ...view.reveals].map(fact => fact.factKey));
+    return new Set([...view.known, ...view.reveals, ...view.readerKnows].map(fact => fact.factKey));
   }
   const unscheduled = facts.filter(fact => fact.revealChapter === null);
   const onPage =

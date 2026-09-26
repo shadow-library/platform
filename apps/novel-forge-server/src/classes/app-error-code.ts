@@ -77,7 +77,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_004 = AppErrorCode.badRequest('DRF_004', 'Draft is not approved — approve draft before finalizing');
   static readonly DRF_005 = AppErrorCode.badRequest('DRF_005', 'Chapter adds no new canon to the bible');
   static readonly DRF_006 = AppErrorCode.notFound('DRF_006', 'Chapter scene image not found');
-  static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — an ancestor chapter changed; regenerate before approving');
+  static readonly DRF_007 = AppErrorCode.badRequest('DRF_007', 'Draft is stale — something it was written against changed; regenerate or edit it, or approve it as written');
   static readonly DRF_008 = AppErrorCode.badRequest('DRF_008', 'Chapter is isolated — continuity proposals and bible extraction are unavailable for isolated chapters');
   static readonly DRF_009 = AppErrorCode.badRequest('DRF_009', 'Draft approval is never applied automatically — select the approval step and apply it deliberately');
   static readonly DRF_010 = AppErrorCode.conflict('DRF_010', 'A generation job is already running for this project — wait for it to finish before regenerating a chapter');
@@ -89,6 +89,11 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_013 = AppErrorCode.conflict('DRF_013', 'This chapter changed while you were working on it. Reload it and try again.');
   static readonly DRF_014 = AppErrorCode.badRequest('DRF_014', 'Chapter generation is never applied automatically — select the generation step and apply it deliberately');
   static readonly DRF_015 = AppErrorCode.conflict('DRF_015', 'Chapter {chapter} already has a draft — regenerate it from the chapter itself');
+  static readonly DRF_016 = AppErrorCode.badRequest(
+    'DRF_016',
+    'Chapter {chapter} cannot be written by the AI until chapter {teacher} is approved — its characters learn something there that later chapters build on. You can still write chapter {chapter} yourself.',
+  );
+  static readonly DRF_017 = AppErrorCode.badRequest('DRF_017', 'This draft is stale because a reveal in its plan no longer holds — fix the plan; it cannot be approved as written');
 
   /*!
    * Finalize Errors

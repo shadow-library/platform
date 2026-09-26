@@ -17,6 +17,7 @@ export const WRITER_SECTION_CAPS = {
   castCard: 1_000,
   knownFacts: 4_000,
   chapterReveals: 1_500,
+  readerKnows: 1_500,
   hiddenConstraints: 1_500,
   allowedClues: 1_000,
   openCanon: 3_000,
@@ -33,7 +34,8 @@ export const WRITER_OPTIONAL_PRIORITY = {
   castState: 2,
   castCard: 3,
   excessCard: 4,
-  pluginSection: 5,
+  readerKnows: 5,
+  pluginSection: 6,
 } as const;
 
 export interface WriterReservation {

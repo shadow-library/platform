@@ -207,6 +207,16 @@ export class ApproveDraftBody {
 
   @Field({ optional: true })
   idempotencyKey?: string;
+
+  @Field({
+    optional: true,
+    description:
+      'Approve a stale draft as written: its prose stays, its stale reason is cleared and the override is recorded. Needs `staleReason`; refused (DRF_017) when a reveal in its plan no longer holds.',
+  })
+  keepStale?: boolean;
+
+  @Field({ optional: true, description: 'With `keepStale`, the stale reason the author saw. A draft that has gone stale for another reason since is refused with DRF_013.' })
+  staleReason?: string;
 }
 
 @Schema()
@@ -1030,6 +1040,12 @@ export class JobEnqueueResponse {
     description: 'Present when the batch was cut short of its limit: this chapter has neither a draft nor finalized prose, and generation continues only once it has one.',
   })
   stoppedAtUnwrittenChapter?: number;
+
+  @Field(() => Integer, {
+    optional: true,
+    description: 'Present when the batch was cut short of its limit: this chapter teaches its characters something, and the AI writes the next only once it is approved.',
+  })
+  stoppedAtTeachingChapter?: number;
 }
 
 @Schema()

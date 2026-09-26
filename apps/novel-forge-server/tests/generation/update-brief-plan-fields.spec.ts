@@ -31,7 +31,7 @@ function makeService(): { service: GenerationService; written: { values?: Row; s
       projects: { findFirst: async () => ({ storyCurrentChapter: 0 }) },
       chapters: { findFirst: async () => undefined },
     },
-    update: () => ({ set: () => ({ where: async () => undefined }) }),
+    update: () => ({ set: () => ({ where: () => Object.assign(Promise.resolve(), { returning: async () => [] }) }) }),
     select: () => ({ from: () => ({ where: () => ({ for: async () => [existing] }) }) }),
     insert: () => ({
       values: (values: Row) => {

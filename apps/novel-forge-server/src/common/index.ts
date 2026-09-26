@@ -24,5 +24,6 @@ export * from './publish-token';
 export * from './reveal-rule';
 export * from './reveal-term';
 export * from './sanitize-content';
+export * from './teaching-gate';
 export * from './term-text';
 export * from './unlock-condition';

@@ -69,10 +69,20 @@
   reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
   readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
 - **Approval** is author-initiated and never auto-applied from chat, binds to the draft revision the author read (a chat approval card to the one current when it
-  was staged), may override a contradiction (recorded), and ledgers the brief's `learns` in the same transaction. Any change to the draft's prose, a judge verdict, or an
-  earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest
-  approved or final chapter that claims it, and moves there when a later claim is revoked.
-- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation report holds an error for this chapter. The continuity delta goes
+  was staged), may override a contradiction (recorded), and in the same transaction replaces the chapter's ledger rows with the brief's `learns` as _provisional_
+  knowledge bound to that revision, so repeated approvals leave one set, bound to the latest. Any change to the draft's prose, a judge verdict, or an earlier chapter's
+  change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest approved or final
+  chapter that claims it, and moves there when a later claim is revoked. A stale draft may be approved as written: the request names the stale reason the author saw,
+  only that reason is cleared, the override is recorded, and nothing later goes stale since the prose is unchanged; a draft stale because a reveal in its plan no
+  longer holds cannot be approved that way.
+- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation
+  report holds an error for this chapter. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
+  another), sets each revealed fact's `disclosedInChapter` unless an earlier chapter set it, and reaches the claimed milestones; a replay finds nothing left to do.
+  A writer at chapter N reads what its POV cast learned before N — committed, or provisional from an approved earlier draft — plus N's own reveals, pooled for the
+  whole chapter. Any change that revokes an approval (prose, what a plan teaches, reveal rule, deletion) marks every later draft stale; a plan edit that changes only
+  the milestones a chapter claims resets that chapter's approval alone. The AI does not write a chapter while an earlier chapter whose plan teaches something is
+  neither approved nor final (the author may still write it by hand; planning is not gated), and a batch ends at such a chapter. A chapter with no knowledge contract
+  discloses the dated facts that first become showable there, never open canon. The proposed "the reader knows; <POV> does not" section is off unless `KNOWLEDGE_READER_KNOWS_LABEL` is set. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted).
 - **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
 - **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer

@@ -1,4 +1,5 @@
-import { type SQL } from 'drizzle-orm';
+import { is, SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { schema } from '@server/database';
 
@@ -35,7 +36,21 @@ type TableName = keyof typeof TABLES;
 const BRIEF_DEFAULTS: Row = { volumeKey: null, isEnding: false, claimedMilestones: null, knowledgeContract: null, staleReason: null, revision: 1, contentHash: null };
 const MILESTONE_DEFAULTS: Row = { kind: 'custom', state: 'open', plannedChapter: null, reachedChapter: null, boundRevision: null, subjectEntityKey: null };
 const DRAFT_DEFAULTS: Row = { status: 'draft', reviewStatus: 'needs_review', staleReason: null, revision: 1, isolated: false };
-const FACT_DEFAULTS: Row = { revealChapter: null, unlock: null, source: 'manual', plannedChapter: null, terms: null, writerNote: null };
+const FACT_DEFAULTS: Row = { revealChapter: null, unlock: null, source: 'manual', plannedChapter: null, disclosedInChapter: null, terms: null, writerNote: null };
+const KNOWLEDGE_DEFAULTS: Row = { status: 'committed', draftRevision: null };
+
+interface ConflictUpdate {
+  set: Row;
+  setWhere?: SQL;
+}
+
+const dialect = new PgDialect();
+
+function excludedValue(value: SQL, proposed: Row): unknown {
+  const column = /^excluded\.(\w+)$/.exec(dialect.sqlToQuery(value).sql)?.[1];
+  if (!column) throw new Error(`plan-tables: unsupported upsert value "${dialect.sqlToQuery(value).sql}"`);
+  return proposed[column.replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase())];
+}
 
 /** In-memory project tables behind the drizzle surface the plan rules use, honouring their filters through `sql-filter`. */
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -51,8 +66,18 @@ export function planTables(seed: PlanSeed = {}) {
     [schema.chapters, (seed.chapters ?? []).map(withId({ status: 'done' }))],
     [schema.drafts, (seed.drafts ?? []).map(withId(DRAFT_DEFAULTS))],
     [schema.entities, (seed.entities ?? []).map(withId({}))],
-    [schema.characterKnowledge, (seed.knowledge ?? []).map(row => ({ projectId: 7n, source: 'brief', ...row }))],
+    [schema.characterKnowledge, (seed.knowledge ?? []).map(row => ({ projectId: 7n, source: 'brief', ...KNOWLEDGE_DEFAULTS, ...row }))],
   ]);
+  // Only the ledger's (fact, entity) key is modelled: the one conflict target a plan rule upserts arrays against.
+  const upsert = (table: unknown, row: Row, set: Row, setWhere?: SQL): void => {
+    const clash = table === schema.characterKnowledge ? rows(table).find(existing => existing['factId'] === row['factId'] && existing['entityId'] === row['entityId']) : undefined;
+    if (!clash) {
+      rows(table).push(row);
+      return;
+    }
+    if (!matchesWhere(clash, setWhere, row)) return;
+    for (const [field, value] of Object.entries(set)) clash[field] = is(value, SQL) ? excludedValue(value, row) : value;
+  };
   const project: Row = { id: 7n, storyCurrentChapter: seed.storyCurrentChapter ?? 0, premise: null, brief: null, themes: null, instructions: null };
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
   const finder = (table: unknown) => ({
@@ -86,8 +111,13 @@ export function planTables(seed: PlanSeed = {}) {
     insert: (table: unknown) => ({
       values: (values: Row | Row[]) => {
         if (Array.isArray(values)) {
-          rows(table).push(...values.map(value => ({ projectId: 7n, ...value })));
-          return { onConflictDoUpdate: async () => undefined };
+          const incoming = values.map(value => ({ projectId: 7n, ...(table === schema.characterKnowledge ? KNOWLEDGE_DEFAULTS : {}), ...value }));
+          return {
+            then: (resolve: () => unknown, reject: (error: unknown) => unknown) => Promise.resolve(void rows(table).push(...incoming)).then(resolve, reject),
+            onConflictDoUpdate: async ({ set, setWhere }: ConflictUpdate) => {
+              for (const row of incoming) upsert(table, row, set, setWhere);
+            },
+          };
         }
         const row: Row = { id: BigInt(nextId++), projectId: 7n, ...(table === schema.milestones ? MILESTONE_DEFAULTS : {}), ...values };
         const clash = table === schema.briefs ? rows(table).find(existing => existing['chapter'] === row['chapter']) : undefined;

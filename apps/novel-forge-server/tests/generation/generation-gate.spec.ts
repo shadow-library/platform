@@ -6,7 +6,7 @@ import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
 import { queryRows } from '../sql-filter';
 
 interface GateFixture {
-  briefs?: { chapter: number; writeMode: 'standard' | 'external'; staleReason: string | null }[];
+  briefs?: { chapter: number; writeMode: 'standard' | 'external'; staleReason: string | null; knowledgeContract?: unknown }[];
   drafted?: number[];
   finalized?: number[];
   draftStatus?: 'draft' | 'final';
@@ -17,6 +17,7 @@ interface GateFixture {
 }
 
 const plan = (chapter: number) => ({ chapter, writeMode: 'standard' as const, staleReason: null });
+const teachingPlan = (chapter: number) => ({ ...plan(chapter), knowledgeContract: { pov: ['mira'], learns: [{ entityKey: 'mira', factKey: 'lamp_rank_4_rule' }] } });
 
 function makeService(fixture: GateFixture = {}) {
   const briefs = fixture.briefs ?? [plan(1)];
@@ -24,7 +25,14 @@ function makeService(fixture: GateFixture = {}) {
   const db = {
     query: {
       projects: { findFirst: async () => ({ id: 1n }) },
-      briefs: { findFirst: async () => briefs[0], findMany: async () => briefs },
+      briefs: {
+        findFirst: async () => briefs[0],
+        findMany: async (query?: Parameters<typeof queryRows>[1]) =>
+          queryRows(
+            briefs.map(brief => ({ projectId: 1n, ...brief })),
+            query,
+          ),
+      },
       drafts: {
         findFirst: async (query: { columns?: Record<string, boolean> }) => {
           if (query.columns && 'id' in query.columns) return fixture.drafted?.length ? { id: 1n } : undefined;
@@ -34,7 +42,7 @@ function makeService(fixture: GateFixture = {}) {
         findMany: async () => (fixture.drafted ?? []).map(chapter => ({ chapter, generator: fixture.handWritten?.includes(chapter) ? 'human' : 'ai' })),
       },
       jobs: { findFirst: async () => (fixture.activeJob ? { id: 'job-0', status: 'in_progress', target: '1' } : undefined) },
-      chapters: { findMany: async () => (fixture.finalized ?? []).map(number => ({ number })) },
+      chapters: { findFirst: async () => undefined, findMany: async () => (fixture.finalized ?? []).map(number => ({ number })) },
     },
   };
   const jobService = { enqueue: async (...args: unknown[]) => (enqueued.push(args), 'job-1') };
@@ -129,6 +137,22 @@ describe('GenerationService.generate', () => {
     await service.generate(1n, {});
 
     expect(enqueued).toEqual([[1n, 'generate', '3', expect.objectContaining({ chapters: [3] })]]);
+  });
+
+  it('should refuse to draft the chapter after one that teaches its cast something until that chapter is approved', async () => {
+    const { service, enqueued } = makeService({ briefs: [teachingPlan(1), plan(2)], drafted: [1] });
+
+    await expect(service.generate(1n, {})).rejects.toMatchObject({ code: 'DRF_016', message: expect.stringContaining('until chapter 1 is approved') });
+    expect(enqueued).toEqual([]);
+  });
+
+  it('should end a batch at a chapter that teaches its cast something', async () => {
+    const { service, enqueued } = makeService({ briefs: [plan(1), teachingPlan(2), plan(3)] });
+
+    const result = await service.generate(1n, { limit: 3 });
+
+    expect(result).toMatchObject({ target: '1,2', stoppedAtTeachingChapter: 2 });
+    expect(enqueued).toEqual([[1n, 'generate', '1,2', expect.objectContaining({ chapters: [1, 2] })]]);
   });
 
   it('should continue an imported novel whose finalized chapters have no plans', async () => {
