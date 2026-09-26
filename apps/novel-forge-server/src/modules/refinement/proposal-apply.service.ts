@@ -33,6 +33,7 @@ import { defaultChapterMode } from '../ai/chapter-route';
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
+import { hasOrganiseUndo, recordOrganiseDecision, revertOrganiseDecision, wholeOrganiseSelection } from '../notes/organise-record';
 import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
 import { CHAT_TURN_GRAPH } from './chat-selection';
@@ -230,7 +231,8 @@ export class ProposalApplyService {
 
       const ops = proposal.changeSet as ChangeOp[];
       const auditSelection = proposal.kind === 'bible_audit' ? await auditCardSelection(tx, proposal.id, options?.opIndexes) : undefined;
-      const selected = this.resolveSelection(ops, auditSelection ?? options?.opIndexes);
+      const organiseSelection = options?.opIndexes ? undefined : wholeOrganiseSelection(proposal);
+      const selected = this.resolveSelection(ops, auditSelection ?? organiseSelection ?? options?.opIndexes);
       const selectedOps = selected.map(index => ({ index, op: ops[index] as ChangeOp }));
       const contentOps = selectedOps.filter((s): s is { index: number; op: ContentOp } => !isActionOp(s.op));
       const selectedActions = selectedOps.filter((s): s is { index: number; op: ActionOp } => isActionOp(s.op));
@@ -295,6 +297,7 @@ export class ProposalApplyService {
         .where(eq(schema.refinementProposals.id, proposal.id))
         .returning();
       if (!applied) throw AppErrorCode.RFN_001.create();
+      await recordOrganiseDecision(tx, projectId, proposal, selected);
 
       await tx
         .insert(schema.userFeedback)
@@ -450,6 +453,8 @@ export class ProposalApplyService {
       case 'milestone.upsert':
       case 'milestone.remove':
         return this.inverseMilestone(ctx, op);
+      case 'organise.rule':
+        return Promise.resolve(null);
     }
   }
 
@@ -619,6 +624,8 @@ export class ProposalApplyService {
         return this.applyMilestoneUpsert(ctx, op);
       case 'milestone.remove':
         return this.applyMilestoneRemove(ctx, op);
+      case 'organise.rule':
+        return Promise.resolve();
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit. Reaching here is a programming error, not bad input.
@@ -982,7 +989,7 @@ export class ProposalApplyService {
         .for('update');
       if (!proposal) throw AppErrorCode.RFN_001.create();
       const inverseOps = (proposal.inverseOps ?? []) as ContentOp[];
-      if (proposal.status !== 'applied' || inverseOps.length === 0) throw AppErrorCode.RFN_007.create();
+      if (proposal.status !== 'applied' || (inverseOps.length === 0 && !hasOrganiseUndo(proposal))) throw AppErrorCode.RFN_007.create();
 
       // Content identity (exists + contentHash) is the guard — NOT revision: reverting a newer change
       // on the same artifact restores this proposal's content but bumps the revision counter, and a
@@ -1003,6 +1010,7 @@ export class ProposalApplyService {
       if (inverseOps.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
       for (const op of removalsLast(inverseOps)) await this.applyOp(ctx, op);
       await enforcePlanOps(ctx.tx, projectId, inverseOps);
+      await revertOrganiseDecision(tx, projectId, proposal);
 
       const [reverted] = await tx
         .update(schema.refinementProposals)
@@ -1053,7 +1061,7 @@ export class ProposalApplyService {
     const result: RollbackResult = { reverted: [], skipped: [] };
     for (const proposal of newer) {
       const inverseOps = (proposal.inverseOps ?? []) as ContentOp[];
-      if (inverseOps.length === 0) {
+      if (inverseOps.length === 0 && !hasOrganiseUndo(proposal)) {
         result.skipped.push(proposal.id);
         continue;
       }

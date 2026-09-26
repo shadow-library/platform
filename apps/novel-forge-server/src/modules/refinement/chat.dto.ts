@@ -193,6 +193,12 @@ export class ChatMessageResponse {
   @Field(() => Integer, { optional: true, nullable: true })
   outputTokens?: number | null;
 
+  @Field({
+    optional: true,
+    description: 'A message of the author’s long enough to keep as notes, which the notes do not hold yet: offer "Save this as notes?", answered by `POST /notes/from-message`.',
+  })
+  offersNotes?: boolean;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 }

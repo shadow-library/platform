@@ -26,18 +26,24 @@ import { type NewLedgerEntry } from '../ledger/ledger.types';
 import { type ContentOp, type OpType } from '../refinement/change-set';
 import { type PageRef, type PageSection } from './bible-page';
 import { lockedLinks } from './content-keys';
+import { type OrganiseClaim, pageRef, recordRef } from './organise-claims';
 import {
   addressOf,
   loadPages,
   ownPageWrite,
   pageBody,
   pageLine,
+  type PageWrite,
+  recordsWrittenBefore,
   recordWrite,
+  type RecordWrite,
   refuseSelection,
   samePage,
   sharedPageWrite,
+  untouchedSections,
   withBacking,
   writtenBefore,
+  type WrittenRecord,
   type WrittenSection,
 } from './organise-content';
 import {
@@ -54,7 +60,7 @@ import { OPEN_QUESTIONS_PAGE, ORGANISE_STEP_KEY, TIMELINE_PAGE } from './organis
 export const ORGANISE_MIN_WORDS = 600;
 
 /** Everything organising may write, for the host that applies a plan as the author's own change. */
-export const ORGANISE_CHANGE_OPS: readonly OpType[] = ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'];
+export const ORGANISE_CHANGE_OPS: readonly OpType[] = ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove', 'organise.rule'];
 
 const TIMELINE_TITLE = 'Timeline';
 const TIMELINE_LEAD = 'The events your notes describe, placed where your notes place them. “Not yet placed” means your notes do not say when yet.';
@@ -127,6 +133,23 @@ export interface OrganisePlanContext {
   tx: PrimaryTransaction;
 }
 
+/** Where an op of the plan came from in the notes, by the ref it writes. */
+export interface OrganiseOpSource {
+  ref: string;
+  /** Present only when everything the op writes rests on quotes the server found in the notes. */
+  quote?: string;
+  paragraphs: number[];
+  /** For a page mixing notes-backed sections with the rest: the write of the notes-backed ones alone, which leaves the rest as it stands. */
+  notesOnly?: { op: ContentOp; quote: string; paragraphs: number[]; claim: OrganiseClaim };
+}
+
+export interface OrganisePlanClaims {
+  /** What organising holds after this plan at refs it has no write for. */
+  settled: OrganiseClaim[];
+  /** What organising holds at an op's ref once that op is applied. */
+  byOp: Map<ContentOp, OrganiseClaim>;
+}
+
 /** Written to the ledger only through `reconcileOrganiseEntries`, which gives `replaces`, `retires` and `withdraws` their meaning. */
 export interface OrganisePlan {
   entries: NewLedgerEntry[];
@@ -139,17 +162,25 @@ export interface OrganisePlan {
   retires: string[];
   /** Earlier refusals of a suggestion the author has now accepted, taken back by id. */
   withdraws: bigint[];
+  sources: OrganiseOpSource[];
+  claims: OrganisePlanClaims;
 }
 
 interface KeptPage {
   page: OrganisePageOption;
   sections: PageSection[];
+  /** The kept sections whose quote the server found, as the round wrote them. */
+  fromNotes: PageSection[];
+  /** Every section is from the notes and no suggestion was added. */
+  onlyNotes: boolean;
+  quote?: string;
+  paragraphs: number[];
 }
 
 interface OrganiseAnswer {
   pages: KeptPage[];
   records: OrganiseRecordOption[];
-  events: { event: string; band: TimelineBand }[];
+  events: { event: string; band: TimelineBand; paragraphs: number[] }[];
   rules: string[];
   questions: OrganiseQuestionOption[];
   accepted: { suggestion: OrganiseSuggestionOption; page: OrganisePageOption }[];
@@ -206,15 +237,23 @@ function answerOf(selection: OrganiseSelection, options: OrganiseOptions): Organ
   const bands = new Map(selection.timeline.map(choice => [choice.optionId, choice.band]));
 
   return {
-    pages: kept.map(({ page, sections }) => ({
-      page,
-      sections: withAdditions(
-        sections.map(section => ({ heading: section.heading, body: section.body })),
-        accepted.filter(item => item.page.id === page.id).map(item => item.suggestion),
-      ),
-    })),
+    pages: kept.map(({ page, sections }) => {
+      const additions = accepted.filter(item => item.page.id === page.id).map(item => item.suggestion);
+      const verified = sections.filter(section => section.quote !== undefined);
+      return {
+        page,
+        sections: withAdditions(
+          sections.map(section => ({ heading: section.heading, body: section.body })),
+          additions,
+        ),
+        fromNotes: verified.map(section => ({ heading: section.heading, body: section.body })),
+        onlyNotes: additions.length === 0 && verified.length === sections.length,
+        quote: verified[0]?.quote,
+        paragraphs: paragraphsOf(sections),
+      };
+    }),
     records: pick(options.records, selection.records),
-    events: events.map(event => ({ event: event.event, band: bands.get(event.id) ?? event.band })),
+    events: events.map(event => ({ event: event.event, band: bands.get(event.id) ?? event.band, paragraphs: event.paragraphs })),
     rules: pick(options.rules, selection.rules).map(rule => rule.rule),
     questions: pick(options.questions, selection.questions),
     accepted,
@@ -223,6 +262,56 @@ function answerOf(selection: OrganiseSelection, options: OrganiseOptions): Organ
       .map(suggestion => ({ suggestion, reason: verdicts.get(suggestion.id)?.reason?.trim() || null })),
   };
 }
+
+function paragraphsOf(items: readonly { paragraphs: number[] }[]): number[] {
+  return [...new Set(items.flatMap(item => item.paragraphs))].sort((a, b) => a - b);
+}
+
+/** Only a page mixing both gets one: the whole page already stands alone when every section is from the notes, or none is. */
+function notesOnlySource(kept: KeptPage, stored: string | null, written: WrittenSection[]): OrganiseOpSource['notesOnly'] {
+  if (kept.onlyNotes || kept.quote === undefined) return undefined;
+  const claimed = new Set(kept.fromNotes.map(section => organiseTextKey(section.heading)));
+  const untouched = untouchedSections(stored, written).filter(section => !claimed.has(organiseTextKey(section.heading)));
+  const write = sharedPageWrite(kept.page, kept.page.title, stored, written, [...kept.fromNotes, ...untouched]);
+  const op = write.ops.find(candidate => candidate.op === 'bible_document.upsert');
+  if (!op) return undefined;
+  const fromNotes = kept.page.sections.filter(section => section.quote !== undefined);
+  return { op, quote: kept.quote, paragraphs: paragraphsOf(fromNotes), claim: { kind: 'page', ref: pageRef(kept.page), page: write.written } };
+}
+
+function ownClaim(page: PageRef, ops: ContentOp[], present: boolean): OrganiseClaim {
+  const kept = ops.some(op => op.op === 'bible_document.upsert') || (ops.length === 0 && present);
+  return { kind: 'own', ref: pageRef(page), page: kept ? page : null };
+}
+
+function recordClaim(op: ContentOp, written: readonly WrittenRecord[]): OrganiseClaim | null {
+  if (op.op === 'entity.remove') return { kind: 'record', ref: recordRef(op.entityKey), record: null };
+  if (op.op !== 'entity.upsert') return null;
+  return { kind: 'record', ref: recordRef(op.entityKey), record: (op.name === undefined ? undefined : written.find(record => record.entityKey === op.entityKey)) ?? null };
+}
+
+/** Each write claims what it leaves at its ref; a ref the plan leaves as it is keeps the plan's claim without a write. */
+function planClaims(
+  pageWrites: { page: PageRef; write: PageWrite }[],
+  own: { page: PageRef; ops: ContentOp[]; present: boolean }[],
+  records: RecordWrite,
+  previousRecords: readonly WrittenRecord[],
+): OrganisePlanClaims {
+  const byOp = new Map<ContentOp, OrganiseClaim>();
+  const settled: OrganiseClaim[] = [];
+  const claim = (value: OrganiseClaim, ops: ContentOp[]) => (ops.length === 0 ? settled.push(value) : ops.forEach(op => byOp.set(op, value)));
+  for (const { page, write } of pageWrites) claim({ kind: 'page', ref: pageRef(page), page: write.written }, write.ops);
+  for (const { page, ops, present } of own) claim(ownClaim(page, ops, present), ops);
+  for (const op of records.ops) {
+    const value = recordClaim(op, records.written);
+    if (value) byOp.set(op, value);
+  }
+  const touched = new Set(records.ops.flatMap(op => ('entityKey' in op ? [op.entityKey] : [])));
+  for (const record of previousRecords) if (!touched.has(record.entityKey)) settled.push({ kind: 'record', ref: recordRef(record.entityKey), record: null });
+  return { settled, byOp };
+}
+
+const docRef = pageRef;
 
 function isEmptyAnswer(answer: OrganiseAnswer): boolean {
   return answer.pages.length + answer.records.length + answer.events.length + answer.rules.length + answer.questions.length === 0;
@@ -329,18 +418,6 @@ export function describeOrganiseOptions(options: OrganiseOptions): OrganiseOptio
   ];
 }
 
-/** Everything the round offered, for a host with no screen to choose on: suggestions stay undecided, so nothing the notes lack is written. */
-export function keepEveryOrganiseOption(options: OrganiseOptions): OrganiseSelection {
-  return {
-    sections: options.pages.flatMap(page => page.sections.map(section => section.id)),
-    records: options.records.map(record => record.id),
-    timeline: options.timeline.map(event => ({ optionId: event.id, band: event.band })),
-    rules: options.rules.map(rule => rule.id),
-    questions: options.questions.map(item => item.id),
-    suggestions: [],
-  };
-}
-
 export function chosenOrganiseOptionIds(selection: OrganiseSelection): string[] {
   return [
     ...selection.sections,
@@ -368,10 +445,11 @@ export async function planOrganise(selection: OrganiseSelection, { round, ledger
   const bodyOf = (page: PageRef): string | null => stored.find(row => samePage(row, page))?.body ?? null;
   const writtenOn = (page: PageRef): WrittenSection[] => before.find(written => samePage(written, page))?.sections ?? [];
 
-  const shared = [
-    ...answer.pages.map(({ page, sections }) => sharedPageWrite(page, page.title, bodyOf(page), writtenOn(page), sections)),
-    ...stale.map(page => sharedPageWrite(page, page.slug, bodyOf(page), page.sections, [])),
+  const pageWrites = [
+    ...answer.pages.map(({ page, sections }) => ({ page: page as PageRef, write: sharedPageWrite(page, page.title, bodyOf(page), writtenOn(page), sections) })),
+    ...stale.map(page => ({ page: page as PageRef, write: sharedPageWrite(page, page.slug, bodyOf(page), page.sections, []) })),
   ];
+  const shared = pageWrites.map(({ write }) => write);
   const timeline =
     hadOwnPage(TIMELINE_PAGE) || answer.events.length > 0 ? ownPageWrite(TIMELINE_PAGE, TIMELINE_TITLE, TIMELINE_LEAD, bodyOf(TIMELINE_PAGE), timelineSections(answer.events)) : [];
   const questions =
@@ -379,6 +457,15 @@ export async function planOrganise(selection: OrganiseSelection, { round, ledger
       ? ownPageWrite(OPEN_QUESTIONS_PAGE, QUESTIONS_TITLE, QUESTIONS_LEAD, bodyOf(OPEN_QUESTIONS_PAGE), questionSections(answer.questions))
       : [];
   const records = await recordWrite(answer.records, ledger, tx, projectId);
+  const claims = planClaims(
+    pageWrites,
+    [
+      { page: TIMELINE_PAGE, ops: timeline, present: answer.events.length > 0 },
+      { page: OPEN_QUESTIONS_PAGE, ops: questions, present: answer.questions.length > 0 },
+    ],
+    records,
+    recordsWrittenBefore(ledger),
+  );
   const backed = answer.pages.map(({ page }) => ({ section: page.section, slug: page.slug, title: page.title }));
   const changeSet = await withBacking([...records.ops, ...shared.flatMap(write => write.ops), ...timeline, ...questions], backed, tx, projectId);
 
@@ -408,6 +495,21 @@ export async function planOrganise(selection: OrganiseSelection, { round, ledger
   );
   const rejected = answer.rejected.map(({ suggestion, reason }) => authored({ kind: 'rejected', topic: ORGANISE_RULED_OUT_TOPIC, statement: suggestion.text, why: reason }));
   const acceptedTexts = new Set(answer.accepted.map(({ suggestion }) => organiseTextKey(suggestion.text)));
+  const recordOps = records.ops.slice(0, answer.records.length);
+  const sources: OrganiseOpSource[] = [
+    ...answer.pages.map(kept => ({
+      ref: docRef(kept.page),
+      ...(kept.onlyNotes && kept.quote ? { quote: kept.quote } : {}),
+      paragraphs: kept.paragraphs,
+      notesOnly: notesOnlySource(kept, bodyOf(kept.page), writtenOn(kept.page)),
+    })),
+    ...answer.records.flatMap((record, index) => {
+      const op = recordOps[index];
+      return op?.op === 'entity.upsert' ? [{ ref: `entity:${op.entityKey}`, ...(record.quote ? { quote: record.quote } : {}), paragraphs: record.paragraphs }] : [];
+    }),
+    { ref: docRef(TIMELINE_PAGE), paragraphs: paragraphsOf(answer.events) },
+    { ref: docRef(OPEN_QUESTIONS_PAGE), paragraphs: paragraphsOf(answer.questions) },
+  ];
 
   return {
     entries: withoutKnownRejections([decision, ...rules, ...accepted, ...rejected], ledger),
@@ -421,5 +523,7 @@ export async function planOrganise(selection: OrganiseSelection, { round, ledger
           entry.kind === 'rejected' && entry.topic === ORGANISE_RULED_OUT_TOPIC && entry.stepKey === ORGANISE_STEP_KEY && acceptedTexts.has(organiseTextKey(entry.statement)),
       )
       .map(entry => entry.id),
+    sources,
+    claims,
   };
 }

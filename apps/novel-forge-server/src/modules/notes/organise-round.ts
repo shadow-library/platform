@@ -1,4 +1,4 @@
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import {
   ORGANISE_RECORD_TYPES,
   ORGANISE_SOURCES,
@@ -10,6 +10,7 @@ import {
   type TimelineBand,
 } from '@shadow-library/sdk';
 
+import { AppErrorCode } from '@server/classes';
 import { type Bible, type Ledger } from '@server/database';
 
 import { type NotesOrganiseOutput, type NotesOrganisePageOut, ORGANISE_PAGE_SECTIONS, ORGANISE_SLUG_MAX, type OrganisePageSection } from '../ai/schemas/notes-organise.schema';
@@ -17,6 +18,7 @@ import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
 import { AUTHOR_BRIEF_TOPIC } from '../ledger/ledger-sections';
 import { type PageRef } from './bible-page';
 import { addressOf, pageBody, pageLine, samePage } from './organise-content';
+import { type Cited, citedParagraphs, mergeCited, notesSource, type NotesSource, unusedParagraphs, verifiedQuote } from './organise-provenance';
 import { CAST_PAGE, OPEN_QUESTIONS_PAGE, PREMISE_PAGE, TIMELINE_PAGE } from './organised-pages';
 
 const PROSE_SECTION: Bible.Section = 'lore';
@@ -34,6 +36,8 @@ export class OrganiseEventOption {
 
   @Field({ minLength: 1 })
   event: string;
+  @Field(() => [Integer], { description: 'The notes paragraphs it draws on, numbered as the notes are.' })
+  paragraphs: number[];
 }
 
 @Schema()
@@ -49,6 +53,11 @@ export class OrganiseSectionOption {
 
   @Field(() => String, { enum: [...ORGANISE_SOURCES] })
   source: OrganiseSource;
+  @Field({ optional: true, description: 'Words of the notes this rests on, found there by the server; absent when it is not from the notes.' })
+  quote?: string;
+
+  @Field(() => [Integer], { description: 'The notes paragraphs it draws on, numbered as the notes are.' })
+  paragraphs: number[];
 }
 
 @Schema()
@@ -88,6 +97,11 @@ export class OrganiseRecordOption {
 
   @Field(() => String, { enum: [...ORGANISE_SOURCES] })
   source: OrganiseSource;
+  @Field({ optional: true, description: 'Words of the notes this rests on, found there by the server; absent when it is not from the notes.' })
+  quote?: string;
+
+  @Field(() => [Integer], { description: 'The notes paragraphs it draws on, numbered as the notes are.' })
+  paragraphs: number[];
 }
 
 @Schema()
@@ -97,6 +111,11 @@ export class OrganiseRuleOption {
 
   @Field({ minLength: 1 })
   rule: string;
+  @Field({ optional: true, description: 'Words of the notes this rests on, found there by the server; absent when it is not from the notes.' })
+  quote?: string;
+
+  @Field(() => [Integer], { description: 'The notes paragraphs it draws on, numbered as the notes are.' })
+  paragraphs: number[];
 }
 
 @Schema()
@@ -109,6 +128,8 @@ export class OrganiseQuestionOption {
 
   @Field({ minLength: 1 })
   why: string;
+  @Field(() => [Integer], { description: 'The notes paragraphs it draws on, numbered as the notes are.' })
+  paragraphs: number[];
 }
 
 @Schema()
@@ -154,12 +175,19 @@ export class OrganiseOptions {
 
   @Field(() => [OrganiseSuggestionOption])
   suggestions: OrganiseSuggestionOption[];
+  @Field(() => Integer, { description: 'How many paragraphs the notes had.' })
+  paragraphs: number;
+
+  @Field(() => [Integer], { description: 'The paragraphs no kept entry, event or question draws on: the notes not used yet.' })
+  unusedParagraphs: number[];
 }
 
 interface DraftSection {
   heading: string;
   body: string;
   source: OrganiseSource;
+  quote?: string;
+  paragraphs: number[];
 }
 
 interface DraftPage extends PageRef {
@@ -200,11 +228,29 @@ export function uniqueBy<T>(items: T[], key: (item: T) => string): T[] {
   });
 }
 
+/** Items saying the same thing are one item, the first said kept unless a later copy has the quote it lacks; every copy's paragraphs stay with it. */
+function mergedBy<T extends Cited>(items: T[], key: (item: T) => string): T[] {
+  const merged = new Map<string, T>();
+  for (const item of items) {
+    const id = key(item);
+    if (!id) continue;
+    const kept = merged.get(id);
+    if (!kept) {
+      merged.set(id, item);
+      continue;
+    }
+    const chosen = kept.quote || !item.quote ? kept : item;
+    merged.set(id, { ...chosen, paragraphs: mergeCited(kept, item).paragraphs });
+  }
+  return [...merged.values()];
+}
+
 /** Two sections of one page under one heading are one section, unless one is read and the other inferred — those never share a body. */
 function mergeSection(sections: DraftSection[], incoming: DraftSection): void {
   const same = sections.find(section => organiseTextKey(section.heading) === organiseTextKey(incoming.heading));
   if (same && same.source === incoming.source) {
     same.body = `${same.body}\n\n${incoming.body}`;
+    Object.assign(same, mergeCited(same, incoming));
     return;
   }
   sections.push(same ? { ...incoming, heading: `${incoming.heading} (inferred)` } : incoming);
@@ -221,7 +267,7 @@ function characterPage(page: NotesOrganisePageOut, asked: PageRef, characters: S
 }
 
 /** A page in a section the Story Bible reads as records, with no record in the round to back it, moves to a prose section: nothing could write it. */
-function organisedPages(pages: NotesOrganisePageOut[], recordTypes: Set<OrganiseRecordType>, characters: Set<string>): DraftPage[] {
+function organisedPages(pages: NotesOrganisePageOut[], recordTypes: Set<OrganiseRecordType>, characters: Set<string>, source: NotesSource): DraftPage[] {
   const merged = new Map<string, DraftPage>();
   for (const page of pages) {
     const asked = pageAddress(page.section, page.slug, page.title);
@@ -238,7 +284,8 @@ function organisedPages(pages: NotesOrganisePageOut[], recordTypes: Set<Organise
       const own = pageLine(section.heading);
       const heading = character === null || organiseTextKey(own) === organiseTextKey(character) ? own : `${pageLine(character)} — ${own}`;
       const body = pageBody(section.body);
-      if (heading && body) mergeSection(draft.sections, { heading, body, source: section.source });
+      const quote = verifiedQuote(source, section.quote, section.source === 'notes');
+      if (heading && body) mergeSection(draft.sections, { heading, body, source: section.source, quote, paragraphs: citedParagraphs(source, section.paragraphs, quote, body) });
     }
     merged.set(key, draft);
   }
@@ -256,14 +303,55 @@ function rejectedStatements(ledger: Pick<Ledger.Entry, 'kind' | 'statement'>[]):
   return new Set(ledger.filter(entry => entry.kind === 'rejected').map(entry => organiseTextKey(entry.statement)));
 }
 
+/**
+ * Only what the notes back counts as used: sections and records whose quote was found, and the timeline and open questions, which restate
+ * the notes. An inferred section, a suggestion and a rule the author has yet to keep use nothing.
+ */
+function usedParagraphs(round: Omit<OrganiseOptions, 'paragraphs' | 'unusedParagraphs'>): number[] {
+  return [
+    ...round.pages.flatMap(page => page.sections.flatMap(section => (section.quote ? section.paragraphs : []))),
+    ...round.records.flatMap(record => (record.quote ? record.paragraphs : [])),
+    ...round.timeline.flatMap(event => event.paragraphs),
+    ...round.questions.flatMap(item => item.paragraphs),
+  ];
+}
+
+/** Passes over parts of long notes are one answer: their lists join, and what two passes both said merges as any repeat does. */
+export function mergeOrganiseOutputs(outputs: readonly NotesOrganiseOutput[]): NotesOrganiseOutput {
+  const [first, ...rest] = outputs;
+  if (!first) throw AppErrorCode.AI_001.create();
+  if (rest.length === 0) return first;
+  return {
+    reading: first.reading,
+    timeline: outputs.flatMap(output => output.timeline),
+    pages: outputs.flatMap(output => output.pages),
+    records: outputs.flatMap(output => output.records),
+    rules: outputs.flatMap(output => output.rules),
+    questions: outputs.flatMap(output => output.questions),
+    suggestions: outputs.flatMap(output => output.suggestions),
+    coachMessage: outputs.map(output => output.coachMessage.trim()).join('\n\n'),
+  };
+}
+
 export function organiseRound(output: NotesOrganiseOutput, ledger: Pick<Ledger.Entry, 'kind' | 'topic' | 'statement'>[]): OrganiseOptions {
   const brief = ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC)?.statement ?? '';
-  const records = uniqueBy(
-    output.records.map(record => ({ name: pageLine(record.name), type: record.type, summary: pageLine(record.summary), source: record.source })),
-    record => (record.name && record.summary ? `${organiseTextKey(record.name)}|${record.type}` : ''),
+  const source = notesSource(brief);
+  const records = mergedBy(
+    output.records.map(record => {
+      const quote = verifiedQuote(source, record.quote, record.source === 'notes');
+      return {
+        name: pageLine(record.name),
+        type: record.type,
+        summary: pageLine(record.summary),
+        source: record.source,
+        quote,
+        paragraphs: citedParagraphs(source, record.paragraphs, quote, `${record.name} ${record.summary}`),
+      };
+    }),
+    record => (record.name && record.summary ? organiseTextKey(record.name) : ''),
   );
   const characters = new Set(records.filter(record => record.type === 'character').map(record => organiseTextKey(record.name)));
-  const drafts = organisedPages(output.pages, new Set(records.map(record => record.type)), characters);
+  const drafts = organisedPages(output.pages, new Set(records.map(record => record.type)), characters, source);
   const pages = drafts.map((page, index): OrganisePageOption => ({
     id: `p${index + 1}`,
     section: page.section,
@@ -286,23 +374,31 @@ export function organiseRound(output: NotesOrganiseOutput, ledger: Pick<Ledger.E
     suggestion => organiseTextKey(suggestion.text),
   );
 
-  return {
+  const round = {
     reading: output.reading.trim(),
     notesDigest: textDigest(brief),
-    timeline: uniqueBy(
-      output.timeline.map(event => ({ band: event.band, event: pageLine(event.event) })),
+    timeline: mergedBy(
+      output.timeline.map(event => ({ band: event.band, event: pageLine(event.event), paragraphs: citedParagraphs(source, event.paragraphs, undefined, event.event) })),
       event => organiseTextKey(event.event),
     ).map((event, index) => ({ id: `t${index + 1}`, ...event })),
     pages,
     records: records.map((record, index) => ({ id: `e${index + 1}`, ...record })),
-    rules: uniqueBy(
-      output.rules.map(rule => pageLine(rule.rule)),
-      organiseTextKey,
-    ).map((rule, index) => ({ id: `r${index + 1}`, rule })),
-    questions: uniqueBy(
-      output.questions.map(item => ({ question: pageLine(item.question), why: pageLine(item.why) })),
+    rules: mergedBy(
+      output.rules.map(rule => {
+        const quote = verifiedQuote(source, rule.quote, true);
+        return { rule: pageLine(rule.rule), quote, paragraphs: citedParagraphs(source, rule.paragraphs, quote, rule.rule) };
+      }),
+      rule => organiseTextKey(rule.rule),
+    ).map((rule, index) => ({ id: `r${index + 1}`, ...rule })),
+    questions: mergedBy(
+      output.questions.map(item => ({
+        question: pageLine(item.question),
+        why: pageLine(item.why),
+        paragraphs: citedParagraphs(source, item.paragraphs, undefined, item.question),
+      })),
       item => organiseTextKey(item.question),
     ).map((item, index) => ({ id: `q${index + 1}`, ...item })),
     suggestions: suggestions.map((suggestion, index) => ({ id: `s${index + 1}`, ...suggestion })),
   };
+  return { ...round, paragraphs: source.paragraphs.length, unusedParagraphs: unusedParagraphs(source.paragraphs.length, usedParagraphs(round)) };
 }

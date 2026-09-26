@@ -58,6 +58,7 @@ function chat() {
     { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
     { resolve: async () => ({ writerClass: 'permissive', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
+    { read: async () => ({ text: '' }) } as never,
   );
   return { service, inserts, turns };
 }

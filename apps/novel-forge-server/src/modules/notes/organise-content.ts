@@ -97,7 +97,7 @@ export function writtenBefore(ledger: Ledger.Entry[]): WrittenPage[] {
   });
 }
 
-function recordsWrittenBefore(ledger: Ledger.Entry[]): WrittenRecord[] {
+export function recordsWrittenBefore(ledger: Ledger.Entry[]): WrittenRecord[] {
   const records = payloadOf(organiseDecision(ledger))['records'];
   if (!Array.isArray(records)) return [];
   return records.filter((record): record is WrittenRecord => typeof record?.entityKey === 'string' && typeof record.name === 'string' && typeof record.digest === 'string');
@@ -113,6 +113,12 @@ function sectionState(current: PageSection[], written: WrittenSection[], heading
   const mine = written.find(section => organiseTextKey(section.heading) === organiseTextKey(heading));
   if (!mine) return 'foreign';
   return mine.digest === textDigest(present.body) ? 'mine' : 'changed';
+}
+
+/** The sections of a page that still hold exactly what organising wrote there, as they stand. */
+export function untouchedSections(stored: string | null, written: WrittenSection[]): PageSection[] {
+  const current = pageSections(stored);
+  return current.filter(section => sectionState(current, written, section.heading) === 'mine');
 }
 
 /** An organised section that collides with someone else's heading is written beside it under a heading of its own, never over it. */

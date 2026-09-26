@@ -22,6 +22,7 @@ import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { ProjectEventService } from '../events/project-event.service';
+import { NotesStoreService } from '../notes/notes-store.service';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
@@ -234,6 +235,7 @@ export class ChatService {
     private readonly compaction: ChatCompactionService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
+    private readonly notesStore: NotesStoreService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -364,6 +366,10 @@ export class ChatService {
     const runIds = [...new Set(rows.flatMap(row => (row.role === 'assistant' && row.runId ? [row.runId] : [])))];
     const selections = await loadTurnSelections(this.db, runIds);
     return rows.reverse().map(row => (row.role === 'assistant' && row.runId ? { ...row, ...selections.get(row.runId) } : row));
+  }
+
+  async authorNotes(projectId: bigint): Promise<string> {
+    return (await this.notesStore.read(projectId)).text;
   }
 
   /**

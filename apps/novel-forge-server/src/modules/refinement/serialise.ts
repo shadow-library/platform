@@ -1,6 +1,7 @@
 import { type Project, type Refinement } from '@server/database';
 
 import { type CallUsageTotals } from '../ai/usage/call-usage';
+import { type NotesOffer, notesOffer } from '../notes/notes-message';
 import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
 import { type OpResult } from './proposal-apply.service';
@@ -34,7 +35,10 @@ interface ChatMessageRow {
   createdAt: Date;
 }
 
-export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
+const NO_NOTES = notesOffer('');
+
+/** `offersNotes` reads the message against the author's notes, so one they already hold, or could not take, is not offered. */
+export function serialiseMessage(message: ChatMessageRow, offersNotes: NotesOffer = NO_NOTES): ChatMessageResponse {
   return {
     id: message.id,
     sessionId: message.sessionId,
@@ -48,6 +52,7 @@ export function serialiseMessage(message: ChatMessageRow): ChatMessageResponse {
     modelId: message.modelId ?? null,
     contentMode: message.contentMode ?? null,
     costTier: message.costTier ?? null,
+    offersNotes: offersNotes(message),
     createdAt: message.createdAt,
   };
 }
@@ -81,10 +86,10 @@ export function serialiseProposal(proposal: Refinement.Proposal): ProposalRespon
 }
 
 /** One turn on the wire. Shared by the synchronous turn endpoint and the stream's `done` event, which carry the same shape by contract. */
-export function serialiseTurn(result: ChatTurnResult): ChatTurnResponse {
+export function serialiseTurn(result: ChatTurnResult, offersNotes: NotesOffer = NO_NOTES): ChatTurnResponse {
   const applied = result.applied;
   return {
-    userMessage: serialiseMessage(result.userMessage),
+    userMessage: serialiseMessage(result.userMessage, offersNotes),
     assistantMessage: serialiseMessage(result.assistantMessage),
     proposal: result.proposal ? serialiseProposal(result.proposal) : undefined,
     appliedProposal: result.appliedProposal ? serialiseProposal(result.appliedProposal) : undefined,

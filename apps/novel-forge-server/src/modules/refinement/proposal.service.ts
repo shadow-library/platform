@@ -50,6 +50,8 @@ export interface CreateProposalInput {
   sourceIsolated?: boolean;
   /** States read before the change-set was written (an audit's, taken as it loaded the bible), so an edit made meanwhile conflicts at apply; read now otherwise. */
   baseline?: Readonly<Record<string, ArtifactState>>;
+  /** An organise proposal's record, aligned to its change-set: what applying it records on the ledger. */
+  organiseRecord?: unknown;
 }
 
 function pickBaseline(states: Readonly<Record<string, ArtifactState>>, refs: readonly string[]): Record<string, ArtifactState> {
@@ -142,6 +144,7 @@ export class ProposalService {
         model: input.model,
         runId: input.runId,
         warnings: warnings.length > 0 ? warnings : null,
+        organiseRecord: input.organiseRecord,
       })
       .returning();
     if (!proposal) throw AppErrorCode.RFN_001.create();
@@ -266,6 +269,7 @@ export class ProposalService {
     if (existing.status !== 'pending') throw AppErrorCode.RFN_002.create();
     // A finding's op indexes point into the card as staged, so an edit would re-aim every Keep and Skip.
     if (existing.kind === 'bible_audit' && (await findAuditReportForCard(this.db, existing.id))) throw AppErrorCode.AUD_007.create();
+    if (existing.kind === 'organise') throw AppErrorCode.NTS_008.create();
 
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();

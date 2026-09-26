@@ -3,6 +3,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
 import { EventsModule } from '../events/events.module';
+import { NotesStoreModule } from '../notes/notes-store.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { ActionExecutorRegistry } from './action-registry';
 import { ChangeHistoryController } from './change-history.controller';
@@ -21,7 +22,7 @@ import { TurnStreamController } from './turn-stream.controller';
 import { TurnStreamService } from './turn-stream.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, EventsModule, PluginsModule],
+  imports: [DatabaseModule, AiModule, EventsModule, NotesStoreModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
   providers: [
     ActionExecutorRegistry,

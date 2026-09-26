@@ -277,8 +277,19 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly NTS_003 = AppErrorCode.badRequest('NTS_003', 'There are no notes long enough to organise yet — organising needs at least {words} words of your notes');
   static readonly NTS_004 = AppErrorCode.conflict(
     'NTS_004',
-    'Your notes are already organised into the Story Bible, or a card organising them is waiting for you — organising them again now would write the same pages a second time. Accept or discard that card, or undo the applied change, to organise afresh',
+    'A card organising your notes is still waiting for you, or one applied before organising kept track of what it wrote — accept or discard the waiting card, or undo the old one, before organising again',
   );
+  static readonly NTS_005 = AppErrorCode.notFound('NTS_005', 'That message is not one of yours in this chat');
+  static readonly NTS_006 = AppErrorCode.badRequest('NTS_006', 'Only a message of at least {words} words is kept as notes — shorter ones stay in the chat');
+  static readonly NTS_007 = AppErrorCode.badRequest(
+    'NTS_007',
+    'Keep either the part of “{page}” taken from your notes or the whole page with its suggestions, not both — the whole page already holds the first',
+  );
+  static readonly NTS_008 = AppErrorCode.badRequest('NTS_008', 'An organise card is kept or declined entry by entry, not edited — edit the Story Bible once it is applied');
+  static readonly NTS_010 = AppErrorCode.conflict('NTS_010', 'Undo the later organise change (#{proposalId}) first — it builds on this one');
+  static readonly NTS_011 = new AppErrorCode('NTS_011', 'Your organised notes could not be saved as a card, so nothing was kept — organising runs again shortly', 503);
+  // A user-facing 500: applying the card would write the organised pages again, and the author should know why nothing happened.
+  static readonly NTS_009 = new AppErrorCode('NTS_009', 'This organise card has lost the record of what it organised, so applying it could write your pages twice', 500);
 
   /*!
    * Chapter Review Errors

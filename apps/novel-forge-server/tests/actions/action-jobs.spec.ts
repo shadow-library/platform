@@ -4,12 +4,9 @@ import { AppErrorCode } from '@server/classes';
 import { type Job, type Ledger, schema } from '@server/database';
 
 import { ActionJobService } from '@modules/actions/action-job.service';
-import { OrganiseJobService } from '@modules/actions/organise-job.service';
 import { PlanJobService } from '@modules/actions/plan-job.service';
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from '@modules/ai/prompts/scope-playbooks';
-import { type NotesOrganiseOutput } from '@modules/ai/schemas/notes-organise.schema';
 import { JobExecutor } from '@modules/jobs/job.executor';
-import { ORGANISE_CHANGE_OPS } from '@modules/notes';
 import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { startedJobs } from '@modules/refinement/serialise';
 
@@ -20,20 +17,6 @@ const SESSION = '11111111-1111-4111-8111-111111111111';
 const ORIGIN = { sessionId: SESSION, messageId: '4', proposalId: '9', opIndex: 1 };
 const CARD = { proposalId: 9n, opIndex: 1, sessionId: SESSION, messageId: 4n };
 const NOTES = Array.from({ length: 620 }, (_, index) => (index % 12 === 0 ? 'Ilse carries sealed letters up from the salt mine.' : 'word')).join(' ');
-
-const ORGANISED: NotesOrganiseOutput = {
-  reading: 'A courier in a salt-mine town learns who owns the letters she carries.',
-  timeline: [
-    { band: 'opening', event: 'Ilse carries a sealed letter up from the mine' },
-    { band: 'ending', event: 'Ilse burns the guild ledger' },
-  ],
-  pages: [{ section: 'project', slug: 'cast', title: 'Cast', sections: [{ heading: 'Ilse', body: 'A courier who never opens what she carries.', source: 'notes' }] }],
-  records: [{ name: 'Ilse', type: 'character', summary: 'A courier who never opens what she carries.', source: 'notes' }],
-  rules: [{ rule: 'Ilse never opens a letter she carries' }],
-  questions: [{ question: 'Who sent the first letter?', why: 'Chapter one opens on it.' }],
-  suggestions: [],
-  coachMessage: 'Your notes are clear on the opening.',
-};
 
 function job(overrides: Partial<Job.Row> = {}): Job.Row {
   return {
@@ -115,44 +98,6 @@ function recorder() {
   const proposals = { create: async (_projectId: bigint, input: Record<string, unknown>) => (created.push(input), { id: 42n }) };
   return { progress, settled, created, models, jobService, workflowRunService, proposals };
 }
-
-function organiser(stored: Stored) {
-  const seen = recorder();
-  const modelRouter = { structured: async (_prompt: unknown, _vars: unknown, telemetry: Record<string, unknown>) => (seen.models.push(telemetry), ORGANISED) };
-  const service = new OrganiseJobService(
-    databaseOver(stored) as never,
-    seen.jobService as never,
-    seen.workflowRunService as never,
-    modelRouter as never,
-    { resolve: async () => ({}) } as never,
-    seen.proposals as never,
-  );
-  return { service, ...seen };
-}
-
-describe('OrganiseJobService', () => {
-  it('should stage the organised notes as one card in the chat the action was accepted from', async () => {
-    const { service, created, progress, models } = organiser({ ledger: [ledgerEntry({ topic: 'start.brief', statement: NOTES })] });
-
-    await service.run(job());
-
-    expect(models).toEqual([expect.objectContaining({ runId: 'run-1', promptKey: 'notes-organise' })]);
-    expect(created).toEqual([expect.objectContaining({ sessionId: SESSION, messageId: 4n, kind: 'organise', runId: 'run-1', allowedOps: ORGANISE_CHANGE_OPS })]);
-    expect((created[0]?.['changeSet'] as unknown[]).length).toBeGreaterThan(0);
-    expect(progress.at(-1)).toMatchObject({ phase: 'staged', proposalId: '42' });
-  });
-
-  it('should not stage a second card when a retry finds the one its first attempt staged', async () => {
-    const { service, created, progress, models, settled } = organiser({ staged: [{ id: 42n }] });
-
-    await service.run(job({ attempts: 1 }));
-
-    expect(models).toEqual([]);
-    expect(created).toEqual([]);
-    expect(settled).toEqual([['job-1', 'completed']]);
-    expect(progress).toEqual([expect.objectContaining({ phase: 'staged', proposalId: '42' })]);
-  });
-});
 
 describe('PlanJobService', () => {
   const GATE_PLAN = { op: 'brief.update', chapter: 3, body: 'Ilse reaches the gate.', title: 'The Gate' };
@@ -330,7 +275,7 @@ describe('ActionJobService', () => {
     expect(enqueued).toEqual([]);
   });
 
-  it('should refuse to organise notes whose organised pages are already applied, until a newer organise decision', async () => {
+  it('should refuse to organise notes while a legacy organise card applied has no organise decision after it', async () => {
     const notes = [ledgerEntry({ topic: 'start.brief', statement: NOTES })];
     const { registry, enqueued } = actions({ ledger: notes, appliedOrganise: [{ id: 42n }] });
 
@@ -386,10 +331,10 @@ describe('ActionJobService', () => {
 });
 
 describe('the chat hub vocabulary', () => {
-  it('should offer planning the next chapter but withhold organising, which would write organised pages twice', () => {
+  it('should offer planning the next chapter and organising the notes, now that organising records what it applied', () => {
     expect(HUB_ALLOWED_OPS).toContain('action.plan_chapter');
-    expect(HUB_ALLOWED_OPS).not.toContain('action.organise_notes');
-    expect(HUB_INSTRUCTIONS).not.toContain('action.organise_notes');
+    expect(HUB_ALLOWED_OPS).toContain('action.organise_notes');
+    expect(HUB_INSTRUCTIONS).toContain('action.organise_notes');
   });
 });
 

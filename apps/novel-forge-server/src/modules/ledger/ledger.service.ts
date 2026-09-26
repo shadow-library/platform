@@ -16,7 +16,7 @@ function clearable(value: string | undefined, inherited: string | null): string 
   return value.trim() || null;
 }
 
-function toRow(projectId: bigint, entry: NewLedgerEntry, supersedesId: bigint | null = null): Ledger.NewEntry {
+export function ledgerRow(projectId: bigint, entry: NewLedgerEntry, supersedesId: bigint | null = null): Ledger.NewEntry {
   return {
     projectId,
     kind: entry.kind,
@@ -84,7 +84,7 @@ export class LedgerService {
 
     const rows = await executor
       .insert(schema.decisionLedgerEntries)
-      .values(entries.map(entry => toRow(projectId, entry)))
+      .values(entries.map(entry => ledgerRow(projectId, entry)))
       .returning()
       .catch(err => this.databaseService.translateError(err));
     this.logger.info('ledger entries appended', { projectId, count: rows.length, topics: rows.map(row => row.topic) });
@@ -109,7 +109,7 @@ export class LedgerService {
 
       const [successor] = await executor
         .insert(table)
-        .values(toRow(projectId, { ...next, topic: previous.topic }, previous.id))
+        .values(ledgerRow(projectId, { ...next, topic: previous.topic }, previous.id))
         .returning()
         .catch(err => this.databaseService.translateError(err));
       if (!successor) throw AppErrorCode.S001.create();

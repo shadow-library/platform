@@ -57,6 +57,13 @@
       "when": 1790424664340,
       "tag": "0007_job_events",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790427760539,
+      "tag": "0008_organise_record",
+      "breakpoints": true
     }
   ]
 }

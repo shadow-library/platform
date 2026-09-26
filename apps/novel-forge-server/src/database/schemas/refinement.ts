@@ -116,6 +116,9 @@ export const refinementProposals = pgTable(
     error: jsonb('error').$type<Record<string, unknown>>(),
     // Deterministic review findings on AI-authored text (e.g. a removal written as "no X"), shown beside the change-set.
     warnings: jsonb('warnings').$type<string[]>(),
+    // An organise proposal's own record: what applying it records on the ledger, and once applied, the ledger rows that apply wrote so an
+    // undo can restore the chain. Cards staged before the record existed carry `{"legacy": true}`.
+    organiseRecord: jsonb('organise_record'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -123,10 +126,11 @@ export const refinementProposals = pgTable(
     index('refinement_proposals_project_id_status_idx').on(t.projectId, t.status),
     index('refinement_proposals_session_id_idx').on(t.sessionId),
     index('refinement_proposals_project_id_scope_status_idx').on(t.projectId, t.scopeType, t.scopeRef, t.status),
-    // A job's run stages one card: a second attempt racing the first on the same run conflicts instead of staging a duplicate.
+    // A job's run stages one card: a second attempt racing the first on the same run conflicts instead of staging a duplicate. The
+    // organise run's own applied proposal and a card it discarded sit beside that card.
     uniqueIndex('refinement_proposals_job_card_run_id_unique')
       .on(t.runId)
-      .where(sql`${t.kind} in ('organise', 'chapter_plan')`),
+      .where(sql`${t.kind} in ('organise', 'chapter_plan') and ${t.autoApplied} = false and ${t.status} <> 'discarded'`),
   ],
 );
 

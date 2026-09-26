@@ -10,8 +10,6 @@ export interface ScopePlaybook {
 // looks like and the op vocabulary the model may propose — a smaller vocabulary keeps weak local models
 // inside the repair ladder's reach. The chat-scope enum still carries its original per-artifact values
 // for legacy rows, but every session now runs this one playbook.
-// Organising again over notes already organised writes their pages a second time, so the chat cannot offer it until organise tracks what it wrote.
-const CHAT_WITHHELD_ACTIONS: ReadonlySet<ActionType> = new Set(['action.organise_notes']);
 
 export const HUB_PLAYBOOK: ScopePlaybook = {
   guidance:
@@ -33,7 +31,7 @@ export const HUB_PLAYBOOK: ScopePlaybook = {
     'milestone.upsert',
     'milestone.remove',
   ],
-  allowedActions: ACTION_TYPES.filter(action => !CHAT_WITHHELD_ACTIONS.has(action)),
+  allowedActions: ACTION_TYPES,
 };
 
 /** Guidance + the exact op shapes — what ChatService feeds the {scopeInstructions} template var. */

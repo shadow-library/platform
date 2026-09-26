@@ -1,4 +1,4 @@
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { ORGANISE_RECORD_TYPES, ORGANISE_SOURCES, type OrganiseRecordType, type OrganiseSource, TIMELINE_BANDS, type TimelineBand } from '@shadow-library/sdk';
 
 export const ORGANISE_READING_MAX = 1_200;
@@ -18,6 +18,11 @@ export const ORGANISE_QUESTIONS_MAX = 10;
 export const ORGANISE_SUGGESTIONS_MAX = 8;
 export const ORGANISE_SUGGESTION_MAX = 500;
 export const ORGANISE_COACH_MAX = 1_600;
+export const ORGANISE_QUOTE_MAX = 300;
+export const ORGANISE_CITED_PARAGRAPHS_MAX = 20;
+
+const QUOTE_DESCRIPTION = 'the words of the notes this rests on, copied character for character from one paragraph — at least three words; empty when it is inferred';
+const PARAGRAPHS_DESCRIPTION = 'the numbers of the notes paragraphs (the ¶ labels) it draws on';
 
 export const ORGANISE_PAGE_SECTIONS = ['project', 'world', 'power', 'plot'] as const;
 
@@ -35,6 +40,9 @@ export class NotesOrganiseEventOut {
 
   @Field({ minLength: 1, maxLength: ORGANISE_EVENT_MAX, description: "one moment of the story in a short sentence of under twenty words, in the author's words where possible" })
   event: string;
+
+  @Field(() => [Integer], { optional: true, maxItems: ORGANISE_CITED_PARAGRAPHS_MAX, description: PARAGRAPHS_DESCRIPTION })
+  paragraphs?: number[];
 }
 
 @Schema()
@@ -54,6 +62,11 @@ export class NotesOrganiseSectionOut {
     description: "'notes' when the notes state it; 'inferred' when it is your reading of what the notes imply but do not say",
   })
   source: OrganiseSource;
+  @Field({ optional: true, maxLength: ORGANISE_QUOTE_MAX, description: QUOTE_DESCRIPTION })
+  quote?: string;
+
+  @Field(() => [Integer], { optional: true, maxItems: ORGANISE_CITED_PARAGRAPHS_MAX, description: PARAGRAPHS_DESCRIPTION })
+  paragraphs?: number[];
 }
 
 @Schema()
@@ -91,12 +104,22 @@ export class NotesOrganiseRecordOut {
 
   @Field(() => String, { enum: [...ORGANISE_SOURCES] })
   source: OrganiseSource;
+  @Field({ optional: true, maxLength: ORGANISE_QUOTE_MAX, description: QUOTE_DESCRIPTION })
+  quote?: string;
+
+  @Field(() => [Integer], { optional: true, maxItems: ORGANISE_CITED_PARAGRAPHS_MAX, description: PARAGRAPHS_DESCRIPTION })
+  paragraphs?: number[];
 }
 
 @Schema()
 export class NotesOrganiseRuleOut {
   @Field({ minLength: 1, maxLength: ORGANISE_LINE_MAX, description: 'a hard constraint the notes state that holds from chapter one; never a secret' })
   rule: string;
+  @Field({ optional: true, maxLength: ORGANISE_QUOTE_MAX, description: QUOTE_DESCRIPTION })
+  quote?: string;
+
+  @Field(() => [Integer], { optional: true, maxItems: ORGANISE_CITED_PARAGRAPHS_MAX, description: PARAGRAPHS_DESCRIPTION })
+  paragraphs?: number[];
 }
 
 @Schema()
@@ -106,6 +129,8 @@ export class NotesOrganiseQuestionOut {
 
   @Field({ minLength: 1, maxLength: ORGANISE_LINE_MAX, description: 'why it matters for writing the first chapters' })
   why: string;
+  @Field(() => [Integer], { optional: true, maxItems: ORGANISE_CITED_PARAGRAPHS_MAX, description: PARAGRAPHS_DESCRIPTION })
+  paragraphs?: number[];
 }
 
 @Schema()

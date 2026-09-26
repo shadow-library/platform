@@ -12,6 +12,7 @@ import { scopedCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { ProjectEventService } from '../events/project-event.service';
+import { type OrganiseReceipt } from '../notes/organise-card';
 import { AuthoringClaimService } from './authoring-claim.service';
 
 export interface JobProgress {
@@ -24,6 +25,12 @@ export interface JobProgress {
   startedAt?: string;
   /** The card a chat action job staged, once it has. */
   proposalId?: string;
+  /** What an organise job applied at once from the notes, undone by reverting it; `proposalId` is then its card, if any. */
+  appliedProposalId?: string;
+  /** Why an organise job's notes-backed entries landed on the card instead of applying at once. */
+  applyNote?: string;
+  /** An organise job's receipt: how its entries divide, each op's label and paragraphs, and the notes paragraphs nothing used yet. */
+  organised?: OrganiseReceipt;
 }
 
 /** The chat card a job was started from; bigint ids travel as strings because the origin lives in the jsonb payload. */

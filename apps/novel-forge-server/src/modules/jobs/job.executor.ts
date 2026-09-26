@@ -41,6 +41,7 @@ const BUILT_IN_KINDS: ReadonlySet<Job.Kind> = new Set(['generate', 'backfill', '
 
 // A model call that still times out, is rate limited, meets a 5xx or loses its connection after the router's own retries is retried once more as a whole job,
 // later: organising long notes or planning can outlast a gateway's patience on a bad minute. Only kinds whose handler skips work it already staged are retried.
+// An error whose data carries `retryable: true` asks for the same retry: organising rolls a half-staged result back that way.
 const RETRYABLE_KINDS: ReadonlySet<Job.Kind> = new Set(['organise', 'plan']);
 const MAX_JOB_ATTEMPTS = 2;
 const RETRY_BACKOFF_MS = 30_000;
@@ -60,7 +61,7 @@ type SettleOutcome =
 export function retryAfter(job: Pick<Job.Row, 'kind' | 'attempts'>, err: unknown, claimTtlMs: number, now = Date.now()): Date | undefined {
   const attempt = job.attempts + 1;
   if (!RETRYABLE_KINDS.has(job.kind) || attempt >= MAX_JOB_ATTEMPTS) return undefined;
-  if (!AppError.is(err) || !isTransientModelFailure(err)) return undefined;
+  if (!AppError.is(err) || !(isTransientModelFailure(err) || err.data?.['retryable'] === true)) return undefined;
   return new Date(now + Math.min(RETRY_BACKOFF_MS * 2 ** (attempt - 1), claimTtlMs / 2));
 }
 

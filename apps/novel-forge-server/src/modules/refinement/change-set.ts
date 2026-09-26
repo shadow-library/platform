@@ -158,6 +158,16 @@ export interface MilestoneRemoveOp {
   milestoneKey: string;
 }
 
+/**
+ * A hard rule an organise card offers from the notes. It writes no artifact: applying it is the author keeping the rule, which the organise
+ * decision recorded in the same transaction turns into a Notebook direction, and undoing the card takes back.
+ */
+export interface OrganiseRuleOp {
+  op: 'organise.rule';
+  rule: string;
+  optionId: string;
+}
+
 // Action ops drive the pipeline through existing service code. They carry no
 // artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
 // the proposal's opResults, never in domain tables directly.
@@ -232,7 +242,8 @@ export type ContentOp =
   | FactUpsertOp
   | FactRemoveOp
   | MilestoneUpsertOp
-  | MilestoneRemoveOp;
+  | MilestoneRemoveOp
+  | OrganiseRuleOp;
 
 export type ActionOp =
   | GenerateChapterAction
@@ -335,6 +346,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
     optional: {},
     description: "refused while a plan claims the milestone or a fact's unlock names it.",
   },
+  'organise.rule': { required: { rule: 'string', optionId: 'string' }, optional: {}, description: 'a hard rule from the notes the author keeps as a Notebook direction.' },
   'action.generate_chapter': { required: { chapter: 'number' }, optional: {} },
   'action.audit_bible': { required: {}, optional: {} },
   'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
@@ -666,6 +678,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'milestone.upsert' || op.op === 'milestone.remove') return [`milestone:${op.milestoneKey}`];
+    if (op.op === 'organise.rule') return [];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];
   });

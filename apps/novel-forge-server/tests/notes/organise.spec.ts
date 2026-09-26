@@ -125,7 +125,7 @@ function storedRecords(plan: OrganisePlan): NonNullable<Stored['entities']> {
 describe('notesOrganisePrompt', () => {
   it('should keep everything the notes place later on the timeline, and anything undecided an open question', () => {
     expect(notesOrganisePrompt.key).toBe('notes-organise');
-    expect(notesOrganisePrompt.version).toBe('1.4.0');
+    expect(notesOrganisePrompt.version).toBe('1.5.0');
     expect(notesOrganisePrompt.system).toContain('goes ONLY on the timeline, in its band');
     expect(notesOrganisePrompt.system).toContain('A secret is never a rule.');
     expect(notesOrganisePrompt.system).toContain('is an open question, never a statement on a page, in a record or in a rule');
@@ -214,7 +214,9 @@ describe('organiseOptions', () => {
     );
 
     expect(offered.pages.map(page => `${page.section}/${page.slug}`)).toEqual(['project/premise-notes', 'world/valley']);
-    expect(offered.pages[1]?.sections).toEqual([{ id: 'p2s1', heading: 'Weather', body: 'Fog every morning.\n### Seasons\nTwo.\n\nRain after dusk.', source: 'notes' }]);
+    expect(offered.pages[1]?.sections).toEqual([
+      { id: 'p2s1', heading: 'Weather', body: 'Fog every morning.\n### Seasons\nTwo.\n\nRain after dusk.', source: 'notes', paragraphs: [] },
+    ]);
   });
 
   it('should move a page no record could back to a prose section, so a plan can always write it', () => {

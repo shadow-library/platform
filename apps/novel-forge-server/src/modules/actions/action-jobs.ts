@@ -1,10 +1,9 @@
-import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 
 import { AppErrorCode } from '@server/classes';
 import { type DbExecutor, type Job, type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { type JobOrigin, payloadOrigin } from '../jobs/job.service';
-import { ORGANISE_STEP_KEY } from '../notes/organised-pages';
 import { type ActionContext } from '../refinement/action-registry';
 
 export const ORGANISE_GRAPH = 'notes-organise';
@@ -73,24 +72,17 @@ export async function stageOnce(db: PrimaryDatabase, projectId: bigint, jobId: s
 }
 
 /**
- * Until organising tracks what it wrote, a second pass over notes already organised writes their pages again beside the first. So while an
- * organise card waits, or once one is applied, organising waits for a newer organise decision on the ledger — which only the chat-native
- * organise records.
+ * A pending organise card still holds the last round: a second run would stage beside it a card written over the same pages. An applied
+ * card records what it wrote as it applies, except one staged before cards carried their record: its pages cannot be told apart from
+ * the author's, so organising waits until it is undone.
  */
 export async function assertNotesUnorganised(db: Pick<DbExecutor, 'select'>, projectId: bigint): Promise<void> {
-  const [decision] = await db
-    .select({ createdAt: schema.decisionLedgerEntries.createdAt })
-    .from(schema.decisionLedgerEntries)
-    .where(
-      and(eq(schema.decisionLedgerEntries.projectId, projectId), eq(schema.decisionLedgerEntries.kind, 'decision'), eq(schema.decisionLedgerEntries.stepKey, ORGANISE_STEP_KEY)),
-    )
-    .orderBy(desc(schema.decisionLedgerEntries.createdAt))
-    .limit(1);
-  const applied = and(eq(schema.refinementProposals.status, 'applied'), decision ? gt(schema.refinementProposals.createdAt, decision.createdAt) : undefined);
+  const table = schema.refinementProposals;
+  const legacyApplied = and(eq(table.status, 'applied'), sql`${table.organiseRecord}->>'legacy' = 'true'`);
   const [organised] = await db
-    .select({ id: schema.refinementProposals.id })
-    .from(schema.refinementProposals)
-    .where(and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.kind, 'organise'), or(eq(schema.refinementProposals.status, 'pending'), applied)))
+    .select({ id: table.id })
+    .from(table)
+    .where(and(eq(table.projectId, projectId), eq(table.kind, 'organise'), or(eq(table.status, 'pending'), legacyApplied)))
     .limit(1);
   if (organised) throw AppErrorCode.NTS_004.create();
 }

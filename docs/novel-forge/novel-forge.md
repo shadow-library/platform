@@ -269,10 +269,32 @@
 
 - Chat, audit, premise and plugin output MUST NEVER write domain tables directly; only a proposal apply does, in a transaction with a baseline conflict check.
 - Every apply MUST capture inverse ops; revert runs through the same engine under a content-hash conflict guard. NEVER add an apply path that skips inverse capture.
-- Organise (`action.organise_notes`) and plan (`action.plan_chapter`) are always cards and run as jobs whose own output is again a card: an organised Story Bible
-  or a plan for the next writable chapter only, never a direct write. Until organise records what it wrote, the chat does not offer it, and starting it is refused
-  (`NTS_004`) while an organise card is pending, or one applied is newer than the latest organise decision, because a second pass would write the organised
-  pages twice.
+- Starting organise (`action.organise_notes`) or plan (`action.plan_chapter`) is always a card, and each runs as a job. A plan's output is again a card, for the
+  next writable chapter only. Organise's output follows the quote rule with the notes standing in for the author's message: an entry is "from your notes"
+  only when its quote is found in the notes, stated, and it adds little the paragraphs it cites do not say; in an auto-mode chat those entries apply at once
+  as one revertible proposal. Everything else — no quote, a quote not found or hedged, inferred sections, the model's own suggestions, what relies on a
+  suggestion, the planner-only timeline and open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card. A page mixing
+  both is offered as its notes-backed sections, then the whole page; a card keeping both halves is refused (`NTS_007`). A rule becomes a Notebook direction
+  only when the author keeps its op; what applied at once is recorded as the app's (`decidedBy: system`), what the author kept on the card as theirs. A rule
+  or suggestion an earlier answer kept is taken out only when this round offers it again and the author declines it — its op says so on the card; one
+  this round does not offer stays as it was.
+- Each organise proposal carries its own record (`refinement_proposals.organise_record`) and, in the apply's transaction, records the organise decision from
+  the writes actually applied: a write the author declined leaves the earlier claim at its ref, so the next run rewrites what organising still owns in place
+  rather than beside it or freezing it. If the card fails to save after the notes-backed part applied, the whole stage rolls back and the job retries.
+- Undoing an organise proposal — including a card that kept only rules — puts the ledger back as that apply found it by deleting the rows it wrote and
+  making what it retired active again, so the Notebook's history keeps no "kept, then undone" trail; the proposal row keeps it (`organise_record.applied`).
+  A row the author has since withdrawn or reworded in the Notebook is theirs and stays, and what it replaced stays retired. Undo is refused (`NTS_010`)
+  only while a later organise change builds on a row it wrote.
+- A new card without its record is refused (`NTS_009`). Cards staged before records existed carry `{"legacy": true}` and record nothing, and starting
+  organise is refused (`NTS_004`) while an organise card is pending or such a legacy card is applied. A newer round supersedes an organise card still
+  waiting.
+- Every organise entry cites the notes paragraphs it draws on, numbered as `get_notes` numbers them: the paragraph a found quote sits in, and a cited one
+  only when it shares the entry's words. The receipt lists the paragraphs no quoted entry, timeline event or open question draws on as "not used yet", with
+  the notes digest they refer to. Notes longer than one pass's word limit are organised in several passes, one model call each, each told the reading,
+  records, pages and questions of the passes before; the round they merge into can hold more pages, records and events than one pass may write. On an
+  unrestricted project, what the model inferred or suggested is held to the hard line as supplied text before it reaches a card.
+- An author message of 600 words or more that the notes do not hold, and could take within their word limit, is offered as notes; saving it appends it to
+  the notes as paragraphs of its own through the notes store.
 - `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft (regenerating one is
   the author's own request). Action ops run after the content transaction commits and stop at first failure.
 - **Quote rule**: a chat op applies within the turn only when an auto-mode session (the default for a new chat) sent it, its kind is allowlisted
