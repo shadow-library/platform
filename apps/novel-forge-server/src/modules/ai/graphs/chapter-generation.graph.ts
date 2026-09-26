@@ -13,13 +13,12 @@ import {
   KNOWLEDGE_LEAK_PREFIX,
   type KnowledgeLeakIssue,
   loadKnowledgeView,
-  loadWriterForbiddenFacts,
   parseKnowledgeContract,
   renderForbiddenFacts,
   scanKnowledgeLeaks,
-  scrubForWriter,
   writerSafeLeakLines,
 } from '../../bible/fact/knowledge-view';
+import { loadWriterDisclosurePolicy, type WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../../eval/deterministic-metrics';
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall, raisedContainment, type ScopedPolicyResolver } from '../../plugins/plugin-policy.service';
 import { type ContextAssembler } from '../context/context-assembler.service';
@@ -286,10 +285,11 @@ export function writerSafeLeakFindings(prescan: KnowledgeLeakIssue[], judgeIssue
 }
 
 /** Other findings can still name or paraphrase a forbidden fact, so they are scrubbed; the leak findings are already in their writer-safe form. */
-function writerFacingFindings(state: Pick<ChapterGenState, 'findings' | 'knowledgeWriterFindings'>, forbidden: FactLike[]): string {
+function writerFacingFindings(state: Pick<ChapterGenState, 'findings' | 'knowledgeWriterFindings'>, disclosure: WriterDisclosurePolicy): string {
   const render = (findings: JudgeFinding[]): string => findings.map(finding => `[${finding.severity}] ${finding.text}`).join('\n');
-  const others = scrubForWriter(render(state.findings.filter(finding => !finding.text.startsWith(KNOWLEDGE_LEAK_PREFIX))), forbidden);
-  return [others, render(state.knowledgeWriterFindings)].filter(Boolean).join('\n');
+  const others = disclosure.scrub(render(state.findings.filter(finding => !finding.text.startsWith(KNOWLEDGE_LEAK_PREFIX))), 'note');
+  const leaks = state.knowledgeWriterFindings.map(finding => ({ ...finding, text: disclosure.scrubLeakLine(finding.text) }));
+  return [others, render(leaks)].filter(Boolean).join('\n');
 }
 
 function parseJudgeOutput(raw: string): JudgeOutput | null {
@@ -303,8 +303,8 @@ function parseJudgeOutput(raw: string): JudgeOutput | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function createChapterGenerationGraph(services: GraphServices) {
-  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer, pluginPolicy } = services;
+export function createChapterGenerationNodes(services: Omit<GraphServices, 'checkpointer'>) {
+  const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy } = services;
 
   // The graph is built per run, so this closure is the run's scope: one `project_plugins` read feeds every
   // node's policy instead of one read per model call.
@@ -319,6 +319,14 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return (await resolver).forPack(call, CHAPTER_PACK_CONSUMERS);
   }
 
+  // One snapshot per run and chapter, so the pack, the brief and every repair prompt withhold the same material.
+  const disclosures = new Map<number, Promise<WriterDisclosurePolicy>>();
+  function disclosureFor(projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
+    let disclosure = disclosures.get(chapter);
+    if (!disclosure) disclosures.set(chapter, (disclosure = loadWriterDisclosurePolicy(db, projectId, chapter)));
+    return disclosure;
+  }
+
   function routeFor(projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined, raised: boolean): Promise<CallRoute> {
     return routeRunCall({ pluginPolicy, modelRouter, runPolicy: policyFor }, projectId, call, project, raised);
   }
@@ -327,7 +335,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const projectId = BigInt(state.projectId);
     const call: PolicyCall = { role: 'generation', chapter: state.chapter };
     const policy = await policyFor(projectId, call);
-    const pack = await contextAssembler.forChapter(projectId, state.chapter, { policy: await packPolicyFor(projectId, call) });
+    const pack = await contextAssembler.forChapter(projectId, state.chapter, {
+      policy: await packPolicyFor(projectId, call),
+      disclosure: await disclosureFor(projectId, state.chapter),
+    });
     // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
     if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
     return { contextPackId: pack.id ? String(pack.id) : null, writerClassRaised: policy.raised, nodeTrace: ['assembleContext'] };
@@ -357,8 +368,9 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const policy = await policyFor(projectId, { role: 'generation', chapter: state.chapter });
-    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief);
-    const guidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
+    const disclosure = await disclosureFor(projectId, state.chapter);
+    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
+    const guidance = writerSafeGuidance(disclosure, state.guidance);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
@@ -588,9 +600,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
   }
 
-  async function writerSafeGuidance(projectId: bigint, chapter: number, guidance: string): Promise<string> {
-    if (!guidance) return guidance;
-    return scrubForWriter(guidance, await loadWriterForbiddenFacts(db, projectId, chapter));
+  function writerSafeGuidance(disclosure: WriterDisclosurePolicy, guidance: string): string {
+    return guidance ? disclosure.scrub(guidance, 'note') : guidance;
   }
 
   async function repairPatch(state: ChapterGenState) {
@@ -603,7 +614,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       renderedPack = pack?.rendered ?? '';
     }
 
-    const findingsStr = writerFacingFindings(state, await loadWriterForbiddenFacts(db, projectId, state.chapter));
+    const findingsStr = writerFacingFindings(state, await disclosureFor(projectId, state.chapter));
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: PROMPT_REGISTRY.fix.version, role: 'fix' };
 
     const { policy, project } = await routeFor(projectId, { role: 'fix', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
@@ -659,8 +670,9 @@ export function createChapterGenerationGraph(services: GraphServices) {
       ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
     }
 
-    const findingsStr = writerFacingFindings(state, await loadWriterForbiddenFacts(db, projectId, state.chapter));
-    const authorGuidance = await writerSafeGuidance(projectId, state.chapter, state.guidance);
+    const disclosure = await disclosureFor(projectId, state.chapter);
+    const findingsStr = writerFacingFindings(state, disclosure);
+    const authorGuidance = writerSafeGuidance(disclosure, state.guidance);
     const guidance = authorGuidance ? `${authorGuidance}\n\nPrevious judge findings to avoid:\n${findingsStr}` : `Avoid these issues from the previous draft:\n${findingsStr}`;
 
     const ctx: TelemetryContext = {
@@ -673,7 +685,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
     };
 
     const { policy, project } = await routeFor(projectId, { role: 'generation', chapter: state.chapter }, projectRow as ProjectConfig | undefined, state.writerClassRaised);
-    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief);
+    const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const wordTarget = resolveWordTarget(projectRow);
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
@@ -730,18 +742,24 @@ export function createChapterGenerationGraph(services: GraphServices) {
     return { outcome: state.outcome, nodeTrace: ['finish'] };
   }
 
+  return { assembleContext, draftChapter, persistDraft, mechanicalCheck, judge, repairPatch, repairRewrite, accept, acceptAsIs, awaitReview, finish };
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function createChapterGenerationGraph(services: GraphServices) {
+  const nodes = createChapterGenerationNodes(services);
   return new StateGraph(ChapterGenAnnotation)
-    .addNode('assembleContext', assembleContext)
-    .addNode('draftChapter', draftChapter)
-    .addNode('persistDraft', persistDraft)
-    .addNode('mechanicalCheck', mechanicalCheck)
-    .addNode('judge', judge)
-    .addNode('repairPatch', repairPatch)
-    .addNode('repairRewrite', repairRewrite)
-    .addNode('accept', accept)
-    .addNode('acceptAsIs', acceptAsIs)
-    .addNode('awaitReview', awaitReview)
-    .addNode('finish', finish)
+    .addNode('assembleContext', nodes.assembleContext)
+    .addNode('draftChapter', nodes.draftChapter)
+    .addNode('persistDraft', nodes.persistDraft)
+    .addNode('mechanicalCheck', nodes.mechanicalCheck)
+    .addNode('judge', nodes.judge)
+    .addNode('repairPatch', nodes.repairPatch)
+    .addNode('repairRewrite', nodes.repairRewrite)
+    .addNode('accept', nodes.accept)
+    .addNode('acceptAsIs', nodes.acceptAsIs)
+    .addNode('awaitReview', nodes.awaitReview)
+    .addNode('finish', nodes.finish)
     .addEdge(START, 'assembleContext')
     .addEdge('assembleContext', 'draftChapter')
     .addEdge('draftChapter', 'persistDraft')
@@ -754,5 +772,5 @@ export function createChapterGenerationGraph(services: GraphServices) {
     .addEdge('acceptAsIs', 'finish')
     .addEdge('awaitReview', 'finish')
     .addEdge('finish', END)
-    .compile({ checkpointer });
+    .compile({ checkpointer: services.checkpointer });
 }

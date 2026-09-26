@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { applyBudget, countTokens } from '@modules/ai/context/token-budget';
+import { WriterDisclosurePolicy } from '@modules/bible/fact/writer-disclosure-policy';
 import {
   AUTHOR_BRIEF_TOPIC,
   type LedgerContextEntry,
@@ -23,6 +24,8 @@ function entry(overrides: Partial<LedgerContextEntry>): LedgerContextEntry {
     ...overrides,
   };
 }
+
+const OPEN = WriterDisclosurePolicy.planner();
 
 const ledger: LedgerContextEntry[] = [
   entry({ kind: 'decision', topic: 'protagonist', statement: 'Ada believes she owes nothing to anyone.', writerLine: 'Ada never asks for help on the page.' }),
@@ -91,7 +94,7 @@ describe('ledgerSection', () => {
 
 describe('renderWriterLines', () => {
   it('should list the writer lines of active decisions and system details as bullets in ledger order', () => {
-    expect(renderWriterLines(ledger, [])).toBe(
+    expect(renderWriterLines(ledger, OPEN)).toBe(
       ['- Ada never asks for help on the page.', '- Keep the debt visible in each chapter.', '- The clerk moves slowly and misses nothing.'].join('\n'),
     );
   });
@@ -99,14 +102,16 @@ describe('renderWriterLines', () => {
   it('should scrub a hidden fact out of a writer line', () => {
     const hidden = { factKey: 'clerk_is_heir', text: 'The clerk is the heir.', terms: ['misses nothing'] };
 
-    expect(renderWriterLines(ledger, [hidden])).not.toContain('misses nothing');
+    const disclosure = new WriterDisclosurePolicy({ chapter: 5, lockedFacts: [hidden], plannerOnly: [], plannerPages: [], volumeOrdinals: new Map(), currentVolumeOrdinal: null });
+
+    expect(renderWriterLines(ledger, disclosure)).not.toContain('misses nothing');
   });
 
   it('should drop the oldest lines first when the lines exceed the cap, keeping the rest in ledger order', () => {
     const ledger = Array.from({ length: 8 }, (_, index) => entry({ topic: `cast.${index}`, writerLine: `line ${index} keeps the harbour bells ringing at dusk.` }));
     const budget = countTokens('- line 0 keeps the harbour bells ringing at dusk.\n') * 3;
 
-    const rendered = renderWriterLines(ledger, [], budget) ?? '';
+    const rendered = renderWriterLines(ledger, OPEN, budget) ?? '';
 
     expect(rendered.split('\n').map(line => line.split(' keeps')[0])).toEqual(['- line 5', '- line 6', '- line 7']);
     expect(countTokens(rendered)).toBeLessThanOrEqual(budget);
@@ -115,7 +120,7 @@ describe('renderWriterLines', () => {
   it('should mark the section truncated once the cap drops lines', () => {
     const many = Array.from({ length: 200 }, (_, index) => entry({ topic: `cast.${index}`, writerLine: `Character ${index} speaks in short, careful sentences about the tides.` }));
 
-    const section = writerLinesSection(many, []);
+    const section = writerLinesSection(many, OPEN);
 
     expect(section?.truncated).toBe(true);
     expect(section?.required).toBe(true);
@@ -123,7 +128,7 @@ describe('renderWriterLines', () => {
   });
 
   it('should render nothing when no decision carries a writer line', () => {
-    expect(renderWriterLines([entry({ kind: 'direction', writerLine: 'ignored' })], [])).toBeNull();
-    expect(writerLinesSection([], [])).toBeNull();
+    expect(renderWriterLines([entry({ kind: 'direction', writerLine: 'ignored' })], OPEN)).toBeNull();
+    expect(writerLinesSection([], OPEN)).toBeNull();
   });
 });

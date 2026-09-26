@@ -211,6 +211,13 @@ describe('ProposalApplyService — fact unlock and allowed clues', () => {
     expect(rows(schema.canonFacts)[0]).toMatchObject({ unlock: null, allowedClues: null });
   });
 
+  it("should refuse a clue that names one of the fact's give-away terms", async () => {
+    const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', allowedClues: ['the vault key hums'] }], { facts: [{ ...fact, terms: ['vault key'] }] });
+
+    await expect(service.apply(7n, 300n)).rejects.toMatchObject({ code: 'FCT_006' });
+    expect(rows(schema.canonFacts)[0]).toMatchObject({ allowedClues: null });
+  });
+
   it('should trim and de-duplicate the clues it writes', async () => {
     const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', allowedClues: [' a cold draught ', 'a cold draught', 'salt on the sill'] }], {
       facts: [fact],

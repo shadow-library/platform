@@ -14,3 +14,12 @@ export function revealTermPattern(term: string, global = false): RegExp | null {
   const flags = `${global ? 'g' : ''}${/\p{Lu}/u.test(trimmed) ? 'u' : 'iu'}`;
   return new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(trimmed)}(?![\\p{L}\\p{N}_])`, flags);
 }
+
+/** Each allowed clue that names one of the fact's give-away terms, as `"clue" names "term"`: a clue may show an effect, never the name that gives it away. */
+export function cluesNamingTerms(clues: readonly string[] | null | undefined, terms: readonly string[] | null | undefined): string[] {
+  const patterns = (terms ?? []).flatMap(term => {
+    const pattern = revealTermPattern(term);
+    return pattern ? [{ term: term.trim(), pattern }] : [];
+  });
+  return (clues ?? []).flatMap(clue => patterns.filter(({ pattern }) => pattern.test(clue)).map(({ term }) => `"${clue}" names "${term}"`));
+}

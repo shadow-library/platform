@@ -73,7 +73,7 @@ interface FixtureOptions {
 
 function chapterOneDb(options: FixtureOptions = {}) {
   const { contextRefs = baseRefs, instructions = 'WRITING_STYLE_MARKER Write close third person.', extraEntities = [], ledger = [] } = options;
-  const brief = { chapter: 1, body: 'Wren counts crates.', contextRefs, pov: 'wren', volumeKey: null, knowledgeContract: { pov: ['wren'], learns: [] } };
+  const brief = { chapter: 1, body: 'Wren counts crates.', contextRefs, pov: 'wren', volumeKey: volume.volumeKey, knowledgeContract: { pov: ['wren'], learns: [] } };
   const entities = [wren, tobin, guild, ...extraEntities];
   return {
     insert: mock(() => ({ values: mock(() => ({ onConflictDoNothing: mock(() => ({ returning: mock(async () => []) })) })) })),

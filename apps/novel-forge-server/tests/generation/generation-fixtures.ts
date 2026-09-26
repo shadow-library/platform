@@ -127,6 +127,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
       entities: { findMany: async () => knowledge?.entities ?? [] },
       milestones: { findMany: async () => [] },
       volumes: { findMany: async () => [] },
+      bibleDocuments: { findMany: async () => [] },
       chapters: { findFirst: async () => undefined, findMany: async () => [] },
     },
     insert: (table: unknown) => ({

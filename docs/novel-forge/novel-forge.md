@@ -135,12 +135,19 @@
   fact backs them for the writer's scrub to withhold. They are left out of the outliner's citable catalog, and the lore index, never resolve
   into a writer pack whatever ref names them, and are dropped from outlined refs. The chat hub may read them, but only with review — the hub's inventory lists them
   by address alone, and a turn that looks one up never auto-applies: its proposal waits for the author with a warning that it may carry later-story material into what the chapter writer reads.
-  Everything carried from earlier chapters into a writer pack — continuation state, established facts, recent and `chapter:` ref summaries, the previous
-  chapter's ending — passes the same hidden-fact scrub; planner packs are not scrubbed.
+  Every string the chapter writer reads (generation, revision and repair) passes one disclosure policy for that chapter, loaded once per run: the locked facts' text,
+  author note, key and give-away terms, the ending and ending question (until the chapter planned as the ending) and later volumes' goals and notes are withheld
+  wherever they were copied — previous prose, summaries, continuation state, entity sheets, Bible pages, cited refs and their headings, style, writer lines, the brief,
+  feedback, guidance and findings. The planner-only pages' lines are withheld only from what copies authored canon (pages, entity sheets, cited refs, plugin sections),
+  because their opening lines are what the chapter's own plan says. It is lexical: it catches copies, not paraphrase, and a passage under three words or twelve
+  characters is caught only by give-away terms. For the writer a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an
+  earlier chapter, a thread or mystery only once opened, and the volume-plan and escalation-map pages never. A locked fact's allowed clues reach the writer
+  unscrubbed, and a clue may not name its fact's give-away terms. A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one.
+  Planner and chat packs are not scrubbed.
   Reveals MUST be ledgered deterministically at draft approval, never extracted from model output.
 - A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
   decides whether it holds. A fact's `plannedChapter` is provisional; `disclosedInChapter` is set only when the disclosing chapter is finalized, NEVER by planning. The project's
-  `ending` is planner-only and MUST NEVER reach a writer pack or a publish payload.
+  `ending` is planner-only and MUST NEVER reach a writer pack before the chapter planned as the ending, nor a publish payload.
 - **Reveal rule**: a plan for chapter N MAY learn a fact only when every requirement holds for that plan: its dated reveal chapter is at most N, and each unlock term
   holds, where a milestone counts as reached if a finalized chapter at or before N reached it or this plan or an earlier one claims it, and the ending term holds
   from the chapter planned as the ending on (an epilogue included). Milestones carry no order. An undated fact without a condition has no planned reveal, and no

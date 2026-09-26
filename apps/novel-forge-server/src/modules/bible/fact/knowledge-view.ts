@@ -12,6 +12,7 @@ export interface FactLike {
   constraintNote?: string | null;
   writerNote?: string | null;
   terms?: string[] | null;
+  allowedClues?: string[] | null;
   source?: Knowledge.FactSource;
 }
 
@@ -31,15 +32,9 @@ export interface KnowledgeLeakIssue {
 /** The narrow database surface the loaders need — satisfied by both the client and a transaction. */
 type KnowledgeDb = Pick<PrimaryDatabase, 'query'>;
 
-// Terms shorter than this are too collision-prone to scan for.
-const MIN_TERM_LENGTH = 3;
 const EXCERPT_RADIUS = 60;
 
 const EMPTY_VIEW: KnowledgeView = { known: [], reveals: [], hidden: [] };
-
-function escapeRegExp(term: string): string {
-  return term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function excerptAround(body: string, index: number, length: number): string {
   const start = Math.max(0, index - EXCERPT_RADIUS);
@@ -216,8 +211,6 @@ export function renderForbiddenFacts(facts: FactLike[]): string {
 
 export const KNOWLEDGE_LEAK_PREFIX = 'knowledge leak: ';
 const UNKNOWABLE_REVEAL = 'cut anything that states or implies what the POV cast cannot know yet';
-const PRESCAN_LEAK = /^"(.+?)" exposes \[([^\]]+)\]/;
-const WITHHELD = '[withheld]';
 
 function withWriterNote(line: string, fact: FactLike | undefined): string {
   const note = fact?.writerNote?.trim();
@@ -237,55 +230,6 @@ export function writerSafeLeakLines(prescan: Pick<KnowledgeLeakIssue, 'factKey' 
     for (const fact of cited) lines.push(withWriterNote(UNKNOWABLE_REVEAL, fact));
   }
   return [...new Set(lines)].map(line => `${KNOWLEDGE_LEAK_PREFIX}${line}`);
-}
-
-function wholeMention(value: string): RegExp {
-  return new RegExp(`(?<![\\w])${escapeRegExp(value)}(?![\\w])`, 'gi');
-}
-
-/**
- * Makes author- or judge-written text (a revision note, regeneration guidance) safe for the writer: knowledge-leak
- * finding lines are replaced by their writer-safe forms, and any remaining mention of a forbidden fact's text,
- * author note or key is withheld. A bare key is only a key when it has an underscore — `heir` alone is an ordinary word.
- */
-export function scrubForWriter(text: string, forbidden: FactLike[]): string {
-  if (!text || forbidden.length === 0) return text;
-  const prescan: Pick<KnowledgeLeakIssue, 'factKey' | 'term'>[] = [];
-  const judgeIssues: string[] = [];
-  const kept: string[] = [];
-  for (const line of text.split('\n')) {
-    const at = line.toLowerCase().indexOf(KNOWLEDGE_LEAK_PREFIX);
-    if (at === -1) {
-      kept.push(line);
-      continue;
-    }
-    const finding = line.slice(at + KNOWLEDGE_LEAK_PREFIX.length).trim();
-    const match = PRESCAN_LEAK.exec(finding);
-    if (match?.[1] && match[2]) prescan.push({ term: match[1], factKey: match[2] });
-    else judgeIssues.push(finding);
-  }
-
-  const secrets = forbidden
-    .flatMap(fact => [fact.text, fact.constraintNote, `fact:${fact.factKey}`, fact.factKey.includes('_') ? fact.factKey : null])
-    .filter((secret): secret is string => typeof secret === 'string' && secret.trim().length >= MIN_TERM_LENGTH)
-    .sort((a, b) => b.length - a.length);
-  let scrubbed = kept.join('\n');
-  for (const secret of secrets) scrubbed = scrubbed.replace(wholeMention(secret.trim()), WITHHELD);
-
-  const safe = writerSafeLeakLines(prescan, judgeIssues, forbidden).map(line => `- ${line.slice(KNOWLEDGE_LEAK_PREFIX.length)}`);
-  return [scrubbed.trim(), ...safe].filter(Boolean).join('\n');
-}
-
-/** For plan text — briefs and volumes can name a reveal's give-away terms without its text — so the terms are withheld as well. */
-export function scrubPlanForWriter(text: string, forbidden: FactLike[]): string {
-  const patterns = forbidden
-    .flatMap(fact => fact.terms ?? [])
-    .sort((a, b) => b.trim().length - a.trim().length)
-    .map(term => revealTermPattern(term, true))
-    .filter((pattern): pattern is RegExp => pattern !== null);
-  let scrubbed = scrubForWriter(text, forbidden);
-  for (const pattern of patterns) scrubbed = scrubbed.replace(pattern, WITHHELD);
-  return scrubbed;
 }
 
 /**

@@ -8,8 +8,6 @@ import {
   renderHiddenConstraints,
   renderKnownFacts,
   scanKnowledgeLeaks,
-  scrubForWriter,
-  scrubPlanForWriter,
   splitKnowledgeView,
 } from '@modules/bible/fact/knowledge-view';
 
@@ -90,70 +88,6 @@ describe('knowledge renderers', () => {
   it('should withhold a hidden fact whose writer note is missing or blank', () => {
     expect(renderHiddenConstraints([doorFact])).toBe('');
     expect(renderHiddenConstraints(facts)).not.toContain('twin');
-  });
-});
-
-describe('scrubForWriter', () => {
-  it('should replace leak findings with writer-safe lines and withhold every secret mention', () => {
-    const note = [
-      '[soft] knowledge leak: "forgery" exposes [ledger_forgery] — …a forgery…',
-      '[soft] brief: the study scene is skipped',
-      'Keep ledger_forgery quiet: The ledger in the study is a forgery planted by Elias. (Protects the forged-ledger reveal in the study.)',
-    ].join('\n');
-    const scrubbed = scrubForWriter(note, [ledgerFact]);
-    expect(scrubbed).toBe(
-      [
-        '[soft] brief: the study scene is skipped',
-        'Keep [withheld] quiet: [withheld] ([withheld])',
-        '- remove or avoid "forgery" — Elias steers conversation away from the study.',
-      ].join('\n'),
-    );
-  });
-
-  it('should withhold a bare key only when it has an underscore, and a fact: ref always', () => {
-    const heir: FactLike = { factKey: 'heir', text: 'Mara is the lost heir of the tide court.', writerNote: null };
-    expect(scrubForWriter('Keep their plan, but never name the heir or fact:heir. During the storm, bring the Heir back.', [heir])).toBe(
-      'Keep their plan, but never name the heir or [withheld]. During the storm, bring the Heir back.',
-    );
-    const lostHeir: FactLike = { factKey: 'lost_heir', text: 'Mara is the lost heir of the tide court.', writerNote: null };
-    expect(scrubForWriter('Guard lost_heir, not lost_heirloom.', [lostHeir])).toBe('Guard [withheld], not lost_heirloom.');
-  });
-
-  it('should leave text alone when nothing is forbidden', () => {
-    expect(scrubForWriter('knowledge leak: anything', [])).toBe('knowledge leak: anything');
-  });
-
-  it('should be stable when run twice', () => {
-    const once = scrubForWriter('[soft] knowledge leak: [motive_debt] acts on the debt', facts);
-    expect(scrubForWriter(once, facts)).toBe(once);
-  });
-});
-
-describe('scrubPlanForWriter', () => {
-  it('should withhold every give-away term as a whole word, longest first, alongside the fact text', () => {
-    const plan = 'Expose the Forgery; the planted ledger was planted early. The ledger in the study is a forgery planted by Elias. Forgeryless nights.';
-    expect(scrubPlanForWriter(plan, [ledgerFact])).toBe('Expose the [withheld]; the [withheld] ledger was [withheld] early. [withheld] Forgeryless nights.');
-  });
-
-  it('should match a capitalised term case-sensitively so the common word survives', () => {
-    const will: FactLike = { factKey: 'will_lives', text: 'Will survived the flood.', writerNote: null, terms: ['Will'] };
-    expect(scrubPlanForWriter('Will returns, and she will not forgive him.', [will])).toBe('[withheld] returns, and she will not forgive him.');
-  });
-
-  it('should match a lowercase term in any case with Unicode word boundaries', () => {
-    const court: FactLike = { factKey: 'tide_court', text: 'The court is drowned.', writerNote: null, terms: ['tide court'] };
-    expect(scrubPlanForWriter('The Tide Court waits; the tide courtiers do not; Ñtide court stays.', [court])).toBe(
-      'The [withheld] waits; the tide courtiers do not; Ñtide court stays.',
-    );
-  });
-
-  it('should skip terms too short to scan for', () => {
-    const shortTerm: FactLike = { factKey: 'oath_key', text: 'The oath is void.', writerNote: null, terms: ['ox', 'oath'] };
-    expect(scrubPlanForWriter('The ox keeps the oath.', [shortTerm])).toBe('The ox keeps the [withheld].');
-  });
-
-  it('should leave plan text alone when nothing is forbidden', () => {
-    expect(scrubPlanForWriter('Expose the forgery.', [])).toBe('Expose the forgery.');
   });
 });
 

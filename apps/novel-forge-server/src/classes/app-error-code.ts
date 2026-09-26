@@ -216,6 +216,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
   static readonly FCT_004 = AppErrorCode.conflict('FCT_004', 'A canon fact with this key already exists in the project');
   static readonly FCT_005 = AppErrorCode.badRequest('FCT_005', 'Unlock condition is malformed — {reason}');
+  static readonly FCT_006 = AppErrorCode.badRequest('FCT_006', 'An allowed clue names a give-away term of its fact — {reason}');
 
   /*!
    * Milestone Errors

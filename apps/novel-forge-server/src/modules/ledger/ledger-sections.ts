@@ -2,7 +2,7 @@ import { type Ledger } from '@server/database';
 
 import { type ContextSection, type ContextSegment, renderSection } from '../ai/context/sections';
 import { countTokens } from '../ai/context/token-budget';
-import { type FactLike, scrubPlanForWriter } from '../bible/fact/knowledge-view';
+import { type WriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 
 export type LedgerContextEntry = Pick<Ledger.Entry, 'kind' | 'topic' | 'statement' | 'why' | 'rejectedAlternatives' | 'writerLine' | 'decidedBy'>;
 
@@ -64,10 +64,12 @@ function selectWithinBudget(lines: string[], budgetTokens: number): string[] {
   return kept.reverse();
 }
 
-function scrubbedWriterLines(entries: LedgerContextEntry[], forbidden: FactLike[]): string[] {
+type WriterScrub = Pick<WriterDisclosurePolicy, 'scrub'>;
+
+function scrubbedWriterLines(entries: LedgerContextEntry[], disclosure: WriterScrub): string[] {
   return entries
     .filter(entry => DECIDED_KINDS.has(entry.kind) && entry.writerLine)
-    .map(entry => scrubPlanForWriter(entry.writerLine ?? '', forbidden).trim())
+    .map(entry => disclosure.scrub(entry.writerLine ?? '', 'writer_line').trim())
     .filter(Boolean);
 }
 
@@ -75,8 +77,8 @@ function renderKept(kept: string[]): string | null {
   return kept.length === 0 ? null : kept.map(line => `- ${line}`).join('\n');
 }
 
-export function renderWriterLines(entries: LedgerContextEntry[], forbidden: FactLike[], budgetTokens = WRITER_LINES_BUDGET): string | null {
-  return renderKept(selectWithinBudget(scrubbedWriterLines(entries, forbidden), budgetTokens));
+export function renderWriterLines(entries: LedgerContextEntry[], disclosure: WriterScrub, budgetTokens = WRITER_LINES_BUDGET): string | null {
+  return renderKept(selectWithinBudget(scrubbedWriterLines(entries, disclosure), budgetTokens));
 }
 
 function requiredSection(key: string, content: string, segment: ContextSegment, sourceRefs: string[]): ContextSection {
@@ -93,8 +95,8 @@ export function ledgerSection(entries: LedgerContextEntry[], segment: ContextSeg
   return requiredSection('ledger', renderLedger(entries), segment, ledgerRefs(entries.filter(entry => entry.topic !== AUTHOR_BRIEF_TOPIC)));
 }
 
-export function writerLinesSection(entries: LedgerContextEntry[], forbidden: FactLike[]): ContextSection | null {
-  const lines = scrubbedWriterLines(entries, forbidden);
+export function writerLinesSection(entries: LedgerContextEntry[], disclosure: WriterScrub): ContextSection | null {
+  const lines = scrubbedWriterLines(entries, disclosure);
   const kept = selectWithinBudget(lines, WRITER_LINES_BUDGET);
   const content = renderKept(kept);
   if (content === null) return null;

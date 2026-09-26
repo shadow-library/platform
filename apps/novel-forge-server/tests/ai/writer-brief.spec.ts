@@ -34,6 +34,9 @@ function stubDb(endingContract: unknown = brief.endingContract) {
       canonFacts: { findMany: mock(async () => [hiddenFact]) },
       briefs: { findFirst: mock(async () => ({ knowledgeContract: null, endingContract })) },
       characterKnowledge: { findMany: mock(async () => []) },
+      projects: { findFirst: mock(async () => ({ ending: null, endingQuestion: null })) },
+      bibleDocuments: { findMany: mock(async () => []) },
+      volumes: { findMany: mock(async () => []) },
     },
   } as never;
 }

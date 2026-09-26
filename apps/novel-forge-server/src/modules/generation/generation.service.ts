@@ -49,7 +49,7 @@ import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
-import { loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
+import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { redactJobForResponse } from '../jobs/job-response';
@@ -463,16 +463,17 @@ export class GenerationService {
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const { policy, project: routedProject } = await this.draftRoute(projectId, draft, { role: 'revision', chapter }, project);
-    const [pack, forbidden] = await Promise.all([this.contextAssembler.forChapter(projectId, chapter, { policy }), loadWriterForbiddenFacts(this.db, projectId, chapter)]);
+    const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.revision.key, promptVersion: PROMPT_REGISTRY.revision.version, role: PROMPT_REGISTRY.revision.key };
     const revised = (await this.modelRouter.structured(
       PROMPT_REGISTRY.revision,
       {
         contextPack: pack.rendered,
-        chapterBrief: (await loadWriterBrief(this.db, projectId, chapter, brief, forbidden)).chapterBrief,
+        chapterBrief: (await loadWriterBrief(this.db, projectId, chapter, brief, disclosure)).chapterBrief,
         draftBody: draft.body,
-        feedback: scrubForWriter(body.note, forbidden),
+        feedback: [disclosure.scrub(body.note, 'note'), ...disclosure.leakLines(draft.body)].join('\n'),
       },
       ctx,
       routedProject,
@@ -488,7 +489,7 @@ export class GenerationService {
           summary: revised.summary,
           state: revised.state as never,
           revision: sql`${schema.drafts.revision} + 1`,
-          reviewStatus: 'needs_review',
+          reviewStatus: disclosure.leakLines(revised.body).length > 0 ? 'contradiction' : 'needs_review',
           staleReason: null,
           ...(draft.isolated ? { isolated: true } : raisedContainment(policy)),
           updatedAt: new Date(),
@@ -879,16 +880,16 @@ export class GenerationService {
       { role: 'generation', chapter },
       project as ProjectConfig | undefined,
     );
-    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
+    const disclosure = await loadWriterDisclosurePolicy(this.db, projectId, chapter);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy, disclosure });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.generation.key, promptVersion: PROMPT_REGISTRY.generation.version, role: PROMPT_REGISTRY.generation.key };
-    const forbidden = await loadWriterForbiddenFacts(this.db, projectId, chapter);
     const promptVars = {
       stableContext: pack.renderedStable,
       volatileContext: pack.renderedVolatile,
-      ...(await loadWriterBrief(this.db, projectId, chapter, brief, forbidden)),
+      ...(await loadWriterBrief(this.db, projectId, chapter, brief, disclosure)),
       ...generationWordTargetVars(resolveWordTarget(project)),
     };
-    const guidance = body.guidance ? scrubForWriter(body.guidance, forbidden) : '';
+    const guidance = body.guidance ? disclosure.scrub(body.guidance, 'note') : '';
     const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, policy)) as {
       title: string;
       body: string;

@@ -69,8 +69,26 @@ export const OPEN_QUESTIONS_DOC = { section: 'project', slug: 'open-questions' }
  */
 const PLANNER_ONLY_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [ORGANISED_TIMELINE_DOC, OPEN_QUESTIONS_DOC];
 
+/**
+ * Pages the outliner may still cite but the chapter writer never reads: they lay out every volume, later ones included, so a writer ref to
+ * one resolves to nothing. `story_state/volumes` is the address the volume plan had before the manifest.
+ */
+const WRITER_EXCLUDED_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [
+  { section: 'story_state', slug: 'volume-plan' },
+  { section: 'story_state', slug: 'volumes' },
+  { section: 'plot', slug: 'escalation-map' },
+];
+
+function listed(pages: readonly Pick<BibleDocRow, 'section' | 'slug'>[], doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
+  return pages.some(page => page.section === doc.section && page.slug === doc.slug);
+}
+
 export function isPlannerOnlyBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
-  return PLANNER_ONLY_DOCS.some(page => page.section === doc.section && page.slug === doc.slug);
+  return listed(PLANNER_ONLY_DOCS, doc);
+}
+
+export function isWriterExcludedBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {
+  return isPlannerOnlyBibleDoc(doc) || listed(WRITER_EXCLUDED_DOCS, doc);
 }
 
 export function isCoreBibleDoc(doc: Pick<BibleDocRow, 'section' | 'slug'>): boolean {

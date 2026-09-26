@@ -31,6 +31,8 @@ export interface AssembledPack {
   usedTokens: number;
   sections: ContextSection[];
   unresolvedRefs: string[];
+  /** Refs the writer's disclosure policy refused on purpose; kept apart from `unresolvedRefs`, which reports missing context. */
+  withheldRefs?: string[];
   omitted: OmittedSection[];
   renderedStable: string;
   renderedVolatile: string;
@@ -46,6 +48,7 @@ const SECTION_LABELS: Record<string, string> = {
   character_state: '## CHARACTER STATE (CURRENT)',
   relationships: '## CHARACTER RELATIONSHIPS (CURRENT)',
   memory: '## RECENT SUMMARIES',
+  allowed_clues: '## ALLOWED CLUES',
   writing_style: '## WRITING STYLE',
   catalog: '## CANON CATALOG',
   lore_retrieved: '## LORE REFERENCES',

@@ -139,6 +139,7 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     contextPacks: { findFirst: mock(async () => null) },
     userFeedback: { findMany: mock(async () => []) },
     decisionLedgerEntries: { findMany: mock(async () => []) },
+    bibleDocuments: { findMany: mock(async () => []) },
   };
 
   const insert = mock(() => ({
@@ -627,7 +628,7 @@ describe('ContextAssembler — writer-pack scrub', () => {
   });
 
   it('should withhold a reveal term from the volume goal before the reveal chapter', async () => {
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: `Win back the ${TERM}.` };
     const pack = await makeAssembler(scrubDb({ brief: { volumeKey: 'vol_1' }, volume })).forChapter(1n, 5, { dryRun: true });
 
     expect(sectionOf(pack, 'volume_objective')).toContain('Win back the [withheld].');
@@ -635,15 +636,15 @@ describe('ContextAssembler — writer-pack scrub', () => {
   });
 
   it('should let the reveal chapter read the volume goal in full', async () => {
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: `Win back the ${TERM}.` };
     const pack = await makeAssembler(scrubDb({ brief: { chapter: 12, volumeKey: 'vol_1' }, volume })).forChapter(1n, 12, { dryRun: true });
 
     expect(sectionOf(pack, 'volume_objective')).toContain(`Win back the ${TERM}.`);
   });
 
   it('should withhold a reveal term from a volume ref for the writer but not for the planner', async () => {
-    const volume = { volumeKey: 'vol_1', title: 'The River', objective: `Win back the ${TERM}.` };
-    const assembler = makeAssembler(scrubDb({ volume }));
+    const volume = { volumeKey: 'vol_1', ordinal: 1, title: 'The River', objective: `Win back the ${TERM}.` };
+    const assembler = makeAssembler(scrubDb({ brief: { volumeKey: 'vol_1' }, volume }));
 
     const { resolved: writer } = await assembler.resolveRefs(1n, ['volume:vol_1'], 5);
     expect(writer[0]?.rendered).toContain('Goal: Win back the [withheld].');
@@ -654,7 +655,7 @@ describe('ContextAssembler — writer-pack scrub', () => {
   });
 
   it('should leave the planner outline pack unscrubbed', async () => {
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}. ${HIDDEN_TEXT}` };
+    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: `Win back the ${TERM}. ${HIDDEN_TEXT}` };
     const pack = await makeAssembler(scrubDb({ brief: { volumeKey: 'vol_1' }, volume })).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
 
     expect(sectionOf(pack, 'volume_objective')).toContain(`Win back the ${TERM}.`);
@@ -662,7 +663,7 @@ describe('ContextAssembler — writer-pack scrub', () => {
   });
 
   it('should plan an inserted chapter under exactly the volume its caller resolved', async () => {
-    const volume = { volumeKey: 'vol_1', objective: 'Win back the ferry.' };
+    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: 'Win back the ferry.' };
     const fixture = scrubDb({ brief: { volumeKey: 'vol_1' }, volume });
 
     const unassigned = await makeAssembler(fixture).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true, insertAfter: 4, volumeKey: null } as never);
@@ -675,7 +676,7 @@ describe('ContextAssembler — writer-pack scrub', () => {
 
   it('should scrub the revision pack brief, volume objective and carried state keys and label a stale predecessor', async () => {
     const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { [HIDDEN_TEXT]: 'yes' }, staleReason: 'ancestor chapter 3 was regenerated' }];
-    const volume = { volumeKey: 'vol_1', objective: `Win back the ${TERM}.` };
+    const volume = { volumeKey: 'vol_1', ordinal: 1, objective: `Win back the ${TERM}.` };
     const fixture = scrubDb({ brief: { body: `Hint that ${HIDDEN_TEXT}.`, volumeKey: 'vol_1' }, drafts, volume });
     const pack = await makeAssembler(fixture).forRevision(1n, 5, 0n, { dryRun: true } as never);
 

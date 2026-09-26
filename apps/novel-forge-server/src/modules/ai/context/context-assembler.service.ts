@@ -11,25 +11,21 @@ import { type Ledger, type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import {
-  type FactLike,
   loadKnowledgeView,
-  loadWriterForbiddenFacts,
   loadWriterHiddenFactKeys,
   parseKnowledgeContract,
   renderChapterReveals,
   renderHiddenConstraints,
   renderKnownFacts,
-  scanKnowledgeLeaks,
-  scrubForWriter,
-  scrubPlanForWriter,
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
+import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
-import { type BibleDocRow, isPlannerOnlyBibleDoc } from './bible-docs';
+import { type BibleDocRow, isPlannerOnlyBibleDoc, isWriterExcludedBibleDoc } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import { pluginContextSections } from './plugin-sections';
@@ -66,6 +62,15 @@ export interface OutlinePackOptions extends PackOptions {
 
 export interface ChapterPackOptions extends PackOptions {
   dryRun?: boolean;
+  /** The run's disclosure policy, so the pack and the brief the writer reads beside it are scrubbed against one snapshot. */
+  disclosure?: WriterDisclosurePolicy;
+}
+
+interface ResolvedRefs {
+  resolved: ContextSection[];
+  unresolved: string[];
+  /** Refs the chapter's disclosure policy refused on purpose — later volumes, chapters, threads and mysteries, excluded pages. */
+  withheld: string[];
 }
 
 export interface ChatScopeInput {
@@ -125,10 +130,19 @@ export const ENTITY_CARD_BUDGET = 800;
 // able to claim the budget the rest of the pack needs.
 export const WRITING_STYLE_BUDGET = 4_000;
 
-function writingStyleSection(stored: string | null | undefined, forbidden: FactLike[]): ContextSection {
+function writingStyleSection(stored: string | null | undefined, disclosure: WriterDisclosurePolicy): ContextSection {
   const additions = writingInstructionAdditions(stored);
-  const { text, truncated } = effectiveWritingInstructions(additions && scrubForWriter(additions, forbidden), WRITING_STYLE_BUDGET);
+  const { text, truncated } = effectiveWritingInstructions(additions && disclosure.scrub(additions, 'style'), WRITING_STYLE_BUDGET);
   return { ...makeSection('writing_style', text, 'canonical'), truncated };
+}
+
+const ALLOWED_CLUES_LEAD = 'Signs you may show while their cause stays unexplained:';
+
+/** Allowed clues are the author's licence to foreshadow, so they reach the writer unscrubbed. */
+function allowedCluesSection(disclosure: WriterDisclosurePolicy): ContextSection | null {
+  const clues = disclosure.allowedClues();
+  if (clues.length === 0) return null;
+  return makeSection('allowed_clues', [ALLOWED_CLUES_LEAD, ...clues.map(clue => `- ${clue}`)].join('\n'), 'approved_intent');
 }
 
 type EntityCardRow = Pick<typeof schema.entities.$inferSelect, 'name' | 'type' | 'status' | 'body' | 'notes'> & { aliases: { alias: string }[] };
@@ -199,7 +213,7 @@ interface ResolvedRefRows {
   bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
   factMap: Map<string, CanonFactRow>;
   hiddenFactKeys: ReadonlySet<string> | null;
-  forbidden: FactLike[];
+  disclosure: WriterDisclosurePolicy;
 }
 
 type CanonFactRow = typeof schema.canonFacts.$inferSelect;
@@ -291,35 +305,17 @@ function staleDraftPrefix(draft: { staleReason: string | null } | null | undefin
   return draft?.staleReason != null ? `${STALE_LABEL}\n` : '';
 }
 
-// Each key and value is scrubbed before serializing: scrubbing the JSON text would miss a fact whose quotes or line breaks the encoding escapes.
-function writerSafeState(value: unknown, forbidden: FactLike[]): unknown {
-  if (typeof value === 'string') return scrubForWriter(value, forbidden);
-  if (Array.isArray(value)) return value.map(item => writerSafeState(item, forbidden));
-  if (value === null || typeof value !== 'object') return value;
-  const entries = new Map<string, unknown>();
-  for (const [key, item] of Object.entries(value)) {
-    const scrubbed = scrubForWriter(key, forbidden);
-    let safeKey = scrubbed;
-    for (let n = 2; entries.has(safeKey); n++) safeKey = `${scrubbed} (${n})`;
-    entries.set(safeKey, key === 'establishedFacts' && Array.isArray(item) ? writerSafeFacts(item, forbidden) : writerSafeState(item, forbidden));
-  }
-  return Object.fromEntries(entries);
+// Only the tail reaches the writer, so only a margin around it is scrubbed; a passage cut at the margin is still caught by its sentences.
+function scrubbedTail(prose: string, disclosure: WriterDisclosurePolicy): string {
+  return disclosure.scrub(truncateAtParagraphTail(prose, PREV_ENDING_TAIL * 2).text, 'prose');
 }
 
-// An entry tripping a hidden fact's tell-tale terms is dropped outright rather than scrubbed around, so the ledger never carries half a secret forward.
-function writerSafeFacts(entries: unknown[], forbidden: FactLike[]): string[] {
-  return entries
-    .filter((entry): entry is string => typeof entry === 'string' && scanKnowledgeLeaks(entry, forbidden).length === 0)
-    .slice(0, ESTABLISHED_FACTS_MAX)
-    .map(entry => scrubForWriter(entry, forbidden));
+function renderCarriedState(state: unknown, disclosure: WriterDisclosurePolicy): string {
+  return typeof state === 'string' ? disclosure.scrub(state, 'state') : JSON.stringify(disclosure.scrubState(state, ESTABLISHED_FACTS_MAX));
 }
 
-function renderCarriedState(state: unknown, forbidden: FactLike[]): string {
-  return typeof state === 'string' ? scrubForWriter(state, forbidden) : JSON.stringify(writerSafeState(state, forbidden));
-}
-
-function renderIsolatedEnding(summary: string | null, state: unknown, forbidden: FactLike[]): string {
-  return `Summary: ${scrubForWriter(summary ?? '', forbidden)}\nState: ${state ? renderCarriedState(state, forbidden) : 'null'}`;
+function renderIsolatedEnding(summary: string | null, state: unknown, disclosure: WriterDisclosurePolicy): string {
+  return `Summary: ${disclosure.scrub(summary ?? '', 'summary')}\nState: ${state ? renderCarriedState(state, disclosure) : 'null'}`;
 }
 
 // `entity_relationships` is append-only — one row per chapter that observed the pair — so current state
@@ -357,18 +353,14 @@ export class ContextAssembler {
   }
 
   /** `chapter` is the chapter the refs are resolved for; it makes the sections writer-safe for it. */
-  async resolveRefs(projectId: bigint, refs: string[], chapter?: number): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
-    const forbidden = chapter !== undefined && refs.length > 0 ? await loadWriterForbiddenFacts(this.db, projectId, chapter) : [];
-    return this.resolveRefsFor(projectId, refs, chapter, forbidden);
+  async resolveRefs(projectId: bigint, refs: string[], chapter?: number): Promise<ResolvedRefs> {
+    const disclosure = chapter !== undefined && refs.length > 0 ? await loadWriterDisclosurePolicy(this.db, projectId, chapter) : WriterDisclosurePolicy.planner();
+    return this.resolveRefsFor(projectId, refs, chapter, disclosure);
   }
 
-  private async resolveRefsFor(
-    projectId: bigint,
-    refs: string[],
-    chapter: number | undefined,
-    forbidden: FactLike[],
-  ): Promise<{ resolved: ContextSection[]; unresolved: string[] }> {
-    const uniqueRefs = [...new Set(refs)];
+  private async resolveRefsFor(projectId: bigint, refs: string[], chapter: number | undefined, disclosure: WriterDisclosurePolicy): Promise<ResolvedRefs> {
+    const refused = refs.filter(ref => !disclosure.canResolve(ref));
+    const uniqueRefs = [...new Set(refs)].filter(ref => disclosure.canResolve(ref));
     const entityKeys: string[] = [];
     const worldFactValues: string[] = [];
     const threadKeys: string[] = [];
@@ -453,19 +445,25 @@ export class ContextAssembler {
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
+    const withheld: string[] = [...new Set(refused)];
 
     for (const ref of uniqueRefs) {
       const colon = ref.indexOf(':');
       const prefix = colon === -1 ? '' : ref.slice(0, colon);
       const value = ref.slice(colon + 1);
       if (prefix === 'fact' && hiddenFactKeys?.has(value) && !factMap.get(value)?.writerNote?.trim()) continue;
-      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, forbidden };
-      const section = this.resolveRef(ref, prefix, value, chapter, rows);
+      const opened = prefix === 'thread' ? threadMap.get(value) : prefix === 'mystery' ? mysteryMap.get(value) : undefined;
+      if (opened && !disclosure.opensBy(opened.openedChapter)) {
+        withheld.push(ref);
+        continue;
+      }
+      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, disclosure };
+      const section = this.resolveRef(ref, prefix, value, rows);
       if (section) resolved.push(section);
       else unresolved.push(ref);
     }
 
-    return { resolved, unresolved };
+    return { resolved, unresolved, withheld };
   }
 
   /**
@@ -482,62 +480,59 @@ export class ContextAssembler {
     return { kept, dropped: refs.filter(ref => !keptSet.has(ref)) };
   }
 
-  private resolveRef(ref: string, prefix: string, value: string, chapter: number | undefined, rows: ResolvedRefRows): ContextSection | null {
+  private resolveRef(ref: string, prefix: string, value: string, rows: ResolvedRefRows): ContextSection | null {
+    const heading = (label: string): string => rows.disclosure.scrub(label, 'heading');
+    const content = (text: string, field: 'entity' | 'reference' | 'summary' | 'plan' | 'bible_page' | 'knowledge'): string => rows.disclosure.scrub(text, field);
     switch (prefix) {
       case 'entity': {
         const entity = rows.entityMap.get(value);
         if (!entity) return null;
         const card = renderEntityCard(entity, ENTITY_CARD_BUDGET);
-        return makeRefSection(ref, entityLabel(entity), scrubForWriter(card.text, rows.forbidden), entityCardTier(entity.status), card.truncated);
+        return makeRefSection(ref, heading(entityLabel(entity)), content(card.text, 'entity'), entityCardTier(entity.status), card.truncated);
       }
       case 'world_fact': {
         const match = matchWorldFacts(rows.worldFactRows, value);
         if (!match) return null;
         const lines = match.facts.map(f => `${match.byKey ? `${f.category}/` : ''}${f.key}: ${truncateAtParagraph(f.value, 150).text}`);
-        return makeRefSection(ref, `WORLD FACTS: ${value}`, scrubForWriter(lines.join('\n'), rows.forbidden), 'canonical');
+        return makeRefSection(ref, heading(`WORLD FACTS: ${value}`), content(lines.join('\n'), 'reference'), 'canonical');
       }
       case 'thread': {
         const thread = rows.threadMap.get(value);
         if (!thread) return null;
-        const content = `**${thread.threadKey}** (${thread.status}, ch ${thread.openedChapter ?? '?'}–${thread.closedChapter ?? '?'})\n${thread.summary ?? ''}`;
-        return makeRefSection(ref, `PLOT THREAD: ${thread.threadKey}`, scrubForWriter(content, rows.forbidden), 'canonical');
+        const text = `**${thread.threadKey}** (${thread.status}, ch ${thread.openedChapter ?? '?'}–${thread.closedChapter ?? '?'})\n${thread.summary ?? ''}`;
+        return makeRefSection(ref, heading(`PLOT THREAD: ${thread.threadKey}`), content(text, 'reference'), 'canonical');
       }
       case 'mystery': {
         const mystery = rows.mysteryMap.get(value);
         if (!mystery) return null;
-        const content = `**${mystery.mysteryKey}** (${mystery.status}, ch ${mystery.openedChapter ?? '?'})\n${mystery.question}`;
-        return makeRefSection(ref, `MYSTERY: ${mystery.mysteryKey}`, scrubForWriter(content, rows.forbidden), 'canonical');
+        const text = `**${mystery.mysteryKey}** (${mystery.status}, ch ${mystery.openedChapter ?? '?'})\n${mystery.question}`;
+        return makeRefSection(ref, heading(`MYSTERY: ${mystery.mysteryKey}`), content(text, 'reference'), 'canonical');
       }
       case 'chapter': {
         const n = parseInt(value, 10);
         const chapter = rows.chapterMap.get(n);
         if (!chapter) return null;
         const isDraft = chapter.status !== 'done';
-        const content = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${scrubForWriter(chapter.summary ?? '', rows.forbidden)}`;
-        return makeRefSection(ref, `EARLIER CHAPTER: ${n}${chapter.title ? ` — ${chapter.title}` : ''}`, content, isDraft ? 'working' : 'canonical');
+        const text = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${content(chapter.summary ?? '', 'summary')}`;
+        return makeRefSection(ref, heading(`EARLIER CHAPTER: ${n}${chapter.title ? ` — ${chapter.title}` : ''}`), text, isDraft ? 'working' : 'canonical');
       }
       case 'volume': {
         const volume = rows.volumeMap.get(value);
         if (!volume) return null;
-        const content = `**${volume.title ?? volume.volumeKey}**\nGoal: ${volume.objective ?? ''}`;
-        return makeRefSection(
-          ref,
-          scrubPlanForWriter(`VOLUME: ${volume.title ?? volume.volumeKey}`, rows.forbidden),
-          scrubPlanForWriter(content, rows.forbidden),
-          'approved_intent',
-        );
+        const text = `**${volume.title ?? volume.volumeKey}**\nGoal: ${volume.objective ?? ''}`;
+        return makeRefSection(ref, heading(`VOLUME: ${volume.title ?? volume.volumeKey}`), content(text, 'plan'), 'approved_intent');
       }
       case 'bible_doc': {
         const doc = rows.bibleDocMap.get(value.includes('/') ? value : `${value}/`);
-        if (!doc?.body || isPlannerOnlyBibleDoc(doc)) return null;
+        if (!doc?.body || isWriterExcludedBibleDoc(doc)) return null;
         const { text: body, truncated } = truncateAtParagraph(doc.body, 8_000);
-        return makeRefSection(ref, `BIBLE: ${doc.section}/${doc.slug}`, scrubForWriter(body, rows.forbidden), 'canonical', truncated);
+        return makeRefSection(ref, heading(`BIBLE: ${doc.section}/${doc.slug}`), content(body, 'bible_page'), 'canonical', truncated);
       }
       case 'fact': {
         const fact = rows.factMap.get(value);
         if (!fact) return null;
-        if (rows.hiddenFactKeys?.has(fact.factKey)) return makeRefSection(ref, 'WRITING CONSTRAINT', fact.writerNote?.trim() ?? '', 'approved_intent');
-        if (rows.hiddenFactKeys) return makeRefSection(ref, `CANON FACT: ${fact.factKey}`, `**${fact.factKey}**: ${fact.text}`, 'canonical');
+        if (rows.hiddenFactKeys?.has(fact.factKey)) return makeRefSection(ref, 'WRITING CONSTRAINT', content(fact.writerNote?.trim() ?? '', 'knowledge'), 'approved_intent');
+        if (rows.hiddenFactKeys) return makeRefSection(ref, heading(`CANON FACT: ${fact.factKey}`), content(`**${fact.factKey}**: ${fact.text}`, 'knowledge'), 'canonical');
         const constraintLine = fact.constraintNote ? `\nConstraint: ${fact.constraintNote}` : '';
         return makeRefSection(ref, `CANON FACT: ${fact.factKey}`, `**${fact.factKey}**: ${fact.text}${constraintLine}`, 'canonical');
       }
@@ -569,8 +564,8 @@ export class ContextAssembler {
       }),
     ]);
 
-    const [forbidden, ledger, currentVolume] = await Promise.all([
-      loadWriterForbiddenFacts(this.db, projectId, chapter),
+    const [disclosure, ledger, currentVolume] = await Promise.all([
+      opts?.disclosure ?? loadWriterDisclosurePolicy(this.db, projectId, chapter),
       loadActiveLedger(this.db, projectId),
       this.volumeByKey(projectId, brief?.volumeKey),
     ]);
@@ -583,31 +578,30 @@ export class ContextAssembler {
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isIsolated) {
-        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, forbidden), tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure), tier, [`chapter:${chapter - 1}`]));
       } else {
-        const raw = scrubForWriter(prevChapter.content ?? '', forbidden);
-        sections.push(makeSectionTail('prev_ending', raw, PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
     } else if (prevDraft?.isolated) {
       sections.push(
-        makeSection('prev_ending', `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevDraft.state, forbidden)}`, 'working', [
+        makeSection('prev_ending', `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevDraft.state, disclosure)}`, 'working', [
           `chapter:${chapter - 1}`,
         ]),
       );
     } else if (prevDraft?.body) {
       // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
       // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
-      const { text, truncated } = truncateAtParagraphTail(scrubForWriter(prevDraft.body, forbidden), PREV_ENDING_TAIL);
+      const { text, truncated } = truncateAtParagraphTail(scrubbedTail(prevDraft.body, disclosure), PREV_ENDING_TAIL);
       const content = `[DRAFT — not yet canon]\n${prevStale}${text}`;
       const rendered = renderSection('prev_ending', content);
       sections.push({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: [`chapter:${chapter - 1}`], rendered });
     }
 
     const prevState = prevDraft?.state;
-    if (prevState != null) sections.push(makeSection('continuation_state', `${prevStale}${renderCarriedState(prevState, forbidden)}`, 'working', [`chapter:${chapter - 1}`]));
+    if (prevState != null) sections.push(makeSection('continuation_state', `${prevStale}${renderCarriedState(prevState, disclosure)}`, 'working', [`chapter:${chapter - 1}`]));
 
     if (currentVolume?.objective) {
-      const content = scrubPlanForWriter(currentVolume.objective, forbidden);
+      const content = disclosure.scrub(currentVolume.objective, 'plan');
       sections.push(asStable(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`])));
     }
 
@@ -621,7 +615,7 @@ export class ContextAssembler {
       sections.push(
         makeSection(
           'known_facts',
-          renderKnownFacts(view.known),
+          disclosure.scrub(renderKnownFacts(view.known), 'knowledge'),
           'canonical',
           view.known.map(f => `fact:${f.factKey}`),
         ),
@@ -630,13 +624,13 @@ export class ContextAssembler {
         sections.push(
           makeSection(
             'chapter_reveals',
-            renderChapterReveals(view.reveals),
+            disclosure.scrub(renderChapterReveals(view.reveals), 'knowledge'),
             'approved_intent',
             view.reveals.map(f => `fact:${f.factKey}`),
           ),
         );
       }
-      const constraints = renderHiddenConstraints(view.hidden);
+      const constraints = disclosure.scrub(renderHiddenConstraints(view.hidden), 'knowledge');
       if (constraints) {
         sections.push(
           makeSection(
@@ -648,20 +642,24 @@ export class ContextAssembler {
         );
       }
     }
+    const clues = allowedCluesSection(disclosure);
+    if (clues) sections.push(clues);
 
     const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
     let unresolvedRefs: string[] = [];
+    let withheldRefs: string[] = [];
     let refSections: ContextSection[] = [];
 
     if (contextRefs.length > 0) {
-      const { resolved, unresolved } = await this.resolveRefsFor(projectId, contextRefs, chapter, forbidden);
+      const { resolved, unresolved, withheld } = await this.resolveRefsFor(projectId, contextRefs, chapter, disclosure);
       const constrained = new Set(sections.find(s => s.key === 'hidden_constraints')?.sourceRefs ?? []);
       unresolvedRefs = unresolved;
+      withheldRefs = withheld;
       refSections = resolved.filter(section => !section.sourceRefs.some(ref => constrained.has(ref)));
     }
 
     const pov = brief?.pov ?? null;
-    const povSection = pov ? await this.povEntitySection(projectId, pov, forbidden) : null;
+    const povSection = pov ? await this.povEntitySection(projectId, pov, disclosure) : null;
     if (pov && !povSection && !unresolvedRefs.includes(`entity:${pov}`)) unresolvedRefs = [...unresolvedRefs, `entity:${pov}`];
 
     // Only the first FULL_CAST_MAX entity refs retain caller-requested priority; the rest move below memory
@@ -675,44 +673,47 @@ export class ContextAssembler {
 
     for (const s of [...priorityEntitySections, ...nonEntityRefSections.map(asStable)]) sections.push(s);
 
-    for (const s of await this.dynamicCastSections(projectId, entityRefSections, brief?.pov ?? null, forbidden)) sections.push(s);
+    for (const s of await this.dynamicCastSections(projectId, entityRefSections, brief?.pov ?? null, disclosure)) sections.push(s);
 
     const recent = recentSummaries(recentChapters, recentDrafts);
     if (recent.length > 0) {
       const lines = recent.map(recentSummaryLine);
       const tier: ContextTier = recent.some(entry => entry.draft) ? 'working' : 'canonical';
-      sections.push(makeSection('memory', scrubForWriter(lines.join('\n'), forbidden), tier, []));
+      sections.push(makeSection('memory', disclosure.scrub(lines.join('\n'), 'summary'), tier, []));
     }
 
     // Writing style is the generator's only source for voice, craft, and length, so it is required: the
     // budget reserves it before the refs listed ahead of it can crowd it out.
-    sections.push({ ...asStable(writingStyleSection(project?.instructions, forbidden)), required: true });
+    sections.push({ ...asStable(writingStyleSection(project?.instructions, disclosure)), required: true });
 
     for (const s of excessEntitySections) sections.push(s);
 
     // Pushed after every other core section so the author's decisions render next to the brief, which the template appends after the pack.
-    const writerLines = writerLinesSection(ledger, forbidden);
+    const writerLines = writerLinesSection(ledger, disclosure);
     if (writerLines) sections.push(writerLines);
 
-    const pack = await this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, opts);
+    const pack = await this.finalize(projectId, 'generation', chapter, sections, unresolvedRefs, budgetTokens, { ...opts, disclosure, withheldRefs });
     const excessKeys = new Set(excessEntitySections.map(s => s.key));
     const omitted = pack.omitted.filter(o => !excessKeys.has(o.key)).map(o => o.key);
     if (!opts?.dryRun && (pack.unresolvedRefs.length > 0 || omitted.length > 0))
       this.logger.warn('chapter pack dropped context', { projectId, chapter, unresolvedRefs: pack.unresolvedRefs, omitted });
+    if (!opts?.dryRun && (disclosure.withheld.size > 0 || withheldRefs.length > 0))
+      this.logger.info('chapter pack withheld material', { projectId, chapter, withheld: Object.fromEntries(disclosure.withheld), withheldRefs });
     return pack;
   }
 
   // The POV character's card is the one entity card that never pays the shared ENTITY_CARD_BUDGET cap: the
   // drafter writes from inside this head, so a truncated card is a truncated narrator.
-  private async povEntitySection(projectId: bigint, pov: string, forbidden: FactLike[]): Promise<ContextSection | null> {
+  private async povEntitySection(projectId: bigint, pov: string, disclosure: WriterDisclosurePolicy): Promise<ContextSection | null> {
     const entity = await this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, pov)), with: { aliases: true } });
     if (!entity) return null;
-    return makeRefSection(`entity:${pov}`, entityLabel(entity, true), scrubForWriter(renderEntityCard(entity).text, forbidden), entityCardTier(entity.status));
+    const label = disclosure.scrub(entityLabel(entity, true), 'heading');
+    return makeRefSection(`entity:${pov}`, label, disclosure.scrub(renderEntityCard(entity).text, 'entity'), entityCardTier(entity.status));
   }
 
   // Per-chapter dynamic state — never stable, and never project-wide: it is scoped to the cast the brief
   // already named plus its POV, so a hundred-character project still pays for only the characters on stage.
-  private async dynamicCastSections(projectId: bigint, entityRefSections: ContextSection[], pov: string | null, forbidden: FactLike[]): Promise<ContextSection[]> {
+  private async dynamicCastSections(projectId: bigint, entityRefSections: ContextSection[], pov: string | null, disclosure: WriterDisclosurePolicy): Promise<ContextSection[]> {
     const castKeys = new Set(entityRefSections.map(s => s.key.slice('ref:entity:'.length)));
     if (pov) castKeys.add(pov);
     if (castKeys.size === 0) return [];
@@ -732,7 +733,7 @@ export class ContextAssembler {
       sections.push(
         makeSection(
           'character_state',
-          scrubForWriter(blocks.join('\n\n'), forbidden),
+          disclosure.scrub(blocks.join('\n\n'), 'summary'),
           'working',
           inCast.map(s => `entity:${s.entityKey}`),
         ),
@@ -755,7 +756,7 @@ export class ContextAssembler {
       .sort((a, b) => a.localeCompare(b));
     if (lines.length > 0) {
       const refs = [...new Set(rows.map(r => keyById.get(r.entityId)).filter((key): key is string => key !== undefined))].map(key => `entity:${key}`);
-      sections.push(makeSection('relationships', scrubForWriter(lines.join('\n'), forbidden), 'working', refs));
+      sections.push(makeSection('relationships', disclosure.scrub(lines.join('\n'), 'summary'), 'working', refs));
     }
 
     return sections;
@@ -840,34 +841,36 @@ export class ContextAssembler {
 
     void feedbackId; // Used for audit context, not for filtering here.
     const sections: ContextSection[] = [];
-    const [forbidden, currentVolume] = await Promise.all([loadWriterForbiddenFacts(this.db, projectId, chapter), this.volumeByKey(projectId, brief?.volumeKey)]);
+    const [disclosure, currentVolume] = await Promise.all([loadWriterDisclosurePolicy(this.db, projectId, chapter), this.volumeByKey(projectId, brief?.volumeKey)]);
 
     if (prevChapter) {
       const isIsolated = prevChapter.isolated;
       const isFinal = prevChapter.status === 'done';
       const tier: ContextTier = isFinal ? 'canonical' : 'working';
       if (isIsolated) {
-        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, forbidden), tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevDraft?.state, disclosure), tier, [`chapter:${chapter - 1}`]));
       } else {
-        sections.push(makeSectionTail('prev_ending', scrubForWriter(prevChapter.content ?? '', forbidden), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
     }
 
     const prevState = prevDraft?.state;
     if (prevState != null)
-      sections.push(makeSection('continuation_state', `${staleDraftPrefix(prevDraft)}${renderCarriedState(prevState, forbidden)}`, 'working', [`chapter:${chapter - 1}`]));
+      sections.push(makeSection('continuation_state', `${staleDraftPrefix(prevDraft)}${renderCarriedState(prevState, disclosure)}`, 'working', [`chapter:${chapter - 1}`]));
 
-    if (brief) sections.push(makeSection('brief', scrubPlanForWriter(brief.body, forbidden), 'approved_intent', [`chapter:${chapter}`]));
+    if (brief) sections.push(makeSection('brief', disclosure.scrub(brief.body, 'plan'), 'approved_intent', [`chapter:${chapter}`]));
     if (currentVolume?.objective) {
-      const content = scrubPlanForWriter(currentVolume.objective, forbidden);
+      const content = disclosure.scrub(currentVolume.objective, 'plan');
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
     }
 
     const contextRefs = Array.isArray(brief?.contextRefs) ? (brief.contextRefs as string[]) : [];
     let unresolvedRefs: string[] = [];
+    let withheldRefs: string[] = [];
     if (contextRefs.length > 0) {
-      const { resolved, unresolved } = await this.resolveRefsFor(projectId, contextRefs, chapter, forbidden);
+      const { resolved, unresolved, withheld } = await this.resolveRefsFor(projectId, contextRefs, chapter, disclosure);
       unresolvedRefs = unresolved;
+      withheldRefs = withheld;
       for (const s of resolved) sections.push(s);
     }
 
@@ -876,7 +879,7 @@ export class ContextAssembler {
     }
 
     if (feedbackRows.length > 0) {
-      const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ? scrubForWriter(f.note, forbidden) : f.disposition}`).join('\n');
+      const notes = feedbackRows.map((f, i) => `${i + 1}. ${f.note ? disclosure.scrub(f.note, 'note') : f.disposition}`).join('\n');
       sections.push(makeSection('feedback', notes, 'working', []));
     }
 
@@ -885,11 +888,11 @@ export class ContextAssembler {
         .slice()
         .reverse()
         .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
-      sections.push(makeSection('memory', scrubForWriter(lines.join('\n'), forbidden), 'canonical', []));
+      sections.push(makeSection('memory', disclosure.scrub(lines.join('\n'), 'summary'), 'canonical', []));
     }
-    sections.push(writingStyleSection(project?.instructions, forbidden));
+    sections.push(writingStyleSection(project?.instructions, disclosure));
 
-    return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, opts);
+    return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, { ...opts, disclosure, withheldRefs });
   }
 
   async forValidationWindow(projectId: bigint, from: number, to: number, opts?: PackOptions): Promise<AssembledPack & { id: bigint | null }> {
@@ -1161,9 +1164,9 @@ export class ContextAssembler {
     sections: ContextSection[],
     unresolvedRefs: string[],
     budgetTokens: number,
-    opts?: { dryRun?: boolean; policy?: ForgeCallPolicy },
+    opts?: { dryRun?: boolean; policy?: ForgeCallPolicy; disclosure?: WriterDisclosurePolicy; withheldRefs?: string[] },
   ): Promise<AssembledPack & { id: bigint | null }> {
-    const contributed = [...sections, ...pluginContextSections(opts?.policy, sections)];
+    const contributed = [...sections, ...pluginContextSections(opts?.policy, sections, opts?.disclosure)];
     const { fitting: fittingSections, omitted } = applyBudget(contributed, budgetTokens);
     // Stable sections render first so the prefix stays byte-identical across calls with unchanged
     // canon (the provider prompt-cache contract); callers list stable sections first, so for the
@@ -1192,6 +1195,21 @@ export class ContextAssembler {
       }
     }
 
-    return { projectId, purpose, chapter, budgetTokens, usedTokens, sections: fittingSections, unresolvedRefs, omitted, renderedStable, renderedVolatile, rendered, id };
+    const withheldRefs = opts?.withheldRefs ?? [];
+    return {
+      projectId,
+      purpose,
+      chapter,
+      budgetTokens,
+      usedTokens,
+      sections: fittingSections,
+      unresolvedRefs,
+      withheldRefs,
+      omitted,
+      renderedStable,
+      renderedVolatile,
+      rendered,
+      id,
+    };
   }
 }

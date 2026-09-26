@@ -90,6 +90,14 @@ describe('FactService.upsert — unlock condition and allowed clues', () => {
     expect(writes[0]).toMatchObject({ allowedClues: ['a cold draught', 'salt on the sill'] });
   });
 
+  it("should refuse a clue that names one of the fact's give-away terms, whether the terms are sent or stored", async () => {
+    const { service, writes } = createService({ ...stored, terms: ['memory tithe'] });
+
+    await expect(service.upsert(1n, 'lamp_rank_3', { text: 'x', allowedClues: ['the Memory Tithe comes due'] })).rejects.toMatchObject({ code: 'FCT_006' });
+    await expect(service.upsert(1n, 'lamp_rank_3', { text: 'x', terms: ['cold lamp'], allowedClues: ['a cold lamp at dusk'] })).rejects.toMatchObject({ code: 'FCT_006' });
+    expect(writes).toEqual([]);
+  });
+
   it('should refuse a structurally malformed unlock condition before writing', async () => {
     const { service, writes } = createService(stored);
     const body = { text: 'x', unlock: { all: [{ ending: false }] } } as unknown as UpsertFactBody;
