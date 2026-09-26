@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { GenerationService } from '@modules/generation/generation.service';
 
+import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
 import { queryRows } from '../sql-filter';
 
 interface GateFixture {
@@ -11,6 +12,8 @@ interface GateFixture {
   draftStatus?: 'draft' | 'final';
   activeJob?: boolean;
   contradiction?: boolean;
+  handWritten?: number[];
+  claims?: FakeAuthoringClaims;
 }
 
 const plan = (chapter: number) => ({ chapter, writeMode: 'standard' as const, staleReason: null });
@@ -28,7 +31,7 @@ function makeService(fixture: GateFixture = {}) {
           if (query.columns && 'status' in query.columns) return fixture.draftStatus ? { status: fixture.draftStatus } : undefined;
           return fixture.contradiction ? { chapter: 7 } : undefined;
         },
-        findMany: async () => (fixture.drafted ?? []).map(chapter => ({ chapter })),
+        findMany: async () => (fixture.drafted ?? []).map(chapter => ({ chapter, generator: fixture.handWritten?.includes(chapter) ? 'human' : 'ai' })),
       },
       jobs: { findFirst: async () => (fixture.activeJob ? { id: 'job-0', status: 'in_progress', target: '1' } : undefined) },
       chapters: { findMany: async () => (fixture.finalized ?? []).map(number => ({ number })) },
@@ -36,6 +39,7 @@ function makeService(fixture: GateFixture = {}) {
   };
   const jobService = { enqueue: async (...args: unknown[]) => (enqueued.push(args), 'job-1') };
   const jobExecutor = { dispatch: async () => undefined };
+  const claims = fixture.claims ?? new FakeAuthoringClaims();
   const noop = {} as never;
   const service = new GenerationService(
     { getPostgresClient: () => db } as never,
@@ -52,6 +56,7 @@ function makeService(fixture: GateFixture = {}) {
     noop,
     noop,
     noop,
+    claims.asService(),
   );
   return { service, enqueued };
 }
@@ -108,6 +113,22 @@ describe('GenerationService.generate', () => {
 
     expect(result).toMatchObject({ target: '1,2', stoppedAtUnwrittenChapter: 3 });
     expect(enqueued).toHaveLength(1);
+  });
+
+  it('should draft the chapter after hand-written ones, which count toward the frontier like generated drafts', async () => {
+    const { service, enqueued } = makeService({ briefs: [plan(3)], drafted: [1, 2], handWritten: [1, 2] });
+
+    await service.generate(1n, {});
+
+    expect(enqueued).toEqual([[1n, 'generate', '3', expect.objectContaining({ chapters: [3] })]]);
+  });
+
+  it('should carry on past a hand-filled external slot that is not finalized yet', async () => {
+    const { service, enqueued } = makeService({ briefs: [plan(1), { chapter: 2, writeMode: 'external', staleReason: null }, plan(3)], drafted: [1, 2], handWritten: [2] });
+
+    await service.generate(1n, {});
+
+    expect(enqueued).toEqual([[1n, 'generate', '3', expect.objectContaining({ chapters: [3] })]]);
   });
 
   it('should continue an imported novel whose finalized chapters have no plans', async () => {
@@ -173,6 +194,41 @@ describe('GenerationService.generateChapter', () => {
   });
 });
 
+describe('GenerationService.generateUnrestricted', () => {
+  it('should refuse a chapter with an unwritten chapter before it', async () => {
+    const { service } = makeService({ drafted: [1, 2] });
+
+    await expect(service.generateUnrestricted(1n, 5, {})).rejects.toMatchObject({ code: 'DRF_011', message: expect.stringContaining('before chapter 3') });
+  });
+
+  it('should refuse the next chapter while another job holds the novel', async () => {
+    const claims = new FakeAuthoringClaims();
+    await claims.acquire(1n, 'job-1', 'generate');
+    const { service } = makeService({ drafted: [1], claims });
+
+    await expect(service.generateUnrestricted(1n, 2, {})).rejects.toMatchObject({ code: 'JOB_002' });
+    expect(claims.rows.get(1n)?.jobId).toBe('job-1');
+  });
+});
+
+describe('GenerationService.finalize', () => {
+  it('should refuse while a chapter is being written, before reading the draft', async () => {
+    const claims = new FakeAuthoringClaims();
+    await claims.reserve(undefined, 1n, 'job-1', 'generate');
+    const { service } = makeService({ claims });
+
+    await expect(service.finalize(1n, { chapter: 1 })).rejects.toMatchObject({ code: 'JOB_002' });
+  });
+
+  it('should release the claim when finalizing is refused by its own gates', async () => {
+    const claims = new FakeAuthoringClaims();
+    const { service } = makeService({ claims, drafted: [] });
+
+    await expect(service.finalize(1n, { chapter: 1 })).rejects.toMatchObject({ code: 'DRF_001' });
+    expect(claims.rows.size).toBe(0);
+  });
+});
+
 describe('GenerationService.updateBrief', () => {
   function briefDb(existing: Record<string, unknown> | undefined, planned: Record<string, unknown>[]) {
     const inserted: Record<string, unknown>[] = [];
@@ -189,7 +245,7 @@ describe('GenerationService.updateBrief', () => {
     };
     const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
     const noop = {} as never;
-    const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
     return { service, inserted };
   }
 

@@ -6,6 +6,8 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import { GenerationService } from '@modules/generation/generation.service';
 import { schema } from '@server/database';
 
+import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
+
 export interface DraftRow {
   id: bigint;
   projectId: bigint;
@@ -39,6 +41,8 @@ export interface FakeGenerationDbOptions {
   draftWriteResult?: unknown[];
   resetDescendants?: number[];
   knowledge?: KnowledgeFixture;
+  /** Chapters that already have a draft, as the next-chapter gate reads them; chapters 1–3 by default, so chapter 4 is writable. */
+  written?: number[];
 }
 
 export interface FakeGenerationDb {
@@ -55,6 +59,7 @@ export interface GenerationDeps {
   proposalService?: object;
   chapterImages?: object;
   pluginPolicy?: object;
+  claims?: FakeAuthoringClaims;
 }
 
 const dialect = new PgDialect();
@@ -112,7 +117,8 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
       }),
     }),
     query: {
-      drafts: { findFirst: async () => reads.shift() },
+      drafts: { findFirst: async () => reads.shift(), findMany: async () => (options.written ?? [1, 2, 3]).map(chapter => ({ chapter })) },
+      chapters: { findMany: async () => [] },
       briefs: { findFirst: async () => (knowledge ? { knowledgeContract: { pov: ['keeper'], learns: knowledge.learns } } : undefined) },
       projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard' }) },
       canonFacts: { findMany: async () => knowledge?.facts ?? [] },
@@ -181,5 +187,6 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     (deps.chapterImages ?? absent) as never,
     (deps.pluginPolicy ?? absent) as never,
     absent,
+    (deps.claims ?? new FakeAuthoringClaims()).asService(),
   );
 }

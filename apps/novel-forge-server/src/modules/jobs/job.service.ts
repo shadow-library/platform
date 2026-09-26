@@ -1,15 +1,17 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, not, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { ownedBy, type OwnerRef } from '@server/common';
+import { AppErrorCode } from '@server/classes';
+import { AUTHORING_JOB_KINDS, isAuthoringJob, jobHoldsLiveClaim, ownedBy, type OwnerRef } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type DbExecutor, type Job, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { scopedCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
 import { ProjectEventService } from '../events/project-event.service';
+import { AuthoringClaimService } from './authoring-claim.service';
 
 export interface JobProgress {
   done: number;
@@ -19,6 +21,11 @@ export interface JobProgress {
   skipped?: number[];
   /** When work on `current` began, so a client can time the chapter without inferring it from the row's `updatedAt`. */
   startedAt?: string;
+}
+
+interface EnqueuedJob {
+  id: string;
+  outcome: 'inserted' | 'reset' | 'deduped';
 }
 
 export interface JobCancelResult {
@@ -48,6 +55,7 @@ export class JobService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly events: ProjectEventService,
+    private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -59,10 +67,23 @@ export class JobService {
   // Insert a new job row for (projectId, kind, target). Deduplication only applies to *active* work:
   // if a pending/in_progress job already exists we return it unchanged, but a previously terminal job
   // (done/failed) is reset to pending with the new payload so re-posting genuinely re-runs the work.
+  // An authoring job reserves the project's claim in the same transaction, so a second is refused (JOB_002) and rolled back.
   async enqueue(projectId: bigint, kind: Job.Kind, target: string, jobPayload?: unknown): Promise<string> {
     const payload = withScopedCostTier(jobPayload);
     this.logger.debug('enqueue', { projectId, kind, target, payload });
-    const [inserted] = await this.db
+    const enqueued = isAuthoringJob(kind)
+      ? await this.db.transaction(async tx => {
+          const job = await this.upsertJob(tx, projectId, kind, target, payload);
+          if (job.outcome !== 'deduped' && !(await this.claims.reserve(tx, projectId, job.id, kind))) throw AppErrorCode.JOB_002.create();
+          return job;
+        })
+      : await this.upsertJob(this.db, projectId, kind, target, payload);
+    if (enqueued.outcome !== 'deduped') this.announce(enqueued.id, { projectId, kind, status: 'pending' });
+    return enqueued.id;
+  }
+
+  private async upsertJob(db: DbExecutor, projectId: bigint, kind: Job.Kind, target: string, payload: unknown): Promise<EnqueuedJob> {
+    const [inserted] = await db
       .insert(schema.jobs)
       .values({ projectId, kind, target, payload: payload as never })
       .onConflictDoNothing()
@@ -70,11 +91,10 @@ export class JobService {
 
     if (inserted) {
       this.logger.info('Job enqueued', { jobId: inserted.id, projectId, kind, target });
-      this.announce(inserted.id, { projectId, kind, status: 'pending' });
-      return inserted.id;
+      return { id: inserted.id, outcome: 'inserted' };
     }
 
-    const existing = await this.db.query.jobs.findFirst({
+    const existing = await db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, kind), eq(schema.jobs.target, target)),
       columns: { id: true, status: true },
     });
@@ -82,16 +102,15 @@ export class JobService {
 
     if (existing.status === 'pending' || existing.status === 'in_progress') {
       this.logger.debug('enqueue: deduped onto active job', { jobId: existing.id, kind, target, status: existing.status });
-      return existing.id;
+      return { id: existing.id, outcome: 'deduped' };
     }
 
     this.logger.info('Job re-enqueued (terminal job reset to pending)', { jobId: existing.id, kind, target, previousStatus: existing.status });
-    await this.db
+    await db
       .update(schema.jobs)
       .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, cancelRequestedAt: null, updatedAt: new Date() })
       .where(eq(schema.jobs.id, existing.id));
-    this.announce(existing.id, { projectId, kind, status: 'pending' });
-    return existing.id;
+    return { id: existing.id, outcome: 'reset' };
   }
 
   async findPending(): Promise<Job.Row[]> {
@@ -120,9 +139,9 @@ export class JobService {
     if (job) this.announce(jobId, job);
   }
 
-  async succeed(jobId: string): Promise<void> {
+  async succeed(jobId: string, db: DbExecutor = this.db): Promise<void> {
     this.logger.debug('marking job done', { jobId });
-    const [job] = await this.db
+    const [job] = await db
       .update(schema.jobs)
       .set({ status: 'done', updatedAt: new Date() })
       .where(eq(schema.jobs.id, jobId))
@@ -130,9 +149,9 @@ export class JobService {
     if (job) this.announce(jobId, job);
   }
 
-  async fail(jobId: string, error: string): Promise<void> {
+  async fail(jobId: string, error: string, db: DbExecutor = this.db): Promise<void> {
     this.logger.warn('marking job failed', { jobId, error: error.slice(0, 2000) });
-    const [job] = await this.db
+    const [job] = await db
       .update(schema.jobs)
       .set({ status: 'failed', lastError: error.slice(0, 2000), updatedAt: new Date() })
       .where(eq(schema.jobs.id, jobId))
@@ -142,9 +161,9 @@ export class JobService {
 
   // The terminal write for a job the executor stopped: `cancel()` deliberately leaves an in_progress
   // job's status alone, so this is the only path that converts the request into a settled row.
-  async settleCancelled(jobId: string): Promise<void> {
+  async settleCancelled(jobId: string, db: DbExecutor = this.db): Promise<void> {
     this.logger.info('marking job cancelled', { jobId });
-    const [job] = await this.db
+    const [job] = await db
       .update(schema.jobs)
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(schema.jobs.id, jobId))
@@ -167,6 +186,7 @@ export class JobService {
       .returning({ projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status });
     if (cancelledPending) {
       this.logger.info('job cancelled before dispatch', { jobId });
+      if (isAuthoringJob(cancelledPending.kind)) await this.claims.releaseReservation(jobId);
       this.announce(jobId, cancelledPending);
       return { status: 'cancelled', outcome: 'cancelled' };
     }
@@ -213,18 +233,32 @@ export class JobService {
     this.events.publish(job.projectId, { type: 'job', jobId, kind: job.kind, status: job.status });
   }
 
+  // A job named by a live, started claim is still running on some replica, so boot recovery leaves it alone; the janitor resets it once stale.
   async recoverStuck(): Promise<void> {
-    const stuck = await this.db.query.jobs.findMany({
-      where: eq(schema.jobs.status, 'in_progress'),
-      columns: { id: true, kind: true, target: true },
-    });
+    const reset = await this.resetOrphaned(and(eq(schema.jobs.status, 'in_progress'), not(jobHoldsLiveClaim(this.claims.ttlMs, true))));
+    if (reset.length > 0) this.logger.warn(`Crash recovery: reset ${reset.length} in-progress job(s) back to pending`, { jobs: reset });
+  }
 
-    if (stuck.length === 0) return;
+  async resetOrphanedAuthoring(): Promise<void> {
+    const where = and(eq(schema.jobs.status, 'in_progress'), inArray(schema.jobs.kind, AUTHORING_JOB_KINDS), not(jobHoldsLiveClaim(this.claims.ttlMs, true)));
+    const reset = await this.resetOrphaned(where);
+    if (reset.length > 0) this.logger.warn(`Reset ${reset.length} authoring job(s) whose claim went stale back to pending`, { jobs: reset });
+  }
 
-    this.logger.warn(`Crash recovery: resetting ${stuck.length} in-progress job(s) back to pending`, {
-      jobs: stuck.map(j => ({ id: j.id, kind: j.kind, target: j.target })),
-    });
+  /** Pending authoring jobs no live claim or reservation names: nobody is dispatching them. */
+  async findUnclaimedPendingAuthoring(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.status, 'pending'), inArray(schema.jobs.kind, AUTHORING_JOB_KINDS), not(jobHoldsLiveClaim(this.claims.ttlMs, false))));
+    return rows.map(row => row.id);
+  }
 
-    await this.db.update(schema.jobs).set({ status: 'pending', updatedAt: new Date() }).where(eq(schema.jobs.status, 'in_progress'));
+  private async resetOrphaned(where: SQL | undefined): Promise<{ id: string; kind: Job.Kind; target: string }[]> {
+    return this.db
+      .update(schema.jobs)
+      .set({ status: 'pending', updatedAt: new Date() })
+      .where(where)
+      .returning({ id: schema.jobs.id, kind: schema.jobs.kind, target: schema.jobs.target });
   }
 }

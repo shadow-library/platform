@@ -12,7 +12,7 @@ function makeService(cancelResult: CancelOutcome | undefined): { service: Genera
   const jobService = { cancel: async (jobId: string, projectId: bigint) => (calls.push([jobId, projectId]), cancelResult) } as never;
   const databaseService = { getPostgresClient: () => ({}) } as never;
   const noop = {} as never;
-  const service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, noop, noop, noop, noop, noop);
+  const service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, noop, noop, noop, noop, noop, noop);
   return { service, calls };
 }
 

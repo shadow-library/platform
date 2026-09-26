@@ -8,6 +8,7 @@ import { AppErrorCode } from '@server/classes';
 import {
   briefContentHash,
   declaredDraftFields,
+  firstUnwrittenChapter,
   isFinalizable,
   ledgerBriefReveals,
   markDescendantDraftsStale,
@@ -46,6 +47,7 @@ import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { type CallRoute, resolveUnrestrictedRoute, type RoutedCall } from '../ai/unrestricted-route';
 import { loadWriterForbiddenFacts, scrubForWriter } from '../bible/fact/knowledge-view';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
+import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -194,6 +196,7 @@ export class GenerationService {
     private readonly chapterImages: ChapterImageService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly pluginProposals: PluginProposalService,
+    private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -760,7 +763,17 @@ export class GenerationService {
     });
   }
 
+  /** Finalizing commits knowledge, milestones and reader disclosure the next chapter's writer reads, so it holds the authoring claim like a job. */
   async finalize(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
+    return this.claims.runExclusive(
+      projectId,
+      'finalize',
+      () => AppErrorCode.JOB_002.create(),
+      () => this.finalizeClaimed(projectId, body),
+    );
+  }
+
+  private async finalizeClaimed(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
     let draft: Generation.Draft | null = null;
     if (body.chapter !== undefined) {
       draft = (await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, body.chapter)) })) ?? null;
@@ -833,6 +846,31 @@ export class GenerationService {
   }
 
   async generateUnrestricted(projectId: bigint, chapter: number, body: GenerateUnrestrictedBody): Promise<Generation.Draft> {
+    return this.claims.runExclusive(
+      projectId,
+      'generate',
+      () => AppErrorCode.JOB_002.create(),
+      async () => {
+        await this.assertWrittenBefore(projectId, chapter);
+        return this.generateUnrestrictedClaimed(projectId, chapter, body);
+      },
+    );
+  }
+
+  /** Chapters are written strictly in order: chapter N is writable only once every chapter before it has a draft or finalized prose. */
+  private async assertWrittenBefore(projectId: bigint, chapter: number): Promise<void> {
+    const [drafts, finalized] = await Promise.all([
+      this.db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), lt(schema.drafts.chapter, chapter)), columns: { chapter: true } }),
+      this.db.query.chapters.findMany({
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, chapter)),
+        columns: { number: true },
+      }),
+    ]);
+    const blocker = firstUnwrittenChapter(new Set(drafts.map(d => d.chapter)), new Set(finalized.map(c => c.number)));
+    if (blocker < chapter) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(blocker) });
+  }
+
+  private async generateUnrestrictedClaimed(projectId: bigint, chapter: number, body: GenerateUnrestrictedBody): Promise<Generation.Draft> {
     const locked = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (locked?.status === 'final') throw AppErrorCode.DRF_002.create();
 

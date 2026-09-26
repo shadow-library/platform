@@ -2,6 +2,7 @@ import { Module } from '@shadow-library/app';
 import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
 import { AiModule } from '../ai/ai.module';
+import { AuthoringClaimModule } from '../jobs/authoring-claim.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { PluginProposalModule } from '../plugins/plugin-proposal.module';
 import { PluginsModule } from '../plugins/plugins.module';
@@ -18,7 +19,7 @@ import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 
 @Module({
-  imports: [DatabaseModule, AiModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
+  imports: [DatabaseModule, AiModule, AuthoringClaimModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
   controllers: [GenerationController, ChapterImageController, ChapterInsertController, ChapterAmendController, ChapterRowsController],
   providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],

@@ -38,11 +38,15 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly CHP_001 = AppErrorCode.notFound('CHP_001', 'Chapter not found');
   static readonly CHP_003 = AppErrorCode.badRequest('CHP_003', 'Insert position is behind the write frontier — only chapters ahead of the last finalized chapter can be inserted');
-  static readonly CHP_004 = AppErrorCode.conflict('CHP_004', 'A generation job is already running for this project — wait for it to finish before inserting a chapter');
+  static readonly CHP_004 = AppErrorCode.conflict('CHP_004', 'A chapter is being written, planned or finalized for this novel — wait for it to finish before inserting a chapter');
   static readonly CHP_005 = AppErrorCode.badRequest('CHP_005', 'Isolated chapter has no summary or continuation state — summarize the chapter before finalizing');
   static readonly CHP_006 = AppErrorCode.badRequest('CHP_006', 'Chapter is not finalized canon — amend is only available once the chapter is finalized');
   static readonly CHP_007 = AppErrorCode.badRequest('CHP_007', 'Draft has no prose yet — import or generate the chapter before summarizing it');
   static readonly CHP_008 = AppErrorCode.conflict('CHP_008', 'Chapter is locked — finalized prose changes only through amend');
+  static readonly CHP_009 = AppErrorCode.conflict(
+    'CHP_009',
+    'Chapter {chapter} is already written — a chapter can only be inserted after the last written chapter, because inserting earlier would renumber written chapters',
+  );
 
   /*!
    * Brief Errors
@@ -146,6 +150,10 @@ export class AppErrorCode extends ServerErrorCode {
    * Job Errors
    */
   static readonly JOB_001 = AppErrorCode.notFound('JOB_001', 'Job not found');
+  static readonly JOB_002 = AppErrorCode.conflict(
+    'JOB_002',
+    'A chapter is being written, planned or finalized for this novel — wait for it to finish or cancel it, then try again',
+  );
 
   /*!
    * Chat Errors

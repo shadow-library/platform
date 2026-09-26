@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type BatchBrief, declaredDraftFields, selectGenerationBatch, toContentRating } from '@server/common';
+import { type BatchBrief, declaredDraftFields, firstUnwrittenChapter, selectGenerationBatch, toContentRating } from '@server/common';
 
 const standard = (chapter: number): BatchBrief => ({ chapter, writeMode: 'standard' });
 const external = (chapter: number): BatchBrief => ({ chapter, writeMode: 'external' });
@@ -34,9 +34,9 @@ describe('selectGenerationBatch', () => {
     expect(selectGenerationBatch(briefs, new Set([1, 2]), new Set([1, 2]), 20)).toEqual({ chapters: [3, 4] });
   });
 
-  it('should still stop at an external slot that has a draft but is not finalized', () => {
+  it('should carry on past an external slot the author has written by hand, before it is finalized', () => {
     const briefs = [standard(1), external(2), standard(3)];
-    expect(selectGenerationBatch(briefs, new Set([1, 2]), new Set([1]), 20)).toEqual({ chapters: [], stoppedAtExternalChapter: 2 });
+    expect(selectGenerationBatch(briefs, new Set([1, 2]), new Set([1]), 20)).toEqual({ chapters: [3] });
   });
 
   it('should report no stop when the limit is reached before the external slot', () => {
@@ -79,6 +79,13 @@ describe('selectGenerationBatch', () => {
 
   it('should never generate a finalized chapter that has no draft', () => {
     expect(selectGenerationBatch([standard(1), standard(2)], new Set(), new Set([1]), 5)).toEqual({ chapters: [2] });
+  });
+});
+
+describe('firstUnwrittenChapter', () => {
+  it('should answer the lowest chapter with neither a draft nor finalized prose', () => {
+    expect(firstUnwrittenChapter(new Set([1, 2, 5]), new Set([3])), 'drafts and finals together').toBe(4);
+    expect(firstUnwrittenChapter(new Set(), new Set()), 'an empty novel').toBe(1);
   });
 });
 

@@ -12,7 +12,7 @@ setConfig({ ...OPENAPI_DUMP_CONFIG, 'auth.issuer': auth.idp.issuer, 'auth.app-id
 
 const { AppModule } = await import('./app.module');
 const { WorkflowRunService } = await import('@modules/ai/graphs/workflow-run.service');
-const { CheckpointJanitor, JobExecutor, JobService, PublicationJanitor } = await import('@modules/jobs');
+const { AuthoringJobJanitor, CheckpointJanitor, JobExecutor, JobService, PublicationJanitor } = await import('@modules/jobs');
 
 /** Each of these recovers, dispatches or sweeps jobs at boot; the workflow runner opens its own LangGraph checkpoint connection */
 const overrides = [
@@ -22,6 +22,7 @@ const overrides = [
   withoutStartupHooks(WorkflowRunService),
   withoutStartupHooks(JobService),
   withoutStartupHooks(JobExecutor),
+  withoutStartupHooks(AuthoringJobJanitor),
   withoutStartupHooks(CheckpointJanitor),
   withoutStartupHooks(PublicationJanitor),
 ];

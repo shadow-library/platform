@@ -39,8 +39,14 @@
 ## Architecture
 
 - Jobs and most HTTP requests run through `WorkflowRunService` (one run row, `thread_id = run.id`) -> LangGraph graph -> nodes -> services and chains via `ModelRouterService`;
-  outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows dispatched under
-  a per-replica, per-project lock; a duplicate (project, kind, target) request returns the active job.
+  outline, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows; a duplicate
+  (project, kind, target) request returns the active job.
+- **One authoring job per project**, held in the database (`authoring_claims`), so it holds across replicas. Authoring jobs (generate, import, and the finalize/plan/organise
+  kinds) reserve the claim in the transaction that enqueues them, and a second is refused (`JOB_002`) rather than queued; finalize, unrestricted fill and insert hold it for
+  their synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches
+  authoring jobs left without a live claim, which is how a crashed worker's job recovers. Heartbeat, release and settle are conditioned on the holder's fencing token, but
+  draft writes themselves are not: a job that lost its claim may still land the chapter in flight, then stops at the next chapter and never settles as done.
+  Publish and reindex jobs take no claim.
 - Model routing: roles map to author-selectable groups, overridable per project; an Unrestricted alternate map with an allowlist exists. A model type (standard or
   unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`; Balanced is the pre-tier map. A call resolves
   the project's pin for its role, then the owner's account default (Balanced only), then the tier map. Standard Performant equals Balanced
@@ -58,7 +64,7 @@
   deterministic check -> judge -> route. The judge has read-only tools over prose, lore, entities, summaries, world facts and plot threads (bible, volumes, briefs and drafts are
   chat-hub-only); a contradiction verdict must carry a hard finding, and deterministic checks block acceptance without hardening the verdict; unparseable judge output goes to
   human review, never acceptance. autoFix patches then rewrites up to a cap, then accepts as-is with findings kept. A failed run stops the batch; batches truncate at an
-  unfilled `external` slot.
+  unfilled `external` slot. A hand-written draft counts toward the next-chapter frontier exactly like a generated one, including in an `external` slot before it is final.
 - **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements (sentence and paragraph length,
   reading grade, ornate constructions per 1,000 words, flagged sentences) reach it as evidence and are kept in the judge note, but never trigger repair themselves. A
   readability-only miss is repaired within the budget and otherwise accepted for normal review: it never marks a draft as a contradiction, halts a batch or blocks the next chapter.
@@ -135,8 +141,8 @@
 - A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
   decides whether it holds. A fact's `plannedChapter` is provisional; `disclosedInChapter` is set only when the disclosing chapter is finalized, NEVER by planning. The project's
   `ending` is planner-only and MUST NEVER reach a writer pack or a publish payload.
-- Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only ahead of the write frontier
-  and never while a generate job is active.
+- Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only after the last written chapter
+  (a draft after the insert point refuses it with `CHP_009`; plans after it shift) and only while it holds the authoring claim (`CHP_004` otherwise).
 - Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only, but a stale brief blocks generation and a stale draft cannot be approved.
 - A chapter's volume is the one its brief names; an imported chapter keeps the volume its bundle placed it in. A new brief that names none, and an inserted chapter, join the volume of the nearest planned chapter before it (or, ahead of every
   planned chapter, after it). A volume a brief still names cannot be removed, so a change-set's volume removals (and a revert's) run after its other ops; a plan

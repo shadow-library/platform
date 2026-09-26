@@ -16,6 +16,7 @@ import { isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
+import { AuthoringClaimService } from '../../jobs/authoring-claim.service';
 import { clearLedgerBriefLinks } from '../../ledger/ledger-entries';
 import { type CostWindow, summarizeCost } from './project-cost';
 import { assertUnderProjectCap } from './project-limits';
@@ -45,6 +46,7 @@ export class ProjectService {
     private readonly storage: StorageService,
     private readonly authClient: AuthClient,
     private readonly context: ContextService,
+    private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -292,7 +294,12 @@ export class ProjectService {
 
   async delete(id: bigint): Promise<void> {
     this.logger.info('deleting project (cascades to all child tables)', { projectId: id });
-    const result = await this.db.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
+    // The claim goes first because its job reference is ON DELETE RESTRICT; the row lock keeps a concurrent acquire from recreating it.
+    const result = await this.db.transaction(async tx => {
+      await tx.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.id, id)).for('update');
+      await tx.delete(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, id));
+      return tx.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
+    });
     if (result.length === 0) throw AppErrorCode.PRJ_001.create();
   }
 
@@ -348,16 +355,14 @@ export class ProjectService {
     return { stage, tablesCleared };
   }
 
-  /**
-   * A generate reset deletes the jobs an authoring claim may name, and the claim's job reference restricts that delete. A claim whose job is still
-   * pending or running is refused rather than cleared, since the job would keep writing drafts the reset just removed; any other claim is stale.
-   */
+  /** The reset deletes the jobs a claim may name, so it refuses while the claim's job is active or a job-less claim (finalize, insert) is live. */
   private async releaseIdleAuthoringClaim(projectId: bigint): Promise<void> {
     await this.db.transaction(async tx => {
       const [claim] = await tx.select().from(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, projectId)).for('update');
       if (!claim) return;
       const job = claim.jobId ? await tx.query.jobs.findFirst({ where: eq(schema.jobs.id, claim.jobId), columns: { status: true } }) : undefined;
-      if (job && (job.status === 'pending' || job.status === 'in_progress')) throw AppErrorCode.PRJ_011.create();
+      const busy = job ? job.status === 'pending' || job.status === 'in_progress' : (await this.claims.holder(projectId, tx))?.live === true;
+      if (busy) throw AppErrorCode.PRJ_011.create();
       await tx.delete(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, projectId));
       this.logger.info('reset released a stale authoring claim', { projectId, jobId: claim.jobId, kind: claim.kind });
     });

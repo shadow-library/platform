@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
 import { type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -16,6 +16,7 @@ import { buildOutlinePrompt, outlineWordTargetVars } from '../ai/prompts';
 import { type OutlineOutput } from '../ai/schemas';
 import { shiftLedgerBriefLinks } from '../ledger/ledger-entries';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
+import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 
 export interface InsertOptions {
@@ -115,8 +116,7 @@ const INSERT_STALE_REASON = 'a chapter was inserted after this point';
 /**
  * Inserts a chapter slot the plan never allocated: one transaction that
  * renumbers everything above the insert point, re-renders the briefs it moved, and lands an `external`
- * write-mode brief in the hole, in the volume of the chapter it follows. Legal only ahead of the write frontier,
- * which is what keeps finalized canon — and `chapter_publications.publishedOrdinal` with it — immovable.
+ * write-mode brief in the hole, in the volume of the chapter it follows. Legal only after the last written chapter and under the authoring claim.
  */
 @Injectable()
 export class ChapterInsertService {
@@ -128,6 +128,7 @@ export class ChapterInsertService {
     private readonly modelRouter: ModelRouterService,
     private readonly contextAssembler: ContextAssembler,
     private readonly pluginPolicy: PluginPolicyService,
+    private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -138,7 +139,15 @@ export class ChapterInsertService {
     if (opts.briefOrigin === 'hand' ? !opts.briefBody?.trim() : !opts.intent?.trim()) throw AppErrorCode.S003.create();
 
     await this.assertInsertable(projectId, afterChapter);
+    return this.claims.runExclusive(
+      projectId,
+      'plan',
+      () => AppErrorCode.CHP_004.create(),
+      () => this.insertClaimed(projectId, afterChapter, opts),
+    );
+  }
 
+  private async insertClaimed(projectId: bigint, afterChapter: number, opts: InsertOptions): Promise<InsertResult> {
     const newChapter = afterChapter + 1;
     // The planner call can take minutes; running it here rather than inside the transaction keeps it off
     // the locks the renumber holds across every chapter-keyed table. The guards are re-asserted once it returns.
@@ -215,13 +224,13 @@ export class ChapterInsertService {
     if (afterChapter < frontier) throw AppErrorCode.CHP_003.create();
     if (afterChapter > 0 && afterChapter > (await this.highestChapter(projectId, db))) throw AppErrorCode.CHP_001.create();
 
-    // The same query `GenerationService.generate` uses for its ordering guard: a batch mid-write would
-    // have chapter numbers shifted out from under the drafts it is persisting.
-    const activeJob = await db.query.jobs.findFirst({
-      where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
-      columns: { id: true },
+    // Renumbering written prose would break the next-chapter rule; plans after the insert point shift freely.
+    const writtenAfter = await db.query.drafts.findFirst({
+      where: and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, afterChapter)),
+      orderBy: asc(schema.drafts.chapter),
+      columns: { chapter: true },
     });
-    if (activeJob) throw AppErrorCode.CHP_004.create();
+    if (writtenAfter) throw AppErrorCode.CHP_009.create({ chapter: String(writtenAfter.chapter) });
   }
 
   private async parkAbove(tx: DbExecutor, projectId: bigint, afterChapter: number, target: ShiftTarget): Promise<void> {

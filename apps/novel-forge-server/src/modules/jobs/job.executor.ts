@@ -3,8 +3,9 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
+import { isAuthoringJob } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, schema } from '@server/database';
+import { type DbExecutor, type Job, type PrimaryDatabase, schema } from '@server/database';
 
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
@@ -12,7 +13,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { setProjectCover } from '../illustration/uploaded-cover';
 import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
-import { ConcurrencyController } from './concurrency.controller';
+import { AuthoringClaimService } from './authoring-claim.service';
 import { JobService, payloadCostTier } from './job.service';
 
 interface GeneratePayload {
@@ -35,15 +36,26 @@ interface ImportPayload {
 // whole of a model call after the author hit stop; the boundary checks alone only catch it between steps.
 const CANCEL_POLL_MS = 1000;
 
+const CLAIM_REFUSED_MESSAGE = 'Another chapter was being written, planned or finalized for this novel, so this job did not start';
+const CLAIM_LOST_MESSAGE = 'This job stopped responding and another job took over the novel, so its result was not kept as finished';
+
+type SettleOutcome = { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'cancelled' };
+
+interface JobWatch {
+  observed: boolean;
+  claimLost: boolean;
+  claim?: { projectId: bigint; token: string };
+}
+
 @Injectable()
 export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
   private readonly db: PrimaryDatabase;
-  private readonly cancelWatches = new Map<string, { observed: boolean }>();
+  private readonly cancelWatches = new Map<string, JobWatch>();
 
   constructor(
     private readonly jobService: JobService,
-    private readonly concurrency: ConcurrencyController,
+    private readonly claims: AuthoringClaimService,
     private readonly workflowRunService: WorkflowRunService,
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
@@ -71,60 +83,114 @@ export class JobExecutor {
     }
 
     // Only pending jobs are dispatchable. A done/failed job must not silently re-run (and re-spend on
-    // LLM calls); an in_progress job is already owned by another dispatch on the per-project lock.
+    // LLM calls); an in_progress job is already owned by another dispatch.
     if (job.status !== 'pending') {
       this.logger.warn('dispatch: skipping non-pending job', { jobId, status: job.status });
       return;
     }
 
-    const projectId = job.projectId;
-    const isLocal = false;
-    const key = this.concurrency.lockKey(projectId, isLocal);
-    this.logger.debug('dispatch: awaiting concurrency lock', { jobId, kind: job.kind, projectId, lockKey: key });
-
-    await this.concurrency.run(key, async () => {
-      const claimed = await this.jobService.start(jobId);
-      if (!claimed) {
-        this.logger.warn('dispatch: job already claimed by another worker', { jobId });
-        return;
-      }
-
-      // The claim is what earns the right to refuse to start. Two paths reach here already cancelled: a
-      // job cancelled while it queued behind the lock but after the status read above, and one that crash
-      // recovery reset from in_progress back to pending with its request still on the row.
-      if (await this.cancelRequested(jobId)) return this.markCancelled(job);
-
-      const startedAt = Date.now();
-      // Payload can carry chapter lists, guidance, limits — sensitive/verbose, so it rides on debug.
-      this.logger.info('Job started', { jobId, kind: job.kind, projectId, target: job.target });
-      this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
-      const stopWatching = this.watchForCancellation(jobId);
-      try {
-        await runWithCostTier(payloadCostTier(job.payload), () => this.runJob(job));
-        if (await this.cancelRequested(jobId)) return this.markCancelled(job);
-        await this.jobService.succeed(jobId);
-        this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
-      } catch (err) {
-        // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and cancellation makes
-        // the job terminal-cancelled with its finished work kept, not failed into a retry ladder.
-        if (await this.cancelRequested(jobId)) return this.markCancelled(job);
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Job failed', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt, err });
-        await this.jobService.fail(jobId, msg);
-      } finally {
-        stopWatching();
-      }
-    });
+    if (!isAuthoringJob(job.kind)) return this.execute(job);
+    const token = await this.claims.acquire(job.projectId, job.id, job.kind);
+    if (!token) return this.refuseUnclaimed(job);
+    return this.execute(job, token);
   }
 
-  private watchForCancellation(jobId: string): () => void {
-    this.cancelWatches.set(jobId, { observed: false });
+  // A claim still naming this job belongs to an earlier dispatch of it (a crashed worker, or a replica still running it); the janitor retries once it is stale.
+  private async refuseUnclaimed(job: Job.Row): Promise<void> {
+    const holder = await this.claims.holder(job.projectId);
+    if (holder?.jobId === job.id) return this.logger.info('dispatch: job waits for its previous claim to go stale', { jobId: job.id, projectId: job.projectId });
+    this.logger.warn('dispatch: another authoring job holds the project', { jobId: job.id, projectId: job.projectId, holderJobId: holder?.jobId, holderKind: holder?.kind });
+    await this.jobService.fail(job.id, CLAIM_REFUSED_MESSAGE);
+  }
+
+  private async execute(job: Job.Row, token?: string): Promise<void> {
+    const { id: jobId, projectId } = job;
+    const claimed = await this.jobService.start(jobId);
+    if (!claimed) {
+      this.logger.warn('dispatch: job already claimed by another worker', { jobId });
+      if (token) await this.claims.release(projectId, token);
+      return;
+    }
+
+    // Winning `start()` is what earns the right to refuse to start. Two paths reach here already cancelled: a job
+    // cancelled after the status read above, and one that crash recovery reset from in_progress back to
+    // pending with its request still on the row.
+    if (await this.cancelRequested(jobId)) return this.settle(job, token, { status: 'cancelled' });
+
+    const startedAt = Date.now();
+    // Payload can carry chapter lists, guidance, limits — sensitive/verbose, so it rides on debug.
+    this.logger.info('Job started', { jobId, kind: job.kind, projectId, target: job.target });
+    this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
+    const outcome = await this.runWatched(job, token);
+    await this.settle(job, token, outcome);
+    if (outcome.status === 'done') this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
+    if (outcome.status === 'failed') this.logger.error('Job failed', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt, err: outcome.cause });
+  }
+
+  // Watching stops before the settle releases the claim, so a heartbeat racing the release is never reported as a lost claim.
+  private async runWatched(job: Job.Row, token: string | undefined): Promise<SettleOutcome> {
+    const stopWatching = this.watchForCancellation(job.id, job.projectId, token);
+    try {
+      await runWithCostTier(payloadCostTier(job.payload), () => this.runJob(job));
+      return (await this.cancelRequested(job.id)) ? { status: 'cancelled' } : { status: 'done' };
+    } catch (err) {
+      // Cancellation wins over the error: an aborted model call surfaces as a thrown step, and cancellation makes
+      // the job terminal-cancelled with its finished work kept, not failed into a retry ladder.
+      if (await this.cancelRequested(job.id)) return { status: 'cancelled' };
+      return { status: 'failed', error: err instanceof Error ? err.message : String(err), cause: err };
+    } finally {
+      stopWatching();
+    }
+  }
+
+  // The settle is the fencing point: the final status commits with the claim's release, and only while the token still holds it.
+  private async settle(job: Job.Row, token: string | undefined, outcome: SettleOutcome): Promise<void> {
+    const write = (db?: DbExecutor): Promise<void> => {
+      if (outcome.status === 'done') return this.jobService.succeed(job.id, db);
+      if (outcome.status === 'failed') return this.jobService.fail(job.id, outcome.error, db);
+      return this.jobService.settleCancelled(job.id, db);
+    };
+    if (!token) await write();
+    else if (!(await this.claims.settle(job.projectId, token, write))) return this.settleLostClaim(job, outcome);
+    if (outcome.status === 'cancelled') this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
+  }
+
+  // A claim re-taken for this same job means a newer run of it owns the row now, so the stale run leaves the row alone.
+  private async settleLostClaim(job: Job.Row, outcome: SettleOutcome): Promise<void> {
+    const holder = await this.claims.holder(job.projectId);
+    this.logger.warn('Job lost its authoring claim before settling', { jobId: job.id, projectId: job.projectId, outcome: outcome.status, holderJobId: holder?.jobId });
+    if (holder?.jobId === job.id) return;
+    await this.jobService.fail(job.id, CLAIM_LOST_MESSAGE);
+  }
+
+  private watchForCancellation(jobId: string, projectId: bigint, token?: string): () => void {
+    this.cancelWatches.set(jobId, { observed: false, claimLost: false, claim: token ? { projectId, token } : undefined });
+    const stopHeartbeat = token ? this.claims.keepAlive(projectId, token, () => void this.onClaimLost(jobId)) : undefined;
     const timer = setInterval(() => void this.cancelRequested(jobId).catch(err => this.logger.warn('cancel poll failed', { err, jobId })), CANCEL_POLL_MS);
     timer.unref();
     return () => {
       clearInterval(timer);
+      stopHeartbeat?.();
       this.cancelWatches.delete(jobId);
     };
+  }
+
+  // At a chapter boundary the heartbeat doubles as the fence check, so a job that lost its claim never starts the next chapter.
+  private async mayContinue(jobId: string): Promise<boolean> {
+    if (await this.cancelRequested(jobId)) return false;
+    const watch = this.cancelWatches.get(jobId);
+    if (!watch?.claim) return true;
+    if (!watch.claimLost && (await this.claims.heartbeat(watch.claim.projectId, watch.claim.token))) return true;
+    await this.onClaimLost(jobId);
+    return false;
+  }
+
+  private async onClaimLost(jobId: string): Promise<void> {
+    const watch = this.cancelWatches.get(jobId);
+    if (!watch || watch.claimLost) return;
+    watch.claimLost = true;
+    this.logger.warn('Job lost its authoring claim; stopping its runs', { jobId });
+    await this.cancelLiveRuns(jobId);
   }
 
   // Latches on first observation so the per-chapter boundary checks cost nothing once the answer is yes,
@@ -149,11 +215,6 @@ export class JobExecutor {
     for (const run of live) this.workflowRunService.cancel(run.id);
   }
 
-  private async markCancelled(job: Job.Row): Promise<void> {
-    await this.jobService.settleCancelled(job.id);
-    this.logger.info('Job cancelled', { jobId: job.id, kind: job.kind, projectId: job.projectId });
-  }
-
   private async runJob(job: Job.Row): Promise<void> {
     this.logger.debug('runJob: routing to handler', { jobId: job.id, kind: job.kind });
     switch (job.kind) {
@@ -176,7 +237,7 @@ export class JobExecutor {
     this.logger.debug('runGenerate: starting', { jobId: job.id, chapters, total, autoFix, maxFixes, guidance });
 
     for (const [i, chapter] of chapters.entries()) {
-      if (await this.cancelRequested(job.id)) return;
+      if (!(await this.mayContinue(job.id))) return;
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating', startedAt: new Date().toISOString() });
       this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
@@ -244,7 +305,7 @@ export class JobExecutor {
 
     // The only boundary an import has: the chapters are landed and kept, the cover is abandoned. The
     // payload is still compacted, so a cancelled import never leaves the whole bundle's prose sitting on the row.
-    if (await this.cancelRequested(job.id)) return this.compactImportPayload(job.id, total, !!cover);
+    if (!(await this.mayContinue(job.id))) return this.compactImportPayload(job.id, total, !!cover);
 
     if (cover) {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });

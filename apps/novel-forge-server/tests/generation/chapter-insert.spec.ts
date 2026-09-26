@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { ChapterInsertService } from '@modules/generation/chapter-insert.service';
 import { type Ledger, schema } from '@server/database';
 
+import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
 import { queryRows } from '../sql-filter';
 
 type Chain = PromiseLike<unknown> & Record<string, (...args: unknown[]) => Chain>;
@@ -21,8 +22,14 @@ function chain(result: unknown, onSet?: (values: unknown) => void): Chain {
   }) as unknown as Chain;
 }
 
-function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Record<string, unknown>[] = [], facts: { id: bigint; unlock: unknown }[] = []) {
+function fakeDatabase(
+  ledger: { id: bigint; links: Ledger.Links }[],
+  planned: Record<string, unknown>[] = [],
+  facts: { id: bigint; unlock: unknown }[] = [],
+  written: number[] = [],
+) {
   const briefs = planned.map(brief => ({ projectId: 1n, ...brief }));
+  const drafts = written.map(chapter => ({ projectId: 1n, chapter }));
   const ledgerUpdates: unknown[] = [];
   const updatedTables: unknown[] = [];
   const updates: { table: unknown; values: Record<string, unknown> }[] = [];
@@ -36,7 +43,7 @@ function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Re
         findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(briefs, query)[0],
         findMany: async (query: Parameters<typeof queryRows>[1]) => queryRows(briefs, query),
       },
-      jobs: none,
+      drafts: { findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(drafts, query)[0] },
       volumes: none,
     },
     select: () => ({ from: (table: unknown) => chain(table === schema.decisionLedgerEntries ? ledger : table === schema.canonFacts ? facts : []) }),
@@ -63,7 +70,7 @@ function fakeDatabase(ledger: { id: bigint; links: Ledger.Links }[], planned: Re
 describe('ChapterInsertService.insertAfter', () => {
   it('should renumber the brief chapters the decision ledger links to', async () => {
     const { databaseService, ledgerUpdates } = fakeDatabase([{ id: 9n, links: { volumeKeys: ['vol_1'], briefChapters: [1, 2] } }]);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 0, { briefOrigin: 'hand', briefBody: 'Ada meets the clerk.' });
 
@@ -72,7 +79,7 @@ describe('ChapterInsertService.insertAfter', () => {
 
   it('should shift the planned chapter of facts and milestones, and never a disclosed or reached chapter', async () => {
     const { databaseService, shiftedFields } = fakeDatabase([], [{ chapter: 3, body: 'The toll doubles.', volumeKey: null }]);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
 
@@ -88,7 +95,7 @@ describe('ChapterInsertService.insertAfter', () => {
       { id: 6n, unlock: { all: [{ chapter: 1 }, { ending: true }] } },
     ];
     const { databaseService, updates } = fakeDatabase([], [{ chapter: 3, body: 'The toll doubles.', volumeKey: null }], facts);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
 
@@ -102,7 +109,7 @@ describe('ChapterInsertService.insertAfter', () => {
       { chapter: 4, body: 'The ferry burns.', volumeKey: 'volume_3' },
     ];
     const { databaseService, insertedBriefs, updatedTables } = fakeDatabase([], briefs);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 3, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
 
@@ -113,7 +120,7 @@ describe('ChapterInsertService.insertAfter', () => {
 
   it('should put a chapter inserted before the first one in the volume of chapter 1', async () => {
     const { databaseService, insertedBriefs } = fakeDatabase([], [{ chapter: 1, body: 'Ada meets the clerk.', volumeKey: 'volume_1' }]);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 0, { briefOrigin: 'hand', briefBody: 'A prologue on the river.' });
 
@@ -127,7 +134,7 @@ describe('ChapterInsertService.insertAfter', () => {
       { chapter: 4, body: 'The ferry burns.', volumeKey: 'volume_2' },
     ];
     const { databaseService, insertedBriefs } = fakeDatabase([], briefs);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 3, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
 
@@ -140,7 +147,7 @@ describe('ChapterInsertService.insertAfter', () => {
       { chapter: 3, body: 'The toll doubles.', volumeKey: 'volume_3' },
     ];
     const { databaseService, insertedBriefs } = fakeDatabase([], briefs);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada checks the ledger.' });
 
@@ -149,10 +156,61 @@ describe('ChapterInsertService.insertAfter', () => {
 
   it('should leave the new chapter without a volume when no planned chapter has one', async () => {
     const { databaseService, insertedBriefs } = fakeDatabase([], [{ chapter: 2, body: 'The clerk lies.', volumeKey: null }]);
-    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
 
     await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada checks the ledger.' });
 
     expect(insertedBriefs[0]).toMatchObject({ chapter: 3, volumeKey: null });
+  });
+
+  it('should refuse to insert ahead of a written chapter, naming the first one it would renumber', async () => {
+    const planned = [
+      { chapter: 3, body: 'The toll doubles.', volumeKey: null },
+      { chapter: 4, body: 'The ferry burns.', volumeKey: null },
+    ];
+    const { databaseService, insertedBriefs, updatedTables } = fakeDatabase([], planned, [], [1, 2, 3]);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
+
+    await expect(service.insertAfter(1n, 1, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' })).rejects.toMatchObject({
+      code: 'CHP_009',
+      message: expect.stringContaining('Chapter 2 is already written'),
+    });
+    expect(insertedBriefs).toEqual([]);
+    expect(updatedTables).toEqual([]);
+  });
+
+  it('should insert after the last written chapter, shifting only the plans that follow it', async () => {
+    const planned = [
+      { chapter: 3, body: 'The toll doubles.', volumeKey: null },
+      { chapter: 4, body: 'The ferry burns.', volumeKey: null },
+    ];
+    const { databaseService, insertedBriefs } = fakeDatabase([], planned, [], [1, 2]);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
+
+    const result = await service.insertAfter(1n, 2, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
+
+    expect(result).toMatchObject({ newChapter: 3, shiftedChapters: 2 });
+    expect(insertedBriefs[0]).toMatchObject({ chapter: 3 });
+  });
+
+  it('should refuse while another job holds the novel, leaving that job’s claim in place', async () => {
+    const claims = new FakeAuthoringClaims();
+    await claims.acquire(1n, 'job-1', 'generate');
+    const { databaseService, insertedBriefs } = fakeDatabase([], [{ chapter: 2, body: 'The clerk lies.', volumeKey: null }]);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, claims.asService());
+
+    await expect(service.insertAfter(1n, 1, { briefOrigin: 'hand', briefBody: 'Ada checks the ledger.' })).rejects.toMatchObject({ code: 'CHP_004' });
+    expect(insertedBriefs).toEqual([]);
+    expect(claims.rows.get(1n)?.jobId).toBe('job-1');
+  });
+
+  it('should hold the claim while it renumbers and release it afterwards', async () => {
+    const claims = new FakeAuthoringClaims();
+    const { databaseService } = fakeDatabase([], [{ chapter: 2, body: 'The clerk lies.', volumeKey: null }]);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, claims.asService());
+
+    await service.insertAfter(1n, 1, { briefOrigin: 'hand', briefBody: 'Ada checks the ledger.' });
+
+    expect(claims.rows.size).toBe(0);
   });
 });

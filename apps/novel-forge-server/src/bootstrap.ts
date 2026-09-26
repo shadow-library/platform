@@ -27,6 +27,9 @@ declare module '@shadow-library/common' {
 
     'ai.langsmith.api.key': string | undefined;
 
+    /** How long an authoring claim survives without a heartbeat before another worker may take the project over. */
+    'jobs.authoring-claim.ttl-ms': number;
+
     /** Max projects one owner may hold; 0 disables the cap. */
     'projects.max-per-owner': number;
 
@@ -51,6 +54,8 @@ Config.load('ai.quota.window-ms', { defaultValue: '3600000', validateType: 'numb
 Config.load('ai.quota.max-calls', { defaultValue: '1000', validateType: 'number' });
 Config.load('ai.quota.max-cost-usd', { defaultValue: '50', validateType: 'number' });
 Config.load('ai.langsmith.api.key');
+
+Config.load('jobs.authoring-claim.ttl-ms', { defaultValue: '120000', validateType: 'number' });
 
 Config.load('projects.max-per-owner', { defaultValue: '100', validateType: 'number' });
 

@@ -6,13 +6,15 @@ import type { JobProgress } from '@modules/jobs/job.service';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import type { WorkflowRunResult } from '@modules/ai/graphs/workflow-run.service';
 
+import { FakeAuthoringClaims } from './authoring-claim-fixtures';
+
 function makeExecutor(runChapterGeneration: (input: unknown) => Promise<WorkflowRunResult>) {
   const progressCalls: [string, JobProgress][] = [];
   const progress = mock(async (jobId: string, snapshot: JobProgress) => {
     progressCalls.push([jobId, snapshot]);
   });
   const jobService = { progress, get: async () => ({ cancelRequestedAt: null }) } as never;
-  const concurrency = {} as never;
+  const claims = new FakeAuthoringClaims().asService();
   const runChapterGenerationMock = mock(runChapterGeneration);
   const workflowRunService = { runChapterGeneration: runChapterGenerationMock } as never;
   const indexingService = {} as never;
@@ -20,7 +22,7 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const publishRunner = {} as never;
   const storage = {} as never;
 
-  const executor = new JobExecutor(jobService, concurrency, workflowRunService, indexingService, databaseService, publishRunner, storage);
+  const executor = new JobExecutor(jobService, claims, workflowRunService, indexingService, databaseService, publishRunner, storage);
   return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
 }
 

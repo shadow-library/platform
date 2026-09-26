@@ -5,6 +5,7 @@ import { ProjectService } from '@modules/project/project/project.service';
 import { briefContentHash } from '@server/common';
 import { schema } from '@server/database';
 
+import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
 import { matchesWhere } from '../sql-filter';
 
 type Row = Record<string, unknown>;
@@ -36,7 +37,7 @@ function fakeProject(briefs: Row[], volumes: Row[]) {
   };
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => (transactions.push(run), run(tx)) };
   const noop = {} as never;
-  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop), rows, transactions };
+  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop), rows, transactions };
 }
 
 describe('ProjectService.reset', () => {
@@ -56,7 +57,7 @@ describe('ProjectService.reset', () => {
 });
 
 describe('ProjectService.reset — authoring claims', () => {
-  function fakeClaimProject(claim: Row | undefined, job: Row | undefined) {
+  function fakeClaimProject(claim: Row | undefined, job: Row | undefined, claims = new FakeAuthoringClaims()) {
     const deleted: unknown[] = [];
     const tx = {
       select: () => ({ from: () => ({ where: () => ({ for: async () => (claim ? [claim] : []) }) }) }),
@@ -69,7 +70,7 @@ describe('ProjectService.reset — authoring claims', () => {
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
     const noop = {} as never;
-    return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop), deleted };
+    return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, claims.asService()), deleted };
   }
 
   it('should refuse a generate reset while the claim is held by a pending or running job, deleting nothing', async () => {
@@ -88,6 +89,21 @@ describe('ProjectService.reset — authoring claims', () => {
 
     expect(deleted[0]).toBe(schema.authoringClaims);
     expect(deleted).toContain(schema.jobs);
+  });
+
+  it('should refuse while a finalize or insert holds a live claim with no job, and clear one that went stale', async () => {
+    const claims = new FakeAuthoringClaims();
+    await claims.acquire(7n, null, 'finalize');
+    const claim = { projectId: 7n, jobId: null, kind: 'finalize' };
+
+    const busy = fakeClaimProject(claim, undefined, claims);
+    await expect(busy.service.reset(7n, 'generate')).rejects.toMatchObject({ code: 'PRJ_011' });
+    expect(busy.deleted).toEqual([]);
+
+    claims.expire(7n);
+    const stale = fakeClaimProject(claim, undefined, claims);
+    await stale.service.reset(7n, 'generate');
+    expect(stale.deleted[0]).toBe(schema.authoringClaims);
   });
 
   it('should reset without touching claims when none is held', async () => {

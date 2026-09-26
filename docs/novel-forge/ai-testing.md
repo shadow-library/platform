@@ -1205,7 +1205,8 @@ bible_document.remove`, `model` recorded. `model_calls`: `chapter-extract@1.0.0`
   finalized), or a chapter row's "Insert a chapter after N";
   `POST /projects/:projectId/chapters/:afterChapter/insert`.
 - **Preconditions:** `afterChapter >= max(finalized chapter number)` (`CHP_003`);
-  `afterChapter <= max(chapter, brief)` (`CHP_001`); **no active `generate` job** (`CHP_004`).
+  `afterChapter <= max(chapter, brief)` (`CHP_001`); **no draft after the insert point** (`CHP_009`); **no other job or
+  action holding the novel's authoring claim** (`CHP_004`).
 - **Input (planner):** `{"briefOrigin":"planner","intent":"A quiet chapter where Amara reads her mother's
 own withdrawal slip and realizes the handwriting is hers."}`
   **Input (hand):** `{"briefOrigin":"hand","briefBody":"…the brief, stored verbatim…"}`
@@ -1220,7 +1221,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   the chapter it follows (of chapter 1 when inserted before it); no volume row changes. Shifted briefs have their body/`context_refs`/`knowledge_contract` chapter
   references rewritten. Descendant drafts get `stale_reason='a chapter was inserted after this point'`.
   `chapter_publications` is deliberately **not** shifted.
-- **Fails when:** `CHP_003` / `CHP_001` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
+- **Fails when:** `CHP_003` / `CHP_001` / `CHP_009` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
   `planner`).
 - **Cost:** 0 model calls for `hand`; 1 `outline@3.1.0` call for `planner`.
 

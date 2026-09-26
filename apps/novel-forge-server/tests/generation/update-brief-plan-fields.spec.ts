@@ -37,7 +37,7 @@ function makeService(): { service: GenerationService; written: { values?: Row; s
   };
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
   const noop = {} as never;
-  const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   return { service, written };
 }
 

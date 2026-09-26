@@ -1,9 +1,10 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { runWithCostTier, scopedCostTier } from '@modules/ai/cost-tier-scope';
-import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService, payloadCostTier } from '@modules/jobs/job.service';
+
+import { FakeAuthoringClaims } from './authoring-claim-fixtures';
 
 function fakeJobService() {
   const inserted: unknown[] = [];
@@ -14,8 +15,9 @@ function fakeJobService() {
         return { onConflictDoNothing: () => ({ returning: async () => [{ id: 'job-1' }] }) };
       },
     }),
+    transaction: async (run: (tx: unknown) => Promise<unknown>) => run(db),
   };
-  const service = new JobService({ getPostgresClient: () => db } as never, { publish: () => undefined } as never);
+  const service = new JobService({ getPostgresClient: () => db } as never, { publish: () => undefined } as never, new FakeAuthoringClaims().asService());
   return { service, inserted };
 }
 
@@ -65,7 +67,7 @@ describe('JobExecutor.dispatch', () => {
     };
     const executor = new JobExecutor(
       jobService as never,
-      new ConcurrencyController(),
+      new FakeAuthoringClaims().asService(),
       workflowRunService as never,
       {} as never,
       { getPostgresClient: () => ({}) } as never,

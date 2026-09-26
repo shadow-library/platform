@@ -3,7 +3,7 @@ import { AppError, Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 import { type Genre, NOVEL_GENRES } from '@shadow-library/sdk';
 
-import { volumeContentHash } from '@server/common';
+import { authoringClaimClock, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
@@ -44,8 +44,8 @@ export class NovelImportService {
   }
 
   /**
-   * Validates the bundle fully, then creates the `projects` row and enqueues the `import` job in one
-   * transaction — either both exist or neither does. The job itself (`JobExecutor.runImport`) does the
+   * Validates the bundle fully, then creates the `projects` row, enqueues the `import` job and reserves the
+   * project's authoring claim for it in one transaction — either all exist or none does. The job itself (`JobExecutor.runImport`) does the
    * actual chapter/cover writes; this method never touches `chapters`.
    */
   async import(body: ImportNovelBody): Promise<ImportNovelResponse> {
@@ -102,6 +102,9 @@ export class NovelImportService {
         .values({ projectId: project.id, kind: 'import', target: `import-${project.id}`, payload: payload as never })
         .returning({ id: schema.jobs.id });
       if (!job) throw AppError.internal('novel-import: failed to enqueue import job');
+      await tx
+        .insert(schema.authoringClaims)
+        .values({ projectId: project.id, jobId: job.id, kind: 'import', claimedAt: authoringClaimClock(), heartbeatAt: authoringClaimClock() });
 
       return { projectId: project.id, jobId: job.id };
     });
