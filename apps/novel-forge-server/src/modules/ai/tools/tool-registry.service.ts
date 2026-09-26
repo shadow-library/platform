@@ -4,9 +4,11 @@ import { Injectable } from '@shadow-library/app';
 
 import { getBibleDocumentTool } from './tools/get-bible-document.tool';
 import { getBriefTool } from './tools/get-brief.tool';
+import { getCanonFactsTool } from './tools/get-canon-facts.tool';
 import { getChapterSummariesTool } from './tools/get-chapter-summaries.tool';
 import { getDraftTool } from './tools/get-draft.tool';
 import { getEntityTool } from './tools/get-entity.tool';
+import { getNotesTool } from './tools/get-notes.tool';
 import { getPlotThreadsTool } from './tools/get-plot-threads.tool';
 import { getVolumeTool } from './tools/get-volume.tool';
 import { getWorldFactsTool } from './tools/get-world-facts.tool';
@@ -25,7 +27,13 @@ const ALL_TOOLS: RegisteredTool[] = [
   getVolumeTool,
   getBriefTool,
   getDraftTool,
+  getCanonFactsTool,
+  getNotesTool,
 ];
+
+export function toolsForNode(nodeName: string): RegisteredTool[] {
+  return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName));
+}
 
 @Injectable()
 export class ToolRegistryService {
@@ -50,6 +58,6 @@ export class ToolRegistryService {
   }
 
   getRaw(nodeName: string): RegisteredTool[] {
-    return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName));
+    return toolsForNode(nodeName);
   }
 }

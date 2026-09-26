@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
-import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -16,7 +15,7 @@ import { countTokens } from '../ai/context/token-budget';
 import { isRegisteredModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { type ModelRoute, ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
-import { buildChatRefinePrompt, HUB_ALLOWED_OPS, HUB_INSTRUCTIONS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
+import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
@@ -458,15 +457,15 @@ export class ChatService {
     const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
     const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
-    const [pack, history] = await Promise.all([
-      this.contextAssembler.forChatTurn(projectId, session, { policy }),
-      this.compaction.buildHistory(session, project, route.contentMode),
-    ]);
-
+    const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
     const turnRules = renderTurnRules({ proseEdits });
-    const scopeInstructions = `${HUB_INSTRUCTIONS}\n\n${this.renderLookupVocabulary()}`;
+    const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE));
+    const promptTokens = chatPromptTokens(scopeInstructions);
+    const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
+    const requestTokens = [turnRules, content, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
+    const pack = await this.contextAssembler.forNovelChat(projectId, session.createdAt, { policy, promptTokens, requestTokens });
 
     // Pinned into `config.models.chat` so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
     const resolvedModel = route.resolved;
@@ -603,16 +602,6 @@ export class ChatService {
       turnRunId,
     );
     if (named) this.events.publish(projectId, { type: 'chat', sessionId });
-  }
-
-  /** The lookup half of the hub playbook: names, argument shapes, and purposes of the read-only tools. */
-  private renderLookupVocabulary(): string {
-    const tools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
-    const lines = tools.map(tool => {
-      const shape = tool.inputSchema instanceof z.ZodObject ? Object.keys(tool.inputSchema.shape).join(', ') : 'see description';
-      return `- ${tool.name} (args: ${shape}) — ${tool.description}`;
-    });
-    return `Lookup tools available this scope (read-only):\n${lines.join('\n')}`;
   }
 
   /**

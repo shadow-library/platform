@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
-import { buildChatRefinePrompt, buildOutlinePrompt, HUB_INSTRUCTIONS, HUB_PLAYBOOK, outlineWordTargetVars, PROMPT_REGISTRY, renderTurnRules } from '@modules/ai/prompts';
+import { toolsForNode } from '@modules/ai/tools';
+import {
+  buildChatRefinePrompt,
+  buildOutlinePrompt,
+  chatPromptTokens,
+  chatScopeInstructions,
+  HUB_INSTRUCTIONS,
+  HUB_PLAYBOOK,
+  outlineWordTargetVars,
+  PROMPT_REGISTRY,
+  renderTurnRules,
+} from '@modules/ai/prompts';
 import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, EDIT_BY_DELETION } from '@modules/ai/prompts/authoring-preamble';
 import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import {
@@ -223,12 +234,33 @@ describe('Prompt modules', () => {
 
     it('binds the read-before-overwrite rule on every record-overwriting op', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(hub).toContain('Chat context is an index, not the text');
+      expect(hub).toContain("Your context is the novel's durable state, not its text");
       for (const op of ['bible_document.upsert', 'volume.upsert', 'brief.update', 'draft.update']) expect(hub).toContain(op);
       for (const tool of ['get_bible_document', 'get_volume', 'get_brief', 'get_draft']) expect(hub).toContain(tool);
       expect(hub).not.toContain('arc.upsert');
       expect(hub).not.toContain('get_arc');
       expect(hub).toContain('Lookups and a changeSet never share a response');
+    });
+
+    it('should give the chat turn and the context preview one playbook, lookup vocabulary included', () => {
+      const instructions = chatScopeInstructions(toolsForNode('chat-hub'));
+      expect(instructions).toStartWith(HUB_INSTRUCTIONS);
+      expect(instructions).toContain('- get_notes (args: from, part, query)');
+      expect(instructions).toContain('- get_canon_facts (args: keys)');
+      expect(chatPromptTokens(instructions)).toBeGreaterThan(chatPromptTokens(HUB_INSTRUCTIONS));
+    });
+
+    it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
+      const hub = HUB_INSTRUCTIONS;
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.6.0');
+      expect(hub).toContain('Writing with you:');
+      expect(hub).toContain('Writing by hand:');
+      expect(hub).toContain('fetch before you critique');
+      for (const tool of ['get_draft', 'get_canon_facts', 'get_notes']) expect(hub).toContain(tool);
+      expect(hub).toContain('Discussing:');
+      expect(hub).toContain("accept 'undecided for now'");
+      expect(hub).toContain('ending is PLANNER-ONLY');
+      expect(hub).toContain('outrank every summary');
     });
 
     it('should accept epistemic ops on every scope, since they all share the hub playbook', () => {

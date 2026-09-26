@@ -62,5 +62,5 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
 export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
-export { buildChatRefinePrompt, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
+export { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';

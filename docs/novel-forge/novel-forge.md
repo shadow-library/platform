@@ -84,7 +84,13 @@
   neither approved nor final (the author may still write it by hand; planning is not gated), and a batch ends at such a chapter. A chapter with no knowledge contract
   discloses the dated facts that first become showable there, never open canon. The proposed "the reader knows; <POV> does not" section is off unless `KNOWLEDGE_READER_KNOWS_LABEL` is set. The continuity delta goes
   through proposals (auto-applied; low-confidence entries stay pending; isolated chapters are skipped, not extracted).
-- **Chat hub**: one conversation over the whole novel; context is an index, detail via declared lookups (never native tool binding). Manual mode stages a proposal; auto applies it.
+- **Chat hub**: one conversation over the whole novel. Its context is the novel's durable state, not its text — the story (the ending, ending question and later
+  volumes' goals labelled planner-only), the Notebook, open promises, inventories by name and key, and where the story stands. The first model round is budgeted as a
+  whole request: the stable sections (plugin sections excepted, which always ride volatile) against a fixed allowance for history and message, so the cached
+  prefix holds as a conversation grows, and the optional volatile ones against what is actually sent; the pack never drops below a 6k floor, the handoff is always
+  kept, so a request near the history ceiling can run past the budget, and lookup rounds add on top. The author's own words render before, and outrank, any AI summary. Detail
+  comes through declared lookups (never native tool binding); a turn that reads the author's notes is held for review like one that reads a planner-only page. Manual
+  mode stages a proposal; auto applies it.
 - **Regenerate from brief**: once a plan edit lands on a chapter's brief, the author regenerates that chapter through the normal generation job (judge, readability, writer
   scrubs, repairs) rather than having chat rewrite the prose. It keeps generate's gates — chapters in order, no contradiction elsewhere, no unfilled `external` slot at or before
   it, one generation job at a time, finalized chapters change only through amend — and replaces the prose in place. Whatever the draft held, however it was written, stays in

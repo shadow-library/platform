@@ -158,10 +158,10 @@ describe('the planner and chat contexts', () => {
   });
 
   it('should give the chat hub the premise and pages as the author wrote them', async () => {
-    const pack = await writerAssembler(writerDb(writerTables('locked'))).forChatTurn(7n, { scopeType: 'project', createdAt: new Date() } as never, {});
+    const pack = await writerAssembler(writerDb(writerTables('locked'))).forNovelChat(7n, new Date(), { promptTokens: 4_000, requestTokens: 0 });
 
-    expect(section(pack, 'premise')).toContain(TRUTH);
-    expect(section(pack, 'premise')).toContain(ENDING);
-    expect(section(pack, 'doc_inventory')).toContain('lore/harbour-notes');
+    expect(section(pack, 'story')).toContain(TRUTH);
+    expect(section(pack, 'story')).toContain(ENDING);
+    expect(section(pack, 'inventory')).toContain('lore/harbour-notes');
   });
 });

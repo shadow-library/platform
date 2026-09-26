@@ -23,13 +23,29 @@ import {
 } from '../../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy, WriterDisclosurePolicy } from '../../bible/fact/writer-disclosure-policy';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
-import { writerLinesSection } from '../../ledger/ledger-sections';
+import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
-import { type BibleDocRow, isPlannerOnlyBibleDoc, isWriterExcludedBibleDoc } from './bible-docs';
+import { isWriterExcludedBibleDoc } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
+import {
+  nextChapterNumber,
+  NOVEL_CHAT_MESSAGE_ALLOWANCE,
+  NOVEL_CHAT_PACK_FLOOR,
+  NOVEL_CHAT_PACK_MARGIN,
+  NOVEL_CHAT_REQUEST_BUDGET,
+  NOVEL_CHAT_SECTION_CAPS,
+  renderChapterIndex,
+  renderHandoff,
+  renderInventory,
+  renderNotebook,
+  renderNotesPointer,
+  renderNovelStory,
+  renderPromises,
+  renderVolumeGoals,
+} from './novel-chat-context';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -85,9 +101,11 @@ interface ResolvedRefs {
   characters: string[];
 }
 
-export interface ChatScopeInput {
-  scopeType: schema.Refinement.ChatScope;
-  createdAt: Date;
+export interface NovelChatPackOptions extends PackPolicyOptions {
+  /** The system prompt and playbook: the same every turn, so the stable sections' budget stays put. */
+  promptTokens: number;
+  /** What the turn adds on top: turn rules, history and the author's message. */
+  requestTokens: number;
 }
 
 export const DEFAULT_BUDGET = 24_000;
@@ -98,13 +116,11 @@ const RECENT_SUMMARY_MAX = 400;
 const ESTABLISHED_FACTS_MAX = 15;
 // A stale draft is labelled, not dropped: an ancestor changed under it, but it is still the only continuity the next writer has.
 const STALE_LABEL = '[STALE — may not match the current plan]';
-const PLANNER_ONLY_INVENTORY_NOTE = '(planner-only: says what happens later in the book — look it up to read it; a change drawn from it waits for the author’s review)';
 
-// Refinement budgets. History is prompt messages, not pack text, so it does not count
-// against the pack; the history budgets are enforced by ChatService compaction.
-export const CHAT_HUB_BUDGET = 20_000;
+// History is prompt messages, not pack text; its budgets are enforced by ChatService compaction.
 export const CHAT_HISTORY_BUDGET = 6_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
+export const NOVEL_CHAT_HISTORY_ALLOWANCE = CHAT_HISTORY_BUDGET + CHAT_SUMMARY_BUDGET + NOVEL_CHAT_MESSAGE_ALLOWANCE;
 // A planning pack carries the whole catalog — every canon fact and a description per entity.
 export const OUTLINE_BUDGET = 32_000;
 // Token counts of a section's parts and of the rendered whole differ by a few tokens; the margin keeps a sized section inside the budget.
@@ -309,15 +325,6 @@ function sumTokens(sections: ContextSection[]): number {
 /** The content a section may hold when the section itself, heading included, must fit in `available`. */
 function sizedSectionCeiling(key: string, available: number): number {
   return Math.max(0, available - countTokens(renderSection(key, '')) - SIZED_SECTION_MARGIN);
-}
-
-/** A planner-only page is listed by address alone: the chat can look it up, and a turn that does is held for the author's review. */
-function inventoryLine(doc: Pick<BibleDocRow, 'section' | 'slug' | 'body'>): string {
-  return `${doc.section}/${doc.slug}: ${isPlannerOnlyBibleDoc(doc) ? PLANNER_ONLY_INVENTORY_NOTE : firstLine(doc.body)}`;
-}
-
-function firstLine(text: string | null): string {
-  return (text ?? '').split('\n', 1)[0] ?? '';
 }
 
 type CharacterStateRow = typeof schema.characterStates.$inferSelect;
@@ -1235,32 +1242,85 @@ export class ContextAssembler {
   }
 
   /**
-   * Builds the pack for one chat turn: the stable segment is a whole-project index —
-   * premise, inventories, one-line summaries — with the lookup tools pulling full artifacts on demand.
-   * Volatile carries only the artifacts whose revision moved since the session started. History is NOT part of the pack — it rides as
-   * prompt messages so provider caching can extend across turns.
+   * The stable sections are budgeted against a fixed reservation (prompt plus the history and message allowances), so the cached prefix does
+   * not move as the conversation grows; the optional volatile sections absorb the difference from the request actually sent. This budgets the
+   * first model round only: lookup rounds add their results on top, the pack never shrinks below `NOVEL_CHAT_PACK_FLOOR`, and the handoff is
+   * always kept, so a request near the history ceiling may run past `NOVEL_CHAT_REQUEST_BUDGET`. Plugin sections ride in the volatile segment
+   * whatever they ask for, since a stable one would move the cached prefix as the budget changes.
    */
-  async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: PackPolicyOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const [project, docs, volumes, catalogText] = await Promise.all([
+  async forNovelChat(projectId: bigint, sessionStartedAt: Date, opts: NovelChatPackOptions): Promise<AssembledPack & { id: bigint | null }> {
+    const [project, ledger, volumes, threads, mysteries, entities, pages, facts, worldFacts, milestones, chapters, drafts, plannedBriefs] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+      loadActiveLedger(this.db, projectId),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
-      this.catalogService.render(projectId, { descriptors: 'compact' }),
+      this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')), orderBy: schema.plotThreads.threadKey }),
+      this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')), orderBy: schema.mysteries.mysteryKey }),
+      this.db.query.entities.findMany({ columns: { entityKey: true, name: true, type: true, significance: true }, where: eq(schema.entities.projectId, projectId) }),
+      this.db.query.bibleDocuments.findMany({
+        columns: { section: true, slug: true, frontmatter: true },
+        where: eq(schema.bibleDocuments.projectId, projectId),
+        orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug],
+      }),
+      this.db.query.canonFacts.findMany({ columns: { factKey: true, disclosedInChapter: true }, where: eq(schema.canonFacts.projectId, projectId) }),
+      this.db.query.worldFacts.findMany({
+        columns: { category: true, key: true },
+        where: eq(schema.worldFacts.projectId, projectId),
+        orderBy: [schema.worldFacts.category, schema.worldFacts.key],
+      }),
+      this.db.query.milestones.findMany({
+        columns: { milestoneKey: true, label: true, state: true },
+        where: eq(schema.milestones.projectId, projectId),
+        orderBy: schema.milestones.milestoneKey,
+      }),
+      this.db.query.chapters.findMany({ columns: { number: true, title: true, status: true, summary: true, isolated: true }, where: eq(schema.chapters.projectId, projectId) }),
+      this.db.query.drafts.findMany({
+        columns: { chapter: true, title: true, reviewStatus: true, summary: true, isolated: true, staleReason: true },
+        where: eq(schema.drafts.projectId, projectId),
+      }),
+      this.db.query.briefs.findMany({ columns: { chapter: true }, where: eq(schema.briefs.projectId, projectId) }),
+    ]);
+    const next = nextChapterNumber(chapters, drafts);
+    const [handoffBriefs, pipelineStatus, changed] = await Promise.all([
+      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, [next - 1, next])) }),
+      this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0),
+      this.changedSince(projectId, sessionStartedAt),
     ]);
 
-    const sections: ContextSection[] = [];
-    if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
-    if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(inventoryLine).join('\n'), 'canonical', [])));
-    if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
-    if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
-    sections.push(makeSection('pipeline_status', await this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0), 'working', []));
+    const caps = NOVEL_CHAT_SECTION_CAPS;
+    const section = (key: string, content: string, tier: ContextTier, cap: number, rank: { required: true } | { priority: number }): ContextSection => ({
+      ...fitToCap(makeSection(key, content, tier), cap),
+      ...rank,
+    });
+    const stable: ContextSection[] = [];
+    if (project) {
+      const story = { ...project, authorInstructions: writingInstructionAdditions(project.instructions) || null };
+      stable.push(section('story', renderNovelStory(story), 'canonical', caps.story, { required: true }));
+    }
+    stable.push(section('notebook', renderNotebook(ledger), 'approved_intent', caps.notebook, { required: true }));
+    const notesPointer = renderNotesPointer(ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC)?.statement ?? '');
+    if (notesPointer) stable.push(section('author_notes', notesPointer, 'approved_intent', caps.authorNotes, { required: true }));
+    if (volumes.length > 0) stable.push(section('volume_plan', renderVolumeGoals(volumes), 'approved_intent', caps.volumes, { priority: 0 }));
+    const promises = renderPromises(threads, mysteries, next);
+    if (promises) stable.push(section('promises', promises, 'canonical', caps.promises, { priority: 1 }));
+    const inventory = renderInventory({ entities, pages, facts, worldFacts, milestones });
+    if (inventory) stable.push(section('inventory', inventory, 'canonical', caps.inventory, { priority: 2 }));
+    const chapterIndex = renderChapterIndex(
+      chapters,
+      drafts,
+      plannedBriefs.map(brief => brief.chapter),
+    );
+    if (chapterIndex) stable.push(section('chapter_index', chapterIndex, 'canonical', caps.chapterIndex, { priority: 3 }));
 
-    // Volatile tail: artifacts whose revision moved since the session started — the model must know
-    // the canon under discussion shifted beneath the conversation.
-    const changed = await this.changedSince(projectId, session.createdAt);
-    if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
+    const volatile = [section('handoff', renderHandoff(chapters, drafts, handoffBriefs), 'working', caps.handoff, { required: true })];
+    volatile.push(section('pipeline_status', pipelineStatus, 'working', caps.changedSince, { priority: 0 }));
+    if (changed.length > 0) volatile.push(section('changed_since', changed.join('\n'), 'working', caps.changedSince, { priority: 1 }));
+    const plugins = pluginContextSections(opts.policy, [...stable, ...volatile]).map(plugin => ({ ...plugin, segment: 'volatile' as const }));
 
-    return this.finalize(projectId, 'chat_hub', null, sections, [], CHAT_HUB_BUDGET, opts);
+    const stableRoom = Math.max(NOVEL_CHAT_PACK_FLOOR, NOVEL_CHAT_REQUEST_BUDGET - opts.promptTokens - NOVEL_CHAT_HISTORY_ALLOWANCE) - NOVEL_CHAT_PACK_MARGIN;
+    const kept = applyBudget(stable.map(asStable), stableRoom);
+    const packRoom = Math.max(NOVEL_CHAT_PACK_FLOOR, NOVEL_CHAT_REQUEST_BUDGET - opts.promptTokens - opts.requestTokens) - NOVEL_CHAT_PACK_MARGIN;
+    const pinned = kept.fitting.map(fitting => ({ ...fitting, required: true }));
+    return this.finalize(projectId, 'chat_hub', null, [...pinned, ...volatile, ...plugins], [], Math.max(sumTokens(kept.fitting), packRoom), { ...opts, omitted: kept.omitted });
   }
 
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
@@ -1426,10 +1486,6 @@ export class ContextAssembler {
     const themes = Array.isArray(project.themes) ? (project.themes as string[]).join(', ') : '';
     const additions = writingInstructionAdditions(project.instructions);
     return [project.premise ?? project.brief ?? '', themes ? `Themes: ${themes}` : '', additions ? `Author instructions: ${additions}` : ''].filter(Boolean).join('\n\n');
-  }
-
-  private renderVolumeLine(v: schema.Plan.Volume): string {
-    return `Vol ${v.ordinal} ${v.volumeKey}: ${v.title ?? ''} — ${v.objective ?? ''}`;
   }
 
   private async volumeByKey(projectId: bigint, volumeKey: string | null | undefined): Promise<schema.Plan.Volume | undefined> {

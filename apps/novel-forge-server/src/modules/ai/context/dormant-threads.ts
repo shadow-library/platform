@@ -38,13 +38,16 @@ function evaluate(kind: DormantThreadKind, candidates: DormantCandidate[], curre
   return entries;
 }
 
+type DormantThreadRow = Pick<Story.PlotThread, 'threadKey' | 'summary' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow'>;
+type DormantMysteryRow = Pick<Story.Mystery, 'mysteryKey' | 'question' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow'>;
+
 /**
  * Flags open, non-`intentionallyOpen` threads/mysteries that either haven't been advanced by
  * continuity extraction in `DORMANT_THREAD_THRESHOLD_CHAPTERS` chapters ("dormant") or have passed
  * an authored `payoffWindow` while still open ("overdue") — so planning can deliberately address
  * them instead of letting them silently rot for the rest of the story.
  */
-export function computeDormantThreads(threads: Story.PlotThread[], mysteries: Story.Mystery[], currentChapter: number): DormantThreadEntry[] {
+export function computeDormantThreads(threads: readonly DormantThreadRow[], mysteries: readonly DormantMysteryRow[], currentChapter: number): DormantThreadEntry[] {
   const threadCandidates = threads.map(t => ({
     key: t.threadKey,
     label: t.summary ?? t.threadKey,

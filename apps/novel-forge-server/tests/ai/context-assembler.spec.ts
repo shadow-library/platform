@@ -459,22 +459,27 @@ describe('ContextAssembler.forChapter — established state carry', () => {
   });
 });
 
-describe('ContextAssembler.forChatTurn — planner-only pages', () => {
+describe('ContextAssembler.forNovelChat — planner-only pages', () => {
   it('should list the organised timeline by address alone, so its content reaches a chat turn only through a lookup', async () => {
     const bibleDocuments = [
-      { section: 'project', slug: 'timeline', body: '# Timeline\n\n## The ending\n\n- The ferryman takes the throne', revision: 1, updatedAt: new Date(0) },
-      { section: 'world', slug: 'river', body: 'The river runs east.', revision: 1, updatedAt: new Date(0) },
+      { section: 'project', slug: 'timeline', frontmatter: null, body: '# Timeline\n\n## The ending\n\n- The ferryman takes the throne' },
+      { section: 'world', slug: 'river', frontmatter: { title: 'The River' }, body: 'The river runs east.' },
     ];
     const assembler = makeAssembler({
-      query: { bibleDocuments: { findMany: mock(async () => bibleDocuments) }, briefs: { findFirst: mock(async () => null), findMany: mock(async () => []) } },
+      query: {
+        bibleDocuments: { findMany: mock(async () => bibleDocuments) },
+        briefs: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        milestones: { findMany: mock(async () => []) },
+      },
       $count: mock(async () => 0),
     });
-    const pack = await assembler.forChatTurn(1n, { createdAt: new Date(1) } as never);
-    const inventory = pack.sections.find(section => section.key === 'doc_inventory')?.rendered ?? '';
+    const pack = await assembler.forNovelChat(1n, new Date(1), { promptTokens: 4_000, requestTokens: 0 });
+    const inventory = pack.sections.find(section => section.key === 'inventory')?.rendered ?? '';
 
-    expect(inventory).toContain('world/river: The river runs east.');
-    expect(inventory).toContain('project/timeline: (planner-only');
+    expect(inventory).toContain('world/river');
+    expect(inventory).toContain('project/timeline (planner-only');
     expect(pack.rendered).not.toContain('takes the throne');
+    expect(pack.rendered).not.toContain('The river runs east.');
   });
 });
 

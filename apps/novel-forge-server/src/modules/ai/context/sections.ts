@@ -76,6 +76,13 @@ const SECTION_LABELS: Record<string, string> = {
   ledger: '## DECISION LEDGER',
   author_brief: "## THE AUTHOR'S OWN WORDS",
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
+  story: '## THE STORY',
+  notebook: "## THE NOTEBOOK (THE AUTHOR'S DECISIONS)",
+  author_notes: "## THE AUTHOR'S NOTES",
+  promises: '## OPEN PROMISES',
+  inventory: '## STORY BIBLE INVENTORY',
+  chapter_index: '## CHAPTERS',
+  handoff: '## WHERE THE STORY STANDS',
 };
 
 export const CORE_SECTION_KEYS: ReadonlySet<string> = new Set(Object.keys(SECTION_LABELS));

@@ -11,6 +11,13 @@ describe('planner-only guard', () => {
     expect(readsPlannerOnlyPage('get_bible_document', null)).toBe(false);
   });
 
+  it('should treat reading the author’s notes as a planner-only read, and a canon-fact lookup as none', () => {
+    expect(readsPlannerOnlyPage('get_notes', {})).toBe(true);
+    expect(readsPlannerOnlyPage('get_notes', undefined)).toBe(true);
+    expect(readsPlannerOnlyPage('get_canon_facts', { keys: ['keeper_bargain'] })).toBe(false);
+    expect(PLANNER_ONLY_WARNING).toContain('your notes');
+  });
+
   it('should warn once on a turn that read one, and leave any other turn’s warnings as they are', () => {
     expect(chatTurnWarnings([], true)).toEqual([PLANNER_ONLY_WARNING]);
     expect(chatTurnWarnings(['echo'], true)).toEqual(['echo', PLANNER_ONLY_WARNING]);

@@ -7,12 +7,13 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { ContextAssembler } from '../ai/context/context-assembler.service';
+import { ContextAssembler, NOVEL_CHAT_HISTORY_ALLOWANCE } from '../ai/context/context-assembler.service';
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY } from '../ai/prompts';
+import { chatPromptTokens, chatScopeInstructions, PROMPT_REGISTRY } from '../ai/prompts';
 import { type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { toolsForNode } from '../ai/tools';
 import { renderDocInventory, renderEntityInventory } from '../bible/bible-inventory';
 import { renderManifest } from '../bible/bible-manifest';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
@@ -166,7 +167,7 @@ export class RefineService {
     };
   }
 
-  private async assemblePreview(projectId: bigint, query: ContextPreviewInput): ReturnType<ContextAssembler['forChatTurn']> {
+  private async assemblePreview(projectId: bigint, query: ContextPreviewInput): ReturnType<ContextAssembler['forNovelChat']> {
     const resolver = await this.pluginPolicy.scoped(projectId);
     const chapter = query.chapter ?? 1;
     switch (query.purpose) {
@@ -176,8 +177,12 @@ export class RefineService {
         return this.contextAssembler.forOutline(projectId, chapter, { policy: resolver.for({ role: 'outline', chapter }) });
       case 'chat': {
         if (!query.scopeType) throw AppErrorCode.CHT_003.create();
-        const session = { scopeType: query.scopeType as Refinement.ChatScope, createdAt: new Date() };
-        return this.contextAssembler.forChatTurn(projectId, session, { policy: resolver.for({ role: 'chat' }) });
+        const policy = resolver.for({ role: 'chat' });
+        return this.contextAssembler.forNovelChat(projectId, new Date(), {
+          policy,
+          promptTokens: chatPromptTokens(chatScopeInstructions(toolsForNode('chat-hub'))),
+          requestTokens: NOVEL_CHAT_HISTORY_ALLOWANCE,
+        });
       }
       case 'premise':
         return this.contextAssembler.forPremise(projectId, { policy: resolver.for({ role: 'premise' }) });
