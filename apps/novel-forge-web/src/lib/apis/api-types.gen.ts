@@ -1525,6 +1525,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Active */
+    get: operations['get_api_v1_projects_projectId_ledger'];
+    put?: never;
+    /** Create */
+    post: operations['post_api_v1_projects_projectId_ledger'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/topics/{topic}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** History */
+    get: operations['get_api_v1_projects_projectId_ledger_topics_topic'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/supersede': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Supersede */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_supersede'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ledger/{entryId}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw */
+    post: operations['post_api_v1_projects_projectId_ledger_entryId_withdraw'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/bible/audits': {
     parameters: {
       query?: never;
@@ -2360,75 +2429,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/ledger': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Active */
-    get: operations['get_api_v1_projects_projectId_ledger'];
-    put?: never;
-    /** Create */
-    post: operations['post_api_v1_projects_projectId_ledger'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/topics/{topic}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** History */
-    get: operations['get_api_v1_projects_projectId_ledger_topics_topic'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/{entryId}/supersede': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Supersede */
-    post: operations['post_api_v1_projects_projectId_ledger_entryId_supersede'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ledger/{entryId}/withdraw': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Withdraw */
-    post: operations['post_api_v1_projects_projectId_ledger_entryId_withdraw'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/new-novel': {
     parameters: {
       query?: never;
@@ -2494,6 +2494,23 @@ export interface paths {
     post?: never;
     /** Clear Progress Override */
     delete: operations['delete_api_v1_projects_projectId_progress_key'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/notes/from-message': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Save Message */
+    post: operations['post_api_v1_projects_projectId_notes_from_message'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -4037,6 +4054,8 @@ export interface components {
       inputTokens?: null | number;
       cachedInputTokens?: null | number;
       outputTokens?: null | number;
+      /** @description A message of the author’s long enough to keep as notes, which the notes do not hold yet: offer "Save this as notes?", answered by `POST /notes/from-message`. */
+      offersNotes?: boolean;
       /** Format: date-time */
       createdAt: string;
     };
@@ -4208,6 +4227,94 @@ export interface components {
       id: string;
       /** @description split only: overrides the suggested entity type. */
       entityType?: components['schemas']['EntityType'];
+    };
+    ListLedgerEntriesResponse: {
+      entries: components['schemas']['LedgerEntryResponse'][];
+    };
+    LedgerEntryResponse: {
+      id: string;
+      projectId: string;
+      kind: components['schemas']['LedgerEntryKind'];
+      topic: string;
+      statement: string;
+      why: null | string;
+      rejectedAlternatives: string[];
+      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
+      writerLine: null | string;
+      decidedBy: components['schemas']['LedgerDecidedBy'];
+      /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
+      stepKey: null | string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload: null | {
+        [key: string]: unknown;
+      };
+      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
+      links: components['schemas']['LedgerLinksResponse'];
+      supersedesId: null | string;
+      /**
+       * Format: date-time
+       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
+       */
+      supersededAt: null | string;
+      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
+      withdrawnReason: null | string;
+      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
+      status: components['schemas']['LedgerEntryStatus'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
+    /** @enum {string} */
+    LedgerDecidedBy: 'author' | 'system';
+    LedgerLinksResponse: {
+      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
+      entityKeys?: string[];
+      factKeys?: string[];
+      volumeKeys?: string[];
+      briefChapters?: number[];
+    };
+    LedgerBibleDocumentLinkResponse: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+    };
+    /** @enum {string} */
+    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
+    CreateLedgerEntryBody: {
+      /** @description The author writes directions, rejected ideas and backlog entries directly; a decision only ever supersedes one. */
+      kind: components['schemas']['AuthorLedgerKind'];
+      /** @description Stable topic key, e.g. `premise`, `world.rules`, `organise.rules`. */
+      topic: string;
+      statement: string;
+      /** @description For a rejected entry, the reason the author gave for killing it. */
+      why?: string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorLedgerKind: 'direction' | 'rejected' | 'backlog';
+    SupersedeLedgerEntryBody: {
+      /** @description Kind of the successor; defaults to the superseded entry’s kind (a system detail becomes a decision). Only a decision or a system detail can become a decision. */
+      kind?: components['schemas']['AuthorSupersedeLedgerKind'];
+      statement: string;
+      /** @description Omit to keep the superseded entry’s value when the kind is kept; send an empty string to clear it. */
+      why?: string;
+      /** @description What the decision means for the chapter writer. Omit to keep, empty string to clear. */
+      writerLine?: string;
+      /** @description Omit to keep the superseded entry’s alternatives when the kind is kept. */
+      rejectedAlternatives?: string[];
+      /** @description Omit to keep the superseded entry’s payload when the kind is kept. */
+      payload?: {
+        [key: string]: unknown;
+      };
+    };
+    /** @enum {string} */
+    AuthorSupersedeLedgerKind: 'decision' | 'direction' | 'rejected' | 'backlog';
+    WithdrawLedgerEntryBody: {
+      /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
+      reason: string;
     };
     ListBibleAuditsResponse: {
       /** @description Newest first, up to the most recent 50. */
@@ -5223,94 +5330,6 @@ export interface components {
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
     };
-    ListLedgerEntriesResponse: {
-      entries: components['schemas']['LedgerEntryResponse'][];
-    };
-    LedgerEntryResponse: {
-      id: string;
-      projectId: string;
-      kind: components['schemas']['LedgerEntryKind'];
-      topic: string;
-      statement: string;
-      why: null | string;
-      rejectedAlternatives: string[];
-      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
-      writerLine: null | string;
-      decidedBy: components['schemas']['LedgerDecidedBy'];
-      /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
-      stepKey: null | string;
-      /** @description Structured detail whose fields depend on the topic. */
-      payload: null | {
-        [key: string]: unknown;
-      };
-      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
-      links: components['schemas']['LedgerLinksResponse'];
-      supersedesId: null | string;
-      /**
-       * Format: date-time
-       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
-       */
-      supersededAt: null | string;
-      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
-      withdrawnReason: null | string;
-      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
-      status: components['schemas']['LedgerEntryStatus'];
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @enum {string} */
-    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
-    /** @enum {string} */
-    LedgerDecidedBy: 'author' | 'system';
-    LedgerLinksResponse: {
-      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
-      entityKeys?: string[];
-      factKeys?: string[];
-      volumeKeys?: string[];
-      briefChapters?: number[];
-    };
-    LedgerBibleDocumentLinkResponse: {
-      section: components['schemas']['BibleSection'];
-      slug: string;
-    };
-    /** @enum {string} */
-    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
-    CreateLedgerEntryBody: {
-      /** @description The author writes directions, rejected ideas and backlog entries directly; a decision only ever supersedes one. */
-      kind: components['schemas']['AuthorLedgerKind'];
-      /** @description Stable topic key, e.g. `premise`, `world.rules`, `organise.rules`. */
-      topic: string;
-      statement: string;
-      /** @description For a rejected entry, the reason the author gave for killing it. */
-      why?: string;
-      /** @description Structured detail whose fields depend on the topic. */
-      payload?: {
-        [key: string]: unknown;
-      };
-    };
-    /** @enum {string} */
-    AuthorLedgerKind: 'direction' | 'rejected' | 'backlog';
-    SupersedeLedgerEntryBody: {
-      /** @description Kind of the successor; defaults to the superseded entry’s kind (a system detail becomes a decision). Only a decision or a system detail can become a decision. */
-      kind?: components['schemas']['AuthorSupersedeLedgerKind'];
-      statement: string;
-      /** @description Omit to keep the superseded entry’s value when the kind is kept; send an empty string to clear it. */
-      why?: string;
-      /** @description What the decision means for the chapter writer. Omit to keep, empty string to clear. */
-      writerLine?: string;
-      /** @description Omit to keep the superseded entry’s alternatives when the kind is kept. */
-      rejectedAlternatives?: string[];
-      /** @description Omit to keep the superseded entry’s payload when the kind is kept. */
-      payload?: {
-        [key: string]: unknown;
-      };
-    };
-    /** @enum {string} */
-    AuthorSupersedeLedgerKind: 'decision' | 'direction' | 'rejected' | 'backlog';
-    WithdrawLedgerEntryBody: {
-      /** @description Why the author withdraws the entry. It is deactivated with no successor; a withdrawn rejection is no longer a do-not-propose item. */
-      reason: string;
-    };
     CreateNovelWithNotesBody: {
       /** @description The working title. */
       title: string;
@@ -5359,6 +5378,19 @@ export interface components {
     ProgressOverrideStatus: 'undecided' | 'dismissed';
     /** @enum {string} */
     ProgressItemKey: 'premise' | 'protagonist' | 'opposition' | 'theme' | 'reader_promise' | 'ending' | 'first_volume_goal' | 'next_chapter_planned';
+    SaveMessageAsNotesBody: {
+      /** @description The chat the message was sent in. */
+      sessionId: string;
+      /** @description One of the author’s own messages in that chat, of at least 600 words. */
+      messageId: string;
+    };
+    SavedNotesResponse: {
+      /** @description False when the notes already held the message, so nothing changed. */
+      saved: boolean;
+      /** @description Paragraphs in the notes now, numbered as organising and the chat’s notes lookup number them. */
+      paragraphs: number;
+      words: number;
+    };
     ImportNovelBody: {
       bundle: components['schemas']['NovelBundle'];
     };
@@ -10004,6 +10036,226 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated entry kinds to keep. */
+        kinds?: string;
+        /** @description Comma-separated topic keys to keep; a key ending in `.*` keeps every topic under that prefix. */
+        topics?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_ledger_topics_topic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        topic: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListLedgerEntriesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_supersede: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SupersedeLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_ledger_entryId_withdraw: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WithdrawLedgerEntryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_bible_audits: {
     parameters: {
       query?: never;
@@ -12828,226 +13080,6 @@ export interface operations {
       };
     };
   };
-  get_api_v1_projects_projectId_ledger: {
-    parameters: {
-      query?: {
-        /** @description Comma-separated entry kinds to keep. */
-        kinds?: string;
-        /** @description Comma-separated topic keys to keep; a key ending in `.*` keeps every topic under that prefix. */
-        topics?: string;
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListLedgerEntriesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_ledger_topics_topic: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        topic: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListLedgerEntriesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger_entryId_supersede: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entryId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SupersedeLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_ledger_entryId_withdraw: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entryId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['WithdrawLedgerEntryBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['LedgerEntryResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   post_api_v1_projects_new_novel: {
     parameters: {
       query?: never;
@@ -13269,6 +13301,50 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProgressResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_notes_from_message: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveMessageAsNotesBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SavedNotesResponse'];
         };
       };
       /** @description Default Response */
@@ -13811,6 +13887,18 @@ export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
+export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
+export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
+export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
+export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
+export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
+export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
+export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
+export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
+export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
+export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
+export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
+export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
 export type ListBibleAuditsResponse = components['schemas']['ListBibleAuditsResponse'];
 export type BibleAuditReportResponse = components['schemas']['BibleAuditReportResponse'];
 export type AuditCheckedResponse = components['schemas']['AuditCheckedResponse'];
@@ -13939,18 +14027,6 @@ export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
 export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
-export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
-export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
-export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
-export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
-export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
-export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
-export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
-export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
-export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
-export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
-export type AuthorSupersedeLedgerKind = components['schemas']['AuthorSupersedeLedgerKind'];
-export type WithdrawLedgerEntryBody = components['schemas']['WithdrawLedgerEntryBody'];
 export type CreateNovelWithNotesBody = components['schemas']['CreateNovelWithNotesBody'];
 export type CreateNovelWithNotesResponse = components['schemas']['CreateNovelWithNotesResponse'];
 export type NotesResponse = components['schemas']['NotesResponse'];
@@ -13961,6 +14037,8 @@ export type ProgressItemStatus = components['schemas']['ProgressItemStatus'];
 export type ProgressOverrideBody = components['schemas']['ProgressOverrideBody'];
 export type ProgressOverrideStatus = components['schemas']['ProgressOverrideStatus'];
 export type ProgressItemKey = components['schemas']['ProgressItemKey'];
+export type SaveMessageAsNotesBody = components['schemas']['SaveMessageAsNotesBody'];
+export type SavedNotesResponse = components['schemas']['SavedNotesResponse'];
 export type ImportNovelBody = components['schemas']['ImportNovelBody'];
 export type NovelBundle = components['schemas']['NovelBundle'];
 export type NovelImportMode = components['schemas']['NovelImportMode'];
@@ -14048,6 +14126,9 @@ export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/t
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
+export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
+export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
+export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;
 export type ListAuditsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits']['get']['parameters']['path'], undefined>;
 export type GetAuditPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits/{reportId}']['get']['parameters']['path'], undefined>;
 export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
@@ -14077,9 +14158,6 @@ export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
 export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
-export type ListActiveQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['query'], undefined>;
-export type ListActivePathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger']['get']['parameters']['path'], undefined>;
-export type HistoryPathParams = Exclude<paths['/api/v1/projects/{projectId}/ledger/topics/{topic}']['get']['parameters']['path'], undefined>;
 export type GetNotesPathParams = Exclude<paths['/api/v1/projects/{projectId}/notes']['get']['parameters']['path'], undefined>;
 export type GetProgressPathParams = Exclude<paths['/api/v1/projects/{projectId}/progress']['get']['parameters']['path'], undefined>;
 export type GetAccessPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications/access']['get']['parameters']['path'], undefined>;
