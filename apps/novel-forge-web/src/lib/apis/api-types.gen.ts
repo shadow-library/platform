@@ -4204,8 +4204,26 @@ export interface components {
       outputTokens?: null | number;
       /** @description A message of the author’s long enough to keep as notes, which the notes do not hold yet: offer "Save this as notes?", answered by `POST /notes/from-message`. */
       offersNotes?: boolean;
+      /** @description This turn's question card, when Forge raised one; null on every other message. */
+      question?: components['schemas']['ChatQuestionResponse'] | null;
       /** Format: date-time */
       createdAt: string;
+    };
+    /** @description An identity decision the author hasn't made yet, put to them as 2-4 concrete answers with trade-offs and a recommendation. "Undecided for now" is always an accepted answer and is not one of these cards. */
+    ChatQuestionResponse: {
+      question: string;
+      why?: string | null;
+      answers: components['schemas']['ChatQuestionAnswerResponse'][];
+      /** @description The progress checklist key this question settles, when it settles one. */
+      progressKey?: string | null;
+    };
+    /** @description One concrete example answer to a question card, with the reasoning to accept or decline it. */
+    ChatQuestionAnswerResponse: {
+      title: string;
+      why?: null | string;
+      tradeOff?: null | string;
+      /** @description true on the one answer Forge recommends */
+      recommended?: boolean;
     };
     /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
     PendingTurnResponse: {
@@ -14192,6 +14210,8 @@ export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
 export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
 export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type ChatQuestionResponse = components['schemas']['ChatQuestionResponse'];
+export type ChatQuestionAnswerResponse = components['schemas']['ChatQuestionAnswerResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnOutcome = components['schemas']['ChatTurnOutcome'];
