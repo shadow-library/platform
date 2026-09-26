@@ -1,0 +1,30 @@
+{
+  "id": "vague-idea",
+  "title": "The Keeper's Daughter",
+  "notesFile": "vague-idea.md",
+  "facts": [
+    { "id": "f-daughter", "statement": "The protagonist is a lighthouse keeper's daughter.", "critical": true, "match": { "all": ["lighthouse"], "any": ["daughter", "brisa"] } },
+    {
+      "id": "f-hears-ships",
+      "statement": "She hears ships before they appear on the horizon.",
+      "critical": true,
+      "match": { "all": ["hear|heard|hearing"], "any": ["ship", "vessel"] }
+    },
+    { "id": "f-name", "statement": "Her name is Brisa.", "critical": true, "match": { "all": ["brisa"] } },
+    { "id": "f-father-deaf", "statement": "Her father is going deaf.", "critical": false, "match": { "all": ["deaf"] } },
+    { "id": "f-keeps-watch", "statement": "She keeps the watch because her father is going deaf.", "critical": false, "match": { "all": ["watch"] } },
+    { "id": "f-coast", "statement": "Setting: a cold northern coast with fog.", "critical": false, "match": { "any": ["northern coast", "north coast", "cold coast", "fog"] } },
+    { "id": "f-tone", "statement": "Tone: quiet and lonely.", "critical": false, "match": { "any": ["quiet", "lonely", "loneliness", "solitude"] } },
+    {
+      "id": "f-ghost-ship",
+      "statement": "One night she hears a ship that never arrives.",
+      "critical": true,
+      "match": { "all": ["never arrives|never arrived|never comes|never appears|never reaches"] }
+    }
+  ],
+  "decisions": [
+    { "id": "d-ending-undecided", "statement": "The ending is undecided and must stay undecided.", "critical": true, "undecided": true, "match": { "any": ["ending"] } }
+  ],
+  "timing": [],
+  "forbidden": []
+}

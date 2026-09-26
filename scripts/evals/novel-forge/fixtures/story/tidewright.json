@@ -1,0 +1,298 @@
+{
+  "title": "The Tidewright's Ledger",
+  "synopsis": "In Saltmere, a marsh city on stilts, the Tidewright Guild binds tides into glass lanterns that hold back the sea. Ivo Marren, a seventeen-year-old apprentice who can hear the marsh hum, climbs the guild's four ranks while the guild's own records begin to lie to him.",
+  "notes": "Progression fantasy. Saltmere is a marsh city built on stilts. The Tidewright Guild binds tides into tide-glass lanterns that keep the floods back. Ranks, in order: Reed, Current, Undertow, Deepwater. Each rank is earned by a trial at the Weir, the great sluice gate east of the city.\n\nIvo Marren is seventeen, a Reed apprentice, and the point-of-view character. He hears a low hum under the marsh that nobody else hears. His father Tomas vanished nine years ago during the flood that broke the marsh wall; everyone believes he drowned.\n\nAldine Voss is Ivo's mentor, an Undertow tidewright who lost her left eye to a lantern burst. Petra Quill is his rival, precise and cold. Halvard Crane is the guildmaster. Warden Osk is the old keeper of the Weir. The Brine Syndicate is a smuggling combine that wants the Weir.\n\nTone: salt, rope, lamplight, earned victories. No romance subplot.",
+  "entities": [
+    {
+      "entityKey": "ivo",
+      "type": "character",
+      "name": "Ivo Marren",
+      "significance": "major",
+      "notes": "Seventeen. Reed apprentice at the start. Hears the marsh hum. Father Tomas vanished nine years ago."
+    },
+    {
+      "entityKey": "aldine",
+      "type": "character",
+      "name": "Aldine Voss",
+      "significance": "major",
+      "notes": "Ivo's mentor, Undertow tidewright, lost her left eye to a lantern burst."
+    },
+    { "entityKey": "petra", "type": "character", "name": "Petra Quill", "significance": "major", "notes": "Ivo's rival apprentice. Precise, cold, ambitious." },
+    { "entityKey": "crane", "type": "character", "name": "Halvard Crane", "significance": "major", "notes": "Guildmaster of the Tidewright Guild." },
+    { "entityKey": "osk", "type": "character", "name": "Warden Osk", "significance": "minor", "notes": "Old keeper of the Weir." },
+    {
+      "entityKey": "tomas",
+      "type": "character",
+      "name": "Tomas Marren",
+      "significance": "minor",
+      "notes": "Ivo's father. Vanished nine years ago during the flood that broke the marsh wall."
+    },
+    {
+      "entityKey": "guild",
+      "type": "faction",
+      "name": "Tidewright Guild",
+      "significance": "major",
+      "notes": "Binds tides into tide-glass lanterns. Ranks: Reed, Current, Undertow, Deepwater."
+    },
+    { "entityKey": "syndicate", "type": "faction", "name": "Brine Syndicate", "significance": "minor", "notes": "Smuggling combine that wants control of the Weir." },
+    { "entityKey": "saltmere", "type": "location", "name": "Saltmere", "significance": "major", "notes": "Marsh city built on stilts." },
+    { "entityKey": "weir", "type": "location", "name": "The Weir", "significance": "major", "notes": "Great sluice gate east of the city where rank trials are held." },
+    {
+      "entityKey": "tide_binding",
+      "type": "power_rule",
+      "name": "Tide binding",
+      "significance": "major",
+      "notes": "A tidewright breathes with a tide and seals it into tide-glass. Rank decides how deep a tide can be bound."
+    }
+  ],
+  "milestones": [
+    { "milestoneKey": "ivo_current", "label": "Ivo reaches Current rank", "subjectEntityKey": "ivo", "kind": "rank", "chapter": 4 },
+    { "milestoneKey": "petra_confession", "label": "Petra confesses who pays for her apprenticeship", "subjectEntityKey": "petra", "kind": "event", "chapter": 8 },
+    { "milestoneKey": "ivo_undertow", "label": "Ivo reaches Undertow rank", "subjectEntityKey": "ivo", "kind": "rank", "chapter": 12 },
+    { "milestoneKey": "archive_opened", "label": "The sealed flood archive is opened", "subjectEntityKey": "ivo", "kind": "event", "chapter": 16 },
+    { "milestoneKey": "osk_death", "label": "Warden Osk dies holding the sluice", "subjectEntityKey": "osk", "kind": "event", "chapter": 18 },
+    { "milestoneKey": "ivo_deepwater", "label": "Ivo reaches Deepwater rank", "subjectEntityKey": "ivo", "kind": "rank", "chapter": 27 },
+    { "milestoneKey": "gate_found", "label": "Ivo finds the Deep Gate", "subjectEntityKey": "ivo", "kind": "event", "chapter": 29 }
+  ],
+  "secrets": [
+    {
+      "factKey": "father_silent_warden",
+      "text": "Tomas Marren did not drown. He is the Silent Warden who keeps the Deep Gate sealed from the inside.",
+      "subjects": ["tomas", "ivo"],
+      "terms": ["Silent Warden", "Deep Gate"],
+      "writerNote": "Ivo's father is missing and presumed drowned.",
+      "allowedClues": ["a lantern that burns blue with no hand to tend it", "the marsh hum matches Ivo's own breathing"],
+      "unlockMilestone": "gate_found",
+      "revealPatterns": ["silent warden", "deep gate", "(tomas|father)[^.]{0,80}\\b(alive|still living|did not drown|never drowned)\\b"]
+    },
+    {
+      "factKey": "deepwater_price",
+      "text": "Every Deepwater binding costs the binder one memory, chosen by the tide.",
+      "subjects": ["guild", "aldine"],
+      "terms": ["memory per binding", "binding costs a memory"],
+      "writerNote": "Deepwater bindings have a price the guild does not discuss.",
+      "allowedClues": ["senior tidewrights forget small things", "Aldine keeps a notebook of her own life"],
+      "unlockMilestone": "ivo_deepwater",
+      "revealPatterns": [
+        "\\b(cost|costs|price|pay|pays|paid|surrender|surrenders)\\b[^.]{0,40}\\bmemor(y|ies)\\b",
+        "\\bmemor(y|ies)\\b[^.]{0,40}\\b(taken|surrendered|price|payment)\\b"
+      ]
+    },
+    {
+      "factKey": "crane_forged_records",
+      "text": "Guildmaster Crane forged the flood records of the year the marsh wall broke, to hide that he ordered the wall's lantern moved.",
+      "subjects": ["crane"],
+      "terms": ["forged records", "moved the wall's lantern"],
+      "writerNote": "The flood archive is sealed by the guildmaster's order.",
+      "allowedClues": ["a gap in the ledgers for the flood year"],
+      "unlockMilestone": "archive_opened",
+      "revealPatterns": [
+        "crane[^.]{0,80}\\b(forged|falsified|altered|faked)\\b",
+        "\\brecords?\\b[^.]{0,60}\\b(forged|falsified|faked)\\b",
+        "\\b(ordered|had)\\b[^.]{0,40}lantern[^.]{0,20}\\bmoved\\b"
+      ]
+    },
+    {
+      "factKey": "petra_syndicate",
+      "text": "Petra Quill's apprenticeship is paid for by the Brine Syndicate, who expect reports on the guild.",
+      "subjects": ["petra", "syndicate"],
+      "terms": ["Syndicate pays Petra"],
+      "writerNote": "Petra meets someone outside the guild; the reader does not learn who yet.",
+      "allowedClues": ["Petra slips away after shifts", "Petra has better tide-glass than an apprentice can afford"],
+      "unlockMilestone": "petra_confession",
+      "revealPatterns": [
+        "petra[^.]{0,80}syndicate[^.]{0,60}\\b(pays|paid|sponsor|sponsors|funds|funded|report|reports)\\b",
+        "syndicate[^.]{0,60}\\b(pays|paid|sponsors|funds|funded)\\b[^.]{0,40}petra"
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "n": 1,
+      "title": "The Hum Under the Boards",
+      "pov": "ivo",
+      "plan": "On storm-night duty on the outer stilts, Reed apprentice Ivo hears the marsh hum rise. A lantern on the south walk flickers toward failure and he steadies it by matching its breath, a thing apprentices are forbidden to try. Aldine sees him do it and says nothing until the storm passes."
+    },
+    {
+      "n": 2,
+      "title": "The Trials Posted",
+      "pov": "ivo",
+      "plan": "The guild posts the Current trials. Petra and Ivo trade barbs in the refectory. Warden Osk walks the Reed apprentices along the Weir and shows them the lantern cradles where the trial will be held."
+    },
+    {
+      "n": 3,
+      "title": "Salt in the Glass",
+      "pov": "ivo",
+      "plan": "Aldine trains Ivo to breathe with a slack tide instead of forcing it. He cracks three glasses before he seals a clean one. She tells him patience is the only rank that matters."
+    },
+    {
+      "n": 4,
+      "title": "The Current Trial",
+      "pov": "ivo",
+      "plan": "At the Weir, Ivo binds a running tide under the examiners' eyes and earns Current rank. Petra passes too, with a flawless binding that draws applause. Ivo's is clumsy but holds.",
+      "claimedMilestones": ["ivo_current"]
+    },
+    {
+      "n": 5,
+      "title": "Night Rounds",
+      "pov": "ivo",
+      "plan": "As a new Current, Ivo walks the outer stilts at night. Far out on the marsh he sees a lantern burning blue with no hand to tend it. He reports it; Guildmaster Crane tells him the marsh plays tricks on tired eyes."
+    },
+    {
+      "n": 6,
+      "title": "The Drowned Street",
+      "pov": "ivo",
+      "plan": "A surge floods the lower quarter. Ivo and Petra hold one lantern together until the water drops. Afterward Petra slips away down a side canal and Ivo sees her meet a hooded figure he does not recognise."
+    },
+    {
+      "n": 7,
+      "title": "Ledger Work",
+      "pov": "ivo",
+      "plan": "Punished for leaving his post, Ivo copies guild ledgers for a week. He notices the flood year is missing whole pages. Aldine tells him to copy what is there and stop counting what is not."
+    },
+    {
+      "n": 8,
+      "title": "What Petra Owes",
+      "pov": "ivo",
+      "plan": "Cornered by Ivo, Petra admits that the Brine Syndicate pays for her apprenticeship and expects reports on the guild. Ivo decides to keep her secret for now, and she hates him a little for it.",
+      "claimedMilestones": ["petra_confession"]
+    },
+    {
+      "n": 9,
+      "title": "The Hum Grows",
+      "pov": "ivo",
+      "plan": "The marsh hum grows loud enough to wake Ivo at night. Aldine cannot remember the name of the boat she grew up on and laughs it off. Ivo notices she has started writing small things in a notebook."
+    },
+    {
+      "n": 10,
+      "title": "Storm Season",
+      "pov": "ivo",
+      "plan": "The first great storm of the season hits. Ivo holds the Weir's east lantern alone for an hour after its keeper is hurt. Crane watches from the gatehouse and afterward says Ivo's name to the council."
+    },
+    {
+      "n": 11,
+      "title": "The Undertow Candidates",
+      "pov": "ivo",
+      "plan": "Crane names Ivo and Petra as Undertow candidates. Petra's Syndicate contact demands a copy of the trial schedule; she gives him a false one."
+    },
+    {
+      "n": 12,
+      "title": "Beneath the Weir",
+      "pov": "ivo",
+      "plan": "The Undertow trial is a binding made under water inside the Weir's sluice. Ivo passes and earns Undertow rank. Petra runs out of breath a heartbeat too soon and fails.",
+      "claimedMilestones": ["ivo_undertow"]
+    },
+    {
+      "n": 13,
+      "title": "Petra's Choice",
+      "pov": "ivo",
+      "plan": "The Syndicate orders Petra to steal a Weir key. She refuses and tells Ivo about the order."
+    },
+    {
+      "n": 14,
+      "title": "The Missing Key",
+      "pov": "ivo",
+      "plan": "A Weir key disappears anyway. The guild suspects Petra. Ivo defends her before the council without telling them what he knows."
+    },
+    {
+      "n": 15,
+      "title": "Osk's Warning",
+      "pov": "ivo",
+      "plan": "Warden Osk tells Ivo that the flood archive has been sealed on the guildmaster's order for nine years and that some of what is written there is wrong."
+    },
+    {
+      "n": 16,
+      "title": "The Archive",
+      "pov": "ivo",
+      "plan": "With Aldine's key and Petra's lockwork, Ivo opens the sealed archive. The flood-year records were forged: Crane ordered the marsh wall's lantern moved the night the wall broke.",
+      "claimedMilestones": ["archive_opened"]
+    },
+    {
+      "n": 17,
+      "title": "The Guildmaster's Answer",
+      "pov": "ivo",
+      "plan": "Crane confronts the three of them. He says moving the lantern saved the upper city. Aldine stands beside Ivo and refuses to let the matter drop."
+    },
+    {
+      "n": 18,
+      "title": "Osk at the Weir",
+      "pov": "ivo",
+      "plan": "During a surge the Syndicate uses the stolen key to open a Weir sluice. Warden Osk holds the sluice closed with his own binding until the water passes, and dies there.",
+      "claimedMilestones": ["osk_death"]
+    },
+    {
+      "n": 19,
+      "title": "Ashes on the Water",
+      "pov": "ivo",
+      "plan": "The city buries Osk at sea. The council names Ivo acting keeper of the Weir. Petra breaks with the Syndicate in public."
+    },
+    {
+      "n": 20,
+      "title": "The Deep Hum",
+      "pov": "ivo",
+      "plan": "Ivo realises the hum keeps time with his own breathing. Aldine tells him Deepwater tidewrights are the only ones who go under the marsh itself. The council suspends Crane pending an inquiry."
+    },
+    {
+      "n": 21,
+      "title": "Acting Keeper",
+      "pov": "ivo",
+      "plan": "Ivo runs the Weir for the first time. At night someone uses the stolen key on the north sluice and flees before he reaches it."
+    },
+    {
+      "n": 22,
+      "title": "Syndicate Terms",
+      "pov": "ivo",
+      "plan": "The Syndicate offers Petra forgiveness if she hands them the Weir. With Ivo's knowledge she pretends to consider it."
+    },
+    {
+      "n": 23,
+      "title": "The Inquiry",
+      "pov": "ivo",
+      "plan": "The council hears the archive evidence. Crane's allies stall the vote. Aldine testifies about the night the wall broke."
+    },
+    {
+      "n": 24,
+      "title": "The Blue Lantern Again",
+      "pov": "ivo",
+      "plan": "The blue lantern returns. Ivo follows it to the old sluice under the Weir and finds a sealed iron door he cannot open."
+    },
+    {
+      "n": 25,
+      "title": "Aldine's Notebook",
+      "pov": "ivo",
+      "plan": "Aldine shows Ivo the notebook she keeps of her own life and will not say why. She recommends him for the Deepwater trial."
+    },
+    {
+      "n": 26,
+      "title": "Trap at the Weir",
+      "pov": "ivo",
+      "plan": "The Syndicate springs a trap at the Weir. Petra's warning arrives in time; Ivo holds the gate and the guild recovers the stolen key."
+    },
+    {
+      "n": 27,
+      "title": "Deepwater",
+      "pov": "ivo",
+      "plan": "Ivo's Deepwater trial takes him under the marsh. He binds a deep tide and learns its price: every Deepwater binding costs the binder one memory, chosen by the tide. He loses the memory of his first lantern.",
+      "claimedMilestones": ["ivo_deepwater"]
+    },
+    {
+      "n": 28,
+      "title": "Crane's Sentence",
+      "pov": "ivo",
+      "plan": "The council removes Crane as guildmaster. Aldine is named acting guildmaster and asks Ivo to keep the Weir."
+    },
+    {
+      "n": 29,
+      "title": "The Deep Gate",
+      "pov": "ivo",
+      "plan": "With his Deepwater binding Ivo opens the iron door and descends to the Deep Gate. He learns his father Tomas did not drown: he is the Silent Warden who keeps the gate sealed from the inside.",
+      "claimedMilestones": ["gate_found"]
+    },
+    {
+      "n": 30,
+      "title": "Two Lanterns",
+      "pov": "ivo",
+      "plan": "Ivo returns to Saltmere and decides to train to share his father's watch at the Gate. Petra passes the Undertow trial on her second attempt."
+    }
+  ]
+}

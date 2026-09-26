@@ -1,0 +1,96 @@
+{
+  "description": "Deterministic contradiction checks for the continuation of The Tidewright's Ledger. A check fires when a pattern matches a chapter inside its window; every hit is listed for the owner to confirm, and a critical hit fails the suite until confirmed false.",
+  "checks": [
+    {
+      "id": "osk-dead",
+      "critical": true,
+      "kind": "power_or_state",
+      "statement": "Warden Osk died in chapter 18 and cannot act, speak or appear alive afterwards.",
+      "fromChapter": 19,
+      "toChapter": 30,
+      "patterns": [
+        "\\bosk\\b[^.]{0,20}\\b(said|says|smiled|nodded|laughed|answered|replied|shouted|called|walked|stood|grunted|frowned)\\b",
+        "\\bwarden osk\\b[^.]{0,30}\\b(arrived|appeared|was waiting|is waiting)\\b"
+      ]
+    },
+    {
+      "id": "ivo-undertow-not-lower",
+      "critical": true,
+      "kind": "power",
+      "statement": "Ivo has held Undertow rank since chapter 12; he is never Reed or Current again.",
+      "fromChapter": 13,
+      "toChapter": 30,
+      "patterns": ["\\bivo\\b[^.]{0,40}\\b(a|the|still a|only a) (reed|current)(-| )(rank|apprentice|tidewright)\\b", "\\b(reed|current) apprentice ivo\\b"]
+    },
+    {
+      "id": "ivo-not-deepwater-early",
+      "critical": true,
+      "kind": "power",
+      "statement": "Ivo only reaches Deepwater in chapter 27.",
+      "fromChapter": 21,
+      "toChapter": 26,
+      "patterns": ["\\bivo\\b[^.]{0,40}\\b(is|was|became|now) (a )?deepwater\\b", "\\bdeepwater (tidewright|rank) ivo\\b"]
+    },
+    {
+      "id": "petra-not-undertow-early",
+      "critical": false,
+      "kind": "power",
+      "statement": "Petra failed the Undertow trial in chapter 12 and only passes it in chapter 30.",
+      "fromChapter": 21,
+      "toChapter": 29,
+      "patterns": ["\\bpetra\\b[^.]{0,40}\\b(is|was|became|now) (an )?undertow\\b", "\\bundertow (tidewright|rank) petra\\b"]
+    },
+    {
+      "id": "deepwater-price-locked",
+      "critical": true,
+      "kind": "knowledge",
+      "statement": "The price of Deepwater bindings stays hidden until chapter 27.",
+      "fromChapter": 21,
+      "toChapter": 26,
+      "patterns": ["\\b(cost|costs|price|pay|pays|paid|surrender|surrenders)\\b[^.]{0,40}\\bmemor(y|ies)\\b"]
+    },
+    {
+      "id": "silent-warden-locked",
+      "critical": true,
+      "kind": "knowledge",
+      "statement": "Ivo's father's fate stays hidden until chapter 29.",
+      "fromChapter": 21,
+      "toChapter": 28,
+      "patterns": ["silent warden", "deep gate", "(tomas|father)[^.]{0,80}\\b(alive|still living|did not drown|never drowned)\\b"]
+    },
+    {
+      "id": "key-recovered-late",
+      "critical": false,
+      "kind": "state",
+      "statement": "The stolen Weir key is only recovered in chapter 26.",
+      "fromChapter": 21,
+      "toChapter": 25,
+      "patterns": ["\\b(recovered|found|got back|retrieved)\\b[^.]{0,30}\\b(the )?(weir |stolen )?key\\b"]
+    },
+    {
+      "id": "aldine-one-eye",
+      "critical": false,
+      "kind": "state",
+      "statement": "Aldine lost her left eye before the story began.",
+      "fromChapter": 21,
+      "toChapter": 30,
+      "patterns": ["\\baldine\\b[^.]{0,60}\\bboth (of )?(her )?eyes\\b", "\\baldine's (two|left) eyes?\\b[^.]{0,20}\\b(narrowed|widened|blinked)\\b"]
+    },
+    {
+      "id": "crane-not-guildmaster",
+      "critical": false,
+      "kind": "state",
+      "statement": "Crane is suspended from chapter 20 and removed in chapter 28; he gives no guild orders in between.",
+      "fromChapter": 21,
+      "toChapter": 30,
+      "patterns": ["\\bguildmaster crane\\b[^.]{0,30}\\b(ordered|commanded|decreed|announced)\\b"]
+    }
+  ],
+  "ratingDimensions": [
+    "Voice stays consistent with the baseline",
+    "Progression feels earned (ranks, costs, trials)",
+    "Secrets are handled with allowed clues, not early reveals",
+    "Scene craft: concrete, varied, no summary-telling",
+    "Characters act from their established motives"
+  ]
+}

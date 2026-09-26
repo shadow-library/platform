@@ -78,7 +78,7 @@ const WEB_ENTRIES = [
 const config: KnipConfig = {
   workspaces: {
     '.': {
-      entry: ['scripts/*.ts', 'scripts/utils/*.ts', '*.config.ts'],
+      entry: ['scripts/*.ts', 'scripts/utils/*.ts', 'scripts/evals/*/*.ts', '*.config.ts'],
       project: ['scripts/**/*.ts', '*.config.ts'],
       /**
        * `scripts/build.ts` loads the whole bundler toolchain through `import(name)` over a string array, and

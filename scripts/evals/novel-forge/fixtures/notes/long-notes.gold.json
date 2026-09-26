@@ -1,0 +1,97 @@
+{
+  "id": "long-notes",
+  "title": "The Cartographer of Unfinished Roads",
+  "notesFile": "long-notes.md",
+  "facts": [
+    {
+      "id": "f-maps-make-roads",
+      "statement": "A licensed cartographer's map makes the road appear.",
+      "critical": true,
+      "match": { "all": ["road"], "any": ["map", "maps", "drawn", "draw"] }
+    },
+    { "id": "f-republic", "statement": "The setting is the Republic of Varenne.", "critical": true, "match": { "all": ["varenne"] } },
+    { "id": "f-protagonist", "statement": "The protagonist is Mirela Dask.", "critical": true, "match": { "all": ["mirela"] } },
+    { "id": "f-mirela-age", "statement": "Mirela is twenty-nine.", "critical": false, "match": { "any": ["twenty-nine", "29"] } },
+    { "id": "f-courier", "statement": "Mirela is a courier-cartographer.", "critical": true, "match": { "all": ["courier"] } },
+    { "id": "f-lost-licence", "statement": "She lost her full licence six years ago after the Hesk flood.", "critical": true, "match": { "any": ["licence", "license"] } },
+    { "id": "f-hesk", "statement": "Hesk is the drowned village.", "critical": false, "match": { "all": ["hesk"] } },
+    { "id": "f-left-handed", "statement": "Mirela is left-handed and draws right to left.", "critical": false, "match": { "any": ["left-handed", "right to left", "backwards"] } },
+    { "id": "f-ink-flask", "statement": "She wears a flask of survey ink on a cord.", "critical": false, "match": { "all": ["flask"] } },
+    { "id": "f-bureau-ink", "statement": "Only ink from the Bureau's presses works.", "critical": false, "match": { "all": ["ink"], "any": ["bureau", "press", "presses"] } },
+    { "id": "f-season", "statement": "A drawn road takes a season to appear.", "critical": false, "match": { "all": ["season"] } },
+    { "id": "f-older-map-wins", "statement": "Two roads cannot share ground; the older map wins.", "critical": false, "match": { "any": ["older map", "same ground"] } },
+    { "id": "f-direction-cost", "statement": "Every road drawn costs the cartographer some sense of direction.", "critical": true, "match": { "all": ["direction"] } },
+    { "id": "f-aubrenne", "statement": "Aubrenne is the capital.", "critical": false, "match": { "all": ["aubrenne"] } },
+    { "id": "f-oskel-bridge", "statement": "Oskel's stone bridge was never drawn by anyone.", "critical": false, "match": { "all": ["oskel"], "any": ["bridge"] } },
+    { "id": "f-tavish", "statement": "Tavish Orr is Mirela's courier partner.", "critical": true, "match": { "all": ["tavish"] } },
+    { "id": "f-vell", "statement": "Idris Vell is the Surveyor-General.", "critical": true, "match": { "all": ["vell"] } },
+    { "id": "f-lune", "statement": "Captain Lune Sorrel is a border-guard officer.", "critical": false, "match": { "all": ["lune"] } },
+    { "id": "f-ansel", "statement": "Ansel Dask is Mirela's younger brother, an archive clerk.", "critical": false, "match": { "all": ["ansel"] } },
+    { "id": "f-gwenna", "statement": "Mirela's mother Gwenna was a Bureau cartographer.", "critical": false, "match": { "all": ["gwenna"] } },
+    { "id": "f-unmapped", "statement": "The Unmapped refuse roads.", "critical": false, "match": { "all": ["unmapped"] } },
+    { "id": "f-ossary", "statement": "The Ossary Principalities lie across the eastern border.", "critical": false, "match": { "all": ["ossary"] } },
+    { "id": "f-seal", "statement": "The Bureau's seal is a compass rose with one point missing.", "critical": false, "match": { "all": ["compass"] } },
+    { "id": "f-green-wax", "statement": "Survey sheets are sealed with green wax and a thumbprint.", "critical": false, "match": { "all": ["wax"] } },
+    { "id": "f-march-broth", "statement": "March broth is the road-inn barley soup.", "critical": false, "match": { "all": ["broth"] } },
+    {
+      "id": "f-milestones",
+      "statement": "Milestones are painted white toward the capital and red toward the border.",
+      "critical": false,
+      "match": { "all": ["milestone", "white", "red"] }
+    },
+    { "id": "f-patience", "statement": "Lune rides a grey mare named Patience.", "critical": false, "match": { "all": ["patience"], "any": ["mare", "horse"] } },
+    { "id": "f-corvin", "statement": "Corvin Hale is First Speaker of the Assembly.", "critical": false, "match": { "all": ["corvin"] } }
+  ],
+  "decisions": [
+    { "id": "d-pov", "statement": "Third person limited, always Mirela.", "critical": true, "match": { "any": ["third person", "third-person"] } },
+    { "id": "d-no-licence-back", "statement": "Mirela never gets her full licence back.", "critical": false, "match": { "any": ["licence", "license"], "all": ["never"] } },
+    { "id": "d-no-romance", "statement": "No romance between Mirela and Lune.", "critical": false, "match": { "all": ["romance"] } },
+    { "id": "d-tavish-survives", "statement": "Tavish survives and is exiled.", "critical": false, "match": { "any": ["exiled", "exile", "survives"] } },
+    {
+      "id": "d-hesk-not-her-fault",
+      "statement": "The Hesk flood was not Mirela's fault; her sheet was altered after filing.",
+      "critical": true,
+      "match": { "any": ["altered", "added", "culvert"] }
+    },
+    { "id": "d-ending-undecided", "statement": "The ending is undecided and must stay undecided.", "critical": true, "undecided": true, "match": { "any": ["ending", "ends"] } }
+  ],
+  "timing": [
+    {
+      "id": "t-bridge-after-vell",
+      "statement": "The Oskel bridge collapses in the middle of volume two, after Mirela meets the Surveyor-General.",
+      "critical": true,
+      "event": { "all": ["bridge"], "any": ["collapse", "collapsed", "falls", "fall", "goes down"] },
+      "after": { "any": ["meets the surveyor", "meets idris", "meets vell", "meeting with vell", "meets the surveyor-general"] },
+      "earliestVolume": 2
+    },
+    {
+      "id": "t-tavish-betrayal",
+      "statement": "Tavish's betrayal comes out at the end of volume one.",
+      "critical": true,
+      "event": { "all": ["tavish"], "any": ["betray", "betrayed", "betrayal", "selling", "sold"] },
+      "earliestVolume": 1
+    },
+    {
+      "id": "t-gwenna-truth",
+      "statement": "Mirela learns the truth about her mother only at the very end of volume three.",
+      "critical": true,
+      "event": { "all": ["gwenna"], "any": ["killed", "murdered", "did not die of fever", "not fever"] },
+      "earliestVolume": 3
+    },
+    {
+      "id": "t-second-ink",
+      "statement": "The discovery that the rogue roads use non-Bureau ink ends volume two.",
+      "critical": false,
+      "event": { "all": ["ink"], "any": ["not from the bureau", "second ink", "did not come from"] },
+      "earliestVolume": 2
+    }
+  ],
+  "forbidden": [
+    {
+      "id": "x-romance",
+      "statement": "No romance between Mirela and Lune may be written as story.",
+      "match": { "all": ["lune"], "any": ["lovers", "falls in love", "romance between"] },
+      "unlessAlso": ["no romance", "not romance", "never romance"]
+    }
+  ]
+}

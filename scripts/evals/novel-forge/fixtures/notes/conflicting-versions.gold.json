@@ -1,0 +1,90 @@
+{
+  "id": "conflicting-versions",
+  "title": "The Lamplighter Twins",
+  "notesFile": "conflicting-versions.md",
+  "facts": [
+    { "id": "f-merrow", "statement": "The setting is Merrow, a canal city.", "critical": true, "match": { "all": ["merrow"] } },
+    {
+      "id": "f-company",
+      "statement": "The Lamplighters' Company lights the lamps by hand.",
+      "critical": false,
+      "match": { "any": ["lamplighters' company", "lamplighters company", "the company"] }
+    },
+    { "id": "f-starwick", "statement": "The lamps burn starwick, pressed from moss under the bridges.", "critical": true, "match": { "all": ["starwick"] } },
+    { "id": "f-drowned", "statement": "Starwick light keeps the drowned in the canals.", "critical": true, "match": { "all": ["drowned"] } },
+    { "id": "f-twins", "statement": "The twins are Cas and Wren Tolley.", "critical": true, "match": { "all": ["cas", "wren"] } },
+    { "id": "f-age", "statement": "The twins are nineteen.", "critical": false, "match": { "any": ["nineteen", "19"] } },
+    { "id": "f-mother-dead", "statement": "Their mother drowned when they were twelve.", "critical": false, "match": { "all": ["mother"], "any": ["drowned", "dead", "died"] } },
+    { "id": "f-pike", "statement": "The villain is Master Lamplighter Aurel Pike.", "critical": true, "match": { "any": ["aurel", "pike"] } },
+    { "id": "f-gutter-court", "statement": "The Gutter Court is a minor side faction.", "critical": false, "match": { "all": ["gutter court"] } },
+    { "id": "f-bridges", "statement": "Merrow has one hundred and twelve bridges.", "critical": false, "match": { "any": ["one hundred and twelve", "112"] } },
+    { "id": "f-pole", "statement": "Lamplighters carry a brass pole with a hook and wick-cup.", "critical": false, "match": { "any": ["pole", "wick-cup"] } },
+    { "id": "f-motto", "statement": "The Company motto is \"No street unlit.\"", "critical": false, "match": { "all": ["no street unlit"] } },
+    { "id": "f-signal", "statement": "Two short whistles and one long means \"I'm fine, keep fighting me.\"", "critical": false, "match": { "any": ["whistle", "whistles"] } },
+    { "id": "f-oswin", "statement": "Oswin Brace is the district clerk who suspects the act.", "critical": false, "match": { "all": ["oswin"] } }
+  ],
+  "decisions": [
+    { "id": "d-allies", "statement": "Cas and Wren are allies who pretend to be enemies.", "critical": true, "match": { "any": ["allies", "pretend", "performance", "act"] } },
+    {
+      "id": "d-third-person",
+      "statement": "Third person, alternating between Cas and Wren.",
+      "critical": true,
+      "match": { "any": ["third person", "third-person", "alternating", "alternates", "alternate"] }
+    },
+    {
+      "id": "d-open-drowned",
+      "statement": "Whether the drowned can be saved is undecided.",
+      "critical": false,
+      "undecided": true,
+      "match": { "all": ["drowned"], "any": ["saved", "something else"] }
+    }
+  ],
+  "timing": [
+    {
+      "id": "t-betrayal-end-book-one",
+      "statement": "Wren's betrayal happens at the end of book one, never at the start.",
+      "critical": true,
+      "event": { "any": ["betray", "betrays", "betrayal", "sells a route", "sells cas", "sold the route", "sells the route"] },
+      "notInOpening": true,
+      "earliestVolume": 1
+    }
+  ],
+  "forbidden": [
+    {
+      "id": "x-enemies",
+      "statement": "Version one's genuine enmity is replaced.",
+      "match": { "any": ["enemies from the first page", "genuine enemies", "true enemies", "real enemies"] },
+      "unlessAlso": ["pretend", "act", "performance"]
+    },
+    {
+      "id": "x-mother-soot",
+      "statement": "Mother Soot does not exist in the current version.",
+      "match": { "all": ["mother soot"] },
+      "unlessAlso": ["replaced", "no mother soot", "dropped", "removed", "version one", "old version"]
+    },
+    {
+      "id": "x-whale-oil",
+      "statement": "Whale oil is replaced by starwick.",
+      "match": { "all": ["whale oil"] },
+      "unlessAlso": ["replaced", "instead", "not whale", "no longer", "version one", "old version"]
+    },
+    {
+      "id": "x-first-person",
+      "statement": "First person narration is replaced.",
+      "match": { "all": ["first person"] },
+      "unlessAlso": ["not first person", "no longer", "replaced", "instead", "version one", "old version"]
+    },
+    {
+      "id": "x-mother-alive",
+      "statement": "Their mother is no longer alive.",
+      "match": { "all": ["chandlery"] },
+      "unlessAlso": ["version one", "old version", "replaced", "dropped"]
+    },
+    {
+      "id": "x-seventeen",
+      "statement": "The twins are no longer seventeen.",
+      "match": { "all": ["seventeen"] },
+      "unlessAlso": ["not seventeen", "no longer", "version one", "old version", "nineteen"]
+    }
+  ]
+}
