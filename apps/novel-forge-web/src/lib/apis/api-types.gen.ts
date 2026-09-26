@@ -152,6 +152,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Jobs */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_jobs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Events */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_jobs_events'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream Events */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_jobs_stream'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/{jobId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel Job */
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_jobs_jobId_cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/ai/settings': {
     parameters: {
       query?: never;
@@ -302,525 +370,6 @@ export interface paths {
     post?: never;
     /** Disable Plugin */
     delete: operations['delete_api_v1_projects_projectId_plugins_pluginId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/audits': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Audits */
-    get: operations['get_api_v1_projects_projectId_bible_audits'];
-    put?: never;
-    /** Start Audit */
-    post: operations['post_api_v1_projects_projectId_bible_audits'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/audits/{reportId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Audit */
-    get: operations['get_api_v1_projects_projectId_bible_audits_reportId'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/audits/{reportId}/findings/{findingId}/decision': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Decide Finding */
-    post: operations['post_api_v1_projects_projectId_bible_audits_reportId_findings_findingId_decision'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/audit': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Audit Bible */
-    post: operations['post_api_v1_projects_projectId_bible_audit'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/jobs/{jobId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Job */
-    get: operations['get_api_v1_jobs_jobId'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Proposals */
-    get: operations['get_api_v1_projects_projectId_proposals'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals/{proposalId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Proposal */
-    get: operations['get_api_v1_projects_projectId_proposals_proposalId'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Update Proposal */
-    patch: operations['patch_api_v1_projects_projectId_proposals_proposalId'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals/{proposalId}/apply': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Apply Proposal */
-    post: operations['post_api_v1_projects_projectId_proposals_proposalId_apply'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Undo Impact */
-    get: operations['get_api_v1_projects_projectId_proposals_proposalId_undo_impact'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals/{proposalId}/revert': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Revert Proposal */
-    post: operations['post_api_v1_projects_projectId_proposals_proposalId_revert'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/proposals/{proposalId}/discard': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Discard Proposal */
-    post: operations['post_api_v1_projects_projectId_proposals_proposalId_discard'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/changes': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Changes */
-    get: operations['get_api_v1_projects_projectId_changes'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/changes/rollback': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Rollback Changes */
-    post: operations['post_api_v1_projects_projectId_changes_rollback'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Sessions */
-    get: operations['get_api_v1_projects_projectId_chat_sessions'];
-    put?: never;
-    /** Create Session */
-    post: operations['post_api_v1_projects_projectId_chat_sessions'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Session */
-    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId'];
-    put?: never;
-    post?: never;
-    /** Delete Session */
-    delete: operations['delete_api_v1_projects_projectId_chat_sessions_sessionId'];
-    options?: never;
-    head?: never;
-    /** Update Session */
-    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Messages */
-    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
-    put?: never;
-    /** Create Turn */
-    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Turn Status */
-    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_turn'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/model': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Update Session Model */
-    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId_model'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/archive': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Archive Session */
-    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_archive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/unarchive': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Unarchive Session */
-    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chats/{sessionId}/turn/stream': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Start Turn */
-    post: operations['post_api_v1_projects_projectId_chats_sessionId_turn_stream'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/turns/{runId}/stream': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Stream Turn */
-    get: operations['get_api_v1_projects_projectId_turns_runId_stream'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/premise/enhance': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Enhance Premise */
-    post: operations['post_api_v1_projects_projectId_premise_enhance'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/context/preview': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Preview Context */
-    get: operations['get_api_v1_projects_projectId_context_preview'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/bible/tidy': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Preview Bible Tidy */
-    get: operations['get_api_v1_projects_projectId_bible_tidy'];
-    put?: never;
-    /** Apply Bible Tidy */
-    post: operations['post_api_v1_projects_projectId_bible_tidy'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/internal/bots/{botId}/ownership': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Ownership */
-    get: operations['get_internal_bots_botId_ownership'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/internal/bots/{botId}/transfer': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Transfer Ownership */
-    post: operations['post_internal_bots_botId_transfer'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/source/chapters': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Chapters */
-    get: operations['get_api_v1_projects_projectId_source_chapters'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/source/chapters/{n}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Chapter */
-    get: operations['get_api_v1_projects_projectId_source_chapters_n'];
-    put?: never;
-    post?: never;
-    /** Delete Chapter */
-    delete: operations['delete_api_v1_projects_projectId_source_chapters_n'];
-    options?: never;
-    head?: never;
-    /** Update Chapter */
-    patch: operations['patch_api_v1_projects_projectId_source_chapters_n'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/export/novel': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Export Novel */
-    get: operations['get_api_v1_projects_projectId_export_novel'];
-    put?: never;
-    post?: never;
-    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1579,6 +1128,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/jobs/{jobId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Job */
+    get: operations['get_api_v1_jobs_jobId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/plugins/{pluginId}/augment': {
     parameters: {
       query?: never;
@@ -1590,6 +1156,508 @@ export interface paths {
     put?: never;
     /** Augment */
     post: operations['post_api_v1_projects_projectId_plugins_pluginId_augment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Proposals */
+    get: operations['get_api_v1_projects_projectId_proposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Proposal */
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Proposal */
+    patch: operations['patch_api_v1_projects_projectId_proposals_proposalId'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply Proposal */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_apply'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Undo Impact */
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId_undo_impact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/revert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revert Proposal */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_revert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/discard': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Discard Proposal */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_discard'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/changes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Changes */
+    get: operations['get_api_v1_projects_projectId_changes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/changes/rollback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Rollback Changes */
+    post: operations['post_api_v1_projects_projectId_changes_rollback'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Sessions */
+    get: operations['get_api_v1_projects_projectId_chat_sessions'];
+    put?: never;
+    /** Create Session */
+    post: operations['post_api_v1_projects_projectId_chat_sessions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Session */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId'];
+    put?: never;
+    post?: never;
+    /** Delete Session */
+    delete: operations['delete_api_v1_projects_projectId_chat_sessions_sessionId'];
+    options?: never;
+    head?: never;
+    /** Update Session */
+    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Messages */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
+    put?: never;
+    /** Create Turn */
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Turn Status */
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_turn'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/model': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Session Model */
+    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId_model'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/archive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Archive Session */
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_archive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/unarchive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Unarchive Session */
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chats/{sessionId}/turn/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Turn */
+    post: operations['post_api_v1_projects_projectId_chats_sessionId_turn_stream'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/turns/{runId}/stream': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stream Turn */
+    get: operations['get_api_v1_projects_projectId_turns_runId_stream'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/premise/enhance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Enhance Premise */
+    post: operations['post_api_v1_projects_projectId_premise_enhance'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/context/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Preview Context */
+    get: operations['get_api_v1_projects_projectId_context_preview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/tidy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Preview Bible Tidy */
+    get: operations['get_api_v1_projects_projectId_bible_tidy'];
+    put?: never;
+    /** Apply Bible Tidy */
+    post: operations['post_api_v1_projects_projectId_bible_tidy'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/audits': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Audits */
+    get: operations['get_api_v1_projects_projectId_bible_audits'];
+    put?: never;
+    /** Start Audit */
+    post: operations['post_api_v1_projects_projectId_bible_audits'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/audits/{reportId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Audit */
+    get: operations['get_api_v1_projects_projectId_bible_audits_reportId'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/audits/{reportId}/findings/{findingId}/decision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Decide Finding */
+    post: operations['post_api_v1_projects_projectId_bible_audits_reportId_findings_findingId_decision'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Audit Bible */
+    post: operations['post_api_v1_projects_projectId_bible_audit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/bots/{botId}/ownership': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Ownership */
+    get: operations['get_internal_bots_botId_ownership'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/internal/bots/{botId}/transfer': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transfer Ownership */
+    post: operations['post_internal_bots_botId_transfer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/source/chapters': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Chapters */
+    get: operations['get_api_v1_projects_projectId_source_chapters'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/source/chapters/{n}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Chapter */
+    get: operations['get_api_v1_projects_projectId_source_chapters_n'];
+    put?: never;
+    post?: never;
+    /** Delete Chapter */
+    delete: operations['delete_api_v1_projects_projectId_source_chapters_n'];
+    options?: never;
+    head?: never;
+    /** Update Chapter */
+    patch: operations['patch_api_v1_projects_projectId_source_chapters_n'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/export/novel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export Novel */
+    get: operations['get_api_v1_projects_projectId_export_novel'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2504,6 +2572,74 @@ export interface components {
     SwitchOrganisationResponse: {
       organisationId: string;
     };
+    ListChatJobsResponse: {
+      /** @description Jobs this chat started that are still queued or running. */
+      items: components['schemas']['ChatJobResponse'][];
+      /** @description The session's latest job event seq as of `items`: open the event stream after it to follow these jobs from here. */
+      cursor: number;
+    };
+    ChatJobResponse: {
+      id: string;
+      kind: components['schemas']['JobKind'];
+      target: string;
+      status: components['schemas']['JobStatus'];
+      /** @description Attempts started so far; a model or gateway timeout retries an organise or plan job once. */
+      attempts: number;
+      lastError?: null | string;
+      /** @description Latest progress snapshot; `proposalId` names the staged card once there is one. */
+      progress?: null | {
+        [key: string]: unknown;
+      };
+      /**
+       * Format: date-time
+       * @description When a job waiting to retry is dispatched again.
+       */
+      nextAttemptAt?: null | string;
+      origin: components['schemas']['ChatJobOriginResponse'];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit';
+    /** @enum {string} */
+    JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
+    /** @description The chat card a job was started from. */
+    ChatJobOriginResponse: {
+      proposalId: string;
+      opIndex: number;
+      messageId?: null | string;
+    };
+    ListChatJobEventsResponse: {
+      items: components['schemas']['ChatJobEventResponse'][];
+    };
+    /** @description One step of a job a chat started. The same shape is the `data` of each `job` event on the session’s job event stream, whose SSE id is `seq`. */
+    ChatJobEventResponse: {
+      /** @description The cursor: increasing within the session in the order events commit. */
+      seq: number;
+      jobId: string;
+      kind: components['schemas']['JobKind'];
+      type: components['schemas']['JobEventType'];
+      /** @description `step` and `done` carry the job's progress; `started` and `retrying` the attempt; `failed` and `retrying` the error. */
+      data?: null | {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    JobEventType: 'queued' | 'started' | 'step' | 'retrying' | 'done' | 'failed' | 'cancelled';
+    CancelJobResponse: {
+      jobId: string;
+      /** @description The job status as recorded right now — a `stopping` outcome still reads `in_progress` because the worker writes `cancelled` as it settles. */
+      status: components['schemas']['JobStatus'];
+      /**
+       * @description 'cancelled': the job was still pending and was cancelled immediately, never dispatched. 'stopping': the job was in progress; cancellation was requested and the worker will settle it as cancelled at its next step boundary. 'already_settled': the job had already reached a terminal status (done, failed, or cancelled), so nothing was done.
+       * @enum {string}
+       */
+      outcome: 'cancelled' | 'stopping' | 'already_settled';
+    };
     /** @description Settings that apply to every project and idea the signed-in author owns. */
     AccountSettingsResponse: {
       /** @description Your Balanced tier: used at Balanced when neither a chat pin nor the project names a model; Economy and Performant use the tier map instead. Unrestricted work only takes a default on the unrestricted allowlist. */
@@ -2740,619 +2876,6 @@ export interface components {
       /** @description Order this plugin contributes in relative to the other plugins enabled on the novel. Lower runs first. This request replaces the stored row, so omitting it resets the order to 0. */
       ordinal?: number;
     };
-    ListBibleAuditsResponse: {
-      /** @description Newest first, up to the most recent 50. */
-      items: components['schemas']['BibleAuditReportResponse'][];
-    };
-    /** @description One Story Bible audit: its findings, what it checked, and the card that carries its proposed changes. */
-    BibleAuditReportResponse: {
-      id: string;
-      /** @description What was found and what was checked, in one line; "Nothing found. Checked: …" for a clean audit. */
-      summary: string;
-      checked: components['schemas']['AuditCheckedResponse'];
-      /** @description Contradictions first, then pages and records to add, revise and remove. */
-      findings: components['schemas']['BibleAuditFindingResponse'][];
-      /** @description Findings the author has neither kept nor skipped. */
-      openFindings: number;
-      /** @description The pending proposal that carries the changes; null when the audit proposed none. */
-      proposalId?: null | string;
-      proposalStatus?: components['schemas']['AuditProposalStatus'] | null;
-      /** @description The card’s op indexes to apply: every op a finding not skipped still proposes. Pass as opIndexes when applying the card. */
-      selection: number[];
-      runId?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @description Exactly what this audit read — the report never claims more. */
-    AuditCheckedResponse: {
-      passes: components['schemas']['AuditPassesResponse'];
-      documents: components['schemas']['AuditCheckedDocumentsResponse'];
-      entities: components['schemas']['AuditCheckedEntitiesResponse'];
-      facts: components['schemas']['AuditCheckedFactsResponse'];
-      /** @description The finalized chapters whose summaries were compared; null when none were. */
-      chapters?: components['schemas']['AuditCheckedChaptersResponse'] | null;
-      /** @description Finalized chapters with no summary yet, so not compared. */
-      chaptersWithoutSummary: number[];
-      /** @description Finalized isolated chapters, which the audit never reads, not even their summaries. */
-      chaptersIsolated: number[];
-      chaptersOmitted: number;
-      /** @description The sentence to show, e.g. "Checked: 14 pages, 38 characters, 21 facts, chapters 1–12." */
-      copy: string;
-    };
-    AuditPassesResponse: {
-      /** @description Missing and thin pages and records against the Story Bible manifest. */
-      coverage: components['schemas']['AuditPassStatus'];
-      /** @description Pages, records, facts and finalized chapter summaries compared against each other. */
-      contradictions: components['schemas']['AuditPassStatus'];
-    };
-    /** @enum {string} */
-    AuditPassStatus: 'ran' | 'failed';
-    AuditCheckedDocumentsResponse: {
-      count: number;
-      sections: string[];
-      /** @description Pages too long to read whole; only their beginning was compared. */
-      clipped: number;
-      /** @description Pages that did not fit and were not compared. */
-      omitted: number;
-    };
-    AuditCheckedEntitiesResponse: {
-      count: number;
-      /** @description Entity type → how many were read. */
-      byType: {
-        [key: string]: unknown;
-      };
-      omitted: number;
-    };
-    AuditCheckedFactsResponse: {
-      /** @description Zero when the contradiction check did not run: only it reads the facts. */
-      count: number;
-      omitted: number;
-    };
-    AuditCheckedChaptersResponse: {
-      from: number;
-      to: number;
-      count: number;
-    };
-    BibleAuditFindingResponse: {
-      /** @description Stable within its report; decisions address the finding by it. */
-      id: string;
-      group: components['schemas']['BibleAuditGroup'];
-      /** @description The page or record the finding is about. */
-      ref: string;
-      text: string;
-      evidence: components['schemas']['AuditEvidenceResponse'][];
-      /** @description The ops of the audit’s card that carry this finding’s changes; empty when it has none. */
-      opIndexes: number[];
-      /** @description Why a change the audit proposed for this finding was not put on the card. */
-      withheld?: null | string;
-      /** @description The author’s Keep or Skip, if any. */
-      decision?: components['schemas']['AuditFindingDecisionResponse'] | null;
-    };
-    /** @enum {string} */
-    BibleAuditGroup: 'add' | 'revise' | 'remove' | 'contradiction';
-    AuditEvidenceResponse: {
-      /** @description "doc:<section>/<slug>", "entity:<key>", "fact:<key>" or "chapter:<n>" — always something the audit read. */
-      ref: string;
-      /** @description Words quoted from that source, verified to appear there; null when the finding points at the source as a whole. */
-      quote?: null | string;
-    };
-    AuditFindingDecisionResponse: {
-      decision: components['schemas']['AuditFindingDecision'];
-      reason?: string | null;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @enum {string} */
-    AuditFindingDecision: 'kept' | 'skipped';
-    /** @enum {string} */
-    AuditProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
-    /** @description An audit queued as a job; its report appears in the list when the job is done. */
-    BibleAuditJobResponse: {
-      jobId: string;
-      runId: string;
-      status: components['schemas']['JobStatus'];
-    };
-    /** @enum {string} */
-    JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
-    AuditFindingDecisionBody: {
-      /** @description kept: the finding’s changes stay on the audit’s card (restaged if the card was discarded). skipped: they come off it; skipping every finding discards the card. */
-      decision: components['schemas']['AuditFindingDecision'];
-      /** @description Why, remembered with the decision. Optional. */
-      reason?: string;
-    };
-    JobResponse: {
-      id: string;
-      projectId: string;
-      kind: components['schemas']['JobKind'];
-      target: string;
-      status: components['schemas']['JobStatus'];
-      attempts: number;
-      lastError?: null | string;
-      /** @description Job input whose fields depend on the job kind. */
-      payload?: null | {
-        [key: string]: unknown;
-      };
-      /** @description Current progress snapshot whose fields depend on the job kind. */
-      progress?: null | {
-        [key: string]: unknown;
-      };
-      /** Format: date-time */
-      nextAttemptAt?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-      usage: components['schemas']['JobUsageResponse'];
-    };
-    /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit';
-    /** @description Cost and token totals across every run this job drove — empty (zero calls) for a job kind that makes no model calls, such as publish. */
-    JobUsageResponse: {
-      calls: number;
-      inputTokens: number;
-      cachedInputTokens: number;
-      outputTokens: number;
-      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
-      costUsd: number;
-      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
-      estimatedCostUsd: number;
-      byCostSource: components['schemas']['JobCostSourceItem'][];
-    };
-    /** @description Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none. */
-    JobCostSourceItem: {
-      costSource: string;
-      calls: number;
-      costUsd: number;
-    };
-    /** @enum {string} */
-    SortOrder: 'asc' | 'desc';
-    /** @enum {string} */
-    SortByTime: 'createdAt' | 'updatedAt';
-    /** @enum {string} */
-    RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
-    /** @enum {string} */
-    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'chapter_extract' | 'plugin' | 'chapter_plan' | 'organise';
-    /** @enum {string} */
-    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
-    ListProposalResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ProposalResponse'][];
-    };
-    ProposalResponse: {
-      id: string;
-      projectId: string;
-      sessionId?: null | string;
-      messageId?: null | string;
-      scopeType: components['schemas']['ChatScope'];
-      scopeRef?: null | string;
-      kind: components['schemas']['RefinementKind'];
-      status: components['schemas']['RefinementProposalStatus'];
-      summary?: null | string;
-      /** @description Proposed operations, each discriminated by its op field. */
-      changeSet: components['schemas']['ChangeOpItem'][];
-      /** @description Artifact snapshots keyed by the references the change-set was drafted against. */
-      baseline: {
-        [key: string]: unknown;
-      };
-      autoApplied: boolean;
-      /** @description Whether this proposal has been applied and carries inverse operations, allowing it to be reverted. */
-      revertible: boolean;
-      /** @description Apply-time result for each operation. */
-      opResults?: null | components['schemas']['OpResultItem'][];
-      model?: null | string;
-      runId?: null | string;
-      /** Format: date-time */
-      appliedAt?: null | string;
-      /** Format: date-time */
-      revertedAt?: null | string;
-      /** @description Error-source-specific failure details recorded when proposal application fails. */
-      error?: null | {
-        [key: string]: unknown;
-      };
-      /** @description Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply. */
-      warnings: string[];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
-    ChangeOpItem: {
-      op: string;
-    } & {
-      [key: string]: unknown;
-    };
-    /** @description Apply-time disposition for one operation, optionally including a job, run, or proposal result. */
-    OpResultItem: {
-      index: number;
-      status: string;
-      error?: string;
-      /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
-      note?: string;
-      result?: {
-        [key: string]: unknown;
-      };
-    } & {
-      [key: string]: unknown;
-    };
-    UpdateProposalBody: {
-      /** @description Replacement change-set operations, each discriminated by its op field. */
-      changeSet: components['schemas']['ChangeOpItem'][];
-    };
-    ApplyProposalBody: {
-      /** @description Change-set indexes to apply; omission applies every operation. */
-      opIndexes?: number[];
-    };
-    ApplyProposalResponse: {
-      proposal: components['schemas']['ProposalResponse'];
-      applied: components['schemas']['AppliedArtifactItem'][];
-      staleMarked: string[];
-      opResults: components['schemas']['OpResultItem'][];
-    };
-    AppliedArtifactItem: {
-      artifactRef: string;
-      newRevision?: null | number;
-    };
-    /** @description What undoing an applied change would affect, listed before the author confirms the revert. */
-    UndoImpactResponse: {
-      proposalId: string;
-      dependents: components['schemas']['UndoDependentItem'][];
-      /** @description Finalized plans and drafts that relied only on an updated record: the undo leaves them as they are, so they are counted, not listed. */
-      finalUnaffected: number;
-    };
-    /** @description A record that relies on something an undo would take back. */
-    UndoDependentItem: {
-      kind: components['schemas']['UndoDependentKind'];
-      /** @description The dependent record: `chapter:<n>` for a plan, `draft:<n>` for a draft, `knowledge:<entityKey>/<factKey>` for what a character knows, `proposal:<id>` for a pending suggestion. */
-      ref: string;
-      /** @description The chapter the record belongs to, or where the character learned the fact. */
-      chapter?: null | number;
-      /** @description The undone record this one relies on, as a change-set ref. */
-      because: string;
-      /** @description Finalized history: undo never rewrites it, so the record stays as it is after the revert. */
-      final: boolean;
-    };
-    /** @enum {string} */
-    UndoDependentKind: 'plan' | 'draft' | 'knowledge' | 'suggestion';
-    RevertProposalResponse: {
-      proposal: components['schemas']['ProposalResponse'];
-      reverted: components['schemas']['AppliedArtifactItem'][];
-      staleMarked: string[];
-    };
-    ListChangesResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ChangeItemResponse'][];
-    };
-    ChangeItemResponse: {
-      id: string;
-      sessionId?: null | string;
-      kind: components['schemas']['RefinementKind'];
-      scopeType: components['schemas']['ChatScope'];
-      status: components['schemas']['RefinementProposalStatus'];
-      summary?: null | string;
-      autoApplied: boolean;
-      refs: string[];
-      revertible: boolean;
-      opResults?: null | components['schemas']['OpResultItem'][];
-      /** Format: date-time */
-      appliedAt?: null | string;
-      /** Format: date-time */
-      revertedAt?: null | string;
-    };
-    RollbackBody: {
-      /** @description Newest applied proposal to keep; every later proposal is reverted newest first. */
-      afterProposalId: string;
-    };
-    RollbackResponse: {
-      reverted: components['schemas']['RolledBackItem'][];
-      skipped: string[];
-      stoppedAt?: string;
-      conflict?: {
-        [key: string]: unknown;
-      };
-    };
-    RolledBackItem: {
-      proposalId: string;
-      artifacts: components['schemas']['AppliedArtifactItem'][];
-    };
-    CreateChatSessionBody: {
-      mode?: components['schemas']['ChatMode'];
-    };
-    /** @enum {string} */
-    ChatMode: 'manual' | 'auto';
-    ChatSessionResponse: {
-      id: string;
-      projectId: string;
-      scopeType: components['schemas']['ChatScope'];
-      scopeRef?: null | string;
-      title?: null | string;
-      status: components['schemas']['ChatSessionStatus'];
-      mode: components['schemas']['ChatMode'];
-      modelProvider?: null | string;
-      modelId?: null | string;
-      /** @description The chat's own model type; null follows the project's content mode. */
-      contentMode?: components['schemas']['ContentMode'] | null;
-      /** @description The chat's own cost tier; null follows the project's cost tier. */
-      costTier?: components['schemas']['CostTier'] | null;
-      summary?: null | string;
-      summaryThroughOrdinal: number;
-      /** Format: date-time */
-      lastTurnAt?: null | string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    /** @enum {string} */
-    ChatSessionStatus: 'active' | 'archived';
-    ListChatSessionResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ChatSessionResponse'][];
-    };
-    ListChatMessagesResponse: {
-      messages: components['schemas']['ChatMessageResponse'][];
-      /** @description Present while a chat turn is running for this session; null otherwise. */
-      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
-      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
-      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
-    };
-    ChatMessageResponse: {
-      id: string;
-      sessionId: string;
-      ordinal: number;
-      role: string;
-      content: string;
-      /** @description The turn's suggestion cards: a pending proposal the author accepts or declines op by op. */
-      proposalId?: null | string;
-      /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
-      appliedProposalId?: null | string;
-      runId?: null | string;
-      modelProvider?: null | string;
-      modelId?: null | string;
-      /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
-      contentMode?: components['schemas']['ContentMode'] | null;
-      /** @description The cost tier the reply was written at; null on user messages and on replies older than the selection. */
-      costTier?: components['schemas']['CostTier'] | null;
-      /** @description This reply's model cost, folding in its title and compaction runs; null on user messages and on a reply that carries no run. */
-      costUsd?: null | number;
-      inputTokens?: null | number;
-      cachedInputTokens?: null | number;
-      outputTokens?: null | number;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
-    PendingTurnResponse: {
-      runId: string;
-      /** @description Workflow graph driving the turn — `chat-turn`. */
-      graph: string;
-      /**
-       * Format: date-time
-       * @description When the turn started; elapsed time is measured from here so it survives a refresh.
-       */
-      startedAt: string;
-    };
-    /** @description The turn that died or was stopped, on a transcript still ending in an unanswered user message, so a reload shows why instead of a silent thread. `status: 'cancelled'` is the author stopping the turn deliberately — terminal and not a failure, so the client must not offer the same retry affordance it offers a failure. */
-    FailedTurnResponse: {
-      runId: string;
-      graph: string;
-      /** @description Whether the run failed on its own or was cancelled by the author. */
-      status: components['schemas']['ChatTurnOutcome'];
-      /** Format: date-time */
-      endedAt: string;
-      /** @description Application error code, when the failure carried one; never present for a cancelled run. */
-      code?: string | null;
-      message?: string | null;
-    };
-    /** @enum {string} */
-    ChatTurnOutcome: 'failed' | 'cancelled';
-    /** @description Whether a session’s turn is still running and how far its transcript has got — cheap enough to poll while a turn runs. */
-    ChatTurnStatusResponse: {
-      /** @description Present while a chat turn is running for this session; null otherwise. */
-      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
-      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
-      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
-      /** @description Ordinal of the newest message in the transcript; 0 when it is empty. */
-      lastOrdinal: number;
-    };
-    ChatTurnBody: {
-      /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
-      content: string;
-      /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
-      proseEdits?: boolean;
-      /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
-      justDiscussing?: boolean;
-      /** @description Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode. */
-      contentMode?: components['schemas']['ContentMode'];
-      /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
-      costTier?: components['schemas']['CostTier'];
-    };
-    ChatTurnResponse: {
-      userMessage: components['schemas']['ChatMessageResponse'];
-      assistantMessage: components['schemas']['ChatMessageResponse'];
-      /** @description The turn's suggestion cards, pending the author's per-op accept or decline. */
-      proposal?: components['schemas']['ProposalResponse'];
-      /** @description The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable. */
-      appliedProposal?: components['schemas']['ProposalResponse'];
-      /** @description present when this turn applied the changes taken from the author’s own words */
-      applied?: components['schemas']['TurnAppliedResult'];
-      /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
-      applyNote?: string;
-      runId: string;
-    };
-    /** @description Proposal application outcome returned as part of an automatic-mode turn. */
-    TurnAppliedResult: {
-      applied: components['schemas']['AppliedArtifactItem'][];
-      staleMarked: string[];
-      opResults: components['schemas']['OpResultItem'][];
-    };
-    UpdateChatSessionBody: {
-      mode?: components['schemas']['ChatMode'];
-      title?: string;
-    };
-    /** @description Every field is optional: an omitted field is left as it is, `null` clears it back to the project default. */
-    UpdateSessionModelBody: {
-      /** @description Model provider override; clear both override fields to use the project or profile default. */
-      provider?: string | null;
-      /** @description Model name override; clear both override fields to use the project or profile default. */
-      model?: string | null;
-      /** @description This chat's default model type for its replies; chapters keep their own content mode. */
-      contentMode?: components['schemas']['ContentMode'] | null;
-      /** @description This chat's default cost tier; actions a turn starts run at the turn's tier. */
-      costTier?: components['schemas']['CostTier'] | null;
-    };
-    /** @description A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does. */
-    ChatTurnStreamResponse: {
-      /** @description Workflow run driving the turn — the key of GET /api/v1/projects/:projectId/turns/:runId/stream. */
-      runId: string;
-    };
-    EnhancePremiseBody: {
-      /** @description rough overview to enhance; falls back to the project brief/premise when omitted */
-      overview?: string;
-    };
-    EnhancePremiseResponse: {
-      proposal: components['schemas']['ProposalResponse'];
-      rationale: components['schemas']['PremiseRationaleResponse'];
-      runId: string;
-    };
-    PremiseRationaleResponse: {
-      enhancedPremise: string;
-      hook: string;
-      stakes: string;
-      protagonistDrive: string;
-      progressionSystem: string;
-      serializationNotes: string;
-      genre: string;
-      themes: string[];
-    };
-    ContextPreviewResponse: {
-      purpose: string;
-      budgetTokens: number;
-      usedTokens: number;
-      sections: components['schemas']['ContextSectionPreview'][];
-      unresolvedRefs: string[];
-      omitted: components['schemas']['OmittedSectionPreview'][];
-      renderedStable: string;
-      renderedVolatile: string;
-      rendered: string;
-    };
-    ContextSectionPreview: {
-      key: string;
-      tier: string;
-      segment: string;
-      tokens: number;
-      truncated: boolean;
-    };
-    OmittedSectionPreview: {
-      key: string;
-      /** @description why the section did not reach the model: 'budget' (evicted) or 'unresolved' (ref never resolved) */
-      reason: string;
-    };
-    BibleTidyPreviewResponse: {
-      items: components['schemas']['BibleTidyItem'][];
-    };
-    BibleTidyItem: {
-      /** @description Pins the content the change was computed from; send it back to apply the change. */
-      id: string;
-      kind: components['schemas']['BibleTidyKind'];
-      /** @description Section of the document the change comes from. */
-      section: components['schemas']['BibleSection'];
-      slug: string;
-      /** @description The document title as the Story Bible shows it now. */
-      docTitle: string;
-      /** @description retitle: the stored title being replaced. */
-      currentTitle?: string;
-      /** @description retitle: the title the document would get. */
-      proposedTitle?: string;
-      /** @description split: key of the entity record that would be created. */
-      entityKey?: string;
-      /** @description split: name of the entity record that would be created. */
-      entityName?: string;
-      /** @description split: the suggested entity type; the author may pick another when applying. */
-      entityType?: components['schemas']['EntityType'];
-      /** @description split: the entity body; move_ai_notes: the note being moved. */
-      text?: string;
-      /** @description move_ai_notes: slug of the notes-for-the-AI document the note moves into. */
-      targetSlug?: string;
-    };
-    /** @enum {string} */
-    BibleTidyKind: 'remove_empty' | 'retitle' | 'split' | 'move_ai_notes';
-    /** @enum {string} */
-    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
-    /** @enum {string} */
-    EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
-    ApplyBibleTidyBody: {
-      /** @description The preview items to apply; everything left out stays as it is. */
-      items: components['schemas']['BibleTidySelection'][];
-    };
-    BibleTidySelection: {
-      id: string;
-      /** @description split only: overrides the suggested entity type. */
-      entityType?: components['schemas']['EntityType'];
-    };
-    BotOwnershipResponse: {
-      projects: number;
-      illustrations: number;
-    };
-    TransferOwnershipBody: {
-      /** @description Identity user id the bot-owned rows are reassigned to. */
-      toUserId: string;
-    };
-    TransferOwnershipResponse: {
-      /** @description Projects this call reassigned; a retry of an applied transfer reports zero. */
-      projects: number;
-      /** @description Illustrations this call reassigned; a retry of an applied transfer reports zero. */
-      illustrations: number;
-    };
-    /** @enum {string} */
-    ChapterStatus: 'done' | 'failed' | 'skipped';
-    ListChapterResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ChapterListResponse'][];
-    };
-    ChapterListResponse: {
-      id: string;
-      projectId: string;
-      number: number;
-      title?: null | string;
-      wordCount?: null | number;
-      status: components['schemas']['ChapterStatus'];
-      generator?: null | string;
-      continuityApplied: boolean;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ChapterResponse: {
-      id: string;
-      projectId: string;
-      number: number;
-      title?: null | string;
-      wordCount?: null | number;
-      status: components['schemas']['ChapterStatus'];
-      generator?: null | string;
-      continuityApplied: boolean;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-      content?: null | string;
-      summary?: null | string;
-      note?: null | string;
-    };
-    UpdateChapterBody: {
-      title?: string;
-      content?: string;
-    };
     SeedFromBriefBody: {
       brief: string;
       force?: boolean;
@@ -3533,15 +3056,23 @@ export interface components {
       updatedAt: string;
       usage: components['schemas']['JobUsageResponse'];
     };
-    CancelJobResponse: {
-      jobId: string;
-      /** @description The job status as recorded right now — a `stopping` outcome still reads `in_progress` because the worker writes `cancelled` as it settles. */
-      status: components['schemas']['JobStatus'];
-      /**
-       * @description 'cancelled': the job was still pending and was cancelled immediately, never dispatched. 'stopping': the job was in progress; cancellation was requested and the worker will settle it as cancelled at its next step boundary. 'already_settled': the job had already reached a terminal status (done, failed, or cancelled), so nothing was done.
-       * @enum {string}
-       */
-      outcome: 'cancelled' | 'stopping' | 'already_settled';
+    /** @description Cost and token totals across every run this job drove — empty (zero calls) for a job kind that makes no model calls, such as publish. */
+    JobUsageResponse: {
+      calls: number;
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
+      costUsd: number;
+      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
+      estimatedCostUsd: number;
+      byCostSource: components['schemas']['JobCostSourceItem'][];
+    };
+    /** @description Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none. */
+    JobCostSourceItem: {
+      costSource: string;
+      calls: number;
+      costUsd: number;
     };
     ListDraftResponse: {
       items: components['schemas']['DraftResponse'][];
@@ -3766,6 +3297,69 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    ProposalResponse: {
+      id: string;
+      projectId: string;
+      sessionId?: null | string;
+      messageId?: null | string;
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: null | string;
+      kind: components['schemas']['RefinementKind'];
+      status: components['schemas']['RefinementProposalStatus'];
+      summary?: null | string;
+      /** @description Proposed operations, each discriminated by its op field. */
+      changeSet: components['schemas']['ChangeOpItem'][];
+      /** @description Artifact snapshots keyed by the references the change-set was drafted against. */
+      baseline: {
+        [key: string]: unknown;
+      };
+      autoApplied: boolean;
+      /** @description Whether this proposal has been applied and carries inverse operations, allowing it to be reverted. */
+      revertible: boolean;
+      /** @description Apply-time result for each operation. */
+      opResults?: null | components['schemas']['OpResultItem'][];
+      model?: null | string;
+      runId?: null | string;
+      /** Format: date-time */
+      appliedAt?: null | string;
+      /** Format: date-time */
+      revertedAt?: null | string;
+      /** @description Error-source-specific failure details recorded when proposal application fails. */
+      error?: null | {
+        [key: string]: unknown;
+      };
+      /** @description Review warnings found by deterministic checks on the proposed text, such as a removal written as a negation. Empty when none apply. */
+      warnings: string[];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ChatScope: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
+    /** @enum {string} */
+    RefinementKind: 'chat' | 'hub' | 'premise_enhance' | 'bible_audit' | 'chapter_extract' | 'plugin' | 'chapter_plan' | 'organise';
+    /** @enum {string} */
+    RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
+    /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
+    ChangeOpItem: {
+      op: string;
+    } & {
+      [key: string]: unknown;
+    };
+    /** @description Apply-time disposition for one operation, optionally including a job, run, or proposal result. */
+    OpResultItem: {
+      index: number;
+      status: string;
+      error?: string;
+      /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
+      note?: string;
+      result?: {
+        [key: string]: unknown;
+      };
+    } & {
+      [key: string]: unknown;
     };
     UpdateContinuityBody: {
       /** @description Continuity findings and suggested edits produced by the continuity model. */
@@ -4130,10 +3724,547 @@ export interface components {
       /** @description How many chapters are flagged in total. */
       count: number;
     };
+    JobResponse: {
+      id: string;
+      projectId: string;
+      kind: components['schemas']['JobKind'];
+      target: string;
+      status: components['schemas']['JobStatus'];
+      attempts: number;
+      lastError?: null | string;
+      /** @description Job input whose fields depend on the job kind. */
+      payload?: null | {
+        [key: string]: unknown;
+      };
+      /** @description Current progress snapshot whose fields depend on the job kind. */
+      progress?: null | {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      nextAttemptAt?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      usage: components['schemas']['JobUsageResponse'];
+    };
     /** @description The proposal a plugin's canon augmentation was staged as. No body is returned when the plugin proposed nothing. */
     PluginAugmentResponse: {
       /** @description Id of the pending proposal holding the proposed canon changes, for review through the proposal surface. */
       proposalId: string;
+    };
+    /** @enum {string} */
+    SortOrder: 'asc' | 'desc';
+    /** @enum {string} */
+    SortByTime: 'createdAt' | 'updatedAt';
+    ListProposalResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ProposalResponse'][];
+    };
+    UpdateProposalBody: {
+      /** @description Replacement change-set operations, each discriminated by its op field. */
+      changeSet: components['schemas']['ChangeOpItem'][];
+    };
+    ApplyProposalBody: {
+      /** @description Change-set indexes to apply; omission applies every operation. */
+      opIndexes?: number[];
+    };
+    ApplyProposalResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      applied: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+      opResults: components['schemas']['OpResultItem'][];
+      jobs: components['schemas']['AppliedActionJobItem'][];
+    };
+    AppliedArtifactItem: {
+      artifactRef: string;
+      newRevision?: null | number;
+    };
+    /** @description A job an applied action started — follow it on the chat's job event stream. */
+    AppliedActionJobItem: {
+      /** @description The action op that started it. */
+      index: number;
+      jobId: string;
+      /** @description The workflow run it opened, when the job opens one as it is queued. */
+      runId?: string;
+    };
+    /** @description What undoing an applied change would affect, listed before the author confirms the revert. */
+    UndoImpactResponse: {
+      proposalId: string;
+      dependents: components['schemas']['UndoDependentItem'][];
+      /** @description Finalized plans and drafts that relied only on an updated record: the undo leaves them as they are, so they are counted, not listed. */
+      finalUnaffected: number;
+    };
+    /** @description A record that relies on something an undo would take back. */
+    UndoDependentItem: {
+      kind: components['schemas']['UndoDependentKind'];
+      /** @description The dependent record: `chapter:<n>` for a plan, `draft:<n>` for a draft, `knowledge:<entityKey>/<factKey>` for what a character knows, `proposal:<id>` for a pending suggestion. */
+      ref: string;
+      /** @description The chapter the record belongs to, or where the character learned the fact. */
+      chapter?: null | number;
+      /** @description The undone record this one relies on, as a change-set ref. */
+      because: string;
+      /** @description Finalized history: undo never rewrites it, so the record stays as it is after the revert. */
+      final: boolean;
+    };
+    /** @enum {string} */
+    UndoDependentKind: 'plan' | 'draft' | 'knowledge' | 'suggestion';
+    RevertProposalResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      reverted: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+    };
+    ListChangesResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChangeItemResponse'][];
+    };
+    ChangeItemResponse: {
+      id: string;
+      sessionId?: null | string;
+      kind: components['schemas']['RefinementKind'];
+      scopeType: components['schemas']['ChatScope'];
+      status: components['schemas']['RefinementProposalStatus'];
+      summary?: null | string;
+      autoApplied: boolean;
+      refs: string[];
+      revertible: boolean;
+      opResults?: null | components['schemas']['OpResultItem'][];
+      /** Format: date-time */
+      appliedAt?: null | string;
+      /** Format: date-time */
+      revertedAt?: null | string;
+    };
+    RollbackBody: {
+      /** @description Newest applied proposal to keep; every later proposal is reverted newest first. */
+      afterProposalId: string;
+    };
+    RollbackResponse: {
+      reverted: components['schemas']['RolledBackItem'][];
+      skipped: string[];
+      stoppedAt?: string;
+      conflict?: {
+        [key: string]: unknown;
+      };
+    };
+    RolledBackItem: {
+      proposalId: string;
+      artifacts: components['schemas']['AppliedArtifactItem'][];
+    };
+    CreateChatSessionBody: {
+      mode?: components['schemas']['ChatMode'];
+    };
+    /** @enum {string} */
+    ChatMode: 'manual' | 'auto';
+    ChatSessionResponse: {
+      id: string;
+      projectId: string;
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: null | string;
+      title?: null | string;
+      status: components['schemas']['ChatSessionStatus'];
+      mode: components['schemas']['ChatMode'];
+      modelProvider?: null | string;
+      modelId?: null | string;
+      /** @description The chat's own model type; null follows the project's content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description The chat's own cost tier; null follows the project's cost tier. */
+      costTier?: components['schemas']['CostTier'] | null;
+      summary?: null | string;
+      summaryThroughOrdinal: number;
+      /** Format: date-time */
+      lastTurnAt?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ChatSessionStatus: 'active' | 'archived';
+    ListChatSessionResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChatSessionResponse'][];
+    };
+    ListChatMessagesResponse: {
+      messages: components['schemas']['ChatMessageResponse'][];
+      /** @description Present while a chat turn is running for this session; null otherwise. */
+      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
+      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
+      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
+    };
+    ChatMessageResponse: {
+      id: string;
+      sessionId: string;
+      ordinal: number;
+      role: string;
+      content: string;
+      /** @description The turn's suggestion cards: a pending proposal the author accepts or declines op by op. */
+      proposalId?: null | string;
+      /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
+      appliedProposalId?: null | string;
+      runId?: null | string;
+      modelProvider?: null | string;
+      modelId?: null | string;
+      /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description The cost tier the reply was written at; null on user messages and on replies older than the selection. */
+      costTier?: components['schemas']['CostTier'] | null;
+      /** @description This reply's model cost, folding in its title and compaction runs; null on user messages and on a reply that carries no run. */
+      costUsd?: null | number;
+      inputTokens?: null | number;
+      cachedInputTokens?: null | number;
+      outputTokens?: null | number;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
+    PendingTurnResponse: {
+      runId: string;
+      /** @description Workflow graph driving the turn — `chat-turn`. */
+      graph: string;
+      /**
+       * Format: date-time
+       * @description When the turn started; elapsed time is measured from here so it survives a refresh.
+       */
+      startedAt: string;
+    };
+    /** @description The turn that died or was stopped, on a transcript still ending in an unanswered user message, so a reload shows why instead of a silent thread. `status: 'cancelled'` is the author stopping the turn deliberately — terminal and not a failure, so the client must not offer the same retry affordance it offers a failure. */
+    FailedTurnResponse: {
+      runId: string;
+      graph: string;
+      /** @description Whether the run failed on its own or was cancelled by the author. */
+      status: components['schemas']['ChatTurnOutcome'];
+      /** Format: date-time */
+      endedAt: string;
+      /** @description Application error code, when the failure carried one; never present for a cancelled run. */
+      code?: string | null;
+      message?: string | null;
+    };
+    /** @enum {string} */
+    ChatTurnOutcome: 'failed' | 'cancelled';
+    /** @description Whether a session’s turn is still running and how far its transcript has got — cheap enough to poll while a turn runs. */
+    ChatTurnStatusResponse: {
+      /** @description Present while a chat turn is running for this session; null otherwise. */
+      pendingTurn?: components['schemas']['PendingTurnResponse'] | null;
+      /** @description Present when the last turn failed or was cancelled, leaving the transcript unanswered — see its `status`. */
+      failedTurn?: components['schemas']['FailedTurnResponse'] | null;
+      /** @description Ordinal of the newest message in the transcript; 0 when it is empty. */
+      lastOrdinal: number;
+    };
+    ChatTurnBody: {
+      /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
+      content: string;
+      /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
+      proseEdits?: boolean;
+      /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
+      justDiscussing?: boolean;
+      /** @description Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode. */
+      contentMode?: components['schemas']['ContentMode'];
+      /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
+      costTier?: components['schemas']['CostTier'];
+    };
+    ChatTurnResponse: {
+      userMessage: components['schemas']['ChatMessageResponse'];
+      assistantMessage: components['schemas']['ChatMessageResponse'];
+      /** @description The turn's suggestion cards, pending the author's per-op accept or decline. */
+      proposal?: components['schemas']['ProposalResponse'];
+      /** @description The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable. */
+      appliedProposal?: components['schemas']['ProposalResponse'];
+      /** @description present when this turn applied the changes taken from the author’s own words */
+      applied?: components['schemas']['TurnAppliedResult'];
+      /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
+      applyNote?: string;
+      runId: string;
+    };
+    /** @description Proposal application outcome returned as part of an automatic-mode turn. */
+    TurnAppliedResult: {
+      applied: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+      opResults: components['schemas']['OpResultItem'][];
+    };
+    UpdateChatSessionBody: {
+      mode?: components['schemas']['ChatMode'];
+      title?: string;
+    };
+    /** @description Every field is optional: an omitted field is left as it is, `null` clears it back to the project default. */
+    UpdateSessionModelBody: {
+      /** @description Model provider override; clear both override fields to use the project or profile default. */
+      provider?: string | null;
+      /** @description Model name override; clear both override fields to use the project or profile default. */
+      model?: string | null;
+      /** @description This chat's default model type for its replies; chapters keep their own content mode. */
+      contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description This chat's default cost tier; actions a turn starts run at the turn's tier. */
+      costTier?: components['schemas']['CostTier'] | null;
+    };
+    /** @description A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does. */
+    ChatTurnStreamResponse: {
+      /** @description Workflow run driving the turn — the key of GET /api/v1/projects/:projectId/turns/:runId/stream. */
+      runId: string;
+    };
+    EnhancePremiseBody: {
+      /** @description rough overview to enhance; falls back to the project brief/premise when omitted */
+      overview?: string;
+    };
+    EnhancePremiseResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      rationale: components['schemas']['PremiseRationaleResponse'];
+      runId: string;
+    };
+    PremiseRationaleResponse: {
+      enhancedPremise: string;
+      hook: string;
+      stakes: string;
+      protagonistDrive: string;
+      progressionSystem: string;
+      serializationNotes: string;
+      genre: string;
+      themes: string[];
+    };
+    ContextPreviewResponse: {
+      purpose: string;
+      budgetTokens: number;
+      usedTokens: number;
+      sections: components['schemas']['ContextSectionPreview'][];
+      unresolvedRefs: string[];
+      omitted: components['schemas']['OmittedSectionPreview'][];
+      renderedStable: string;
+      renderedVolatile: string;
+      rendered: string;
+    };
+    ContextSectionPreview: {
+      key: string;
+      tier: string;
+      segment: string;
+      tokens: number;
+      truncated: boolean;
+    };
+    OmittedSectionPreview: {
+      key: string;
+      /** @description why the section did not reach the model: 'budget' (evicted) or 'unresolved' (ref never resolved) */
+      reason: string;
+    };
+    BibleTidyPreviewResponse: {
+      items: components['schemas']['BibleTidyItem'][];
+    };
+    BibleTidyItem: {
+      /** @description Pins the content the change was computed from; send it back to apply the change. */
+      id: string;
+      kind: components['schemas']['BibleTidyKind'];
+      /** @description Section of the document the change comes from. */
+      section: components['schemas']['BibleSection'];
+      slug: string;
+      /** @description The document title as the Story Bible shows it now. */
+      docTitle: string;
+      /** @description retitle: the stored title being replaced. */
+      currentTitle?: string;
+      /** @description retitle: the title the document would get. */
+      proposedTitle?: string;
+      /** @description split: key of the entity record that would be created. */
+      entityKey?: string;
+      /** @description split: name of the entity record that would be created. */
+      entityName?: string;
+      /** @description split: the suggested entity type; the author may pick another when applying. */
+      entityType?: components['schemas']['EntityType'];
+      /** @description split: the entity body; move_ai_notes: the note being moved. */
+      text?: string;
+      /** @description move_ai_notes: slug of the notes-for-the-AI document the note moves into. */
+      targetSlug?: string;
+    };
+    /** @enum {string} */
+    BibleTidyKind: 'remove_empty' | 'retitle' | 'split' | 'move_ai_notes';
+    /** @enum {string} */
+    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
+    /** @enum {string} */
+    EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
+    ApplyBibleTidyBody: {
+      /** @description The preview items to apply; everything left out stays as it is. */
+      items: components['schemas']['BibleTidySelection'][];
+    };
+    BibleTidySelection: {
+      id: string;
+      /** @description split only: overrides the suggested entity type. */
+      entityType?: components['schemas']['EntityType'];
+    };
+    ListBibleAuditsResponse: {
+      /** @description Newest first, up to the most recent 50. */
+      items: components['schemas']['BibleAuditReportResponse'][];
+    };
+    /** @description One Story Bible audit: its findings, what it checked, and the card that carries its proposed changes. */
+    BibleAuditReportResponse: {
+      id: string;
+      /** @description What was found and what was checked, in one line; "Nothing found. Checked: …" for a clean audit. */
+      summary: string;
+      checked: components['schemas']['AuditCheckedResponse'];
+      /** @description Contradictions first, then pages and records to add, revise and remove. */
+      findings: components['schemas']['BibleAuditFindingResponse'][];
+      /** @description Findings the author has neither kept nor skipped. */
+      openFindings: number;
+      /** @description The pending proposal that carries the changes; null when the audit proposed none. */
+      proposalId?: null | string;
+      proposalStatus?: components['schemas']['AuditProposalStatus'] | null;
+      /** @description The card’s op indexes to apply: every op a finding not skipped still proposes. Pass as opIndexes when applying the card. */
+      selection: number[];
+      runId?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description Exactly what this audit read — the report never claims more. */
+    AuditCheckedResponse: {
+      passes: components['schemas']['AuditPassesResponse'];
+      documents: components['schemas']['AuditCheckedDocumentsResponse'];
+      entities: components['schemas']['AuditCheckedEntitiesResponse'];
+      facts: components['schemas']['AuditCheckedFactsResponse'];
+      /** @description The finalized chapters whose summaries were compared; null when none were. */
+      chapters?: components['schemas']['AuditCheckedChaptersResponse'] | null;
+      /** @description Finalized chapters with no summary yet, so not compared. */
+      chaptersWithoutSummary: number[];
+      /** @description Finalized isolated chapters, which the audit never reads, not even their summaries. */
+      chaptersIsolated: number[];
+      chaptersOmitted: number;
+      /** @description The sentence to show, e.g. "Checked: 14 pages, 38 characters, 21 facts, chapters 1–12." */
+      copy: string;
+    };
+    AuditPassesResponse: {
+      /** @description Missing and thin pages and records against the Story Bible manifest. */
+      coverage: components['schemas']['AuditPassStatus'];
+      /** @description Pages, records, facts and finalized chapter summaries compared against each other. */
+      contradictions: components['schemas']['AuditPassStatus'];
+    };
+    /** @enum {string} */
+    AuditPassStatus: 'ran' | 'failed';
+    AuditCheckedDocumentsResponse: {
+      count: number;
+      sections: string[];
+      /** @description Pages too long to read whole; only their beginning was compared. */
+      clipped: number;
+      /** @description Pages that did not fit and were not compared. */
+      omitted: number;
+    };
+    AuditCheckedEntitiesResponse: {
+      count: number;
+      /** @description Entity type → how many were read. */
+      byType: {
+        [key: string]: unknown;
+      };
+      omitted: number;
+    };
+    AuditCheckedFactsResponse: {
+      /** @description Zero when the contradiction check did not run: only it reads the facts. */
+      count: number;
+      omitted: number;
+    };
+    AuditCheckedChaptersResponse: {
+      from: number;
+      to: number;
+      count: number;
+    };
+    BibleAuditFindingResponse: {
+      /** @description Stable within its report; decisions address the finding by it. */
+      id: string;
+      group: components['schemas']['BibleAuditGroup'];
+      /** @description The page or record the finding is about. */
+      ref: string;
+      text: string;
+      evidence: components['schemas']['AuditEvidenceResponse'][];
+      /** @description The ops of the audit’s card that carry this finding’s changes; empty when it has none. */
+      opIndexes: number[];
+      /** @description Why a change the audit proposed for this finding was not put on the card. */
+      withheld?: null | string;
+      /** @description The author’s Keep or Skip, if any. */
+      decision?: components['schemas']['AuditFindingDecisionResponse'] | null;
+    };
+    /** @enum {string} */
+    BibleAuditGroup: 'add' | 'revise' | 'remove' | 'contradiction';
+    AuditEvidenceResponse: {
+      /** @description "doc:<section>/<slug>", "entity:<key>", "fact:<key>" or "chapter:<n>" — always something the audit read. */
+      ref: string;
+      /** @description Words quoted from that source, verified to appear there; null when the finding points at the source as a whole. */
+      quote?: null | string;
+    };
+    AuditFindingDecisionResponse: {
+      decision: components['schemas']['AuditFindingDecision'];
+      reason?: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    AuditFindingDecision: 'kept' | 'skipped';
+    /** @enum {string} */
+    AuditProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted' | 'reverted';
+    /** @description An audit queued as a job; its report appears in the list when the job is done. */
+    BibleAuditJobResponse: {
+      jobId: string;
+      runId: string;
+      status: components['schemas']['JobStatus'];
+    };
+    AuditFindingDecisionBody: {
+      /** @description kept: the finding’s changes stay on the audit’s card (restaged if the card was discarded). skipped: they come off it; skipping every finding discards the card. */
+      decision: components['schemas']['AuditFindingDecision'];
+      /** @description Why, remembered with the decision. Optional. */
+      reason?: string;
+    };
+    BotOwnershipResponse: {
+      projects: number;
+      illustrations: number;
+    };
+    TransferOwnershipBody: {
+      /** @description Identity user id the bot-owned rows are reassigned to. */
+      toUserId: string;
+    };
+    TransferOwnershipResponse: {
+      /** @description Projects this call reassigned; a retry of an applied transfer reports zero. */
+      projects: number;
+      /** @description Illustrations this call reassigned; a retry of an applied transfer reports zero. */
+      illustrations: number;
+    };
+    /** @enum {string} */
+    ChapterStatus: 'done' | 'failed' | 'skipped';
+    ListChapterResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChapterListResponse'][];
+    };
+    ChapterListResponse: {
+      id: string;
+      projectId: string;
+      number: number;
+      title?: null | string;
+      wordCount?: null | number;
+      status: components['schemas']['ChapterStatus'];
+      generator?: null | string;
+      continuityApplied: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ChapterResponse: {
+      id: string;
+      projectId: string;
+      number: number;
+      title?: null | string;
+      wordCount?: null | number;
+      status: components['schemas']['ChapterStatus'];
+      generator?: null | string;
+      continuityApplied: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      content?: null | string;
+      summary?: null | string;
+      note?: null | string;
+    };
+    UpdateChapterBody: {
+      title?: string;
+      content?: string;
     };
     ListChapterReviewsResponse: {
       chapter: number;
@@ -5764,6 +5895,173 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_jobs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatJobsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_jobs_events: {
+    parameters: {
+      query?: {
+        /** @description Only events after this seq — the `cursor` of the jobs list or the `seq` of the last event read. The stream also reads `Last-Event-ID`. Without either, only the events of running jobs and how each job that settled in the last hour ended. */
+        after?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatJobEventsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_jobs_stream: {
+    parameters: {
+      query?: {
+        /** @description Only events after this seq — the `cursor` of the jobs list or the `seq` of the last event read. The stream also reads `Last-Event-ID`. Without either, only the events of running jobs and how each job that settled in the last hour ended. */
+        after?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chat_sessions_sessionId_jobs_jobId_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+        /** @description Job UUID. */
+        jobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelJobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_ai_settings: {
     parameters: {
       query?: never;
@@ -6162,1662 +6460,6 @@ export interface operations {
       path: {
         projectId: string;
         pluginId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible_audits: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListBibleAuditsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_bible_audits: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleAuditJobResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible_audits_reportId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        reportId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleAuditReportResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_bible_audits_reportId_findings_findingId_decision: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        reportId: string;
-        findingId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AuditFindingDecisionBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleAuditReportResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_bible_audit: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleAuditJobResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_jobs_jobId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        jobId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JobResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_proposals: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        status?: components['schemas']['RefinementProposalStatus'];
-        kind?: components['schemas']['RefinementKind'];
-        scopeType?: components['schemas']['ChatScope'];
-        sessionId?: string;
-        /** @description Only proposals with at least one operation aimed at this chapter. */
-        chapter?: number | string;
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_proposals_proposalId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_proposals_proposalId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateProposalBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_proposals_proposalId_apply: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ApplyProposalBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApplyProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_proposals_proposalId_undo_impact: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['UndoImpactResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_proposals_proposalId_revert: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RevertProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_proposals_proposalId_discard: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        proposalId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_changes: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListChangesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_changes_rollback: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RollbackBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RollbackResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_chat_sessions: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        scopeType?: components['schemas']['ChatScope'];
-        status?: components['schemas']['ChatSessionStatus'];
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chat_sessions: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateChatSessionBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_chat_sessions_sessionId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_chat_sessions_sessionId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_chat_sessions_sessionId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateChatSessionBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
-    parameters: {
-      query?: {
-        /** @description return messages with ordinal strictly below this value */
-        before?: number | string;
-        limit?: number | string;
-      };
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListChatMessagesResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ChatTurnBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatTurnResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_chat_sessions_sessionId_turn: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatTurnStatusResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_chat_sessions_sessionId_model: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateSessionModelBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chat_sessions_sessionId_archive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_chats_sessionId_turn_stream: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ChatTurnBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatTurnStreamResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_turns_runId_stream: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Workflow run UUID, as returned by the turn-stream POST. */
-        runId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_premise_enhance: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['EnhancePremiseBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['EnhancePremiseResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_context_preview: {
-    parameters: {
-      query: {
-        purpose: 'generation' | 'outline' | 'chat' | 'premise' | 'audit';
-        /** @description required for generation/outline */
-        chapter?: number | string;
-        /** @description chat scope type */
-        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ContextPreviewResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_bible_tidy: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BibleTidyPreviewResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_projects_projectId_bible_tidy: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ApplyBibleTidyBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApplyProposalResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_internal_bots_botId_ownership: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BotOwnershipResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_internal_bots_botId_transfer: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        botId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['TransferOwnershipBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TransferOwnershipResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_source_chapters: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        status?: components['schemas']['ChapterStatus'];
-      };
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListChapterResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_source_chapters_n: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        n: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChapterResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_projects_projectId_source_chapters_n: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        n: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_source_chapters_n: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        n: number;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateChapterBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChapterResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_export_novel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
       };
       cookie?: never;
     };
@@ -9922,6 +8564,46 @@ export interface operations {
       };
     };
   };
+  get_api_v1_jobs_jobId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        jobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_plugins_pluginId_augment: {
     parameters: {
       query?: never;
@@ -9943,6 +8625,1622 @@ export interface operations {
           'application/json': components['schemas']['PluginAugmentResponse'];
         };
       };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_proposals: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        status?: components['schemas']['RefinementProposalStatus'];
+        kind?: components['schemas']['RefinementKind'];
+        scopeType?: components['schemas']['ChatScope'];
+        sessionId?: string;
+        /** @description Only proposals with at least one operation aimed at this chapter. */
+        chapter?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_proposals_proposalId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_proposals_proposalId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProposalBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_proposals_proposalId_apply: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApplyProposalBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_proposals_proposalId_undo_impact: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UndoImpactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_proposals_proposalId_revert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevertProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_proposals_proposalId_discard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_changes: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChangesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_changes_rollback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RollbackBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RollbackResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        scopeType?: components['schemas']['ChatScope'];
+        status?: components['schemas']['ChatSessionStatus'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chat_sessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateChatSessionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_chat_sessions_sessionId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_chat_sessions_sessionId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateChatSessionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
+    parameters: {
+      query?: {
+        /** @description return messages with ordinal strictly below this value */
+        before?: number | string;
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatMessagesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatTurnBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_chat_sessions_sessionId_turn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_chat_sessions_sessionId_model: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSessionModelBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chat_sessions_sessionId_archive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chats_sessionId_turn_stream: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Chat session UUID. */
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChatTurnBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnStreamResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_turns_runId_stream: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        /** @description Workflow run UUID, as returned by the turn-stream POST. */
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_premise_enhance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EnhancePremiseBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnhancePremiseResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_context_preview: {
+    parameters: {
+      query: {
+        purpose: 'generation' | 'outline' | 'chat' | 'premise' | 'audit';
+        /** @description required for generation/outline */
+        chapter?: number | string;
+        /** @description chat scope type */
+        scopeType?: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief';
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ContextPreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible_tidy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleTidyPreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_bible_tidy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApplyBibleTidyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible_audits: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListBibleAuditsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_bible_audits: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleAuditJobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_bible_audits_reportId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        reportId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleAuditReportResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_bible_audits_reportId_findings_findingId_decision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        reportId: string;
+        findingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AuditFindingDecisionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleAuditReportResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_bible_audit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BibleAuditJobResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_internal_bots_botId_ownership: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BotOwnershipResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_internal_bots_botId_transfer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        botId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransferOwnershipBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TransferOwnershipResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_source_chapters: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        status?: components['schemas']['ChapterStatus'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_source_chapters_n: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_source_chapters_n: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_source_chapters_n: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_export_novel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -12868,6 +13166,15 @@ export type AuthOrganisationsResponse = components['schemas']['AuthOrganisations
 export type AuthOrganisationItem = components['schemas']['AuthOrganisationItem'];
 export type SwitchOrganisationBody = components['schemas']['SwitchOrganisationBody'];
 export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisationResponse'];
+export type ListChatJobsResponse = components['schemas']['ListChatJobsResponse'];
+export type ChatJobResponse = components['schemas']['ChatJobResponse'];
+export type JobKind = components['schemas']['JobKind'];
+export type JobStatus = components['schemas']['JobStatus'];
+export type ChatJobOriginResponse = components['schemas']['ChatJobOriginResponse'];
+export type ListChatJobEventsResponse = components['schemas']['ListChatJobEventsResponse'];
+export type ChatJobEventResponse = components['schemas']['ChatJobEventResponse'];
+export type JobEventType = components['schemas']['JobEventType'];
+export type CancelJobResponse = components['schemas']['CancelJobResponse'];
 export type AccountSettingsResponse = components['schemas']['AccountSettingsResponse'];
 export type AccountModelDefaults = components['schemas']['AccountModelDefaults'];
 export type AccountModelRef = components['schemas']['AccountModelRef'];
@@ -12893,41 +13200,104 @@ export type PluginActionSurface = components['schemas']['PluginActionSurface'];
 export type ProjectPluginResponse = components['schemas']['ProjectPluginResponse'];
 export type ProjectPluginResponse1 = components['schemas']['ProjectPluginResponse1'];
 export type EnablePluginBody = components['schemas']['EnablePluginBody'];
-export type ListBibleAuditsResponse = components['schemas']['ListBibleAuditsResponse'];
-export type BibleAuditReportResponse = components['schemas']['BibleAuditReportResponse'];
-export type AuditCheckedResponse = components['schemas']['AuditCheckedResponse'];
-export type AuditPassesResponse = components['schemas']['AuditPassesResponse'];
-export type AuditPassStatus = components['schemas']['AuditPassStatus'];
-export type AuditCheckedDocumentsResponse = components['schemas']['AuditCheckedDocumentsResponse'];
-export type AuditCheckedEntitiesResponse = components['schemas']['AuditCheckedEntitiesResponse'];
-export type AuditCheckedFactsResponse = components['schemas']['AuditCheckedFactsResponse'];
-export type AuditCheckedChaptersResponse = components['schemas']['AuditCheckedChaptersResponse'];
-export type BibleAuditFindingResponse = components['schemas']['BibleAuditFindingResponse'];
-export type BibleAuditGroup = components['schemas']['BibleAuditGroup'];
-export type AuditEvidenceResponse = components['schemas']['AuditEvidenceResponse'];
-export type AuditFindingDecisionResponse = components['schemas']['AuditFindingDecisionResponse'];
-export type AuditFindingDecision = components['schemas']['AuditFindingDecision'];
-export type AuditProposalStatus = components['schemas']['AuditProposalStatus'];
-export type BibleAuditJobResponse = components['schemas']['BibleAuditJobResponse'];
-export type JobStatus = components['schemas']['JobStatus'];
-export type AuditFindingDecisionBody = components['schemas']['AuditFindingDecisionBody'];
-export type JobResponse = components['schemas']['JobResponse'];
-export type JobKind = components['schemas']['JobKind'];
+export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
+export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
+export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
+export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
+export type BriefWriteMode = components['schemas']['BriefWriteMode'];
+export type BriefResponse = components['schemas']['BriefResponse'];
+export type BriefSceneSchema = components['schemas']['BriefSceneSchema'];
+export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
+export type EndingContractSchema = components['schemas']['EndingContractSchema'];
+export type HookType = components['schemas']['HookType'];
+export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
+export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
+export type GenerateBody = components['schemas']['GenerateBody'];
+export type JobEnqueueResponse = components['schemas']['JobEnqueueResponse'];
+export type ListGenerationJobResponse = components['schemas']['ListGenerationJobResponse'];
+export type GenerationJobItem = components['schemas']['GenerationJobItem'];
 export type JobUsageResponse = components['schemas']['JobUsageResponse'];
 export type JobCostSourceItem = components['schemas']['JobCostSourceItem'];
-export type SortOrder = components['schemas']['SortOrder'];
-export type SortByTime = components['schemas']['SortByTime'];
-export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
-export type RefinementKind = components['schemas']['RefinementKind'];
-export type ChatScope = components['schemas']['ChatScope'];
-export type ListProposalResponse = components['schemas']['ListProposalResponse'];
+export type ListDraftResponse = components['schemas']['ListDraftResponse'];
+export type DraftResponse = components['schemas']['DraftResponse'];
+export type DraftStatus = components['schemas']['DraftStatus'];
+export type DraftReviewStatus = components['schemas']['DraftReviewStatus'];
+export type ContentRatingInput = components['schemas']['ContentRatingInput'];
+export type SexualContentRating = components['schemas']['SexualContentRating'];
+export type ViolenceRating = components['schemas']['ViolenceRating'];
+export type DarkContentRating = components['schemas']['DarkContentRating'];
+export type DraftSummaryResponse = components['schemas']['DraftSummaryResponse'];
+export type DraftSummaryItem = components['schemas']['DraftSummaryItem'];
+export type DraftConflictResponse = components['schemas']['DraftConflictResponse'];
+export type ConflictingDraftResponse = components['schemas']['ConflictingDraftResponse'];
+export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
+export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
+export type FeedbackBody = components['schemas']['FeedbackBody'];
+export type UserFeedbackDisposition = components['schemas']['UserFeedbackDisposition'];
+export type UserFeedbackResponse = components['schemas']['UserFeedbackResponse'];
+export type ApproveDraftBody = components['schemas']['ApproveDraftBody'];
+export type FinalizeReadinessResponse = components['schemas']['FinalizeReadinessResponse'];
+export type FinalizeBlockerResponse = components['schemas']['FinalizeBlockerResponse'];
+export type ListDraftRevisionResponse = components['schemas']['ListDraftRevisionResponse'];
+export type DraftRevisionResponse = components['schemas']['DraftRevisionResponse'];
+export type DraftRevisionSource = components['schemas']['DraftRevisionSource'];
+export type MarkdownResponse = components['schemas']['MarkdownResponse'];
+export type ImportDraftBody = components['schemas']['ImportDraftBody'];
+export type FinalizeBody = components['schemas']['FinalizeBody'];
+export type GenerateUnrestrictedBody = components['schemas']['GenerateUnrestrictedBody'];
+export type ChapterSummarizeResponse = components['schemas']['ChapterSummarizeResponse'];
+export type ContinuityProposalResponse = components['schemas']['ContinuityProposalResponse'];
 export type ProposalResponse = components['schemas']['ProposalResponse'];
+export type ChatScope = components['schemas']['ChatScope'];
+export type RefinementKind = components['schemas']['RefinementKind'];
+export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
 export type ChangeOpItem = components['schemas']['ChangeOpItem'];
 export type OpResultItem = components['schemas']['OpResultItem'];
+export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
+export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
+export type RunGraph = components['schemas']['RunGraph'];
+export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
+export type WorkflowRunListItemResponse = components['schemas']['WorkflowRunListItemResponse'];
+export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
+export type RunUsageResponse = components['schemas']['RunUsageResponse'];
+export type RunCostSourceItem = components['schemas']['RunCostSourceItem'];
+export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
+export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
+export type CostSource = components['schemas']['CostSource'];
+export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
+export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
+export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
+export type RunUsageDetailResponse = components['schemas']['RunUsageDetailResponse'];
+export type ChapterCostResponse = components['schemas']['ChapterCostResponse'];
+export type ChapterCostBreakdownItem = components['schemas']['ChapterCostBreakdownItem'];
+export type CancelRunResponse = components['schemas']['CancelRunResponse'];
+export type RunContextResponse = components['schemas']['RunContextResponse'];
+export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
+export type SearchResponse = components['schemas']['SearchResponse'];
+export type SearchHitResponse = components['schemas']['SearchHitResponse'];
+export type ListChapterImageResponse = components['schemas']['ListChapterImageResponse'];
+export type ChapterImageResponse = components['schemas']['ChapterImageResponse'];
+export type AddChapterImageBody = components['schemas']['AddChapterImageBody'];
+export type InsertChapterBody = components['schemas']['InsertChapterBody'];
+export type InsertChapterResponse = components['schemas']['InsertChapterResponse'];
+export type AmendChapterBody = components['schemas']['AmendChapterBody'];
+export type AmendChapterResponse = components['schemas']['AmendChapterResponse'];
+export type ChapterRowFilter = components['schemas']['ChapterRowFilter'];
+export type ListChapterRowsResponse = components['schemas']['ListChapterRowsResponse'];
+export type ChapterRowResponse = components['schemas']['ChapterRowResponse'];
+export type ChapterRowKind = components['schemas']['ChapterRowKind'];
+export type ChapterRowCountsResponse = components['schemas']['ChapterRowCountsResponse'];
+export type ChapterContradictionResponse = components['schemas']['ChapterContradictionResponse'];
+export type JobResponse = components['schemas']['JobResponse'];
+export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
+export type SortOrder = components['schemas']['SortOrder'];
+export type SortByTime = components['schemas']['SortByTime'];
+export type ListProposalResponse = components['schemas']['ListProposalResponse'];
 export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
 export type ApplyProposalBody = components['schemas']['ApplyProposalBody'];
 export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
 export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
+export type AppliedActionJobItem = components['schemas']['AppliedActionJobItem'];
 export type UndoImpactResponse = components['schemas']['UndoImpactResponse'];
 export type UndoDependentItem = components['schemas']['UndoDependentItem'];
 export type UndoDependentKind = components['schemas']['UndoDependentKind'];
@@ -12967,6 +13337,23 @@ export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
+export type ListBibleAuditsResponse = components['schemas']['ListBibleAuditsResponse'];
+export type BibleAuditReportResponse = components['schemas']['BibleAuditReportResponse'];
+export type AuditCheckedResponse = components['schemas']['AuditCheckedResponse'];
+export type AuditPassesResponse = components['schemas']['AuditPassesResponse'];
+export type AuditPassStatus = components['schemas']['AuditPassStatus'];
+export type AuditCheckedDocumentsResponse = components['schemas']['AuditCheckedDocumentsResponse'];
+export type AuditCheckedEntitiesResponse = components['schemas']['AuditCheckedEntitiesResponse'];
+export type AuditCheckedFactsResponse = components['schemas']['AuditCheckedFactsResponse'];
+export type AuditCheckedChaptersResponse = components['schemas']['AuditCheckedChaptersResponse'];
+export type BibleAuditFindingResponse = components['schemas']['BibleAuditFindingResponse'];
+export type BibleAuditGroup = components['schemas']['BibleAuditGroup'];
+export type AuditEvidenceResponse = components['schemas']['AuditEvidenceResponse'];
+export type AuditFindingDecisionResponse = components['schemas']['AuditFindingDecisionResponse'];
+export type AuditFindingDecision = components['schemas']['AuditFindingDecision'];
+export type AuditProposalStatus = components['schemas']['AuditProposalStatus'];
+export type BibleAuditJobResponse = components['schemas']['BibleAuditJobResponse'];
+export type AuditFindingDecisionBody = components['schemas']['AuditFindingDecisionBody'];
 export type BotOwnershipResponse = components['schemas']['BotOwnershipResponse'];
 export type TransferOwnershipBody = components['schemas']['TransferOwnershipBody'];
 export type TransferOwnershipResponse = components['schemas']['TransferOwnershipResponse'];
@@ -12975,88 +13362,6 @@ export type ListChapterResponse = components['schemas']['ListChapterResponse'];
 export type ChapterListResponse = components['schemas']['ChapterListResponse'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
-export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
-export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
-export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
-export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
-export type BriefWriteMode = components['schemas']['BriefWriteMode'];
-export type BriefResponse = components['schemas']['BriefResponse'];
-export type BriefSceneSchema = components['schemas']['BriefSceneSchema'];
-export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
-export type EndingContractSchema = components['schemas']['EndingContractSchema'];
-export type HookType = components['schemas']['HookType'];
-export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
-export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
-export type GenerateBody = components['schemas']['GenerateBody'];
-export type JobEnqueueResponse = components['schemas']['JobEnqueueResponse'];
-export type ListGenerationJobResponse = components['schemas']['ListGenerationJobResponse'];
-export type GenerationJobItem = components['schemas']['GenerationJobItem'];
-export type CancelJobResponse = components['schemas']['CancelJobResponse'];
-export type ListDraftResponse = components['schemas']['ListDraftResponse'];
-export type DraftResponse = components['schemas']['DraftResponse'];
-export type DraftStatus = components['schemas']['DraftStatus'];
-export type DraftReviewStatus = components['schemas']['DraftReviewStatus'];
-export type ContentRatingInput = components['schemas']['ContentRatingInput'];
-export type SexualContentRating = components['schemas']['SexualContentRating'];
-export type ViolenceRating = components['schemas']['ViolenceRating'];
-export type DarkContentRating = components['schemas']['DarkContentRating'];
-export type DraftSummaryResponse = components['schemas']['DraftSummaryResponse'];
-export type DraftSummaryItem = components['schemas']['DraftSummaryItem'];
-export type DraftConflictResponse = components['schemas']['DraftConflictResponse'];
-export type ConflictingDraftResponse = components['schemas']['ConflictingDraftResponse'];
-export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
-export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
-export type FeedbackBody = components['schemas']['FeedbackBody'];
-export type UserFeedbackDisposition = components['schemas']['UserFeedbackDisposition'];
-export type UserFeedbackResponse = components['schemas']['UserFeedbackResponse'];
-export type ApproveDraftBody = components['schemas']['ApproveDraftBody'];
-export type FinalizeReadinessResponse = components['schemas']['FinalizeReadinessResponse'];
-export type FinalizeBlockerResponse = components['schemas']['FinalizeBlockerResponse'];
-export type ListDraftRevisionResponse = components['schemas']['ListDraftRevisionResponse'];
-export type DraftRevisionResponse = components['schemas']['DraftRevisionResponse'];
-export type DraftRevisionSource = components['schemas']['DraftRevisionSource'];
-export type MarkdownResponse = components['schemas']['MarkdownResponse'];
-export type ImportDraftBody = components['schemas']['ImportDraftBody'];
-export type FinalizeBody = components['schemas']['FinalizeBody'];
-export type GenerateUnrestrictedBody = components['schemas']['GenerateUnrestrictedBody'];
-export type ChapterSummarizeResponse = components['schemas']['ChapterSummarizeResponse'];
-export type ContinuityProposalResponse = components['schemas']['ContinuityProposalResponse'];
-export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
-export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
-export type RunGraph = components['schemas']['RunGraph'];
-export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
-export type WorkflowRunListItemResponse = components['schemas']['WorkflowRunListItemResponse'];
-export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
-export type RunUsageResponse = components['schemas']['RunUsageResponse'];
-export type RunCostSourceItem = components['schemas']['RunCostSourceItem'];
-export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
-export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
-export type CostSource = components['schemas']['CostSource'];
-export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
-export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
-export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
-export type RunUsageDetailResponse = components['schemas']['RunUsageDetailResponse'];
-export type ChapterCostResponse = components['schemas']['ChapterCostResponse'];
-export type ChapterCostBreakdownItem = components['schemas']['ChapterCostBreakdownItem'];
-export type CancelRunResponse = components['schemas']['CancelRunResponse'];
-export type RunContextResponse = components['schemas']['RunContextResponse'];
-export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
-export type SearchResponse = components['schemas']['SearchResponse'];
-export type SearchHitResponse = components['schemas']['SearchHitResponse'];
-export type ListChapterImageResponse = components['schemas']['ListChapterImageResponse'];
-export type ChapterImageResponse = components['schemas']['ChapterImageResponse'];
-export type AddChapterImageBody = components['schemas']['AddChapterImageBody'];
-export type InsertChapterBody = components['schemas']['InsertChapterBody'];
-export type InsertChapterResponse = components['schemas']['InsertChapterResponse'];
-export type AmendChapterBody = components['schemas']['AmendChapterBody'];
-export type AmendChapterResponse = components['schemas']['AmendChapterResponse'];
-export type ChapterRowFilter = components['schemas']['ChapterRowFilter'];
-export type ListChapterRowsResponse = components['schemas']['ListChapterRowsResponse'];
-export type ChapterRowResponse = components['schemas']['ChapterRowResponse'];
-export type ChapterRowKind = components['schemas']['ChapterRowKind'];
-export type ChapterRowCountsResponse = components['schemas']['ChapterRowCountsResponse'];
-export type ChapterContradictionResponse = components['schemas']['ChapterContradictionResponse'];
-export type PluginAugmentResponse = components['schemas']['PluginAugmentResponse'];
 export type ListChapterReviewsResponse = components['schemas']['ListChapterReviewsResponse'];
 export type ChapterReviewRecordResponse = components['schemas']['ChapterReviewRecordResponse'];
 export type ChapterReviewKind = components['schemas']['ChapterReviewKind'];
@@ -13202,37 +13507,24 @@ export type WikiReconcileFailureItem = components['schemas']['WikiReconcileFailu
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type ApiV1ProjectsProjectIdChatSessionsSessionIdJobsPathParams = Exclude<
+  paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs']['get']['parameters']['path'],
+  undefined
+>;
+export type ListEventsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/events']['get']['parameters']['query'], undefined>;
+export type ListEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/events']['get']['parameters']['path'], undefined>;
+export type StreamEventsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/stream']['get']['parameters']['query'], undefined>;
+export type ApiV1ProjectsProjectIdChatSessionsSessionIdJobsStreamPathParams = Exclude<
+  paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/jobs/stream']['get']['parameters']['path'],
+  undefined
+>;
 export type ModelsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/ai/models']['get']['parameters']['query'], undefined>;
 export type ModelsPathParams = Exclude<paths['/api/v1/projects/{projectId}/ai/models']['get']['parameters']['path'], undefined>;
-export type StreamEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdEventsPathParams = Exclude<paths['/api/v1/projects/{projectId}/events']['get']['parameters']['path'], undefined>;
 export type ListProjectPluginsPathParams = Exclude<paths['/api/v1/projects/{projectId}/plugins']['get']['parameters']['path'], undefined>;
-export type ListAuditsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits']['get']['parameters']['path'], undefined>;
-export type GetAuditPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits/{reportId}']['get']['parameters']['path'], undefined>;
-export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
-export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
-export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
-export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
-export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
-export type ListChangesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['query'], undefined>;
-export type ListChangesPathParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['path'], undefined>;
-export type ListSessionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['query'], undefined>;
-export type ListSessionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['path'], undefined>;
-export type GetSessionPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}']['get']['parameters']['path'], undefined>;
-export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['query'], undefined>;
-export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
-export type TurnStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn']['get']['parameters']['path'], undefined>;
-export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/turns/{runId}/stream']['get']['parameters']['path'], undefined>;
-export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
-export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
-export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
-export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
-export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
-export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
-export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
-export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
 export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
-export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
 export type ListDraftsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts']['get']['parameters']['path'], undefined>;
 export type ListDraftSummariesPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/summary']['get']['parameters']['path'], undefined>;
 export type GetDraftPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}']['get']['parameters']['path'], undefined>;
@@ -13255,6 +13547,30 @@ export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId
 export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
 export type ListChapterRowsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['query'], undefined>;
 export type ListChapterRowsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapter-rows']['get']['parameters']['path'], undefined>;
+export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
+export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
+export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
+export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
+export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
+export type ListChangesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['query'], undefined>;
+export type ListChangesPathParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['path'], undefined>;
+export type ListSessionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['query'], undefined>;
+export type ListSessionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['path'], undefined>;
+export type GetSessionPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}']['get']['parameters']['path'], undefined>;
+export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['query'], undefined>;
+export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
+export type TurnStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/turn']['get']['parameters']['path'], undefined>;
+export type StreamTurnPathParams = Exclude<paths['/api/v1/projects/{projectId}/turns/{runId}/stream']['get']['parameters']['path'], undefined>;
+export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
+export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
+export type PreviewBibleTidyPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/tidy']['get']['parameters']['path'], undefined>;
+export type ListAuditsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits']['get']['parameters']['path'], undefined>;
+export type GetAuditPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/audits/{reportId}']['get']['parameters']['path'], undefined>;
+export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
+export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
+export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
+export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
+export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
 export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
 export type GetReviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'], undefined>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
