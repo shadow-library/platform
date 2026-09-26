@@ -29,19 +29,9 @@ import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
-import {
-  editorialOutcome,
-  hashReviewedBody,
-  isReviewStale,
-  judgeOutcome,
-  mechanicsOutcome,
-  openFindings,
-  readabilityOutcome,
-  type ReviewedText,
-  type ReviewOutcome,
-} from './review-findings';
+import { editorialOutcome, isReviewStale, judgeOutcome, mechanicsOutcome, openFindings, readabilityOutcome, type ReviewedText, type ReviewOutcome } from './review-findings';
 import { renderJudgeTask, renderSettledFindings, type SettledFinding } from './review-prompts';
-import { type UsedModel, usedModel } from './review-records';
+import { findReviewedText, KIND_ORDER, type UsedModel, usedModel } from './review-records';
 
 export interface ReviewRequest {
   kind: Review.Kind;
@@ -116,7 +106,6 @@ type ReviewWithRemedies = Review.ChapterReview & { remedies: Review.Remedy[] };
 
 const REVIEW_GRAPH = 'chapter-review';
 const MODEL_KINDS: ReadonlySet<Review.Kind> = new Set(['judge', 'editorial']);
-const KIND_ORDER: Review.Kind[] = ['judge', 'editorial', 'mechanics', 'readability'];
 const HISTORY_LIMIT = 50;
 const MECHANICAL_PRIOR_WINDOW = 10;
 const JUDGE_TOOL_ROUNDS = 4;
@@ -425,22 +414,8 @@ export class ChapterReviewService {
     return source;
   }
 
-  private async findSource(projectId: bigint, chapter: number): Promise<ReviewSource | null> {
-    const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-    if (draft)
-      return sourceOf(draft.body, {
-        draftRevision: draft.revision,
-        draftId: draft.id,
-        saveSeq: draft.saveSeq,
-        isolated: draft.isolated,
-        final: draft.status === 'final',
-        generating: draft.reviewStatus === 'generating',
-      });
-    const final = await this.db.query.chapters.findFirst({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter), eq(schema.chapters.status, 'done')),
-      columns: { content: true, isolated: true },
-    });
-    return final?.content ? sourceOf(final.content, { draftRevision: null, draftId: null, saveSeq: null, isolated: final.isolated, final: true, generating: false }) : null;
+  private findSource(projectId: bigint, chapter: number): Promise<ReviewSource | null> {
+    return findReviewedText(this.db, projectId, chapter);
   }
 
   private async findReview(projectId: bigint, chapter: number, reviewId: bigint): Promise<ReviewWithRemedies> {
@@ -559,11 +534,6 @@ function draftAt(source: ReviewSource): SQL | undefined {
     ne(schema.drafts.status, 'final'),
     ne(schema.drafts.reviewStatus, 'generating'),
   );
-}
-
-function sourceOf(body: string, row: Omit<ReviewSource, 'body' | 'bodyHash'>): ReviewSource | null {
-  if (!body.trim()) return null;
-  return { ...row, body, bodyHash: hashReviewedBody(body) };
 }
 
 function sameRevision(revision: number | null): SQL {

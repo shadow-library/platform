@@ -36,10 +36,7 @@ function isPosition(value: unknown, roster: ReadonlySet<string>): value is Stand
   return typeof location === 'string' && location.trim().length > 0 && location.length <= MAX_LOCATION_LENGTH && !findHardLine([location]);
 }
 
-/**
- * An isolated chapter's continuation state as a standard call may read it: who is where, as roster keys and short places, and nothing else the
- * unrestricted writer described (last beat, conflict, feelings, established facts). A legacy free-text position is dropped with the rest.
- */
+/** An isolated chapter's continuation state as a standard call may read it: roster keys and short places only, never what the unrestricted writer described. */
 export function standardReadableState(state: unknown, roster: ReadonlySet<string>): { characterPositions: StandardPosition[] } | null {
   if (state === null || typeof state !== 'object' || Array.isArray(state)) return null;
   const positions = (state as Record<string, unknown>)['characterPositions'];
@@ -81,4 +78,62 @@ export function standardReadableExtraction<T>(extracted: T): T {
     EXCERPT_FIELDS.has(key) && typeof value === 'string' ? WALLED_OFF_EXCERPT : standardReadableExtraction(value),
   ]);
   return Object.fromEntries(entries) as T;
+}
+
+const WALLED_OFF_REVIEW = "Findings: walled off. This chapter is isolated, so this review's finding text and evidence are not available here.";
+
+/** Decision P4-39: an isolated chapter's evidence never reaches the chat, on any route — same rule `get_draft` already applies to its prose. */
+const WITHHELD_FINDING = '[withheld: isolated chapter]';
+
+export interface IsolatableFinding {
+  text: string;
+  evidence: string | null;
+}
+
+export interface IsolatableRemedy {
+  reason: string | null;
+}
+
+export interface IsolatableCompliance {
+  compliant: boolean;
+  issues: string[];
+}
+
+export interface IsolatableReview<F extends IsolatableFinding = IsolatableFinding, R extends IsolatableRemedy = IsolatableRemedy> {
+  isolated: boolean;
+  note: string | null;
+  findings: readonly F[];
+  remedies: readonly R[];
+  briefCompliance?: IsolatableCompliance | null;
+  readabilityCompliance?: IsolatableCompliance | null;
+  endingCompliance?: IsolatableCompliance | null;
+  knowledgeCompliance?: IsolatableCompliance | null;
+}
+
+function redactedCompliance(compliance: IsolatableCompliance | null | undefined): IsolatableCompliance | null | undefined {
+  return compliance ? { ...compliance, issues: [] } : compliance;
+}
+
+/** Whether a chat lookup must read this review walled off: its own `isolated` flag, or the chapter's current text being isolated now — the only two facts that decide it, kept here so nothing recomputes the `or`. */
+export function isReviewRedacted(review: Pick<IsolatableReview, 'isolated'>, currentlyIsolated: boolean): boolean {
+  return review.isolated || currentlyIsolated;
+}
+
+/**
+ * A chapter review as a chat lookup may read it: findings, evidence, remedy reasons, note and compliance issues walled off when redacted
+ * (see `isReviewRedacted`) — a review recorded before the chapter's isolation changed must not carry stale isolated prose either way. There
+ * is no unrestricted-route exception: P4-39 holds evidence to the same rule `get_draft` already applies to isolated prose.
+ */
+export function standardReadableReview<F extends IsolatableFinding, R extends IsolatableRemedy, T extends IsolatableReview<F, R>>(review: T, currentlyIsolated = false): T {
+  if (!isReviewRedacted(review, currentlyIsolated)) return review;
+  return {
+    ...review,
+    note: WALLED_OFF_REVIEW,
+    findings: review.findings.map(finding => ({ ...finding, text: WITHHELD_FINDING, evidence: finding.evidence !== null ? WITHHELD_FINDING : null })),
+    remedies: review.remedies.map(remedy => ({ ...remedy, reason: null })),
+    briefCompliance: redactedCompliance(review.briefCompliance),
+    readabilityCompliance: redactedCompliance(review.readabilityCompliance),
+    endingCompliance: redactedCompliance(review.endingCompliance),
+    knowledgeCompliance: redactedCompliance(review.knowledgeCompliance),
+  };
 }

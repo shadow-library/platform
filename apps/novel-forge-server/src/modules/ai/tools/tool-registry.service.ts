@@ -11,6 +11,8 @@ import { getDraftTool } from './tools/get-draft.tool';
 import { getEntityTool } from './tools/get-entity.tool';
 import { getNotesTool } from './tools/get-notes.tool';
 import { getPlotThreadsTool } from './tools/get-plot-threads.tool';
+import { getReviewTool } from './tools/get-review.tool';
+import { getUsageTool } from './tools/get-usage.tool';
 import { getVolumeTool } from './tools/get-volume.tool';
 import { getWorldFactsTool } from './tools/get-world-facts.tool';
 import { searchLoreTool } from './tools/search-lore.tool';
@@ -31,6 +33,8 @@ const ALL_TOOLS: RegisteredTool[] = [
   getCanonFactsTool,
   getNotesTool,
   getCharacterTimelineTool,
+  getUsageTool,
+  getReviewTool,
 ];
 
 export function toolsForNode(nodeName: string): RegisteredTool[] {

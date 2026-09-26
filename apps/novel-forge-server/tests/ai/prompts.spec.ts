@@ -253,16 +253,23 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.11.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.12.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
-      for (const tool of ['get_draft', 'get_canon_facts', 'get_notes']) expect(hub).toContain(tool);
+      for (const tool of ['get_draft', 'get_review', 'get_canon_facts', 'get_notes']) expect(hub).toContain(tool);
       expect(hub).toContain('Discussing:');
       expect(hub).toContain("accept 'undecided for now'");
       expect(hub).toContain('ending is PLANNER-ONLY');
       expect(hub).toContain('outrank every summary');
       expect(hub).toContain('raise it as a `question` card');
+    });
+
+    it('fetches the draft and the review before critiquing a hand-written chapter, naming the revision', () => {
+      const hub = HUB_INSTRUCTIONS;
+      expect(hub).toContain('get_draft (with get_brief) and get_review for the chapter');
+      expect(hub).toContain("naming the chapter's revision");
+      expect(hub).toContain('whether it is stale against that revision');
     });
 
     it('should accept epistemic ops on every scope, since they all share the hub playbook', () => {

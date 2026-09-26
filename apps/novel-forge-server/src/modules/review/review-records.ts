@@ -4,7 +4,9 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { type ChapterReviewFinding, type PrimaryDatabase, type PrimaryTransaction, type Review, schema } from '@server/database';
 
-import { graphJudgeOutcome, type GraphJudgePass, hashReviewedBody, isReviewStale, openFindings } from './review-findings';
+import { graphJudgeOutcome, type GraphJudgePass, hashReviewedBody, isReviewStale, openFindings, type ReviewedText } from './review-findings';
+
+export const KIND_ORDER = ['judge', 'editorial', 'mechanics', 'readability'] as const satisfies readonly Review.Kind[];
 
 export interface UsedModel {
   modelProvider: string | null;
@@ -67,6 +69,70 @@ export async function recordGenerationJudge(db: PrimaryDatabase, record: Generat
     model: model?.model ?? null,
   });
   logger.debug('generation judge pass recorded', { projectId: record.projectId, chapter: record.chapter, revision: draft.revision, runId: record.runId });
+}
+
+export interface ReviewedTextRecord extends ReviewedText {
+  isolated: boolean;
+  body: string;
+  draftId: bigint | null;
+  saveSeq: number | null;
+  final: boolean;
+  generating: boolean;
+}
+
+/**
+ * The chapter's current reviewable text, in one row read per candidate so a concurrent autosave can never pair one read's body with
+ * another's revision or lock fields: whichever draft or finalized body exists, its revision, a hash to compare against a stored review,
+ * and whether it is isolated right now — which can differ from a stored review's own `isolated` flag when isolation changed since.
+ */
+export async function findReviewedText(db: ReviewReader, projectId: bigint, chapter: number): Promise<ReviewedTextRecord | null> {
+  const draft = await db.query.drafts.findFirst({
+    where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)),
+    columns: { id: true, revision: true, body: true, isolated: true, saveSeq: true, status: true, reviewStatus: true },
+  });
+  if (draft) {
+    if (!draft.body.trim()) return null;
+    return {
+      draftRevision: draft.revision,
+      bodyHash: hashReviewedBody(draft.body),
+      isolated: draft.isolated,
+      body: draft.body,
+      draftId: draft.id,
+      saveSeq: draft.saveSeq,
+      final: draft.status === 'final',
+      generating: draft.reviewStatus === 'generating',
+    };
+  }
+
+  const final = await db.query.chapters.findFirst({
+    where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter), eq(schema.chapters.status, 'done')),
+    columns: { content: true, isolated: true },
+  });
+  if (!final?.content?.trim()) return null;
+  return {
+    draftRevision: null,
+    bodyHash: hashReviewedBody(final.content),
+    isolated: final.isolated,
+    body: final.content,
+    draftId: null,
+    saveSeq: null,
+    final: true,
+    generating: false,
+  };
+}
+
+/** Whether the chapter is isolated right now, independent of whether it has any reviewable text — a blank isolated draft must still redact. */
+export async function findCurrentIsolation(db: ReviewReader, projectId: bigint, chapter: number): Promise<boolean> {
+  const draft = await db.query.drafts.findFirst({
+    where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)),
+    columns: { isolated: true },
+  });
+  if (draft) return draft.isolated;
+  const final = await db.query.chapters.findFirst({
+    where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter), eq(schema.chapters.status, 'done')),
+    columns: { isolated: true },
+  });
+  return final?.isolated ?? false;
 }
 
 export interface ReviewedDraft {
