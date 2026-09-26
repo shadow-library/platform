@@ -2040,6 +2040,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/drafts/{n}/bridge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Bridge */
+    get: operations['get_api_v1_projects_projectId_drafts_n_bridge'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/bridge/prepare': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Prepare Bridge */
+    post: operations['post_api_v1_projects_projectId_drafts_n_bridge_prepare'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/finalize-review/settings': {
     parameters: {
       query?: never;
@@ -3770,9 +3804,9 @@ export interface components {
       contentRating?: components['schemas']['ContentRatingInput'];
     };
     ChapterSummarizeResponse: {
-      /** @description 2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated chapter; returned unsaved for an isolated one, for review alongside `state` before either is saved through PUT /drafts/:n. */
+      /** @description 2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated or a final chapter; returned unsaved for an unfinished isolated one, for review alongside `state` before either is saved through PUT /drafts/:n. Standard calls read an isolated chapter only through its approved bridge, never this summary. */
       summary: string;
-      /** @description The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated chapter. */
+      /** @description The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated or a final chapter. */
       saveSeq?: number;
       /** @description Continuation state the next chapter would build on. Isolated chapters only — always returned unsaved, for the author's review. */
       state: {
@@ -5191,6 +5225,8 @@ export interface components {
       /** @description False once the prose changed after approval: the review no longer applies and the chapter must be approved again. */
       current: boolean;
       isolated: boolean;
+      /** @description A final isolated chapter's bridge read again after its text changed: only the bridge summary is asked, and nothing is applied to the Story Bible. */
+      bridgeOnly: boolean;
       /** @description Why reading the updates failed, when it did. */
       error?: null | string;
       disclosure: components['schemas']['FinalizeReviewDisclosureResponse'];
@@ -5201,6 +5237,8 @@ export interface components {
       autoKeep: components['schemas']['FinalizeReviewCategory'][];
       /** Format: date-time */
       appliedAt?: null | string;
+      /** @description The revision whose Story Bible updates stand applied — Undo is available while it is set — even when the review shown is a later bridge-only one. Null once they are undone, or when none were applied. */
+      appliedRevision?: null | number;
       /** Format: date-time */
       revertedAt?: null | string;
     };
@@ -5250,7 +5288,7 @@ export interface components {
       decidedAt?: null | string;
     };
     /** @enum {string} */
-    FinalizeReviewCategory: 'entity' | 'appearance' | 'character_state' | 'relationship' | 'promise' | 'knowledge' | 'milestone';
+    FinalizeReviewCategory: 'entity' | 'appearance' | 'character_state' | 'relationship' | 'promise' | 'knowledge' | 'milestone' | 'summary';
     /** @enum {string} */
     FinalizeReviewTriage: 'consequential' | 'routine';
     /** @enum {string} */
@@ -5268,6 +5306,27 @@ export interface components {
       };
       /** @description Why. Required with `skipped`, remembered with the decision. */
       reason?: string;
+    };
+    IsolationBridgeResponse: {
+      chapter: number;
+      /** @description The chapter's current revision: a bridge approved against any other revision carries nothing. */
+      revision: number;
+      /** @description False when nothing is approved against the current text: standard calls then read the chapter as walled off. */
+      approved: boolean;
+      /** @description The approved bridge summary, the only account of the chapter standard calls read. */
+      summary?: null | string;
+      /** @description Where approved characters stand and what condition they are in at the end of the chapter. */
+      positions: components['schemas']['BridgePositionResponse'][];
+      /** @description Approved lines left out because they cross the hard line; they never reach a standard call. */
+      droppedByHardLine: number;
+      /** @description Approved places and conditions left out because they run past a short line (60 characters). */
+      droppedOverLength: number;
+    };
+    BridgePositionResponse: {
+      entityKey: string;
+      location?: null | string;
+      /** @description Injuries and other conditions, as approved. */
+      conditions: string[];
     };
     FinalizeReviewSettingsBody: {
       /** @description Categories whose routine updates are kept without asking. Consequential updates are always asked. */
@@ -12515,6 +12574,88 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_drafts_n_bridge: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IsolationBridgeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_bridge_prepare: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   put_api_v1_projects_projectId_finalize_review_settings: {
     parameters: {
       query?: never;
@@ -16011,6 +16152,8 @@ export type FinalizeReviewBasis = components['schemas']['FinalizeReviewBasis'];
 export type FinalizeReviewFlag = components['schemas']['FinalizeReviewFlag'];
 export type FinalizeReviewDecision = components['schemas']['FinalizeReviewDecision'];
 export type FinalizeReviewItemDecisionBody = components['schemas']['FinalizeReviewItemDecisionBody'];
+export type IsolationBridgeResponse = components['schemas']['IsolationBridgeResponse'];
+export type BridgePositionResponse = components['schemas']['BridgePositionResponse'];
 export type FinalizeReviewSettingsBody = components['schemas']['FinalizeReviewSettingsBody'];
 export type FinalizeReviewSettingsResponse = components['schemas']['FinalizeReviewSettingsResponse'];
 export type ListChapterReviewsResponse = components['schemas']['ListChapterReviewsResponse'];
@@ -16251,6 +16394,7 @@ export type ApiV1ProjectsProjectIdDraftsNFinalizeReviewPathParams = Exclude<
   paths['/api/v1/projects/{projectId}/drafts/{n}/finalize-review']['get']['parameters']['path'],
   undefined
 >;
+export type GetBridgePathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/bridge']['get']['parameters']['path'], undefined>;
 export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
 export type ApiV1ProjectsProjectIdChaptersNReviewsReviewIdPathParams = Exclude<
   paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'],
