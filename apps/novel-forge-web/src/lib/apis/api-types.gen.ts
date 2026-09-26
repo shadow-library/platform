@@ -550,6 +550,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/drafts/next': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start Next Draft */
+    post: operations['post_api_v1_projects_projectId_drafts_next'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/drafts/{n}/revise': {
     parameters: {
       query?: never;
@@ -595,6 +612,23 @@ export interface paths {
     put?: never;
     /** Approve Draft */
     post: operations['post_api_v1_projects_projectId_drafts_n_approve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-readiness': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Finalize Readiness */
+    get: operations['get_api_v1_projects_projectId_drafts_n_finalize_readiness'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2937,6 +2971,10 @@ export interface components {
       title?: null | string;
       status: components['schemas']['DraftStatus'];
       revision: number;
+      /** @description Moves on every hand save, including one folded into the current revision; send it back as `baseSaveSeq`. */
+      saveSeq: number;
+      /** @description The last revision the author approved. It survives later edits and finalize; a different `revision` means the text changed since that approval. */
+      approvedRevision: null | number;
       summary?: null | string;
       body?: null | string;
       state?: null | {
@@ -2998,7 +3036,31 @@ export interface components {
        */
       writtenAt: string;
     };
+    DraftConflictResponse: {
+      code: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+      /** @description Present on DRF_013 when the chapter still has a draft: what it holds now. */
+      current?: components['schemas']['ConflictingDraftResponse'];
+    };
+    /** @description The draft as it stands when a save was refused for being made against an older one. */
+    ConflictingDraftResponse: {
+      id: string;
+      revision: number;
+      saveSeq: number;
+      title: null | string;
+      body: string;
+      summary: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     UpdateDraftBody: {
+      /** @description The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft. */
+      baseDraftId?: string;
+      /** @description The draft revision this save was made against. */
+      baseRevision?: number;
+      /** @description The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues. */
+      baseSaveSeq?: number;
       title?: string;
       body: string;
       summary?: string;
@@ -3035,6 +3097,20 @@ export interface components {
       keepStale?: boolean;
       /** @description With `keepStale`, the stale reason the author saw. A draft that has gone stale for another reason since is refused with DRF_013. */
       staleReason?: string;
+      /** @description The draft `saveSeq` the author read; refused with DRF_013 when a save changed the revision's text since. */
+      saveSeq: number;
+      /** @description The id of the draft the author read; refused with DRF_013 when the chapter was deleted and started again since. */
+      draftId: string;
+    };
+    /** @description What finalize would answer for this chapter now: ready, or every reason it would refuse, in the order it checks them. */
+    FinalizeReadinessResponse: {
+      ready: boolean;
+      blockers: components['schemas']['FinalizeBlockerResponse'][];
+    };
+    FinalizeBlockerResponse: {
+      /** @description The error code finalize would refuse with. */
+      code: string;
+      message: string;
     };
     ListDraftRevisionResponse: {
       items: components['schemas']['DraftRevisionResponse'][];
@@ -3059,6 +3135,12 @@ export interface components {
       markdown: string;
     };
     ImportDraftBody: {
+      /** @description The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft. */
+      baseDraftId?: string;
+      /** @description The draft revision this save was made against. */
+      baseRevision?: number;
+      /** @description The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues. */
+      baseSaveSeq?: number;
       prose: string;
       title?: string;
       summary?: string;
@@ -3480,6 +3562,8 @@ export interface components {
       totalWords: number;
       /** @description The lowest brief with no draft — the chapter `generate` targets next. */
       nextBriefChapter?: null | number;
+      /** @description The only chapter a new draft may start at — the lowest with neither a draft nor finalized prose, planned or not. Writing or filling any other unwritten chapter is refused. */
+      nextWritableChapter: number;
       /** @description The highest planned or written chapter number, 0 when there are none. */
       lastChapter: number;
       /** @description The highest finalized chapter, 0 when none is; no chapter can be inserted below it. */
@@ -3506,6 +3590,8 @@ export interface components {
       isolated?: boolean;
       /** @description Written rows only: finalize is refused until this isolated chapter has a summary and continuation state. */
       finalizeBlocked?: boolean;
+      /** @description Written rows only: the last revision the author approved, null when none was. */
+      approvedRevision?: null | number;
       /** @description Written rows only. */
       wordCount?: number;
     };
@@ -6662,6 +6748,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -6693,6 +6788,55 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_next: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
+        };
+      };
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -6826,6 +6970,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_drafts_n_finalize_readiness: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReadinessResponse'];
         };
       };
       /** @description Default Response */
@@ -6995,6 +7180,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
         };
       };
       /** @description Default Response */
@@ -12413,12 +12607,16 @@ export type ViolenceRating = components['schemas']['ViolenceRating'];
 export type DarkContentRating = components['schemas']['DarkContentRating'];
 export type DraftSummaryResponse = components['schemas']['DraftSummaryResponse'];
 export type DraftSummaryItem = components['schemas']['DraftSummaryItem'];
+export type DraftConflictResponse = components['schemas']['DraftConflictResponse'];
+export type ConflictingDraftResponse = components['schemas']['ConflictingDraftResponse'];
 export type UpdateDraftBody = components['schemas']['UpdateDraftBody'];
 export type ReviseDraftBody = components['schemas']['ReviseDraftBody'];
 export type FeedbackBody = components['schemas']['FeedbackBody'];
 export type UserFeedbackDisposition = components['schemas']['UserFeedbackDisposition'];
 export type UserFeedbackResponse = components['schemas']['UserFeedbackResponse'];
 export type ApproveDraftBody = components['schemas']['ApproveDraftBody'];
+export type FinalizeReadinessResponse = components['schemas']['FinalizeReadinessResponse'];
+export type FinalizeBlockerResponse = components['schemas']['FinalizeBlockerResponse'];
 export type ListDraftRevisionResponse = components['schemas']['ListDraftRevisionResponse'];
 export type DraftRevisionResponse = components['schemas']['DraftRevisionResponse'];
 export type DraftRevisionSource = components['schemas']['DraftRevisionSource'];
@@ -12677,6 +12875,7 @@ export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/job
 export type ListDraftsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts']['get']['parameters']['path'], undefined>;
 export type ListDraftSummariesPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/summary']['get']['parameters']['path'], undefined>;
 export type GetDraftPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}']['get']['parameters']['path'], undefined>;
+export type FinalizeReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/finalize-readiness']['get']['parameters']['path'], undefined>;
 export type ListRevisionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions']['get']['parameters']['path'], undefined>;
 export type GetRevisionPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions/{r}']['get']['parameters']['path'], undefined>;
 export type GetDraftPromptPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/prompt']['get']['parameters']['path'], undefined>;

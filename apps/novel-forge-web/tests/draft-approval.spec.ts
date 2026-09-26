@@ -9,7 +9,10 @@ function apiError(code: string, status = 409): ApiError {
 
 describe('approveDraftRequest', () => {
   it('should approve the revision of the draft on screen', () => {
-    expect(approveDraftRequest('p1', { chapter: 4, revision: 7 })).toEqual({ path: '/projects/p1/drafts/4/approve', body: { revision: 7 } });
+    expect(approveDraftRequest('p1', { id: '12', chapter: 4, revision: 7, saveSeq: 3 })).toEqual({
+      path: '/projects/p1/drafts/4/approve',
+      body: { draftId: '12', revision: 7, saveSeq: 3 },
+    });
   });
 });
 

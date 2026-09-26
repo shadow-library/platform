@@ -100,12 +100,12 @@ export function useDeleteDraftMutation(projectId: string): UseMutationResult<und
   });
 }
 
-export type ApprovedDraft = Pick<DraftResponse, 'chapter' | 'revision'>;
+export type ApprovedDraft = Pick<DraftResponse, 'id' | 'chapter' | 'revision' | 'saveSeq'>;
 
 const DRAFT_MOVED_CODES: ReadonlySet<string> = new Set(['DRF_002', 'DRF_007', 'DRF_013']);
 
 export function approveDraftRequest(projectId: string, draft: ApprovedDraft): { path: string; body: ApproveDraftBody } {
-  return { path: `/projects/${projectId}/drafts/${draft.chapter}/approve`, body: { revision: draft.revision } };
+  return { path: `/projects/${projectId}/drafts/${draft.chapter}/approve`, body: { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq } };
 }
 
 /** The write was refused because the draft on screen is no longer the one the server holds. */
