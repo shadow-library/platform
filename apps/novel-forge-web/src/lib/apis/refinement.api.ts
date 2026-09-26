@@ -17,7 +17,7 @@ import { toast } from '@shadow-library/ui';
 
 import {
   type ApplyProposalResponse,
-  type AuditBibleResponse,
+  type BibleAuditJobResponse,
   type CancelRunResponse,
   type ChatMessageResponse,
   type ChatSessionResponse,
@@ -726,10 +726,10 @@ export function useDiscardProposalMutation(projectId: string): UseMutationResult
   });
 }
 
-export function useAuditBibleMutation(projectId: string): UseMutationResult<AuditBibleResponse, ApiError, undefined> {
+export function useAuditBibleMutation(projectId: string): UseMutationResult<BibleAuditJobResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
-  return useMutation<AuditBibleResponse, ApiError, undefined>({
-    mutationFn: () => APIRequest.post(`/projects/${projectId}/bible/audit`).execute(),
+  return useMutation<BibleAuditJobResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(`/projects/${projectId}/bible/audits`).execute(),
     onSuccess: () => invalidateProposals(queryClient, projectId),
   });
 }

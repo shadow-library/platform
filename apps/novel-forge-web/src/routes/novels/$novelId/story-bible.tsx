@@ -189,12 +189,8 @@ function StoryBibleScreen(): React.JSX.Element {
   );
 
   const runAudit = (): void => {
-    toast.success('Auditing the bible — this reads every document and can take a minute.');
     audit.mutate(undefined, {
-      onSuccess: result =>
-        result.findings.length === 0
-          ? toast.success('Audit clean — no contradictions found.')
-          : toast.success(`Audit found ${result.findings.length} issue${result.findings.length === 1 ? '' : 's'} — review the staged proposal.`),
+      onSuccess: () => toast.success('Auditing the bible — it reads every document and can take a few minutes. Findings arrive as a proposal to review.'),
       onError: err => toast.danger(err.message),
     });
   };
