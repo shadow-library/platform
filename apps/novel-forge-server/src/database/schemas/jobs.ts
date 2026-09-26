@@ -58,7 +58,7 @@ export namespace Job {
   export type EventType = InferEnum<typeof jobEventType>;
 }
 
-export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review', 'audit']);
+export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review', 'audit', 'finalize_review']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
 export const jobEventType = pgEnum('job_event_type', ['queued', 'started', 'step', 'retrying', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter', 'bible']);

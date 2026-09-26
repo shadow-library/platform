@@ -2,8 +2,8 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ContentMode, CostTier, OwnerKind, ProjectKind, SortByTime } from '@server/common';
-import { type Owner, type Project } from '@server/database';
+import { ContentMode, CostTier, FinalizeReviewCategory, OwnerKind, ProjectKind, SortByTime } from '@server/common';
+import { type FinalizeReview, type Owner, type Project } from '@server/database';
 
 // Floor keeps a chapter well above what the mechanical check would hard-reject on its own slack (see
 // `WORD_COUNT_HARD_SLACK` in `mechanical-check.ts`); ceiling is a sanity bound, not a model capability limit.
@@ -125,9 +125,24 @@ export class ProjectModelOverrides {
 }
 
 @Schema()
+export class ProjectFinalizeReviewConfig {
+  @Field(() => [FinalizeReviewCategory], {
+    optional: true,
+    description: 'Categories whose routine finalize-review updates are kept without asking. Consequential updates are always asked one by one.',
+  })
+  autoKeep?: FinalizeReview.Category[];
+}
+
+@Schema()
 export class ProjectConfig {
   @Field(() => ProjectModelOverrides, { optional: true })
   models?: ProjectModelOverrides;
+}
+
+@Schema()
+export class ProjectConfigResponse extends ProjectConfig {
+  @Field(() => ProjectFinalizeReviewConfig, { optional: true, description: 'Written only by PUT /finalize-review/settings; a project update keeps it.' })
+  finalizeReview?: ProjectFinalizeReviewConfig;
 }
 
 @Schema()
@@ -166,8 +181,8 @@ export class ProjectResponse {
   // Non-nullable on purpose: class-schema turns a nullable class-ref into `type: [undefined, 'null']`,
   // which the response serialiser rejects. Fresh projects store `config = null`, so the service maps
   // that null to `undefined` (an omitted field) before serialisation — see `ProjectService.present`.
-  @Field(() => ProjectConfig, { optional: true })
-  config?: ProjectConfig;
+  @Field(() => ProjectConfigResponse, { optional: true })
+  config?: ProjectConfigResponse;
 
   @Field({ optional: true, nullable: true })
   brief?: string | null;

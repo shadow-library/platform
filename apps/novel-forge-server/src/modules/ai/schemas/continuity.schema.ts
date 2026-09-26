@@ -164,7 +164,25 @@ export class ContinuityKnowledgeChange {
 }
 
 @Schema()
+export class ContinuityMilestone {
+  @Field({ minLength: 1, description: 'a key from the MILESTONES list in the context pack' })
+  milestoneKey: string;
+
+  @Field({ description: 'true when the prose shows the milestone happening in this chapter' })
+  reached: boolean;
+
+  @Field({ optional: true, description: 'excerpt from the prose that shows it happening; omit when it does not happen' })
+  evidence?: string;
+}
+
+@Schema()
 export class ContinuitySchema {
+  @Field(() => [ContinuityMilestone], {
+    optional: true,
+    description: 'every milestone the chapter plan claims, and any other listed milestone the prose shows happening, with whether it was reached',
+  })
+  milestones?: ContinuityMilestone[];
+
   @Field(() => [String], { description: 'entityKeys of entities who appear in this chapter' })
   appeared: string[];
 

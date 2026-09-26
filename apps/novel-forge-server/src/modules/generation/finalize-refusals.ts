@@ -5,14 +5,16 @@ import { AppErrorCode } from '@server/classes';
 import { isBlank, isFinalizable, planRevealsRefusal } from '@server/common';
 import { type Generation, type PrimaryDatabase, schema } from '@server/database';
 
+import { loadChapterReviews, reviewRefusal } from '../finalize-review/finalize-review-gate';
 import { openBlockingFindings } from '../review/review-records';
 
 /** Every reason finalize refuses this draft, in its order: finalize throws the first, readiness lists them all; a half-finalized draft resumes. */
 export async function finalizeRefusals(db: PrimaryDatabase, draft: Generation.Draft): Promise<AppError[]> {
   if (draft.status === 'final' && (await isChapterFinalized(db, draft))) return [AppErrorCode.DRF_002.create()];
 
-  const [openBlocking, revealsRefusal, previousFinal, needsRevalidation, latestReport] = await Promise.all([
+  const [openBlocking, reviews, revealsRefusal, previousFinal, needsRevalidation, latestReport] = await Promise.all([
     draft.status === 'final' ? null : openBlockingFindings(db, draft),
+    draft.status === 'final' ? [] : loadChapterReviews(db, draft.projectId, draft.chapter),
     planRevealsRefusal(db, draft.projectId, draft.chapter),
     draft.chapter > 1
       ? db.query.drafts.findFirst({
@@ -35,6 +37,7 @@ export async function finalizeRefusals(db: PrimaryDatabase, draft: Generation.Dr
     draft.status !== 'final' && draft.reviewStatus !== 'approved' ? AppErrorCode.DRF_004.create() : null,
     draft.status !== 'final' && draft.staleReason !== null ? AppErrorCode.DRF_007.create() : null,
     openBlocking ? AppErrorCode.FIN_004.create({ chapter: String(draft.chapter) }) : null,
+    draft.status !== 'final' && draft.reviewStatus === 'approved' ? reviewRefusal(reviews, draft) : null,
     isFinalizable(draft) ? null : AppErrorCode.CHP_005.create(),
     !draft.isolated && isBlank(draft.summary) ? AppErrorCode.CHP_010.create({ chapter: String(draft.chapter) }) : null,
     revealsRefusal,

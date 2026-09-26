@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { ProjectService } from '@modules/project/project/project.service';
 
@@ -42,6 +44,16 @@ describe('ProjectService.update — story fields and cost tier', () => {
 
     expect(sets[0]).toMatchObject({ endingQuestion: 'Will Mira pay the tide?', readerPromise: null, opposition: null, protagonistKey: 'mira' });
     expect(result).toMatchObject({ theme: 'What we owe the sea', ending: 'Mira keeps the lamp lit.', protagonistKey: 'mira' });
+  });
+
+  it('should keep the finalize-review settings when a project update replaces the model config', async () => {
+    const { service, sets } = makeService();
+
+    await service.update(5n, { config: {} });
+
+    const { sql } = new PgDialect().sqlToQuery(sets[0]?.['config'] as SQL);
+    expect(sql).toContain(`jsonb_build_object('finalizeReview', "projects"."config" -> 'finalizeReview')`);
+    expect(sql).toContain('::jsonb ||');
   });
 
   it('should leave the story fields it is not sent untouched', async () => {

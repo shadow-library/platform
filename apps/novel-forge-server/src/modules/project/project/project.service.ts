@@ -215,6 +215,11 @@ export class ProjectService {
       set.wordTargetMax = update.wordTarget?.max ?? null;
     }
     delete set.wordTarget;
+    // `finalizeReview` has its own writer (the finalize-review settings route), so replacing the config keeps it, atomically with the write.
+    if (update.config !== undefined) {
+      const kept = sql`CASE WHEN jsonb_exists(coalesce(${schema.projects.config}, '{}'::jsonb), 'finalizeReview') THEN jsonb_build_object('finalizeReview', ${schema.projects.config} -> 'finalizeReview') ELSE '{}'::jsonb END`;
+      set.config = sql`${JSON.stringify(update.config ?? {})}::jsonb || ${kept}`;
+    }
 
     const [result] = await this.db
       .update(schema.projects)
@@ -250,7 +255,7 @@ export class ProjectService {
           instructions: writingInstructionAdditions(source.instructions),
           contentMode: body.contentMode ?? source.contentMode,
           costTier: source.costTier,
-          config: body.config ?? source.config ?? null,
+          config: body.config ? { ...body.config, ...(source.config?.finalizeReview ? { finalizeReview: source.config.finalizeReview } : {}) } : (source.config ?? null),
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
           wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
         })

@@ -368,4 +368,23 @@ export class AppErrorCode extends ServerErrorCode {
    * Writer snapshot errors
    */
   static readonly WSN_001 = AppErrorCode.notFound('WSN_001', 'Writer snapshot not found');
+
+  /*!
+   * Finalize review errors
+   */
+  static readonly FRV_001 = AppErrorCode.notFound('FRV_001', 'This chapter has no finalize review — approve it first');
+  static readonly FRV_002 = AppErrorCode.conflict('FRV_002', 'The Story Bible updates are still being read from the approved revision — try again in a moment');
+  static readonly FRV_003 = AppErrorCode.conflict('FRV_003', 'Reading the Story Bible updates from this chapter failed — prepare the review again');
+  static readonly FRV_004 = AppErrorCode.conflict('FRV_004', 'The prose changed since it was approved, so its finalize review no longer applies — approve it again');
+  static readonly FRV_005 = AppErrorCode.badRequest('FRV_005', 'Review the Story Bible updates first: {count} still need an answer');
+  static readonly FRV_006 = AppErrorCode.badRequest(
+    'FRV_006',
+    'This chapter reveals {facts}, which needs milestone {milestone} — keep the milestone as reached, or revise the plan or the prose',
+  );
+  static readonly FRV_007 = AppErrorCode.conflict('FRV_007', 'The Story Bible changed since these updates were applied ({table}), so they cannot be undone as a set');
+  static readonly FRV_008 = AppErrorCode.notFound('FRV_008', 'That update is not part of this finalize review');
+  static readonly FRV_009 = AppErrorCode.badRequest('FRV_009', 'An edited update must keep its kind and the record it is about — {reason}');
+  static readonly FRV_010 = AppErrorCode.badRequest('FRV_010', 'Say why you are skipping this update');
+  static readonly FRV_011 = AppErrorCode.conflict('FRV_011', 'These updates were already applied when the chapter was finalized');
+  static readonly FRV_012 = AppErrorCode.conflict('FRV_012', 'Only the updates of the latest final chapter can be undone, and only once they are applied');
 }

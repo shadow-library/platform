@@ -24,6 +24,7 @@ import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
 import { type ContinuityOutput, type GenerationState } from '../schemas';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
+import { applyReviewOnCommit, reviewedEntityKeys } from '../../finalize-review/finalize-review-gate';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { applyContinuityDelta, continuityHasHeldEntries, type ContinuityTransaction, filterToHeldEntries } from './apply-continuity';
 
@@ -169,9 +170,11 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
     if (!draftId) return discloseChapterReveals(tx, projectId, state.chapter);
     const draftRevision = state.draftRevision;
     if (draftRevision === null) throw AppError.internal(`[commitProse] Finalization of chapter ${state.chapter} carries no draft revision`);
+    // A reviewed chapter reaches only the milestones the author kept; one approved before reviews existed reaches what its plan claims.
     const commitKnowledge = async (): Promise<void> => {
       await commitChapterKnowledge(tx, projectId, state.chapter, draftRevision);
-      await reachClaimedMilestones(tx, projectId, state.chapter, draftRevision);
+      const reviewed = await applyReviewOnCommit(tx, { projectId, chapter: state.chapter, draftRevision, prose: state.prose });
+      if (!reviewed) await reachClaimedMilestones(tx, projectId, state.chapter, draftRevision);
     };
     // A summary save on an already-approved draft doesn't bump its revision, so `state.summary` can be stale —
     // `returning` gets the true value from the same write that finalizes the draft, not a racing unlocked read.
@@ -201,6 +204,23 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
     if (current && current.status !== 'final' && current.revision === draftRevision) throw AppErrorCode.DRF_004.create();
     throw await refusedDraftWriteError(tx, projectId, state.chapter);
   });
+}
+
+export async function continuityRoster(db: Pick<PrimaryDatabase, 'query'>, projectId: bigint): Promise<string> {
+  const entityRows = await db.query.entities.findMany({
+    where: eq(schema.entities.projectId, projectId),
+    with: { aliases: true },
+    columns: { entityKey: true, name: true, type: true },
+  });
+  const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
+
+  // Thread and mystery keys are model-authored and upserted by key, so without the existing vocabulary the
+  // extractor coins a fresh key for a thread it already tracks and the same thread splits into two records.
+  const threadRows = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId), columns: { threadKey: true, status: true, summary: true } });
+  const mysteryRows = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId), columns: { mysteryKey: true, status: true, question: true } });
+  const threadRoster = threadRows.map(t => `${t.threadKey} (${t.status}): ${t.summary ?? ''}`).join('\n');
+  const mysteryRoster = mysteryRows.map(m => `${m.mysteryKey} (${m.status}): ${m.question}`).join('\n');
+  return [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join('\n\n');
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -264,23 +284,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     if (!owned) throw AppError.internal(`[${node}] Lost the continuity claim for chapter ${chapter}; another run took ownership`);
   }
 
-  async function continuityRoster(projectId: bigint): Promise<string> {
-    const entityRows = await db.query.entities.findMany({
-      where: eq(schema.entities.projectId, projectId),
-      with: { aliases: true },
-      columns: { entityKey: true, name: true, type: true },
-    });
-    const entityRoster = entityRows.map(e => `${e.entityKey} (${e.type}): ${e.name}`).join('\n');
-
-    // Thread and mystery keys are model-authored and upserted by key, so without the existing vocabulary the
-    // extractor coins a fresh key for a thread it already tracks and the same thread splits into two records.
-    const threadRows = await db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId), columns: { threadKey: true, status: true, summary: true } });
-    const mysteryRows = await db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId), columns: { mysteryKey: true, status: true, question: true } });
-    const threadRoster = threadRows.map(t => `${t.threadKey} (${t.status}): ${t.summary ?? ''}`).join('\n');
-    const mysteryRoster = mysteryRows.map(m => `${m.mysteryKey} (${m.status}): ${m.question}`).join('\n');
-    return [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join('\n\n');
-  }
-
   function continuityContext(state: FinalizationState, projectId: bigint): TelemetryContext {
     return {
       projectId,
@@ -295,15 +298,17 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
   async function extractContinuity(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
+    const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));
     if (state.isolated) {
+      const reviewed = await db.query.chapters.findFirst({ where: chapterWhere, columns: { continuityApplied: true } });
+      if (reviewed?.continuityApplied) return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
       await stageIsolatedContinuity(
         { db, modelRouter },
-        { projectId, chapter: state.chapter, prose: state.prose, contextPack: await continuityRoster(projectId) },
+        { projectId, chapter: state.chapter, prose: state.prose, contextPack: await continuityRoster(db, projectId) },
         continuityContext(state, projectId),
       );
       return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
     }
-    const chapterWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter));
 
     // Claiming the row is the only thing that grants the right to extract. A plain `continuityApplied` read
     // would be a check-then-act: two concurrent finalizes of the same chapter both see `false`, both call the
@@ -324,7 +329,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       return { continuityDelta: null, nodeTrace: ['extractContinuity'] };
     }
 
-    const contextPack = await continuityRoster(projectId);
+    const contextPack = await continuityRoster(db, projectId);
     const ctx = continuityContext(state, projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     // Containment decides the route here, not the plan: this prose is not walled off, so it goes to the standard map.
@@ -409,7 +414,12 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       logger.warn('updateIndexes: addProse failed (non-fatal)', { err });
     }
 
-    const touchedKeys = [...(state.continuityDelta?.appeared ?? []), ...(state.continuityDelta?.newEntities?.map(e => e.entityKey) ?? [])];
+    const touchedKeys = state.continuityDelta
+      ? [...(state.continuityDelta.appeared ?? []), ...(state.continuityDelta.newEntities?.map(e => e.entityKey) ?? [])]
+      : await reviewedEntityKeys(db, projectId, state.chapter).catch(err => {
+          logger.warn('updateIndexes: reviewed entities not read (non-fatal)', { err });
+          return [];
+        });
     for (const key of touchedKeys) {
       try {
         const entity = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, key)) });

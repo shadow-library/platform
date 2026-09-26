@@ -2,8 +2,9 @@ import { describe, expect, it } from 'bun:test';
 
 import { commitFinalProse } from '@modules/ai/graphs/chapter-finalization.graph';
 import { loadKnowledgeView, loadWriterForbiddenFacts, loadWriterHiddenFactKeys, renderJudgeReaderKnows, renderReaderKnows } from '@modules/bible/fact/knowledge-view';
+import { FinalizeReviewService } from '@modules/finalize-review/finalize-review.service';
 import { type GenerationService } from '@modules/generation/generation.service';
-import { resetApprovalForPlanChange, revokeProvisionalReveals } from '@server/common';
+import { findPlanClaimProblems, loadPlanState, planRevealsRefusal, resetApprovalForPlanChange, revokeProvisionalReveals } from '@server/common';
 import { schema } from '@server/database';
 
 import { makeGenerationService } from '../generation/generation-fixtures';
@@ -11,6 +12,7 @@ import { planTables } from './plan-tables';
 
 type Tables = ReturnType<typeof planTables>;
 
+const PROSE = 'The lamp burns cold.';
 const CONTRACT = { pov: ['mira', 'oren'], learns: [{ entityKey: 'mira', factKey: 'lamp_rank_4_rule' }] };
 const RANK_FOUR_RULE = { factKey: 'lamp_rank_4_rule', text: 'The fourth rank costs a memory an hour.', unlock: { all: [{ milestone: 'lamp_rank_4' }] } };
 
@@ -24,9 +26,28 @@ function chapterFive(): Tables {
       { entityKey: 'oren', name: 'Oren' },
     ],
     briefs: [{ chapter: 5, claimedMilestones: ['lamp_rank_4'], knowledgeContract: CONTRACT }],
-    drafts: [{ id: 55n, chapter: 5, revision: 2 }],
+    drafts: [{ id: 55n, chapter: 5, revision: 2, body: PROSE }],
     storyCurrentChapter: 4,
   });
+}
+
+/** Stands in for the prepare job and the author: every review still preparing becomes ready with the claimed milestone kept as reached. */
+function settleReviews(tables: Tables): void {
+  for (const review of tables.rows(schema.finalizeReviews)) {
+    if (review['status'] !== 'preparing') continue;
+    review['status'] = 'ready';
+    tables.rows(schema.finalizeReviewItems).push({
+      id: 900n + BigInt(review['draftRevision'] as number),
+      reviewId: review['id'],
+      category: 'milestone',
+      triage: 'routine',
+      flag: null,
+      dependents: null,
+      proposed: { category: 'milestone', milestoneKey: 'lamp_rank_4', reached: true },
+      edited: null,
+      decision: 'kept',
+    });
+  }
 }
 
 const generation = (tables: Tables): GenerationService => makeGenerationService(tables.db);
@@ -40,7 +61,8 @@ function finalize(tables: Tables, draftRevision: number, draftId = String(tables
   const insert = tables.db.insert;
   const db = { ...tables.db, insert: (table: unknown) => (table === schema.chapters ? { values: () => ({ onConflictDoUpdate: async () => undefined }) } : insert(table)) };
   db.transaction = async run => run(db);
-  const input = { projectId: '7', chapter: 5, runId: 'run-1', draftId: draftId || null, draftRevision, prose: 'The lamp burns cold.', summary: '' };
+  settleReviews(tables);
+  const input = { projectId: '7', chapter: 5, runId: 'run-1', draftId: draftId || null, draftRevision, prose: PROSE, summary: '' };
   return commitFinalProse(db as never, { ...input, title: 'Cold Light', generator: 'standard', isolated: false });
 }
 
@@ -152,6 +174,109 @@ describe('knowledge lifecycle — finalize', () => {
     expect(tables.fact('lamp_rank_4_rule')?.['disclosedInChapter']).toBe(5);
     expect(tables.milestone('lamp_rank_4')).toMatchObject({ state: 'reached', reachedChapter: 5, boundRevision: 2 });
     expect((await view(tables, 6)).known.map(fact => fact.factKey)).toEqual(['lamp_rank_4_rule']);
+  });
+
+  it('should flag a claimed milestone the prose missed and leave it locked, and refuse while the plan reveals what it unlocks', async () => {
+    const tables = chapterFive();
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    const [review] = tables.rows(schema.finalizeReviews);
+    Object.assign(review as object, { status: 'ready' });
+    const missed = {
+      id: 950n,
+      reviewId: review?.['id'],
+      category: 'milestone',
+      triage: 'consequential',
+      subjectKey: 'lamp_rank_4',
+      flag: 'missed_milestone',
+      dependents: ['lamp_rank_4_rule'],
+      proposed: { category: 'milestone', milestoneKey: 'lamp_rank_4', reached: false },
+      edited: null,
+      decision: 'kept',
+    };
+    tables.rows(schema.finalizeReviewItems).push(missed);
+
+    await expect(finalize(tables, 2)).rejects.toMatchObject({ code: 'FRV_006' });
+    Object.assign(missed, { dependents: null });
+    await finalize(tables, 2);
+
+    expect(tables.milestone('lamp_rank_4')?.['state']).not.toBe('reached');
+    expect(tables.draft(5)?.['status']).toBe('final');
+  });
+
+  it('should drop a missed claim from the finalized plan, so the next chapter cannot reveal through it and a later plan can claim it', async () => {
+    const tables = chapterFive();
+    tables
+      .rows(schema.briefs)
+      .push({ id: 99n, projectId: 7n, chapter: 6, knowledgeContract: CONTRACT, claimedMilestones: null, staleReason: null, isEnding: false, volumeKey: null });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    const [review] = tables.rows(schema.finalizeReviews);
+    Object.assign(review as object, { status: 'ready' });
+    tables.rows(schema.finalizeReviewItems).push({
+      id: 951n,
+      reviewId: review?.['id'],
+      category: 'milestone',
+      subjectKey: 'lamp_rank_4',
+      flag: 'missed_milestone',
+      dependents: null,
+      proposed: { category: 'milestone', milestoneKey: 'lamp_rank_4', reached: false },
+      edited: null,
+      decision: 'kept',
+    });
+    tables.rows(schema.chapters).push({ id: 500n, projectId: 7n, number: 5, status: 'done' });
+
+    await finalize(tables, 2);
+
+    expect(tables.brief(5)?.['claimedMilestones']).toBeNull();
+    expect(await planRevealsRefusal(tables.db as never, 7n, 6)).toMatchObject({ code: 'PLN_004' });
+    const state = await loadPlanState(tables.db as never, 7n);
+    expect(findPlanClaimProblems({ chapter: 6, volumeKey: null, isEnding: false, claimedMilestones: ['lamp_rank_4'] }, state)).toEqual([]);
+  });
+
+  it('should not apply a review twice when finalize replays its commit', async () => {
+    const tables = chapterFive();
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    await finalize(tables, 2);
+    Object.assign(tables.milestone('lamp_rank_4') as object, { state: 'planned', reachedChapter: null });
+
+    await finalize(tables, 2);
+
+    expect(tables.milestone('lamp_rank_4')?.['state']).toBe('planned');
+    expect(tables.rows(schema.finalizeReviews)[0]?.['status']).toBe('applied');
+  });
+
+  it('should put a kept milestone back through the real snapshot on revert, and refuse once a later chapter is final', async () => {
+    const tables = chapterFive();
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    await finalize(tables, 2);
+    expect(tables.milestone('lamp_rank_4')?.['state']).toBe('reached');
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+
+    tables.rows(schema.chapters).push({ id: 600n, projectId: 7n, number: 6, status: 'done' });
+    await expect(reviews.revert(7n, 5)).rejects.toMatchObject({ code: 'FRV_012' });
+    tables.rows(schema.chapters).pop();
+
+    await reviews.revert(7n, 5);
+    expect(tables.milestone('lamp_rank_4')).toMatchObject({ reachedChapter: null });
+    expect(tables.milestone('lamp_rank_4')?.['state']).not.toBe('reached');
+    expect(tables.rows(schema.finalizeReviews)[0]?.['status']).toBe('reverted');
+  });
+
+  it("should drop a reverted milestone's claim, so the next chapter cannot reveal through it and a later plan can claim it", async () => {
+    const tables = chapterFive();
+    tables
+      .rows(schema.briefs)
+      .push({ id: 99n, projectId: 7n, chapter: 6, knowledgeContract: CONTRACT, claimedMilestones: null, staleReason: null, isEnding: false, volumeKey: null });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
+    await finalize(tables, 2);
+    expect(await planRevealsRefusal(tables.db as never, 7n, 6)).toBeNull();
+    const reviews = new FinalizeReviewService({ getPostgresClient: () => tables.db } as never, {} as never, { registerHandler: () => undefined } as never, {} as never);
+
+    await reviews.revert(7n, 5);
+
+    expect(tables.brief(5)?.['claimedMilestones']).toBeNull();
+    expect(await planRevealsRefusal(tables.db as never, 7n, 6)).toMatchObject({ code: 'PLN_004' });
+    const state = await loadPlanState(tables.db as never, 7n);
+    expect(findPlanClaimProblems({ chapter: 6, volumeKey: null, isEnding: false, claimedMilestones: ['lamp_rank_4'] }, state)).toEqual([]);
   });
 
   it('should change nothing when a finalization is replayed', async () => {

@@ -55,6 +55,7 @@ import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summa
 import { WriterSnapshotService } from '../ai/writer-snapshot.service';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
+import { FINALIZE_REVIEW_JOB_TARGET, stageFinalizeReview } from '../finalize-review/finalize-review-stage';
 import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { redactJobForResponse, toJobUsageResponse } from '../jobs/job-response';
 import { type JobUsageResponse } from '../jobs/jobs.dto';
@@ -624,11 +625,25 @@ export class GenerationService {
       const reveals = await ledgerBriefReveals(tx, projectId, chapter, row.revision);
       if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, revision: row.revision, applied: reveals.applied });
 
-      return { ...row, overriddenFindings: await overrideOpenBlockingOnApproval(tx, row) };
+      const review = await stageFinalizeReview(tx, row);
+      return { ...row, overriddenFindings: await overrideOpenBlockingOnApproval(tx, row), review };
     });
 
-    this.logger.info('draft approved', { projectId, chapter, revision: updated.revision, reviewerId: body.reviewerId, overriddenFindings: updated.overriddenFindings });
-    return updated;
+    const { review, ...approved } = updated;
+    this.logger.info('draft approved', { projectId, chapter, revision: approved.revision, reviewerId: body.reviewerId, overriddenFindings: approved.overriddenFindings });
+    if (review.needsPrepare) await this.prepareFinalizeReview(projectId, chapter, review.reviewId);
+    return approved;
+  }
+
+  /** The review is durable before its job is: a failed enqueue leaves it preparing, and the author's prepare call enqueues it again. */
+  async prepareFinalizeReview(projectId: bigint, chapter: number, reviewId: bigint): Promise<void> {
+    try {
+      const jobId = await this.jobService.enqueue(projectId, 'finalize_review', FINALIZE_REVIEW_JOB_TARGET(chapter), { reviewId: String(reviewId) });
+      await this.db.update(schema.finalizeReviews).set({ jobId, updatedAt: new Date() }).where(eq(schema.finalizeReviews.id, reviewId));
+      this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('finalize review job dispatch failed', { err, jobId, projectId, chapter }));
+    } catch (err) {
+      this.logger.error('finalize review job not enqueued', { err, projectId, chapter, reviewId });
+    }
   }
 
   async listRevisions(projectId: bigint, chapter: number): Promise<Ai.DraftRevision[]> {
@@ -672,6 +687,7 @@ export class GenerationService {
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
       await tx.delete(schema.chapterReviews).where(and(eq(schema.chapterReviews.projectId, projectId), eq(schema.chapterReviews.chapter, chapter)));
+      await tx.delete(schema.finalizeReviews).where(and(eq(schema.finalizeReviews.projectId, projectId), eq(schema.finalizeReviews.chapter, chapter)));
     });
 
     // Scene images live outside the draft transaction (they touch disk).

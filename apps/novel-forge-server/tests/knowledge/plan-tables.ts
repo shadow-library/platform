@@ -34,13 +34,14 @@ const TABLES = {
   chapterReviews: schema.chapterReviews,
   plotThreads: schema.plotThreads,
   mysteries: schema.mysteries,
+  finalizeReviewItems: schema.finalizeReviewItems,
 } as const;
 
 type TableName = keyof typeof TABLES;
 
 const BRIEF_DEFAULTS: Row = { volumeKey: null, isEnding: false, claimedMilestones: null, knowledgeContract: null, staleReason: null, revision: 1, contentHash: null };
 const MILESTONE_DEFAULTS: Row = { kind: 'custom', state: 'open', plannedChapter: null, reachedChapter: null, boundRevision: null, subjectEntityKey: null };
-const DRAFT_DEFAULTS: Row = { status: 'draft', reviewStatus: 'needs_review', staleReason: null, revision: 1, saveSeq: 0, approvedRevision: null, isolated: false };
+const DRAFT_DEFAULTS: Row = { body: '', status: 'draft', reviewStatus: 'needs_review', staleReason: null, revision: 1, saveSeq: 0, approvedRevision: null, isolated: false };
 const FACT_DEFAULTS: Row = { revealChapter: null, unlock: null, source: 'manual', plannedChapter: null, disclosedInChapter: null, terms: null, writerNote: null };
 const KNOWLEDGE_DEFAULTS: Row = { status: 'committed', draftRevision: null };
 
@@ -74,6 +75,8 @@ export function planTables(seed: PlanSeed = {}) {
     [schema.characterKnowledge, (seed.knowledge ?? []).map(row => ({ projectId: 7n, source: 'brief', ...KNOWLEDGE_DEFAULTS, ...row }))],
     [schema.plotThreads, (seed.plotThreads ?? []).map(withId({ status: 'open', intentionallyOpen: false }))],
     [schema.mysteries, (seed.mysteries ?? []).map(withId({ status: 'open', intentionallyOpen: false }))],
+    [schema.finalizeReviews, []],
+    [schema.finalizeReviewItems, []],
   ]);
   // Only the ledger's (fact, entity) key is modelled: the one conflict target a plan rule upserts arrays against.
   const upsert = (table: unknown, row: Row, set: Row, setWhere?: SQL): void => {
@@ -94,8 +97,14 @@ export function planTables(seed: PlanSeed = {}) {
   const query = Object.fromEntries(Object.entries(TABLES).map(([name, table]) => [name, finder(table)])) as Record<TableName, ReturnType<typeof finder>>;
   const locks: unknown[] = [];
 
+  const withItems = (review: Row): Row => ({ ...review, items: rows(schema.finalizeReviewItems).filter(item => item['reviewId'] === review['id']) });
+  const finalizeReviews = {
+    findFirst: async (q?: Parameters<typeof queryRows>[1]) => queryRows(rows(schema.finalizeReviews), q).map(withItems)[0],
+    findMany: async (q?: Parameters<typeof queryRows>[1]) => queryRows(rows(schema.finalizeReviews), q).map(withItems),
+  };
+
   const db = {
-    query: { ...query, projects: { findFirst: async () => project } },
+    query: { ...query, finalizeReviews, projects: { findFirst: async () => project } },
     select: () => ({
       from: (table: unknown) => ({
         where: (condition: SQL) => ({
@@ -118,7 +127,12 @@ export function planTables(seed: PlanSeed = {}) {
     insert: (table: unknown) => ({
       values: (values: Row | Row[]) => {
         if (Array.isArray(values)) {
-          const incoming = values.map(value => ({ projectId: 7n, ...(table === schema.characterKnowledge ? KNOWLEDGE_DEFAULTS : {}), ...value }));
+          const incoming = values.map(value => ({
+            ...(table === schema.finalizeReviewItems ? { id: BigInt(nextId++) } : {}),
+            projectId: 7n,
+            ...(table === schema.characterKnowledge ? KNOWLEDGE_DEFAULTS : {}),
+            ...value,
+          }));
           return {
             then: (resolve: () => unknown, reject: (error: unknown) => unknown) => Promise.resolve(void rows(table).push(...incoming)).then(resolve, reject),
             onConflictDoUpdate: async ({ set, setWhere }: ConflictUpdate) => {
@@ -127,11 +141,16 @@ export function planTables(seed: PlanSeed = {}) {
           };
         }
         const row: Row = { id: BigInt(nextId++), projectId: 7n, ...(table === schema.milestones ? MILESTONE_DEFAULTS : {}), ...values };
-        const clash = table === schema.briefs ? rows(table).find(existing => existing['chapter'] === row['chapter']) : undefined;
+        const clash =
+          table === schema.briefs
+            ? rows(table).find(existing => existing['chapter'] === row['chapter'])
+            : table === schema.finalizeReviews
+              ? rows(table).find(existing => existing['chapter'] === row['chapter'] && existing['draftRevision'] === row['draftRevision'])
+              : undefined;
         if (!clash) rows(table).push(row);
         return Object.assign(Promise.resolve(), {
           returning: async () => [row],
-          onConflictDoNothing: () => ({ returning: async () => [row] }),
+          onConflictDoNothing: () => ({ returning: async () => (clash && table === schema.finalizeReviews ? [] : [row]) }),
           onConflictDoUpdate: ({ set }: { set: Row }) => ({ returning: async () => [clash ? Object.assign(clash, set) : row] }),
         });
       },

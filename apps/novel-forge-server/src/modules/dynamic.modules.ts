@@ -21,6 +21,7 @@ import { BotOwnershipModule } from '@modules/bot-ownership';
 import { ChapterModule } from '@modules/chapter';
 import { EventsModule } from '@modules/events';
 import { ExportModule } from '@modules/export';
+import { FinalizeReviewModule } from '@modules/finalize-review';
 import { GenerationModule } from '@modules/generation';
 import { HubActionsModule } from '@modules/hub';
 import { IllustrationModule } from '@modules/illustration';
@@ -59,6 +60,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     ChapterModule,
     EventsModule,
     ExportModule,
+    FinalizeReviewModule,
     GenerationModule,
     HubActionsModule,
     IllustrationModule,

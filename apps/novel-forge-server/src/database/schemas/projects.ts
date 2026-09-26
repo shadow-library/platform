@@ -2,6 +2,7 @@ import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { type Genre } from '@shadow-library/sdk';
 
+import { type FinalizeReview } from './finalize-review';
 import { jsonb } from './jsonb';
 import { ownerKind } from './owner';
 
@@ -34,8 +35,13 @@ interface ProjectModelOverridesData {
   image?: ProjectModelRefData;
 }
 
+export interface ProjectFinalizeReviewData {
+  autoKeep?: FinalizeReview.Category[];
+}
+
 export interface ProjectConfigData {
   models?: ProjectModelOverridesData;
+  finalizeReview?: ProjectFinalizeReviewData;
 }
 
 // The genre a novel-import bundle carried in, when it matches the platform list, kept in `projects.importedMeta`. It is

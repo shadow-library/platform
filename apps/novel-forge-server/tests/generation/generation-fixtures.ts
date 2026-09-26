@@ -114,7 +114,8 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
   const writes: RecordedWrite[] = [];
   const knowledge = options.knowledge;
   let outcome: 'committed' | 'rolled back' | undefined;
-  const resultFor = async (table: unknown) => (table === schema.userFeedback ? [{ id: 7n }] : table === schema.drafts ? (options.draftWriteResult ?? []) : []);
+  const resultFor = async (table: unknown) =>
+    table === schema.userFeedback || table === schema.finalizeReviews ? [{ id: 7n }] : table === schema.drafts ? (options.draftWriteResult ?? []) : [];
   const awaitable = (table: unknown) => Object.assign(Promise.resolve(undefined), { returning: () => resultFor(table) });
   const awaitableRows = (rows: unknown[]) => Object.assign(Promise.resolve(undefined), { returning: async () => rows });
 

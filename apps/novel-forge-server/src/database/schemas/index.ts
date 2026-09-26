@@ -16,3 +16,4 @@ export * from './ai';
 export * from './review';
 export * from './plugins';
 export * from './account-settings';
+export * from './finalize-review';
