@@ -1,1 +1,0 @@
-ALTER TABLE "refinement_proposals" ADD COLUMN "diagnostics" jsonb;

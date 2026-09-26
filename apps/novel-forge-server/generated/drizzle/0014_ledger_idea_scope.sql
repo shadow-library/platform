@@ -1,6 +1,0 @@
-CREATE TYPE "public"."ledger_rejection_scope" AS ENUM('never', 'not_now', 'not_this_version');--> statement-breakpoint
-ALTER TABLE "decision_ledger_entries" ADD COLUMN "idea_id" varchar(64);--> statement-breakpoint
-ALTER TABLE "decision_ledger_entries" ADD COLUMN "rejection_scope" "ledger_rejection_scope";--> statement-breakpoint
-ALTER TABLE "decision_ledger_entries" ADD COLUMN "rejection_anchor" jsonb;--> statement-breakpoint
-CREATE UNIQUE INDEX "decision_ledger_entries_project_id_idea_id_idx" ON "decision_ledger_entries" USING btree ("project_id","idea_id") WHERE "decision_ledger_entries"."idea_id" IS NOT NULL AND "decision_ledger_entries"."superseded_at" IS NULL;--> statement-breakpoint
-ALTER TABLE "decision_ledger_entries" ADD CONSTRAINT "decision_ledger_entries_rejection_check" CHECK (("decision_ledger_entries"."idea_id" IS NULL AND "decision_ledger_entries"."rejection_scope" IS NULL AND "decision_ledger_entries"."rejection_anchor" IS NULL) OR ("decision_ledger_entries"."idea_id" IS NOT NULL AND "decision_ledger_entries"."kind" = 'rejected' AND "decision_ledger_entries"."rejection_scope" IS NOT NULL AND ("decision_ledger_entries"."rejection_scope" = 'never') = ("decision_ledger_entries"."rejection_anchor" IS NULL)));

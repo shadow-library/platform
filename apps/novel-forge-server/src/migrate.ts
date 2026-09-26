@@ -1,4 +1,5 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
@@ -20,6 +21,8 @@ Logger.attachTransport(Config.isProd() ? 'console:json' : 'console:pretty');
 
 try {
   const db = drizzle(url);
+  // Drizzle never generates CREATE EXTENSION, and the schema's vector columns need it before the first migration.
+  await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   await migrate(db, { migrationsFolder });
   logger.info('Drizzle migrations applied');
   const checkPointer = PostgresSaver.fromConnString(url);
