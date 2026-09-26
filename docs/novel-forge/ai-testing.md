@@ -227,7 +227,7 @@ Cookie-authenticated mutations need the double-submit pair: cookie `csrf-token` 
 `src/modules/auth/role-catalog.constants.ts:23-69`. The default `NovelForgeAuthor` role holds
 `projects:read`, `projects:write`, `illustrations:write`, `generation:run` — **but not** `ADMIN_PERMISSION`.
 The three harness-observability routes are `@RequirePermission(ADMIN_PERMISSION, { highRisk: true })`
-(`src/modules/generation/generation.controller.ts:328-329,343-344,350-351`), so **your test user must be an
+(`src/modules/generation/generation.controller.ts:308-309,323-324,330-331`), so **your test user must be an
 admin** or you inspect `model_calls` in SQL instead.
 
 e2e personas, once the e2e seed has been run against that identity: `e2e.user1@shadow-apps.test` /
@@ -304,9 +304,9 @@ Three ways to override, in precedence order (`model-router.service.ts:229-249`):
 `GET /api/v1/ai/models` (`ai.controller.ts:26-54`) returns the whole registry with prices, context windows and both
 default maps — the quickest way to see what is selectable.
 
-> **Stale helper:** `e2e/tests/novel-forge/forge-helpers.ts:75` pins `{provider:'anthropic', model:'claude-haiku-4-5'}`.
-> That id is not in `MODEL_MAP` and the provider is not `openrouter`, so a PATCH with it now returns `AI_002`
-> (`project.service.ts:80-83`). Do not copy it.
+`e2e/tests/novel-forge/forge-helpers.ts:67` exports `HAIKU_MODEL = {provider:'openrouter', model:'anthropic/claude-haiku-4.5'}`,
+a registered id with the right provider — the helper that previously pinned an unregistered `anthropic/claude-haiku-4-5` id
+(and would have 400'd with `AI_002`) has since been fixed; it is safe to copy.
 
 ---
 
@@ -329,17 +329,21 @@ PATCH /api/v1/projects/:id   {"brief": "<your premise>"}
 ```
 
 (`project.dto.ts:201-202`). The Story Bible screen refuses to run without one
-(`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:541-543`).
+(`apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:204-207`).
 
-**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — every door posts to
-`POST /api/v1/projects`. "Design a new novel" creates a `new_novel` project; "I know the
-novel" creates the same project and leaves you on Overview. Screens are declared once in
-`apps/novel-forge-web/src/components/Layout/screens.tsx:53-72`, each with a `workflows` filter; for a `new_novel`
-project the visible labels are **Overview**, **Story Bible**, **Volumes & Arcs**, **Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Proposals**, **Workflow
-Runs** (admin-only, `adminOnly: true` at `:69`), **Publish**, **Project Settings**.
+**UI equivalent:** `apps/novel-forge-web/src/features/projects/NewNovelModal.tsx` — a single "Start a new
+novel" form (working title + content mode) posts to `POST /api/v1/projects` with `kind: 'new_novel'` and
+opens straight into the Workspace chat (`projectHomeRoute()`, `/novels/$novelId/chat`); there is no second
+door — continuing an existing manuscript is the separate **Import novel** screen (Part 4). Screens are
+declared once in `apps/novel-forge-web/src/components/Layout/screens.tsx:25-35` — there is only one project
+kind now, so the list is no longer filtered — and the visible labels are **Overview**, **Story Bible**,
+**Chapters**, **Illustrations**, **Review Queue**, **Refinement Chat**, **Workflow Runs** (admin-only,
+`adminOnly: true` at `:32`), **Publish**, **Project Settings**. There is no standalone **Volumes & Arcs**
+screen and no standalone **Proposals** screen any more: continuity and refinement proposals are both a
+view inside **Review Queue** (`review.tsx`), and `/novels/$novelId/proposals` only redirects old links there.
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
-built by `buildFinalBundle` at `e2e/tests/novel-forge/forge-helpers.ts:119`. Useful when you need chapters to
+built by `buildFinalBundle` at `e2e/tests/novel-forge/forge-helpers.ts:110`. Useful when you need chapters to
 exist but do not want to pay for generation.
 
 ---
@@ -391,9 +395,9 @@ unindexed. The repair rules differ by kind:
 | `:452`     | debug       | `parsed via tolerant extraction` + which source                                                                                    |
 | `:459-470` | error/debug | `All parse attempts failed` (→ `AI_001`) with both raw outputs                                                                     |
 
-API (all three require `ADMIN_PERMISSION`, `highRisk` — `generation.controller.ts:328-329,343-344,350-351`):
+API (all three require `ADMIN_PERMISSION`, `highRisk` — `generation.controller.ts:308-309,323-324,330-331`):
 
-- `GET /api/v1/projects/:id/runs` — run list (not admin-gated, `:321`).
+- `GET /api/v1/projects/:id/runs` — run list (not admin-gated, `:301`).
 - `GET /api/v1/projects/:id/runs/:runId` — status, outcome, `input`, `nodeTrace`, `modelCalls[]`, `toolCalls[]`,
   `contextPack` (`generation.dto.ts:731-777`).
 - `GET /api/v1/projects/:id/runs/:runId/context` — the assembled pack plus `rendered`, the exact text supplied
@@ -429,21 +433,21 @@ This is the part the README does not cover and where the obvious move is wrong.
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Throw away everything for one project           | `DELETE /api/v1/projects/:id` (204) — cascades to every child table                                         | `project.controller.ts:68-72`, `project.service.ts:342-346`               |
 | Re-run the bible builder over an existing bible | `POST /api/v1/projects/:id/seed-from-brief` with `{"brief":"…","force":true}`                               | `generation.dto.ts:105-112`; skip-check at `bible-builder.graph.ts:73-81` |
-| Clear drafts/briefs only                        | `POST /api/v1/projects/:id/reset {"stage":"generate"}`                                                      | `project.service.ts:376-385`                                              |
-| Clear volumes                                   | `…/reset {"stage":"plan"}`                                                                                  | `project.service.ts:369-374`                                              |
-| Clear entities/world facts                      | `…/reset {"stage":"knowledge"}`                                                                             | `project.service.ts:352-367`                                              |
+| Clear drafts/briefs only                        | `POST /api/v1/projects/:id/reset {"stage":"generate"}`                                                      | `project.service.ts:328-338`                                              |
+| Clear volumes                                   | `…/reset {"stage":"plan"}`                                                                                  | `project.service.ts:308-326`                                              |
+| Clear entities/world facts                      | `…/reset {"stage":"knowledge"}`                                                                             | `project.service.ts:297-306`                                              |
 | Wipe the DB                                     | `DROP DATABASE novel_forge; CREATE DATABASE novel_forge;` then `bun run db apps/novel-forge-server migrate` | no endpoint or script exists                                              |
 
 **Two traps:**
 
 1. `POST /:id/reset` with `stage: "all"` **does not delete `bible_documents` or `canon_facts`.** Read
-   `project.service.ts:348-388` — `bibleDocuments` and `canonFacts` appear nowhere in it. So after a "reset all"
+   `project.service.ts:293-342` — `bibleDocuments` and `canonFacts` appear nowhere in it. So after a "reset all"
    the bible prose survives, and a `seed-from-brief` **without** `force:true` skips every stage
    (`bible-builder.graph.ts:73-81`) and returns `completed` having made zero model calls. If you are comparing
    bible outputs, the only clean baselines are **a fresh project** or **`force: true`**.
 2. The UI cannot re-run the builder at all. The "Generate story bible" button lives inside the screen's
-   `EmptyState` (`story-bible.tsx:640-660`) — once any entity exists the empty state is gone — and `runSeed` never
-   sends `force` (`story-bible.tsx:546`). **Every re-run is an API call.**
+   `EmptyState` (`story-bible.tsx:505-518`) — once any entity exists the empty state is gone — and `runSeed` never
+   sends `force` (`story-bible.tsx:210`). **Every re-run is an API call.**
 
 Cost note: one full bible build = **7 model calls** minimum (one per manifest stage,
 `bible-builder.graph.ts:263-281`), plus one extra per stage that fails schema validation and enters the repair
@@ -515,7 +519,9 @@ From `apps/novel-forge-server` (`package.json:7-16`) — these are the one excep
 repo root", because they are the workspace's own scripts and Bun resolves `tests/` relative to the cwd:
 
 ```bash
-bun run test            # bun test --coverage --timeout 20000 — the whole suite
+bun test                # the whole suite — the workspace has no `test` script of its own any more, so
+                         # `bun run test` errors "Script not found"; `scripts/verify.ts` falls back to plain
+                         # `bun test` for it (no `--coverage`, default timeout) the same way
 bun test tests/ai       # AI tests only
 bun test tests/eval     # eval tests only (no DB needed)
 bun run test:ai:unit    # prompts.spec + model-router.spec + context-assembler.spec
@@ -537,20 +543,25 @@ check the skip count in the summary. Template name: `scripts/db.ts:78` derives `
 while `tests/fixtures/template-db.ts:12` hardcodes `novel_forge_template`; they agree only when the URL's database
 is named `novel_forge`, or you export `POSTGRES_TEMPLATE_DB_NAME`.
 
-#### `tests/ai/prompts.spec.ts` (1,307 lines) — makes no model calls
+#### `tests/ai/prompts.spec.ts` (718 lines) — makes no model calls
 
-It asserts prompt **wiring**: the `AUTHORING_STYLE` / `AUTHORING_STYLE_PLANNING` split by prompt `kind` (`:49-77`),
-hard-pinned versions for specific keys (generation 2.5.0 at `:1008`, outline 2.3.0 at `:1063`, judge 2.3.0 at
-`:1090`, bible-audit 2.0.0 at `:190-204`, and others), template-variable rendering and message order for the
-cache-strategy prompts, and `parseSchema` acceptance/rejection of hand-written payloads. It also pins prompt copy
-as string-contains — the generation prompt must state a floor, aim and ceiling built from `WORD_TARGET_MIN` /
-`WORD_TARGET_AIM` / `WORD_TARGET_MAX` (`:945-950`), which it imports from the eval bands at `:43`, so the prompt
-text and the metric band cannot drift apart.
+It asserts prompt **wiring**: the `AUTHORING_STYLE` invariant across authoring-kind prompts (`:24-64`), the ending-contract,
+judge, fix and bible-stage (characters) schema shapes, refinement-prompt module behaviour (cache strategy, scope
+playbooks, lookup rendering), outline invariants, and `parseSchema` acceptance/rejection of hand-written payloads. It also
+pins prompt copy as string-contains — the generation prompt must state a floor, aim and ceiling built from `WORD_TARGET_MIN`
+/ `WORD_TARGET_AIM` / `WORD_TARGET_MAX` (`:404-419`), which it imports from the eval bands at `:19`, so the prompt text and
+the metric band cannot drift apart.
+
+**There is no hard-pinned-version test any more.** Version numbers surface only as informal labels on describe blocks
+(`readability (judge v2.4, fix v1.3)`, `reader value and purpose (outline v2.3)`) — none of it asserts against
+`PROMPT_REGISTRY[key].version`, and the labels themselves already lag the registry (judge is 2.4.0, fix 1.4.0 and outline
+3.1.0 today). Read the version straight off `PROMPT_REGISTRY` or this doc's recipes, not off a describe-block name.
 
 There is **no registry-completeness test**: the only registry-wide loops filter by `kind`. Most bible-builder stage
-versions are **not** pinned anywhere; `tests/ai/bible-stage-contract.spec.ts:64-69` only checks the seven keys exist.
-Coverage ignores `src/modules/ai/prompts/**` and `src/modules/ai/schemas/**` and `coverageThreshold = 0`
-(`bunfig.toml`).
+versions are **not** pinned anywhere; `tests/ai/bible-stage-contract.spec.ts` only checks the seven keys exist.
+Coverage ignores `src/modules/ai/prompts/**` and `src/modules/ai/schemas/**`; `apps/novel-forge-server` no longer has its
+own `bunfig.toml` (only some `packages/*` and the two other web apps do), so no coverage threshold is configured at all
+for this workspace — a change in coverage behavior worth confirming is intentional rather than an accidental deletion.
 
 **Proves:** the prompt text, versions, template variables and schemas are internally consistent.
 **Does not prove:** that any model obeys any of it.
@@ -687,8 +698,8 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Preconditions:** `status='active'`. Falls back to `projects.brief` then `projects.premise` when `overview` is
   omitted; when supplied, `overview` must be 10–200,000 characters.
 - **Input:** `{"overview": "<the sample spark above>"}`
-- **Run:** 1. POST. 2. Read the `rationale` fields. 3. Open **Proposals** (`/novels/$novelId/proposals`), review, apply.
-- **Verify:** run `graph='premise-enhance'`, `target='premise'`, prompt `premise-enhance@1.1.0`, role `premise`;
+- **Run:** 1. POST. 2. Read the `rationale` fields. 3. Open **Review Queue**'s Proposals view (`/novels/$novelId/review?view=proposals`), review, apply.
+- **Verify:** run `graph='premise-enhance'`, `target='premise'`, prompt `premise-enhance@1.2.0`, role `premise`;
   context pack `purpose='premise'` (project premise + a 1-line-per-doc inventory). The response's `rationale` object
   carries `enhancedPremise, hook, stakes, protagonistDrive, progressionSystem, serializationNotes, genre, themes`, and
   `proposal` is the staged change-set (`kind='premise_enhance'`, `scope_type='novel'`, allowed ops `premise.update`,
@@ -714,7 +725,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
   `graph='bible-builder'`, `target='all-stages'`. 3. Read `GET …/bible` and `GET …/entities`.
 - **Verify:** `node_trace` = `foundation, world, power, factionsAndLocations, characters, plot, volumes, indexLore`.
   Seven prompts, one per stage: `bible:foundation@2.0.0`, `bible:world@1.0.0`, `bible:power@1.0.0`,
-  `bible:factions-locations@2.0.0`, `bible:characters@2.0.0`, `bible:plot@2.0.0`, `bible:volumes@2.0.0`. Each stage
+  `bible:factions-locations@2.0.0`, `bible:characters@2.0.0`, `bible:plot@2.0.0`, `bible:volumes@2.1.0`. Each stage
   writes `model_calls.role` = its **prompt key** (`bible:foundation`, `bible:world`, …), not `bible` — filter on
   `prompt_key`, not on `role`. `bible_documents` gains the manifest addresses: `project/premise`, `world/setting-overview`,
   `power/system-and-limits`, `world/factions-and-locations`, `project/cast`, `plot/escalation-map`,
@@ -764,8 +775,8 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Preconditions:** `status='active'`. Most informative right after the builder, and again after you hand-delete an
   entity to prove the auditor notices.
 - **Input:** none (empty POST).
-- **Run:** 1. POST. 2. Read `findings[]`. 3. If a proposal came back, review it in **Proposals** and apply.
-- **Verify:** run `graph='bible-audit'`, `target='bible'`, prompt `bible-audit@2.0.0`, role `audit`; context pack `purpose='audit'`
+- **Run:** 1. POST. 2. Read `findings[]`. 3. If a proposal came back, review it in **Review Queue**'s Proposals view and apply.
+- **Verify:** run `graph='bible-audit'`, `target='bible'`, prompt `bible-audit@2.1.0`, role `audit`; context pack `purpose='audit'`
   (premise + first 5 lines of each doc), plus the rendered doc inventory, entity inventory and `renderManifest()`.
   Findings are keyed `doc:<section>/<slug>` or `entity:<entityKey>` with `action` ∈ `add|revise|remove|keep`.
   A clean bible returns findings and **no** proposal. Otherwise a `kind='bible_audit'` proposal stages
@@ -783,7 +794,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 #### Bible / entity / canon-fact refinement — proposal-only writes
 
 - **Entry:** applying anything from this path: `POST /api/v1/projects/{projectId}/proposals/{proposalId}/apply`
-  (revert: `/revert`, discard: `/discard`; list: **Proposals** screen). Conversational refinement of an individual
+  (revert: `/revert`, discard: `/discard`; list: **Review Queue**'s Proposals view). Conversational refinement of an individual
   document or entity is the **refinement chat hub** (`/novels/$novelId/chat`) — covered in
   Part 5 (chat hub and admin).
 - **Preconditions:** a pending proposal from premise-enhance, bible-audit, or a chat turn.
@@ -868,10 +879,10 @@ volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
    facts, or `project/reader-promise`.
 3. **`POST /api/v1/projects/{projectId}/premise/enhance` is unreachable from the web app.** Only
    `apps/novel-forge-web/src/lib/apis/api-types.gen.ts:1618` mentions it; no hook or component calls it (contrast
-   `bible/audit` → `apps/novel-forge-web/src/lib/apis/refinement.api.ts:695` →
-   `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:436`). It is reachable via the chat hub's
+   `bible/audit` → `apps/novel-forge-web/src/lib/apis/refinement.api.ts:729` →
+   `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:193`). It is reachable via the chat hub's
    `action.enhance_premise` op.
-4. **“Generate story bible” only exists in the empty state.** `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:642-657`
+4. **“Generate story bible” only exists in the empty state.** `apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:505-518`
    renders the button inside `EmptyState`, so once a single entity exists there is no UI path to a rebuild —
    `force: true` is API-only.
 5. **`seed-from-brief` runs the whole 7-stage graph inside the HTTP request**
@@ -893,10 +904,12 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 - A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
   bible builder wrote or you added by hand.
   Check with `GET /projects/:projectId/bible/readiness` → `readyToDraft: true`, and the **Story Bible** screen.
-- Admin scope (`novel-forge:admin`) for `GET /runs/:runId`, `/runs/:runId/context`, `/runs/:runId/calls/:callId`
+- The `novel-forge:admin` permission for `GET /runs/:runId`, `/runs/:runId/context`, `/runs/:runId/calls/:callId`
   and the **Workflow Runs** screen — these are `@RequirePermission(ADMIN_PERMISSION, {highRisk:true})`
-  (`generation.controller.ts:329,344,351`). Without it you cannot inspect the harness at all.
-- The nav label is **Volumes & Arcs**; that screen's own heading reads "Story Plan" (`volumes.tsx:172`).
+  (`generation.controller.ts:308,323,330`). Without it you cannot inspect the harness at all. See Part 5 §0.1 for
+  how to actually get it granted.
+- Volumes have no screen of their own any more — they show inline on **Chapters** and are read-only over HTTP
+  (see "Volumes and chapter plans" below).
 - JSON payloads below are wrapped to fit the page. Rejoin the wrapped lines before sending — a break that
   falls inside a quoted string is not valid JSON.
 
@@ -955,7 +968,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 
 - **Entry:** **Chapters** screen → "Generate ch N"; `POST /projects/:projectId/generate` → **202**.
 - **Preconditions:** no draft with `review_status='contradiction'` (else `DRF_003`); briefs exist (else `BRF_001`);
-  no stale brief in the batch (else `BRF_002`). Volumes are not required.
+  no stale brief in the batch (else `BRF_002`). Volumes are not required and have no approval step.
 - **Input:** `{"limit": 1}` — what the UI sends. For the ladder use `{"limit":1,"autoFix":true,"maxFixes":3}`.
 - **Run:** 1. **Chapters** → "Generate ch 1". 2. Click the progress banner. 3. When it settles open the chapter.
 - **Verify:** `jobs` row `kind='generate'`, `target='1'`, payload `{chapters,autoFix,maxFixes,guidance}`.
@@ -967,7 +980,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   non-compliant (`:409`), so a weak judge model lands here on an otherwise clean chapter.
   `drafts`: `revision=0`, `generator='standard'`, `review_status='needs_review'`, `judge='consistent'`,
   `volume_key` set. `draft_revisions` gains `source='generated'` with the `run_id`.
-  **Workflow Runs** screen → the run → `generation@2.5.0`, `judge@2.3.0`, tokens in/out, tool calls, and
+  **Workflow Runs** screen → the run → `generation@2.8.0`, `judge@2.4.0`, tokens in/out, tool calls, and
   "Prompt anatomy" → "View full context" for the rendered pack (`runs.tsx:404,247,281`). `cost_usd` stays null
   for text calls — only image calls record one. `GET /projects/:projectId/drafts/1/prompt` returns the same pack.
   **Quality:** the draft must land the brief's `endingContract.hookType` on its last beat and must not open by
@@ -1012,14 +1025,12 @@ verbatim — "…"`. It compares the last 60 words of the highest-numbered **fin
 - **Run:** `DELETE /drafts/2`, POST with `autoFix:true`, then `GET /projects/:projectId/runs` → the run → open it.
 - **Verify:** `workflow_runs.node_trace` shows the detour, e.g. `… judge → repairPatch → persistDraft →
 mechanicalCheck → judge → …`; a patch whose `find` anchor is not unique falls through to `repairRewrite`
-  (`routeAfterPatch`, `chapter-generation.graph.ts:123`). `model_calls` gains one `fix` row per patch attempt
-  and a second `generation@2.5.0` per rewrite. **`prompt_version` on the fix row reads `1.0.0`, not the
-  `1.2.0` that `ai/prompts/fix.prompt.ts:29` declares** — `repairPatch` hardcodes the telemetry version
-  (`chapter-generation.graph.ts:461`), so filter those rows on `prompt_key='fix'` / `role='fix'`, never on the
-  version. `drafts.revision` increments once per persisted attempt; `draft_revisions.source` reads `patched`
-  for **every** post-first attempt, rewrites included — `repairRewrite` resets `repairMode` to `'patch'` before
-  `persistDraft` computes the source (`:567` vs `:247`), so the `rewritten` enum value is never written. Tell
-  the two apart by the node trace and by which prompt the attempt's `model_calls` row names.
+  (`routeAfterPatch`, `chapter-generation.graph.ts:264`). `model_calls` gains one `fix` row per patch attempt
+  (`prompt_version` reads the live `fix.prompt.ts` version — `repairPatch` reads it off `PROMPT_REGISTRY.fix.version`
+  rather than a hardcoded string) and a second `generation@2.8.0` per rewrite. `drafts.revision` increments
+  once per persisted attempt; `draft_revisions.source` reads `patched` for a patch attempt and `rewritten`
+  for a rewrite attempt — both nodes set `repairMode` to their own kind, so the node trace and the source
+  column agree.
   Ladder exits: `accept` (clean) / `acceptAsIs` at `attempt >= maxFixes` or when a finding repeats verbatim (`sameFinding`) → outcome
   `accepted_with_findings`, `review_status='contradiction'` / `awaitReview` when `verdict='evaluation_failed'`
   or `autoFix:false` → outcome `awaiting_review`. `drafts.judge_note` lists every finding as `[severity] text`.
@@ -1060,7 +1071,7 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
 - **Run:** 1. **Review Queue** → pick the chapter. 2. Press `R`, paste the note, submit. 3. Toast `Chapter N revised — re-review the new draft`.
 - **Verify:** `user_feedback` row `artifact_type='draft'`, `disposition='revision_requested'` with the note;
   `drafts.revision` +1, `review_status` back to `needs_review`, `stale_reason=NULL`; `draft_revisions` row
-  `source='revised'` linked to that `feedback_id`. `model_calls`: `revision@1.1.0`.
+  `source='revised'` linked to that `feedback_id`. `model_calls`: `revision@1.4.0`.
   **Every descendant draft is marked stale** — `drafts.stale_reason = 'ancestor chapter N was revised'`
   for chapters > N (`markDescendantDraftsStale`). **Quality:** diff `GET /drafts/:n/revisions/:r` against the
   previous revision — the note's three asks must each be visible; a revision that only rewords is a failure.
@@ -1113,10 +1124,10 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   leaves `continuity_applied=false` — that is by design, not a half-finalize
   (`chapter-finalization.graph.ts:162`). Canon written: `entities` (+`entity_appearances`), `plot_threads`,
   `mysteries`, `character_states`, `relationships`; `timeline`, `power` and `knowledgeChanges` are deliberately
-  never persisted. `model_calls` records the continuity call as `continuity@1.0.0`, **not** the `1.3.0` that
-  `ai/prompts/continuity.prompt.ts:16` declares — the graph hardcodes the telemetry version
-  (`chapter-finalization.graph.ts:203`). The `propose-continuity` route below records `1.3.0` correctly, so the
-  same prompt shows two versions depending on which path made the call.
+  never persisted. `model_calls` records the continuity call as `continuity@1.3.0`, matching
+  `ai/prompts/continuity.prompt.ts:16` — finalize and the `propose-continuity` route below both read the
+  version off `PROMPT_REGISTRY.continuity.version` (`chapter-finalization.graph.ts:241`), so the two paths
+  agree.
   **Quality:** read `continuity_proposals.proposal.chapterSummary` — it must state what
   _changed_, not recap the scene, and its `threads` must reuse existing `thread_key`s, not coin duplicates.
 - **Fails when:** `FIN_001`/`FIN_002`/`FIN_003`/`CHP_005`/`DRF_004`; `[guard] Chapter N is not next in sequence`;
@@ -1127,12 +1138,10 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
 
 #### Continuity proposal review (low-confidence hold)
 
-- **Entry:** **API only.** `/chapters/:n/continuity-proposal*` has no web client — the paths exist in
-  `lib/apis/api-types.gen.ts` and nowhere else. **Confirmed dead end in the UI:** the **Review Queue** empty
-  state offers "Review N continuity proposals", counted from `GET /review-queue`, and links to **Proposals**
-  (`review.tsx:302-303`) — but that screen loads `GET /projects/:projectId/proposals`, the _refinement_
-  collection (`lib/apis/refinement.api.ts:627`, consumed at `proposals.tsx:313`), which never contains a
-  continuity proposal. The link can only ever show the wrong list.
+- **Entry:** **Review Queue**'s Proposals view (`review.tsx`) lists continuity proposals in their own "Continuity"
+  section alongside refinement proposals under "Refinement", and can apply or discard one directly
+  (`useApplyContinuityProposalMutation` / `useDiscardContinuityProposalMutation`). **PATCH is still API only** —
+  there is no UI control to edit a held entry's `confidence` before applying.
   `GET|PATCH /projects/:projectId/chapters/:n/continuity-proposal`, `…/apply`, `…/discard`.
 - **Preconditions:** a `pending` continuity proposal (finalize left one held, or run
   `POST /chapters/:n/propose-continuity` to make a fresh one).
@@ -1154,7 +1163,8 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
   never went through the finalization extractor.
 - **Input:** no body.
 - **Run:** 1. Open the chapter. 2. "Add to bible". 3. Toast `Canon proposal drafted — review it on the
-Proposals page`. 4. **Proposals** → open → apply.
+Proposals page` (stale copy — there is no separate Proposals page any more; it means **Review Queue**'s
+Proposals view, `chapters.tsx:1253`). 4. **Review Queue** → Proposals → open → apply.
 - **Verify:** `refinement.proposals` row `kind='chapter_extract'`, `scope_type='brief'`,
   `scope_ref='chapter:N'`, `allowed_ops` = `entity.upsert, entity.remove, bible_document.upsert,
 bible_document.remove`, `model` recorded. `model_calls`: `chapter-extract@1.0.0`, `role='extraction'`.
@@ -1212,7 +1222,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   `chapter_publications` is deliberately **not** shifted.
 - **Fails when:** `CHP_003` / `CHP_001` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
   `planner`).
-- **Cost:** 0 model calls for `hand`; 1 `outline@2.3.0` call for `planner`.
+- **Cost:** 0 model calls for `hand`; 1 `outline@3.1.0` call for `planner`.
 
 #### Unrestricted fill / `external` write mode
 
@@ -1239,7 +1249,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   `POST /chapters/:n/summarize` (returns `{summary,state}` **unpersisted**; save via `PUT /drafts/:n`, whose
   `body` field is required, so resend the prose alongside the summary or you will blank it), the UI's
   "Finalize is blocked until this chapter is summarized" alert; `CHP_007` if the draft has no prose.
-- **Cost:** 1–3 calls (generation + expansion) for unrestricted; 1 (`chapter-summarize@1.0.0`) for summarize;
+- **Cost:** 1–3 calls (generation + expansion) for unrestricted; 1 (`chapter-summarize@1.1.0`) for summarize;
   0 for import.
 
 #### Amend a finalized chapter
@@ -1393,15 +1403,10 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 
 #### 0.1 Access
 
-- **Gate.** `GET /projects/:p/runs/:runId`, `/runs/:runId/context` and `/runs/:runId/calls/:callId` carry `@RequirePermission('novel-forge:admin', { highRisk: true })` (`generation/generation.controller.ts:329,344,351`). The PDP check runs in the caller's org (`packages/auth/src/module/auth-guard.ts:197`). A non-admin gets 403 `IAM_002` (`apps/novel-forge-server/tests/generation/run-admin-gate.spec.ts`).
+- **Gate.** `GET /projects/:p/runs/:runId`, `/runs/:runId/context` and `/runs/:runId/calls/:callId` carry `@RequirePermission('novel-forge:admin', { highRisk: true })` (`generation/generation.controller.ts:308,323,330`). The PDP check runs in the caller's org (`packages/auth/src/module/auth-guard.ts`). A non-admin gets 403 `IAM_002` (`apps/novel-forge-server/tests/generation/run-admin-gate.spec.ts`).
 - **Ungated.** `GET /projects/:p/runs` (latest 20 author-facing runs), `GET /projects/:p/ai-usage`, `GET /projects/:p/context/preview` and `GET /projects/:p/drafts/:n/prompt`. The preview route's `@BotPermission('novel-forge:generation:run')` binds bot tokens only; a user session needs nothing beyond the controller's `novel-forge:projects:read` floor.
-- **UI.** "Workflow Runs" (`/novels/$novelId/runs`) checks a different thing: the session's OIDC **scope** list must contain `novel-forge:admin` (`apps/novel-forge-web/src/lib/session.ts:11`, fed by `packages/auth/src/module/auth.controller.ts:153`). Without it the screen shows "Workflow Runs needs the admin scope" and issues no requests.
-- **How to actually get the grant.** `novel-forge:admin` is a PDP permission (`apps/novel-forge-server/src/constants.ts:12`) that nothing grants today:
-  - It is absent from `NOVEL_FORGE_ROLE_CATALOG` (`auth/role-catalog.constants.ts`) and from identity's own seed for this app, which declares only `novel-forge:curate` / `NovelForgeCurator` (`apps/identity-server/src/modules/bootstrap/ecosystem-seed.constants.ts:137-159`).
-  - The server pushes that catalog to identity on every boot (`packages/auth/src/module/auth.module.ts:78`) and identity deletes every permission and role absent from it (`apps/identity-server/src/modules/authz/catalog-sync.service.ts:192,205`). Its "more than half" guardrail does not fire for one extra row, so a hand-seeded permission is silently wiped at the next boot.
-  - Identity's admin API only lists permissions and assigns or revokes role assignments (`apps/identity-server/src/modules/admin/admin-role.controller.ts:83,91,105`) — it cannot create a permission or a role. The PDP resolves permissions purely from role assignments, with no superuser bypass (`authz/policy-decision.service.ts:183-190`).
-  - The one durable path: add the permission plus a role carrying it to `NOVEL_FORGE_ROLE_CATALOG`, restart the server so the catalog syncs, then assign that role through identity's `POST /api/v1/admin/role-assignments`. That is a code change, not an operator action.
-  - The UI gate cannot be satisfied at all right now: it reads token scopes, and `novel-forge:admin` is not a registered OAuth scope for this application. Expect the API to answer while the screen stays locked.
+- **UI.** "Workflow Runs" (`/novels/$novelId/runs`) does not read OIDC session scopes — a browser session only ever carries those, never the per-organisation RBAC permission the admin routes check, so the gate asks instead: `GET /api/v1/access` (`auth/access.controller.ts`) puts the same `novel-forge:admin` PDP question to identity that `@RequirePermission` does, and `resolveIsAdmin`/`useIsAdmin` (`apps/novel-forge-web/src/lib/session.ts`) read the answer. The nav entry hides without it (`screens.tsx`'s `adminOnly`), and the route's own `beforeLoad` gates independently (`runs.tsx`) — so the nav and the server can never disagree about who is an admin.
+- **How to actually get the grant.** `novel-forge:admin` is a PDP permission (`apps/novel-forge-server/src/constants.ts:12`) that **is** grantable: `NOVEL_FORGE_ROLE_CATALOG` (`auth/role-catalog.constants.ts`) declares both the permission and the `NovelForgeAdmin` role (deliberately not default, not bot-grantable — a platform role admin assigns it to a person), and identity's own seed for this app mirrors both (`apps/identity-server/src/modules/bootstrap/ecosystem-seed.constants.ts:151,161-164`) with `grantToBootstrapAdmin: true`, so the bootstrap admin persona (`admin@shadow-apps.com`, §3) already holds it out of the box. For anyone else, a platform role admin assigns `NovelForgeAdmin` through identity's `POST /api/v1/admin/role-assignments`, in the organisation the session acts in — an operator action, not a code change.
 - **Fallback with no admin grant.** Query the DB directly (0.7).
 
 #### 0.2 What each endpoint returns
@@ -1425,7 +1430,7 @@ Cost basis (from `ai/models.ts`, USD per 1M tokens in/out): glm-5.2 0.97/3.04 (c
 
 #### 0.4 Reconstruct the exact prompt of any call
 
-1. Take `promptKey@promptVersion` from the call row and open `ai/prompts/<promptKey>.prompt.ts` (chat hub: `chat-refine.prompt.ts`, version 2.1.0). The template is there, and the version must bump on any wording change.
+1. Take `promptKey@promptVersion` from the call row and open `ai/prompts/<promptKey>.prompt.ts` (chat hub: `chat-refine.prompt.ts`, version 2.3.0). The template is there, and the version must bump on any wording change.
 2. Fill the variables. For `chat-refine`:
    - `scopeInstructions` = `HUB_INSTRUCTIONS` (`ai/prompts/scope-playbooks.ts`) plus the lookup vocabulary.
    - `stableContext` = the pack's stable segment.
@@ -1532,7 +1537,7 @@ Ordinary hub turns run `chat-refine@2.3.0`, role `chat` (planning-group model), 
 
 #### 1.4 Per-op cherry-pick apply and baseline conflict
 
-- **Entry:** UI: in the chat, the turn card "N changes" with a checkbox per op and the "Apply N selected" and "Decline all" buttons, or the "Proposals" screen. API `POST /proposals/:id/apply {"opIndexes":[...]}`.
+- **Entry:** UI: in the chat, the turn card "N changes" with a checkbox per op and the "Apply N selected" and "Decline all" buttons, or **Review Queue**'s Proposals view. API `POST /proposals/:id/apply {"opIndexes":[...]}`.
 - **Preconditions:** the pending 1.1 proposal (call it `$X`).
 - **Run:**
   1. `PATCH /proposals/$X {"changeSet":[<the ops>]}`: hand-edit (for example delete the `volume.upsert` op for volume 2). Ops are re-validated and the baseline is re-captured for the new refs.
@@ -1873,13 +1878,12 @@ export default function createPlugin() {
 
 1. **Tool-loop calls are never recorded.** `ai/tools/tool-loop.ts` invokes the model with no telemetry callback, so every judge and window-validation call made through `chatFor` + `runToolLoop` writes no `model_calls` row. `GET /cost`, the quota's spend window and the Runs view all leave that spend out.
 2. **`model_calls.status` enum is mostly dead.** `parse_error`, `repaired`, `refused` and `timeout` are never written (enum at `src/database/schemas/ai.ts:42`). The Runs UI "repaired" chip can never show; a repaired call is an `attempt=1` row with `ok`.
-3. **`novel-forge:admin` cannot be granted at all today.** It is absent from `auth/role-catalog.constants.ts` and from identity's `ecosystem-seed.constants.ts`; identity's admin API can only assign existing roles, and the boot catalog sync deletes any permission or role hand-seeded beside the manifest. It is also not a registered OAuth scope, so the UI's scope gate can never pass even once the PDP gate does. See 0.1 for the code-change path.
-4. **Recorded cost does not say where it came from.** A text row's `cost_usd` is the provider figure or a write-time list-price estimate, indistinguishable after the fact, so `GET /cost` can only flag as estimated the rows it prices itself.
-5. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
-6. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
-7. **Unused error codes.** `CHT_004`, `CHT_005` and `AI_003` are never thrown anywhere in the server, though the web app still maps `AI_003` to failure copy. Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
-8. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
-9. **Auto-apply conflict leaves `conflicted`, not `pending`.** The `autoApply` doc comment says pending (`chat.service.ts:503`); the conflict status flip commits inside `apply`, so the reloaded proposal is `conflicted`.
-10. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
-11. **Stale comments.** `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
-12. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).
+3. **Recorded cost does not say where it came from.** A text row's `cost_usd` is the provider figure or a write-time list-price estimate, indistinguishable after the fact, so `GET /cost` can only flag as estimated the rows it prices itself.
+4. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
+5. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
+6. **Unused error codes.** `CHT_004`, `CHT_005` and `AI_003` are never thrown anywhere in the server, though the web app still maps `AI_003` to failure copy. Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
+7. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
+8. **Auto-apply conflict leaves `conflicted`, not `pending`.** The `autoApply` doc comment says pending (`chat.service.ts:503`); the conflict status flip commits inside `apply`, so the reloaded proposal is `conflicted`.
+9. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts:255`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
+10. **Stale comments.** `chat.tsx:404` claims the server's `failedTurn` query "never picks up a `cancelled` run at all"; it does (`chat.service.ts:389` matches `['failed','cancelled']`).
+11. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).

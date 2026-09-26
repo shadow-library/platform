@@ -1245,7 +1245,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
   const runExtract = (): void => {
     extract.mutate(undefined, {
-      onSuccess: () => toast.success('Canon proposal drafted — review it on the Proposals page'),
+      onSuccess: () => toast.success('Canon proposal drafted — review it in the Review Queue'),
       onError: err => toast.danger(err.message),
     });
   };

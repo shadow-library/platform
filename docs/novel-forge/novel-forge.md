@@ -22,7 +22,7 @@
 - **Isolated chapter**: content firewalled from indexes, retrieval and continuity extraction (`isolated`), independent of provenance (`generator`).
 - **Proposal** (`refinement_proposals`): a staged change-set of content and action ops; the only way chat, audit, tidy-up, premise and plugin output changes domain data (pipeline graphs write their own results directly).
 - **Context pack**: the exact text a model saw, split into a stable (cacheable) and a volatile segment, with a manifest of what was included, cut or unresolved.
-- **Review queue**: drafts needing review or in contradiction, plus pending continuity proposals. Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
+- **Review queue**: one inbox — drafts needing review or in contradiction, plus pending continuity and refinement proposals (chat, audit, premise and plugin change-sets). Approval is author-initiated and never auto-applied from a chat turn; the judge only advises.
 - **Writing style**: the built-in plain web-novel style always reaches the writer, and a project's `instructions` are additions after it (point of view, tone, content limits)
   that win where the two conflict. The default is never trimmed to fit; additions give up their tail instead. A copy of the current or an earlier default inside stored
   instructions, verbatim or lightly edited, is dropped on read so the default never reaches the writer twice.
