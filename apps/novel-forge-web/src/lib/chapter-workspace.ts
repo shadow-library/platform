@@ -1,4 +1,4 @@
-import { type ApiError, type ChapterRowResponse, type DraftResponse, type FinalizeReadinessResponse, type JobEnqueueResponse } from '@/lib/apis';
+import { type ApiError, type ChapterRowResponse, type DraftResponse, type JobEnqueueResponse } from '@/lib/apis';
 import { approvalRefusal } from '@/lib/chapter-checks';
 
 const TEACHING_GATE_CODE = 'DRF_016';
@@ -52,12 +52,6 @@ export function statusLabel(draft: ApprovalView): string | undefined {
   if (draft.reviewStatus === 'approved') return `Approved · version ${draft.approvedRevision ?? draft.revision}`;
   if (changedSinceApproval(draft) !== undefined) return 'Changed';
   return undefined;
-}
-
-/** Why finalize would refuse now, in the server's order; nothing while the answer is loading or failed, so the server's own refusal speaks on click. */
-export function finalizeBlockerMessages(readiness: FinalizeReadinessResponse | undefined): string[] {
-  if (!readiness || readiness.ready) return [];
-  return readiness.blockers.length > 0 ? readiness.blockers.map(blocker => blocker.message) : ['Finalize isn’t available for this chapter right now.'];
 }
 
 /** The approval was refused because the text moved since the author read it. */

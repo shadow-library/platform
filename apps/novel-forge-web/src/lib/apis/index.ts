@@ -23,6 +23,7 @@ export * from './events.api';
 export * from './novel-import.api';
 export * from './publishing.api';
 export * from './plugin.api';
+export * from './finalize-review.api';
 
 /**
  * `publishing.api.ts` predates its feature's OpenAPI schema and hand-authors its own request/response

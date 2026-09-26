@@ -40,6 +40,8 @@ export interface NextStepInput {
   reviewQueueCount: number;
   /** Drafted-but-not-final chapters, formatted as e.g. "1–3, 5" — the chapters finalizing would lock in. */
   notFinalChapterRange?: string;
+  /** The lowest drafted chapter that is not final — chapters finalize in order, so the one whose Finalize review comes next. */
+  nextFinalizeChapter?: number;
 }
 
 interface NextStepRule {
@@ -104,16 +106,19 @@ const RULES: readonly NextStepRule[] = [
     test: input => input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.reviewQueueCount === 0 && input.briefsRemaining <= 0,
     build: input => ({
       id: 'finalize-chapters',
-      label: 'Finalize chapters',
-      // Finalize has no plain button — it's a hub action the author asks the chat assistant to run.
-      reason: input.notFinalChapterRange
-        ? `Every drafted chapter is approved — ask the assistant to finalize chapter${/[,–]/.test(input.notFinalChapterRange) ? 's' : ''} ${input.notFinalChapterRange}.`
-        : 'Every drafted chapter is approved — ask the assistant to finalize them.',
-      target: { screen: 'chat' },
+      label: input.nextFinalizeChapter != null ? `Finalize chapter ${input.nextFinalizeChapter}` : 'Finalize chapters',
+      reason: finalizeReason(input.notFinalChapterRange),
+      target: { screen: 'chapters', chapter: input.nextFinalizeChapter },
     }),
     comingUpLabel: 'Finalize chapters',
   },
 ];
+
+function finalizeReason(range: string | undefined): string {
+  if (!range) return 'Every drafted chapter is approved — finalize them in order, each through its Finalize review.';
+  if (!/[,–]/.test(range)) return `Every drafted chapter is approved — finalize chapter ${range} through its Finalize review.`;
+  return `Every drafted chapter is approved — finalize chapters ${range} in order, each through its Finalize review.`;
+}
 
 function hasRoadmapIndex(rule: NextStepRule): rule is NextStepRule & { roadmapIndex: number } {
   return rule.roadmapIndex !== undefined;
@@ -240,5 +245,6 @@ export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
     contradictedChapter,
     reviewQueueCount: state.reviewDrafts.length + state.pendingContinuityCount + state.pendingRefinementCount,
     notFinalChapterRange,
+    nextFinalizeChapter: notFinalChapters.length > 0 ? Math.min(...notFinalChapters) : undefined,
   };
 }

@@ -195,14 +195,6 @@ export function useApproveDraftMutation(projectId: string): UseMutationResult<Dr
   });
 }
 
-export function useFinalizeChapterMutation(projectId: string): UseMutationResult<WorkflowRunResponse, ApiError, number> {
-  const queryClient = useQueryClient();
-  return useMutation<WorkflowRunResponse, ApiError, number>({
-    mutationFn: chapter => APIRequest.post(`/projects/${projectId}/finalize`).body({ chapter }).execute(),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId] }),
-  });
-}
-
 export function useReviseDraftMutation(projectId: string, n: number): UseMutationResult<DraftResponse, ApiError, { note: string }> {
   const queryClient = useQueryClient();
   return useMutation<DraftResponse, ApiError, { note: string }>({

@@ -45,7 +45,7 @@ function invalidateChapterViews(queryClient: ReturnType<typeof useQueryClient>, 
   queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'briefs'] });
 }
 
-function draftDetailKey(projectId: string, n: number): readonly [string, string, string, number] {
+export function draftDetailKey(projectId: string, n: number): readonly [string, string, string, number] {
   return ['projects', projectId, 'drafts', n] as const;
 }
 

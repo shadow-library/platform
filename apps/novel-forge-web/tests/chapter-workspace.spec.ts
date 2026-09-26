@@ -6,7 +6,6 @@ import {
   approveAsWrittenRefused,
   batchStopNotice,
   changedSinceApproval,
-  finalizeBlockerMessages,
   rowChangedSinceApproval,
   statusLabel,
   teachingGateRefusal,
@@ -104,29 +103,6 @@ describe('rowChangedSinceApproval', () => {
     expect(rowChangedSinceApproval({ status: 'final', reviewStatus: 'final', approvedRevision: 3 })).toBe(false);
     expect(rowChangedSinceApproval({ status: 'draft', reviewStatus: 'needs_review', approvedRevision: null })).toBe(false);
     expect(rowChangedSinceApproval({})).toBe(false);
-  });
-});
-
-describe('finalizeBlockerMessages', () => {
-  it('should list the server’s reasons in its order', () => {
-    expect(
-      finalizeBlockerMessages({
-        ready: false,
-        blockers: [
-          { code: 'FIN_001', message: 'Chapters must be finalized in order' },
-          { code: 'CHP_005', message: 'Isolated chapter has no summary' },
-        ],
-      }),
-    ).toEqual(['Chapters must be finalized in order', 'Isolated chapter has no summary']);
-  });
-
-  it('should block nothing when ready, loading, or unanswered', () => {
-    expect(finalizeBlockerMessages({ ready: true, blockers: [] })).toEqual([]);
-    expect(finalizeBlockerMessages(undefined)).toEqual([]);
-  });
-
-  it('should still block a refusal that names no reason', () => {
-    expect(finalizeBlockerMessages({ ready: false, blockers: [] })).toHaveLength(1);
   });
 });
 

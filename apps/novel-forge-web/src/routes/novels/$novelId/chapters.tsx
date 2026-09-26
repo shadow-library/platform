@@ -43,6 +43,7 @@ import {
   EditorStrip,
   FinalizeButton,
   HeldActions,
+  StoryBibleUpdatesButton,
   UnsavedChangesGuard,
   useChapterEditor,
   useOverrideConfirm,
@@ -1521,6 +1522,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 </Button>
               </Tooltip>
             )}
+            {actions.amend && <StoryBibleUpdatesButton novelId={novelId} chapter={chapter} />}
             {actions.approve && (
               <Button variant="primary" size="sm" loading={approveDraft.isPending} onClick={approve}>
                 {draft.approvedRevision === null ? 'Approve' : 'Approve again'}

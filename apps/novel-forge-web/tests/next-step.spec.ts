@@ -30,23 +30,24 @@ describe('computeNextStep', () => {
     expect(result.next?.label).toBe('Generate the next chapter');
   });
 
-  it('should ask to finalize through the chat assistant once every outlined chapter is drafted and approved', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '7–10' }));
+  it('should send the author to the next chapter’s Finalize review once every outlined chapter is drafted and approved', () => {
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '7–10', nextFinalizeChapter: 7 }));
     expect(result.next).toMatchObject({
       id: 'finalize-chapters',
-      target: { screen: 'chat' },
-      reason: 'Every drafted chapter is approved — ask the assistant to finalize chapters 7–10.',
+      label: 'Finalize chapter 7',
+      target: { screen: 'chapters', chapter: 7 },
+      reason: 'Every drafted chapter is approved — finalize chapters 7–10 in order, each through its Finalize review.',
     });
   });
 
   it('should give a generic finalize reason when the not-final chapter range is unknown', () => {
     const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0 }));
-    expect(result.next?.reason).toBe('Every drafted chapter is approved — ask the assistant to finalize them.');
+    expect(result.next?.reason).toBe('Every drafted chapter is approved — finalize them in order, each through its Finalize review.');
   });
 
   it('should use singular phrasing in the finalize reason for a single not-final chapter', () => {
     const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 9, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '10' }));
-    expect(result.next?.reason).toBe('Every drafted chapter is approved — ask the assistant to finalize chapter 10.');
+    expect(result.next?.reason).toBe('Every drafted chapter is approved — finalize chapter 10 through its Finalize review.');
   });
 
   it('should not offer to finalize while anything is still pending review', () => {
@@ -153,6 +154,7 @@ describe('deriveNextStepInput', () => {
       }),
     );
     expect(result.notFinalChapterRange).toBe('2–3, 5');
+    expect(result.nextFinalizeChapter).toBe(2);
   });
 
   it('should leave the not-final chapter range unset once every draft is final', () => {

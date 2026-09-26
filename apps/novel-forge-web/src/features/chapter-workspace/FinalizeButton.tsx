@@ -1,73 +1,41 @@
 import { useState } from 'react';
-import { Button, ConfirmDialog, Popover, toast } from '@shadow-library/ui';
+import { Button } from '@shadow-library/ui';
 
-import { useFinalizeChapterMutation, useFinalizeReadinessQuery } from '@/lib/apis';
-import { finalizeBlockerMessages } from '@/lib/chapter-workspace';
+import { useDraftSummaryQuery, useFinalizeReviewQuery } from '@/lib/apis';
+import { latestFinalChapter } from '@/lib/finalize-review';
 
-import styles from './FinalizeButton.module.css';
+import { FinalizeReviewDialog } from './FinalizeReviewDialog';
 
 export interface FinalizeButtonProps {
   novelId: string;
   chapter: number;
 }
 
+/** Finalize always goes through the review of what the approved chapter changes in the Story Bible; nothing finalizes from the header directly. */
 export function FinalizeButton({ novelId, chapter }: FinalizeButtonProps): React.JSX.Element {
-  const finalize = useFinalizeChapterMutation(novelId);
-  const readiness = useFinalizeReadinessQuery(novelId, chapter);
-  const blockers = finalizeBlockerMessages(readiness.data);
-  const [confirming, setConfirming] = useState(false);
-
-  const run = (): void => {
-    finalize.mutate(chapter, {
-      onSuccess: result => {
-        setConfirming(false);
-        if (result.status === 'failed') {
-          toast.danger(`Chapter ${chapter} could not be finalized — the run is listed under Runs`);
-          return;
-        }
-        toast.success(`Chapter ${chapter} is final`);
-      },
-      onError: error => {
-        setConfirming(false);
-        toast.danger(error.message);
-      },
-    });
-  };
-
-  if (blockers.length > 0) {
-    return (
-      <Popover>
-        <Popover.Trigger asChild>
-          <Button variant="secondary" size="sm" aria-label={`Finalize — ${blockers.length === 1 ? 'one thing' : `${blockers.length} things`} to do first`}>
-            Finalize
-          </Button>
-        </Popover.Trigger>
-        <Popover.Content align="end">
-          <Popover.Header title={`Chapter ${chapter} can’t be finalized yet`} />
-          <ul className={styles.reasons}>
-            {blockers.map(reason => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-        </Popover.Content>
-      </Popover>
-    );
-  }
-
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="primary" size="sm" loading={finalize.isPending || readiness.isLoading} onClick={() => setConfirming(true)}>
-        Finalize
+      <Button variant="primary" size="sm" onClick={() => setOpen(true)}>
+        Finalize · review Story Bible updates
       </Button>
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={`Finalize chapter ${chapter}?`}
-        description="Locks the approved version. After this only Amend changes its text, and the Story Bible updates it proposes wait in the Review Queue."
-        confirmLabel="Finalize"
-        loading={finalize.isPending}
-        onConfirm={run}
-      />
+      <FinalizeReviewDialog novelId={novelId} chapter={chapter} open={open} onOpenChange={setOpen} canRevert={false} />
+    </>
+  );
+}
+
+/** A final chapter's applied review, with Undo while it is the latest final chapter; absent for chapters finalized before reviews existed. */
+export function StoryBibleUpdatesButton({ novelId, chapter }: FinalizeButtonProps): React.JSX.Element | null {
+  const [open, setOpen] = useState(false);
+  const review = useFinalizeReviewQuery(novelId, chapter);
+  const summary = useDraftSummaryQuery(novelId, open);
+  if (!review.data) return null;
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        Story Bible updates
+      </Button>
+      <FinalizeReviewDialog novelId={novelId} chapter={chapter} open={open} onOpenChange={setOpen} canRevert={latestFinalChapter(summary.data?.items) === chapter} />
     </>
   );
 }

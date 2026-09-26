@@ -2,6 +2,8 @@ export * from './ChecksDrawer';
 export * from './ChecksPanel';
 export * from './EditorStrip';
 export * from './FinalizeButton';
+export * from './FinalizeReviewDialog';
+export * from './FinalizeReviewItemCard';
 export * from './UnsavedChangesGuard';
 export * from './use-chapter-editor';
 export * from './use-override-confirm';
