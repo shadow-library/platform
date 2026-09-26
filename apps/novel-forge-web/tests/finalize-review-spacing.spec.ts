@@ -70,6 +70,12 @@ const DIALOG: Expected[] = [
   { selector: '.routineActions', values: { gap: '8px' }, source: 'rule 6 (8px between controls) — the canvas row has one link, this one Keep and Skip' },
   { selector: '.link', values: { padding: '0' }, source: 'l.23 .link padding 0' },
   {
+    selector: '.bridge',
+    values: { gap: '8px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' },
+    source: 'the bridge block: the routine section’s gap 8 and radius 8 (l.59) with the disclosure line’s padding 10px 12px (l.73)',
+  },
+  { selector: '.bridgeSummary', values: { margin: '0' }, source: 'paragraph reset; spacing comes from .bridge’s gap' },
+  {
     selector: '.disclosure',
     values: { gap: '10px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' },
     source: 'l.73 disclosure line gap 10, padding 10px 12px, radius 8',

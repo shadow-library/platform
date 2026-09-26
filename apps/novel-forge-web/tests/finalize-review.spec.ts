@@ -52,6 +52,7 @@ function review(overrides: Partial<FinalizeReviewResponse> = {}): FinalizeReview
     status: 'ready',
     current: true,
     isolated: false,
+    bridgeOnly: false,
     error: null,
     disclosure: { clear: true, findings: [], copy: 'No unplanned disclosure detected · revision 3' },
     open: { consequential: 1, routine: 1 },

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@shadow-library/ui';
 
-import { useDraftSummaryQuery, useFinalizeReviewQuery } from '@/lib/apis';
+import { useDraftQuery, useDraftSummaryQuery, useFinalizeReviewQuery } from '@/lib/apis';
 import { latestFinalChapter } from '@/lib/finalize-review';
 
 import { FinalizeReviewDialog } from './FinalizeReviewDialog';
@@ -24,16 +24,20 @@ export function FinalizeButton({ novelId, chapter }: FinalizeButtonProps): React
   );
 }
 
-/** A final chapter's applied review, with Undo while it is the latest final chapter; absent for chapters finalized before reviews existed. */
+/**
+ * A final chapter's applied review, with Undo while it is the latest final chapter, and an unrestricted chapter's bridge; absent for a standard
+ * chapter finalized before reviews existed.
+ */
 export function StoryBibleUpdatesButton({ novelId, chapter }: FinalizeButtonProps): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
   const review = useFinalizeReviewQuery(novelId, chapter);
+  const draft = useDraftQuery(novelId, chapter);
   const summary = useDraftSummaryQuery(novelId, open);
-  if (!review.data) return null;
+  if (!review.data && !draft.data?.isolated) return null;
   return (
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        Story Bible updates
+        {review.data && !review.data.bridgeOnly ? 'Story Bible updates' : 'Bridge'}
       </Button>
       <FinalizeReviewDialog novelId={novelId} chapter={chapter} open={open} onOpenChange={setOpen} canRevert={latestFinalChapter(summary.data?.items) === chapter} />
     </>

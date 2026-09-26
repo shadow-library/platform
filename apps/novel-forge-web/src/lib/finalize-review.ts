@@ -1,12 +1,14 @@
 import { type ChipIntent } from '@/components/nf/StatusChip';
 import {
   type ApiError,
+  type BridgePositionResponse,
   type DraftSummaryItem,
   type FinalizeReadinessResponse,
   type FinalizeReviewCategory,
   type FinalizeReviewDecision,
   type FinalizeReviewItemResponse,
   type FinalizeReviewResponse,
+  type IsolationBridgeResponse,
 } from '@/lib/apis';
 
 export type FinalizeReviewPhase =
@@ -19,6 +21,8 @@ export type FinalizeReviewPhase =
   | { kind: 'answering'; open: number }
   | { kind: 'answered'; blockers: string[] }
   | { kind: 'finalizable' }
+  | { kind: 'bridging'; open: number }
+  | { kind: 'bridged' }
   | { kind: 'applied' }
   | { kind: 'reverted' };
 
@@ -40,6 +44,9 @@ export type EditValue = string | boolean;
 
 export type EditPatch = { patch: Record<string, unknown> } | { problem: string };
 
+export type BridgeStatus =
+  { kind: 'approved'; replacing: boolean } | { kind: 'awaiting' } | { kind: 'reading' } | { kind: 'empty' } | { kind: 'failed' } | { kind: 'missing'; stale: boolean };
+
 export interface EvidenceLine {
   label: string | null;
   text: string;
@@ -49,7 +56,7 @@ const NO_REVIEW_CODE = 'FRV_001';
 const OPEN_ITEMS_CODE = 'FRV_005';
 const WITHHELD_PREFIX = '[excerpt withheld';
 
-/** Routine-capable categories, in the order the review lists them; knowledge is always asked one by one, so it never auto-keeps. */
+/** Routine-capable categories, in the order the review lists them; knowledge and the bridge summary are always asked one by one, so they never auto-keep. */
 export const AUTO_KEEP_CATEGORIES: readonly FinalizeReviewCategory[] = ['appearance', 'character_state', 'relationship', 'promise', 'entity', 'milestone'];
 
 const CATEGORY_LABELS: Record<FinalizeReviewCategory, string> = {
@@ -60,6 +67,7 @@ const CATEGORY_LABELS: Record<FinalizeReviewCategory, string> = {
   promise: 'Promise',
   knowledge: 'Knows',
   milestone: 'Milestone',
+  summary: 'Summary later chapters see',
 };
 
 const AUTO_KEEP_LABELS: Record<FinalizeReviewCategory, string> = {
@@ -70,6 +78,7 @@ const AUTO_KEEP_LABELS: Record<FinalizeReviewCategory, string> = {
   promise: 'Promises that moved',
   knowledge: 'What characters learn',
   milestone: 'Planned milestones',
+  summary: 'Bridge summaries',
 };
 
 /** The fields `editedChange` on the server accepts per proposed record; the keys naming the record are never among them. */
@@ -97,6 +106,7 @@ const EDIT_FIELDS: Record<string, readonly EditField[]> = {
   ],
   knowledge: [{ key: 'how', label: 'How they learn it', kind: 'longText', required: true }],
   milestone: [{ key: 'reached', label: 'Reached in this chapter', kind: 'flag' }],
+  summary: [{ key: 'text', label: 'What later chapters read', kind: 'longText', required: true }],
 };
 
 /**
@@ -119,6 +129,7 @@ export function finalizeReviewPhase(
   if (review.status === 'preparing') return { kind: 'preparing' };
   if (review.status === 'failed') return { kind: 'failed', error: review.error ?? null };
   const open = review.open.consequential + review.open.routine;
+  if (review.bridgeOnly) return open > 0 ? { kind: 'bridging', open } : { kind: 'bridged' };
   if (open > 0) return { kind: 'answering', open };
   if (readiness?.ready) return { kind: 'finalizable' };
   return { kind: 'answered', blockers: finalizeBlockers(readiness) };
@@ -153,7 +164,7 @@ export function itemTag(item: Pick<FinalizeReviewItemResponse, 'flag' | 'basis' 
   if (item.flag === 'unplanned_disclosure') return { label: 'Unplanned disclosure', intent: 'danger' };
   if (item.flag === 'missed_milestone') return { label: 'Missed milestone', intent: 'warning' };
   if (item.flag === 'unclaimed_milestone') return { label: 'Unplanned milestone', intent: 'warning' };
-  if (item.basis === 'inferred') return { label: 'Interpretation', intent: 'warning' };
+  if (item.basis === 'inferred' && item.category !== 'summary') return { label: 'Interpretation', intent: 'warning' };
   return { label: categoryLabel(item.category), intent: 'accent' };
 }
 
@@ -203,6 +214,7 @@ function recordOf(proposed: Record<string, unknown>): { name: string; fields: Re
       return 'thread' in proposed ? { name: 'thread', fields: asRecord(proposed.thread) } : { name: 'mystery', fields: asRecord(proposed.mystery) };
     case 'knowledge':
     case 'milestone':
+    case 'summary':
       return { name: proposed.category, fields: proposed };
     default:
       return { name: 'appearance', fields: {} };
@@ -316,4 +328,58 @@ export function reviewSubtitle(review: Pick<FinalizeReviewResponse, 'draftRevisi
   const read = `Read from revision ${review.draftRevision}, the one you approved.`;
   const ask = calls === 0 ? 'Nothing needs your call.' : `${calls === 1 ? 'One thing needs' : `${calls} things need`} your call.`;
   return `${read} ${ask} Skipping only means “don’t record this” — it doesn’t unsay what the reader saw. To change what happened, edit the chapter before finalizing.`;
+}
+
+export function reviewTitle(chapter: number, review: Pick<FinalizeReviewResponse, 'bridgeOnly'> | undefined): string {
+  if (review?.bridgeOnly) return `Bridge for the chapters after chapter ${chapter}`;
+  return `Finalize chapter ${chapter} — what it changes in your Story Bible`;
+}
+
+export function bridgeSubtitle(review: Pick<FinalizeReviewResponse, 'draftRevision'>): string {
+  return `Read from revision ${review.draftRevision}, the amended text. It changes no Story Bible records — it only sets what standard chapters may know of this unrestricted chapter, so there is nothing to finalize or undo.`;
+}
+
+type BridgeReview = Pick<FinalizeReviewResponse, 'bridgeOnly' | 'current' | 'status' | 'draftRevision' | 'consequential'>;
+
+/** A review of the current text still reading or asking its summary: until that is answered, the bridge before it keeps crossing. */
+function summaryWaiting(review: BridgeReview | undefined): boolean {
+  if (!review?.current) return false;
+  if (review.status === 'preparing') return true;
+  return review.status === 'ready' && review.consequential.some(item => item.category === 'summary' && !item.decision);
+}
+
+/**
+ * What a standard call can read of an isolated chapter, and what the author can do about it: an unfinished chapter's bridge is answered in its
+ * finalize review, and a final one's is read again only when no bridge-only review of the current text is waiting or already answered.
+ */
+export function bridgeStatus(bridge: Pick<IsolationBridgeResponse, 'approved' | 'revision'>, final: boolean, review: BridgeReview | undefined): BridgeStatus {
+  if (bridge.approved) return { kind: 'approved', replacing: summaryWaiting(review) };
+  if (!final) return { kind: 'awaiting' };
+  if (review?.bridgeOnly && summaryWaiting(review)) return { kind: 'reading' };
+  if (review?.bridgeOnly && review.current && review.status === 'ready') return { kind: 'empty' };
+  if (review?.bridgeOnly && review.current && review.status === 'failed') return { kind: 'failed' };
+  return { kind: 'missing', stale: review !== undefined && review.draftRevision < bridge.revision };
+}
+
+/** The revision whose Story Bible updates Undo can still take back while a bridge-only review stands in front of the applied finalize review. */
+export function undoBehindBridge(review: Pick<FinalizeReviewResponse, 'bridgeOnly' | 'appliedRevision'> | undefined, canRevert: boolean): number | null {
+  if (!review?.bridgeOnly || !canRevert) return null;
+  return review.appliedRevision ?? null;
+}
+
+export function bridgePositionLine(position: Pick<BridgePositionResponse, 'entityKey' | 'location' | 'conditions'>): string {
+  const where = position.location ? `at ${position.location}` : null;
+  return [position.entityKey, [where, ...position.conditions].filter(Boolean).join(', ')].join(' — ');
+}
+
+export function droppedOverLengthNote(dropped: number): string | null {
+  if (dropped === 0) return null;
+  const lines = dropped === 1 ? 'One place or condition was' : `${dropped} places and conditions were`;
+  return `${lines} too long to carry over — each crosses only as a short line of up to 60 characters.`;
+}
+
+export function droppedByHardLineNote(dropped: number): string | null {
+  if (dropped === 0) return null;
+  const lines = dropped === 1 ? 'One approved line was' : `${dropped} approved lines were`;
+  return `${lines} left out because ${dropped === 1 ? 'it crosses' : 'they cross'} the hard line — standard chapters never read what crosses it, even when you kept it.`;
 }

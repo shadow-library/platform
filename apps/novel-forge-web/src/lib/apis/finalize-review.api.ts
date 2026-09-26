@@ -5,6 +5,7 @@ import {
   type FinalizeReviewItemDecisionBody,
   type FinalizeReviewResponse,
   type FinalizeReviewSettingsResponse,
+  type IsolationBridgeResponse,
   type WorkflowRunResponse,
 } from './api-types.gen';
 import { draftDetailKey } from './interstitial.api';
@@ -15,6 +16,9 @@ const PREPARING_POLL_MS = 2000;
 /** Refusals that mean the review on screen is no longer the one the server holds, so it is read again. */
 const REVIEW_MOVED_CODES: ReadonlySet<string> = new Set(['FRV_001', 'FRV_002', 'FRV_003', 'FRV_004', 'FRV_008', 'FRV_011']);
 
+/** Refusals that mean the chapter on screen is no longer isolated (BRG_001) or no longer final (BRG_002), so the draft is read again. */
+const CHAPTER_MOVED_CODES: ReadonlySet<string> = new Set(['BRG_001', 'BRG_002']);
+
 // Keyed under the chapter's draft so an approval, a save or any draft mutation reads the review again.
 export function finalizeReviewKey(projectId: string, n: number): readonly [string, string, string, number, string] {
   return [...draftDetailKey(projectId, n), 'finalize-review'] as const;
@@ -22,6 +26,10 @@ export function finalizeReviewKey(projectId: string, n: number): readonly [strin
 
 function readinessKey(projectId: string, n: number): readonly [string, string, string, number, string] {
   return [...draftDetailKey(projectId, n), 'finalize-readiness'] as const;
+}
+
+export function isolationBridgeKey(projectId: string, n: number): readonly [string, string, string, number, string] {
+  return [...draftDetailKey(projectId, n), 'bridge'] as const;
 }
 
 function reviewPath(projectId: string, n: number): string {
@@ -43,6 +51,7 @@ async function storeReview(queryClient: QueryClient, projectId: string, n: numbe
   await queryClient.cancelQueries({ queryKey: finalizeReviewKey(projectId, n), exact: true });
   queryClient.setQueryData(finalizeReviewKey(projectId, n), review);
   queryClient.invalidateQueries({ queryKey: readinessKey(projectId, n) });
+  queryClient.invalidateQueries({ queryKey: isolationBridgeKey(projectId, n) });
 }
 
 function refetchMovedReview(queryClient: QueryClient, projectId: string, n: number, error: ApiError): void {
@@ -70,6 +79,27 @@ export function usePrepareFinalizeReviewMutation(projectId: string, n: number): 
       .body({})
       .execute(),
   );
+}
+
+export function useIsolationBridgeQuery(projectId: string, n: number, enabled = true): UseQueryResult<IsolationBridgeResponse, ApiError> {
+  return useQuery<IsolationBridgeResponse, ApiError>({
+    queryKey: isolationBridgeKey(projectId, n),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/${n}/bridge`).execute(),
+    enabled: enabled && Boolean(projectId),
+    retry: (count, error) => error.status >= 500 && count < 2,
+  });
+}
+
+/** Reads a final isolated chapter's bridge again from its current text, as a bridge-only review the dialog then shows. */
+export function usePrepareBridgeMutation(projectId: string, n: number): UseMutationResult<FinalizeReviewResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<FinalizeReviewResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(`/projects/${projectId}/drafts/${n}/bridge/prepare`).body({}).execute(),
+    onSuccess: review => storeReview(queryClient, projectId, n, review),
+    onError: error => {
+      if (CHAPTER_MOVED_CODES.has(error.code)) queryClient.invalidateQueries({ queryKey: draftDetailKey(projectId, n) });
+    },
+  });
 }
 
 export interface FinalizeReviewDecisionVariables {

@@ -8,12 +8,14 @@ import {
   type FinalizeReviewItemResponse,
   type FinalizeReviewResponse,
   useDecideFinalizeReviewItemMutation,
+  useDraftQuery,
   useFinalizeReadinessQuery,
   useFinalizeReviewedChapterMutation,
   useFinalizeReviewQuery,
   useFinalizeReviewSettingsMutation,
   useFinalizeUnreviewedChapterMutation,
   useKeepRoutineMutation,
+  usePrepareBridgeMutation,
   usePrepareFinalizeReviewMutation,
   useRevertFinalizeReviewMutation,
   type WorkflowRunResponse,
@@ -21,6 +23,7 @@ import {
 import {
   autoKeepChoices,
   autoKeepLabel,
+  bridgeSubtitle,
   categoryLabel,
   decisionAnnouncement,
   decisionLabel,
@@ -33,12 +36,15 @@ import {
   keptCount,
   nextOpenItemId,
   reviewSubtitle,
+  reviewTitle,
   toggledAutoKeep,
+  undoBehindBridge,
 } from '@/lib/finalize-review';
 import { useElapsed } from '@/lib/use-elapsed';
 
 import { FinalizeReviewItemCard, type ItemProblem, SkipForm } from './FinalizeReviewItemCard';
 import styles from './FinalizeReviewDialog.module.css';
+import { IsolationBridgePanel } from './IsolationBridgePanel';
 
 const STUCK_PREPARING_MS = 60_000;
 
@@ -53,14 +59,18 @@ export interface FinalizeReviewDialogProps {
 
 export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, canRevert }: FinalizeReviewDialogProps): ReactElement {
   const review = useFinalizeReviewQuery(novelId, chapter, open);
+  const draft = useDraftQuery(novelId, chapter, open);
   const data = review.data;
+  const final = draft.data?.status === 'final';
   const unreviewed = review.error?.code === 'FRV_001';
-  const needsReadiness = open && ((data?.status === 'ready' && data.current) || unreviewed);
+  const needsReadiness = open && !final && !data?.bridgeOnly && ((data?.status === 'ready' && data.current) || unreviewed);
   const readiness = useFinalizeReadinessQuery(novelId, chapter, needsReadiness);
   const phase = finalizeReviewPhase(data, review.error, needsReadiness ? readiness.data : undefined);
-  const action = finalizeAction(phase, needsReadiness ? readiness.data : undefined);
+  const action = !draft.data || final ? null : finalizeAction(phase, needsReadiness ? readiness.data : undefined);
 
-  const prepare = usePrepareFinalizeReviewMutation(novelId, chapter);
+  const prepareReview = usePrepareFinalizeReviewMutation(novelId, chapter);
+  const prepareBridge = usePrepareBridgeMutation(novelId, chapter);
+  const prepare = data?.bridgeOnly ? prepareBridge : prepareReview;
   const decide = useDecideFinalizeReviewItemMutation(novelId, chapter);
   const keepRoutine = useKeepRoutineMutation(novelId, chapter);
   const settings = useFinalizeReviewSettingsMutation(novelId, chapter);
@@ -206,9 +216,11 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
     closeForms();
   };
 
-  const reviewing = phase.kind === 'answering' || phase.kind === 'answered' || phase.kind === 'finalizable';
+  const reviewing = phase.kind === 'answering' || phase.kind === 'answered' || phase.kind === 'finalizable' || phase.kind === 'bridging' || phase.kind === 'bridged';
   const settled = phase.kind === 'applied' || phase.kind === 'reverted';
-  const blockers = reviewing || unreviewed ? finalizeBlockers(readiness.data) : [];
+  const blockers = needsReadiness && (reviewing || unreviewed) ? finalizeBlockers(readiness.data) : [];
+  const appliedBehind = undoBehindBridge(data, canRevert);
+  const loading = phase.kind === 'loading' || (phase.kind === 'missing' && !draft.data);
   const readinessFailed = needsReadiness && Boolean(readiness.error) && !readiness.data;
   const kept = data ? keptCount(data) : 0;
 
@@ -216,8 +228,8 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
     <Dialog open={open} onOpenChange={closeAnd}>
       <Dialog.Content size="lg" onEscapeKeyDown={onEscapeKeyDown}>
         <Dialog.Header
-          title={`Finalize chapter ${chapter} — what it changes in your Story Bible`}
-          description={reviewing && data ? reviewSubtitle(data) : undefined}
+          title={reviewTitle(chapter, data)}
+          description={reviewing && data ? (data.bridgeOnly ? bridgeSubtitle(data) : reviewSubtitle(data)) : undefined}
           showClose={false}
         />
         <Dialog.Body className={styles.body}>
@@ -225,12 +237,15 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
             {announcement}
           </div>
 
-          {phase.kind === 'loading' && (
+          {loading && (
             <div className={styles.loading}>
               <Spinner size="lg" label="Loading the review" />
             </div>
           )}
-          {phase.kind === 'missing' && (
+          {phase.kind === 'missing' && draft.data && final && (
+            <p className={styles.note}>Chapter {chapter} was finalized before Story Bible reviews existed, so there are no updates to show.</p>
+          )}
+          {phase.kind === 'missing' && draft.data && !final && (
             <Alert intent="info" title="This chapter has no Story Bible review">
               It was approved before finalize reviews existed, so it finalizes as it always did: its Story Bible updates wait in the Review Queue afterwards.
             </Alert>
@@ -243,7 +258,7 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
           {phase.kind === 'preparing' && data && (
             <div className={styles.preparing} role="status">
               <Spinner size="sm" />
-              <span>Reading the Story Bible updates from revision {data.draftRevision}…</span>
+              <span>{data.bridgeOnly ? `Reading the bridge from revision ${data.draftRevision}…` : `Reading the Story Bible updates from revision ${data.draftRevision}…`}</span>
               {stuck && (
                 <Button variant="ghost" size="sm" loading={prepare.isPending} onClick={() => prepare.mutate(undefined, { onError: error => toast.danger(error.message) })}>
                   Prepare again
@@ -260,7 +275,12 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
               {phase.error ?? 'The reader stopped before it finished.'}
             </Alert>
           )}
-          {phase.kind === 'invalidated' && data && (
+          {phase.kind === 'invalidated' && data?.bridgeOnly && (
+            <Alert intent="warning" title="The text changed after this bridge was read">
+              This bridge was read from revision {data.draftRevision}. Read it again to answer for the current text.
+            </Alert>
+          )}
+          {phase.kind === 'invalidated' && data && !data.bridgeOnly && (
             <Alert intent="warning" title="The prose changed since you approved it">
               This review was read from revision {data.draftRevision}. Approve the chapter again to review what the new revision changes.
             </Alert>
@@ -278,6 +298,17 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
           )}
 
           {data?.isolated && (reviewing || settled) && <p className={styles.note}>This chapter is isolated, so the lines each update was read from are withheld here.</p>}
+
+          {appliedBehind !== null && (
+            <div className={styles.disclosure} data-tone="success">
+              <span>Story Bible updates for revision {appliedBehind}: applied</span>
+              <button type="button" className={`${styles.link} ${styles.disclosureLink}`} disabled={revert.isPending} onClick={() => setConfirmRevert(true)}>
+                Undo
+              </button>
+            </div>
+          )}
+
+          {draft.data?.isolated && <IsolationBridgePanel novelId={novelId} chapter={chapter} final={final} review={data} onPrepared={announce} />}
 
           {data && (reviewing || settled) && (
             <>
@@ -380,22 +411,26 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
                 </section>
               )}
 
-              {data.consequential.length === 0 && data.routine.length === 0 && <p className={styles.note}>This chapter changes nothing in the Story Bible.</p>}
+              {data.consequential.length === 0 && data.routine.length === 0 && (
+                <p className={styles.note}>{data.bridgeOnly ? 'No summary was read from this text, so nothing crosses.' : 'This chapter changes nothing in the Story Bible.'}</p>
+              )}
 
-              <div className={styles.disclosure} data-tone={data.disclosure.clear ? 'success' : 'warning'}>
-                <span>{data.disclosure.copy}</span>
-                <button type="button" className={`${styles.link} ${styles.disclosureLink}`} aria-expanded={checkedOpen} onClick={() => setCheckedOpen(value => !value)}>
-                  What was checked
-                </button>
-              </div>
-              {!data.disclosure.clear && (
+              {!data.bridgeOnly && (
+                <div className={styles.disclosure} data-tone={data.disclosure.clear ? 'success' : 'warning'}>
+                  <span>{data.disclosure.copy}</span>
+                  <button type="button" className={`${styles.link} ${styles.disclosureLink}`} aria-expanded={checkedOpen} onClick={() => setCheckedOpen(value => !value)}>
+                    What was checked
+                  </button>
+                </div>
+              )}
+              {!data.bridgeOnly && !data.disclosure.clear && (
                 <ul className={styles.reasons}>
                   {data.disclosure.findings.map(finding => (
                     <li key={finding}>{finding}</li>
                   ))}
                 </ul>
               )}
-              {checkedOpen && (
+              {!data.bridgeOnly && checkedOpen && (
                 <span className={styles.checked}>
                   The updates read from revision {data.draftRevision} were checked against what the plan still keeps locked at this chapter. It’s a model reading, so “nothing
                   detected” is not a guarantee.
@@ -419,14 +454,14 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
             </Alert>
           )}
           {refusal && (
-            <Alert intent="danger" title={phase.kind === 'applied' ? 'Couldn’t undo the updates' : 'Couldn’t finalize'} role="alert">
+            <Alert intent="danger" title={phase.kind === 'applied' || appliedBehind !== null ? 'Couldn’t undo the updates' : 'Couldn’t finalize'} role="alert">
               {refusal.message}
             </Alert>
           )}
         </Dialog.Body>
 
         <Dialog.Footer className={styles.footer}>
-          {data && reviewing && autoKeepChoices(data).length > 0 && (
+          {data && reviewing && !data.bridgeOnly && autoKeepChoices(data).length > 0 && (
             <span className={styles.autoKeep} role="group" aria-label="Keep automatically from now on">
               <span>Keep automatically from now on:</span>
               {autoKeepChoices(data).map(category => (

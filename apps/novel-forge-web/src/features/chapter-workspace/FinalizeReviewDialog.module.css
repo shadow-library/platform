@@ -213,6 +213,21 @@
   outline-offset: 2px;
 }
 
+.bridge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+}
+
+.bridgeSummary {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-primary);
+}
+
 .disclosure {
   display: flex;
   align-items: center;
