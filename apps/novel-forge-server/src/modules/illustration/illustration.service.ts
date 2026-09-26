@@ -14,7 +14,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { type GeneratedImage, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { illustrationComposePrompt } from '../ai/prompts/illustration-compose.prompt';
 import { EntityService } from '../bible/entity/entity.service';
-import { loadWriterDisclosurePolicy, type WriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
+import { loadArtDisclosurePolicy, type WriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { ChapterImageService } from '../generation/chapter-image.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ProjectService } from '../project/project/project.service';
@@ -25,6 +25,7 @@ import {
   type ReferenceView,
   type ReferenceWarning,
   type ResolvedReferences,
+  scrubReference,
   summarizeReferences,
 } from './illustration-reference.service';
 import { applyInstructionEdit, hashInstructions, type InstructionEdit, renderPromptSpec, renderReferenceManifest } from './prompt-spec';
@@ -108,6 +109,8 @@ interface ComposeRequest {
   references: Illustration.Reference[];
   described?: DescribedAppearance;
   depiction?: DepictionPoint;
+  /** What the image prompt may carry (P4-51): the depiction's policy for an entity, else that of the chapter or, for a cover, the latest final one. */
+  disclosure: WriterDisclosurePolicy;
 }
 
 interface DepictionPoint {
@@ -157,24 +160,27 @@ export class IllustrationService {
     const autoReferences = input.autoReferences ?? true;
     const depiction = await this.depictionFor(projectId, subjectType, input.depictsChapter);
     const depictsChapter = depiction?.policy.chapter ?? null;
+    const disclosure = depiction?.policy ?? (await this.artDisclosureFor(projectId, subjectType, subjectKey));
     const target = `${subjectType}:${subjectKey ?? 'cover'}`;
     const entity = await this.loadEntity(projectId, subjectType, subjectKey);
     const appearance = entity?.appearance?.trim() || null;
     const anchor = appearance && depiction ? depiction.policy.scrub(appearance, 'entity') : appearance;
-    const resolved = await this.referenceService.resolve({
-      projectId,
-      project,
-      subjectType,
-      subjectKey,
-      attached: attachedReferences,
-      autoReferences,
-      depiction: depiction?.policy,
-    });
+    const resolved = await this.referenceService
+      .resolve({
+        projectId,
+        project,
+        subjectType,
+        subjectKey,
+        attached: attachedReferences,
+        autoReferences,
+        depiction: depiction?.policy,
+      })
+      .then(references => readableReferences(references, disclosure));
 
     const chainInput = { subjectType, subjectKey, instructions, references: attachedReferences, autoReferences, depictsChapter };
     const { result } = await this.workflowRuns.runChain(projectId, 'illustration', target, chainInput, async runId => {
-      const described = anchor ? undefined : await this.describeOnce(projectId, project, entity, resolved, runId);
-      const request = { subjectType, subjectKey, instructions, anchor, references: resolved.references, described, depiction };
+      const described = anchor ? undefined : await this.describeOnce(projectId, project, entity, resolved, runId, disclosure);
+      const request = { subjectType, subjectKey, instructions, anchor, references: resolved.references, described, depiction, disclosure };
       const composed = await this.compose(projectId, project, request, runId);
       const promptSpec: Illustration.PromptSpec = { ...composed, attachedReferences, autoReferences };
       const candidates = await this.generate(projectId, project, promptSpec, runId, resolved);
@@ -221,17 +227,19 @@ export class IllustrationService {
     if (!project) throw AppErrorCode.PRJ_001.create();
 
     const promptSpec: Illustration.PromptSpec = { ...row.promptSpec, instructions: applyInstructionEdit(row.promptSpec.instructions, edit) };
-    const resolved = await this.referenceService.resolve({
-      projectId,
-      project,
-      subjectType: row.subjectType,
-      subjectKey: row.subjectKey,
-      attached: [],
-      carried: promptSpec.attachedReferences ?? [],
-      autoReferences: promptSpec.autoReferences ?? true,
-      editSourceRef: editSourceOf(row),
-      depiction: await this.storedDepiction(projectId, row),
-    });
+    const resolved = await this.referenceService
+      .resolve({
+        projectId,
+        project,
+        subjectType: row.subjectType,
+        subjectKey: row.subjectKey,
+        attached: [],
+        carried: promptSpec.attachedReferences ?? [],
+        autoReferences: promptSpec.autoReferences ?? true,
+        editSourceRef: editSourceOf(row),
+        depiction: await this.storedDepiction(projectId, row),
+      })
+      .then(async references => readableReferences(references, await this.storedDisclosure(projectId, row)));
 
     const { result } = await this.workflowRuns.runChain(projectId, 'illustration', `refine:${illustrationId}`, { edit }, runId =>
       this.generate(projectId, project, promptSpec, runId, resolved),
@@ -358,9 +366,9 @@ export class IllustrationService {
   }
 
   private async compose(projectId: bigint, project: ProjectConfig, request: ComposeRequest, runId: string): Promise<Illustration.PromptSpec> {
-    const { subjectType, subjectKey, instructions, anchor, described, depiction } = request;
+    const { subjectType, subjectKey, instructions, anchor, described, depiction, disclosure } = request;
     const policy = await this.pluginPolicy.resolve(projectId, { role: 'illustration' });
-    const pack = await this.assembler.forIllustration(projectId, subjectType, subjectKey, { policy, depiction: depiction?.policy });
+    const pack = await this.assembler.forIllustration(projectId, subjectType, subjectKey, { policy, depiction: disclosure });
 
     const composed = await this.modelRouter.structured(
       illustrationComposePrompt,
@@ -373,7 +381,7 @@ export class IllustrationService {
       },
       { projectId, runId, node: 'compose', promptKey: illustrationComposePrompt.key, promptVersion: illustrationComposePrompt.version, role: 'illustration' },
       project,
-      policy,
+      disclosure.scrubPolicy(policy),
     );
 
     const derived = described?.appearance ?? composed.appearance;
@@ -400,6 +408,7 @@ export class IllustrationService {
     entity: EntitySubject | null,
     resolved: ResolvedReferences,
     runId: string,
+    disclosure: WriterDisclosurePolicy,
   ): Promise<DescribedAppearance | undefined> {
     if (!entity) return undefined;
     const referenceIndex = resolved.references.findIndex(reference => reference.role === 'likeness');
@@ -409,7 +418,7 @@ export class IllustrationService {
 
     try {
       const description = await this.describer.describe({ projectId, project, imageDataUrl, subjectLabel: entity.name, note: reference.note, runId });
-      return { ...description, referenceIndex };
+      return { ...description, appearance: disclosure.scrub(description.appearance, 'entity'), referenceIndex };
     } catch (error) {
       if (isProgrammingError(error)) throw error;
       const detail = AppError.is(error) ? { code: error.code } : { name: errorName(error), message: errorMessage(error) };
@@ -446,11 +455,22 @@ export class IllustrationService {
       return undefined;
     }
     const { chapter, frontier } = await resolveDepiction(this.db, projectId, requested);
-    return { policy: await loadWriterDisclosurePolicy(this.db, projectId, chapter), frontier };
+    return { policy: await loadArtDisclosurePolicy(this.db, projectId, chapter), frontier };
+  }
+
+  private async artDisclosureFor(projectId: bigint, subjectType: Illustration.SubjectType, subjectKey: string | null): Promise<WriterDisclosurePolicy> {
+    const chapter = subjectType === 'chapter' ? Number(subjectKey) : await latestFinalChapter(this.db, projectId);
+    return loadArtDisclosurePolicy(this.db, projectId, chapter);
+  }
+
+  /** The art policy a stored image is drawn under (P4-51): its depicted chapter's for an entity, else that of its chapter or the latest final one. */
+  private async storedDisclosure(projectId: bigint, row: Illustration.Row): Promise<WriterDisclosurePolicy> {
+    if (row.depictsChapter !== null) return loadArtDisclosurePolicy(this.db, projectId, row.depictsChapter);
+    return this.artDisclosureFor(projectId, row.subjectType, row.subjectKey);
   }
 
   private async storedDepiction(projectId: bigint, row: Illustration.Row): Promise<WriterDisclosurePolicy | undefined> {
-    return row.depictsChapter === null ? undefined : loadWriterDisclosurePolicy(this.db, projectId, row.depictsChapter);
+    return row.depictsChapter === null ? undefined : loadArtDisclosurePolicy(this.db, projectId, row.depictsChapter);
   }
 
   private async loadEntity(projectId: bigint, subjectType: Illustration.SubjectType, subjectKey: string | null): Promise<EntitySubject | null> {
@@ -577,6 +597,11 @@ function mergeReferenceLedger(ledger: Illustration.Reference[], sent: Illustrati
   const byRef = new Map(ledger.map(reference => [reference.ref, reference]));
   for (const reference of sent) byRef.set(reference.ref, reference);
   return [...byRef.values()];
+}
+
+/** What the image models may read of the references (P4-51): every label, note and name scrubbed; which images are allowed is the resolver's call. */
+function readableReferences(resolved: ResolvedReferences, disclosure: WriterDisclosurePolicy): ResolvedReferences {
+  return { ...resolved, references: resolved.references.map(reference => scrubReference(reference, disclosure)) };
 }
 
 function composeReferenceInput(references: Illustration.Reference[], described: DescribedAppearance | undefined): string {

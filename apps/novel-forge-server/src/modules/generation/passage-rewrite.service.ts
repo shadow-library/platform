@@ -144,7 +144,7 @@ export class PassageRewriteService {
       },
       ctx,
       routedProject,
-      policy,
+      disclosure.scrubPolicy(policy),
     )) as PassageRewriteOutput;
     const replacement = fitReplacement(passage, output.replacement);
 

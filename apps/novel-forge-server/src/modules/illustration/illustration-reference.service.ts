@@ -546,7 +546,7 @@ function withCaption(label: string, caption: string | null): string {
   return caption ? `${label}, captioned "${caption}"` : label;
 }
 
-function scrubReference(reference: Illustration.Reference, depiction: Pick<WriterDisclosurePolicy, 'scrub'>): Illustration.Reference {
+export function scrubReference(reference: Illustration.Reference, depiction: Pick<WriterDisclosurePolicy, 'scrub'>): Illustration.Reference {
   const scrub = (text: string | undefined): string | undefined => (text === undefined ? undefined : depiction.scrub(text, 'reference'));
   const { label, note, name } = reference;
   return {

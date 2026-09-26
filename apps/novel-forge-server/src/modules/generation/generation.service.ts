@@ -512,7 +512,7 @@ export class GenerationService {
       },
       ctx,
       routedProject,
-      policy,
+      disclosure.scrubPolicy(policy),
     )) as { title: string; body: string; summary: string; state?: GenerationState };
 
     return this.db.transaction(async tx => {
@@ -790,13 +790,20 @@ export class GenerationService {
       ...generationWordTargetVars(resolveWordTarget(project)),
     };
     const guidance = body.guidance ? disclosure.scrub(body.guidance, 'note') : '';
-    const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, policy)) as {
+    const writerPolicy = disclosure.scrubPolicy(policy);
+    const generated = (await this.modelRouter.structured(PROMPT_REGISTRY.generation, { ...promptVars, guidance }, ctx, routedProject, writerPolicy)) as {
       title: string;
       body: string;
       summary: string;
       state?: GenerationState;
     };
-    const expansion = await expandShortDraft(this.modelRouter, { ...promptVars, guidance, body: generated.body }, { ...ctx, node: 'generateUnrestricted' }, routedProject, policy);
+    const expansion = await expandShortDraft(
+      this.modelRouter,
+      { ...promptVars, guidance, body: generated.body },
+      { ...ctx, node: 'generateUnrestricted' },
+      routedProject,
+      writerPolicy,
+    );
     const result = { ...generated, body: expansion.body };
 
     // The replacement and the descendant invalidation it forces commit together: a crash between them

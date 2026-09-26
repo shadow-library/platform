@@ -305,6 +305,29 @@ export function writerSafeLeakFindings(prescan: KnowledgeLeakIssue[], judgeIssue
   return writerSafeLeakLines(prescan, judgeIssues, forbidden).map(text => ({ severity: 'soft' as const, text }));
 }
 
+const EXISTING_TITLES_MAX = 10;
+
+/** The title prompt's inputs: the recent finalized titles as its style reference, an isolated chapter's left out, and the draft's summary, both scrubbed. */
+async function titlePromptInput(
+  db: Pick<PrimaryDatabase, 'query'>,
+  projectId: bigint,
+  chapter: number,
+  summary: string,
+  disclosure: WriterDisclosurePolicy,
+): Promise<{ existingTitles: string; chapterSummary: string }> {
+  const earlier = await db.query.chapters.findMany({
+    columns: { number: true, title: true, isolated: true },
+    where: and(eq(schema.chapters.projectId, projectId), lt(schema.chapters.number, chapter), eq(schema.chapters.status, 'done')),
+    orderBy: desc(schema.chapters.number),
+    limit: EXISTING_TITLES_MAX,
+  });
+  const titles = earlier
+    .filter(row => !row.isolated && row.title?.trim())
+    .reverse()
+    .map(row => `- Ch ${row.number}: ${disclosure.scrub(row.title ?? '', 'heading')}`);
+  return { existingTitles: titles.join('\n') || '(none yet)', chapterSummary: disclosure.scrub(summary, 'summary') };
+}
+
 /** Other findings can still name or paraphrase a forbidden fact, so they are scrubbed; the leak findings are already in their writer-safe form. */
 function writerFacingFindings(state: Pick<ChapterGenState, 'findings' | 'knowledgeWriterFindings'>, disclosure: WriterDisclosurePolicy): string {
   const render = (findings: JudgeFinding[]): string => findings.map(finding => `[${finding.severity}] ${finding.text}`).join('\n');
@@ -445,8 +468,10 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const { policy, project } = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
+    const route = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
     const disclosure = await disclosureFor(projectId, state.chapter);
+    const { project } = route;
+    const policy = disclosure.scrubPolicy(route.policy);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const guidance = writerSafeGuidance(disclosure, state.guidance);
     const wordTarget = resolveWordTarget(projectRow);
@@ -486,7 +511,13 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
       const titleRoute = await routeFor(projectId, 'title', { ...state, writerClassRaised: raised }, undefined);
       raised ||= titleRoute.policy.raised;
-      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx, titleRoute.project, titleRoute.policy)) as {
+      const titleResult = (await modelRouter.structured(
+        PROMPT_REGISTRY.title,
+        await titlePromptInput(db, projectId, state.chapter, result.summary, disclosure),
+        titleCtx,
+        titleRoute.project,
+        disclosure.scrubPolicy(titleRoute.policy),
+      )) as {
         title: string;
       };
       title = titleResult.title ?? '';
@@ -706,7 +737,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       renderedPack = pack?.rendered ?? '';
     }
 
-    const findingsStr = writerFacingFindings(state, await disclosureFor(projectId, state.chapter));
+    const disclosure = await disclosureFor(projectId, state.chapter);
+    const findingsStr = writerFacingFindings(state, disclosure);
     const ctx: TelemetryContext = {
       projectId,
       runId: state.runId,
@@ -717,7 +749,9 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const { policy, project } = await routeFor(projectId, 'repair', state, projectRow as ProjectConfig | undefined);
+    const route = await routeFor(projectId, 'repair', state, projectRow as ProjectConfig | undefined);
+    const { project } = route;
+    const policy = disclosure.scrubPolicy(route.policy);
     const [targetRevision, planRevision] = await Promise.all([targetRevisionFor(projectId, state.chapter), briefRevisionFor(projectId, state.chapter)]);
     ctx.onMessages = writerSnapshots.onMessages({
       projectId,
@@ -726,7 +760,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       attempt: state.attempt + 1,
       role: 'repair',
       contextPackId: state.contextPackId ? BigInt(state.contextPackId) : null,
-      keptBack: keptBackOf(await disclosureFor(projectId, state.chapter), null),
+      keptBack: keptBackOf(disclosure, null),
       planRevision,
       bibleHash: bibleHashOf(renderedPack),
       promptKey: PROMPT_REGISTRY.fix.key,
@@ -801,7 +835,9 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       chapter: state.chapter,
     };
 
-    const { policy, project } = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
+    const route = await routeFor(projectId, 'draft', state, projectRow as ProjectConfig | undefined);
+    const { project } = route;
+    const policy = disclosure.scrubPolicy(route.policy);
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const wordTarget = resolveWordTarget(projectRow);
 

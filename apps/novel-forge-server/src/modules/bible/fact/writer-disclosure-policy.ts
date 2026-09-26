@@ -191,6 +191,12 @@ export class WriterDisclosurePolicy {
     return safeLines.length === 0 ? scrubbed : [scrubbed.trim(), ...safeLines].filter(Boolean).join('\n');
   }
 
+  /** A plugin's system messages reach the writer beside the pack rather than in it, so they pass the scrub its context sections do. */
+  scrubPolicy<T extends { systemMessages?: readonly { role: 'system'; content: string }[] }>(policy: T): T {
+    if (!policy.systemMessages?.length) return policy;
+    return { ...policy, systemMessages: policy.systemMessages.map(message => ({ ...message, content: this.scrub(message.content, 'plugin') })) };
+  }
+
   /** Structured continuation state, key by key and value by value: scrubbing its JSON would miss a passage whose quotes or breaks the encoding escapes. */
   scrubState(value: unknown, establishedFactsMax: number): unknown {
     if (typeof value === 'string') return this.scrub(value, 'state');
@@ -377,6 +383,22 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
     volumeOrdinals,
     currentVolumeOrdinal,
   };
+}
+
+/**
+ * What reader-facing art drawn as of `chapter` may carry (P4-51): the writer policy of that chapter, with the ending and the ending question
+ * withheld even at or after the ending chapter, since an image prompt never needs them.
+ */
+export async function loadArtDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
+  const [sources, project] = await Promise.all([
+    loadWriterDisclosureSources(db, projectId, chapter),
+    db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) }),
+  ]);
+  return writerDisclosurePolicy({
+    ...sources,
+    ending: present(project?.ending) ? project.ending : null,
+    endingQuestion: present(project?.endingQuestion) ? project.endingQuestion : null,
+  });
 }
 
 export async function loadWriterDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {

@@ -75,7 +75,7 @@ export interface PackPolicyOptions {
 }
 
 export interface IllustrationPackOptions extends PackPolicyOptions {
-  /** The policy of the chapter an entity subject is drawn as of; ignored for any other subject. */
+  /** The art disclosure policy of the chapter the image is drawn as of: an entity's depicted chapter, a chapter subject's own, or the latest final one for a cover. */
   depiction?: WriterDisclosurePolicy;
 }
 
@@ -1423,8 +1423,8 @@ export class ContextAssembler {
    * Pack for composing one image prompt. The art-style bible and the project premise are stable (they
    * bind every illustration in the project); the subject card and the canon that describes how the
    * subject looks are volatile. `subjectKey` is the entity key, the chapter number as text, or null
-   * for the project cover. An entity drawn as of a chapter reads only what that chapter's writer may: every section passes its
-   * disclosure scrub, its changes stop at the chapter, and its present-day status is left out.
+   * for the project cover. Reader-facing art reads only what the reader has by its chapter (P4-51): with `depiction`, every section passes
+   * that policy's scrub, the art style and premise as copied pages, and an entity's changes stop at the chapter with its present-day status left out.
    */
   async forIllustration(
     projectId: bigint,
@@ -1432,7 +1432,7 @@ export class ContextAssembler {
     subjectKey: string | null,
     opts?: IllustrationPackOptions,
   ): Promise<AssembledPack & { id: bigint | null }> {
-    const disclosure = subjectType === 'entity' ? opts?.depiction : undefined;
+    const disclosure = opts?.depiction;
     const scrub = (text: string, field: WriterField): string => (disclosure ? disclosure.scrub(text, field) : text);
     const [project, artStyle] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
@@ -1442,16 +1442,16 @@ export class ContextAssembler {
     ]);
 
     const sections: ContextSection[] = [];
-    if (artStyle?.body) sections.push(asStable(makeSection('art_style', scrub(artStyle.body, 'style'), 'canonical', [`doc:${ART_STYLE_DOC.section}/${ART_STYLE_DOC.slug}`])));
+    if (artStyle?.body) sections.push(asStable(makeSection('art_style', scrub(artStyle.body, 'bible_page'), 'canonical', [`doc:${ART_STYLE_DOC.section}/${ART_STYLE_DOC.slug}`])));
     if (project) {
       const premise = [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n');
-      sections.push(asStable(makeSection('premise', scrub(premise, 'summary'), 'canonical', ['premise'])));
+      sections.push(asStable(makeSection('premise', scrub(premise, 'reference'), 'canonical', ['premise'])));
     }
 
     if (subjectType === 'entity' && subjectKey) sections.push(...(await this.entitySubjectSections(projectId, subjectKey, disclosure)));
-    if (subjectType === 'chapter' && subjectKey) sections.push(...(await this.chapterSubjectSections(projectId, Number(subjectKey))));
+    if (subjectType === 'chapter' && subjectKey) sections.push(...(await this.chapterSubjectSections(projectId, Number(subjectKey), disclosure)));
 
-    const chapter = subjectType === 'chapter' && subjectKey ? Number(subjectKey) : (disclosure?.chapter ?? null);
+    const chapter = subjectType === 'chapter' && subjectKey ? Number(subjectKey) : subjectType === 'entity' ? (disclosure?.chapter ?? null) : null;
     return this.finalize(projectId, 'illustration', chapter, sections, [], ILLUSTRATION_BUDGET, { policy: opts?.policy, disclosure });
   }
 
@@ -1493,7 +1493,8 @@ export class ContextAssembler {
     return sections;
   }
 
-  private async chapterSubjectSections(projectId: bigint, chapter: number): Promise<ContextSection[]> {
+  private async chapterSubjectSections(projectId: bigint, chapter: number, disclosure?: WriterDisclosurePolicy): Promise<ContextSection[]> {
+    const scrub = (text: string, field: WriterField): string => (disclosure ? disclosure.scrub(text, field) : text);
     const [chapterRow, appearances] = await Promise.all([
       this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
       this.db.query.entityAppearances.findMany({ where: and(eq(schema.entityAppearances.projectId, projectId), eq(schema.entityAppearances.chapter, chapter)) }),
@@ -1502,7 +1503,9 @@ export class ContextAssembler {
     const subject = walledOff(chapterRow, (await loadIsolationBridges(this.db, projectId, [{ chapter, isolated: chapterRow.isolated }])).get(chapter));
 
     const sections = [
-      makeSection('subject_card', [`Chapter ${chapter}: ${subject.title ?? ''}`, subject.summary ?? ''].filter(Boolean).join('\n\n'), 'canonical', [`chapter:${chapter}`]),
+      makeSection('subject_card', scrub([`Chapter ${chapter}: ${subject.title ?? ''}`, subject.summary ?? ''].filter(Boolean).join('\n\n'), 'reference'), 'canonical', [
+        `chapter:${chapter}`,
+      ]),
     ];
 
     const entityIds = appearances.map(a => a.entityId);
@@ -1513,7 +1516,7 @@ export class ContextAssembler {
     sections.push(
       makeSection(
         'cast_appearance',
-        rendered,
+        scrub(rendered, 'entity'),
         'canonical',
         cast.map(e => `entity:${e.entityKey}`),
       ),
