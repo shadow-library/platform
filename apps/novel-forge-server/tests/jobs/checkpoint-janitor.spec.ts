@@ -19,13 +19,14 @@ describe('CheckpointJanitor.purgeJobEvents', () => {
     const before = Date.now();
 
     await janitor.purgeJobEvents(db as never, 7);
+    const after = Date.now();
 
     expect(deletes.map(entry => entry.table)).toEqual([schema.jobEvents]);
     const query = dialect.sqlToQuery(deletes[0]?.where as SQL);
     expect(query.sql).toBe('"job_events"."job_id" in (select "id" from "jobs" where ("jobs"."status" in ($1, $2, $3) and "jobs"."updated_at" < $4))');
     expect(query.params.slice(0, 3)).toEqual(['done', 'failed', 'cancelled']);
     const cutoff = new Date(String(query.params[3]).replace(' ', 'T').replace(/Z?$/, 'Z'));
-    expect(cutoff.getTime()).toBeLessThanOrEqual(before - 7 * 86_400_000);
-    expect(cutoff.getTime()).toBeGreaterThan(before - 7 * 86_400_000 - 60_000);
+    expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - 7 * 86_400_000);
+    expect(cutoff.getTime()).toBeLessThanOrEqual(after - 7 * 86_400_000);
   });
 });
