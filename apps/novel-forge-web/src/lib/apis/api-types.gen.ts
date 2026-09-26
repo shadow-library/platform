@@ -1748,6 +1748,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/source/chapters/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Search Chapters */
+    get: operations['get_api_v1_projects_projectId_source_chapters_search'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/source/chapters/{n}': {
     parameters: {
       query?: never;
@@ -4663,12 +4680,16 @@ export interface components {
       illustrations: number;
     };
     /** @enum {string} */
+    SortByChapter: 'number' | 'createdAt' | 'updatedAt';
+    /** @enum {string} */
     ChapterStatus: 'done' | 'failed' | 'skipped';
     ListChapterResponse: {
       total: number;
       limit: number;
       offset: number;
       items: components['schemas']['ChapterListResponse'][];
+      page: number;
+      totalPages: number;
     };
     ChapterListResponse: {
       id: string;
@@ -4679,10 +4700,28 @@ export interface components {
       status: components['schemas']['ChapterStatus'];
       generator?: null | string;
       continuityApplied: boolean;
+      isolated: boolean;
+      volumeKey?: null | string;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    ChapterSearchResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChapterSearchHit'][];
+      page: number;
+      totalPages: number;
+    };
+    ChapterSearchHit: {
+      number: number;
+      title?: null | string;
+      /** @description A short excerpt around the first match, ellipsised at either end when truncated. */
+      snippet: string;
+      /** @description How many times the query occurs in this chapter, case-insensitively. */
+      matchCount: number;
     };
     ChapterResponse: {
       id: string;
@@ -4693,6 +4732,8 @@ export interface components {
       status: components['schemas']['ChapterStatus'];
       generator?: null | string;
       continuityApplied: boolean;
+      isolated: boolean;
+      volumeKey?: null | string;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -5088,6 +5129,8 @@ export interface components {
       limit: number;
       offset: number;
       items: components['schemas']['EntityResponse'][];
+      page: number;
+      totalPages: number;
     };
     TimelineResponse: {
       events: components['schemas']['CharacterEventResponse'][];
@@ -10953,8 +10996,16 @@ export interface operations {
         limit?: number | string;
         offset?: number | string;
         sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
+        sortBy?: components['schemas']['SortByChapter'];
         status?: components['schemas']['ChapterStatus'];
+        /** @description Only chapters in this volume. */
+        volumeKey?: string;
+        /** @description Only chapters whose brief's point of view (any pooled scene) is this entity key. */
+        pov?: string;
+        /** @description Only chapters this thread opened, closed, or was last advanced in. */
+        thread?: string;
+        /** @description Ignore limit/offset and return the page containing this chapter number instead. */
+        goto?: number | string;
       };
       header?: never;
       path: {
@@ -10971,6 +11022,57 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ListChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_source_chapters_search: {
+    parameters: {
+      query: {
+        limit?: number | string;
+        offset?: number | string;
+        /** @description Only chapters in this volume. */
+        volumeKey?: string;
+        /** @description Only chapters whose brief's point of view (any pooled scene) is this entity key. */
+        pov?: string;
+        /** @description Only chapters this thread opened, closed, or was last advanced in. */
+        thread?: string;
+        /** @description Text to search for across finalized and drafted prose. */
+        q: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterSearchResponse'];
         };
       };
       /** @description Default Response */
@@ -14418,9 +14520,12 @@ export type AuditFindingDecisionBody = components['schemas']['AuditFindingDecisi
 export type BotOwnershipResponse = components['schemas']['BotOwnershipResponse'];
 export type TransferOwnershipBody = components['schemas']['TransferOwnershipBody'];
 export type TransferOwnershipResponse = components['schemas']['TransferOwnershipResponse'];
+export type SortByChapter = components['schemas']['SortByChapter'];
 export type ChapterStatus = components['schemas']['ChapterStatus'];
 export type ListChapterResponse = components['schemas']['ListChapterResponse'];
 export type ChapterListResponse = components['schemas']['ChapterListResponse'];
+export type ChapterSearchResponse = components['schemas']['ChapterSearchResponse'];
+export type ChapterSearchHit = components['schemas']['ChapterSearchHit'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
 export type ListChapterReviewsResponse = components['schemas']['ListChapterReviewsResponse'];
@@ -14639,6 +14744,8 @@ export type GetAuditPathParams = Exclude<paths['/api/v1/projects/{projectId}/bib
 export type GetOwnershipPathParams = Exclude<paths['/internal/bots/{botId}/ownership']['get']['parameters']['path'], undefined>;
 export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
 export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
+export type SearchChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/search']['get']['parameters']['query'], undefined>;
+export type SearchChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/search']['get']['parameters']['path'], undefined>;
 export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
 export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
 export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
