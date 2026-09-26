@@ -1282,6 +1282,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/ops/{opIndex}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject Op */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_reject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/discard': {
     parameters: {
       query?: never;
@@ -3556,6 +3573,8 @@ export interface components {
     /** @description Change-set operation whose remaining fields depend on its server-validated op value. */
     ChangeOpItem: {
       op: string;
+      /** @description Stamped by the server on every content op: the same change proposed again carries the same id. Turn it down with the op rejection route. */
+      ideaId?: string;
     } & {
       [key: string]: unknown;
     };
@@ -4116,6 +4135,69 @@ export interface components {
       reverted: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
     };
+    RejectProposalOpBody: {
+      /** @description `never`: not offered again until the author withdraws the Notebook entry. `not_now`: not offered again while the active volume stays the same. `not_this_version`: not offered again while every record the change would write is unchanged — a later edit to any of them makes the idea eligible again. */
+      scope: components['schemas']['LedgerRejectionScope'];
+      /** @description The author's reason, kept on the Notebook entry. */
+      why?: string;
+    };
+    /** @enum {string} */
+    LedgerRejectionScope: 'never' | 'not_now' | 'not_this_version';
+    LedgerEntryResponse: {
+      id: string;
+      projectId: string;
+      kind: components['schemas']['LedgerEntryKind'];
+      topic: string;
+      statement: string;
+      why: null | string;
+      rejectedAlternatives: string[];
+      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
+      writerLine: null | string;
+      decidedBy: components['schemas']['LedgerDecidedBy'];
+      /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
+      stepKey: null | string;
+      /** @description Structured detail whose fields depend on the topic. */
+      payload: null | {
+        [key: string]: unknown;
+      };
+      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
+      links: components['schemas']['LedgerLinksResponse'];
+      supersedesId: null | string;
+      /**
+       * Format: date-time
+       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
+       */
+      supersededAt: null | string;
+      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
+      withdrawnReason: null | string;
+      /** @description The suggestion this rejection turns down, by the idea id its card op carried; null for any other entry. */
+      ideaId: null | string;
+      /** @description How long a rejected idea stays turned down: `never` until withdrawn, `not_now` while the same volume is active, `not_this_version` while the records it would change are unchanged. */
+      rejectionScope: components['schemas']['LedgerRejectionScope'] | null;
+      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
+      status: components['schemas']['LedgerEntryStatus'];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
+    /** @enum {string} */
+    LedgerDecidedBy: 'author' | 'system';
+    LedgerLinksResponse: {
+      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
+      entityKeys?: string[];
+      factKeys?: string[];
+      volumeKeys?: string[];
+      briefChapters?: number[];
+    };
+    LedgerBibleDocumentLinkResponse: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+    };
+    /** @enum {string} */
+    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
+    /** @enum {string} */
+    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
     ListChangesResponse: {
       total: number;
       limit: number;
@@ -4399,8 +4481,6 @@ export interface components {
     /** @enum {string} */
     BibleTidyKind: 'remove_empty' | 'retitle' | 'split' | 'move_ai_notes';
     /** @enum {string} */
-    BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
-    /** @enum {string} */
     EntityType: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
     ApplyBibleTidyBody: {
       /** @description The preview items to apply; everything left out stays as it is. */
@@ -4414,55 +4494,6 @@ export interface components {
     ListLedgerEntriesResponse: {
       entries: components['schemas']['LedgerEntryResponse'][];
     };
-    LedgerEntryResponse: {
-      id: string;
-      projectId: string;
-      kind: components['schemas']['LedgerEntryKind'];
-      topic: string;
-      statement: string;
-      why: null | string;
-      rejectedAlternatives: string[];
-      /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
-      writerLine: null | string;
-      decidedBy: components['schemas']['LedgerDecidedBy'];
-      /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
-      stepKey: null | string;
-      /** @description Structured detail whose fields depend on the topic. */
-      payload: null | {
-        [key: string]: unknown;
-      };
-      /** @description Content this entry produced, addressed by the keys the change-set ops use. */
-      links: components['schemas']['LedgerLinksResponse'];
-      supersedesId: null | string;
-      /**
-       * Format: date-time
-       * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
-       */
-      supersededAt: null | string;
-      /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
-      withdrawnReason: null | string;
-      /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
-      status: components['schemas']['LedgerEntryStatus'];
-      /** Format: date-time */
-      createdAt: string;
-    };
-    /** @enum {string} */
-    LedgerEntryKind: 'decision' | 'direction' | 'rejected' | 'backlog' | 'system';
-    /** @enum {string} */
-    LedgerDecidedBy: 'author' | 'system';
-    LedgerLinksResponse: {
-      bibleDocuments?: components['schemas']['LedgerBibleDocumentLinkResponse'][];
-      entityKeys?: string[];
-      factKeys?: string[];
-      volumeKeys?: string[];
-      briefChapters?: number[];
-    };
-    LedgerBibleDocumentLinkResponse: {
-      section: components['schemas']['BibleSection'];
-      slug: string;
-    };
-    /** @enum {string} */
-    LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
     CreateLedgerEntryBody: {
       /** @description The author writes directions, rejected ideas and backlog entries directly; a decision only ever supersedes one. */
       kind: components['schemas']['AuthorLedgerKind'];
@@ -9493,6 +9524,52 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_reject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+        opIndex: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RejectProposalOpBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerEntryResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_proposals_proposalId_discard: {
     parameters: {
       query?: never;
@@ -14270,6 +14347,15 @@ export type WriterKeptItem = components['schemas']['WriterKeptItem'];
 export type WriterKeptKind = components['schemas']['WriterKeptKind'];
 export type WriterUnlockItem = components['schemas']['WriterUnlockItem'];
 export type RevertProposalResponse = components['schemas']['RevertProposalResponse'];
+export type RejectProposalOpBody = components['schemas']['RejectProposalOpBody'];
+export type LedgerRejectionScope = components['schemas']['LedgerRejectionScope'];
+export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
+export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
+export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
+export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
+export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
+export type BibleSection = components['schemas']['BibleSection'];
+export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
 export type ListChangesResponse = components['schemas']['ListChangesResponse'];
 export type ChangeItemResponse = components['schemas']['ChangeItemResponse'];
 export type RollbackBody = components['schemas']['RollbackBody'];
@@ -14303,17 +14389,10 @@ export type OmittedSectionPreview = components['schemas']['OmittedSectionPreview
 export type BibleTidyPreviewResponse = components['schemas']['BibleTidyPreviewResponse'];
 export type BibleTidyItem = components['schemas']['BibleTidyItem'];
 export type BibleTidyKind = components['schemas']['BibleTidyKind'];
-export type BibleSection = components['schemas']['BibleSection'];
 export type EntityType = components['schemas']['EntityType'];
 export type ApplyBibleTidyBody = components['schemas']['ApplyBibleTidyBody'];
 export type BibleTidySelection = components['schemas']['BibleTidySelection'];
 export type ListLedgerEntriesResponse = components['schemas']['ListLedgerEntriesResponse'];
-export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
-export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
-export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
-export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
-export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
-export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
 export type CreateLedgerEntryBody = components['schemas']['CreateLedgerEntryBody'];
 export type AuthorLedgerKind = components['schemas']['AuthorLedgerKind'];
 export type SupersedeLedgerEntryBody = components['schemas']['SupersedeLedgerEntryBody'];
