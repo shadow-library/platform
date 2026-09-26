@@ -1835,6 +1835,125 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Review */
+    get: operations['get_api_v1_projects_projectId_drafts_n_finalize_review'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review/prepare': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Prepare Review */
+    post: operations['post_api_v1_projects_projectId_drafts_n_finalize_review_prepare'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review/items/{itemId}/decision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Decide Item */
+    post: operations['post_api_v1_projects_projectId_drafts_n_finalize_review_items_itemId_decision'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review/keep-routine': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Keep Routine */
+    post: operations['post_api_v1_projects_projectId_drafts_n_finalize_review_keep_routine'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review/finalize': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Finalize */
+    post: operations['post_api_v1_projects_projectId_drafts_n_finalize_review_finalize'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/drafts/{n}/finalize-review/revert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revert */
+    post: operations['post_api_v1_projects_projectId_drafts_n_finalize_review_revert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/finalize-review/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Settings */
+    put: operations['put_api_v1_projects_projectId_finalize_review_settings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/chapters/{n}/reviews': {
     parameters: {
       query?: never;
@@ -2825,7 +2944,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit';
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit' | 'finalize_review';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
     /** @description The chat card a job was started from. */
@@ -4829,6 +4948,100 @@ export interface components {
       title?: string;
       content?: string;
     };
+    FinalizeReviewResponse: {
+      id: string;
+      chapter: number;
+      /** @description The approved revision the updates were read from. */
+      draftRevision: number;
+      status: components['schemas']['FinalizeReviewStatus'];
+      /** @description False once the prose changed after approval: the review no longer applies and the chapter must be approved again. */
+      current: boolean;
+      isolated: boolean;
+      /** @description Why reading the updates failed, when it did. */
+      error?: null | string;
+      disclosure: components['schemas']['FinalizeReviewDisclosureResponse'];
+      /** @description Items still waiting for an answer; finalize refuses until both are zero. */
+      open: components['schemas']['FinalizeReviewOpenResponse'];
+      consequential: components['schemas']['FinalizeReviewItemResponse'][];
+      routine: components['schemas']['FinalizeReviewItemResponse'][];
+      autoKeep: components['schemas']['FinalizeReviewCategory'][];
+      /** Format: date-time */
+      appliedAt?: null | string;
+      /** Format: date-time */
+      revertedAt?: null | string;
+    };
+    /** @enum {string} */
+    FinalizeReviewStatus: 'preparing' | 'ready' | 'failed' | 'applied' | 'reverted';
+    FinalizeReviewDisclosureResponse: {
+      clear: boolean;
+      findings: string[];
+      /** @description e.g. "No unplanned disclosure detected · revision 4". */
+      copy: string;
+    };
+    FinalizeReviewOpenResponse: {
+      consequential: number;
+      routine: number;
+    };
+    FinalizeReviewItemResponse: {
+      /** @description Decisions address the item by it. */
+      id: string;
+      category: components['schemas']['FinalizeReviewCategory'];
+      /** @description consequential: asked one by one. routine: batched, and kept automatically in an auto-keep category. */
+      triage: components['schemas']['FinalizeReviewTriage'];
+      /** @description observed: stated outright in the prose. inferred: read between the lines — check it. */
+      basis: components['schemas']['FinalizeReviewBasis'];
+      /** @description The record the update is about: an entity, promise or milestone key. */
+      subjectKey: string;
+      /** @description The update in plain words. */
+      claim: string;
+      /** @description The line it came from; withheld on an isolated chapter. */
+      evidence?: null | string;
+      /** @description The change finalize applies when the item is kept. */
+      proposed: {
+        [key: string]: unknown;
+      };
+      /** @description The change as the author edited it; applied instead of `proposed`. */
+      edited?: null | {
+        [key: string]: unknown;
+      };
+      /** @description missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here. */
+      flag?: components['schemas']['FinalizeReviewFlag'] | null;
+      /** @description What the flag puts at stake: the reveals that need a missed milestone, or what a disclosure still waits on. */
+      dependents?: null | string[];
+      decision?: components['schemas']['FinalizeReviewDecision'] | null;
+      reason?: null | string;
+      /** @description Kept by the author’s auto-keep setting rather than by hand. */
+      autoKept: boolean;
+      /** Format: date-time */
+      decidedAt?: null | string;
+    };
+    /** @enum {string} */
+    FinalizeReviewCategory: 'entity' | 'appearance' | 'character_state' | 'relationship' | 'promise' | 'knowledge' | 'milestone';
+    /** @enum {string} */
+    FinalizeReviewTriage: 'consequential' | 'routine';
+    /** @enum {string} */
+    FinalizeReviewBasis: 'observed' | 'inferred';
+    /** @enum {string} */
+    FinalizeReviewFlag: 'missed_milestone' | 'unclaimed_milestone' | 'unplanned_disclosure';
+    /** @enum {string} */
+    FinalizeReviewDecision: 'kept' | 'edited' | 'skipped';
+    FinalizeReviewItemDecisionBody: {
+      /** @description kept: applied at finalize as proposed. edited: applied with `edited` laid over it. skipped: never applied and never asked again for this revision. */
+      decision: components['schemas']['FinalizeReviewDecision'];
+      /** @description With `edited`: only the fields to change, e.g. {"statusNote": "…"} or {"reached": true}. The keys naming the record are not editable; an appearance has nothing to edit. */
+      edited?: {
+        [key: string]: unknown;
+      };
+      /** @description Why. Required with `skipped`, remembered with the decision. */
+      reason?: string;
+    };
+    FinalizeReviewSettingsBody: {
+      /** @description Categories whose routine updates are kept without asking. Consequential updates are always asked. */
+      autoKeep: components['schemas']['FinalizeReviewCategory'][];
+    };
+    FinalizeReviewSettingsResponse: {
+      autoKeep: components['schemas']['FinalizeReviewCategory'][];
+    };
     ListChapterReviewsResponse: {
       chapter: number;
       /** @description The draft revision the chapter is at now; null when it has no draft. */
@@ -5536,7 +5749,7 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       /** @description The default cost tier AI work on this novel runs at. */
       costTier: components['schemas']['CostTier'];
-      config?: components['schemas']['ProjectConfig'];
+      config?: components['schemas']['ProjectConfigResponse'];
       brief?: null | string;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
       instructions?: null | string;
@@ -5559,8 +5772,10 @@ export interface components {
     };
     /** @enum {string} */
     OwnerKind: 'user' | 'bot';
-    ProjectConfig: {
+    ProjectConfigResponse: {
       models?: components['schemas']['ProjectModelOverrides'];
+      /** @description Written only by PUT /finalize-review/settings; a project update keeps it. */
+      finalizeReview?: components['schemas']['ProjectFinalizeReviewConfig'];
     };
     /** @description Optional provider and model overrides keyed by AI role. */
     ProjectModelOverrides: {
@@ -5588,6 +5803,10 @@ export interface components {
       provider: string;
       model: string;
     };
+    ProjectFinalizeReviewConfig: {
+      /** @description Categories whose routine finalize-review updates are kept without asking. Consequential updates are always asked one by one. */
+      autoKeep?: components['schemas']['FinalizeReviewCategory'][];
+    };
     ListProjectResponse: {
       total: number;
       limit: number;
@@ -5608,7 +5827,7 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       /** @description The default cost tier AI work on this novel runs at. */
       costTier: components['schemas']['CostTier'];
-      config?: components['schemas']['ProjectConfig'];
+      config?: components['schemas']['ProjectConfigResponse'];
       brief?: null | string;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
       instructions?: null | string;
@@ -5665,6 +5884,9 @@ export interface components {
       instructions?: string | null;
       /** @description Chapter word-count target; send `null` to restore the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'] | null;
+    };
+    ProjectConfig: {
+      models?: components['schemas']['ProjectModelOverrides'];
     };
     CloneProjectBody: {
       name: string;
@@ -11410,6 +11632,301 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_drafts_n_finalize_review: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_finalize_review_prepare: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_finalize_review_items_itemId_decision: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        itemId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FinalizeReviewItemDecisionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_finalize_review_keep_routine: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_finalize_review_finalize: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowRunResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_drafts_n_finalize_review_revert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_finalize_review_settings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FinalizeReviewSettingsBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewSettingsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_chapters_n_reviews: {
     parameters: {
       query?: never;
@@ -14699,6 +15216,19 @@ export type ChapterSearchResponse = components['schemas']['ChapterSearchResponse
 export type ChapterSearchHit = components['schemas']['ChapterSearchHit'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
+export type FinalizeReviewResponse = components['schemas']['FinalizeReviewResponse'];
+export type FinalizeReviewStatus = components['schemas']['FinalizeReviewStatus'];
+export type FinalizeReviewDisclosureResponse = components['schemas']['FinalizeReviewDisclosureResponse'];
+export type FinalizeReviewOpenResponse = components['schemas']['FinalizeReviewOpenResponse'];
+export type FinalizeReviewItemResponse = components['schemas']['FinalizeReviewItemResponse'];
+export type FinalizeReviewCategory = components['schemas']['FinalizeReviewCategory'];
+export type FinalizeReviewTriage = components['schemas']['FinalizeReviewTriage'];
+export type FinalizeReviewBasis = components['schemas']['FinalizeReviewBasis'];
+export type FinalizeReviewFlag = components['schemas']['FinalizeReviewFlag'];
+export type FinalizeReviewDecision = components['schemas']['FinalizeReviewDecision'];
+export type FinalizeReviewItemDecisionBody = components['schemas']['FinalizeReviewItemDecisionBody'];
+export type FinalizeReviewSettingsBody = components['schemas']['FinalizeReviewSettingsBody'];
+export type FinalizeReviewSettingsResponse = components['schemas']['FinalizeReviewSettingsResponse'];
 export type ListChapterReviewsResponse = components['schemas']['ListChapterReviewsResponse'];
 export type ChapterReviewRecordResponse = components['schemas']['ChapterReviewRecordResponse'];
 export type ChapterReviewKind = components['schemas']['ChapterReviewKind'];
@@ -14795,13 +15325,15 @@ export type ProjectKind = components['schemas']['ProjectKind'];
 export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type OwnerKind = components['schemas']['OwnerKind'];
-export type ProjectConfig = components['schemas']['ProjectConfig'];
+export type ProjectConfigResponse = components['schemas']['ProjectConfigResponse'];
 export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
 export type ProjectModelRef = components['schemas']['ProjectModelRef'];
+export type ProjectFinalizeReviewConfig = components['schemas']['ProjectFinalizeReviewConfig'];
 export type ListProjectResponse = components['schemas']['ListProjectResponse'];
 export type ProjectDetailResponse = components['schemas']['ProjectDetailResponse'];
 export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
 export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
+export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
@@ -14921,8 +15453,15 @@ export type SearchChaptersQueryParams = Exclude<paths['/api/v1/projects/{project
 export type SearchChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/search']['get']['parameters']['path'], undefined>;
 export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
 export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdDraftsNFinalizeReviewPathParams = Exclude<
+  paths['/api/v1/projects/{projectId}/drafts/{n}/finalize-review']['get']['parameters']['path'],
+  undefined
+>;
 export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
-export type GetReviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdChaptersNReviewsReviewIdPathParams = Exclude<
+  paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'],
+  undefined
+>;
 export type ListIllustrationsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['query'], undefined>;
 export type ListIllustrationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations']['get']['parameters']['path'], undefined>;
 export type ListReferenceOptionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/illustrations/reference-options']['get']['parameters']['query'], undefined>;
