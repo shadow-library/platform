@@ -24,6 +24,7 @@ import {
   GuidePane,
   ListHead,
   PowerLadder,
+  type PromisesState,
   SecretDetail,
   SecretRow,
   SecretsList,
@@ -33,6 +34,7 @@ import {
   TopicList,
   useAuditPoll,
   useTabsFit,
+  useUnlockLookup,
 } from '@/features/story-bible';
 import styles from '@/features/story-bible/StoryBible.module.css';
 import {
@@ -51,6 +53,7 @@ import {
   useListBibleDocsQuery,
   useListEntitiesQuery,
   useListFactsQuery,
+  useListPromisesQuery,
   useProjectQuery,
   useRevealFactMutation,
   useSeedFromBriefMutation,
@@ -79,6 +82,7 @@ import { readinessDisplay } from '@/lib/bible-readiness';
 import { BIBLE_VIEWS, type BibleSearch, type BibleView, parseBibleSearch } from '@/lib/bible-search';
 import { groupSecrets, isSecret, secretCountsBySubject, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, newEntryType, parseBibleTopic, stagesByDocument, TOPIC_LABEL } from '@/lib/bible-topics';
+import { PROMISE_PAGE_SIZE } from '@/lib/promises';
 import { emptyFactForm, factBodyFromForm, factFormFromFact, type FactFormState, filterFacts } from '@/lib/canon-facts';
 import { relativeTime } from '@/lib/format';
 
@@ -132,6 +136,9 @@ function StoryBibleScreen(): React.JSX.Element {
 
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<EntryKindFilter>('all');
+  const [promisePage, setPromisePage] = useState(1);
+  const promisesQuery = useListPromisesQuery(novelId, { limit: PROMISE_PAGE_SIZE, offset: (promisePage - 1) * PROMISE_PAGE_SIZE });
+  const { lookup: unlockLookup } = useUnlockLookup(novelId);
   const [tidying, setTidying] = useState(false);
   const queryClient = useQueryClient();
   const [auditJob, setAuditJob] = useState<StartedAudit | undefined>();
@@ -191,6 +198,11 @@ function StoryBibleScreen(): React.JSX.Element {
   };
   const searchForFact = (fact: FactResponse): BibleSearch => ({ view: 'secrets', fact: fact.factKey });
   const backSearch: BibleSearch = view ? { view } : { topic: activeTopic };
+
+  let promises: PromisesState;
+  if (promisesQuery.data) promises = { status: 'ready', items: promisesQuery.data.items, total: promisesQuery.data.total };
+  else if (promisesQuery.error) promises = { status: 'error', message: promisesQuery.error.message, onRetry: () => void promisesQuery.refetch() };
+  else promises = { status: 'loading' };
 
   const pickTab = (value: string): void => {
     setQuery('');
@@ -392,7 +404,7 @@ function StoryBibleScreen(): React.JSX.Element {
     list = <SecretsList novelId={novelId} groups={secretGroups} names={names} selectedKey={search.fact} searchFor={searchForFact} />;
     fallback = { fact: secretGroups.planned[0] ?? secretGroups.unplanned[0] };
   } else if (view === 'threads') {
-    list = <ThreadsList />;
+    list = <ThreadsList promises={promises} />;
     fallback = {};
   } else if (view === 'recent') {
     list = (
@@ -437,7 +449,7 @@ function StoryBibleScreen(): React.JSX.Element {
 
   let pane: ReactNode;
   if (view === 'threads' && !searching) {
-    pane = <ThreadsPane novelId={novelId} />;
+    pane = <ThreadsPane novelId={novelId} promises={promises} lookup={unlockLookup} nextChapter={unlockLookup.nextChapter} page={promisePage} onPage={setPromisePage} />;
   } else if (placeholder) {
     pane = (
       <section className={styles.pane}>
@@ -520,7 +532,7 @@ function StoryBibleScreen(): React.JSX.Element {
 
   const tabValues: (BibleTopic | BibleView)[] = [...topics, ...BIBLE_VIEWS];
   const tabCount = (value: BibleTopic | BibleView): number | undefined => {
-    if (value === 'threads') return undefined;
+    if (value === 'threads') return promisesQuery.data?.total;
     return value === 'secrets' ? secretTotal : value === 'recent' ? recent.thisWeek.length : counts[value];
   };
   const tabLabel = (value: BibleTopic | BibleView): string => (isView(value) ? VIEW_LABEL[value] : TOPIC_LABEL[value]);

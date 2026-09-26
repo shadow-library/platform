@@ -13,6 +13,7 @@ export * from './interstitial.api';
 export * from './bible.api';
 export * from './fact.api';
 export * from './milestone.api';
+export * from './promise.api';
 export * from './insight.api';
 export * from './refinement.api';
 export * from './chat.api';

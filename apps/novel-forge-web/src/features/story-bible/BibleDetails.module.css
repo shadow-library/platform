@@ -396,6 +396,82 @@
   color: var(--sh-text-primary);
 }
 
+.promiseRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+}
+
+.quietNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: var(--sh-border-width) solid var(--sh-warning-border);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-warning-bg-subtle);
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-primary);
+}
+
+.promiseTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+}
+
+.promiseGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px 110px 170px 170px;
+  gap: 12px;
+}
+
+.promiseHead {
+  padding: 8px 12px;
+  background: var(--sh-surface-well);
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+}
+
+.promiseBody {
+  align-items: center;
+  padding: 10px 12px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-primary);
+}
+
+.promiseName {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.promiseLabel {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.promiseKind {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.promiseCell {
+  font-size: var(--sh-text-body-sm);
+}
+
+.promiseChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 @media (max-width: 960px) {
   .ladder {
     grid-template-columns: minmax(0, 1fr);
@@ -403,6 +479,21 @@
 }
 
 @media (max-width: 760px) {
+  .promiseGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .promiseHead {
+    display: none;
+  }
+
+  .promiseCell[data-label]::before,
+  .promiseChips[data-label]::before {
+    content: attr(data-label) ' · ';
+    color: var(--sh-text-secondary);
+  }
+
   .stateRow {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;

@@ -182,6 +182,31 @@ const DETAILS: Expected[] = [
     values: { 'grid-template-columns': 'minmax(0, 1fr)', gap: '4px' },
     source: 'phone: label above value, rule 7 (4px title→subtitle)',
   },
+  {
+    selector: '.promiseRow',
+    values: { gap: '12px', padding: '10px' },
+    source: 'copied from StoryBible .row (padding 10, gap 12) without its hover, since a promise row is read-only; Bible l.105 list rows',
+  },
+  {
+    selector: '.quietNotice',
+    values: { gap: '10px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' },
+    source: 'Bible l.199 quiet-promise notice: gap 10, padding 10px 12px, radius 8, warning colours',
+  },
+  { selector: '.promiseTable', values: { 'border-radius': 'var(--sh-radius-lg)' }, source: 'Bible l.203 table: default border, radius 8, overflow hidden' },
+  {
+    selector: '.promiseGrid',
+    values: { 'grid-template-columns': 'minmax(0, 1fr) 80px 110px 170px 170px', gap: '12px' },
+    source: 'Bible l.204/l.206 columns minmax(0, 1fr) 80px 110px 170px 170px, gap 12',
+  },
+  { selector: '.promiseHead', values: { padding: '8px 12px' }, source: 'Bible l.204 header row padding 8px 12px, well background, 12px 600' },
+  { selector: '.promiseBody', values: { padding: '10px 12px' }, source: 'Bible l.206 body row padding 10px 12px, subtle border-top, 14px' },
+  { selector: '.promiseName', values: { 'min-width': '0' }, source: 'Bible l.207 name + kind column' },
+  { selector: '.promiseChips', values: { gap: '6px' }, source: 'rule 6: 6 between chips' },
+  {
+    selector: '@media (max-width: 760px) .promiseGrid',
+    values: { 'grid-template-columns': 'minmax(0, 1fr)', gap: '4px' },
+    source: 'phone: cells stack, each labelled, rule 7 (4px title→subtitle)',
+  },
 ];
 
 /** Rules deleted with the markup that used them: the two-column secret card and the truth/writer boxes, replaced by the four-state rows. */
