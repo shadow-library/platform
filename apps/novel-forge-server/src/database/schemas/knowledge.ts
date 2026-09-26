@@ -29,6 +29,9 @@ export namespace Knowledge {
   export type MilestoneKind = InferEnum<typeof milestoneKind>;
   export type MilestoneState = InferEnum<typeof milestoneState>;
   export type KnowledgeStatus = InferEnum<typeof knowledgeStatus>;
+  export type CharacterEvent = InferSelectModel<typeof characterEvents>;
+  export type CharacterEventKind = InferEnum<typeof characterEventKind>;
+  export type CharacterEventSource = InferEnum<typeof characterEventSource>;
 }
 
 export const entityType = pgEnum('entity_type', ['character', 'faction', 'location', 'power_rule', 'item', 'concept']);
@@ -38,6 +41,11 @@ export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'gen
 export const milestoneKind = pgEnum('milestone_kind', ['rank', 'event', 'learned_from', 'custom']);
 export const milestoneState = pgEnum('milestone_state', ['open', 'planned', 'reached']);
 export const knowledgeStatus = pgEnum('knowledge_status', ['provisional', 'committed']);
+// Every value has a durable canon source `applyContinuityDelta` already writes: `state` mirrors `character_states`,
+// `appearance` mirrors `entity_appearances`, `relationship` mirrors `entity_relationships`. `power` and `knowledge`
+// changes are deliberately not persisted anywhere yet (see `apply-continuity.ts`), so no event kind stands for them.
+export const characterEventKind = pgEnum('character_event_kind', ['state', 'appearance', 'relationship']);
+export const characterEventSource = pgEnum('character_event_source', ['continuity', 'backfill', 'manual']);
 
 // Author opt-out for the reader wiki: `default` projects the entity to the published wiki (spoiler-gated
 // per fragment), `hidden` withholds it entirely — a flipped-to-hidden entity is deleted from the reader
@@ -230,6 +238,44 @@ export const characterStates = pgTable(
   },
   t => [unique('character_states_project_id_entity_key_unique').on(t.projectId, t.entityKey)],
 );
+
+// Per-chapter history behind "How <name> has changed": one row per entity per chapter per changed kind, replayed
+// in chapter order. `detailKey` distinguishes multiple events of the same kind in one chapter (a relationship
+// event's target+kind) and is `''` where a kind is already one-per-chapter. `status`/`draftRevision` mirror
+// `character_knowledge` (T05) for a provisional row bound to an approval and dropped by `revokeProvisionalReveals`
+// on revise — `applyContinuityDelta` writes `committed` today since it only runs once a chapter is already
+// finalized; the manual propose→apply path can commit from an unapproved draft, which is fine for now since
+// nothing here is provisional yet. T26's event-apply service is what will actually write `provisional` rows.
+export const characterEvents = pgTable(
+  'character_events',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    entityId: bigint('entity_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    chapter: integer('chapter').notNull(),
+    kind: characterEventKind('kind').notNull(),
+    detailKey: varchar('detail_key').notNull().default(''),
+    before: jsonb('before'),
+    after: jsonb('after'),
+    source: characterEventSource('source').notNull().default('continuity'),
+    status: knowledgeStatus('status').notNull().default('committed'),
+    draftRevision: integer('draft_revision'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [
+    unique('character_events_project_id_entity_id_chapter_kind_detail_unique').on(t.projectId, t.entityId, t.chapter, t.kind, t.detailKey),
+    index('character_events_project_id_entity_id_idx').on(t.projectId, t.entityId, t.chapter),
+  ],
+);
+
+export const characterEventsRelations = relations(characterEvents, ({ one }) => ({
+  project: one(projects, { fields: [characterEvents.projectId], references: [projects.id] }),
+  entity: one(entities, { fields: [characterEvents.entityId], references: [entities.id] }),
+}));
 
 export const entitiesRelations = relations(entities, ({ one, many }) => ({
   project: one(projects, { fields: [entities.projectId], references: [projects.id] }),

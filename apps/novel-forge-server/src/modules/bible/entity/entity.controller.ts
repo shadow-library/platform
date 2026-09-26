@@ -13,6 +13,7 @@ import {
   EntityResponse,
   ListEntitiesQuery,
   ListEntityResponse,
+  TimelineResponse,
   UpdateEntityBody,
   UploadImageBody,
 } from './entity.dto';
@@ -43,6 +44,13 @@ export class EntityController {
     const entity = await this.entityService.get(params.projectId, params.entityKey);
     if (!entity) throw AppErrorCode.ENT_001.create();
     return entity;
+  }
+
+  @Get('/:entityKey/timeline')
+  @RespondFor(200, TimelineResponse)
+  async getTimeline(@Params() params: EntityKeyParams): Promise<TimelineResponse> {
+    const events = await this.entityService.timeline(params.projectId, params.entityKey);
+    return { events };
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

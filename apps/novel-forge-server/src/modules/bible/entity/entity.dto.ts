@@ -2,7 +2,7 @@ import { Field, Integer, OmitType, PartialType, Schema } from '@shadow-library/c
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { EntityOrigin, EntitySignificance, EntityType, SortByTime } from '@server/common';
+import { CharacterEventKind, CharacterEventSource, EntityOrigin, EntitySignificance, EntityType, KnowledgeStatus, SortByTime } from '@server/common';
 import { entitySignificance, type Knowledge } from '@server/database';
 
 @Schema()
@@ -170,3 +170,46 @@ export class ListEntitiesQuery extends PaginationQuery(SortByTime, { sortBy: 'up
 
 @Schema()
 export class ListEntityResponse extends Paginated(EntityResponse) {}
+
+@Schema()
+export class CharacterEventResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field(() => CharacterEventKind)
+  kind: Knowledge.CharacterEventKind;
+
+  @Field({
+    optional: true,
+    description: "Distinguishes multiple events of the same kind in one chapter, e.g. a relationship's target and kind; empty for a kind that is already one-per-chapter.",
+  })
+  detailKey?: string;
+
+  @Field({
+    optional: true,
+    nullable: true,
+    description: "The changed field's shape before this chapter — null when this is the first record of it, or when it was backfilled and no earlier history is known.",
+  })
+  before?: unknown;
+
+  @Field({ optional: true, nullable: true, description: "The changed field's shape as of this chapter." })
+  after?: unknown;
+
+  @Field(() => CharacterEventSource)
+  source: Knowledge.CharacterEventSource;
+
+  @Field(() => KnowledgeStatus, { description: 'Provisional events belong to an approval not yet finalized; committed ones are canon.' })
+  status: Knowledge.KnowledgeStatus;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+}
+
+@Schema()
+export class TimelineResponse {
+  @Field(() => [CharacterEventResponse])
+  events: CharacterEventResponse[];
+}

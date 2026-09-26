@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -33,6 +33,40 @@ export function filterToHeldEntries(delta: ContinuityOutput): ContinuityOutput {
     relationships: (delta.relationships ?? []).filter(relationship => relationship.confidence === 'low'),
     characterStates: (delta.characterStates ?? []).filter(characterState => characterState.confidence === 'low'),
   };
+}
+
+interface CharacterEventInput {
+  entityId: bigint;
+  chapter: number;
+  kind: schema.Knowledge.CharacterEventKind;
+  detailKey?: string;
+  before: unknown;
+  after: unknown;
+}
+
+// History `character_states`/`entity_appearances`/`entity_relationships` don't keep themselves. A retried
+// continuity apply for the same (entity, chapter, kind, detailKey) updates `after` in place rather than
+// duplicating the row; `before` is written once and kept, since it is what a *later* re-extraction would
+// otherwise clobber with a value that isn't actually "before" anymore.
+async function recordCharacterEvent(tx: ContinuityTransaction, projectId: bigint, event: CharacterEventInput): Promise<void> {
+  const detailKey = event.detailKey ?? '';
+  await tx
+    .insert(schema.characterEvents)
+    .values({
+      projectId,
+      entityId: event.entityId,
+      chapter: event.chapter,
+      kind: event.kind,
+      detailKey,
+      before: event.before as never,
+      after: event.after as never,
+      source: 'continuity',
+      status: 'committed',
+    })
+    .onConflictDoUpdate({
+      target: [schema.characterEvents.projectId, schema.characterEvents.entityId, schema.characterEvents.chapter, schema.characterEvents.kind, schema.characterEvents.detailKey],
+      set: { after: sql`EXCLUDED.after`, source: 'continuity' },
+    });
 }
 
 export async function applyContinuityDelta(tx: ContinuityTransaction, projectId: bigint, chapter: number, delta: ContinuityOutput): Promise<void> {
@@ -75,7 +109,16 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: appeared entity not found, skipping', { projectId, chapter, entityKey });
       continue;
     }
-    await tx.insert(schema.entityAppearances).values({ entityId, projectId, chapter, firstChapter: chapter, lastChapter: chapter }).onConflictDoNothing();
+    const [appearance] = await tx
+      .insert(schema.entityAppearances)
+      .values({ entityId, projectId, chapter, firstChapter: chapter, lastChapter: chapter })
+      .onConflictDoNothing()
+      .returning();
+    if (appearance) {
+      // No `after` payload: `firstChapter`/`lastChapter` are chapter numbers a chapter insert's shift pass can't
+      // see inside jsonb, and `seenChapters` is never set on this insert — the event's own chapter says it all.
+      await recordCharacterEvent(tx, projectId, { entityId, chapter, kind: 'appearance', before: null, after: null });
+    }
   }
 
   for (const thread of delta.threads ?? []) {
@@ -189,7 +232,21 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: relationship target entity not found, skipping', { projectId, chapter, targetKey: relationship.targetKey });
       continue;
     }
-    await tx
+    // The relationship's own row for this chapter doesn't exist yet on a first pass, so "before" is read from
+    // the most recent earlier chapter that recorded this (entity, target, kind) — or an undated (`chapter` null)
+    // row, for one seeded before this table tracked chapters.
+    const existingRelationship = await tx.query.entityRelationships.findFirst({
+      where: and(
+        eq(schema.entityRelationships.projectId, projectId),
+        eq(schema.entityRelationships.entityId, entityId),
+        eq(schema.entityRelationships.targetKey, relationship.targetKey),
+        eq(schema.entityRelationships.kind, relationship.kind),
+        or(isNull(schema.entityRelationships.chapter), lt(schema.entityRelationships.chapter, chapter)),
+      ),
+      columns: { note: true },
+      orderBy: [sql`${schema.entityRelationships.chapter} desc nulls last`],
+    });
+    const [savedRelationship] = await tx
       .insert(schema.entityRelationships)
       .values({ projectId, entityId, targetKey: relationship.targetKey, kind: relationship.kind, note: relationship.note ?? null, chapter })
       .onConflictDoUpdate({
@@ -201,7 +258,18 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
           schema.entityRelationships.chapter,
         ],
         set: { note: sql`COALESCE(EXCLUDED.note, entity_relationships.note)` },
+      })
+      .returning();
+    if (savedRelationship) {
+      await recordCharacterEvent(tx, projectId, {
+        entityId,
+        chapter,
+        kind: 'relationship',
+        detailKey: `${relationship.targetKey}:${relationship.kind}`,
+        before: existingRelationship ? { targetKey: relationship.targetKey, kind: relationship.kind, note: existingRelationship.note } : null,
+        after: { targetKey: relationship.targetKey, kind: relationship.kind, note: savedRelationship.note },
       });
+    }
   }
 
   for (const characterState of delta.characterStates ?? []) {
@@ -216,10 +284,18 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: character state entity not found, skipping', { projectId, chapter, entityKey: characterState.entityKey });
       continue;
     }
-    const existingState = await tx.query.characterStates.findFirst({
-      where: and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, characterState.entityKey)),
-      columns: { lastUpdatedChapter: true },
-    });
+    // FOR UPDATE only serialises once the row exists — a concurrent first insert for this entity can still race.
+    const [existingState] = await tx
+      .select({
+        lastUpdatedChapter: schema.characterStates.lastUpdatedChapter,
+        location: schema.characterStates.location,
+        conditions: schema.characterStates.conditions,
+        immediateGoal: schema.characterStates.immediateGoal,
+        statusNote: schema.characterStates.statusNote,
+      })
+      .from(schema.characterStates)
+      .where(and(eq(schema.characterStates.projectId, projectId), eq(schema.characterStates.entityKey, characterState.entityKey)))
+      .for('update');
     if (existingState?.lastUpdatedChapter != null && existingState.lastUpdatedChapter > chapter) {
       logger.warn('applyContinuityDelta: character state already updated past this chapter, skipping', {
         projectId,
@@ -253,6 +329,17 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
           updatedAt: new Date(),
         },
       });
+
+    const after = {
+      location: characterState.location ?? null,
+      conditions: characterState.conditions ?? null,
+      immediateGoal: characterState.immediateGoal ?? null,
+      statusNote: characterState.statusNote ?? null,
+    };
+    const before = existingState
+      ? { location: existingState.location, conditions: existingState.conditions, immediateGoal: existingState.immediateGoal, statusNote: existingState.statusNote }
+      : null;
+    await recordCharacterEvent(tx, projectId, { entityId, chapter, kind: 'state', before, after });
   }
 
   // `delta.knowledgeChanges` is deliberately not written to `character_knowledge`: that ledger is populated

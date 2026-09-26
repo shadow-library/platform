@@ -71,6 +71,20 @@
       "when": 1790430241141,
       "tag": "0009_proposal_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790432260945,
+      "tag": "0010_character_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790432274226,
+      "tag": "0011_character_events_backfill",
+      "breakpoints": true
     }
   ]
 }

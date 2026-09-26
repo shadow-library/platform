@@ -113,6 +113,15 @@ export async function revokeProvisionalReveals(db: KnowledgeLedger, projectId: b
     .where(and(eq(schema.characterKnowledge.projectId, projectId), eq(schema.characterKnowledge.source, 'brief'), chapter))
     .returning({ factId: schema.characterKnowledge.factId, entityId: schema.characterKnowledge.entityId });
   if (deleted.length > 0) await reledgerRemainingClaims(db, projectId, revoked, deleted);
+  await revokeProvisionalCharacterEvents(db, projectId, revoked);
+}
+
+/** `revokeProvisionalReveals`'s counterpart for `character_events` (T27), dropped at the same reset points. A no-op today — nothing yet writes `provisional` events — but the hook T26's event-apply service will need. */
+export async function revokeProvisionalCharacterEvents(db: KnowledgeLedger, projectId: bigint, chapters: number | readonly number[]): Promise<void> {
+  const revoked = typeof chapters === 'number' ? [chapters] : [...chapters];
+  if (revoked.length === 0) return;
+  const chapter = typeof chapters === 'number' ? eq(schema.characterEvents.chapter, chapters) : inArray(schema.characterEvents.chapter, revoked);
+  await db.delete(schema.characterEvents).where(and(eq(schema.characterEvents.projectId, projectId), eq(schema.characterEvents.status, 'provisional'), chapter));
 }
 
 /**

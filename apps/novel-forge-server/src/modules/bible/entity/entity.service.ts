@@ -198,6 +198,19 @@ export class EntityService {
     return entity;
   }
 
+  /** "How <name> has changed", in chapter order. Author-facing, so unlike `WriterDisclosurePolicy` nothing here is scrubbed. */
+  async timeline(projectId: bigint, entityKey: string): Promise<Knowledge.CharacterEvent[]> {
+    const entity = await this.db.query.entities.findFirst({
+      where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
+      columns: { id: true },
+    });
+    if (!entity) throw AppErrorCode.ENT_001.create();
+    return this.db.query.characterEvents.findMany({
+      where: and(eq(schema.characterEvents.projectId, projectId), eq(schema.characterEvents.entityId, entity.id)),
+      orderBy: [asc(schema.characterEvents.chapter), asc(schema.characterEvents.createdAt)],
+    });
+  }
+
   async delete(projectId: bigint, entityKey: string): Promise<void> {
     const result = await this.db
       .delete(schema.entities)

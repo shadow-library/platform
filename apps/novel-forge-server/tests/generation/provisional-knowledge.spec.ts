@@ -173,13 +173,32 @@ describe('provisional brief reveals', () => {
 
     await markDescendantDraftsStale(fake.db as never, 1n, 4, 'ancestor chapter 4 was hand_edited');
 
-    const kinds = fake.writes.map(write => `${write.table === schema.characterKnowledge ? 'knowledge' : 'drafts'}:${write.kind}`);
-    expect(kinds).toEqual(['drafts:update', 'drafts:update', 'knowledge:delete']);
+    const label = (table: unknown) => (table === schema.characterKnowledge ? 'knowledge' : table === schema.characterEvents ? 'events' : 'drafts');
+    const kinds = fake.writes.map(write => `${label(write.table)}:${write.kind}`);
+    expect(kinds).toEqual(['drafts:update', 'drafts:update', 'knowledge:delete', 'events:delete']);
     const reset = statement(fake.writesTo(schema.drafts, 'update')[1]?.where);
     expect(reset.sql).toBe('(("drafts"."project_id" = $1 and "drafts"."chapter" > $2 and "drafts"."status" <> $3) and "drafts"."review_status" = $4)');
     expect(statement(fake.writesTo(schema.characterKnowledge, 'delete')[0]?.where)).toEqual({
       sql: '("character_knowledge"."project_id" = $1 and "character_knowledge"."source" = $2 and "character_knowledge"."learned_in_chapter" in ($3, $4))',
       params: [1n, 'brief', 5, 7],
+    });
+    expect(statement(fake.writesTo(schema.characterEvents, 'delete')[0]?.where)).toEqual({
+      sql: '("character_events"."project_id" = $1 and "character_events"."status" = $2 and "character_events"."chapter" in ($3, $4))',
+      params: [1n, 'provisional', 5, 7],
+    });
+  });
+});
+
+describe('revokeProvisionalCharacterEvents', () => {
+  it("should drop only the revoked chapters' provisional events, alongside the brief-sourced ledger rows", async () => {
+    const { fake, service, revocations } = serviceOver({ draftReads: [draftRow()], draftWriteResult: [draftRow({ revision: 3 })] });
+
+    await service.reviseDraft(1n, 4, { note: 'Slow the count down.' });
+
+    expect(revocations()).toContainEqual(REVOKE_CHAPTER_4);
+    expect(statement(fake.writesTo(schema.characterEvents, 'delete')[0]?.where)).toEqual({
+      sql: '("character_events"."project_id" = $1 and "character_events"."status" = $2 and "character_events"."chapter" in ($3))',
+      params: [1n, 'provisional', 4],
     });
   });
 });

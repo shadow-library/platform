@@ -121,6 +121,7 @@ const SHIFT_TARGETS: ShiftTarget[] = [
   { table: schema.mysteries, projectId: schema.mysteries.projectId, column: schema.mysteries.lastAdvancedChapter, field: 'lastAdvancedChapter' },
   { table: schema.mysteries, projectId: schema.mysteries.projectId, column: schema.mysteries.payoffWindow, field: 'payoffWindow' },
   { table: schema.modelCalls, projectId: schema.modelCalls.projectId, column: schema.modelCalls.chapter, field: 'chapter' },
+  { table: schema.characterEvents, projectId: schema.characterEvents.projectId, column: schema.characterEvents.chapter, field: 'chapter' },
 ];
 
 const INSERT_STALE_REASON = 'a chapter was inserted after this point';

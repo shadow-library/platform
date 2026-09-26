@@ -5,6 +5,7 @@ import { Injectable } from '@shadow-library/app';
 import { getBibleDocumentTool } from './tools/get-bible-document.tool';
 import { getBriefTool } from './tools/get-brief.tool';
 import { getCanonFactsTool } from './tools/get-canon-facts.tool';
+import { getCharacterTimelineTool } from './tools/get-character-timeline.tool';
 import { getChapterSummariesTool } from './tools/get-chapter-summaries.tool';
 import { getDraftTool } from './tools/get-draft.tool';
 import { getEntityTool } from './tools/get-entity.tool';
@@ -29,6 +30,7 @@ const ALL_TOOLS: RegisteredTool[] = [
   getDraftTool,
   getCanonFactsTool,
   getNotesTool,
+  getCharacterTimelineTool,
 ];
 
 export function toolsForNode(nodeName: string): RegisteredTool[] {
