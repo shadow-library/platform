@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
+import { type APIRequestContext, expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
 import { apiContext, mutate, PERSONAS, pollJob, subFor } from '../../lib';
-import { buildFinalBundle, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
+import { buildFinalBundle, deleteProjectQuietly, jsonOrUndefined, pollWebNovel, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -23,17 +23,6 @@ import { buildFinalBundle, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix }
  */
 
 test.describe.configure({ mode: 'serial' });
-
-/** Polls a web-novel GET until it returns `wantStatus`, so an in-flight reader push has time to arrive. */
-async function pollWebNovel(ctx: APIRequestContext, path: string, wantStatus: number, timeoutMs = 45_000): Promise<APIResponse> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const response = await ctx.get(path);
-    if (response.status() === wantStatus) return response;
-    if (Date.now() >= deadline) return response;
-    await new Promise(r => setTimeout(r, 2_000));
-  }
-}
 
 test.describe('novel-forge import and publish pipeline', () => {
   const slug = `e2e-forge-pub-${uniqueSuffix()}`;

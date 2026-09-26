@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
+import { type APIRequestContext, expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
 import { apiContext, mutate, pollJob, subFor, webNovelDb } from '../../lib';
-import { buildFinalBundle, deleteProjectQuietly, uniqueSuffix } from './forge-helpers';
+import { buildFinalBundle, deleteProjectQuietly, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -24,14 +24,6 @@ interface WikiEntry {
   hiddenFacetCount: number;
 }
 
-interface ReconcileResult {
-  novel: string;
-  pushed: number[];
-  skipped: number[];
-  failed: { ordinal: number; error: string }[];
-  wiki: { pushed: string[]; skipped: string[]; failed: { entryKey: string; error: string }[] };
-}
-
 /**
  * Declaring the constants
  *
@@ -46,7 +38,7 @@ interface ReconcileResult {
  *
  * Convergence is driven here through `reconcile` (synchronous converge), NOT the auto-push jobs: publishing a
  * chapter while a converge job is already in flight is silently "deduped onto active job", so those chapters
- * would only settle on the janitor sweep — see the note on `reconcileUntilConverged` below.
+ * would only settle on the janitor sweep — see `reconcileUntilConverged`.
  *
  * Gating design used here (both derived from published ordinals, no `firstSeenChapter` needed — the create DTO
  * does not even expose it):
@@ -64,42 +56,6 @@ test.describe.configure({ mode: 'serial', timeout: 150_000 });
 const VISIBLE_KEY = 'e2e-hero';
 const GATED_KEY = 'e2e-order';
 const FACT_KEY = 'e2e-order-origin';
-
-/** Polls a web-novel GET until it returns `wantStatus`, so an in-flight reader push has time to arrive. */
-async function pollWebNovel(ctx: APIRequestContext, path: string, wantStatus: number, timeoutMs = 45_000): Promise<APIResponse> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const response = await ctx.get(path);
-    if (response.status() === wantStatus) return response;
-    if (Date.now() >= deadline) return response;
-    await new Promise(r => setTimeout(r, 2_000));
-  }
-}
-
-/**
- * Repeatedly calls the synchronous `reconcile` endpoint until every chapter and every wanted wiki entry has
- * settled (pushed or already-in-sync skipped) with no failures. Reconcile is the deterministic converge trigger:
- * the low-latency auto-push job dedups concurrent enqueues, so a chapter published during an in-flight converge
- * never gets its own push and lingers `scheduled` — reconcile forces the full manifest-diff converge that pushes
- * it. In one pass reconcile pushes the due chapters (marking them `published`) and THEN recomputes the wiki off
- * those just-updated ordinals, so the gated entry appears as soon as its gating chapter is live.
- */
-async function reconcileUntilConverged(ctx: APIRequestContext, projectId: string, wantChapters: number[], wantWiki: string[], timeoutMs = 90_000): Promise<ReconcileResult> {
-  const deadline = Date.now() + timeoutMs;
-  let last: ReconcileResult = { novel: '', pushed: [], skipped: [], failed: [], wiki: { pushed: [], skipped: [], failed: [] } };
-  for (;;) {
-    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/publications/reconcile`);
-    if (response.status() === 200) {
-      last = (await response.json()) as ReconcileResult;
-      const chaptersSettled = new Set([...last.pushed, ...last.skipped]);
-      const wikiSettled = new Set([...last.wiki.pushed, ...last.wiki.skipped]);
-      const converged = last.failed.length === 0 && last.wiki.failed.length === 0 && wantChapters.every(o => chaptersSettled.has(o)) && wantWiki.every(k => wikiSettled.has(k));
-      if (converged) return last;
-    }
-    if (Date.now() >= deadline) return last;
-    await new Promise(r => setTimeout(r, 3_000));
-  }
-}
 
 test.describe('novel-forge wiki publish → reader', () => {
   const slug = `e2e-wiki-${uniqueSuffix()}`;
@@ -261,7 +217,6 @@ test.describe('novel-forge wiki publish → reader', () => {
     // retract the published novel (there is no delete-novel push). It remains readable — an orphan the author
     // would retire explicitly. Observed, not asserted as desired behaviour.
     const stillThere = await webGuestCtx.get(`/api/novels/${slug}`);
-
-    console.log(`[wiki-publish] after forge project delete, reader GET /api/novels/${slug} → ${stillThere.status()} (200 = orphaned, not cascaded)`);
+    test.info().annotations.push({ type: 'reader after forge delete', description: `GET /api/novels/${slug} → ${stillThere.status()} (200 = orphaned, not cascaded)` });
   });
 });

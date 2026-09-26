@@ -7,6 +7,8 @@
   "description": "Whole-platform Playwright suite \u2014 cross-app smoke flows against already-deployed service URLs supplied via environment variables.",
   "scripts": {
     "test": "bunx playwright test",
+    "test:deterministic": "bunx playwright test --grep-invert @model",
+    "test:model": "E2E_LIVE_AI=1 bunx playwright test --grep @model",
     "test:setup": "bunx playwright install --with-deps chromium",
     "test:report": "bunx playwright show-report test-results/html-report"
   },
