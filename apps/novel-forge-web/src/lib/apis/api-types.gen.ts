@@ -2632,6 +2632,23 @@ export interface paths {
     patch: operations['patch_api_v1_projects_projectId_milestones_milestoneKey'];
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/promises': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Promises */
+    get: operations['get_api_v1_projects_projectId_promises'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/bible/readiness': {
     parameters: {
       query?: never;
@@ -4244,6 +4261,8 @@ export interface components {
       title?: null | string;
       /** @description Null for a written chapter that has no brief. */
       writeMode?: components['schemas']['BriefWriteMode'] | null;
+      /** @description The chapter's point of view: the brief's own pov, or the first pooled scene pov. Null when neither names one. */
+      pov?: null | string;
       /** @description Written rows only. */
       status?: components['schemas']['DraftStatus'];
       /** @description Written rows only. */
@@ -4254,6 +4273,8 @@ export interface components {
       isolated?: boolean;
       /** @description Written rows only: finalize is refused until the chapter has a summary — every chapter needs one — plus, for an isolated chapter, continuation state. */
       finalizeBlocked?: boolean;
+      /** @description Written rows only: the draft's current revision. */
+      revision?: number;
       /** @description Written rows only: the last revision the author approved, null when none was. */
       approvedRevision?: null | number;
       /** @description Written rows only. */
@@ -5734,6 +5755,12 @@ export interface components {
       lastChapter?: null | number;
       /** @description Sum of word counts across the volume’s chapters. */
       wordCount: number;
+      /** @description Chapters this volume claims anywhere in the plan — final, drafted, or briefed only — so a not-yet-written chapter still places into it. */
+      planChapterCount: number;
+      /** @description Lowest chapter number claimed anywhere in the plan; null when it has none. */
+      planFirstChapter?: null | number;
+      /** @description Highest chapter number claimed anywhere in the plan; null when it has none. */
+      planLastChapter?: null | number;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -5908,6 +5935,44 @@ export interface components {
       subjectEntityKey?: string | null;
       kind?: components['schemas']['MilestoneKind'];
     };
+    /** @enum {string} */
+    PromiseKind: 'thread' | 'mystery';
+    /** @enum {string} */
+    PromiseStatus: 'open' | 'closed' | 'resolved' | 'dropped';
+    ListPromisesResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['PromiseItemResponse'][];
+    };
+    /** @description One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact (P4-38). */
+    PromiseItemResponse: {
+      kind: components['schemas']['PromiseKind'];
+      /** @description The thread or mystery key. */
+      key: string;
+      /** @description The thread's summary or the mystery's question. */
+      label: string;
+      status: components['schemas']['PromiseStatus'];
+      /** @description Marked by the outliner or continuity extraction as a deliberate running promise, not an oversight. */
+      intentionallyOpen: boolean;
+      openedChapter?: null | number;
+      /** @description The most recent chapter whose continuity extraction named this promise. */
+      lastAdvancedChapter?: null | number;
+      /** @description Set once a thread is closed; null for a mystery. */
+      closedChapter?: null | number;
+      /** @description Set once a mystery is resolved; null for a thread. */
+      resolvedChapter?: null | number;
+      /** @description A single target chapter the promise is expected to pay off by. */
+      payoffWindow?: null | number;
+      /** @description The milestone this promise is meant to pay off by. */
+      payoffMilestoneKey?: null | string;
+      /** @description The volume this promise is meant to pay off by. */
+      payoffVolumeKey?: null | string;
+      /** @description P4-41b: 'due' once the payoff milestone is reached or the payoff volume is the one now active; 'overdue' once the authored chapter window passes or the payoff volume already met its goal. */
+      due: components['schemas']['DueStanding'];
+    };
+    /** @enum {string} */
+    DueStanding: 'not_due' | 'due' | 'overdue';
     BibleReadinessResponse: {
       dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
       /** @description one entry per bible role, in manifest order, explaining what the coverage dimension counted */
@@ -9659,6 +9724,10 @@ export interface operations {
         limit?: number | string;
         offset?: number | string;
         filter?: components['schemas']['ChapterRowFilter'];
+        /** @description Only rows whose brief's point of view (any pooled scene) is this entity key. Covers drafts and planned chapters too. */
+        pov?: string;
+        /** @description Only rows this thread opened, closed, or was last advanced in. Covers drafts and planned chapters too. */
+        thread?: string;
       };
       header?: never;
       path: {
@@ -14508,6 +14577,53 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_promises: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        kind?: components['schemas']['PromiseKind'];
+        status?: components['schemas']['PromiseStatus'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListPromisesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_bible_readiness: {
     parameters: {
       query?: never;
@@ -15983,6 +16099,11 @@ export type MilestoneKind = components['schemas']['MilestoneKind'];
 export type MilestoneState = components['schemas']['MilestoneState'];
 export type CreateMilestoneBody = components['schemas']['CreateMilestoneBody'];
 export type UpdateMilestoneBody = components['schemas']['UpdateMilestoneBody'];
+export type PromiseKind = components['schemas']['PromiseKind'];
+export type PromiseStatus = components['schemas']['PromiseStatus'];
+export type ListPromisesResponse = components['schemas']['ListPromisesResponse'];
+export type PromiseItemResponse = components['schemas']['PromiseItemResponse'];
+export type DueStanding = components['schemas']['DueStanding'];
 export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
 export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
 export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
@@ -16151,6 +16272,8 @@ export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/
 export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
 export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
 export type ListMilestonesPathParams = Exclude<paths['/api/v1/projects/{projectId}/milestones']['get']['parameters']['path'], undefined>;
+export type ListPromisesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/promises']['get']['parameters']['query'], undefined>;
+export type ListPromisesPathParams = Exclude<paths['/api/v1/projects/{projectId}/promises']['get']['parameters']['path'], undefined>;
 export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
