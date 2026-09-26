@@ -83,6 +83,7 @@ export type StartedReview = { queued: false; review: ChapterReviewView } | { que
 interface ReviewSource extends ReviewedText {
   body: string;
   draftId: bigint | null;
+  saveSeq: number | null;
   isolated: boolean;
   final: boolean;
   generating: boolean;
@@ -430,6 +431,7 @@ export class ChapterReviewService {
       return sourceOf(draft.body, {
         draftRevision: draft.revision,
         draftId: draft.id,
+        saveSeq: draft.saveSeq,
         isolated: draft.isolated,
         final: draft.status === 'final',
         generating: draft.reviewStatus === 'generating',
@@ -438,7 +440,7 @@ export class ChapterReviewService {
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter), eq(schema.chapters.status, 'done')),
       columns: { content: true, isolated: true },
     });
-    return final?.content ? sourceOf(final.content, { draftRevision: null, draftId: null, isolated: final.isolated, final: true, generating: false }) : null;
+    return final?.content ? sourceOf(final.content, { draftRevision: null, draftId: null, saveSeq: null, isolated: final.isolated, final: true, generating: false }) : null;
   }
 
   private async findReview(projectId: bigint, chapter: number, reviewId: bigint): Promise<ReviewWithRemedies> {
@@ -553,6 +555,7 @@ function draftAt(source: ReviewSource): SQL | undefined {
   return and(
     eq(schema.drafts.id, source.draftId ?? -1n),
     eq(schema.drafts.revision, source.draftRevision ?? -1),
+    eq(schema.drafts.saveSeq, source.saveSeq ?? -1),
     ne(schema.drafts.status, 'final'),
     ne(schema.drafts.reviewStatus, 'generating'),
   );

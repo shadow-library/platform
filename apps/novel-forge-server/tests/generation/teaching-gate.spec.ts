@@ -61,7 +61,7 @@ describe('untilFirstTeacher', () => {
 
 describe('GenerationService — writing by hand after an unapproved lesson', () => {
   it('should let the author write the next chapter themselves', async () => {
-    const fake = fakeGenerationDb({ draftReads: [undefined], draftWriteResult: [draftRow({ chapter: 6 })], knowledge: knowledgeFixture() });
+    const fake = fakeGenerationDb({ draftReads: [undefined], draftWriteResult: [draftRow({ chapter: 6 })], knowledge: knowledgeFixture(), written: [1, 2, 3, 4, 5] });
 
     await makeGenerationService(fake.db).updateDraft(1n, 6, { title: 'By Hand', body: 'Mira writes it herself.', summary: 'Written by hand.' });
 

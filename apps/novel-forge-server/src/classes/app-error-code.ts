@@ -94,6 +94,15 @@ export class AppErrorCode extends ServerErrorCode {
     'Chapter {chapter} cannot be written by the AI until chapter {teacher} is approved — its characters learn something there that later chapters build on. You can still write chapter {chapter} yourself.',
   );
   static readonly DRF_017 = AppErrorCode.badRequest('DRF_017', 'This draft is stale because a reveal in its plan no longer holds — fix the plan; it cannot be approved as written');
+  static readonly DRF_018 = AppErrorCode.badRequest(
+    'DRF_018',
+    'Only chapter {next} can be started now — chapters are written in order, so chapter {chapter} cannot get a new draft',
+  );
+  static readonly DRF_019 = AppErrorCode.conflict(
+    'DRF_019',
+    'Chapter {chapter} is being written by the AI right now — wait for it to finish, or cancel it to write the chapter yourself',
+  );
+  static readonly DRF_020 = AppErrorCode.badRequest('DRF_020', 'A save made against an earlier read must send baseDraftId, baseRevision and baseSaveSeq together');
 
   /*!
    * Finalize Errors
@@ -101,6 +110,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FIN_001 = AppErrorCode.badRequest('FIN_001', 'Chapters must be finalized in order');
   static readonly FIN_002 = AppErrorCode.badRequest('FIN_002', 'An earlier chapter needs re-validation after a bible or chapter change — run validation before finalizing');
   static readonly FIN_003 = AppErrorCode.badRequest('FIN_003', 'The latest validation report has an unresolved error for this chapter — resolve it before finalizing');
+  static readonly FIN_004 = AppErrorCode.badRequest(
+    'FIN_004',
+    'Chapter {chapter} has a blocking review finding still open — change the text, dismiss the finding or approve over it before finalizing',
+  );
 
   /*!
    * AI Errors

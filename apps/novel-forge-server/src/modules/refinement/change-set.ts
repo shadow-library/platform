@@ -187,6 +187,8 @@ interface ApproveDraftAction {
   op: 'action.approve_draft';
   chapter: number;
   revision?: number;
+  saveSeq?: number;
+  draftId?: string;
 }
 
 interface ValidateAction {
@@ -312,7 +314,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
   'action.judge_draft': { required: { chapter: 'number' }, optional: {} },
   'action.revise_draft': { required: { chapter: 'number', note: 'string' }, optional: {} },
-  'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number' } },
+  'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number', saveSeq: 'number', draftId: 'string' } },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
 };
@@ -606,7 +608,7 @@ export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabulary
 }
 
 /** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them. */
-const SERVER_STAMPED_FIELDS: Partial<Record<ActionType, readonly string[]>> = { 'action.approve_draft': ['revision'] };
+const SERVER_STAMPED_FIELDS: Partial<Record<ActionType, readonly string[]>> = { 'action.approve_draft': ['revision', 'saveSeq', 'draftId'] };
 
 /** Action shapes + what each one does — the pipeline half of the hub playbook. */
 export function renderActionVocabulary(actions: readonly ActionType[]): string {

@@ -66,12 +66,13 @@ export class HubActionRegistrar {
 
     registry.register('action.approve_draft', async (projectId, action) => {
       if (action.op !== 'action.approve_draft') throw AppError.internal('executor misrouted');
-      if (action.revision === undefined) {
+      const { revision, saveSeq, draftId } = action;
+      if (revision === undefined || saveSeq === undefined || draftId === undefined || !/^\d+$/.test(draftId)) {
         await this.generationService.getDraft(projectId, action.chapter);
         throw AppErrorCode.DRF_013.create();
       }
-      await this.generationService.approveDraft(projectId, action.chapter, { revision: action.revision });
-      return { summary: `approved chapter ${action.chapter} draft at revision ${action.revision}` };
+      await this.generationService.approveDraft(projectId, action.chapter, { revision, saveSeq, draftId: BigInt(draftId) });
+      return { summary: `approved chapter ${action.chapter} draft at revision ${revision}` };
     });
 
     registry.register('action.validate', async (projectId, action) => {

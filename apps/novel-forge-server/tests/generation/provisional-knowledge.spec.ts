@@ -40,12 +40,15 @@ describe('GenerationService.approveDraft', () => {
   it('should approve the revision the author read and ledger its brief reveals in the same transaction', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow()], draftWriteResult: [draftRow()], knowledge: knowledgeFixture() });
 
-    await service.approveDraft(1n, 4, { revision: 2 });
+    await service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n });
 
     const [approval] = fake.writesTo(schema.drafts, 'update');
     const where = render(approval?.where);
-    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."status" <> $3 and "drafts"."stale_reason" is null and "drafts"."review_status" <> $4)');
-    expect(where.params).toEqual([11n, 2, 'final', 'generating']);
+    expect(where.sql).toBe(
+      '("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."save_seq" = $3 and "drafts"."status" <> $4 and "drafts"."stale_reason" is null and "drafts"."review_status" <> $5)',
+    );
+    expect(where.params).toEqual([11n, 2, 0, 'final', 'generating']);
+    expect(approval?.values).toMatchObject({ reviewStatus: 'approved', approvedRevision: 2 });
     expect(fake.writesTo(schema.userFeedback)).toEqual([expect.objectContaining({ values: expect.objectContaining({ disposition: 'approved' }) })]);
     expect(fake.writesTo(schema.characterKnowledge).map(write => write.kind)).toEqual(['delete', 'upsert']);
     expect(statement(fake.writesTo(schema.characterKnowledge, 'delete')[0]?.where)).toEqual(REVOKE_CHAPTER_4);
@@ -58,14 +61,14 @@ describe('GenerationService.approveDraft', () => {
   it('should refuse a revision the draft has already moved past before opening a transaction', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow({ revision: 3 })], knowledge: knowledgeFixture() });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_013' });
     expect(fake.writes).toEqual([]);
   });
 
   it('should refuse a revision that moved between the read and the write without an audit row or a ledger row', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow(), draftRow({ revision: 3 })], knowledge: knowledgeFixture() });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_013' });
     expect(fake.writesTo(schema.userFeedback)).toEqual([]);
     expect(fake.writesTo(schema.characterKnowledge)).toEqual([]);
     expect(fake.outcome()).toBe('rolled back');
@@ -74,7 +77,7 @@ describe('GenerationService.approveDraft', () => {
   it('should refuse an approval that lost the race to a finalize of the same revision, leaving the committed knowledge alone', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow(), draftRow({ status: 'final' })], knowledge: knowledgeFixture() });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_002' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_002' });
     expect(fake.writesTo(schema.characterKnowledge)).toEqual([]);
     expect(fake.outcome()).toBe('rolled back');
   });
@@ -86,14 +89,14 @@ describe('GenerationService.approveDraft — approving a stale draft as written'
   it('should clear exactly the stale reason the author saw, record the override and mark nothing else stale', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow({ staleReason: STALE })], draftWriteResult: [draftRow()], knowledge: knowledgeFixture() });
 
-    await service.approveDraft(1n, 4, { revision: 2, keepStale: true, staleReason: STALE });
+    await service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n, keepStale: true, staleReason: STALE });
 
     const draftUpdates = fake.writesTo(schema.drafts, 'update');
     expect(draftUpdates).toHaveLength(1);
     expect(draftUpdates[0]?.values).toMatchObject({ reviewStatus: 'approved', staleReason: null });
     expect(statement(draftUpdates[0]?.where)).toEqual({
-      sql: '("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."status" <> $3 and "drafts"."stale_reason" = $4 and "drafts"."review_status" <> $5)',
-      params: [11n, 2, 'final', STALE, 'generating'],
+      sql: '("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."save_seq" = $3 and "drafts"."status" <> $4 and "drafts"."stale_reason" = $5 and "drafts"."review_status" <> $6)',
+      params: [11n, 2, 0, 'final', STALE, 'generating'],
     });
     expect(fake.writesTo(schema.userFeedback)[0]?.values).toMatchObject({ disposition: 'approved', note: `approved as written over: ${STALE}` });
     expect(fake.outcome()).toBe('committed');
@@ -102,7 +105,7 @@ describe('GenerationService.approveDraft — approving a stale draft as written'
   it('should refuse a stale draft without the author asking to keep it', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow({ staleReason: STALE })] });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_007' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_007' });
     expect(fake.writes).toEqual([]);
   });
 
@@ -110,14 +113,14 @@ describe('GenerationService.approveDraft — approving a stale draft as written'
     const reason = `${REVEAL_STALE_PREFIX}lamp_rank_4_rule (needs milestone lamp_rank_4 reached)`;
     const { fake, service } = serviceOver({ draftReads: [draftRow({ staleReason: reason })] });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2, keepStale: true, staleReason: reason })).rejects.toMatchObject({ code: 'DRF_017' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n, keepStale: true, staleReason: reason })).rejects.toMatchObject({ code: 'DRF_017' });
     expect(fake.writes).toEqual([]);
   });
 
   it('should refuse when the draft went stale for another reason than the one the author saw', async () => {
     const { fake, service } = serviceOver({ draftReads: [draftRow({ staleReason: 'ancestor chapter 2 was revised' })] });
 
-    await expect(service.approveDraft(1n, 4, { revision: 2, keepStale: true, staleReason: STALE })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n, keepStale: true, staleReason: STALE })).rejects.toMatchObject({ code: 'DRF_013' });
     expect(fake.writes).toEqual([]);
   });
 });
@@ -151,8 +154,8 @@ describe('provisional brief reveals', () => {
 
       const descendants = fake.writesTo(schema.drafts, 'update').map(write => statement(write.where));
       expect(descendants).toContainEqual({
-        sql: '("drafts"."project_id" = $1 and "drafts"."chapter" > $2 and "drafts"."status" <> $3)',
-        params: [1n, 4, 'final'],
+        sql: '(("drafts"."project_id" = $1 and "drafts"."chapter" > $2 and "drafts"."status" <> $3) and ("drafts"."stale_reason" is null or "drafts"."stale_reason" like $4))',
+        params: [1n, 4, 'final', `${REVEAL_STALE_PREFIX}%`],
       });
       expect(revocations()).toContainEqual(REVOKE_CHAPTER_4);
     },

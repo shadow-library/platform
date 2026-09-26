@@ -39,6 +39,10 @@ export const drafts = pgTable(
     title: varchar('title', { length: 500 }),
     status: draftStatus('status').notNull().default('draft'),
     revision: integer('revision').notNull().default(0),
+    // Bumped by every hand save, including one folded into the current revision, so a save can prove it read the prose as it stands.
+    saveSeq: integer('save_seq').notNull().default(0),
+    // The last revision the author approved; survives later edits and finalize, replaced by the next approval.
+    approvedRevision: integer('approved_revision'),
     words: integer('words'),
     volumeKey: varchar('volume_key'),
     summary: text('summary'),

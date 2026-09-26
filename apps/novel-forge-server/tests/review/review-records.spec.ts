@@ -85,7 +85,7 @@ describe('GenerationService.approveDraft over open review findings', () => {
       knowledge: knowledgeFixture(),
       latestJudgeReview: review,
     });
-    const approved = await makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2 });
+    const approved = await makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n });
     return { approved, remedies: fake.writesTo(schema.chapterReviewRemedies) };
   };
 

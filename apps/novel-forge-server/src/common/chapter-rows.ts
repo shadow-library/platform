@@ -16,6 +16,7 @@ export interface WrittenChapterRow {
   generator: Project.ContentGenerator;
   isolated: boolean;
   finalizeBlocked: boolean;
+  approvedRevision: number | null;
   wordCount: number;
   judgeNote: string | null;
 }

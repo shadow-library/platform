@@ -8,11 +8,14 @@ import { ChapterReviewService } from '@modules/review/chapter-review.service';
 import { AppErrorCode } from '@server/classes';
 import { type Review, schema } from '@server/database';
 
+import { matchesWhere } from '../sql-filter';
+
 export interface ReviewDraftRow {
   id: bigint;
   projectId: bigint;
   chapter: number;
   revision: number;
+  saveSeq: number;
   status: 'draft' | 'final';
   reviewStatus: 'generating' | 'needs_review' | 'contradiction' | 'approved';
   body: string;
@@ -24,6 +27,8 @@ export interface RecordedWrite {
   kind: 'insert' | 'upsert' | 'update' | 'delete' | 'lock';
   values?: unknown;
   where?: SQL;
+  /** Whether a draft update's predicate matched the draft as it then stood. */
+  landed?: boolean;
 }
 
 export interface ModelCall {
@@ -43,6 +48,8 @@ export interface ReviewFakeOptions {
   editorialAnswer?: object;
   /** The draft moved on while the model was reading it, so the revision-bound draft update matches nothing. */
   draftMoved?: boolean;
+  /** An autosave folds new text into the revision while the model reads it: same revision, next save sequence. */
+  foldWhileReading?: boolean;
   /** The model the unrestricted route resolves, to try one off the allowlist. */
   unrestrictedModel?: ResolvedModel;
   /** The writer's required material is over its limits, so an enforcing pack request fails. */
@@ -80,7 +87,7 @@ export function render(where: SQL | undefined): { sql: string; params: unknown[]
 }
 
 export function reviewDraft(overrides: Partial<ReviewDraftRow> = {}): ReviewDraftRow {
-  return { id: 11n, projectId: 1n, chapter: 4, revision: 2, status: 'draft', reviewStatus: 'needs_review', body: CHAPTER_BODY, isolated: false, ...overrides };
+  return { id: 11n, projectId: 1n, chapter: 4, revision: 2, saveSeq: 0, status: 'draft', reviewStatus: 'needs_review', body: CHAPTER_BODY, isolated: false, ...overrides };
 }
 
 function promptText(messages: BaseMessage[] | Record<string, unknown>): string {
@@ -162,8 +169,9 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     update: (table: unknown) => ({
       set: (values: Record<string, unknown>) => ({
         where: (where: SQL) => {
-          writes.push({ table, kind: 'update', values, where });
-          return awaitableRows(table === schema.drafts && !options.draftMoved ? [{ id: 11n }] : []);
+          const landed = table === schema.drafts && !options.draftMoved && draft !== null && matchesWhere({ ...draft }, where);
+          writes.push({ table, kind: 'update', values, where, ...(table === schema.drafts ? { landed } : {}) });
+          return awaitableRows(landed ? [{ id: 11n }] : []);
         },
       }),
     }),
@@ -197,6 +205,7 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     chatFor: async (role: string, _ctx: unknown, project?: { contentMode?: string }) => ({
       invoke: async (messages: BaseMessage[]) => {
         record(role, project, promptText(messages));
+        if (options.foldWhileReading && draft) draft = { ...draft, saveSeq: draft.saveSeq + 1, body: `${draft.body} She counted again.` };
         return new AIMessage(typeof judgeAnswer === 'string' ? judgeAnswer : JSON.stringify(judgeAnswer));
       },
     }),

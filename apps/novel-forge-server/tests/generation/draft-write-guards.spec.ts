@@ -18,18 +18,24 @@ interface GuardCase {
 const BODY = { title: 'Low Water', body: 'The ferry waits for a tide that never turns.', summary: 'The ferry is stranded.' };
 
 const GUARDED_WRITES: GuardCase[] = [
-  { name: 'updateDraft', call: service => service.updateDraft(1n, 4, BODY), kind: 'upsert', predicate: write => write.setWhere, expected: ['"drafts"."status" <> $'] },
+  {
+    name: 'updateDraft',
+    call: service => service.updateDraft(1n, 4, BODY),
+    kind: 'update',
+    predicate: write => write.where,
+    expected: ['"drafts"."revision" = $', '"drafts"."save_seq" = $', '"drafts"."status" <> $'],
+  },
   {
     name: 'importDraft',
     call: service => service.importDraft(1n, 4, { title: BODY.title, prose: BODY.body, summary: BODY.summary }),
-    kind: 'upsert',
-    predicate: write => write.setWhere,
-    expected: ['"drafts"."status" <> $'],
+    kind: 'update',
+    predicate: write => write.where,
+    expected: ['"drafts"."revision" = $', '"drafts"."save_seq" = $', '"drafts"."status" <> $'],
   },
   { name: 'deleteDraft', call: service => service.deleteDraft(1n, 4), kind: 'delete', predicate: write => write.where, expected: ['"drafts"."status" <> $'] },
   {
     name: 'approveDraft',
-    call: service => service.approveDraft(1n, 4, { revision: 2 }),
+    call: service => service.approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n }),
     kind: 'update',
     predicate: write => write.where,
     expected: ['"drafts"."revision" = $', '"drafts"."status" <> $', '"drafts"."stale_reason" is null', '"drafts"."review_status" <> $'],
@@ -64,13 +70,13 @@ describe('GenerationService.approveDraft', () => {
   it('should report a draft that went stale before the approval landed as stale', async () => {
     const fake = fakeGenerationDb({ draftReads: [draftRow(), draftRow({ staleReason: 'ancestor chapter 3 was regenerated' })] });
 
-    await expect(makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_007' });
+    await expect(makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_007' });
   });
 
   it('should report a live, fresh draft that refused the approval as a conflict', async () => {
     const fake = fakeGenerationDb({ draftReads: [draftRow(), draftRow()] });
 
-    await expect(makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(makeGenerationService(fake.db).approveDraft(1n, 4, { revision: 2, saveSeq: 0, draftId: 11n })).rejects.toMatchObject({ code: 'DRF_013' });
   });
 });
 

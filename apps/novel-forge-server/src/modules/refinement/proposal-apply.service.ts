@@ -6,6 +6,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import {
   assertMilestoneSubject,
+  assertStartsNextChapter,
   briefContentHash,
   changedCluesNamingTerms,
   computeBibleDocHash,
@@ -58,6 +59,8 @@ import {
 export interface AppliedArtifact {
   artifactRef: string;
   newRevision: number | null;
+  newSaveSeq?: number;
+  newDraftId?: bigint;
 }
 
 export interface OpResult {
@@ -128,7 +131,7 @@ type TxResult =
 export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArtifact[]): ActionOp {
   if (op.op !== 'action.approve_draft') return op;
   const written = applied.find(artifact => artifact.artifactRef === `draft:${op.chapter}`);
-  return typeof written?.newRevision === 'number' ? { ...op, revision: written.newRevision } : op;
+  return typeof written?.newRevision === 'number' ? { ...op, revision: written.newRevision, saveSeq: written.newSaveSeq, draftId: written.newDraftId?.toString() } : op;
 }
 
 /**
@@ -771,15 +774,18 @@ export class ProposalApplyService {
 
     const merged = { title: op.title ?? existing?.title ?? null, body: op.body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
 
-    let written: { id: bigint; revision: number } | undefined;
+    let written: { id: bigint; revision: number; saveSeq: number } | undefined;
     if (existing) {
       [written] = await ctx.tx
         .update(schema.drafts)
         .set({ ...merged, revision: sql`${schema.drafts.revision} + 1`, reviewStatus: 'needs_review', staleReason: null, updatedAt: new Date() })
-        .where(and(eq(schema.drafts.id, existing.id), eq(schema.drafts.revision, existing.revision), ne(schema.drafts.status, 'final')))
-        .returning({ id: schema.drafts.id, revision: schema.drafts.revision });
+        .where(
+          and(eq(schema.drafts.id, existing.id), eq(schema.drafts.revision, existing.revision), eq(schema.drafts.saveSeq, existing.saveSeq), ne(schema.drafts.status, 'final')),
+        )
+        .returning({ id: schema.drafts.id, revision: schema.drafts.revision, saveSeq: schema.drafts.saveSeq });
       if (!written) throw await refusedDraftWriteError(ctx.tx, ctx.projectId, op.chapter);
     } else {
+      await assertStartsNextChapter(ctx.tx, ctx.projectId, op.chapter);
       [written] = await ctx.tx
         .insert(schema.drafts)
         .values({
@@ -792,7 +798,7 @@ export class ProposalApplyService {
           generator: op.generator ?? 'standard',
           isolated: op.isolated ?? false,
         })
-        .returning({ id: schema.drafts.id, revision: schema.drafts.revision });
+        .returning({ id: schema.drafts.id, revision: schema.drafts.revision, saveSeq: schema.drafts.saveSeq });
       if (!written) throw AppErrorCode.DRF_001.create();
     }
 
@@ -802,7 +808,7 @@ export class ProposalApplyService {
       .onConflictDoNothing();
     await markDescendantDraftsStale(ctx.tx, ctx.projectId, op.chapter, `ancestor chapter ${op.chapter} was chat_edited`);
     if (existing) await revokeProvisionalReveals(ctx.tx, ctx.projectId, op.chapter);
-    ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: written.revision });
+    ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: written.revision, newSaveSeq: written.saveSeq, newDraftId: written.id });
   }
 
   private async applyDraftRemove(ctx: ApplyContext, op: DraftRemoveOp): Promise<void> {

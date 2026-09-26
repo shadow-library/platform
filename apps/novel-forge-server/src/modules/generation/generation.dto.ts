@@ -1,5 +1,5 @@
 import { EnumType, Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
-import { Transform } from '@shadow-library/fastify';
+import { ErrorResponseDto, Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { type ContentRating, type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
@@ -168,7 +168,28 @@ export class GenerateBody {
 }
 
 @Schema()
-export class UpdateDraftBody {
+export class DraftSaveBase {
+  @Field(() => String, {
+    optional: true,
+    pattern: '^[0-9]+$',
+    description: 'The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft.',
+  })
+  @Transform('bigint:parse')
+  baseDraftId?: bigint;
+
+  @Field(() => Integer, { optional: true, description: 'The draft revision this save was made against.' })
+  baseRevision?: number;
+
+  @Field(() => Integer, {
+    optional: true,
+    description:
+      'The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues.',
+  })
+  baseSaveSeq?: number;
+}
+
+@Schema()
+export class UpdateDraftBody extends DraftSaveBase {
   @Field({ optional: true })
   title?: string;
 
@@ -217,6 +238,13 @@ export class ApproveDraftBody {
 
   @Field({ optional: true, description: 'With `keepStale`, the stale reason the author saw. A draft that has gone stale for another reason since is refused with DRF_013.' })
   staleReason?: string;
+
+  @Field(() => Integer, { description: "The draft `saveSeq` the author read; refused with DRF_013 when a save changed the revision's text since." })
+  saveSeq: number;
+
+  @Field(() => String, { pattern: '^[0-9]+$', description: 'The id of the draft the author read; refused with DRF_013 when the chapter was deleted and started again since.' })
+  @Transform('bigint:parse')
+  draftId: bigint;
 }
 
 @Schema()
@@ -232,7 +260,7 @@ export class ContentRatingInput {
 }
 
 @Schema()
-export class ImportDraftBody {
+export class ImportDraftBody extends DraftSaveBase {
   @Field()
   prose: string;
 
@@ -414,6 +442,15 @@ export class DraftResponse {
   @Field(() => Integer)
   revision: number;
 
+  @Field(() => Integer, { description: 'Moves on every hand save, including one folded into the current revision; send it back as `baseSaveSeq`.' })
+  saveSeq: number;
+
+  @Field(() => Integer, {
+    nullable: true,
+    description: 'The last revision the author approved. It survives later edits and finalize; a different `revision` means the text changed since that approval.',
+  })
+  approvedRevision: number | null;
+
   @Field({ optional: true, nullable: true })
   summary?: string | null;
 
@@ -461,6 +498,54 @@ export class DraftResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema({ description: 'The draft as it stands when a save was refused for being made against an older one.' })
+export class ConflictingDraftResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => Integer)
+  saveSeq: number;
+
+  @Field({ nullable: true })
+  title: string | null;
+
+  @Field()
+  body: string;
+
+  @Field({ nullable: true })
+  summary: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class DraftConflictResponse extends ErrorResponseDto {
+  @Field(() => ConflictingDraftResponse, { optional: true, description: 'Present on DRF_013 when the chapter still has a draft: what it holds now.' })
+  current?: ConflictingDraftResponse;
+}
+
+@Schema()
+export class FinalizeBlockerResponse {
+  @Field({ description: 'The error code finalize would refuse with.' })
+  code: string;
+
+  @Field()
+  message: string;
+}
+
+@Schema({ description: 'What finalize would answer for this chapter now: ready, or every reason it would refuse, in the order it checks them.' })
+export class FinalizeReadinessResponse {
+  @Field()
+  ready: boolean;
+
+  @Field(() => [FinalizeBlockerResponse])
+  blockers: FinalizeBlockerResponse[];
 }
 
 @Schema()
@@ -1135,6 +1220,9 @@ export class ChapterRowResponse {
   @Field({ optional: true, description: 'Written rows only: finalize is refused until this isolated chapter has a summary and continuation state.' })
   finalizeBlocked?: boolean;
 
+  @Field(() => Integer, { optional: true, nullable: true, description: 'Written rows only: the last revision the author approved, null when none was.' })
+  approvedRevision?: number | null;
+
   @Field(() => Integer, { optional: true, description: 'Written rows only.' })
   wordCount?: number;
 }
@@ -1179,6 +1267,12 @@ export class ListChapterRowsResponse extends Paginated(ChapterRowResponse) {
 
   @Field(() => Integer, { optional: true, nullable: true, description: 'The lowest brief with no draft — the chapter `generate` targets next.' })
   nextBriefChapter?: number | null;
+
+  @Field(() => Integer, {
+    description:
+      'The only chapter a new draft may start at — the lowest with neither a draft nor finalized prose, planned or not. Writing or filling any other unwritten chapter is refused.',
+  })
+  nextWritableChapter: number;
 
   @Field(() => Integer, { description: 'The highest planned or written chapter number, 0 when there are none.' })
   lastChapter: number;

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -10,12 +10,11 @@ import {
   briefContentHash,
   declaredDraftFields,
   enforcePlanWrite,
-  firstUnwrittenChapter,
-  isFinalizable,
   ledgerBriefReveals,
   lockProjectPlan,
   markDescendantDraftsStale,
   nearestVolumeKey,
+  nextWritableChapter,
   normalizeBriefScenes,
   normalizeStringList,
   planFrontier,
@@ -62,6 +61,8 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { overrideOpenBlockingOnApproval } from '../review/review-records';
 import { ChapterImageService } from './chapter-image.service';
+import { asRetryableSave, draftBaseOf, insertHandWrittenDraft, saveHandWrittenDraft } from './draft-save';
+import { finalizeRefusals } from './finalize-refusals';
 import {
   type ApproveDraftBody,
   AUTHOR_FACING_GRAPHS,
@@ -147,6 +148,11 @@ export interface DraftSummary {
   stale: boolean;
   updatedAt: Date;
   writtenAt: Date;
+}
+
+export interface FinalizeReadiness {
+  ready: boolean;
+  blockers: { code: string; message: string }[];
 }
 
 export interface SearchResult {
@@ -422,50 +428,20 @@ export class GenerationService {
   }
 
   async updateDraft(projectId: bigint, chapter: number, body: UpdateDraftBody): Promise<Generation.Draft> {
-    const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-    if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
+    const fields = { title: body.title, body: body.body, summary: body.summary, state: body.state };
+    const base = draftBaseOf(body);
+    return this.db.transaction(tx => saveHandWrittenDraft(tx, { projectId, chapter, source: 'hand_edited', fields, base })).catch(asRetryableSave);
+  }
 
-    return this.db.transaction(async tx => {
-      const [draft] = await tx
-        .insert(schema.drafts)
-        .values({
-          projectId,
-          chapter,
-          title: body.title,
-          body: body.body,
-          summary: body.summary,
-          state: body.state as never,
-          status: 'draft',
-          reviewStatus: 'needs_review',
-          staleReason: null,
-          generator: 'human',
-        })
-        .onConflictDoUpdate({
-          target: [schema.drafts.projectId, schema.drafts.chapter],
-          set: {
-            title: body.title,
-            body: body.body,
-            summary: body.summary,
-            state: body.state as never,
-            revision: sql`${schema.drafts.revision} + 1`,
-            reviewStatus: 'needs_review',
-            staleReason: null,
-            updatedAt: new Date(),
-          },
-          setWhere: ne(schema.drafts.status, 'final'),
-        })
-        .returning();
-      if (!draft) throw await refusedDraftWriteError(tx, projectId, chapter);
-
-      await tx
-        .insert(schema.draftRevisions)
-        .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'hand_edited', body: draft.body, summary: draft.summary })
-        .onConflictDoNothing();
-      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was hand_edited`);
-      await revokeProvisionalReveals(tx, projectId, chapter);
-
-      return draft;
-    });
+  /** "Write it myself": an empty hand-written draft at the next writable chapter, which the server — not the editor — chooses. */
+  async startNextDraft(projectId: bigint): Promise<Generation.Draft> {
+    await this.assertProjectExists(projectId);
+    return this.db
+      .transaction(async tx => {
+        const chapter = await nextWritableChapter(tx, projectId);
+        return insertHandWrittenDraft(tx, { projectId, chapter, source: 'hand_edited', fields: { body: '' } });
+      })
+      .catch(asRetryableSave);
   }
 
   async reviseDraft(projectId: bigint, chapter: number, body: ReviseDraftBody): Promise<Generation.Draft> {
@@ -574,7 +550,8 @@ export class GenerationService {
     const keptStale = draft.staleReason && body.keepStale ? draft.staleReason : null;
     if (draft.staleReason && !keptStale) throw AppErrorCode.DRF_007.create();
     if (keptStale?.startsWith(REVEAL_STALE_PREFIX)) throw AppErrorCode.DRF_017.create();
-    if (draft.revision !== body.revision || (keptStale && keptStale !== body.staleReason)) throw AppErrorCode.DRF_013.create();
+    if (draft.id !== body.draftId || draft.revision !== body.revision || draft.saveSeq !== body.saveSeq || (keptStale && keptStale !== body.staleReason))
+      throw AppErrorCode.DRF_013.create();
 
     // The approval, its audit row and the brief's provisional reveals commit together, and only for the revision the author read. Approving
     // as written clears only the stale reason the author saw; the prose is unchanged, so nothing built on it goes stale.
@@ -584,11 +561,12 @@ export class GenerationService {
       await assertPlanRevealsHold(tx, projectId, chapter);
       const [row] = await tx
         .update(schema.drafts)
-        .set({ reviewStatus: 'approved', ...(keptStale ? { staleReason: null } : {}), updatedAt: new Date() })
+        .set({ reviewStatus: 'approved', approvedRevision: body.revision, ...(keptStale ? { staleReason: null } : {}), updatedAt: new Date() })
         .where(
           and(
-            eq(schema.drafts.id, draft.id),
+            eq(schema.drafts.id, body.draftId),
             eq(schema.drafts.revision, body.revision),
+            eq(schema.drafts.saveSeq, body.saveSeq),
             ne(schema.drafts.status, 'final'),
             keptStale ? eq(schema.drafts.staleReason, keptStale) : isNull(schema.drafts.staleReason),
             ne(schema.drafts.reviewStatus, 'generating'),
@@ -668,52 +646,9 @@ export class GenerationService {
   }
 
   async importDraft(projectId: bigint, chapter: number, body: ImportDraftBody): Promise<Generation.Draft> {
-    const existing = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-    if (existing?.status === 'final') throw AppErrorCode.DRF_002.create();
-
-    const declared = declaredDraftFields(body);
-    return this.db.transaction(async tx => {
-      const [draft] = await tx
-        .insert(schema.drafts)
-        .values({
-          projectId,
-          chapter,
-          title: body.title,
-          body: body.prose,
-          summary: body.summary,
-          status: 'draft',
-          reviewStatus: 'needs_review',
-          staleReason: null,
-          generator: 'human',
-          ...declared,
-        })
-        .onConflictDoUpdate({
-          target: [schema.drafts.projectId, schema.drafts.chapter],
-          set: {
-            title: body.title,
-            body: body.prose,
-            summary: body.summary,
-            revision: sql`${schema.drafts.revision} + 1`,
-            reviewStatus: 'needs_review',
-            staleReason: null,
-            generator: 'human',
-            ...declared,
-            updatedAt: new Date(),
-          },
-          setWhere: ne(schema.drafts.status, 'final'),
-        })
-        .returning();
-      if (!draft) throw await refusedDraftWriteError(tx, projectId, chapter);
-
-      await tx
-        .insert(schema.draftRevisions)
-        .values({ projectId, draftId: draft.id, revision: draft.revision, source: 'imported', body: draft.body, summary: draft.summary })
-        .onConflictDoNothing();
-      await markDescendantDraftsStale(tx, projectId, chapter, `ancestor chapter ${chapter} was imported`);
-      await revokeProvisionalReveals(tx, projectId, chapter);
-
-      return draft;
-    });
+    const fields = { title: body.title, body: body.prose, summary: body.summary, generator: 'human' as const, ...declaredDraftFields(body) };
+    const base = draftBaseOf(body);
+    return this.db.transaction(tx => saveHandWrittenDraft(tx, { projectId, chapter, source: 'imported', fields, base })).catch(asRetryableSave);
   }
 
   /** Finalizing commits knowledge, milestones and reader disclosure the next chapter's writer reads, so it holds the authoring claim like a job. */
@@ -727,46 +662,19 @@ export class GenerationService {
   }
 
   private async finalizeClaimed(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
-    let draft: Generation.Draft | null = null;
-    if (body.chapter !== undefined) {
-      draft = (await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, body.chapter)) })) ?? null;
-    } else {
-      draft =
-        (await this.db.query.drafts.findFirst({
-          where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'approved')),
-          orderBy: asc(schema.drafts.chapter),
-        })) ?? null;
-    }
+    const draft =
+      body.chapter === undefined
+        ? await this.db.query.drafts.findFirst({
+            where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'approved')),
+            orderBy: asc(schema.drafts.chapter),
+          })
+        : await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, body.chapter)) });
 
     if (!draft) throw AppErrorCode.DRF_001.create();
-    if (draft.status === 'final') {
-      if (await this.isChapterFinalized(projectId, draft.chapter, draft.isolated)) throw AppErrorCode.DRF_002.create();
-      this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
-    } else if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
-    if (!isFinalizable(draft)) throw AppErrorCode.CHP_005.create();
-    await assertPlanRevealsHold(this.db, projectId, draft.chapter);
+    const [refusal] = await finalizeRefusals(this.db, draft);
+    if (refusal) throw refusal;
+    if (draft.status === 'final') this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
-
-    if (draft.chapter > 1) {
-      const prevFinal = await this.db.query.drafts.findFirst({
-        where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, draft.chapter - 1), eq(schema.drafts.status, 'final')),
-      });
-      if (!prevFinal) throw AppErrorCode.FIN_001.create();
-    }
-
-    // Enforce bible/chapter consistency: an earlier finalized chapter invalidated by a canon change must
-    // be re-validated before we build the next chapter on top of stale context.
-    const stale = await this.db.query.chapters.findFirst({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.needsRevalidation, true), lt(schema.chapters.number, draft.chapter)),
-    });
-    if (stale) throw AppErrorCode.FIN_002.create();
-
-    const latestReport = await this.db.query.validationReports.findFirst({
-      where: and(eq(schema.validationReports.projectId, projectId), eq(schema.validationReports.scope, 'novel')),
-      orderBy: desc(schema.validationReports.createdAt),
-    });
-    const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
-    if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw AppErrorCode.FIN_003.create();
 
     return this.workflowRunService.runChapterFinalization({
       projectId,
@@ -782,21 +690,12 @@ export class GenerationService {
     });
   }
 
-  /**
-   * Whether chapter N reached the *end* of the finalization pipeline, as opposed to only its first
-   * (prose-committing) node. `commitProse` flips the draft to `final` before continuity extraction and
-   * the cursor advance run, so a draft's own status cannot answer this — a failure anywhere downstream
-   * leaves a `final` draft over a half-finalized chapter that must be allowed to finish.
-   */
-  private async isChapterFinalized(projectId: bigint, chapter: number, isolated: boolean): Promise<boolean> {
-    const [chapterRow, project] = await Promise.all([
-      this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-    ]);
-    if (!chapterRow) return false;
-    // Isolated chapters bypass continuity extraction entirely, so their flag never turns true.
-    if (!chapterRow.continuityApplied && !isolated) return false;
-    return (project?.storyCurrentChapter ?? 0) >= chapter;
+  /** What finalize would answer for this chapter right now, from the same checks, without taking the authoring claim it would need. */
+  async finalizeReadiness(projectId: bigint, chapter: number): Promise<FinalizeReadiness> {
+    const draft = await this.getDraft(projectId, chapter);
+    const [holder, refusals] = await Promise.all([this.claims.holder(projectId), finalizeRefusals(this.db, draft)]);
+    const blockers = [...(holder?.live ? [AppErrorCode.JOB_002.create()] : []), ...refusals].map(error => ({ code: error.code, message: error.message }));
+    return { ready: blockers.length === 0, blockers };
   }
 
   async generateUnrestricted(projectId: bigint, chapter: number, body: GenerateUnrestrictedBody): Promise<Generation.Draft> {
@@ -814,14 +713,7 @@ export class GenerationService {
 
   /** Chapters are written strictly in order: chapter N is writable only once every chapter before it has a draft or finalized prose. */
   private async assertWrittenBefore(projectId: bigint, chapter: number): Promise<void> {
-    const [drafts, finalized] = await Promise.all([
-      this.db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), lt(schema.drafts.chapter, chapter)), columns: { chapter: true } }),
-      this.db.query.chapters.findMany({
-        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, chapter)),
-        columns: { number: true },
-      }),
-    ]);
-    const blocker = firstUnwrittenChapter(new Set(drafts.map(d => d.chapter)), new Set(finalized.map(c => c.number)));
+    const blocker = await nextWritableChapter(this.db, projectId);
     if (blocker < chapter) throw AppErrorCode.DRF_011.create({ chapter: String(chapter), blocker: String(blocker) });
   }
 

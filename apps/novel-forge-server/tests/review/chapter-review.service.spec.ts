@@ -91,8 +91,8 @@ describe('ChapterReviewService.run', () => {
     const [verdict, held] = run.writesTo(schema.drafts, 'update');
     expect(verdict?.values).toMatchObject({ judge: 'contradiction' });
     const where = render(verdict?.where);
-    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."status" <> $3 and "drafts"."review_status" <> $4)');
-    expect(where.params).toEqual([11n, 2, 'final', 'generating']);
+    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."save_seq" = $3 and "drafts"."status" <> $4 and "drafts"."review_status" <> $5)');
+    expect(where.params).toEqual([11n, 2, 0, 'final', 'generating']);
     expect(render((held?.values as { reviewStatus: never }).reviewStatus).sql).toContain("'contradiction'::draft_review_status");
     expect(run.writesTo(schema.drafts, 'lock').length).toBe(1);
     expect(run.writesTo(schema.characterKnowledge, 'delete').length).toBe(1);
@@ -105,8 +105,8 @@ describe('ChapterReviewService.run', () => {
 
     const updates = run.writesTo(schema.drafts, 'update');
     expect(holds(updates)).toEqual([]);
-    expect(render(lifts(updates)[0]?.where).sql).toContain('"drafts"."review_status" = $5');
-    expect(render(lifts(updates)[0]?.where).params[4]).toBe('contradiction');
+    expect(render(lifts(updates)[0]?.where).sql).toContain('"drafts"."review_status" = $6');
+    expect(render(lifts(updates)[0]?.where).params[5]).toBe('contradiction');
     expect(run.writesTo(schema.characterKnowledge)).toEqual([]);
   });
 
@@ -116,6 +116,18 @@ describe('ChapterReviewService.run', () => {
     const review = await run.service.run(1n, 4, { kind: 'judge' });
 
     expect(review.disposition).toBe('blocking');
+    expect(run.writesTo(schema.characterKnowledge)).toEqual([]);
+  });
+
+  it('should keep a review that lands after an autosave folded new text into the revision off the draft', async () => {
+    const run = reviewHarness({ draft: reviewDraft({ reviewStatus: 'approved' }), judgeAnswer: CONTRADICTION, foldWhileReading: true });
+
+    const review = await run.service.run(1n, 4, { kind: 'judge' });
+
+    expect(review).toMatchObject({ draftRevision: 2, disposition: 'blocking' });
+    const draftUpdates = run.writesTo(schema.drafts, 'update');
+    expect(draftUpdates.length).toBeGreaterThan(0);
+    expect(draftUpdates.every(write => write.landed === false)).toBe(true);
     expect(run.writesTo(schema.characterKnowledge)).toEqual([]);
   });
 
@@ -386,7 +398,7 @@ describe('ChapterReviewService.remedy', () => {
 
     expect(afterFirst).toBe(0);
     const [lift] = lifts(run.writesTo(schema.drafts, 'update'));
-    expect(render(lift?.where).params).toEqual([11n, 2, 'final', 'generating', 'contradiction']);
+    expect(render(lift?.where).params).toEqual([11n, 2, 0, 'final', 'generating', 'contradiction']);
     expect(run.writesTo(schema.drafts, 'lock').length).toBe(3);
   });
 

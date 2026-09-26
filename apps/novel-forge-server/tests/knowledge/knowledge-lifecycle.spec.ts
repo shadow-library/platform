@@ -24,7 +24,7 @@ function chapterFive(): Tables {
       { entityKey: 'oren', name: 'Oren' },
     ],
     briefs: [{ chapter: 5, claimedMilestones: ['lamp_rank_4'], knowledgeContract: CONTRACT }],
-    drafts: [{ chapter: 5, revision: 2 }],
+    drafts: [{ id: 55n, chapter: 5, revision: 2 }],
     storyCurrentChapter: 4,
   });
 }
@@ -58,26 +58,26 @@ describe('knowledge lifecycle — approval', () => {
     const tables = chapterFive();
     const service = generation(tables);
 
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'provisional', revision: 2 }]);
 
     await editDraft(tables);
     expect(ledger(tables)).toEqual([]);
 
-    await service.approveDraft(7n, 5, { revision: 3 });
+    await service.approveDraft(7n, 5, { revision: 3, saveSeq: 0, draftId: 55n });
     await editDraft(tables);
-    await service.approveDraft(7n, 5, { revision: 4 });
-    await service.approveDraft(7n, 5, { revision: 4 });
+    await service.approveDraft(7n, 5, { revision: 4, saveSeq: 0, draftId: 55n });
+    await service.approveDraft(7n, 5, { revision: 4, saveSeq: 0, draftId: 55n });
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'provisional', revision: 4 }]);
   });
 
   it('should rebind the set to the revision being approved even when nothing revoked the earlier approval', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     Object.assign(tables.draft(5) as object, { revision: 3 });
 
-    await service.approveDraft(7n, 5, { revision: 3 });
+    await service.approveDraft(7n, 5, { revision: 3, saveSeq: 0, draftId: 55n });
 
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'provisional', revision: 3 }]);
   });
@@ -85,7 +85,7 @@ describe('knowledge lifecycle — approval', () => {
   it("should hand an approved chapter's reveals to the next chapter as known, never hidden, scrubbed or forbidden", async () => {
     const tables = chapterFive();
     tables.rows(schema.briefs).push({ id: 99n, projectId: 7n, chapter: 6, knowledgeContract: { pov: ['mira'], learns: [] }, endingContract: null, claimedMilestones: null });
-    await generation(tables).approveDraft(7n, 5, { revision: 2 });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
 
     const own = await view(tables, 5);
     const next = await view(tables, 6);
@@ -106,7 +106,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
   it('should reset the approval and revoke its reveals, so finalize refuses until the author approves the new plan', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     const later = approvedChapterSix(tables);
 
     await service.updateBrief(7n, 5, { body: 'Mira keeps the rank a secret.', knowledgeContract: { pov: ['mira', 'oren'], learns: [] } });
@@ -120,7 +120,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
   it('should reset the approval when only the claimed milestones change, leaving later drafts as they were', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     const later = approvedChapterSix(tables);
 
     await resetApprovalForPlanChange(tables.db as never, 7n, 5, tables.brief(5), { knowledgeContract: CONTRACT, claimedMilestones: [] });
@@ -132,7 +132,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
   it('should keep the approval through an edit that leaves what the chapter teaches and claims alone', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
 
     await service.updateBrief(7n, 5, { body: 'Mira climbs the tower at dusk.' });
 
@@ -144,7 +144,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
 describe('knowledge lifecycle — finalize', () => {
   it('should commit the provisional rows, disclose the reveal to the reader and reach the claimed milestone', async () => {
     const tables = chapterFive();
-    await generation(tables).approveDraft(7n, 5, { revision: 2 });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
 
     await finalize(tables, 2);
 
@@ -156,7 +156,7 @@ describe('knowledge lifecycle — finalize', () => {
 
   it('should change nothing when a finalization is replayed', async () => {
     const tables = chapterFive();
-    await generation(tables).approveDraft(7n, 5, { revision: 2 });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
     const snapshot = structuredClone({ knowledge: tables.rows(schema.characterKnowledge), facts: tables.rows(schema.canonFacts), milestones: tables.rows(schema.milestones) });
 
@@ -168,7 +168,7 @@ describe('knowledge lifecycle — finalize', () => {
   it('should keep the disclosure of an earlier chapter that already showed the reader the fact', async () => {
     const tables = chapterFive();
     Object.assign(tables.fact('lamp_rank_4_rule') as object, { disclosedInChapter: 3 });
-    await generation(tables).approveDraft(7n, 5, { revision: 2 });
+    await generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
 
     await finalize(tables, 2);
 
@@ -180,19 +180,19 @@ describe('knowledge lifecycle — approve and finalize racing', () => {
   it('should refuse an approval that lands after the finalize committed, leaving the knowledge committed', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await finalize(tables, 2);
 
-    await expect(service.approveDraft(7n, 5, { revision: 2 })).rejects.toMatchObject({ code: 'DRF_002' });
+    await expect(service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n })).rejects.toMatchObject({ code: 'DRF_002' });
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'committed', revision: 2 }]);
   });
 
   it('should refuse a finalize of a revision an edit and a new approval replaced, leaving the new approval provisional', async () => {
     const tables = chapterFive();
     const service = generation(tables);
-    await service.approveDraft(7n, 5, { revision: 2 });
+    await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     await editDraft(tables);
-    await service.approveDraft(7n, 5, { revision: 3 });
+    await service.approveDraft(7n, 5, { revision: 3, saveSeq: 0, draftId: 55n });
 
     await expect(finalize(tables, 2)).rejects.toMatchObject({ code: 'DRF_013' });
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'provisional', revision: 3 }]);

@@ -1,3 +1,4 @@
+import { firstUnwrittenChapter } from '@server/common';
 import { type Chapter, type Generation, type Knowledge, type Ledger, type Plan, type Project, type Story } from '@server/database';
 
 import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
@@ -339,10 +340,8 @@ function indexChapters(chapters: readonly NovelChatChapter[], drafts: readonly N
 
 /** A final import counts as written. */
 export function nextChapterNumber(chapters: readonly NovelChatChapter[], drafts: readonly Pick<NovelChatDraft, 'chapter'>[]): number {
-  const written = new Set([...chapters.filter(chapter => chapter.status === 'done').map(chapter => chapter.number), ...drafts.map(draft => draft.chapter)]);
-  let next = 1;
-  while (written.has(next)) next++;
-  return next;
+  const finalized = chapters.filter(chapter => chapter.status === 'done').map(chapter => chapter.number);
+  return firstUnwrittenChapter(new Set(drafts.map(draft => draft.chapter)), new Set(finalized));
 }
 
 export function renderChapterIndex(chapters: readonly NovelChatChapter[], drafts: readonly NovelChatDraft[], plannedChapters: readonly number[]): string | null {

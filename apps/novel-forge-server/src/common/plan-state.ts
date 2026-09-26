@@ -1,9 +1,10 @@
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { type AppError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { type DbExecutor, schema } from '@server/database';
 
-import { markDescendantDraftsStale } from './draft-staleness';
+import { markDescendantDraftsStale, REVEAL_STALE_PREFIX } from './draft-staleness';
 import { loadPlanState, type PlanState } from './plan-world';
 import { revokeProvisionalReveals } from './provisional-knowledge';
 import {
@@ -16,9 +17,6 @@ import {
   renderRevealRuleViolations,
 } from './reveal-rule';
 import { isUnlockCondition } from './unlock-condition';
-
-/** Prefixes the stale reason a plan and its draft get when a reveal the plan makes stops holding, so reconcile can lift exactly its own mark. */
-export const REVEAL_STALE_PREFIX = 'a reveal in this plan no longer holds: ';
 
 /**
  * The reveal rule, milestone claims and the single ending, checked on the plans just written as they now stand, then the state
@@ -45,11 +43,16 @@ export async function enforcePlanWrite(tx: DbExecutor, projectId: bigint, chapte
  * A chapter already finalized is history, which lets a resumed finalization through.
  */
 export async function assertPlanRevealsHold(tx: DbExecutor, projectId: bigint, chapter: number): Promise<void> {
+  const refusal = await planRevealsRefusal(tx, projectId, chapter);
+  if (refusal) throw refusal;
+}
+
+export async function planRevealsRefusal(tx: DbExecutor, projectId: bigint, chapter: number): Promise<AppError | null> {
   const state = await loadPlanState(tx, projectId);
   const plan = state.plans.find(candidate => candidate.chapter === chapter);
-  if (!plan || chapter <= state.frontier) return;
+  if (!plan || chapter <= state.frontier) return null;
   const violations = findPlanRevealViolations(plan, state.facts, state);
-  if (violations.length > 0) throw AppErrorCode.PLN_004.create({ chapter, violations: renderRevealRuleViolations(violations) });
+  return violations.length > 0 ? AppErrorCode.PLN_004.create({ chapter, violations: renderRevealRuleViolations(violations) }) : null;
 }
 
 /**

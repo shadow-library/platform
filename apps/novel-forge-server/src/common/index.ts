@@ -15,6 +15,7 @@ export * from './draft-write-guard';
 export * from './enum.dto';
 export * from './finalize-gate';
 export * from './knowledge-contract';
+export * from './next-chapter';
 export * from './open-canon';
 export * from './owner';
 export * from './plan-state';

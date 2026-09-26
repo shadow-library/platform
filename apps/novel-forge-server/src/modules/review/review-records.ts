@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Review, schema } from '@server/database';
+import { type ChapterReviewFinding, type PrimaryDatabase, type PrimaryTransaction, type Review, schema } from '@server/database';
 
 import { graphJudgeOutcome, type GraphJudgePass, hashReviewedBody, isReviewStale, openFindings } from './review-findings';
 
@@ -69,27 +69,48 @@ export async function recordGenerationJudge(db: PrimaryDatabase, record: Generat
   logger.debug('generation judge pass recorded', { projectId: record.projectId, chapter: record.chapter, revision: draft.revision, runId: record.runId });
 }
 
-/**
- * Approving is the author's answer to every blocking finding still open on the latest judge review of the text they approve, so each is
- * recorded as overridden. Returns how many were.
- */
-export async function overrideOpenBlockingOnApproval(tx: PrimaryTransaction, draft: { projectId: bigint; chapter: number; revision: number; body: string }): Promise<number> {
-  const latest = await tx.query.chapterReviews.findFirst({
+export interface ReviewedDraft {
+  projectId: bigint;
+  chapter: number;
+  revision: number;
+  body: string;
+}
+
+export interface OpenBlocking {
+  reviewId: bigint;
+  findings: ChapterReviewFinding[];
+}
+
+/** The blocking findings still open on the latest judge review of the text as it stands — what holds the chapter until the author answers them. */
+export async function openBlockingFindings(db: ReviewReader, draft: ReviewedDraft): Promise<OpenBlocking | null> {
+  const latest = await db.query.chapterReviews.findFirst({
     where: and(eq(schema.chapterReviews.projectId, draft.projectId), eq(schema.chapterReviews.chapter, draft.chapter), eq(schema.chapterReviews.kind, 'judge')),
     orderBy: [desc(schema.chapterReviews.createdAt), desc(schema.chapterReviews.id)],
     with: { remedies: true },
   });
-  if (!latest || isReviewStale(latest, { draftRevision: draft.revision, bodyHash: hashReviewedBody(draft.body) })) return 0;
-  const open = openFindings(latest.findings, latest.remedies).filter(finding => finding.severity === 'blocking');
-  if (open.length === 0) return 0;
+  if (!latest || isReviewStale(latest, { draftRevision: draft.revision, bodyHash: hashReviewedBody(draft.body) })) return null;
+  const findings = openFindings(latest.findings, latest.remedies).filter(finding => finding.severity === 'blocking');
+  return findings.length > 0 ? { reviewId: latest.id, findings } : null;
+}
+
+/** Approving is the author's answer to every blocking finding still open on the latest judge review of the text they approve, so each is recorded as overridden. Returns how many were. */
+export async function overrideOpenBlockingOnApproval(tx: PrimaryTransaction, draft: ReviewedDraft): Promise<number> {
+  const open = await openBlockingFindings(tx, draft);
+  if (!open) return 0;
   await tx
     .insert(schema.chapterReviewRemedies)
     .values(
-      open.map(finding => ({ reviewId: latest.id, findingId: finding.id, fingerprint: finding.fingerprint, action: 'overridden' as const, reason: APPROVAL_OVERRIDE_REASON })),
+      open.findings.map(finding => ({
+        reviewId: open.reviewId,
+        findingId: finding.id,
+        fingerprint: finding.fingerprint,
+        action: 'overridden' as const,
+        reason: APPROVAL_OVERRIDE_REASON,
+      })),
     )
     .onConflictDoUpdate({
       target: [schema.chapterReviewRemedies.reviewId, schema.chapterReviewRemedies.findingId],
       set: { action: sql`excluded.action`, reason: sql`excluded.reason`, updatedAt: new Date() },
     });
-  return open.length;
+  return open.findings.length;
 }

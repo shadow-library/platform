@@ -14,11 +14,13 @@ import {
   ChapterParams,
   ChapterSummarizeResponse,
   ContinuityProposalResponse,
+  DraftConflictResponse,
   DraftResponse,
   DraftRevisionResponse,
   DraftSummaryResponse,
   FeedbackBody,
   FinalizeBody,
+  FinalizeReadinessResponse,
   GenerateBody,
   GenerateUnrestrictedBody,
   ImportDraftBody,
@@ -131,8 +133,18 @@ export class GenerationController {
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/drafts/next')
+  @HttpStatus(201)
+  @RespondFor(201, DraftResponse)
+  @RespondFor(409, DraftConflictResponse)
+  startNextDraft(@Params() params: ProjectParams): Promise<DraftResponse> {
+    return this.generationService.startNextDraft(params.projectId);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Put('/drafts/:n')
   @RespondFor(200, DraftResponse)
+  @RespondFor(409, DraftConflictResponse)
   updateDraft(@Params() params: ChapterParams, @Body() body: UpdateDraftBody): Promise<DraftResponse> {
     return this.generationService.updateDraft(params.projectId, params.n, body);
   }
@@ -167,6 +179,12 @@ export class GenerationController {
     return this.generationService.approveDraft(params.projectId, params.n, body);
   }
 
+  @Get('/drafts/:n/finalize-readiness')
+  @RespondFor(200, FinalizeReadinessResponse)
+  finalizeReadiness(@Params() params: ChapterParams): Promise<FinalizeReadinessResponse> {
+    return this.generationService.finalizeReadiness(params.projectId, params.n);
+  }
+
   @Get('/drafts/:n/revisions')
   @RespondFor(200, ListDraftRevisionResponse)
   async listRevisions(@Params() params: ChapterParams): Promise<ListDraftRevisionResponse> {
@@ -189,6 +207,7 @@ export class GenerationController {
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/drafts/:n/import')
   @RespondFor(200, DraftResponse)
+  @RespondFor(409, DraftConflictResponse)
   importDraft(@Params() params: ChapterParams, @Body() body: ImportDraftBody): Promise<DraftResponse> {
     return this.generationService.importDraft(params.projectId, params.n, body);
   }

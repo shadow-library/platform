@@ -11,6 +11,7 @@ function draft(chapter: number, overrides: Partial<ChapterRowDraft> = {}): Chapt
     generator: 'standard',
     isolated: false,
     finalizeBlocked: false,
+    approvedRevision: null,
     wordCount: 100,
     judgeNote: null,
     ...overrides,

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { commitFinalProse } from '@modules/ai/graphs/chapter-finalization.graph';
 import { MilestoneService } from '@modules/bible/milestone/milestone.service';
 import { GenerationService } from '@modules/generation/generation.service';
-import { ledgerBriefReveals, reconcilePlanState, REVEAL_STALE_PREFIX } from '@server/common';
+import { ledgerBriefReveals, markDescendantDraftsStale, reconcilePlanState, REVEAL_STALE_PREFIX } from '@server/common';
 import { schema } from '@server/database';
 
 import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
@@ -113,12 +113,36 @@ describe('ledgerBriefReveals — reveal rule', () => {
   });
 });
 
-describe('GenerationService — approval and plans at the frontier', () => {
-  it('should refuse to approve a draft whose plan reveals a locked fact', async () => {
+describe('markDescendantDraftsStale over a reveal mark', () => {
+  it('should keep a later draft stale for its ancestor after the plan that marked it is fixed', async () => {
     const tables = revealedAfterClaim({ drafts: [{ chapter: 5, revision: 2 }] });
     Object.assign(tables.brief(4) as object, { claimedMilestones: null });
+    await reconcilePlanState(tables.db as never, 7n);
+    expect(tables.draft(5)?.['staleReason']).toBe(LOCKED_REASON);
 
-    await expect(generation(tables).approveDraft(7n, 5, { revision: 2 })).rejects.toMatchObject({ code: 'PLN_004' });
+    await markDescendantDraftsStale(tables.db as never, 7n, 4, 'ancestor chapter 4 was hand_edited');
+    Object.assign(tables.brief(4) as object, { claimedMilestones: ['lamp_rank_4'] });
+    await reconcilePlanState(tables.db as never, 7n);
+
+    expect(tables.brief(5)?.['staleReason']).toBeNull();
+    expect(tables.draft(5)?.['staleReason']).toBe('ancestor chapter 4 was hand_edited');
+  });
+
+  it('should keep an earlier ancestor reason over a later one', async () => {
+    const tables = revealedAfterClaim({ drafts: [{ chapter: 5, revision: 2, staleReason: 'ancestor chapter 3 was hand_edited' }] });
+
+    await markDescendantDraftsStale(tables.db as never, 7n, 4, 'ancestor chapter 4 was hand_edited');
+
+    expect(tables.draft(5)?.['staleReason']).toBe('ancestor chapter 3 was hand_edited');
+  });
+});
+
+describe('GenerationService — approval and plans at the frontier', () => {
+  it('should refuse to approve a draft whose plan reveals a locked fact', async () => {
+    const tables = revealedAfterClaim({ drafts: [{ id: 55n, chapter: 5, revision: 2 }] });
+    Object.assign(tables.brief(4) as object, { claimedMilestones: null });
+
+    await expect(generation(tables).approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n })).rejects.toMatchObject({ code: 'PLN_004' });
     expect(tables.draft(5)?.['reviewStatus']).toBe('needs_review');
   });
 

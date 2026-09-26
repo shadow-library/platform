@@ -23,6 +23,14 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
   },
   { pattern: new RegExp(`^${COLUMN} is (not )?null`), build: match => row => isNullish(row[camel(match[1])]) !== Boolean(match[2]) },
   {
+    pattern: new RegExp(`^${COLUMN} (not )?like \\$(\\d+)`),
+    build: (match, params) => row => {
+      const value = row[camel(match[1])];
+      if (typeof value !== 'string') return false;
+      return likePattern(String(params[Number(match[3]) - 1])).test(value) !== Boolean(match[2]);
+    },
+  },
+  {
     pattern: new RegExp(`^${COLUMN} (=|<>|<=|>=|<|>) \\$(\\d+)`),
     build: (match, params) => row => compare(row[camel(match[1])], match[2] as string, params[Number(match[3]) - 1]),
   },
@@ -37,6 +45,11 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
 
 function camel(column: string | undefined): string {
   return (column ?? '').replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase());
+}
+
+function likePattern(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped.replace(/%/g, '.*').replace(/_/g, '.')}$`, 's');
 }
 
 function isNullish(value: unknown): boolean {

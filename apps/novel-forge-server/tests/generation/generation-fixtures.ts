@@ -13,6 +13,8 @@ export interface DraftRow {
   projectId: bigint;
   chapter: number;
   revision: number;
+  saveSeq: number;
+  approvedRevision: number | null;
   status: 'draft' | 'final';
   staleReason: string | null;
   body: string;
@@ -76,6 +78,8 @@ export function draftRow(overrides: Partial<DraftRow> = {}): DraftRow {
     projectId: 1n,
     chapter: 4,
     revision: 2,
+    saveSeq: 0,
+    approvedRevision: null,
     status: 'draft',
     staleReason: null,
     body: 'The keeper counts the ships.',
@@ -110,13 +114,17 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
 
   const db = {
     select: () => ({
-      from: () => ({
+      from: (table: unknown) => ({
         where: () => ({
           then: (resolve: (rows: unknown[]) => unknown, reject: (error: unknown) => unknown) => {
             const row = reads.shift();
             return Promise.resolve(row ? [row] : []).then(resolve, reject);
           },
-          for: async () => [],
+          for: async () => {
+            if (table !== schema.drafts) return [];
+            const row = reads.shift();
+            return row ? [row] : [];
+          },
         }),
       }),
     }),
@@ -131,6 +139,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
       bibleDocuments: { findMany: async () => [] },
       chapters: { findFirst: async () => undefined, findMany: async () => [] },
       chapterReviews: { findFirst: async () => options.latestJudgeReview },
+      jobs: { findMany: async () => [] },
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
@@ -138,7 +147,7 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
         writes.push(write);
         return {
           returning: () => resultFor(table),
-          onConflictDoNothing: async () => undefined,
+          onConflictDoNothing: () => Object.assign(Promise.resolve(undefined), { returning: () => resultFor(table) }),
           onConflictDoUpdate: (config: { setWhere?: SQL }) => {
             write.kind = 'upsert';
             write.setWhere = config.setWhere;

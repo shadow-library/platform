@@ -1,9 +1,12 @@
-import { and, eq, gt, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, like, ne, or } from 'drizzle-orm';
 
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { parseKnowledgeContract } from './knowledge-contract';
 import { type KnowledgeLedger, revokeProvisionalReveals } from './provisional-knowledge';
+
+/** Prefixes the stale reason a plan and its draft get when a reveal the plan makes stops holding, so reconcile can lift exactly its own mark. */
+export const REVEAL_STALE_PREFIX = 'a reveal in this plan no longer holds: ';
 
 export type DraftWriter = Pick<PrimaryDatabase, 'update'> & KnowledgeLedger;
 
@@ -51,11 +54,12 @@ export async function resetApprovalForPlanChange(
 export async function markDescendantDraftsStale(db: DraftWriter, projectId: bigint, chapter: number, reason: string): Promise<void> {
   const descendants = and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter), ne(schema.drafts.status, 'final'));
 
-  // An earlier, more specific reason is kept: it names the change the draft actually rests on.
+  // An earlier, more specific reason is kept: it names the change the draft actually rests on. A reveal mark is replaced, since fixing
+  // the plan lifts it and would otherwise hide this change.
   await db
     .update(schema.drafts)
-    .set({ staleReason: sql`coalesce(${schema.drafts.staleReason}, ${reason})`, updatedAt: new Date() })
-    .where(descendants);
+    .set({ staleReason: reason, updatedAt: new Date() })
+    .where(and(descendants, or(isNull(schema.drafts.staleReason), like(schema.drafts.staleReason, `${REVEAL_STALE_PREFIX}%`))));
   const reset = await db
     .update(schema.drafts)
     .set({ reviewStatus: 'needs_review', updatedAt: new Date() })

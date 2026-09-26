@@ -75,12 +75,21 @@
   earlier chapter's change resets it, and until the chapter is final that revokes the reveals it ledgered. A reveal several briefs declare is ledgered at the earliest approved or final
   chapter that claims it, and moves there when a later claim is revoked. A stale draft may be approved as written: the request names the stale reason the author saw,
   only that reason is cleared, the override is recorded, and nothing later goes stale since the prose is unchanged; a draft stale because a reveal in its plan no
-  longer holds cannot be approved that way.
+  longer holds cannot be approved that way. A draft carries one stale reason — the earliest ancestor change, which replaces a reveal mark so fixing the plan cannot hide
+  it — so approving as written clears only that reason, even when a later ancestor has changed too.
 - **Chapter review**: judge, editorial, mechanics and readability reviews run on request against any chapter — generated, hand-written or final. The two model kinds run
   as a `review` job; the generation run stores its last judge pass as a review of the revision it produced. The author answers each finding: dismiss (with a reason), "I'll fix
   it myself", or override a blocking one; an answer can be withdrawn.
-- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation or the latest validation
-  report holds an error for this chapter. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
+- **Writing by hand**: a new draft starts only at the next writable chapter — the lowest with neither a draft nor finalized prose, one rule shared with generation, the chat
+  and chat draft ops — and never while a generate job targets it; "Write it myself" asks the server to start it rather than naming a chapter, and an existing draft stays
+  editable wherever it sits. A save names the draft, revision and save sequence it read (`baseDraftId`, `baseRevision`, `baseSaveSeq`, all three or none) and is refused
+  (`DRF_013`, answered with the draft as it stands) once another write moved on; a save naming no base is still accepted on an existing draft, and the editor always sends
+  one. No hand save lands while the AI is writing the chapter or a generate job targets it, and a save that loses a database deadlock is answered `DRF_013` for the
+  autosave to retry. An autosave folds into the revision it continues while that revision is the author's own hand edit, under
+  ten minutes old, never approved, reviewed or stale: it keeps one history row, and the cascade (later drafts stale, reveals revoked) still runs on every save. Reviews bind
+  to the save sequence as well as the revision, and approvals to the draft id too. `approvedRevision` keeps the last approved revision through later edits and finalize.
+- **Finalize** runs strictly in order and commits only the approved draft revision it read; refuses when an earlier chapter needs re-validation, the latest validation
+  report holds an error for this chapter, the draft is stale, or a blocking finding is still open on its latest judge review. Readiness answers from the same checks. The same commit turns the chapter's provisional rows bound to that revision into _committed_ knowledge (dropping any bound to
   another), sets each revealed fact's `disclosedInChapter` unless an earlier chapter set it, and reaches the claimed milestones; a replay finds nothing left to do.
   A writer at chapter N reads what its POV cast learned before N — committed, or provisional from an approved earlier draft — plus N's own reveals, pooled for the
   whole chapter. Any change that revokes an approval (prose, what a plan teaches, reveal rule, deletion) marks every later draft stale; a plan edit that changes only
@@ -263,4 +272,6 @@
 
 - Bible audit does not flag spoiler prose outside `canon_facts`; nothing scans for it.
 - Cancellation is process-local: a cancel reaches only the replica running the work.
+- The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered
+  `DRF_013` until the cascade locks them in chapter order.
 - A brief's content mode is stored but not yet routed: chapter writing follows the project's content mode until per-chapter routing lands with its isolation read policy.

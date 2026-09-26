@@ -69,20 +69,21 @@ function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: rea
  * keeps a revision it carries.
  */
 async function stampApprovalRevisions(executor: DbExecutor, projectId: bigint, ops: ChangeOp[], keepSupplied: boolean): Promise<ChangeOp[]> {
-  const unstamped = (op: ChangeOp): op is ApproveDraftOp => op.op === 'action.approve_draft' && !(keepSupplied && typeof op.revision === 'number');
+  const unstamped = (op: ChangeOp): op is ApproveDraftOp =>
+    op.op === 'action.approve_draft' && !(keepSupplied && typeof op.revision === 'number' && typeof op.saveSeq === 'number' && typeof op.draftId === 'string');
   const chapters = [...new Set(ops.filter(unstamped).map(op => op.chapter))];
   if (chapters.length === 0) return ops;
 
   const drafts = await executor.query.drafts.findMany({
-    columns: { chapter: true, revision: true },
+    columns: { id: true, chapter: true, revision: true, saveSeq: true },
     where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, chapters)),
   });
-  const revisionByChapter = new Map(drafts.map(draft => [draft.chapter, draft.revision]));
+  const readByChapter = new Map(drafts.map(draft => [draft.chapter, { revision: draft.revision, saveSeq: draft.saveSeq, draftId: String(draft.id) }]));
   return ops.map(op => {
     if (!unstamped(op)) return op;
-    const { revision: _supplied, ...approval } = op;
-    const revision = revisionByChapter.get(op.chapter);
-    return revision === undefined ? approval : { ...approval, revision };
+    const { revision: _revision, saveSeq: _saveSeq, draftId: _draftId, ...approval } = op;
+    const read = readByChapter.get(op.chapter);
+    return read === undefined ? approval : { ...approval, ...read };
   });
 }
 

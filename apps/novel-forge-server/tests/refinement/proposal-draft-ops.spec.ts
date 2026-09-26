@@ -5,6 +5,7 @@ import { FakeDatabaseService } from '@shadow-library/modules/testing';
 import { HubActionRegistrar } from '@modules/hub/hub-action.registrar';
 import { ActionExecutorRegistry, type ActionOp, bindApprovalRevision, type ChangeOp, type DraftUpdateOp, ProposalApplyService, ProposalService } from '@modules/refinement';
 import { AppErrorCode } from '@server/classes';
+import { REVEAL_STALE_PREFIX } from '@server/common';
 import { schema } from '@server/database';
 
 import { type DraftRow, draftRow, fakeGenerationDb, render } from '../generation/generation-fixtures';
@@ -19,7 +20,7 @@ function applyDraftOp(reads: (DraftRow | undefined)[], written: unknown[] = []) 
     update: (op: DraftUpdateOp & { isolated?: boolean; generator?: 'unrestricted' }) => service['applyDraftUpdate'](ctx, op),
     remove: (chapter: number) => service['applyDraftRemove'](ctx, { op: 'draft.remove', chapter }),
     inverse: (op: ChangeOp) => service['inverseDraft'](ctx, op as DraftUpdateOp),
-    staleMarks: () => fake.writesTo(schema.drafts, 'update').filter(write => typeof write.values?.['staleReason'] === 'object' && write.values['staleReason'] !== null),
+    staleMarks: () => fake.writesTo(schema.drafts, 'update').filter(write => typeof write.values?.['staleReason'] === 'string'),
   };
 }
 
@@ -27,18 +28,18 @@ const REVOKE_CHAPTER_4 = '("character_knowledge"."project_id" = $1 and "characte
 
 describe('ProposalApplyService applyDraftUpdate', () => {
   it('should bind the write to the revision it read, bump it in SQL and revoke the reveals the old prose earned', async () => {
-    const run = applyDraftOp([draftRow()], [{ id: 11n, revision: 3 }]);
+    const run = applyDraftOp([draftRow()], [{ id: 11n, revision: 3, saveSeq: 1 }]);
 
     await run.update({ op: 'draft.update', chapter: 4, body: 'The ferry leaves without its keeper.' });
 
     const [write] = run.fake.writesTo(schema.drafts, 'update');
     const where = render(write?.where);
-    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."status" <> $3)');
-    expect(where.params).toEqual([11n, 2, 'final']);
+    expect(where.sql).toBe('("drafts"."id" = $1 and "drafts"."revision" = $2 and "drafts"."save_seq" = $3 and "drafts"."status" <> $4)');
+    expect(where.params).toEqual([11n, 2, 0, 'final']);
     expect(render(write?.values?.['revision'] as SQL).sql).toBe('"drafts"."revision" + 1');
     expect(run.fake.writesTo(schema.draftRevisions)[0]?.values).toMatchObject({ draftId: 11n, revision: 3, source: 'chat_edited' });
     expect(render(run.fake.writesTo(schema.characterKnowledge, 'delete')[0]?.where).sql).toBe(REVOKE_CHAPTER_4);
-    expect(run.ctx.applied).toEqual([{ artifactRef: 'draft:4', newRevision: 3 }]);
+    expect(run.ctx.applied).toEqual([{ artifactRef: 'draft:4', newRevision: 3, newSaveSeq: 1, newDraftId: 11n }]);
   });
 
   it.each([
@@ -77,7 +78,7 @@ describe('ProposalApplyService draft ops and later chapters', () => {
 
     await run.update({ op: 'draft.update', chapter: 4, title: 'Slack Water' });
 
-    expect(run.staleMarks().map(write => render(write.where).params)).toEqual([[1n, 4, 'final']]);
+    expect(run.staleMarks().map(write => render(write.where).params)).toEqual([[1n, 4, 'final', `${REVEAL_STALE_PREFIX}%`]]);
   });
 
   it('should leave a later chapter the same proposal also rewrote fresh, not stale', async () => {
@@ -87,7 +88,7 @@ describe('ProposalApplyService draft ops and later chapters', () => {
     await run.update({ op: 'draft.update', chapter: 5, body: 'The keeper swims after it.' });
 
     const writes = run.fake.writesTo(schema.drafts, 'update').map(write => write.values ?? {});
-    const staleMark = writes.findIndex(values => typeof values['staleReason'] === 'object' && values['staleReason'] !== null);
+    const staleMark = writes.findIndex(values => typeof values['staleReason'] === 'string');
     const chapterFive = writes.findIndex(values => values['body'] === 'The keeper swims after it.');
     expect(staleMark).toBeGreaterThan(-1);
     expect(chapterFive).toBeGreaterThan(staleMark);
@@ -109,6 +110,18 @@ describe('ProposalApplyService draft ops and later chapters', () => {
     await run.remove(4);
 
     expect(run.staleMarks()).toHaveLength(1);
+  });
+});
+
+describe('ProposalApplyService draft ops and the next chapter', () => {
+  it('should refuse to start a draft past the next writable chapter, writing nothing', async () => {
+    const run = applyDraftOp([undefined], [{ id: 12n, revision: 1, saveSeq: 0 }]);
+
+    await expect(run.update({ op: 'draft.update', chapter: 6, body: 'Written ahead of a gap.' })).rejects.toMatchObject({
+      code: 'DRF_018',
+      message: expect.stringContaining('Only chapter 4'),
+    });
+    expect(run.fake.writes).toEqual([]);
   });
 });
 
@@ -158,8 +171,13 @@ describe('bindApprovalRevision', () => {
     expect(bindApprovalRevision(approve, [{ artifactRef: 'draft:5', newRevision: 8 }])).toEqual(approve);
   });
 
-  it("should approve the revision the proposal's own edit wrote", () => {
-    expect(bindApprovalRevision(approve, [{ artifactRef: 'draft:4', newRevision: 3 }])).toEqual({ ...approve, revision: 3 });
+  it("should approve the draft, revision and save sequence the proposal's own edit wrote", () => {
+    expect(bindApprovalRevision(approve, [{ artifactRef: 'draft:4', newRevision: 3, newSaveSeq: 6, newDraftId: 12n }])).toEqual({
+      ...approve,
+      revision: 3,
+      saveSeq: 6,
+      draftId: '12',
+    });
   });
 
   it('should leave every other action untouched', () => {
@@ -169,27 +187,27 @@ describe('bindApprovalRevision', () => {
 });
 
 describe('ProposalService.create approval staging', () => {
-  function executor(drafts: { chapter: number; revision: number }[]) {
+  function executor(drafts: { id: bigint; chapter: number; revision: number; saveSeq: number }[]) {
     return {
       query: { drafts: { findMany: async () => drafts } },
       insert: () => ({ values: (values: Record<string, unknown>) => ({ returning: async () => [{ id: 300n, ...values }] }) }),
     };
   }
 
-  it('should stamp the current draft revision over whatever the model sent, and drop it when there is no draft', async () => {
+  it('should stamp the current draft, revision and save sequence over whatever the model sent, and drop them when there is no draft', async () => {
     const changeSet: ChangeOp[] = [
-      { op: 'action.approve_draft', chapter: 4, revision: 99 },
-      { op: 'action.approve_draft', chapter: 6 },
+      { op: 'action.approve_draft', chapter: 4, revision: 99, saveSeq: 99, draftId: '99' },
+      { op: 'action.approve_draft', chapter: 6, saveSeq: 3 },
     ];
 
     const proposal = await new ProposalService(new FakeDatabaseService()).create(
       7n,
       { scopeType: 'project', kind: 'chat', changeSet, warnings: [] },
-      executor([{ chapter: 4, revision: 2 }]) as never,
+      executor([{ id: 11n, chapter: 4, revision: 2, saveSeq: 5 }]) as never,
     );
 
-    expect(proposal.changeSet).toEqual([
-      { op: 'action.approve_draft', chapter: 4, revision: 2 },
+    expect(proposal.changeSet).toStrictEqual([
+      { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: '11' },
       { op: 'action.approve_draft', chapter: 6 },
     ]);
   });
@@ -212,18 +230,34 @@ describe('HubActionRegistrar action.approve_draft', () => {
     return { approve, approvals };
   }
 
-  it('should approve exactly the revision the card was staged against', async () => {
+  it('should approve exactly the draft, revision and save sequence the card was staged against', async () => {
     const { approve, approvals } = register();
 
-    await approve(1n, { op: 'action.approve_draft', chapter: 4, revision: 2 });
+    await approve(1n, { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: '11' });
 
-    expect(approvals).toEqual([[1n, 4, { revision: 2 }]]);
+    expect(approvals).toEqual([[1n, 4, { revision: 2, saveSeq: 5, draftId: 11n }]]);
   });
 
-  it('should refuse a card staged before approvals carried a revision rather than approve whatever the draft now holds', async () => {
+  it('should approve a card rebound to the draft its own proposal wrote', async () => {
+    const { approve, approvals } = register();
+    const card = bindApprovalRevision({ op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: '11' }, [
+      { artifactRef: 'draft:4', newRevision: 1, newSaveSeq: 0, newDraftId: 12n },
+    ]);
+
+    await approve(1n, card);
+
+    expect(approvals).toEqual([[1n, 4, { revision: 1, saveSeq: 0, draftId: 12n }]]);
+  });
+
+  it.each([
+    ['a revision', { op: 'action.approve_draft', chapter: 4 }],
+    ['a save sequence', { op: 'action.approve_draft', chapter: 4, revision: 2 }],
+    ['a draft', { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5 }],
+    ['a readable draft id', { op: 'action.approve_draft', chapter: 4, revision: 2, saveSeq: 5, draftId: 'eleven' }],
+  ] as const)('should refuse a card staged without %s rather than approve whatever the draft now holds', async (_, card) => {
     const { approve, approvals } = register();
 
-    await expect(approve(1n, { op: 'action.approve_draft', chapter: 4 })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(approve(1n, card)).rejects.toMatchObject({ code: 'DRF_013' });
     expect(approvals).toEqual([]);
   });
 

@@ -29,6 +29,13 @@
       "when": 1790418562079,
       "tag": "0003_chapter_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790420290210,
+      "tag": "0004_draft_approved_revision",
+      "breakpoints": true
     }
   ]
 }

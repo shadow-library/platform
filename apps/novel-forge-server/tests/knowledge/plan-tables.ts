@@ -36,7 +36,7 @@ type TableName = keyof typeof TABLES;
 
 const BRIEF_DEFAULTS: Row = { volumeKey: null, isEnding: false, claimedMilestones: null, knowledgeContract: null, staleReason: null, revision: 1, contentHash: null };
 const MILESTONE_DEFAULTS: Row = { kind: 'custom', state: 'open', plannedChapter: null, reachedChapter: null, boundRevision: null, subjectEntityKey: null };
-const DRAFT_DEFAULTS: Row = { status: 'draft', reviewStatus: 'needs_review', staleReason: null, revision: 1, isolated: false };
+const DRAFT_DEFAULTS: Row = { status: 'draft', reviewStatus: 'needs_review', staleReason: null, revision: 1, saveSeq: 0, approvedRevision: null, isolated: false };
 const FACT_DEFAULTS: Row = { revealChapter: null, unlock: null, source: 'manual', plannedChapter: null, disclosedInChapter: null, terms: null, writerNote: null };
 const KNOWLEDGE_DEFAULTS: Row = { status: 'committed', draftRevision: null };
 
