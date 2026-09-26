@@ -5998,6 +5998,8 @@ export interface components {
     PromiseKind: 'thread' | 'mystery';
     /** @enum {string} */
     PromiseStatus: 'open' | 'closed' | 'resolved' | 'dropped';
+    /** @enum {string} */
+    PromiseSort: 'due';
     ListPromisesResponse: {
       total: number;
       limit: number;
@@ -14727,6 +14729,7 @@ export interface operations {
         sortBy?: components['schemas']['SortByTime'];
         kind?: components['schemas']['PromiseKind'];
         status?: components['schemas']['PromiseStatus'];
+        sort?: components['schemas']['PromiseSort'];
       };
       header?: never;
       path: {
@@ -16244,6 +16247,7 @@ export type CreateMilestoneBody = components['schemas']['CreateMilestoneBody'];
 export type UpdateMilestoneBody = components['schemas']['UpdateMilestoneBody'];
 export type PromiseKind = components['schemas']['PromiseKind'];
 export type PromiseStatus = components['schemas']['PromiseStatus'];
+export type PromiseSort = components['schemas']['PromiseSort'];
 export type ListPromisesResponse = components['schemas']['ListPromisesResponse'];
 export type PromiseItemResponse = components['schemas']['PromiseItemResponse'];
 export type DueStanding = components['schemas']['DueStanding'];
