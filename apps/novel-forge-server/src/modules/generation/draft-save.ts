@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { and, desc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 
-import { AppErrorCode, DraftConflictError } from '@server/classes';
+import { AppErrorCode, DraftConflictError, SummaryConflictError } from '@server/classes';
 import { assertStartsNextChapter, markDescendantDraftsStale, revokeProvisionalReveals } from '@server/common';
 import { type Generation, type PrimaryTransaction, schema } from '@server/database';
 
@@ -74,6 +74,48 @@ export async function saveHandWrittenDraft(tx: PrimaryTransaction, save: HandSav
   return folds ? rewriteRevision(tx, draft) : recordRevision(tx, draft, save.source);
 }
 
+export interface SummarySave {
+  projectId: bigint;
+  chapter: number;
+  summary: string;
+  /** The prose the summary describes. Set only for an AI summary — refused as a conflict, carrying the summary, if the draft's body has since moved. A hand-written summary omits it. */
+  body?: string;
+  base?: DraftBase;
+}
+
+/** Writes only the summary column — never the prose revision or review status — so it applies mid-review and on a finalized chapter alike; a final chapter's `chapters` row is kept in step for later chapters' context packs. */
+export async function saveDraftSummary(tx: PrimaryTransaction, save: SummarySave): Promise<Generation.Draft & { summary: string }> {
+  // Locked ahead of the draft below, matching amend's chapters-then-draft order, whether or not this chapter turns out to be final.
+  await tx
+    .select({ id: schema.chapters.id })
+    .from(schema.chapters)
+    .where(and(eq(schema.chapters.projectId, save.projectId), eq(schema.chapters.number, save.chapter)))
+    .for('update');
+
+  const [current] = await tx
+    .select()
+    .from(schema.drafts)
+    .where(and(eq(schema.drafts.projectId, save.projectId), eq(schema.drafts.chapter, save.chapter)))
+    .for('update');
+  if (!current) throw AppErrorCode.DRF_001.create();
+  if (current.reviewStatus === 'generating') throw AppErrorCode.DRF_019.create({ chapter: String(save.chapter) });
+  await assertNotBeingGenerated(tx, save.projectId, save.chapter);
+  if (save.base && !isBase(current, save.base)) throw new DraftConflictError(current);
+  if (save.body !== undefined && save.body !== current.body) throw new SummaryConflictError(current, save.summary);
+
+  const updated = { ...current, summary: save.summary, saveSeq: current.saveSeq + 1, updatedAt: new Date() };
+  await tx.update(schema.drafts).set({ summary: updated.summary, saveSeq: updated.saveSeq, updatedAt: updated.updatedAt }).where(eq(schema.drafts.id, current.id));
+
+  if (current.status === 'final') {
+    await tx
+      .update(schema.chapters)
+      .set({ summary: save.summary, updatedAt: new Date() })
+      .where(and(eq(schema.chapters.projectId, save.projectId), eq(schema.chapters.number, save.chapter)));
+  }
+
+  return updated;
+}
+
 function isBase(current: Generation.Draft, base: DraftBase): boolean {
   return current.id === base.draftId && current.revision === base.revision && current.saveSeq === base.saveSeq;
 }
@@ -88,13 +130,13 @@ function unchangedSince(current: Generation.Draft): SQL | undefined {
 
 async function refusedHandSave(tx: PrimaryTransaction, projectId: bigint, chapter: number): Promise<AppError> {
   const current = await tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-  if (!current) return AppErrorCode.DRF_013.create();
+  if (!current) return AppErrorCode.DRF_001.create();
   if (current.status === 'final') return AppErrorCode.DRF_002.create();
   return new DraftConflictError(current);
 }
 
 async function startDraft(tx: PrimaryTransaction, save: HandSave): Promise<Generation.Draft> {
-  if (save.base) throw AppErrorCode.DRF_013.create();
+  if (save.base) throw AppErrorCode.DRF_001.create();
   await assertStartsNextChapter(tx, save.projectId, save.chapter);
   return insertHandWrittenDraft(tx, save);
 }
@@ -111,7 +153,7 @@ export async function insertHandWrittenDraft(tx: PrimaryTransaction, save: Omit<
   return recordRevision(tx, draft, save.source);
 }
 
-async function assertNotBeingGenerated(tx: PrimaryTransaction, projectId: bigint, chapter: number): Promise<void> {
+export async function assertNotBeingGenerated(tx: Pick<PrimaryTransaction, 'query'>, projectId: bigint, chapter: number): Promise<void> {
   const generating = await tx.query.jobs.findMany({
     where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
     columns: { target: true },
@@ -119,9 +161,9 @@ async function assertNotBeingGenerated(tx: PrimaryTransaction, projectId: bigint
   if (generating.some(job => job.target.split(',').map(Number).includes(chapter))) throw AppErrorCode.DRF_019.create({ chapter: String(chapter) });
 }
 
-/** Postgres aborts one side of a deadlock between two saves; the loser is answered as a conflict, which the editor's autosave retries on its next tick. */
+/** The loser of a Postgres deadlock gets DRF_021 — retryable, unlike DRF_013's stale-base conflict. */
 export function asRetryableSave(error: unknown): never {
-  if (isDeadlock(error)) throw AppErrorCode.DRF_013.create();
+  if (isDeadlock(error)) throw AppErrorCode.DRF_021.create();
   throw error;
 }
 

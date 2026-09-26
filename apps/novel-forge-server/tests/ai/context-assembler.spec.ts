@@ -372,6 +372,16 @@ describe('ContextAssembler.forChapter — established state carry', () => {
     expect(rendered).not.toContain('CANON_ONE');
   });
 
+  it('should carry a hand-written chapter summary into recent-chapter memory exactly as an AI one', async () => {
+    const finalized = [{ number: 2, summary: 'CANON_AI_WRITTEN', generator: 'standard' }];
+    const drafts = [{ chapter: 4, body: 'x', summary: 'HAND_WRITTEN_SUMMARY', generator: 'human', state: null }];
+    const pack = await makeAssembler(carryOverrides({ drafts, finalized })).forChapter(1n, 5, { dryRun: true });
+
+    const rendered = pack.sections.find(s => s.key === 'memory')?.rendered ?? '';
+    expect(rendered).toContain('Ch 2: CANON_AI_WRITTEN');
+    expect(rendered).toContain('Ch 4: HAND_WRITTEN_SUMMARY');
+  });
+
   it('should carry the previous chapter established facts into the continuation state', async () => {
     const state = { lastBeat: 'She pockets the brass key.', establishedFacts: ['The tide gauge read 7 at dusk', 'Her left wrist is sprained'] };
     const pack = await makeAssembler(carryOverrides({ drafts: [{ chapter: 4, body: 'Tail.', summary: 'Four.', state }] })).forChapter(1n, 5, { dryRun: true });

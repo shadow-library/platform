@@ -752,6 +752,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chapters/{n}/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Summary */
+    put: operations['put_api_v1_projects_projectId_chapters_n_summary'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/chapters/{n}/propose-continuity': {
     parameters: {
       query?: never;
@@ -3355,12 +3372,33 @@ export interface components {
       contentRating?: components['schemas']['ContentRatingInput'];
     };
     ChapterSummarizeResponse: {
-      /** @description 2-3 sentence summary of what happened in the chapter, past tense — not persisted until saved through PUT /drafts/:n. */
+      /** @description 2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated chapter; returned unsaved for an isolated one, for review alongside `state` before either is saved through PUT /drafts/:n. */
       summary: string;
-      /** @description Continuation state the next chapter would build on — review and edit before saving through PUT /drafts/:n. */
+      /** @description The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated chapter. */
+      saveSeq?: number;
+      /** @description Continuation state the next chapter would build on. Isolated chapters only — always returned unsaved, for the author's review. */
       state: {
         [key: string]: unknown;
       };
+    };
+    SummaryConflictResponse: {
+      code: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+      /** @description Present on DRF_013 when the chapter still has a draft: what it holds now. */
+      current?: components['schemas']['ConflictingDraftResponse'];
+      /** @description The summary computed from the prose as it stood before the conflict — re-offer it once reloaded, rather than summarising again. */
+      attemptedSummary: string;
+    };
+    UpdateSummaryBody: {
+      /** @description The id of the draft this save was made against. The three base fields go together; omit all three only to start a chapter that has no draft. */
+      baseDraftId?: string;
+      /** @description The draft revision this save was made against. */
+      baseRevision?: number;
+      /** @description The draft `saveSeq` this save was made against. A save whose base no longer matches is refused with DRF_013 carrying the current draft; a matching autosave may fold into the revision it continues. */
+      baseSaveSeq?: number;
+      /** @description The author's own summary for the chapter, replacing the AI-produced or previous one. Works on a final chapter too. */
+      summary: string;
     };
     ContinuityProposalResponse: {
       id: string;
@@ -3781,7 +3819,7 @@ export interface components {
       generator?: string;
       /** @description Written rows only. */
       isolated?: boolean;
-      /** @description Written rows only: finalize is refused until this isolated chapter has a summary and continuation state. */
+      /** @description Written rows only: finalize is refused until the chapter has a summary — every chapter needs one — plus, for an isolated chapter, continuation state. */
       finalizeBlocked?: boolean;
       /** @description Written rows only: the last revision the author approved, null when none was. */
       approvedRevision?: null | number;
@@ -7667,6 +7705,69 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChapterSummarizeResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SummaryConflictResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_chapters_n_summary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSummaryBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftConflictResponse'];
         };
       };
       /** @description Default Response */
@@ -13617,6 +13718,8 @@ export type ImportDraftBody = components['schemas']['ImportDraftBody'];
 export type FinalizeBody = components['schemas']['FinalizeBody'];
 export type GenerateUnrestrictedBody = components['schemas']['GenerateUnrestrictedBody'];
 export type ChapterSummarizeResponse = components['schemas']['ChapterSummarizeResponse'];
+export type SummaryConflictResponse = components['schemas']['SummaryConflictResponse'];
+export type UpdateSummaryBody = components['schemas']['UpdateSummaryBody'];
 export type ContinuityProposalResponse = components['schemas']['ContinuityProposalResponse'];
 export type ProposalResponse = components['schemas']['ProposalResponse'];
 export type ChatScope = components['schemas']['ChatScope'];

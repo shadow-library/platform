@@ -119,6 +119,19 @@ describe('editorReducer — conflict', () => {
     expect([state.status, state.theirs?.saveSeq]).toEqual(['conflict', 8]);
   });
 
+  it('should adopt a same-content server push as the new base without disturbing unsaved text or becoming a conflict', () => {
+    const state = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'server', draft: { ...DRAFT, revision: 4, saveSeq: 12 } });
+
+    expect([state.status, state.body, state.base.revision, state.base.saveSeq, canAutosave(state)]).toEqual(['idle', 'mine', 4, 12, true]);
+  });
+
+  it('should clear a stuck conflict when another tab reverts to content matching the base, resuming autosave', () => {
+    const state = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'server', draft: THEIRS }, { type: 'server', draft: { ...DRAFT, revision: 6, saveSeq: 20 } });
+
+    expect([state.status, state.body, state.error, state.theirs]).toEqual(['idle', 'mine', undefined, undefined]);
+    expect(canAutosave(state)).toBe(true);
+  });
+
   it('should stop autosaving and offer the recover path when unsaved text meets a newer version', () => {
     const state = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'server', draft: THEIRS });
 
@@ -211,7 +224,7 @@ describe('editorReducer — conflict', () => {
   });
 
   it('should keep a deletion found mid-save when that save then fails vaguely', () => {
-    const state = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'save-started' }, { type: 'deleted' }, { type: 'save-refused', refusal: { kind: 'ambiguous' } });
+    const state = run(openEditor(DRAFT), { type: 'edit', body: 'mine' }, { type: 'save-started' }, { type: 'deleted' }, { type: 'save-refused', refusal: { kind: 'collided' } });
 
     expect([state.status, state.body]).toEqual(['deleted', 'mine']);
   });
@@ -259,8 +272,12 @@ describe('saveRefusalOf', () => {
     expect(saveRefusalOf(conflict(THEIRS))).toEqual({ kind: 'conflict', current: { ...THEIRS, summary: null, updatedAt: '2026-09-26T00:00:00Z' } });
   });
 
-  it('should not claim a deletion from a moved-draft refusal with no current draft, since a deadlock looks the same', () => {
-    expect(saveRefusalOf(conflict())).toEqual({ kind: 'ambiguous' });
+  it('should fail outright, not retry, a bare DRF_013 with no current draft — a deleted chapter surfaces through 404 instead', () => {
+    expect(saveRefusalOf(conflict())).toEqual({ kind: 'failed', message: 'This chapter changed while you were working on it. Reload it and try again.' });
+  });
+
+  it('should read a Postgres deadlock as a distinct, retryable collision', () => {
+    expect(saveRefusalOf(apiError(409, 'DRF_021', 'This save collided with another save happening at the same time — try again'))).toEqual({ kind: 'collided' });
   });
 
   it('should sort the server’s other refusals', () => {
@@ -342,15 +359,46 @@ describe('runSave', () => {
     expect([calls, h.state().status]).toEqual([2, 'idle']);
   });
 
-  it('should fail, not claim a deletion, when a refusal without a current draft repeats', async () => {
+  it("should adopt a conflict's current draft as the new base and retry once when only its version moved, not its content", async () => {
+    let calls = 0;
+    const h = harness(run(openEditor(DRAFT), { type: 'edit', body: 'mine' }));
+    const write = h.deps.write;
+    h.deps.write = async text => {
+      calls += 1;
+      if (calls === 1) throw conflict({ ...DRAFT, revision: 4, saveSeq: 12 });
+      return write(text);
+    };
+
+    expect(await runSave(h.deps)).toBe(true);
+    expect([calls, h.state().status]).toEqual([2, 'idle']);
+    expect(h.writes[0]).toMatchObject({ baseRevision: 4, baseSaveSeq: 12, body: 'mine' });
+  });
+
+  it('should retry once on a DRF_021 collision, without treating it as a conflict', async () => {
+    let calls = 0;
+    const h = harness(run(openEditor(DRAFT), { type: 'edit', body: 'mine' }));
+    const write = h.deps.write;
+    h.deps.write = async text => {
+      calls += 1;
+      if (calls === 1) throw apiError(409, 'DRF_021', 'This save collided with another save happening at the same time — try again');
+      return write(text);
+    };
+
+    expect(await runSave(h.deps)).toBe(true);
+    expect([calls, h.state().status]).toEqual([2, 'idle']);
+  });
+
+  it('should fail outright, without retrying, when a refusal carries no current draft at all', async () => {
+    let calls = 0;
     const h = harness(run(openEditor(DRAFT), { type: 'edit', body: 'mine' }), {
       write: async () => {
+        calls += 1;
         throw conflict();
       },
     });
 
     expect(await runSave(h.deps)).toBe(false);
-    expect([h.state().status, h.state().body]).toEqual(['failed', 'mine']);
+    expect([calls, h.state().status, h.state().body]).toEqual([1, 'failed', 'mine']);
   });
 
   it('should hold the text while the AI writes the chapter', async () => {

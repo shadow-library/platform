@@ -24,12 +24,12 @@ describe('approveDraftRequest', () => {
 });
 
 describe('draftMovedUnderneath', () => {
-  it('should read a conflict, a finalized draft and a stale draft as the prose on screen being out of date', () => {
-    expect(['DRF_013', 'DRF_002', 'DRF_007'].map(code => draftMovedUnderneath(apiError(code)))).toEqual([true, true, true]);
+  it('should read a conflict, a deleted, a finalized and a stale draft as the prose on screen being out of date', () => {
+    expect(['DRF_013', 'DRF_001', 'DRF_002', 'DRF_007'].map(code => draftMovedUnderneath(apiError(code)))).toEqual([true, true, true, true]);
   });
 
   it('should leave any other failure to the toast alone', () => {
-    expect(draftMovedUnderneath(apiError('DRF_001', 404))).toBe(false);
+    expect(draftMovedUnderneath(apiError('DRF_020', 400))).toBe(false);
   });
 });
 

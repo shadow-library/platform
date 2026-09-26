@@ -64,7 +64,7 @@ import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { overrideOpenBlockingOnApproval } from '../review/review-records';
 import { ChapterImageService } from './chapter-image.service';
-import { asRetryableSave, draftBaseOf, insertHandWrittenDraft, saveHandWrittenDraft } from './draft-save';
+import { asRetryableSave, assertNotBeingGenerated, draftBaseOf, insertHandWrittenDraft, saveDraftSummary, saveHandWrittenDraft } from './draft-save';
 import { finalizeRefusals } from './finalize-refusals';
 import {
   type ApproveDraftBody,
@@ -87,6 +87,7 @@ import {
   type UpdateBriefBody,
   type UpdateContinuityBody,
   type UpdateDraftBody,
+  type UpdateSummaryBody,
 } from './generation.dto';
 
 interface RunContextSectionSummary {
@@ -817,13 +818,15 @@ export class GenerationService {
   }
 
   /**
-   * Runs a permissive model over a draft's existing prose and returns `{ summary, state }` without
-   * persisting anything — the author reviews and edits before saving through `PUT /drafts/:n`, so a bad
-   * result is simply discarded rather than becoming the value the finalize gate (CHP_005) checks.
+   * Runs a permissive model over a draft's prose, hand-written or AI, final or not. A non-isolated chapter's summary saves
+   * directly. An isolated chapter's summary and state come back unsaved: `state` is what CHP_005 checks, so a bad one stays
+   * the author's to accept via `PUT /drafts/:n`, not something this call can make true on its own.
    */
   async summarizeChapter(projectId: bigint, chapter: number): Promise<ChapterSummarizeResponse> {
     const draft = await this.getDraft(projectId, chapter);
     if (!draft.body || draft.body.trim().length === 0) throw AppErrorCode.CHP_007.create();
+    if (draft.reviewStatus === 'generating') throw AppErrorCode.DRF_019.create({ chapter: String(chapter) });
+    await assertNotBeingGenerated(this.db, projectId, chapter);
 
     const { project, mode } = await this.chapterSetting(projectId, chapter, draft);
     const route = await this.chapterRoute(projectId, { role: 'summary', chapter, mode }, project);
@@ -839,8 +842,17 @@ export class GenerationService {
       summary: string;
       state: Record<string, unknown>;
     };
+    if (draft.isolated) return { summary: result.summary, state: result.state };
 
-    return { summary: result.summary, state: result.state };
+    const saved = await this.db.transaction(tx => saveDraftSummary(tx, { projectId, chapter, summary: result.summary, body: draft.body })).catch(asRetryableSave);
+
+    return { summary: saved.summary, saveSeq: saved.saveSeq, state: result.state };
+  }
+
+  /** The author's own summary, saved through the same summary-only path as an AI one — no body guard, since the author is naming the summary rather than describing a read of the prose. Works on a final chapter too. */
+  async updateSummary(projectId: bigint, chapter: number, body: UpdateSummaryBody): Promise<Generation.Draft> {
+    const base = draftBaseOf(body);
+    return this.db.transaction(tx => saveDraftSummary(tx, { projectId, chapter, summary: body.summary, base })).catch(asRetryableSave);
   }
 
   async proposeContinuity(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {

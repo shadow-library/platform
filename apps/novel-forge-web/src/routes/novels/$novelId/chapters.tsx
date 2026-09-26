@@ -21,7 +21,7 @@ import {
   Tooltip,
 } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon } from '@/components/icons';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon } from '@/components/icons';
 import {
   type ChipIntent,
   ContentRatingPicker,
@@ -62,6 +62,7 @@ import {
   isIsolated,
   isQueuedReview,
   type ListChapterRowsQueryParams,
+  SummaryConflictError,
   useAddChapterImageMutation,
   useAmendChapterMutation,
   useApproveDraftMutation,
@@ -79,6 +80,7 @@ import {
   useImportDraftMutation,
   useInsertChapterMutation,
   useRunReviewMutation,
+  useSaveSummaryMutation,
   useStartNextDraftMutation,
   useSummarizeChapterMutation,
   useUpdateDraftMutation,
@@ -755,7 +757,13 @@ function ChapterList({ novelId, page, filter, onOpen, onBrowse }: ChapterListPro
                           </span>
                         )}
                         {row.finalizeBlocked && (
-                          <Tooltip content="Finalize is refused until this chapter has a summary and continuation state.">
+                          <Tooltip
+                            content={
+                              row.isolated
+                                ? 'Finalize is refused until this chapter has a summary and continuation state.'
+                                : 'Finalize is refused until this chapter has a summary.'
+                            }
+                          >
                             <span className={styles.badge}>
                               <StatusChip intent="danger">needs summary</StatusChip>
                             </span>
@@ -929,30 +937,46 @@ function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: Pro
 interface SummarizeDialogProps {
   novelId: string;
   draft: DraftResponse;
+  /** False opens straight into an empty summary field, for "write your own" — no model call, nothing read until Save. */
+  autoRun: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-// The endpoint deliberately persists nothing — the author reads what the permissive model produced,
-// edits it, and only then saves it as the value the finalize gate checks.
-function SummarizeDialog({ novelId, draft, onOpenChange }: SummarizeDialogProps): React.JSX.Element {
+// An isolated chapter's summary and state are review-then-apply (finalize's own gate on both); a non-isolated
+// chapter has no state to gate, so its summary alone saves directly, from the AI call or from Save.
+function SummarizeDialog({ novelId, draft, autoRun, onOpenChange }: SummarizeDialogProps): React.JSX.Element {
   const { chapter } = draft;
+  const isolated = isIsolated(draft);
   const summarize = useSummarizeChapterMutation(novelId, chapter);
   const updateDraft = useUpdateDraftMutation(novelId, chapter);
-  const [summary, setSummary] = useState('');
-  const [stateText, setStateText] = useState('{}');
+  const saveSummary = useSaveSummaryMutation(novelId, chapter);
+  const [summary, setSummary] = useState(draft.summary ?? '');
+  const [stateText, setStateText] = useState(() => JSON.stringify(draft.state ?? {}, null, 2));
   const requestedRef = useRef(false);
 
-  useEffect(() => {
-    if (requestedRef.current) return;
-    requestedRef.current = true;
+  const runSummarize = (): void => {
     summarize.mutate(undefined, {
       onSuccess: result => {
         setSummary(result.summary);
         setStateText(JSON.stringify(result.state, null, 2));
       },
-      onError: error => toast.danger(error.message),
+      onError: error => {
+        if (error instanceof SummaryConflictError) {
+          setSummary(error.attemptedSummary);
+          toast.warning('This chapter changed while summarizing — review the result before saving.');
+        } else {
+          toast.danger(error.message);
+        }
+      },
     });
-  }, [summarize]);
+  };
+
+  useEffect(() => {
+    if (!autoRun || requestedRef.current) return;
+    requestedRef.current = true;
+    runSummarize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once, on open, only when autoRun asked for it
+  }, [autoRun]);
 
   const parsedState = useMemo(() => {
     try {
@@ -963,12 +987,28 @@ function SummarizeDialog({ novelId, draft, onOpenChange }: SummarizeDialogProps)
     }
   }, [stateText]);
 
+  const saving = isolated ? updateDraft.isPending : saveSummary.isPending;
+  const waiting = autoRun && summarize.isPending;
+
   const save = (): void => {
-    updateDraft.mutate(
-      { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, body: draft.body ?? '', summary: summary.trim(), state: parsedState },
+    if (isolated) {
+      updateDraft.mutate(
+        { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, body: draft.body ?? '', summary: summary.trim(), state: parsedState },
+        {
+          onSuccess: () => {
+            toast.success('Summary and continuation state saved');
+            onOpenChange(false);
+          },
+          onError: error => toast.danger(error.message),
+        },
+      );
+      return;
+    }
+    saveSummary.mutate(
+      { summary: summary.trim(), baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq },
       {
         onSuccess: () => {
-          toast.success('Summary and continuation state saved');
+          toast.success('Summary saved');
           onOpenChange(false);
         },
         onError: error => toast.danger(error.message),
@@ -977,28 +1017,44 @@ function SummarizeDialog({ novelId, draft, onOpenChange }: SummarizeDialogProps)
   };
 
   return (
-    <Dialog open onOpenChange={open => !updateDraft.isPending && onOpenChange(open)}>
+    <Dialog open onOpenChange={open => !saving && onOpenChange(open)}>
       <Dialog.Content size="lg">
-        <Dialog.Header title={`Summarize chapter ${chapter}`} description="Nothing is saved until you apply it — review both fields first." />
+        <Dialog.Header
+          title={`Summarize chapter ${chapter}`}
+          description={
+            isolated
+              ? 'Review both fields, then apply them to the draft.'
+              : autoRun
+                ? 'Saved once the AI finishes reading the chapter — edit it and save again if you change it.'
+                : 'The current summary, if any — write your own, or ask the AI, then save.'
+          }
+        />
         <Dialog.Body>
-          {summarize.isPending ? (
+          {waiting ? (
             <div className={styles.summarizeWaiting}>
               <Spinner size="sm" />
               <span>Reading the chapter…</span>
             </div>
           ) : (
             <div className={styles.dialogForm}>
+              {!autoRun && (
+                <Button variant="secondary" size="sm" className={styles.startAligned} loading={summarize.isPending} onClick={runSummarize}>
+                  Summarise with AI
+                </Button>
+              )}
               <FormField label="Summary" required helper="2–3 sentences, past tense. This is all the next chapter gets to see of this one.">
                 <Textarea value={summary} onValueChange={setSummary} minRows={4} autoGrow />
               </FormField>
-              <FormField
-                label="Continuation state"
-                required
-                error={parsedState ? undefined : 'Must be a JSON object'}
-                helper="What the next chapter builds on — positions, injuries, who knows what."
-              >
-                <Textarea value={stateText} onValueChange={setStateText} minRows={8} autoGrow className={styles.jsonField} />
-              </FormField>
+              {isolated && (
+                <FormField
+                  label="Continuation state"
+                  required
+                  error={parsedState ? undefined : 'Must be a JSON object'}
+                  helper="What the next chapter builds on — positions, injuries, who knows what."
+                >
+                  <Textarea value={stateText} onValueChange={setStateText} minRows={8} autoGrow className={styles.jsonField} />
+                </FormField>
+              )}
             </div>
           )}
         </Dialog.Body>
@@ -1006,8 +1062,8 @@ function SummarizeDialog({ novelId, draft, onOpenChange }: SummarizeDialogProps)
           <Dialog.Close asChild>
             <Button variant="ghost">Cancel</Button>
           </Dialog.Close>
-          <Button variant="primary" disabled={!summary.trim() || !parsedState} loading={updateDraft.isPending} onClick={save}>
-            Apply to draft
+          <Button variant="primary" disabled={!summary.trim() || (isolated && !parsedState)} loading={saving} onClick={save}>
+            {isolated ? 'Apply to draft' : 'Save'}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
@@ -1136,6 +1192,11 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const [checksKind, setChecksKind] = useState<ChapterReviewKind>('judge');
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [summarizeOpen, setSummarizeOpen] = useState(false);
+  const [summarizeAutoRun, setSummarizeAutoRun] = useState(true);
+  const openSummarize = (autoRun: boolean): void => {
+    setSummarizeAutoRun(autoRun);
+    setSummarizeOpen(true);
+  };
   const [amendOpen, setAmendOpen] = useState(false);
   const [amendResult, setAmendResult] = useState<AmendChapterResponse | undefined>();
   const [staleRefusal, setStaleRefusal] = useState<string | undefined>();
@@ -1426,6 +1487,9 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                   <IconButton variant="ghost" aria-label="Edit prose" icon={<EditIcon size={17} />} onClick={() => setEditing(true)} />
                 </Tooltip>
               )}
+              <Tooltip content="View or edit this chapter's summary">
+                <IconButton variant="ghost" aria-label="Summary" icon={<DocIcon size={17} />} onClick={() => openSummarize(false)} />
+              </Tooltip>
               <Tooltip content="Add this chapter's new canon to the bible as a proposal">{addToBible}</Tooltip>
               {actions.verify && (
                 <Button variant="secondary" size="sm" loading={runReview.isPending && runReview.variables?.kind === 'judge'} onClick={runJudge}>
@@ -1442,6 +1506,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content align="end">
                   {actions.edit && <DropdownMenu.Item onSelect={() => setEditing(true)}>Edit prose</DropdownMenu.Item>}
+                  <DropdownMenu.Item onSelect={() => openSummarize(false)}>Summary</DropdownMenu.Item>
                   <DropdownMenu.Item disabled={!draft.body?.trim()} onSelect={runExtract}>
                     Add to bible
                   </DropdownMenu.Item>
@@ -1512,17 +1577,31 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
         ) : (
           <div className={`nf-scroll ${styles.scrollFill}`}>
             <article className={`nf-page ${styles.reader}`}>
-              {finalizeBlocked && (
-                <Alert
-                  intent="danger"
-                  title="Finalize is blocked until this chapter is summarized"
-                  action={{ label: 'Summarize', onClick: () => setSummarizeOpen(true) }}
-                  className={styles.notice}
-                >
-                  This chapter’s prose is firewalled, so chapter {chapter + 1} sees only its summary and continuation state — and both are empty. Summarizing proposes them; you
-                  review and apply before anything is saved.
-                </Alert>
-              )}
+              {finalizeBlocked &&
+                (isIsolated(draft) ? (
+                  <Alert
+                    intent="danger"
+                    title="Finalize is blocked until this chapter is summarized"
+                    action={{ label: 'Summarize', onClick: () => openSummarize(true) }}
+                    className={styles.notice}
+                  >
+                    This chapter’s prose is firewalled, so chapter {chapter + 1} sees only its summary and continuation state — and both are empty. Summarizing proposes them; you
+                    review and apply before anything is saved.
+                  </Alert>
+                ) : (
+                  <Alert
+                    intent="danger"
+                    title="Finalize needs a summary for this chapter"
+                    action={{ label: 'Summarise with AI', onClick: () => openSummarize(true) }}
+                    className={styles.notice}
+                  >
+                    Chapter {chapter + 1}’s writer reads this chapter’s summary, not its prose — and it’s empty.{' '}
+                    <button type="button" className={styles.linkButton} onClick={() => openSummarize(false)}>
+                      Write your own
+                    </button>{' '}
+                    instead.
+                  </Alert>
+                ))}
               {amendResult?.suggestExtractToBible && (
                 <Alert
                   intent="warning"
@@ -1590,7 +1669,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
 
       <UnsavedChangesGuard when={unsaved} description={leaveWarning(editor.state)} onSave={saveBlocked ? undefined : editor.save} />
 
-      {summarizeOpen && <SummarizeDialog novelId={novelId} draft={draft} onOpenChange={setSummarizeOpen} />}
+      {summarizeOpen && <SummarizeDialog novelId={novelId} draft={draft} autoRun={summarizeAutoRun} onOpenChange={setSummarizeOpen} />}
 
       {amendOpen && <AmendDialog novelId={novelId} chapter={chapter} draft={draft} onOpenChange={setAmendOpen} onAmended={setAmendResult} />}
 

@@ -29,3 +29,21 @@ export class DraftConflictError extends AppError {
     return { ...super.toResponse(), current: this.#current };
   }
 }
+
+export interface SummaryConflictErrorObject extends DraftConflictErrorObject {
+  attemptedSummary: string;
+}
+
+/** DRF_013 for a summary computed against prose that has since moved; `attemptedSummary` carries the computed text so the caller can re-offer it once reloaded, instead of paying for another model call. */
+export class SummaryConflictError extends DraftConflictError {
+  readonly #attemptedSummary: string;
+
+  constructor(draft: ConflictingDraft, attemptedSummary: string) {
+    super(draft);
+    this.#attemptedSummary = attemptedSummary;
+  }
+
+  override toResponse(): SummaryConflictErrorObject {
+    return { ...super.toResponse(), attemptedSummary: this.#attemptedSummary };
+  }
+}

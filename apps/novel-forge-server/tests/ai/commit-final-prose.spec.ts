@@ -18,8 +18,10 @@ const INPUT: CommitProseInput = {
   isolated: false,
 };
 
-function commit(options: { finalized: boolean; reads?: (DraftRow | undefined)[]; input?: Partial<CommitProseInput> }) {
-  const fake = fakeGenerationDb({ draftReads: options.reads ?? [], draftWriteResult: options.finalized ? [{ id: 11n }] : [] });
+function commit(options: { finalized: boolean; reads?: (DraftRow | undefined)[]; input?: Partial<CommitProseInput>; finalSummary?: string }) {
+  const effectiveSummary = options.input?.summary ?? INPUT.summary;
+  const draftWriteResult = options.finalized ? [{ id: 11n, summary: options.finalSummary ?? effectiveSummary }] : [];
+  const fake = fakeGenerationDb({ draftReads: options.reads ?? [], draftWriteResult });
   return { fake, run: commitFinalProse(fake.db as never, { ...INPUT, ...options.input }) };
 }
 
@@ -34,6 +36,23 @@ describe('commitFinalProse', () => {
     expect(where.params).toEqual([11n, 2, 'approved', 'final']);
     expect(fake.writesTo(schema.chapters, 'upsert')).toHaveLength(1);
     expect(fake.outcome()).toBe('committed');
+  });
+
+  it("should overwrite the committed summary with the finalizing UPDATE's own returned value, when a later save changed it", async () => {
+    const { fake, run } = commit({ finalized: true, finalSummary: 'Updated after approval, before finalize committed.' });
+
+    await run;
+
+    const [chapterUpdate] = fake.writesTo(schema.chapters, 'update');
+    expect(chapterUpdate?.values).toMatchObject({ summary: 'Updated after approval, before finalize committed.' });
+  });
+
+  it('should not touch the chapter row again when the finalizing UPDATE returns the summary already committed', async () => {
+    const { fake, run } = commit({ finalized: true });
+
+    await run;
+
+    expect(fake.writesTo(schema.chapters, 'update')).toEqual([]);
   });
 
   it('should commit the provisional knowledge bound to the finalized revision and drop any bound to another', async () => {

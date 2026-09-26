@@ -32,10 +32,10 @@ export class ChapterAmendService {
   }
 
   /**
-   * Replaces a finalized chapter's prose in place — the one path allowed past `chapters.locked`.
-   * It is deliberately prose-only: the bible keeps every fact this
-   * chapter already contributed and no downstream chapter is flagged, so the response asks the UI to
-   * offer `extract-to-bible` as the author's explicit follow-up.
+   * Replaces a finalized chapter's prose in place — the one path allowed past `chapters.locked` for prose
+   * (`saveDraftSummary` is the separate exception for a final chapter's summary, which is metadata, not prose).
+   * Deliberately prose-only otherwise: the bible keeps what this chapter already contributed and no downstream
+   * chapter is flagged, so the response asks the UI to offer `extract-to-bible` as an explicit follow-up.
    */
   async amend(projectId: bigint, chapterNumber: number, body: AmendChapterBody): Promise<AmendChapterResponse> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
@@ -49,9 +49,8 @@ export class ChapterAmendService {
     const declared = declaredDraftFields({ contentRating: body.contentRating });
 
     const { amended, decision } = await this.db.transaction(async tx => {
-      // No `setWhere: ne(locked, true)` here, unlike the finalization graph's `commitProse`: that guard
-      // stops a re-run from clobbering canon it did not write, and clobbering canon on the author's
-      // explicit instruction is this endpoint's entire purpose. `locked` stays true — amend never unlocks.
+      // No `setWhere: ne(locked, true)` here, unlike `commitProse`: clobbering the chapter's prose on the
+      // author's explicit instruction is this endpoint's entire purpose. `locked` stays true — amend never unlocks.
       const content = sanitizeMarkdown(body.content);
       const [amended] = await tx
         .update(schema.chapters)

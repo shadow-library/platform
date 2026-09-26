@@ -2,7 +2,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { buildChapterRows, type ChapterRow, type ChapterRowDraft, firstUnwrittenChapter, isFinalizable, pageChapterRows, summarizeChapterRows } from '@server/common';
+import { buildChapterRows, type ChapterRow, type ChapterRowDraft, firstUnwrittenChapter, isBlank, isFinalizable, pageChapterRows, summarizeChapterRows } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type ListChapterRowsQuery, type ListChapterRowsResponse } from './generation.dto';
@@ -55,7 +55,7 @@ export class ChapterRowsService {
 
     const written: ChapterRowDraft[] = draftRows.map(({ summary, state, ...draft }) => ({
       ...draft,
-      finalizeBlocked: !isFinalizable({ isolated: draft.isolated, summary, state }),
+      finalizeBlocked: !isFinalizable({ isolated: draft.isolated, summary, state }) || (!draft.isolated && isBlank(summary)),
     }));
     const nextWritableChapter = firstUnwrittenChapter(new Set(draftRows.map(draft => draft.chapter)), new Set(finalizedRows.map(chapter => chapter.number)));
     return { rows: buildChapterRows(written, briefRows), nextWritableChapter };

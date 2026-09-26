@@ -45,9 +45,11 @@ import {
   SearchQuery,
   SearchResponse,
   SeedFromBriefBody,
+  SummaryConflictResponse,
   UpdateBriefBody,
   UpdateContinuityBody,
   UpdateDraftBody,
+  UpdateSummaryBody,
   UserFeedbackResponse,
   WorkflowRunDetailResponse,
   WorkflowRunResponse,
@@ -240,8 +242,17 @@ export class GenerationController {
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/summarize')
   @RespondFor(200, ChapterSummarizeResponse)
+  @RespondFor(409, SummaryConflictResponse)
   summarizeChapter(@Params() params: ChapterParams): Promise<ChapterSummarizeResponse> {
     return this.generationService.summarizeChapter(params.projectId, params.n);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Put('/chapters/:n/summary')
+  @RespondFor(200, DraftResponse)
+  @RespondFor(409, DraftConflictResponse)
+  updateSummary(@Params() params: ChapterParams, @Body() body: UpdateSummaryBody): Promise<DraftResponse> {
+    return this.generationService.updateSummary(params.projectId, params.n, body);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

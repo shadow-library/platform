@@ -316,11 +316,27 @@ export class GenerateUnrestrictedBody {
 
 @Schema()
 export class ChapterSummarizeResponse {
-  @Field({ minLength: 1, description: '2-3 sentence summary of what happened in the chapter, past tense — not persisted until saved through PUT /drafts/:n.' })
+  @Field({
+    minLength: 1,
+    description:
+      '2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated chapter; returned unsaved for an isolated one, for review alongside `state` before either is saved through PUT /drafts/:n.',
+  })
   summary: string;
 
-  @Field(() => Object, { additionalProperties: true, description: 'Continuation state the next chapter would build on — review and edit before saving through PUT /drafts/:n.' })
+  @Field(() => Integer, { optional: true, description: 'The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated chapter.' })
+  saveSeq?: number;
+
+  @Field(() => Object, {
+    additionalProperties: true,
+    description: "Continuation state the next chapter would build on. Isolated chapters only — always returned unsaved, for the author's review.",
+  })
   state: Record<string, unknown>;
+}
+
+@Schema()
+export class UpdateSummaryBody extends DraftSaveBase {
+  @Field({ minLength: 1, description: "The author's own summary for the chapter, replacing the AI-produced or previous one. Works on a final chapter too." })
+  summary: string;
 }
 
 @Schema()
@@ -543,6 +559,12 @@ export class ConflictingDraftResponse {
 export class DraftConflictResponse extends ErrorResponseDto {
   @Field(() => ConflictingDraftResponse, { optional: true, description: 'Present on DRF_013 when the chapter still has a draft: what it holds now.' })
   current?: ConflictingDraftResponse;
+}
+
+@Schema()
+export class SummaryConflictResponse extends DraftConflictResponse {
+  @Field({ minLength: 1, description: 'The summary computed from the prose as it stood before the conflict — re-offer it once reloaded, rather than summarising again.' })
+  attemptedSummary: string;
 }
 
 @Schema()
@@ -1232,7 +1254,10 @@ export class ChapterRowResponse {
   @Field({ optional: true, description: 'Written rows only.' })
   isolated?: boolean;
 
-  @Field({ optional: true, description: 'Written rows only: finalize is refused until this isolated chapter has a summary and continuation state.' })
+  @Field({
+    optional: true,
+    description: 'Written rows only: finalize is refused until the chapter has a summary — every chapter needs one — plus, for an isolated chapter, continuation state.',
+  })
   finalizeBlocked?: boolean;
 
   @Field(() => Integer, { optional: true, nullable: true, description: 'Written rows only: the last revision the author approved, null when none was.' })

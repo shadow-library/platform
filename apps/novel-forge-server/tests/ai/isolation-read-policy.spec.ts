@@ -137,8 +137,8 @@ async function runLadder(mode5: 'standard' | 'unrestricted' | null) {
   return { contentMode: assembled.contentMode, calls };
 }
 
-function service(calls: RecordedCall[], rows = tables(), extracted?: unknown) {
-  const fake = fakeGenerationDb({ draftReads: [draftRow({ chapter: 5, body: 'The pier creaks under the morning tide.' })], draftWriteResult: [draftRow({ chapter: 5 })] });
+function service(calls: RecordedCall[], rows = tables(), extracted?: unknown, draftReads = [draftRow({ chapter: 5, body: 'The pier creaks under the morning tide.' })]) {
+  const fake = fakeGenerationDb({ draftReads, draftWriteResult: [draftRow({ chapter: 5 })] });
   const insert = (table: unknown) => {
     const recorded = (fake.db as unknown as { insert: (into: unknown) => { values: (values: Record<string, unknown>) => unknown } }).insert(table);
     if (table !== schema.continuityProposals) return recorded;

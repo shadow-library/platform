@@ -52,7 +52,7 @@ export type EditorAction =
 export type SaveRefusal =
   | { kind: 'conflict'; current: ServerDraft }
   | { kind: 'deleted' }
-  | { kind: 'ambiguous' }
+  | { kind: 'collided' }
   | { kind: 'locked' }
   | { kind: 'held'; message: string }
   | { kind: 'failed'; message: string };
@@ -70,6 +70,11 @@ export function versionOf(draft: ServerDraft): EditorVersion {
 
 export function isSameBase(a: DraftBase, b: DraftBase): boolean {
   return a.draftId === b.draftId && a.revision === b.revision && a.saveSeq === b.saveSeq;
+}
+
+/** The draft a conflict reports back may have moved (a fold, another tab's identical save) without the text actually diverging — this is content equality, not `isSameBase`'s exact-version one. */
+function matchesBase(current: Pick<ServerDraft, 'id' | 'title' | 'body'>, base: EditorVersion): boolean {
+  return current.id === base.draftId && (current.title ?? '') === base.title && (current.body ?? '') === base.body;
 }
 
 export function openEditor(draft: ServerDraft): EditorState {
@@ -107,6 +112,10 @@ function reconcile(state: EditorState, draft: ServerDraft): EditorState {
   const theirs = versionOf(draft);
   if (draft.status === 'final') return { ...state, status: 'locked', theirs, error: undefined };
   if (isSameBase(theirs, state.base)) return state;
+  if (matchesBase(draft, state.base)) {
+    const wasConflict = state.status === 'conflict';
+    return { ...state, base: theirs, theirs: undefined, status: wasConflict ? 'idle' : state.status, error: wasConflict ? undefined : state.error };
+  }
   if (!isDirty(state)) return { title: theirs.title, body: theirs.body, base: theirs, status: 'idle' };
   return { ...state, status: 'conflict', theirs, error: undefined };
 }
@@ -114,14 +123,14 @@ function reconcile(state: EditorState, draft: ServerDraft): EditorState {
 /** A chapter found deleted or final while a save was in flight stays that way; a vaguer refusal of that save must not hide it. */
 function refuse(state: EditorState, refusal: SaveRefusal): EditorState {
   const terminal = state.status === 'deleted' || state.status === 'locked';
-  if (terminal && (refusal.kind === 'ambiguous' || refusal.kind === 'failed')) return state;
+  if (terminal && (refusal.kind === 'collided' || refusal.kind === 'failed')) return state;
   const settled: EditorState = { ...state, status: 'idle' };
   switch (refusal.kind) {
     case 'conflict':
       return reconcile(settled, refusal.current);
     case 'deleted':
       return { ...settled, status: 'deleted', theirs: undefined, error: undefined };
-    case 'ambiguous':
+    case 'collided':
       return { ...settled, status: 'failed', error: 'The chapter could not be saved — try again' };
     case 'locked':
       return { ...settled, status: 'locked', error: undefined };
@@ -185,15 +194,17 @@ export function saveLabel(state: EditorState): SaveLabel {
 const FINALIZED_CODE = 'DRF_002';
 const AI_WRITING_CODE = 'DRF_019';
 const MOVED_CODE = 'DRF_013';
+const COLLIDED_CODE = 'DRF_021';
 
-/** A DRF_013 without a current draft is either a deleted chapter or a deadlock the server gave up on; only a retry tells them apart. */
+/** DRF_021 is a Postgres deadlock the server gave up on, worth exactly one blind retry. A bare DRF_013 — no current draft — is a genuine failure; a deleted chapter surfaces through 404/DRF_001 instead. */
 export function saveRefusalOf(error: unknown): SaveRefusal {
   if (!isApiError(error)) return { kind: 'failed', message: error instanceof Error ? error.message : 'The chapter could not be saved' };
   if (error.code === AI_WRITING_CODE) return { kind: 'held', message: error.message };
   if (error.code === FINALIZED_CODE) return { kind: 'locked' };
   if (error.status === 404) return { kind: 'deleted' };
+  if (error.code === COLLIDED_CODE) return { kind: 'collided' };
   if (error.code === MOVED_CODE && error instanceof DraftSaveConflict) {
-    return error.current ? { kind: 'conflict', current: { ...error.current, status: 'draft' } } : { kind: 'ambiguous' };
+    return error.current ? { kind: 'conflict', current: { ...error.current, status: 'draft' } } : { kind: 'failed', message: error.message };
   }
   return { kind: 'failed', message: error.message };
 }
@@ -214,27 +225,30 @@ export interface SaveDeps {
 }
 
 /**
- * One save of the text on screen, made against the base it was edited from. A refusal that does not show the draft
- * moving — no current draft, or a current draft that is still the base — is what a deadlock looks like, so it is tried
- * once more before failing; a deleted chapter surfaces through the draft query's 404 instead.
+ * One save of the text on screen, made against the base it was edited from. A DRF_021 collision is retried
+ * once blindly; a conflict whose current draft has the same id, title and body as the base — nothing really
+ * diverged — adopts it as the new base and retries once too, so it never surfaces as a false conflict.
  */
 export async function runSave({ write, getState, dispatch, refusalOf }: SaveDeps): Promise<boolean> {
   const current = getState();
   if (!canAutosave(current)) return isSettled(current);
   const sent: EditorText = { title: current.title, body: current.body };
-  const { base } = current;
-  const request: DraftWrite = { baseDraftId: base.draftId, baseRevision: base.revision, baseSaveSeq: base.saveSeq, title: sent.title.trim() || undefined, body: sent.body };
+  let base = current.base;
   dispatch({ type: 'save-started' });
   for (let attempt = 0; ; attempt++) {
+    const request: DraftWrite = { baseDraftId: base.draftId, baseRevision: base.revision, baseSaveSeq: base.saveSeq, title: sent.title.trim() || undefined, body: sent.body };
     try {
       const saved = await write(request);
       dispatch({ type: 'saved', saved: { ...versionOf(saved), ...sent } });
       return isSettled(getState());
     } catch (error) {
       const refusal = refusalOf(error);
-      const retryable = refusal.kind === 'ambiguous' || (refusal.kind === 'conflict' && isSameBase(versionOf(refusal.current), base));
-      if (retryable && attempt === 0) continue;
-      dispatch({ type: 'save-refused', refusal: retryable ? { kind: 'ambiguous' } : refusal });
+      if (refusal.kind === 'collided' && attempt === 0) continue;
+      if (refusal.kind === 'conflict' && attempt === 0 && matchesBase(refusal.current, base)) {
+        base = versionOf(refusal.current);
+        continue;
+      }
+      dispatch({ type: 'save-refused', refusal });
       return false;
     }
   }

@@ -166,7 +166,7 @@ export interface ApprovedDraft extends Pick<DraftResponse, 'id' | 'chapter' | 'r
   keptStaleReason?: string;
 }
 
-const DRAFT_MOVED_CODES: ReadonlySet<string> = new Set(['DRF_002', 'DRF_007', 'DRF_013']);
+const DRAFT_MOVED_CODES: ReadonlySet<string> = new Set(['DRF_001', 'DRF_002', 'DRF_007', 'DRF_013']);
 
 export function approveDraftRequest(projectId: string, draft: ApprovedDraft): { path: string; body: ApproveDraftBody } {
   const bound: ApproveDraftBody = { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq };

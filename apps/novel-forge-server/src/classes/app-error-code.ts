@@ -50,6 +50,7 @@ export class AppErrorCode extends ServerErrorCode {
     'CHP_009',
     'Chapter {chapter} is already written — a chapter can only be inserted after the last written chapter, because inserting earlier would renumber written chapters',
   );
+  static readonly CHP_010 = AppErrorCode.badRequest('CHP_010', 'Chapter {chapter} has no summary — write one or summarise with AI');
 
   /*!
    * Brief Errors
@@ -109,6 +110,7 @@ export class AppErrorCode extends ServerErrorCode {
     'Chapter {chapter} is being written by the AI right now — wait for it to finish, or cancel it to write the chapter yourself',
   );
   static readonly DRF_020 = AppErrorCode.badRequest('DRF_020', 'A save made against an earlier read must send baseDraftId, baseRevision and baseSaveSeq together');
+  static readonly DRF_021 = AppErrorCode.conflict('DRF_021', 'This save collided with another save happening at the same time — try again');
 
   /*!
    * Finalize Errors

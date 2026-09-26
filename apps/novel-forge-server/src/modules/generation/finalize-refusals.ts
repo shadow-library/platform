@@ -2,7 +2,7 @@ import { and, desc, eq, lt } from 'drizzle-orm';
 import { type AppError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { isFinalizable, planRevealsRefusal } from '@server/common';
+import { isBlank, isFinalizable, planRevealsRefusal } from '@server/common';
 import { type Generation, type PrimaryDatabase, schema } from '@server/database';
 
 import { openBlockingFindings } from '../review/review-records';
@@ -36,6 +36,7 @@ export async function finalizeRefusals(db: PrimaryDatabase, draft: Generation.Dr
     draft.status !== 'final' && draft.staleReason !== null ? AppErrorCode.DRF_007.create() : null,
     openBlocking ? AppErrorCode.FIN_004.create({ chapter: String(draft.chapter) }) : null,
     isFinalizable(draft) ? null : AppErrorCode.CHP_005.create(),
+    !draft.isolated && isBlank(draft.summary) ? AppErrorCode.CHP_010.create({ chapter: String(draft.chapter) }) : null,
     revealsRefusal,
     previousFinal ? null : AppErrorCode.FIN_001.create(),
     needsRevalidation ? AppErrorCode.FIN_002.create() : null,

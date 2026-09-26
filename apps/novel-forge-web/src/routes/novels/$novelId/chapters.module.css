@@ -568,6 +568,10 @@
   gap: 14px;
 }
 
+.startAligned {
+  align-self: flex-start;
+}
+
 .dialogGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -613,6 +617,19 @@
 
 .notice {
   margin-bottom: 20px;
+}
+
+.linkButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--sh-accent);
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
 }
 
 .pagination {

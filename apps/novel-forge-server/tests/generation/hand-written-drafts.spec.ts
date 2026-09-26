@@ -95,11 +95,32 @@ describe('GenerationService — base revision on hand saves', () => {
     expect(tables.writes).toEqual([]);
   });
 
-  it('should refuse a base for a chapter whose draft is gone', async () => {
+  it('should refuse a base for a chapter whose draft is gone as not found', async () => {
     const { tables, service } = novel();
 
-    await expect(service.updateDraft(7n, 4, { ...PROSE, ...base(0, 0, 4n) })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(service.updateDraft(7n, 4, { ...PROSE, ...base(0, 0, 4n) })).rejects.toMatchObject({ code: 'DRF_001' });
     expect(tables.writes).toEqual([]);
+  });
+
+  it('should answer draft-not-found, not a bare conflict, when the row is gone by the time the refused write is explained', async () => {
+    const tx = {
+      query: {
+        jobs: { findMany: async () => [] },
+        drafts: { findFirst: async () => undefined },
+      },
+      insert: () => ({
+        values: () => ({ onConflictDoNothing: () => ({ returning: async () => [] }) }),
+      }),
+    };
+
+    await expect(
+      insertHandWrittenDraft(tx as never, {
+        projectId: 7n,
+        chapter: 3,
+        source: 'hand_edited',
+        fields: { title: null, summary: null, state: null, generator: 'human', contentRating: null, isolated: false, body: 'x' },
+      }),
+    ).rejects.toMatchObject({ code: 'DRF_001' });
   });
 
   it('should refuse a stale tab saving over a chapter that was deleted and started again', async () => {
@@ -127,11 +148,11 @@ describe('GenerationService — base revision on hand saves', () => {
   it.each([
     ['a bare deadlock', { code: '40P01' }],
     ['a query error caused by one', Object.assign(new Error('Failed query'), { cause: { code: 'ERR_POSTGRES_SERVER_ERROR', errno: '40P01' } })],
-  ])('should answer %s as a conflict the autosave retries', async (_, deadlock) => {
+  ])('should answer %s with a distinct retryable conflict, not the stale-base one', async (_, deadlock) => {
     const service = makeGenerationService({ transaction: async () => Promise.reject(deadlock) });
 
-    await expect(service.updateDraft(7n, 3, { ...PROSE, ...base(2, 0) })).rejects.toMatchObject({ code: 'DRF_013' });
-    await expect(service.importDraft(7n, 3, { prose: PROSE.body, ...base(2, 0) })).rejects.toMatchObject({ code: 'DRF_013' });
+    await expect(service.updateDraft(7n, 3, { ...PROSE, ...base(2, 0) })).rejects.toMatchObject({ code: 'DRF_021' });
+    await expect(service.importDraft(7n, 3, { prose: PROSE.body, ...base(2, 0) })).rejects.toMatchObject({ code: 'DRF_021' });
   });
 
   it('should pass any other database failure through untouched', async () => {
@@ -203,6 +224,30 @@ describe('ChapterRowsService.list', () => {
       [2, null],
       [3, 2],
     ]);
+  });
+
+  it('should block finalize on a written row with no summary, whether or not it is isolated', async () => {
+    const { tables } = novel({ chapter3: { summary: null, isolated: false } });
+
+    const list = await new ChapterRowsService({ getPostgresClient: () => tables.db } as never).list(7n, { filter: 'all', limit: 25, offset: 0 });
+
+    expect(list.items.find(row => row.chapter === 3)).toMatchObject({ finalizeBlocked: true });
+  });
+
+  it('should not block finalize on a non-isolated row that has a summary', async () => {
+    const { tables } = novel({ chapter3: { summary: 'The keeper counted twice.' } });
+
+    const list = await new ChapterRowsService({ getPostgresClient: () => tables.db } as never).list(7n, { filter: 'all', limit: 25, offset: 0 });
+
+    expect(list.items.find(row => row.chapter === 3)).toMatchObject({ finalizeBlocked: false });
+  });
+
+  it('should still block an isolated row missing continuation state, even with a summary', async () => {
+    const { tables } = novel({ chapter3: { summary: 'Bridge summary.', isolated: true, state: null } });
+
+    const list = await new ChapterRowsService({ getPostgresClient: () => tables.db } as never).list(7n, { filter: 'all', limit: 25, offset: 0 });
+
+    expect(list.items.find(row => row.chapter === 3)).toMatchObject({ finalizeBlocked: true });
   });
 });
 
@@ -375,7 +420,7 @@ describe('GenerationService — autosave folding', () => {
 });
 
 describe('GenerationService.finalizeReadiness', () => {
-  const approved = { reviewStatus: 'approved', approvedRevision: 2 };
+  const approved = { reviewStatus: 'approved', approvedRevision: 2, summary: 'The keeper counts the ships twice.' };
   const allChaptersFinal = (drafts: number[]) =>
     drafts.map(chapter => ({ id: BigInt(chapter), chapter, body: `${chapter}.`, revision: 1, status: 'final', reviewStatus: 'final' }));
 
@@ -431,5 +476,32 @@ describe('GenerationService.finalizeReadiness', () => {
     const { service } = finalizing({ status: 'final', reviewStatus: 'final' }, { chapters: [{ number: 3, continuityApplied: true }], storyCurrentChapter: 3 });
 
     await expect(service.finalizeReadiness(7n, 3)).resolves.toMatchObject({ ready: false, blockers: [{ code: 'DRF_002' }] });
+  });
+
+  it('should ask a human chapter with no summary to write one or summarize, distinct from the isolated-chapter gate', async () => {
+    const { service } = finalizing({ ...approved, generator: 'human', summary: null });
+
+    await expect(service.finalizeReadiness(7n, 3)).resolves.toMatchObject({
+      ready: false,
+      blockers: [{ code: 'CHP_010', message: expect.stringContaining('Chapter 3 has no summary') }],
+    });
+  });
+
+  it('should not ask a standard AI chapter for a summary when it already has one', async () => {
+    const { service } = finalizing({ ...approved, generator: 'standard' });
+
+    await expect(service.finalizeReadiness(7n, 3)).resolves.toEqual({ ready: true, blockers: [] });
+  });
+
+  it('should ask a standard AI chapter for a summary too, if it somehow has none', async () => {
+    const { service } = finalizing({ ...approved, generator: 'standard', summary: null });
+
+    await expect(service.finalizeReadiness(7n, 3)).resolves.toMatchObject({ ready: false, blockers: [{ code: 'CHP_010' }] });
+  });
+
+  it('should let the author supply their own summary for a human chapter instead of the AI one', async () => {
+    const { service } = finalizing({ ...approved, generator: 'human', summary: 'The author wrote this summary by hand.' });
+
+    await expect(service.finalizeReadiness(7n, 3)).resolves.toEqual({ ready: true, blockers: [] });
   });
 });

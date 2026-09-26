@@ -165,20 +165,30 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
         setWhere: ne(schema.chapters.locked, true),
       });
 
-    if (!state.draftId) return discloseChapterReveals(tx, projectId, state.chapter);
+    const draftId = state.draftId ? BigInt(state.draftId) : null;
+    if (!draftId) return discloseChapterReveals(tx, projectId, state.chapter);
     const draftRevision = state.draftRevision;
     if (draftRevision === null) throw AppError.internal(`[commitProse] Finalization of chapter ${state.chapter} carries no draft revision`);
     const commitKnowledge = async (): Promise<void> => {
       await commitChapterKnowledge(tx, projectId, state.chapter, draftRevision);
       await reachClaimedMilestones(tx, projectId, state.chapter, draftRevision);
     };
-    const draftId = BigInt(state.draftId);
+    // A summary save on an already-approved draft doesn't bump its revision, so `state.summary` can be stale —
+    // `returning` gets the true value from the same write that finalizes the draft, not a racing unlocked read.
     const [finalized] = await tx
       .update(schema.drafts)
       .set({ status: 'final', reviewStatus: 'final', updatedAt: new Date() })
       .where(and(eq(schema.drafts.id, draftId), eq(schema.drafts.revision, draftRevision), eq(schema.drafts.reviewStatus, 'approved'), ne(schema.drafts.status, 'final')))
-      .returning({ id: schema.drafts.id });
-    if (finalized) return commitKnowledge();
+      .returning({ summary: schema.drafts.summary });
+    if (finalized) {
+      if (finalized.summary !== state.summary) {
+        await tx
+          .update(schema.chapters)
+          .set({ summary: finalized.summary || null, updatedAt: new Date() })
+          .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)));
+      }
+      return commitKnowledge();
+    }
 
     const current = await tx.query.drafts.findFirst({ columns: { status: true, revision: true }, where: eq(schema.drafts.id, draftId) });
     if (current?.status === 'final' && current.revision === draftRevision) return commitKnowledge();
