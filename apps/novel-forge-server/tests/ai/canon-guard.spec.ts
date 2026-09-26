@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   findBriefRevealViolations,
   isLimitCategory,
+  loadRevealGuard,
   renderHardLimits,
   renderRevealSchedule,
   renderRevealViolation,
@@ -15,6 +16,8 @@ import {
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { buildOutlinePrompt } from '@modules/ai/prompts';
 import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
+
+import { planTables } from '../knowledge/plan-tables';
 
 const bellRinger: ScheduledReveal = {
   factKey: 'bell_ringer_is_heir',
@@ -51,7 +54,7 @@ function brief(chapter: number, overrides: Record<string, unknown> = {}) {
 }
 
 describe('scheduledReveals', () => {
-  it('should keep only scheduled non-seed facts, ordered by reveal chapter then key', () => {
+  it('should keep the non-seed secrets, ordered by reveal chapter then key, with the undated ones locked last', () => {
     const reveals = scheduledReveals([
       { factKey: 'zeta', revealChapter: 9, terms: ['  ', 'zeta word'], source: 'manual', writerNote: null },
       { factKey: 'alpha', revealChapter: 9, terms: null, source: 'import', writerNote: null },
@@ -61,10 +64,27 @@ describe('scheduledReveals', () => {
     ]);
 
     expect(reveals).toEqual([
-      { factKey: 'early', revealChapter: 2, terms: [], writerNote: null },
-      { factKey: 'alpha', revealChapter: 9, terms: [], writerNote: null },
-      { factKey: 'zeta', revealChapter: 9, terms: ['zeta word'], writerNote: null },
+      { factKey: 'early', revealChapter: 2, terms: [], writerNote: null, unlock: null },
+      { factKey: 'alpha', revealChapter: 9, terms: [], writerNote: null, unlock: null },
+      { factKey: 'zeta', revealChapter: 9, terms: ['zeta word'], writerNote: null, unlock: null },
+      { factKey: 'unscheduled', revealChapter: null, terms: ['x'], writerNote: null, unlock: null },
     ]);
+  });
+
+  it('should lock a conditioned fact for the span unless its unlock holds, and then leave only its date to guard', () => {
+    const unlock = { all: [{ milestone: 'rank_four' }] };
+    const facts = [
+      { factKey: 'rank_four_rule', revealChapter: null, terms: ['fourth rung'], source: 'manual' as const, writerNote: null, unlock },
+      { factKey: 'rank_four_cost', revealChapter: 9, terms: [], source: 'manual' as const, writerNote: null, unlock },
+      { factKey: 'seed_rule', revealChapter: null, terms: [], source: 'seed' as const, writerNote: null, unlock },
+    ];
+
+    expect(scheduledReveals(facts).map(reveal => [reveal.factKey, reveal.revealChapter])).toEqual([
+      ['rank_four_cost', null],
+      ['rank_four_rule', null],
+      ['seed_rule', null],
+    ]);
+    expect(scheduledReveals(facts, () => true).map(reveal => [reveal.factKey, reveal.revealChapter])).toEqual([['rank_four_cost', 9]]);
   });
 });
 
@@ -292,6 +312,65 @@ describe('sanitiseBriefReveals', () => {
 
     expect(JSON.stringify(sanitised)).not.toMatch(/cracked bell|Orrin Vale/i);
     expect(sanitised).toContainEqual({ subject: 'chapter 4', field: 'knowledgeContract.learns', factKey: 'bell_ringer_is_heir', revealChapter: 12 });
+  });
+});
+
+describe('locked reveals', () => {
+  const lampAlive: ScheduledReveal = { factKey: 'lamp_is_alive', revealChapter: null, terms: ['living lamp'], writerNote: null };
+  const rankFour: ScheduledReveal = {
+    factKey: 'lamp_rank_4_rule',
+    revealChapter: null,
+    terms: ['fourth rung'],
+    writerNote: 'The higher ranks cost more.',
+    unlock: { all: [{ milestone: 'lamp_rank_4' }, { chapter: 9 }] },
+  };
+
+  it('should render a locked fact with its condition, hidden for the whole span', () => {
+    expect(renderRevealSchedule([rankFour, lampAlive], { start: 4, end: 4 }).lines).toEqual([
+      'lamp_rank_4_rule — locked until milestone lamp_rank_4 reached and chapter 9 or later: hidden for this whole span; never name: fourth rung',
+      'lamp_is_alive — locked with no reveal planned: hidden for this whole span; never name: living lamp',
+    ]);
+  });
+
+  it('should drop the learn of a locked fact and scrub its terms from every chapter the planner writes', () => {
+    const leaky = brief(40, {
+      objective: 'Mira climbs the fourth rung.',
+      events: ['the living lamp speaks', 'the tide turns'],
+      knowledgeContract: { pov: ['mira'], learns: [{ entityKey: 'mira', factKey: 'lamp_rank_4_rule' }] },
+    });
+
+    const { briefs, sanitised } = sanitiseBriefReveals([leaky], [rankFour, lampAlive]);
+
+    expect(briefs[0]).toMatchObject({ objective: 'The higher ranks cost more.', events: ['the tide turns'], knowledgeContract: { pov: ['mira'], learns: [] } });
+    expect(sanitised.map(({ field, factKey, revealChapter }) => [field, factKey, revealChapter])).toEqual([
+      ['knowledgeContract.learns', 'lamp_rank_4_rule', null],
+      ['events[0]', 'lamp_is_alive', null],
+      ['objective', 'lamp_rank_4_rule', null],
+    ]);
+    expect(renderRevealViolation(sanitised[0] as never)).toBe(
+      'chapter 40 knowledgeContract.learns names lamp_rank_4_rule, which stays locked for this whole span — leave the discovery out',
+    );
+  });
+
+  it('should unlock a conditioned fact for an inserted chapter only when an earlier plan claims its milestone and its chapter term still holds after the shift', async () => {
+    const unlock = { all: [{ milestone: 'lamp_rank_4' }, { chapter: 8 }] };
+    const seed = {
+      milestones: [{ milestoneKey: 'lamp_rank_4', label: 'Fourth rank' }],
+      facts: [
+        { factKey: 'lamp_rank_4_rule', text: 'The fourth rank costs a memory an hour.', unlock, terms: ['fourth rung'] },
+        { factKey: 'lamp_is_alive', text: 'The lamp is alive.' },
+      ],
+    };
+    const claimed = planTables({ ...seed, briefs: [{ chapter: 7, body: 'Mira trains.', claimedMilestones: ['lamp_rank_4'] }] });
+    const unclaimed = planTables(seed);
+
+    const afterEight = await loadRevealGuard(claimed.db as never, 7n, { start: 9, end: 9 }, 8);
+    const afterSeven = await loadRevealGuard(claimed.db as never, 7n, { start: 8, end: 8 }, 7);
+    const nobodyClaims = await loadRevealGuard(unclaimed.db as never, 7n, { start: 9, end: 9 }, 8);
+
+    expect(afterEight.all.map(reveal => reveal.factKey)).toEqual(['lamp_is_alive']);
+    expect(afterSeven.all.map(reveal => reveal.factKey)).toEqual(['lamp_is_alive', 'lamp_rank_4_rule']);
+    expect(nobodyClaims.all.map(reveal => reveal.factKey)).toEqual(['lamp_is_alive', 'lamp_rank_4_rule']);
   });
 });
 

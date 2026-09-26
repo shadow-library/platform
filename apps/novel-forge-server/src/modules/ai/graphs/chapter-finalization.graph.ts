@@ -3,7 +3,7 @@ import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { refusedDraftWriteError, sanitizeMarkdown } from '@server/common';
+import { assertPlanRevealsHold, lockProjectPlan, reachClaimedMilestones, refusedDraftWriteError, sanitizeMarkdown } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
@@ -67,7 +67,8 @@ export interface CommitProseInput {
 
 /**
  * Writes the canonical chapter and marks its draft final in one transaction, bound to the draft revision finalize read and approved:
- * a revise or edit landing in between refuses the commit, so the locked chapter never holds prose the final draft does not.
+ * a revise or edit landing in between refuses the commit, so the locked chapter never holds prose the final draft does not. The commit
+ * is refused while the chapter's plan reveals a locked fact, and reaches the milestones the plan claims.
  */
 export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseInput): Promise<void> {
   const projectId = BigInt(state.projectId);
@@ -76,6 +77,10 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
   logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
 
   await db.transaction(async tx => {
+    // Locks in the order every plan write takes them (project, then chapter and draft rows, then milestones), so a claim cannot move
+    // between the rule check below and the milestones this commit reaches.
+    await lockProjectPlan(tx, projectId);
+    await assertPlanRevealsHold(tx, projectId, state.chapter);
     // `setWhere` makes a finalized chapter immutable at the write path — a locked row is never overwritten, only (re)inserted once.
     await tx
       .insert(schema.chapters)
@@ -115,7 +120,7 @@ export async function commitFinalProse(db: PrimaryDatabase, state: CommitProseIn
       .set({ status: 'final', reviewStatus: 'final', updatedAt: new Date() })
       .where(and(eq(schema.drafts.id, draftId), eq(schema.drafts.revision, state.draftRevision), eq(schema.drafts.reviewStatus, 'approved'), ne(schema.drafts.status, 'final')))
       .returning({ id: schema.drafts.id });
-    if (finalized) return;
+    if (finalized) return reachClaimedMilestones(tx, projectId, state.chapter, state.draftRevision);
 
     const current = await tx.query.drafts.findFirst({ columns: { status: true, revision: true }, where: eq(schema.drafts.id, draftId) });
     if (current?.status === 'final' && current.revision === state.draftRevision) return;

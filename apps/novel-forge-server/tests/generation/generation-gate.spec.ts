@@ -235,7 +235,14 @@ describe('GenerationService.updateBrief', () => {
     const rows = planned.map(row => ({ projectId: 1n, ...row }));
     const tx = {
       select: () => ({ from: () => ({ where: () => ({ for: async () => (existing ? [existing] : []) }) }) }),
-      query: { briefs: { findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(rows, query)[0] } },
+      query: {
+        briefs: { findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(rows, query)[0], findMany: async () => [] },
+        milestones: { findMany: async () => [] },
+        volumes: { findMany: async () => [] },
+        canonFacts: { findMany: async () => [] },
+        projects: { findFirst: async () => ({ storyCurrentChapter: 0 }) },
+        chapters: { findFirst: async () => undefined },
+      },
       insert: () => ({
         values: (values: Record<string, unknown>) => {
           inserted.push(values);

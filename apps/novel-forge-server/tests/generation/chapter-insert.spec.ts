@@ -25,7 +25,7 @@ function chain(result: unknown, onSet?: (values: unknown) => void): Chain {
 function fakeDatabase(
   ledger: { id: bigint; links: Ledger.Links }[],
   planned: Record<string, unknown>[] = [],
-  facts: { id: bigint; unlock: unknown }[] = [],
+  facts: ({ id: bigint; unlock: unknown } & Record<string, unknown>)[] = [],
   written: number[] = [],
 ) {
   const briefs = planned.map(brief => ({ projectId: 1n, ...brief }));
@@ -43,8 +43,10 @@ function fakeDatabase(
         findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(briefs, query)[0],
         findMany: async (query: Parameters<typeof queryRows>[1]) => queryRows(briefs, query),
       },
-      drafts: { findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(drafts, query)[0] },
+      drafts: { findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(drafts, query)[0], findMany: none.findMany },
       volumes: none,
+      milestones: none,
+      canonFacts: { findFirst: none.findFirst, findMany: async () => facts },
     },
     select: () => ({ from: (table: unknown) => chain(table === schema.decisionLedgerEntries ? ledger : table === schema.canonFacts ? facts : []) }),
     update: (table: unknown) => {
@@ -101,6 +103,19 @@ describe('ChapterInsertService.insertAfter', () => {
 
     const unlockWrites = updates.filter(update => update.table === schema.canonFacts && 'unlock' in update.values).map(update => update.values['unlock']);
     expect(unlockWrites).toEqual([{ all: [{ milestone: 'ada_reads_ledger' }, { chapter: 5 }, { chapter: 2 }] }]);
+  });
+
+  it('should run the plan rules in the insert transaction, marking a later plan whose reveal no longer holds', async () => {
+    const planned = [
+      { id: 1n, chapter: 3, body: 'Ada opens the ledger.', knowledgeContract: { pov: ['ada'], learns: [{ entityKey: 'ada', factKey: 'ledger_is_forged' }] }, staleReason: null },
+    ];
+    const facts = [{ id: 5n, factKey: 'ledger_is_forged', revealChapter: null, unlock: null, source: 'manual', plannedChapter: null }];
+    const { databaseService, updates } = fakeDatabase([], planned, facts);
+    const service = new ChapterInsertService(databaseService as never, null as never, null as never, null as never, new FakeAuthoringClaims().asService());
+
+    await service.insertAfter(1n, 1, { briefOrigin: 'hand', briefBody: 'Ada counts the tolls.' });
+
+    expect(updates).toContainEqual({ table: schema.briefs, values: { staleReason: expect.stringContaining('ledger_is_forged (needs a reveal chapter or an unlock condition)') } });
   });
 
   it('should put the new chapter in the volume of the chapter it follows, and never touch a volume row', async () => {

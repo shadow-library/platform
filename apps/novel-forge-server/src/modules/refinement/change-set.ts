@@ -1,5 +1,5 @@
 import { validateBriefScenes, validateUnlockCondition } from '@server/common';
-import { type Bible, type BriefScene, type Generation, type Plan, type Project, type UnlockCondition } from '@server/database';
+import { type Bible, type BriefScene, type Generation, type Knowledge, type Plan, type Project, type UnlockCondition } from '@server/database';
 
 import { HOOK_TYPES, type HookTypeValue } from '../ai/schemas/enums';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
@@ -121,7 +121,7 @@ export interface EntityRemoveOp {
  * it; `constraintNote` is author-only, `writerNote` is the writer-safe instruction shown while the fact
  * is hidden (omitted keeps the current one, blank clears it), and `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
  * a fact enters the ledger through a brief's knowledgeContract and draft approval, nowhere else.
- * `revealChapter` is the schedule, not the ledger: omitted keeps it, a number sets it (1 is open canon), explicit `null` undates the fact — hidden until a plan reveals it.
+ * `revealChapter` is the schedule, not the ledger: omitted keeps it, a number sets it (1 is open canon), explicit `null` undates the fact, which no plan may reveal until it has an unlock condition.
  */
 export interface FactUpsertOp {
   op: 'fact.upsert';
@@ -139,6 +139,20 @@ export interface FactUpsertOp {
 export interface FactRemoveOp {
   op: 'fact.remove';
   factKey: string;
+}
+
+/** A milestone's state follows the plans that claim it and the chapters that reach it, so no op sets it. */
+export interface MilestoneUpsertOp {
+  op: 'milestone.upsert';
+  milestoneKey: string;
+  label?: string;
+  subjectEntityKey?: string | null;
+  kind?: Knowledge.MilestoneKind;
+}
+
+export interface MilestoneRemoveOp {
+  op: 'milestone.remove';
+  milestoneKey: string;
 }
 
 // Action ops drive the pipeline through existing service code. They carry no
@@ -199,7 +213,9 @@ export type ContentOp =
   | EntityUpsertOp
   | EntityRemoveOp
   | FactUpsertOp
-  | FactRemoveOp;
+  | FactRemoveOp
+  | MilestoneUpsertOp
+  | MilestoneRemoveOp;
 
 export type ActionOp =
   GenerateChapterAction | AuditBibleAction | EnhancePremiseAction | JudgeDraftAction | ReviseDraftAction | ApproveDraftAction | ValidateAction | FinalizeAction;
@@ -222,6 +238,8 @@ const CONTENT_MODES = ['standard', 'unrestricted'];
 const VOLUME_STATES = ['not_started', 'active', 'goal_met'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
+const MILESTONE_KINDS = ['rank', 'event', 'learned_from', 'custom'];
+const MILESTONE_KEY = /^\S+$/;
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
@@ -251,7 +269,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
       claimedMilestones: 'string[]|null',
       isEnding: 'boolean',
     },
-    description: `direction is the agreed direction for the chapter; contentMode (${CONTENT_MODES.join(' | ')}, null = the project's) decides how it is written; scenes are [{"summary": <string>, "pov": <entity key or null>}]; claimedMilestones are the milestone keys the chapter reaches; isEnding marks the planned final chapter. volumeKey names the volume whose goal the chapter serves; a new brief without one joins the volume of the nearest planned chapter before it. writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
+    description: `direction is the agreed direction for the chapter; contentMode (${CONTENT_MODES.join(' | ')}, null = the project's) decides how it is written; scenes are [{"summary": <string>, "pov": <entity key or null>}]; claimedMilestones are the milestone keys the chapter reaches — each milestone is claimed by one plan at most; isEnding marks the planned final chapter, and only one plan may carry it. knowledgeContract.learns may name a fact only once the plan reaches its revealChapter and every term of its unlock holds for this plan (its own claimedMilestones and earlier plans' count as reached); an undated fact without an unlock cannot be revealed until it gets one. volumeKey names the volume whose goal the chapter serves; a new brief without one joins the volume of the nearest planned chapter before it. writeMode (one of: ${BRIEF_WRITE_MODES.join(' | ')}) governs batch selection: "external" halts the primary writer's batch at that chapter until it is finalized.`,
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
@@ -275,6 +293,16 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
     },
   },
   'fact.remove': { required: { factKey: 'string' }, optional: {} },
+  'milestone.upsert': {
+    required: { milestoneKey: 'string' },
+    optional: { label: 'string', subjectEntityKey: 'string|null', kind: 'string' },
+    description: `a story event a chapter plan claims to reach and a fact's unlock may name; label is required for a new milestone; subjectEntityKey is the character it concerns (null clears it); kind is one of: ${MILESTONE_KINDS.join(' | ')}. Its state follows the plans and finalized chapters and cannot be set.`,
+  },
+  'milestone.remove': {
+    required: { milestoneKey: 'string' },
+    optional: {},
+    description: "refused while a plan claims the milestone or a fact's unlock names it.",
+  },
   'action.generate_chapter': { required: { chapter: 'number' }, optional: {} },
   'action.audit_bible': { required: {}, optional: {} },
   'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
@@ -473,6 +501,11 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'brief.update' && Array.isArray(record['scenes'])) errors.push(...validateBriefScenes(record['scenes']).map(error => `${path}: ${error}`));
     if (op === 'brief.update' && Array.isArray(record['claimedMilestones']) && (record['claimedMilestones'] as unknown[]).some(key => typeof key !== 'string' || key.trim() === ''))
       errors.push(`${path}: claimedMilestones must hold non-empty milestone keys`);
+    if (op === 'milestone.upsert' && record['kind'] !== undefined && !MILESTONE_KINDS.includes(record['kind'] as string))
+      errors.push(`${path}: kind must be one of ${MILESTONE_KINDS.join(', ')}`);
+    if (op === 'milestone.upsert' && typeof record['label'] === 'string' && record['label'].trim() === '') errors.push(`${path}: label must not be blank`);
+    if (op.startsWith('milestone.') && typeof record['milestoneKey'] === 'string' && !MILESTONE_KEY.test(record['milestoneKey']))
+      errors.push(`${path}: milestoneKey must be a non-empty key without spaces`);
     if (op === 'volume.upsert' && record['state'] !== undefined && !VOLUME_STATES.includes(record['state'] as string))
       errors.push(`${path}: state must be one of ${VOLUME_STATES.join(', ')}`);
     if (op === 'fact.upsert' && typeof record['revealChapter'] === 'number' && record['revealChapter'] < 1) errors.push(`${path}: revealChapter must be >= 1`);
@@ -542,7 +575,7 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     ? `\nknowledgeContract, when present, must be exactly: {"pov": <non-empty array of entity keys>, "learns": <optional array of {"entityKey": <string>, "factKey": <string>}>} — pov bounds what the chapter may state; learns names the facts discovered on-page. A chapter that reveals nothing previously hidden omits the contract entirely; pass null to drop one the brief already carries.`
     : '';
   const factRules = ops.includes('fact.upsert')
-    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — hidden until a plan reveals it. unlock, when present, is {"all": [<one of {"milestone": <key>} | {"volume": <key>} | {"chapter": <number>} | {"ending": true}>, ...]} — the fact may be revealed only once every term holds; allowedClues are observable effects the writer may show while the explanation stays hidden. Omit either to keep it; pass null to clear it.'
+    ? '\nCanon facts are the spoiler ledger: a truth the reader must not learn yet goes in fact.upsert body and NEVER in bible prose, an entity sheet, or a brief — those are visible to the drafter. constraintNote is an author-only note the drafter never sees; writerNote is the writer-safe instruction the drafter gets while the fact is hidden — it must never state or hint at the truth, and without one the fact is withheld from the drafter entirely; terms are the give-away names and phrases the leak scan blocks. In a mystery the reveal schedule IS the plot, so place each reveal deliberately: set revealChapter as the intended beat and stage the matching brief.update knowledgeContract.learns that pays it off. Omit revealChapter to leave the schedule alone; pass null to undate the fact — an undated fact without an unlock stays hidden and no plan may reveal it. unlock, when present, is {"all": [<one of {"milestone": <key>} | {"volume": <key>} | {"chapter": <number>} | {"ending": true}>, ...]} — the fact may be revealed only once every term holds; allowedClues are observable effects the writer may show while the explanation stays hidden. Omit either to keep it; pass null to clear it.'
     : '';
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${contractShape}${knowledgeShape}${factRules}`;
 }
@@ -573,6 +606,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'volume.upsert' || op.op === 'volume.remove') return [`volume:${op.volumeKey}`];
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
+    if (op.op === 'milestone.upsert' || op.op === 'milestone.remove') return [`milestone:${op.milestoneKey}`];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];
   });

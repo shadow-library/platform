@@ -17,12 +17,13 @@ interface ParsedRefs {
   drafts: number[];
   entityKeys: string[];
   factKeys: string[];
+  milestoneKeys: string[];
 }
 
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [], milestoneKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
@@ -33,6 +34,7 @@ function parseRefs(refs: string[]): ParsedRefs {
     else if (ref.startsWith('draft:')) parsed.drafts.push(Number(ref.slice(6)));
     else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
     else if (ref.startsWith('fact:')) parsed.factKeys.push(ref.slice(5));
+    else if (ref.startsWith('milestone:')) parsed.milestoneKeys.push(ref.slice(10));
   }
   return parsed;
 }
@@ -110,6 +112,15 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
       }
       const contentHash = computeContentHash(hashed);
       states[`fact:${row.factKey}`] = { exists: true, revision: null, contentHash };
+    }
+  }
+
+  // State is derived from plans and finalized chapters, so only what an op can write is hashed.
+  if (parsed.milestoneKeys.length > 0) {
+    const rows = await db.query.milestones.findMany({ where: and(eq(schema.milestones.projectId, projectId), inArray(schema.milestones.milestoneKey, parsed.milestoneKeys)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({ label: row.label, subjectEntityKey: row.subjectEntityKey, kind: row.kind });
+      states[`milestone:${row.milestoneKey}`] = { exists: true, revision: null, contentHash };
     }
   }
 

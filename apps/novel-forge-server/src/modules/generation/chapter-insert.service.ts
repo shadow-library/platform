@@ -5,7 +5,16 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { markDescendantDraftsStale, nearestVolumeKey, renderBriefBody, renderSceneEvents, shiftBriefBody, shiftChapterReferences, shiftFactUnlocks } from '@server/common';
+import {
+  enforcePlanWrite,
+  markDescendantDraftsStale,
+  nearestVolumeKey,
+  renderBriefBody,
+  renderSceneEvents,
+  shiftBriefBody,
+  shiftChapterReferences,
+  shiftFactUnlocks,
+} from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type PrimaryDatabase, schema } from '@server/database';
 
@@ -202,6 +211,7 @@ export class ChapterInsertService {
       if (!brief) throw AppErrorCode.S001.create();
 
       await markDescendantDraftsStale(tx, projectId, afterChapter, INSERT_STALE_REASON);
+      await enforcePlanWrite(tx, projectId, [newChapter]);
       return { brief, newChapter, shiftedChapters: shifted.length };
     });
 

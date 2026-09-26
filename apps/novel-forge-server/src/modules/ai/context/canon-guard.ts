@@ -1,7 +1,7 @@
-import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
-import { revealTermPattern } from '@server/common';
-import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
+import { describeUnlockTerm, evaluateUnlock, loadPlanState, nearestVolumeKey, planUnlockContext, revealTermPattern, shiftUnlockChapters } from '@server/common';
+import { type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
 
 import { clipAtBoundary } from './bible-docs';
 import { countTokens } from './token-budget';
@@ -13,9 +13,11 @@ export interface ChapterSpan {
 
 export interface ScheduledReveal {
   factKey: string;
-  revealChapter: number;
+  /** Null when the fact stays locked for the whole span: undated without a condition, or its unlock condition does not hold there. */
+  revealChapter: number | null;
   terms: string[];
   writerNote: string | null;
+  unlock?: UnlockCondition | null;
 }
 
 /** `advised` are the reveals the rendered schedule names, worth one repair; `all` is every later reveal, which the final guard sanitises against. */
@@ -29,7 +31,7 @@ export interface RevealViolation {
   subject: string;
   field: string;
   factKey: string;
-  revealChapter: number;
+  revealChapter: number | null;
 }
 
 interface GuardLines {
@@ -37,7 +39,7 @@ interface GuardLines {
   omitted: number;
 }
 
-type RevealFactRow = Pick<Knowledge.CanonFact, 'factKey' | 'revealChapter' | 'terms' | 'source' | 'writerNote'>;
+type RevealFactRow = Pick<Knowledge.CanonFact, 'factKey' | 'revealChapter' | 'terms' | 'source' | 'writerNote'> & { unlock?: UnlockCondition | null };
 type LimitEntityRow = Pick<Knowledge.Entity, 'entityKey' | 'type' | 'body' | 'notes'>;
 
 interface LimitWorldFactRow {
@@ -76,17 +78,33 @@ function byKey(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Seed facts are reader promises the book obeys openly, so only the author's scheduled secrets are guarded. */
-export function scheduledReveals(facts: readonly RevealFactRow[]): ScheduledReveal[] {
+export function isRevealLocked(reveal: Pick<ScheduledReveal, 'revealChapter'>, chapter: number): boolean {
+  return reveal.revealChapter === null || reveal.revealChapter > chapter;
+}
+
+function byRevealChapter(left: ScheduledReveal, right: ScheduledReveal): number {
+  if (left.revealChapter === right.revealChapter) return byKey(left.factKey, right.factKey);
+  if (left.revealChapter === null) return 1;
+  if (right.revealChapter === null) return -1;
+  return left.revealChapter - right.revealChapter;
+}
+
+/**
+ * Seed facts are reader promises the book obeys openly, so only the author's secrets are guarded: a dated one until its chapter, and an
+ * undated one or one whose unlock does not hold (`unlockHolds` answers for the span) for the whole span. Without `unlockHolds` every
+ * condition counts as unmet.
+ */
+export function scheduledReveals(facts: readonly RevealFactRow[], unlockHolds: (unlock: UnlockCondition) => boolean = () => false): ScheduledReveal[] {
   return facts
-    .filter((fact): fact is RevealFactRow & { revealChapter: number } => fact.revealChapter !== null && fact.source !== 'seed')
-    .map(fact => ({
-      factKey: fact.factKey,
-      revealChapter: fact.revealChapter,
-      terms: (fact.terms ?? []).filter(term => term.trim().length > 0),
-      writerNote: fact.writerNote?.trim() || null,
-    }))
-    .sort((left, right) => left.revealChapter - right.revealChapter || byKey(left.factKey, right.factKey));
+    .flatMap(fact => {
+      const unlock = fact.unlock ?? null;
+      if (fact.source === 'seed' && unlock === null) return [];
+      const locked = unlock === null ? fact.revealChapter === null : !unlockHolds(unlock);
+      if (!locked && fact.revealChapter === null) return [];
+      const terms = (fact.terms ?? []).filter(term => term.trim().length > 0);
+      return [{ factKey: fact.factKey, revealChapter: locked ? null : fact.revealChapter, terms, writerNote: fact.writerNote?.trim() || null, unlock }];
+    })
+    .sort(byRevealChapter);
 }
 
 /** Moves every reveal after `afterChapter` one chapter later, as a chapter insert will once it commits. */
@@ -113,14 +131,20 @@ function termsNote(reveal: ScheduledReveal): string {
   return reveal.terms.length > 0 ? `; never name: ${reveal.terms.join(', ')}` : '';
 }
 
+function lockedLine(reveal: ScheduledReveal): string {
+  const condition = reveal.unlock ? `until ${reveal.unlock.all.map(describeUnlockTerm).join(' and ')}` : 'with no reveal planned';
+  return `${reveal.factKey} — locked ${condition}: hidden for this whole span${termsNote(reveal)}`;
+}
+
 function scheduleLine(reveal: ScheduledReveal, span: ChapterSpan): string {
+  if (reveal.revealChapter === null) return lockedLine(reveal);
   const rule = reveal.revealChapter > span.end ? 'hidden for this whole span' : `nothing before ch ${reveal.revealChapter} may surface it`;
   return `${reveal.factKey} — reveals ch ${reveal.revealChapter}: ${rule}${termsNote(reveal)}`;
 }
 
 // Earliest reveals first: those landing inside the span are the ones a planner is most tempted to pull forward.
 function fitSchedule(reveals: readonly ScheduledReveal[], span: ChapterSpan): { kept: ScheduledReveal[]; lines: string[]; candidates: number } {
-  const candidates = reveals.filter(reveal => reveal.revealChapter > span.start);
+  const candidates = reveals.filter(reveal => isRevealLocked(reveal, span.start));
   return { ...fitLines(candidates, reveal => scheduleLine(reveal, span), REVEAL_SCHEDULE_BUDGET), candidates: candidates.length };
 }
 
@@ -131,15 +155,31 @@ export function renderRevealSchedule(reveals: readonly ScheduledReveal[], span: 
 
 /** The repair only hears about reveals the rendered schedule names; the final guard covers every later reveal regardless. */
 export function revealGuard(reveals: readonly ScheduledReveal[], span: ChapterSpan): RevealGuard {
-  return { advised: fitSchedule(reveals, span).kept, all: reveals.filter(reveal => reveal.revealChapter > span.start) };
+  return { advised: fitSchedule(reveals, span).kept, all: reveals.filter(reveal => isRevealLocked(reveal, span.start)) };
+}
+
+/**
+ * A condition is judged for a plan at the span's first chapter that claims nothing and is not the ending — what a planned slot knows before
+ * the author confirms its claims. With `insertAfter`, plans and chapter terms are read as the insert will leave them.
+ */
+export async function spanUnlockHolds(
+  db: Pick<PrimaryDatabase, 'query'>,
+  projectId: bigint,
+  span: ChapterSpan,
+  insertAfter?: number,
+): Promise<(unlock: UnlockCondition) => boolean> {
+  const [state, volumeKey] = await Promise.all([loadPlanState(db, projectId), nearestVolumeKey(db, projectId, span.start - 1)]);
+  const ctx = planUnlockContext({ chapter: span.start, volumeKey, isEnding: false, claimedMilestones: [] }, state);
+  return unlock => evaluateUnlock(insertAfter === undefined ? unlock : shiftUnlockChapters(unlock, insertAfter), ctx).holds;
 }
 
 export async function loadRevealGuard(db: Pick<PrimaryDatabase, 'query'>, projectId: bigint, span: ChapterSpan, insertAfter?: number): Promise<RevealGuard> {
   const facts = await db.query.canonFacts.findMany({
-    columns: { factKey: true, revealChapter: true, terms: true, source: true, writerNote: true },
-    where: and(eq(schema.canonFacts.projectId, projectId), isNotNull(schema.canonFacts.revealChapter), ne(schema.canonFacts.source, 'seed')),
+    columns: { factKey: true, revealChapter: true, terms: true, source: true, writerNote: true, unlock: true },
+    where: eq(schema.canonFacts.projectId, projectId),
   });
-  return revealGuard(scheduledReveals(insertAfter === undefined ? facts : shiftRevealsForInsert(facts, insertAfter)), span);
+  const unlockHolds = facts.some(fact => fact.unlock) ? await spanUnlockHolds(db, projectId, span, insertAfter) : undefined;
+  return revealGuard(scheduledReveals(insertAfter === undefined ? facts : shiftRevealsForInsert(facts, insertAfter), unlockHolds), span);
 }
 
 export function isLimitCategory(category: string): boolean {
@@ -177,6 +217,11 @@ function firstMentioningField(fields: [string, string | undefined][], reveal: Sc
 }
 
 export function renderRevealViolation({ subject, field, factKey, revealChapter }: RevealViolation): string {
+  if (revealChapter === null) {
+    const locked = 'which stays locked for this whole span';
+    if (field === LEARNS_FIELD) return `${subject} ${LEARNS_FIELD} names ${factKey}, ${locked} — leave the discovery out`;
+    return `${subject} ${field} names a REVEAL SCHEDULE term of ${factKey}, ${locked} — keep it out`;
+  }
   const schedule = `whose reveal is scheduled for chapter ${revealChapter}`;
   if (field === LEARNS_FIELD) return `${subject} ${LEARNS_FIELD} names ${factKey}, ${schedule} — move the discovery there`;
   return `${subject} ${field} names a REVEAL SCHEDULE term of ${factKey}, ${schedule} — keep it out until then`;
@@ -212,7 +257,7 @@ export function findBriefRevealViolations(briefs: readonly PlannedBrief[], revea
       ...(brief.repetitionRisks ?? []).map((risk, index): [string, string] => [`repetitionRisks[${index}]`, risk]),
     ];
     for (const reveal of reveals) {
-      if (reveal.revealChapter <= brief.chapter) continue;
+      if (!isRevealLocked(reveal, brief.chapter)) continue;
       const field = learned.has(reveal.factKey) ? LEARNS_FIELD : firstMentioningField(fields, reveal);
       if (field) violations.push({ subject, field, factKey: reveal.factKey, revealChapter: reveal.revealChapter });
     }
@@ -234,7 +279,8 @@ function firstHit(text: string, reveals: readonly ScheduledReveal[]): ScheduledR
 }
 
 function placeholderFor(reveal: ScheduledReveal, reveals: readonly ScheduledReveal[]): string {
-  return [`(withheld until ch ${reveal.revealChapter})`, '(withheld)'].find(candidate => !firstHit(candidate, reveals)) ?? '…';
+  const candidates = reveal.revealChapter === null ? ['(withheld)'] : [`(withheld until ch ${reveal.revealChapter})`, '(withheld)'];
+  return candidates.find(candidate => !firstHit(candidate, reveals)) ?? '…';
 }
 
 // A writer note stands in for the first sentence it replaces in a field; later sentences it would replace are dropped.
@@ -294,7 +340,7 @@ function sanitiseScene<T extends PlannedScene>(scene: T, path: string, state: Sa
 export function sanitiseBriefReveals<T extends PlannedBrief>(briefs: readonly T[], reveals: readonly ScheduledReveal[]): { briefs: T[]; sanitised: RevealViolation[] } {
   const sanitised: RevealViolation[] = [];
   const safe = briefs.map(brief => {
-    const state: Sanitiser = { subject: `chapter ${brief.chapter}`, reveals: reveals.filter(reveal => reveal.revealChapter > brief.chapter), sanitised };
+    const state: Sanitiser = { subject: `chapter ${brief.chapter}`, reveals: reveals.filter(reveal => isRevealLocked(reveal, brief.chapter)), sanitised };
     if (state.reveals.length === 0) return brief;
     const early = new Set(state.reveals.map(reveal => reveal.factKey));
     const learns = brief.knowledgeContract?.learns;

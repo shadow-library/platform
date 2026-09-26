@@ -5,5 +5,6 @@ export * from './document/bible-document.service';
 export * from './entity/entity.service';
 export * from './fact/fact.service';
 export * from './fact/knowledge-view';
+export * from './milestone/milestone.service';
 export * from './readiness/bible-readiness.service';
 export * from './volume/volume.service';

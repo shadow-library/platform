@@ -110,19 +110,24 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
   const db = {
     select: () => ({
       from: () => ({
-        where: async () => {
-          const row = reads.shift();
-          return row ? [row] : [];
-        },
+        where: () => ({
+          then: (resolve: (rows: unknown[]) => unknown, reject: (error: unknown) => unknown) => {
+            const row = reads.shift();
+            return Promise.resolve(row ? [row] : []).then(resolve, reject);
+          },
+          for: async () => [],
+        }),
       }),
     }),
     query: {
       drafts: { findFirst: async () => reads.shift(), findMany: async () => (options.written ?? [1, 2, 3]).map(chapter => ({ chapter })) },
-      chapters: { findMany: async () => [] },
-      briefs: { findFirst: async () => (knowledge ? { knowledgeContract: { pov: ['keeper'], learns: knowledge.learns } } : undefined) },
+      briefs: { findFirst: async () => (knowledge ? { knowledgeContract: { pov: ['keeper'], learns: knowledge.learns } } : undefined), findMany: async () => [] },
       projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard' }) },
       canonFacts: { findMany: async () => knowledge?.facts ?? [] },
       entities: { findMany: async () => knowledge?.entities ?? [] },
+      milestones: { findMany: async () => [] },
+      volumes: { findMany: async () => [] },
+      chapters: { findFirst: async () => undefined, findMany: async () => [] },
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {

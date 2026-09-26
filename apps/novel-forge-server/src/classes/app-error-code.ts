@@ -57,6 +57,18 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly BRF_004 = AppErrorCode.badRequest('BRF_004', 'Chapter plan scenes are malformed — {reason}');
 
   /*!
+   * Plan Rule Errors
+   */
+  static readonly PLN_001 = AppErrorCode.badRequest('PLN_001', 'The plan for chapter {chapter} reveals facts that are still locked there: {violations}');
+  static readonly PLN_002 = AppErrorCode.conflict('PLN_002', 'Chapter {chapter} is already planned as the ending — clear its ending flag first');
+  static readonly PLN_003 = AppErrorCode.badRequest('PLN_003', 'The plan for chapter {chapter} cannot claim these milestones: {reason}');
+  static readonly PLN_004 = AppErrorCode.conflict(
+    'PLN_004',
+    'The plan for chapter {chapter} reveals facts that are locked there — change the plan before approving or finalizing: {violations}',
+  );
+  static readonly PLN_005 = AppErrorCode.badRequest('PLN_005', 'Chapter {chapter} is finalized — its plan can no longer change');
+
+  /*!
    * Draft Errors
    */
   static readonly DRF_001 = AppErrorCode.notFound('DRF_001', 'Draft not found');
@@ -204,6 +216,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
   static readonly FCT_004 = AppErrorCode.conflict('FCT_004', 'A canon fact with this key already exists in the project');
   static readonly FCT_005 = AppErrorCode.badRequest('FCT_005', 'Unlock condition is malformed — {reason}');
+
+  /*!
+   * Milestone Errors
+   */
+  static readonly MIL_001 = AppErrorCode.notFound('MIL_001', 'Milestone not found');
+  static readonly MIL_002 = AppErrorCode.conflict('MIL_002', 'A milestone with this key already exists in the project');
+  static readonly MIL_003 = AppErrorCode.conflict('MIL_003', 'Milestone {milestoneKey} is still referenced by {references} — remove those references first');
+  static readonly MIL_004 = AppErrorCode.badRequest('MIL_004', 'Milestone subject {entityKey} is not an entity of this novel');
 
   /*!
    * Decision Ledger Errors

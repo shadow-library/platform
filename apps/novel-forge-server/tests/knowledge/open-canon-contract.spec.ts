@@ -50,10 +50,14 @@ describe('loadKnowledgeView under a chapter-one knowledge contract', () => {
   });
 
   it('should still hold a scheduled secret back, and hand this chapter’s own reveal to the reveals section', async () => {
-    const view = await loadKnowledgeView(db(), 7n, 1, contract);
+    const view = await loadKnowledgeView(db(), 7n, 8, contract);
 
     expect(view.reveals.map(fact => fact.factKey)).toEqual(['reveal_1']);
     expect(view.hidden).toEqual([]);
+
+    const early = await loadKnowledgeView(db(), 7n, 1, contract);
+    expect(early.reveals).toEqual([]);
+    expect(early.hidden.map(fact => fact.factKey)).toEqual(['reveal_1']);
 
     const earlier = await loadKnowledgeView(db(), 7n, 1, { pov: ['kaen'], learns: [] });
     expect(earlier.hidden.map(fact => fact.factKey)).toEqual(['reveal_1']);

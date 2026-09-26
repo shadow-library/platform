@@ -21,7 +21,17 @@ const existing: Row = {
 
 function makeService(): { service: GenerationService; written: { values?: Row; set?: Row } } {
   const written: { values?: Row; set?: Row } = {};
+  const milestones = ['mira_rank_2', 'mira_rank_3', 'tide_turns'].map((milestoneKey, index) => ({ id: BigInt(index + 1), milestoneKey, state: 'open', plannedChapter: null }));
   const tx = {
+    query: {
+      briefs: { findMany: async () => [{ ...existing, ...written.set }] },
+      milestones: { findMany: async () => milestones },
+      volumes: { findMany: async () => [] },
+      canonFacts: { findMany: async () => [] },
+      projects: { findFirst: async () => ({ storyCurrentChapter: 0 }) },
+      chapters: { findFirst: async () => undefined },
+    },
+    update: () => ({ set: () => ({ where: async () => undefined }) }),
     select: () => ({ from: () => ({ where: () => ({ for: async () => [existing] }) }) }),
     insert: () => ({
       values: (values: Row) => {

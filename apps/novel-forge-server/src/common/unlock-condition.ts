@@ -1,6 +1,6 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 
-import { type DbExecutor, schema, type UnlockCondition } from '@server/database';
+import { type DbExecutor, schema, type UnlockCondition, type UnlockTerm } from '@server/database';
 
 import { shiftChapterNumber } from './chapter-shift';
 
@@ -32,6 +32,43 @@ export function validateUnlockCondition(value: unknown): string[] {
 
 export function isUnlockCondition(value: unknown): value is UnlockCondition {
   return validateUnlockCondition(value).length === 0;
+}
+
+/** The story point an unlock is evaluated at: a plan for one chapter, with the milestones that count as reached there. */
+export interface UnlockContext {
+  chapter: number;
+  /** The chapter planned as the ending, if any: the ending and every chapter after it (an epilogue) count as at the ending. */
+  endingChapter: number | null;
+  volumeKey: string | null;
+  volumeOrdinals: ReadonlyMap<string, number>;
+  reachedMilestones: ReadonlySet<string>;
+}
+
+export interface UnlockEvaluation {
+  holds: boolean;
+  missing: UnlockTerm[];
+}
+
+function termHolds(term: UnlockTerm, ctx: UnlockContext): boolean {
+  if ('milestone' in term) return ctx.reachedMilestones.has(term.milestone);
+  if ('chapter' in term) return ctx.chapter >= term.chapter;
+  if ('ending' in term) return ctx.endingChapter !== null && ctx.chapter >= ctx.endingChapter;
+  const planOrdinal = ctx.volumeKey === null ? undefined : ctx.volumeOrdinals.get(ctx.volumeKey);
+  const termOrdinal = ctx.volumeOrdinals.get(term.volume);
+  return planOrdinal !== undefined && termOrdinal !== undefined && planOrdinal >= termOrdinal;
+}
+
+/** Every term must hold on its own: milestones carry no order, so reaching a later rank never implies an earlier one. */
+export function evaluateUnlock(condition: UnlockCondition, ctx: UnlockContext): UnlockEvaluation {
+  const missing = condition.all.filter(term => !termHolds(term, ctx));
+  return { holds: missing.length === 0, missing };
+}
+
+export function describeUnlockTerm(term: UnlockTerm): string {
+  if ('milestone' in term) return `milestone ${term.milestone} reached`;
+  if ('volume' in term) return `volume ${term.volume} reached`;
+  if ('chapter' in term) return `chapter ${term.chapter} or later`;
+  return 'the planned ending or later';
 }
 
 export function shiftUnlockChapters(unlock: UnlockCondition, afterChapter: number, delta = 1): UnlockCondition {

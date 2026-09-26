@@ -25,7 +25,7 @@ function buildTemplate(): ChatPromptTemplate {
 
 export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
-  version: '2.4.0',
+  version: '2.5.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },

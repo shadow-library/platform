@@ -4,7 +4,7 @@ import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { normalizeStringList, validateUnlockCondition } from '@server/common';
+import { lockProjectPlan, normalizeStringList, reconcilePlanState, validateUnlockCondition } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
 
@@ -62,7 +62,16 @@ export class FactService {
     const unlockErrors = body.unlock ? validateUnlockCondition(body.unlock) : [];
     if (unlockErrors.length > 0) throw AppErrorCode.FCT_005.create({ reason: unlockErrors.join('; ') });
     await this.assertProject(projectId);
-    const existing = await this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) });
+    await this.db.transaction(async tx => {
+      await lockProjectPlan(tx, projectId);
+      await this.writeFact(tx as unknown as PrimaryDatabase, projectId, factKey, body);
+      await reconcilePlanState(tx, projectId);
+    });
+    return this.get(projectId, factKey);
+  }
+
+  private async writeFact(db: PrimaryDatabase, projectId: bigint, factKey: string, body: UpsertFactBody): Promise<void> {
+    const existing = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) });
     const merged = {
       text: body.text,
       subjects: (body.subjects ?? existing?.subjects ?? null) as never,
@@ -75,28 +84,30 @@ export class FactService {
     };
 
     if (existing) {
-      await this.db
+      await db
         .update(schema.canonFacts)
         .set({ ...merged, updatedAt: new Date() })
         .where(eq(schema.canonFacts.id, existing.id))
         .catch(err => this.databaseService.translateError(err));
     } else {
-      await this.db
+      await db
         .insert(schema.canonFacts)
         .values({ projectId, factKey, ...merged })
         .catch(err => this.databaseService.translateError(err));
     }
-
-    return this.get(projectId, factKey);
   }
 
   async delete(projectId: bigint, factKey: string): Promise<void> {
     await this.assertProject(projectId);
-    const deleted = await this.db
-      .delete(schema.canonFacts)
-      .where(and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)))
-      .returning();
-    if (deleted.length === 0) throw AppErrorCode.FCT_001.create();
+    await this.db.transaction(async tx => {
+      await lockProjectPlan(tx, projectId);
+      const deleted = await tx
+        .delete(schema.canonFacts)
+        .where(and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)))
+        .returning();
+      if (deleted.length === 0) throw AppErrorCode.FCT_001.create();
+      await reconcilePlanState(tx, projectId);
+    });
   }
 
   /**

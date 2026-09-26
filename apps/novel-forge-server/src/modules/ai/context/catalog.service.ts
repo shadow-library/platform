@@ -8,7 +8,7 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { bibleDocExcerpt, bibleDocLabel, bibleDocRef, type BibleDocRow, clipAtBoundary, hasBibleContent, isPlannerOnlyBibleDoc, rankBibleDocs } from './bible-docs';
-import { type ChapterSpan, renderHardLimits, renderRevealSchedule, scheduledReveals, shiftRevealsForInsert } from './canon-guard';
+import { type ChapterSpan, renderHardLimits, renderRevealSchedule, scheduledReveals, shiftRevealsForInsert, spanUnlockHolds } from './canon-guard';
 import { countTokens } from './token-budget';
 
 // A long-running project's chapters/entities grow unboundedly; canon facts and world facts (already
@@ -255,7 +255,8 @@ export class CatalogService {
 
     if (options.span) {
       const { start, end } = options.span;
-      const schedule = renderRevealSchedule(scheduledReveals(canonFacts), options.span);
+      const unlockHolds = canonFacts.some(fact => fact.unlock) ? await spanUnlockHolds(this.db, projectId, options.span, options.insertAfter) : undefined;
+      const schedule = renderRevealSchedule(scheduledReveals(canonFacts, unlockHolds), options.span);
       part('reveal_schedule', `REVEAL SCHEDULE (binding for chapters ${start}–${end}):`, schedule.lines, 'later reveals', schedule.omitted);
       const limits = renderHardLimits(entities, worldFacts);
       part('hard_limits', 'HARD LIMITS (no planned event may break these):', limits.lines, 'further limits', limits.omitted);

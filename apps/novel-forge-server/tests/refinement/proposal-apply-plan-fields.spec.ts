@@ -10,12 +10,16 @@ import { matchesWhere, queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
 
-async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volumes?: Row[]; facts?: Row[] } = {}) {
+async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volumes?: Row[]; facts?: Row[]; milestones?: Row[] } = {}) {
   const seeded = (rows: Row[] = []) => rows.map((row, index) => ({ id: BigInt(index + 1), projectId: 7n, revision: 1, contentHash: null, ...row }));
   const tables = new Map<unknown, Row[]>([
     [schema.briefs, seeded(seed.briefs)],
     [schema.volumes, seeded(seed.volumes)],
     [schema.canonFacts, seeded(seed.facts)],
+    [
+      schema.milestones,
+      seeded(seed.milestones ?? [{ milestoneKey: 'ada_reads_ledger', label: 'Ada reads the ledger', state: 'open', plannedChapter: null, reachedChapter: null }]),
+    ],
     [schema.refinementProposals, []],
   ]);
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
@@ -29,6 +33,8 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
       briefs: finder(schema.briefs),
       volumes: finder(schema.volumes),
       canonFacts: finder(schema.canonFacts),
+      milestones: finder(schema.milestones),
+      chapters: { findFirst: async () => undefined },
     },
     select: () => ({ from: (table: unknown) => ({ where: () => ({ for: async () => rows(table) }) }) }),
     update: (table: unknown) => ({

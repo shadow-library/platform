@@ -23,8 +23,14 @@ function createService(initial: StoredFact): FactService {
   const postgres = {
     query: {
       projects: { findFirst: async () => ({ id: initial.projectId }) },
-      canonFacts: { findFirst: async () => store.current },
+      canonFacts: { findFirst: async () => store.current, findMany: async () => [store.current] },
+      briefs: { findMany: async () => [] },
+      milestones: { findMany: async () => [] },
+      volumes: { findMany: async () => [] },
+      chapters: { findFirst: async () => undefined },
     },
+    select: () => ({ from: () => ({ where: () => ({ for: async () => [] }) }) }),
+    transaction: async (run: (tx: unknown) => Promise<unknown>) => run(postgres),
     update: () => ({
       set: (values: Partial<StoredFact>) => ({
         where: async () => {

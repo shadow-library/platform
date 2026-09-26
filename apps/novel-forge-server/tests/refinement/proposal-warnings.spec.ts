@@ -7,7 +7,7 @@ describe('revealClearWarnings', () => {
     const ops: ChangeOp[] = [{ op: 'fact.upsert', factKey: 'the_vault_is_empty', revealChapter: null }];
     const warnings = revealClearWarnings(ops, new Map([['the_vault_is_empty', 12]]));
     expect(warnings).toEqual([
-      "fact:the_vault_is_empty is scheduled to reveal at chapter 12; this clears that date and returns it to hidden until a plan reveals it — check that's intended.",
+      "fact:the_vault_is_empty is scheduled to reveal at chapter 12; this clears that date, so only an unlock condition can let a plan reveal it — check that's intended.",
     ]);
   });
 

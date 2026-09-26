@@ -42,8 +42,14 @@ function createService(initial: Row): { service: FactService; writes: Row[] } {
   const postgres = {
     query: {
       projects: { findFirst: async () => ({ id: 1n }) },
-      canonFacts: { findFirst: async () => store.current },
+      canonFacts: { findFirst: async () => store.current, findMany: async () => [store.current] },
+      briefs: { findMany: async () => [] },
+      milestones: { findMany: async () => [] },
+      volumes: { findMany: async () => [] },
+      chapters: { findFirst: async () => undefined },
     },
+    select: () => ({ from: () => ({ where: () => ({ for: async () => [] }) }) }),
+    transaction: async (run: (tx: unknown) => Promise<unknown>) => run(postgres),
     update: () => ({
       set: (values: Row) => ({
         where: async () => {

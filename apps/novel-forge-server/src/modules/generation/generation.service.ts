@@ -6,15 +6,19 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import {
+  assertPlanRevealsHold,
   briefContentHash,
   declaredDraftFields,
+  enforcePlanWrite,
   firstUnwrittenChapter,
   isFinalizable,
   ledgerBriefReveals,
+  lockProjectPlan,
   markDescendantDraftsStale,
   nearestVolumeKey,
   normalizeBriefScenes,
   normalizeStringList,
+  planFrontier,
   refusedDraftWriteError,
   revokeProvisionalReveals,
   selectGenerationBatch,
@@ -237,6 +241,8 @@ export class GenerationService {
     if (body.isEnding !== undefined) edits.isEnding = body.isEnding;
 
     const result = await this.db.transaction(async tx => {
+      await lockProjectPlan(tx, projectId);
+      if (chapter <= (await planFrontier(tx, projectId))) throw AppErrorCode.PLN_005.create({ chapter });
       const [existing] = await tx
         .select()
         .from(schema.briefs)
@@ -253,6 +259,7 @@ export class GenerationService {
           set: { ...edits, revision, contentHash, handEdited: true, updatedAt: new Date() },
         })
         .returning();
+      await enforcePlanWrite(tx, projectId, [chapter]);
       return upserted;
     });
     if (!result) throw AppErrorCode.DRF_001.create();
@@ -615,6 +622,8 @@ export class GenerationService {
     // The approval, its audit row and the brief's reveals commit together, and only for the revision the author read.
     // `idempotencyKey` (unique) makes a retried approve a no-op instead of a duplicate approval row.
     const updated = await this.db.transaction(async tx => {
+      await lockProjectPlan(tx, projectId);
+      await assertPlanRevealsHold(tx, projectId, chapter);
       const [row] = await tx
         .update(schema.drafts)
         .set({ reviewStatus: 'approved', updatedAt: new Date() })
@@ -775,6 +784,7 @@ export class GenerationService {
       this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
     } else if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
     if (!isFinalizable(draft)) throw AppErrorCode.CHP_005.create();
+    await assertPlanRevealsHold(this.db, projectId, draft.chapter);
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
     if (draft.chapter > 1) {

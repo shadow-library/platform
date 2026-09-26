@@ -79,7 +79,8 @@ export class UpsertFactBody {
     optional: true,
     nullable: true,
     minimum: 1,
-    description: 'Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact — hidden until a plan reveals it.',
+    description:
+      'Reveal chapter: a number for a dated reveal, 1 for open canon. Omit to keep the current schedule, send null to undate the fact, which no plan may reveal until it has an unlock condition.',
   })
   revealChapter?: number | null;
 

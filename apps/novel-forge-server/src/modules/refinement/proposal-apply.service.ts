@@ -5,12 +5,17 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import {
+  assertMilestoneSubject,
   briefContentHash,
   computeBibleDocHash,
+  enforcePlanWrite,
+  findMilestoneReferences,
+  lockProjectPlan,
   markDescendantDraftsStale,
   nearestVolumeKey,
   normalizeBriefScenes,
   normalizeStringList,
+  planFrontier,
   refusedDraftWriteError,
   revokeProvisionalReveals,
   volumeContentHash,
@@ -40,6 +45,8 @@ import {
   type FactRemoveOp,
   type FactUpsertOp,
   isActionOp,
+  type MilestoneRemoveOp,
+  type MilestoneUpsertOp,
   type PremiseUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
@@ -96,6 +103,9 @@ interface BaselineMismatch {
 // is the engine's to record, never a field a model or author change-set can set.
 type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
 
+// A removed milestone comes back with the chapter that reached it; its planned state is re-derived from the plans.
+type MilestoneRestoreOp = MilestoneUpsertOp & { reachedChapter?: number | null; boundRevision?: number | null };
+
 // The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
 type DraftRestoreOp = DraftUpdateOp & { isolated?: boolean; generator?: Project.ContentGenerator };
 
@@ -140,11 +150,31 @@ export function declinedOpNote(opResults: OpResult[]): string | undefined {
 }
 
 /**
- * A volume can be removed only once no brief names it, and a change-set may list the brief that leaves it after the removal — as may the
- * inverse of one that listed the new volume after the brief moving into it. Removals therefore run last, every other op in its listed order.
+ * A volume can be removed only once no brief names it, and a milestone only once no plan claims it and no fact's unlock names it; a
+ * change-set may list the op that lets go of either after the removal, as may the inverse of one that listed the new record after the op
+ * that took it up. Removals therefore run last, volumes then milestones, every other op in its listed order.
  */
-export function volumeRemovalsLast<T extends { op: string }>(ops: readonly T[]): T[] {
-  return [...ops.filter(op => op.op !== 'volume.remove'), ...ops.filter(op => op.op === 'volume.remove')];
+export function removalsLast<T extends { op: string }>(ops: readonly T[]): T[] {
+  const removal = (kind: string) => ops.filter(op => op.op === kind);
+  return [...ops.filter(op => op.op !== 'volume.remove' && op.op !== 'milestone.remove'), ...removal('volume.remove'), ...removal('milestone.remove')];
+}
+
+const PLAN_STATE_OPS: ReadonlySet<string> = new Set([
+  'brief.update',
+  'brief.remove',
+  'volume.upsert',
+  'volume.remove',
+  'fact.upsert',
+  'fact.remove',
+  'milestone.upsert',
+  'milestone.remove',
+]);
+
+/** Plans, and the facts, volumes and milestones their reveal rule reads, are checked as the whole change-set leaves them, so one op may rely on another. */
+async function enforcePlanOps(tx: PrimaryDatabase, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
+  if (!ops.some(op => PLAN_STATE_OPS.has(op.op))) return;
+  const written = ops.flatMap(op => (op.op === 'brief.update' ? [op.chapter] : []));
+  await enforcePlanWrite(tx, projectId, written);
 }
 
 /** The one gate between an op and the artifact it edits: `rationale` explains the change to the author and is never stored beside the content it describes. */
@@ -244,11 +274,14 @@ export class ProposalApplyService {
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
       const inverseOps: ContentOp[] = [];
-      for (const op of volumeRemovalsLast(contentOps.map(entry => entry.op))) {
+      const selectedContent = contentOps.map(entry => entry.op);
+      if (selectedContent.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
+      for (const op of removalsLast(selectedContent)) {
         const inverse = await this.captureInverse(ctx, op);
         await this.applyOp(ctx, op);
         if (inverse) inverseOps.unshift(inverse);
       }
+      await enforcePlanOps(ctx.tx, projectId, selectedContent);
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
 
       const opResults = this.opResultsFor(ops, selected, declinedNotes);
@@ -422,6 +455,9 @@ export class ProposalApplyService {
       case 'fact.upsert':
       case 'fact.remove':
         return this.inverseFact(ctx, op);
+      case 'milestone.upsert':
+      case 'milestone.remove':
+        return this.inverseMilestone(ctx, op);
     }
   }
 
@@ -539,6 +575,23 @@ export class ProposalApplyService {
     };
   }
 
+  private async inverseMilestone(ctx: ApplyContext, op: MilestoneUpsertOp | MilestoneRemoveOp): Promise<ContentOp | null> {
+    const milestone = await ctx.tx.query.milestones.findFirst({
+      where: and(eq(schema.milestones.projectId, ctx.projectId), eq(schema.milestones.milestoneKey, op.milestoneKey)),
+    });
+    if (!milestone) return op.op === 'milestone.upsert' ? { op: 'milestone.remove', milestoneKey: op.milestoneKey } : null;
+    const inverse: MilestoneRestoreOp = {
+      op: 'milestone.upsert',
+      milestoneKey: op.milestoneKey,
+      label: milestone.label,
+      subjectEntityKey: milestone.subjectEntityKey,
+      kind: milestone.kind,
+      reachedChapter: milestone.reachedChapter,
+      boundRevision: milestone.boundRevision,
+    };
+    return inverse;
+  }
+
   private applyOp(ctx: ApplyContext, incoming: ChangeOp): Promise<void> {
     const op = withoutRationale(incoming);
     switch (op.op) {
@@ -568,6 +621,10 @@ export class ProposalApplyService {
         return this.applyFactUpsert(ctx, op);
       case 'fact.remove':
         return this.applyFactRemove(ctx, op);
+      case 'milestone.upsert':
+        return this.applyMilestoneUpsert(ctx, op);
+      case 'milestone.remove':
+        return this.applyMilestoneRemove(ctx, op);
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit. Reaching here is a programming error, not bad input.
@@ -664,10 +721,15 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: null });
   }
 
-  private async applyBriefUpdate(ctx: ApplyContext, op: BriefRestoreOp): Promise<void> {
-    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
+  /** A plan at or behind the story cursor or the latest finalized chapter is part of canon's history. */
+  private async assertPlanOpen(ctx: ApplyContext, chapter: number): Promise<void> {
+    const project = await ctx.tx.query.projects.findFirst({ columns: { id: true }, where: eq(schema.projects.id, ctx.projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_005.create();
+    if (chapter <= (await planFrontier(ctx.tx, ctx.projectId))) throw AppErrorCode.RFN_005.create();
+  }
+
+  private async applyBriefUpdate(ctx: ApplyContext, op: BriefRestoreOp): Promise<void> {
+    await this.assertPlanOpen(ctx, op.chapter);
 
     const existing = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
 
@@ -707,9 +769,7 @@ export class ProposalApplyService {
   }
 
   private async applyBriefRemove(ctx: ApplyContext, op: BriefRemoveOp): Promise<void> {
-    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
-    if (!project) throw AppErrorCode.PRJ_001.create();
-    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_005.create();
+    await this.assertPlanOpen(ctx, op.chapter);
 
     const deleted = await ctx.tx
       .delete(schema.briefs)
@@ -861,6 +921,46 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
   }
 
+  private async applyMilestoneUpsert(ctx: ApplyContext, op: MilestoneRestoreOp): Promise<void> {
+    const existing = await ctx.tx.query.milestones.findFirst({
+      where: and(eq(schema.milestones.projectId, ctx.projectId), eq(schema.milestones.milestoneKey, op.milestoneKey)),
+    });
+    if (!existing && !op.label?.trim()) throw AppErrorCode.RFN_004.create();
+    const restoring = 'reachedChapter' in op;
+    if (!restoring && op.subjectEntityKey?.trim() && op.subjectEntityKey.trim() !== existing?.subjectEntityKey)
+      await assertMilestoneSubject(ctx.tx, ctx.projectId, op.subjectEntityKey.trim());
+
+    const merged = {
+      label: op.label?.trim() || existing?.label || op.milestoneKey,
+      subjectEntityKey: op.subjectEntityKey === undefined ? (existing?.subjectEntityKey ?? null) : op.subjectEntityKey?.trim() || null,
+      kind: op.kind ?? existing?.kind ?? 'custom',
+    };
+    if (existing) {
+      await ctx.tx
+        .update(schema.milestones)
+        .set({ ...merged, updatedAt: new Date() })
+        .where(eq(schema.milestones.id, existing.id));
+    } else {
+      const reached =
+        typeof op.reachedChapter === 'number'
+          ? { state: 'reached' as const, plannedChapter: op.reachedChapter, reachedChapter: op.reachedChapter, boundRevision: op.boundRevision ?? null }
+          : {};
+      await ctx.tx.insert(schema.milestones).values({ projectId: ctx.projectId, milestoneKey: op.milestoneKey, ...merged, ...reached });
+    }
+    ctx.applied.push({ artifactRef: `milestone:${op.milestoneKey}`, newRevision: null });
+  }
+
+  private async applyMilestoneRemove(ctx: ApplyContext, op: MilestoneRemoveOp): Promise<void> {
+    const references = await findMilestoneReferences(ctx.tx, ctx.projectId, op.milestoneKey);
+    if (references.length > 0) throw AppErrorCode.MIL_003.create({ milestoneKey: op.milestoneKey, references: references.join(', ') });
+    const deleted = await ctx.tx
+      .delete(schema.milestones)
+      .where(and(eq(schema.milestones.projectId, ctx.projectId), eq(schema.milestones.milestoneKey, op.milestoneKey)))
+      .returning();
+    if (deleted.length === 0) throw AppErrorCode.MIL_001.create();
+    ctx.applied.push({ artifactRef: `milestone:${op.milestoneKey}`, newRevision: null });
+  }
+
   /**
    * Undoes an applied proposal by executing its stored inverse ops through the same appliers —
    * same hashing, revision bumps, and staleness propagation as any apply. Guarded
@@ -896,7 +996,9 @@ export class ProposalApplyService {
       if (mismatches.length > 0) return { outcome: 'conflicted' as const, mismatches };
 
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
-      for (const op of volumeRemovalsLast(inverseOps)) await this.applyOp(ctx, op);
+      if (inverseOps.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
+      for (const op of removalsLast(inverseOps)) await this.applyOp(ctx, op);
+      await enforcePlanOps(ctx.tx, projectId, inverseOps);
 
       const [reverted] = await tx
         .update(schema.refinementProposals)

@@ -1,6 +1,6 @@
 import { and, eq, inArray, lt } from 'drizzle-orm';
 
-import { isOpenCanon, type KnowledgeContract, parseKnowledgeContract, revealTermPattern } from '@server/common';
+import { chapterUnlockContext, evaluateUnlock, isOpenCanon, type KnowledgeContract, parseKnowledgeContract, revealRequirements, revealTermPattern } from '@server/common';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 export { type KnowledgeContract, parseKnowledgeContract } from '@server/common';
@@ -94,9 +94,22 @@ export async function loadKnowledgeView(db: KnowledgeDb, projectId: bigint, chap
   }
 
   const learnKeys = new Set(contract.learns.map(reveal => reveal.factKey));
+  // A plan the reveal rule would refuse today (written before it, or left stale by a plan it relied on) reveals nothing to the writer.
+  const learned = facts.filter(fact => learnKeys.has(fact.factKey));
+  if (learned.length > 0) {
+    const ctx = await chapterUnlockContext(
+      db,
+      projectId,
+      chapter,
+      learned.some(fact => fact.unlock),
+    );
+    for (const fact of learned) {
+      if (revealRequirements(fact, ctx).length > 0) learnKeys.delete(fact.factKey);
+    }
+  }
   // Open canon is a rule the whole cast lives under, not a truth anyone had to learn, so a contract narrows what is privately known and never withholds it.
   for (const fact of facts) {
-    if (isOpenCanon(fact.revealChapter) && !learnKeys.has(fact.factKey)) knownKeys.add(fact.factKey);
+    if (isOpenCanon(fact.revealChapter) && !fact.unlock && !learnKeys.has(fact.factKey)) knownKeys.add(fact.factKey);
   }
   return splitKnowledgeView(facts as FactLike[], knownKeys, learnKeys);
 }
@@ -109,8 +122,8 @@ function mustNotResolveKeys(endingContract: unknown): Set<string> {
 
 /**
  * Facts the chapter writer must not read at `chapter`: under a knowledge contract, everything the POV cast neither
- * knows nor learns this chapter; without one, everything whose planned reveal is still ahead or, when unscheduled,
- * that no brief has revealed on the page yet — a manual ledger row can record a character's private knowledge, so it
+ * knows nor may learn this chapter under the reveal rule; without one, everything whose planned reveal is still ahead or whose unlock
+ * does not hold there or, when unscheduled, that no brief has revealed on the page yet — a manual ledger row can record a character's private knowledge, so it
  * never unlocks the writer. A fact the brief's ending contract forbids resolving is hidden either way.
  */
 export async function loadWriterHiddenFactKeys(db: KnowledgeDb, projectId: bigint, chapter: number, facts: Knowledge.CanonFact[]): Promise<Set<string>> {
@@ -145,7 +158,14 @@ async function writerVisibleFactKeys(db: KnowledgeDb, projectId: bigint, chapter
         })
       : [];
   const revealedOnPage = new Set(onPage.map(row => row.factId));
-  return new Set(facts.filter(fact => (fact.revealChapter === null ? revealedOnPage.has(fact.id) : fact.revealChapter <= chapter)).map(fact => fact.factKey));
+  const ctx = await chapterUnlockContext(
+    db,
+    projectId,
+    chapter,
+    facts.some(fact => fact.revealChapter !== null && fact.unlock),
+  );
+  const scheduled = (fact: Knowledge.CanonFact, revealChapter: number): boolean => revealChapter <= chapter && (!fact.unlock || evaluateUnlock(fact.unlock, ctx).holds);
+  return new Set(facts.filter(fact => (fact.revealChapter === null ? revealedOnPage.has(fact.id) : scheduled(fact, fact.revealChapter))).map(fact => fact.factKey));
 }
 
 /** The chapter's writer-hidden facts, minus seed reader promises (which the book obeys openly) — what writer-bound text must never carry. */

@@ -17,8 +17,19 @@ function fakeProject(briefs: Row[], volumes: Row[]) {
   ]);
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
   const transactions: unknown[] = [];
+  const matching = (table: unknown, condition: SQL) => rows(table).filter(row => matchesWhere(row, condition));
   const tx = {
-    select: () => ({ from: (table: unknown) => ({ where: async (condition: SQL) => rows(table).filter(row => matchesWhere(row, condition)) }) }),
+    select: () => ({
+      from: (table: unknown) => ({ where: (condition: SQL) => Object.assign(Promise.resolve(matching(table, condition)), { for: async () => matching(table, condition) }) }),
+    }),
+    query: {
+      briefs: { findMany: async () => rows(schema.briefs) },
+      volumes: { findMany: async () => rows(schema.volumes) },
+      milestones: { findMany: async () => [] },
+      canonFacts: { findMany: async () => [] },
+      projects: { findFirst: async () => undefined },
+      chapters: { findFirst: async () => undefined },
+    },
     update: (table: unknown) => ({
       set: (values: Row) => ({
         where: async (condition: SQL) =>
@@ -61,7 +72,15 @@ describe('ProjectService.reset — authoring claims', () => {
     const deleted: unknown[] = [];
     const tx = {
       select: () => ({ from: () => ({ where: () => ({ for: async () => (claim ? [claim] : []) }) }) }),
-      query: { jobs: { findFirst: async () => job } },
+      query: {
+        jobs: { findFirst: async () => job },
+        briefs: { findMany: async () => [] },
+        milestones: { findMany: async () => [] },
+        volumes: { findMany: async () => [] },
+        canonFacts: { findMany: async () => [] },
+        projects: { findFirst: async () => undefined },
+        chapters: { findFirst: async () => undefined },
+      },
       delete: (table: unknown) => ({ where: async () => void deleted.push(table) }),
     };
     const db = {

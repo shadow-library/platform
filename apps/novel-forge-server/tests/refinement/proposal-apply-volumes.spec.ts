@@ -15,6 +15,8 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
   const tables = new Map<unknown, Row[]>([
     [schema.briefs, (seed.briefs ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 7n, revision: 1, contentHash: null, ...row }))],
     [schema.volumes, (seed.volumes ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 7n, revision: 1, contentHash: null, ...row }))],
+    [schema.canonFacts, []],
+    [schema.milestones, []],
     [schema.refinementProposals, []],
   ]);
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
@@ -27,6 +29,9 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
       projects: { findFirst: async () => ({ id: 7n, premise: null, brief: null, themes: null, instructions: null, storyCurrentChapter: 0 }) },
       briefs: finder(schema.briefs),
       volumes: finder(schema.volumes),
+      canonFacts: finder(schema.canonFacts),
+      milestones: finder(schema.milestones),
+      chapters: { findFirst: async () => undefined },
     },
     select: () => ({ from: (table: unknown) => ({ where: () => ({ for: async () => rows(table) }) }) }),
     update: (table: unknown) => ({

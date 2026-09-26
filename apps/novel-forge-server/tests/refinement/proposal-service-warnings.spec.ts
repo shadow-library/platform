@@ -21,7 +21,7 @@ describe('ProposalService.create — reveal-clear warning always runs, even with
     const proposal = await service.create(7n, { scopeType: 'project', kind: 'chat', changeSet: undateOp, warnings: [] }, executor as never);
 
     expect(proposal.warnings).toEqual([
-      "fact:f1 is scheduled to reveal at chapter 12; this clears that date and returns it to hidden until a plan reveals it — check that's intended.",
+      "fact:f1 is scheduled to reveal at chapter 12; this clears that date, so only an unlock condition can let a plan reveal it — check that's intended.",
     ]);
   });
 

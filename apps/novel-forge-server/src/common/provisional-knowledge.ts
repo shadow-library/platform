@@ -5,6 +5,8 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { parseKnowledgeContract } from './knowledge-contract';
+import { plannedUnlockContexts } from './plan-world';
+import { revealRequirements } from './reveal-rule';
 
 export type KnowledgeLedger = Pick<PrimaryDatabase, 'query' | 'insert' | 'delete'>;
 
@@ -35,6 +37,8 @@ async function writeBriefReveals(db: Pick<PrimaryDatabase, 'insert'>, rows: Brie
 /**
  * Applies a brief's `learns` declarations to the ledger at draft approval — the deterministic alternative to AI extraction. Unknown
  * entity/fact keys are logged and skipped: approval is a human gate and a missed row is recoverable via the manual reveal endpoint.
+ * A learn the reveal rule refuses for the chapter is skipped too, so a plan written before the rule, or left behind by a plan it relied
+ * on, never ledgers a locked fact.
  */
 export async function ledgerBriefReveals(db: Pick<PrimaryDatabase, 'query' | 'insert'>, projectId: bigint, chapter: number): Promise<{ applied: number; skipped: string[] }> {
   const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
@@ -47,12 +51,19 @@ export async function ledgerBriefReveals(db: Pick<PrimaryDatabase, 'query' | 'in
     db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)) }),
     db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) }),
   ]);
-  const factIdByKey = new Map(facts.map(fact => [fact.factKey, fact.id]));
+  const contextAt = await plannedUnlockContexts(
+    db,
+    projectId,
+    facts.some(fact => fact.unlock),
+  );
+  const locked = new Set(facts.filter(fact => revealRequirements(fact, contextAt(chapter)).length > 0).map(fact => fact.factKey));
+  const factIdByKey = new Map(facts.filter(fact => !locked.has(fact.factKey)).map(fact => [fact.factKey, fact.id]));
   const entityIdByKey = new Map(entities.map(entity => [entity.entityKey, entity.id]));
 
   const skipped: string[] = [];
   const rows = new Map<string, BriefRevealRow>();
   for (const reveal of contract.learns) {
+    if (locked.has(reveal.factKey)) continue;
     const factId = factIdByKey.get(reveal.factKey);
     const entityId = entityIdByKey.get(reveal.entityKey);
     if (!factId || !entityId) {
@@ -64,6 +75,7 @@ export async function ledgerBriefReveals(db: Pick<PrimaryDatabase, 'query' | 'in
 
   await writeBriefReveals(db, [...rows.values()]);
   if (skipped.length > 0) logger.warn('brief reveals reference unknown keys — skipped', { projectId, chapter, skipped });
+  if (locked.size > 0) logger.warn('brief reveals the reveal rule refuses at this chapter — skipped', { projectId, chapter, locked: [...locked] });
   return { applied: rows.size, skipped };
 }
 
@@ -86,7 +98,10 @@ export async function revokeProvisionalReveals(db: KnowledgeLedger, projectId: b
 
 async function reledgerRemainingClaims(db: KnowledgeLedger, projectId: bigint, revoked: number[], deleted: LedgerPair[]): Promise<void> {
   const [facts, entities, claimants] = await Promise.all([
-    db.query.canonFacts.findMany({ columns: { id: true, factKey: true }, where: inArray(schema.canonFacts.id, [...new Set(deleted.map(pair => pair.factId))]) }),
+    db.query.canonFacts.findMany({
+      columns: { id: true, factKey: true, revealChapter: true, unlock: true, source: true },
+      where: inArray(schema.canonFacts.id, [...new Set(deleted.map(pair => pair.factId))]),
+    }),
     db.query.entities.findMany({ columns: { id: true, entityKey: true }, where: inArray(schema.entities.id, [...new Set(deleted.map(pair => pair.entityId))]) }),
     db.query.drafts.findMany({
       columns: { chapter: true },
@@ -112,12 +127,18 @@ async function reledgerRemainingClaims(db: KnowledgeLedger, projectId: bigint, r
   });
 
   const wanted = new Set(deleted.map(pairKey));
-  const factIdByKey = new Map(facts.map(fact => [fact.factKey, fact.id]));
+  const factByKey = new Map(facts.map(fact => [fact.factKey, fact]));
   const entityIdByKey = new Map(entities.map(entity => [entity.entityKey, entity.id]));
+  const contextAt = await plannedUnlockContexts(
+    db,
+    projectId,
+    facts.some(fact => fact.unlock),
+  );
   const earliest = new Map<string, BriefRevealRow>();
   for (const brief of briefs) {
     for (const reveal of parseKnowledgeContract(brief.knowledgeContract)?.learns ?? []) {
-      const factId = factIdByKey.get(reveal.factKey);
+      const fact = factByKey.get(reveal.factKey);
+      const factId = fact && revealRequirements(fact, contextAt(brief.chapter)).length === 0 ? fact.id : undefined;
       const entityId = entityIdByKey.get(reveal.entityKey);
       if (!factId || !entityId) continue;
       const key = pairKey({ factId, entityId });

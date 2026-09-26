@@ -27,6 +27,8 @@ export const HUB_PLAYBOOK: ScopePlaybook = {
     'entity.remove',
     'fact.upsert',
     'fact.remove',
+    'milestone.upsert',
+    'milestone.remove',
   ],
   allowedActions: ACTION_TYPES,
 };

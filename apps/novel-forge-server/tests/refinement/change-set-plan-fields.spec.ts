@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { renderOpVocabulary, validateChangeSet, validatePluginChangeSet } from '@modules/refinement';
+import { changeSetRefs, renderOpVocabulary, validateChangeSet, validatePluginChangeSet } from '@modules/refinement';
 import { validateBriefScenes, validateUnlockCondition } from '@server/common';
 
 describe('validateChangeSet — chapter plan fields', () => {
@@ -78,6 +78,41 @@ describe('validateChangeSet — chapter plan fields', () => {
     expect(vocabulary).toContain('{"ending": true}');
     expect(vocabulary).toContain('"isEnding": <boolean, optional>');
     expect(vocabulary).toContain('state is one of: not_started | active | goal_met');
+  });
+});
+
+describe('validateChangeSet — milestones', () => {
+  it('should accept a milestone upsert and removal, and a subject cleared with null', () => {
+    expect(
+      validateChangeSet([
+        { op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', label: 'Mira reaches the fourth rank', kind: 'rank', subjectEntityKey: 'mira' },
+        { op: 'milestone.upsert', milestoneKey: 'tide_turns', subjectEntityKey: null },
+        { op: 'milestone.remove', milestoneKey: 'old_rank' },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('should reject an unknown kind, a blank label, a state the op may not set and a key with spaces', () => {
+    expect(
+      validateChangeSet([
+        { op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', kind: 'level' },
+        { op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', label: '  ' },
+        { op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', state: 'reached' },
+        { op: 'milestone.remove', milestoneKey: 'lamp rank 4' },
+      ]),
+    ).toEqual([
+      'changeSet[0]: kind must be one of rank, event, learned_from, custom',
+      'changeSet[1]: label must not be blank',
+      "changeSet[2]: unexpected field 'state'",
+      'changeSet[3]: milestoneKey must be a non-empty key without spaces',
+    ]);
+  });
+
+  it('should keep milestones out of a plugin change-set and address them by key', () => {
+    expect(validatePluginChangeSet([{ op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', label: 'Fourth rank' }])).toEqual([
+      "changeSet[0]: op 'milestone.upsert' is not allowed for this scope",
+    ]);
+    expect(changeSetRefs([{ op: 'milestone.remove', milestoneKey: 'lamp_rank_4' }])).toEqual(['milestone:lamp_rank_4']);
   });
 });
 

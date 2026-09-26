@@ -17,8 +17,10 @@ async function fakeTransaction(
     query: {
       projects: { findFirst: mock(async () => project) },
       volumes: { findFirst: mock(async () => volumes[0]), findMany: mock(async () => volumes) },
-      briefs: { findFirst: mock(async () => (options.plannedChapter === undefined ? undefined : { chapter: options.plannedChapter })) },
+      briefs: { findFirst: mock(async () => (options.plannedChapter === undefined ? undefined : { chapter: options.plannedChapter })), findMany: mock(async () => []) },
       canonFacts: { findFirst: mock(async () => facts[0]), findMany: mock(async () => facts) },
+      milestones: { findMany: mock(async () => []) },
+      chapters: { findFirst: mock(async () => undefined) },
     },
     delete: () => ({ where: async (condition: unknown) => void deleted.push(condition) }),
     select: () => ({ from: () => ({ where: () => ({ for: async () => [proposal] }) }) }),

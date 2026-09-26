@@ -6,7 +6,7 @@ import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { briefContentHash, ownedBy } from '@server/common';
+import { briefContentHash, lockProjectPlan, ownedBy, reconcilePlanState } from '@server/common';
 import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
 import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
@@ -320,6 +320,7 @@ export class ProjectService {
 
     if (stage === 'plan' || stage === 'all') {
       const unassigned = await this.db.transaction(async tx => {
+        await lockProjectPlan(tx, id);
         const planned = await tx
           .select()
           .from(schema.briefs)
@@ -332,6 +333,7 @@ export class ProjectService {
             .where(eq(schema.briefs.id, brief.id));
         }
         await tx.delete(schema.volumes).where(eq(schema.volumes.projectId, id));
+        await reconcilePlanState(tx, id);
         return planned.length;
       });
       tablesCleared.push('volumes');
@@ -342,7 +344,11 @@ export class ProjectService {
       await this.releaseIdleAuthoringClaim(id);
       await this.db.delete(schema.drafts).where(eq(schema.drafts.projectId, id));
       tablesCleared.push('drafts');
-      await this.db.delete(schema.briefs).where(eq(schema.briefs.projectId, id));
+      await this.db.transaction(async tx => {
+        await lockProjectPlan(tx, id);
+        await tx.delete(schema.briefs).where(eq(schema.briefs.projectId, id));
+        await reconcilePlanState(tx, id);
+      });
       tablesCleared.push('briefs');
       await clearLedgerBriefLinks(this.db, id);
       await this.db.delete(schema.continuityProposals).where(eq(schema.continuityProposals.projectId, id));

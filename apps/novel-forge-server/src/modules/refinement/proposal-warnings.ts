@@ -88,7 +88,7 @@ export function revealClearWarnings(ops: readonly ChangeOp[], datedFacts: Readon
   return ops.filter(isFactUndateOp).flatMap(op => {
     const dated = datedFacts.get(op.factKey);
     if (dated === undefined) return [];
-    return [`fact:${op.factKey} is scheduled to reveal at chapter ${dated}; this clears that date and returns it to hidden until a plan reveals it — check that's intended.`];
+    return [`fact:${op.factKey} is scheduled to reveal at chapter ${dated}; this clears that date, so only an unlock condition can let a plan reveal it — check that's intended.`];
   });
 }
 

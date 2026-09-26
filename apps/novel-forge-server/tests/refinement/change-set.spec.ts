@@ -180,7 +180,7 @@ describe('epistemic ops', () => {
     expect(rendered).toContain('"pov": <non-empty array of entity keys>');
     expect(rendered).toContain('NEVER in bible prose');
     expect(rendered).toContain('the reveal schedule IS the plot');
-    expect(rendered).toContain('pass null to undate the fact — hidden until a plan reveals it');
+    expect(rendered).toContain('pass null to undate the fact — an undated fact without an unlock stays hidden and no plan may reveal it');
     expect(renderOpVocabulary(['volume.upsert'])).not.toContain('knowledgeContract');
     expect(renderOpVocabulary(['brief.update'])).not.toContain('spoiler ledger');
   });

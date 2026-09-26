@@ -141,6 +141,19 @@
 - A fact's unlock condition is a conjunction (milestone reached, volume reached, chapter at least N, at the ending); every writer checks its shape, and only the reveal rule
   decides whether it holds. A fact's `plannedChapter` is provisional; `disclosedInChapter` is set only when the disclosing chapter is finalized, NEVER by planning. The project's
   `ending` is planner-only and MUST NEVER reach a writer pack or a publish payload.
+- **Reveal rule**: a plan for chapter N MAY learn a fact only when every requirement holds for that plan: its dated reveal chapter is at most N, and each unlock term
+  holds, where a milestone counts as reached if a finalized chapter at or before N reached it or this plan or an earlier one claims it, and the ending term holds
+  from the chapter planned as the ending on (an epilogue included). Milestones carry no order. An undated fact without a condition has no planned reveal, and no
+  plan may reveal it. The rule runs on every plan write (hand edit, proposal apply, revert, chapter insert; the insert planner sanitises its own output first)
+  against the plans as the whole write leaves them. A plan whose reveal stops holding because something it relied on changed is never silently rewritten: the plan
+  and its unfinalized draft are marked stale, the draft's approval and the reveals it ledgered are revoked, and approval and finalize refuse that chapter until the
+  plan is fixed; approval ledgers only the learns the rule allows. The writer pack mirrors the rule: a learn it would refuse reveals nothing, and a dated fact past
+  its chapter stays hidden while its unlock does not hold. What a POV character already knows stays known whatever the condition.
+- A plan at or behind the story cursor or the latest finalized chapter MUST NEVER change. Plan writes, fact writes that reconcile plans, and the finalization commit
+  take the project row lock first, so a claim cannot move between a rule check and what it guards.
+- A milestone's state is derived, never authored: `planned` at the earliest chapter whose plan claims it, `open` when none does, `reached` only in the finalization
+  commit of the chapter whose plan claims it, bound to the committed revision. Rewriting or regenerating that chapter's prose keeps the claim; only a plan change
+  moves it. A milestone is claimed by one plan at most and cannot be removed while a plan claims it or a fact's unlock names it. At most one plan is the ending.
 - Insert MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only after the last written chapter
   (a draft after the insert point refuses it with `CHP_009`; plans after it shift) and only while it holds the authoring claim (`CHP_004` otherwise).
 - Entity canon MUST exist as entity records, not cast narrated in a document. `staleReason` is a signal only, but a stale brief blocks generation and a stale draft cannot be approved.
