@@ -20,6 +20,8 @@ function thread(key: string, overrides: Record<string, unknown> = {}) {
     openedChapter: 1,
     lastAdvancedChapter: 1,
     payoffWindow: null,
+    payoffMilestoneKey: null,
+    payoffVolumeKey: null,
     ...overrides,
   } as never;
 }
@@ -88,6 +90,97 @@ describe('selectObligations', () => {
     expect(selectObligations({ chapter: 1, previousEnding: { openQuestion: 'x' }, threads: [], mysteries: [], volume: { volumeKey: 'v', title: null, objective: ' ' } })).toEqual(
       [],
     );
+  });
+
+  it('should surface a promise due once its payoff milestone is reached, ahead of a merely quiet one', () => {
+    const [promise] = selectObligations({
+      chapter: 12,
+      previousEnding: null,
+      threads: [thread('debt', { lastAdvancedChapter: 2 }), thread('oath', { lastAdvancedChapter: 9, payoffMilestoneKey: 'reveal_thief' })],
+      mysteries: [],
+      volume: null,
+      milestoneStates: new Map([['reveal_thief', 'reached']]),
+    });
+
+    expect(promise).toEqual({ kind: 'promise', ref: 'thread:oath', text: 'A promise due now that its payoff milestone is reached: The oath thread' });
+  });
+
+  it('should surface a promise due (not yet overdue) while its payoff volume is active (P4-41b)', () => {
+    const [promise] = selectObligations({
+      chapter: 12,
+      previousEnding: null,
+      threads: [thread('debt', { lastAdvancedChapter: 2 }), thread('oath', { lastAdvancedChapter: 9, payoffVolumeKey: 'vol_01' })],
+      mysteries: [],
+      volume: null,
+      volumeStates: new Map([['vol_01', 'active']]),
+    });
+
+    expect(promise).toEqual({ kind: 'promise', ref: 'thread:oath', text: 'A promise due while its payoff volume is active: The oath thread' });
+  });
+
+  it('should surface a promise as overdue once its payoff volume already met its goal (P4-41b)', () => {
+    const [promise] = selectObligations({
+      chapter: 12,
+      previousEnding: null,
+      threads: [thread('debt', { lastAdvancedChapter: 2 }), thread('oath', { lastAdvancedChapter: 9, payoffVolumeKey: 'vol_01' })],
+      mysteries: [],
+      volume: null,
+      volumeStates: new Map([['vol_01', 'goal_met']]),
+    });
+
+    expect(promise).toEqual({ kind: 'promise', ref: 'thread:oath', text: 'A promise overdue — its payoff volume already met its goal: The oath thread' });
+  });
+
+  it('should rank a promise overdue by its payoff volume ahead of one merely quiet, by staleness on a tie with an authored chapter', () => {
+    const [promise] = selectObligations({
+      chapter: 6,
+      previousEnding: null,
+      threads: [thread('oath', { lastAdvancedChapter: 5, payoffVolumeKey: 'vol_01' }), thread('debt', { lastAdvancedChapter: 1, payoffWindow: 6 })],
+      mysteries: [],
+      volume: null,
+      volumeStates: new Map([['vol_01', 'goal_met']]),
+    });
+
+    // Both are top-ranked (an authored deadline passed; a payoff volume already met its goal) — staleness breaks the tie.
+    expect(promise?.ref).toBe('thread:debt');
+  });
+
+  it('should rank a promise due by an authored chapter ahead of one merely due by an active payoff volume', () => {
+    const [promise] = selectObligations({
+      chapter: 6,
+      previousEnding: null,
+      threads: [thread('oath', { lastAdvancedChapter: 5, payoffVolumeKey: 'vol_01' }), thread('debt', { lastAdvancedChapter: 1, payoffWindow: 6 })],
+      mysteries: [],
+      volume: null,
+      volumeStates: new Map([['vol_01', 'active']]),
+    });
+
+    expect(promise?.ref).toBe('thread:debt');
+  });
+
+  it('should never treat a payoff milestone or volume as due while it has not been reached', () => {
+    const [promise] = selectObligations({
+      chapter: 12,
+      previousEnding: null,
+      threads: [thread('debt', { lastAdvancedChapter: 2 }), thread('oath', { lastAdvancedChapter: 9, payoffMilestoneKey: 'reveal_thief' })],
+      mysteries: [],
+      volume: null,
+      milestoneStates: new Map([['reveal_thief', 'planned']]),
+    });
+
+    expect(promise).toEqual({ kind: 'promise', ref: 'thread:debt', text: 'The longest-quiet promise (quiet since chapter 2, dormant): The debt thread' });
+  });
+
+  it('should exclude a dropped promise from the recap entirely', () => {
+    const obligations = selectObligations({
+      chapter: 12,
+      previousEnding: null,
+      threads: [thread('debt', { status: 'dropped', lastAdvancedChapter: 1 })],
+      mysteries: [],
+      volume: null,
+    });
+
+    expect(obligations).toEqual([]);
   });
 });
 

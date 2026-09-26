@@ -264,6 +264,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly MIL_004 = AppErrorCode.badRequest('MIL_004', 'Milestone subject {entityKey} is not an entity of this novel');
 
   /*!
+   * Promise Errors
+   */
+  static readonly PMS_001 = AppErrorCode.notFound('PMS_001', 'Promise not found');
+  static readonly PMS_002 = AppErrorCode.conflict('PMS_002', 'A {kind} with this key already exists in the project');
+  static readonly PMS_003 = AppErrorCode.badRequest('PMS_003', 'lastAdvancedChapter ({lastAdvancedChapter}) cannot be ahead of the latest chapter ({latest})');
+
+  /*!
    * Decision Ledger Errors
    */
   static readonly LDG_001 = AppErrorCode.notFound('LDG_001', 'Ledger entry not found');

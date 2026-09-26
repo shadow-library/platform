@@ -281,6 +281,88 @@ const OVERRIDE_CASES: Case[] = [
   { name: 'just discussing keeps the reason of an op that was a card anyway', op: mira(), justDiscussing: true, expected: { side: 'card', reason: 'no_quote' } },
 ];
 
+const PROMISE_MESSAGE = 'Mira swore to find who took the ledger, and she means to see it paid off.';
+
+const PROMISE_CASES: Case[] = [
+  {
+    name: 'a new promise the author stated applies',
+    op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'direct' },
+  },
+  {
+    name: 'rewording an existing promise applies',
+    op: { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'she means to see it paid off', quote: 'she means to see it paid off' },
+    existing: ['promise:thread:ledger'],
+    message: PROMISE_MESSAGE,
+    expected: { side: 'direct' },
+  },
+  {
+    name: 'closing a promise as paid off is always a card',
+    op: { op: 'promise.update', kind: 'thread', key: 'ledger', status: 'paid_off', quote: 'she means to see it paid off' },
+    existing: ['promise:thread:ledger'],
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_disposition' },
+  },
+  {
+    name: 'setting a payoff target is not on the allowlist',
+    op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', payoffMilestoneKey: 'reveal_thief', quote: 'she means to see it paid off' },
+    existing: ['promise:thread:ledger'],
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'not_allowlisted' },
+  },
+  {
+    name: 'dropping a promise is always a card',
+    op: { op: 'promise.drop', kind: 'thread', key: 'ledger', quote: 'she means to see it paid off' },
+    existing: ['promise:thread:ledger'],
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'removal' },
+  },
+  {
+    name: 'recording progress on a promise is always a card',
+    op: { op: 'promise.update', kind: 'thread', key: 'ledger', lastAdvancedChapter: 4, quote: 'she means to see it paid off' },
+    existing: ['promise:thread:ledger'],
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_progress' },
+  },
+  {
+    name: 'creating over a dropped promise key is a card, not a hard failure',
+    op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
+    existing: { 'promise:thread:ledger': { label: 'Old ledger promise', status: 'dropped' } },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_reuse' },
+  },
+  {
+    name: 'creating over a closed promise key is a card, not a hard failure',
+    op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
+    existing: { 'promise:thread:ledger': { label: 'Old ledger promise', status: 'closed' } },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_reuse' },
+  },
+  {
+    // P4-41 probe: a plain, already-stated key ('ledger') never needed the key-laundering exemption in the first place — the label's own
+    // words are already in the author's message, so the fix changes nothing here.
+    name: 'P4-41 probe: a plain key like "ledger" still applies once its label is otherwise stated',
+    op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'direct' },
+  },
+  {
+    // P4-41 probe: before the fix, a long descriptive key's own words were exempt from the novelty budget on create, so a model could smuggle
+    // an unstated secret into the key and repeat it in the label for free. The key no longer launders that content.
+    name: 'P4-41 probe: a long descriptive key no longer launders its words into the label on create',
+    op: {
+      op: 'promise.create',
+      kind: 'thread',
+      key: 'mira-secretly-serves-the-tide-queen-as-a-spy',
+      label: 'Mira secretly serves the tide-queen as a spy',
+      quote: 'she means to see it paid off',
+    },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'novel_content' },
+  },
+];
+
 const TABLES: [string, Case[]][] = [
   ['the quote', QUOTE_CASES],
   ['a tentative quote', TENTATIVE_CASES],
@@ -288,6 +370,7 @@ const TABLES: [string, Case[]][] = [
   ['the allowlist', ALLOWLIST_CASES],
   ['always-card rules', ALWAYS_CARD_CASES],
   ['turn overrides', OVERRIDE_CASES],
+  ['promises', PROMISE_CASES],
 ];
 
 for (const [table, cases] of TABLES) {

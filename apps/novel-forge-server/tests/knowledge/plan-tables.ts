@@ -16,6 +16,8 @@ export interface PlanSeed {
   knowledge?: Row[];
   drafts?: Row[];
   chapters?: Row[];
+  plotThreads?: Row[];
+  mysteries?: Row[];
   storyCurrentChapter?: number;
 }
 
@@ -30,6 +32,8 @@ const TABLES = {
   entities: schema.entities,
   characterKnowledge: schema.characterKnowledge,
   chapterReviews: schema.chapterReviews,
+  plotThreads: schema.plotThreads,
+  mysteries: schema.mysteries,
 } as const;
 
 type TableName = keyof typeof TABLES;
@@ -68,6 +72,8 @@ export function planTables(seed: PlanSeed = {}) {
     [schema.drafts, (seed.drafts ?? []).map(withId(DRAFT_DEFAULTS))],
     [schema.entities, (seed.entities ?? []).map(withId({}))],
     [schema.characterKnowledge, (seed.knowledge ?? []).map(row => ({ projectId: 7n, source: 'brief', ...KNOWLEDGE_DEFAULTS, ...row }))],
+    [schema.plotThreads, (seed.plotThreads ?? []).map(withId({ status: 'open', intentionallyOpen: false }))],
+    [schema.mysteries, (seed.mysteries ?? []).map(withId({ status: 'open', intentionallyOpen: false }))],
   ]);
   // Only the ledger's (fact, entity) key is modelled: the one conflict target a plan rule upserts arrays against.
   const upsert = (table: unknown, row: Row, set: Row, setWhere?: SQL): void => {

@@ -126,10 +126,13 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: low-confidence thread skipped for review', { projectId, chapter, threadKey: thread.threadKey });
       continue;
     }
+    const threadWhere = and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.threadKey, thread.threadKey));
+    // Serialises with a concurrent promise.drop or set_payoff, which would otherwise be overwritten by this read's stale status.
+    await tx.select({ id: schema.plotThreads.id }).from(schema.plotThreads).where(threadWhere).for('update');
     // An approved-late proposal from an older chapter must not drag a thread back to the status it had then.
     const existingThread = await tx.query.plotThreads.findFirst({
-      where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.threadKey, thread.threadKey)),
-      columns: { lastAdvancedChapter: true },
+      where: threadWhere,
+      columns: { lastAdvancedChapter: true, status: true, closedChapter: true, intentionallyOpen: true },
     });
     if (existingThread?.lastAdvancedChapter != null && existingThread.lastAdvancedChapter > chapter) {
       logger.warn('applyContinuityDelta: thread already advanced past this chapter, skipping', {
@@ -140,28 +143,28 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       });
       continue;
     }
+    // A dropped thread and a dormant-on-purpose one are the author's own calls (promise.drop, promise.set_payoff) — continuity
+    // extraction never reopens or un-silences one.
+    const dropped = existingThread?.status === 'dropped';
+    const status = dropped ? existingThread.status : thread.status;
+    const closedChapter = dropped ? existingThread.closedChapter : thread.status === 'closed' ? chapter : (existingThread?.closedChapter ?? null);
+    const intentionallyOpen = existingThread ? existingThread.intentionallyOpen : (thread.intentionallyOpen ?? false);
+
     await tx
       .insert(schema.plotThreads)
       .values({
         projectId,
         threadKey: thread.threadKey,
-        status: thread.status,
+        status,
         openedChapter: chapter,
-        closedChapter: thread.status === 'closed' ? chapter : null,
+        closedChapter,
         summary: thread.summary ?? null,
-        intentionallyOpen: thread.intentionallyOpen ?? false,
+        intentionallyOpen,
         lastAdvancedChapter: chapter,
       })
       .onConflictDoUpdate({
         target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
-        set: {
-          status: sql`EXCLUDED.status`,
-          closedChapter: thread.status === 'closed' ? chapter : sql`plot_threads.closed_chapter`,
-          summary: sql`COALESCE(EXCLUDED.summary, plot_threads.summary)`,
-          intentionallyOpen: sql`EXCLUDED.intentionally_open`,
-          lastAdvancedChapter: chapter,
-          updatedAt: new Date(),
-        },
+        set: { status, closedChapter, summary: sql`COALESCE(EXCLUDED.summary, plot_threads.summary)`, intentionallyOpen, lastAdvancedChapter: chapter, updatedAt: new Date() },
       });
   }
 
@@ -170,9 +173,11 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       logger.warn('applyContinuityDelta: low-confidence mystery skipped for review', { projectId, chapter, mysteryKey: mystery.mysteryKey });
       continue;
     }
+    const mysteryWhere = and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.mysteryKey, mystery.mysteryKey));
+    await tx.select({ id: schema.mysteries.id }).from(schema.mysteries).where(mysteryWhere).for('update');
     const existingMystery = await tx.query.mysteries.findFirst({
-      where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.mysteryKey, mystery.mysteryKey)),
-      columns: { lastAdvancedChapter: true },
+      where: mysteryWhere,
+      columns: { lastAdvancedChapter: true, status: true, resolvedChapter: true, intentionallyOpen: true },
     });
     if (existingMystery?.lastAdvancedChapter != null && existingMystery.lastAdvancedChapter > chapter) {
       logger.warn('applyContinuityDelta: mystery already advanced past this chapter, skipping', {
@@ -183,26 +188,32 @@ export async function applyContinuityDelta(tx: ContinuityTransaction, projectId:
       });
       continue;
     }
+    // See the plot-threads block above: a dropped mystery and a dormant-on-purpose one are the author's own calls, never undone by extraction.
+    const mysteryDropped = existingMystery?.status === 'dropped';
+    const mysteryStatus = mysteryDropped ? existingMystery.status : mystery.status;
+    const resolvedChapter = mysteryDropped ? existingMystery.resolvedChapter : mystery.status === 'resolved' ? chapter : (existingMystery?.resolvedChapter ?? null);
+    const mysteryIntentionallyOpen = existingMystery ? existingMystery.intentionallyOpen : (mystery.intentionallyOpen ?? false);
+
     await tx
       .insert(schema.mysteries)
       .values({
         projectId,
         mysteryKey: mystery.mysteryKey,
-        status: mystery.status,
+        status: mysteryStatus,
         question: mystery.question ?? '',
         openedChapter: chapter,
-        resolvedChapter: mystery.status === 'resolved' ? chapter : null,
-        intentionallyOpen: mystery.intentionallyOpen ?? false,
+        resolvedChapter,
+        intentionallyOpen: mysteryIntentionallyOpen,
         truthFactKey: mystery.truthFactKey ?? null,
         lastAdvancedChapter: chapter,
       })
       .onConflictDoUpdate({
         target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
         set: {
-          status: sql`EXCLUDED.status`,
-          resolvedChapter: mystery.status === 'resolved' ? chapter : sql`mysteries.resolved_chapter`,
+          status: mysteryStatus,
+          resolvedChapter,
           question: sql`COALESCE(NULLIF(EXCLUDED.question, ''), mysteries.question)`,
-          intentionallyOpen: sql`EXCLUDED.intentionally_open`,
+          intentionallyOpen: mysteryIntentionallyOpen,
           truthFactKey: sql`COALESCE(EXCLUDED.truth_fact_key, mysteries.truth_fact_key)`,
           lastAdvancedChapter: chapter,
           updatedAt: new Date(),

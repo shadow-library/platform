@@ -158,6 +158,54 @@ export interface MilestoneRemoveOp {
   milestoneKey: string;
 }
 
+export type PromiseKind = 'thread' | 'mystery';
+
+/** A new promise — a thread or a mystery the reader is waiting on. `label` is the thread's summary or the mystery's question. */
+export interface PromiseCreateOp {
+  op: 'promise.create';
+  kind: PromiseKind;
+  key: string;
+  label: string;
+  openedChapter?: number;
+}
+
+/**
+ * Rewords a promise or records that continuity moved it forward. `status` closes it as paid off or reopens it — dropping one goes through
+ * `promise.drop` instead, so a removal-shaped change is always a card.
+ */
+export interface PromiseUpdateOp {
+  op: 'promise.update';
+  kind: PromiseKind;
+  key: string;
+  label?: string;
+  lastAdvancedChapter?: number;
+  status?: 'open' | 'paid_off';
+}
+
+/**
+ * What a promise pays off by — a milestone, a volume, a chapter, or `someday` (explicitly, not by omission) — and whether it is dormant on
+ * purpose. Bundled together because both describe the same disposition: how, or whether, this promise is expected to resolve. Omitting a
+ * payoff field leaves it as it stands; an explicit `null` clears just that one; `someday: true` clears all three at once.
+ */
+export interface PromiseSetPayoffOp {
+  op: 'promise.set_payoff';
+  kind: PromiseKind;
+  key: string;
+  payoffMilestoneKey?: string | null;
+  payoffVolumeKey?: string | null;
+  payoffWindow?: number | null;
+  /** Clears payoffMilestoneKey, payoffVolumeKey and payoffWindow together — the deliberate way to say "someday", rather than leaving every field out. */
+  someday?: boolean;
+  dormant?: boolean;
+}
+
+/** Gives up on a promise without deleting its record — a removal card, like every other op that lets go of something. */
+export interface PromiseDropOp {
+  op: 'promise.drop';
+  kind: PromiseKind;
+  key: string;
+}
+
 /**
  * A hard rule an organise card offers from the notes. It writes no artifact: applying it is the author keeping the rule, which the organise
  * decision recorded in the same transaction turns into a Notebook direction, and undoing the card takes back.
@@ -249,6 +297,10 @@ export type ContentOp =
   | FactRemoveOp
   | MilestoneUpsertOp
   | MilestoneRemoveOp
+  | PromiseCreateOp
+  | PromiseUpdateOp
+  | PromiseSetPayoffOp
+  | PromiseDropOp
   | OrganiseRuleOp;
 
 export type ActionOp =
@@ -287,6 +339,9 @@ const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai'
 const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 const MILESTONE_KINDS = ['rank', 'event', 'learned_from', 'custom'];
 const MILESTONE_KEY = /^\S+$/;
+const PROMISE_KINDS = ['thread', 'mystery'];
+const PROMISE_STATUSES = ['open', 'paid_off'];
+const PROMISE_KEY = /^\S+$/;
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
@@ -355,6 +410,23 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
     optional: {},
     description: "refused while a plan claims the milestone or a fact's unlock names it.",
   },
+  'promise.create': {
+    required: { kind: 'string', key: 'string', label: 'string' },
+    optional: { openedChapter: 'number' },
+    description: `kind is one of: ${PROMISE_KINDS.join(' | ')} — a promise is something the reader is waiting for. label is the thread's summary or the mystery's question.`,
+  },
+  'promise.update': {
+    required: { kind: 'string', key: 'string' },
+    optional: { label: 'string', lastAdvancedChapter: 'number', status: 'string' },
+    description: `status (${PROMISE_STATUSES.join(' | ')}) closes a promise as paid off or reopens it; dropping one uses promise.drop instead. lastAdvancedChapter records the chapter that last moved it forward.`,
+  },
+  'promise.set_payoff': {
+    required: { kind: 'string', key: 'string' },
+    optional: { payoffMilestoneKey: 'string|null', payoffVolumeKey: 'string|null', payoffWindow: 'number|null', someday: 'boolean', dormant: 'boolean' },
+    description:
+      'sets what a promise pays off by — a milestone, a volume, or a chapter number — and whether it is dormant on purpose (silences the obligations recap and the dormant-thread report). Omit a payoff field to leave it; pass null to clear just that one; someday: true clears all three deliberately, instead of leaving every field out.',
+  },
+  'promise.drop': { required: { kind: 'string', key: 'string' }, optional: {}, description: 'gives up on a promise without deleting its record.' },
   'organise.rule': { required: { rule: 'string', optionId: 'string' }, optional: {}, description: 'a hard rule from the notes the author keeps as a Notebook direction.' },
   'action.generate_chapter': { required: { chapter: 'number' }, optional: {} },
   'action.audit_bible': { required: {}, optional: {} },
@@ -588,6 +660,13 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     }
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapter' && typeof record['chapter'] === 'number' && record['chapter'] < 1) errors.push(`${path}: chapter must be >= 1`);
+    if (op.startsWith('promise.') && !PROMISE_KINDS.includes(record['kind'] as string)) errors.push(`${path}: kind must be one of ${PROMISE_KINDS.join(', ')}`);
+    if (op.startsWith('promise.') && typeof record['key'] === 'string' && !PROMISE_KEY.test(record['key'])) errors.push(`${path}: key must be a non-empty key without spaces`);
+    if (op === 'promise.create' && typeof record['label'] === 'string' && record['label'].trim() === '') errors.push(`${path}: label must not be blank`);
+    if (op === 'promise.update' && record['status'] !== undefined && !PROMISE_STATUSES.includes(record['status'] as string))
+      errors.push(`${path}: status must be one of ${PROMISE_STATUSES.join(', ')}`);
+    if (op === 'promise.set_payoff' && record['someday'] === true && ['payoffMilestoneKey', 'payoffVolumeKey', 'payoffWindow'].some(field => record[field] !== undefined))
+      errors.push(`${path}: someday cannot be combined with payoffMilestoneKey, payoffVolumeKey or payoffWindow`);
   });
 
   if (errors.length === 0 && options?.entityMaterialization !== false) errors.push(...validateEntityMaterialization(value, allowedOps));
@@ -689,6 +768,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
     if (op.op === 'fact.upsert' || op.op === 'fact.remove') return [`fact:${op.factKey}`];
     if (op.op === 'milestone.upsert' || op.op === 'milestone.remove') return [`milestone:${op.milestoneKey}`];
+    if (op.op === 'promise.create' || op.op === 'promise.update' || op.op === 'promise.set_payoff' || op.op === 'promise.drop') return [`promise:${op.kind}:${op.key}`];
     if (op.op === 'organise.rule') return [];
     if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];

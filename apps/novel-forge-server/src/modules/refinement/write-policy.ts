@@ -18,7 +18,19 @@ export type CardReason =
   | 'removal'
   | 'novel_content'
   | 'depends_on_card';
-export type AlwaysCardRule = 'removal' | 'action' | 'plan' | 'prose' | 'planner_only_page' | 'replaces_story' | 'secret_truth' | 'secret_gating' | 'volume_structure';
+export type AlwaysCardRule =
+  | 'removal'
+  | 'action'
+  | 'plan'
+  | 'prose'
+  | 'planner_only_page'
+  | 'replaces_story'
+  | 'secret_truth'
+  | 'secret_gating'
+  | 'volume_structure'
+  | 'promise_disposition'
+  | 'promise_progress'
+  | 'promise_reuse';
 
 export interface OpDisposition {
   index: number;
@@ -54,7 +66,15 @@ export interface ChangeSetSplit {
   held: boolean;
 }
 
-export const DIRECT_OP_KINDS: ReadonlySet<OpType> = new Set(['premise.update', 'bible_document.upsert', 'entity.upsert', 'fact.upsert', 'volume.upsert']);
+export const DIRECT_OP_KINDS: ReadonlySet<OpType> = new Set([
+  'premise.update',
+  'bible_document.upsert',
+  'entity.upsert',
+  'fact.upsert',
+  'volume.upsert',
+  'promise.create',
+  'promise.update',
+]);
 
 export const ALWAYS_CARD: Readonly<Partial<Record<OpType, AlwaysCardRule>>> = {
   'bible_document.remove': 'removal',
@@ -64,6 +84,7 @@ export const ALWAYS_CARD: Readonly<Partial<Record<OpType, AlwaysCardRule>>> = {
   'entity.remove': 'removal',
   'fact.remove': 'removal',
   'milestone.remove': 'removal',
+  'promise.drop': 'removal',
   'brief.update': 'plan',
   'draft.update': 'prose',
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
@@ -75,13 +96,19 @@ const REMOVAL_FLOOR = 4;
 const BUDGET_SHARE = 0.25;
 const STORY_FIELDS = declaredOpFields('premise.update');
 const FACT_DIRECT_FIELDS: ReadonlySet<string> = new Set(['factKey', 'body', 'subjects', 'constraintNote', 'terms']);
-const RECORD_KEY_FIELDS = ['entityKey', 'factKey', 'volumeKey', 'milestoneKey', 'section', 'slug', 'name'] as const;
+// A record's identifying key is exempt from the novelty budget once the record exists — but on the op that creates it (P4-41), the key
+// is itself unreviewed written content: a model or author could smuggle a secret into a fresh key and repeat it verbatim in a text field
+// for free. `DISPLAY_KEY_FIELDS` (a page's own ref, an entity's display name) stay exempt either way.
+const IDENTIFIER_KEY_FIELDS = ['entityKey', 'factKey', 'volumeKey', 'milestoneKey', 'key'] as const;
+const DISPLAY_KEY_FIELDS = ['section', 'slug', 'name'] as const;
 const TEXT_FIELDS: Readonly<Partial<Record<OpType, readonly string[]>>> = {
   'premise.update': STORY_FIELDS,
   'bible_document.upsert': ['body', 'frontmatter'],
   'volume.upsert': ['title', 'objective', 'body'],
   'entity.upsert': ['status', 'motivation', 'notes', 'body'],
   'fact.upsert': ['body', 'constraintNote', 'terms'],
+  'promise.create': ['label'],
+  'promise.update': ['label'],
 };
 
 const HEDGE_CUE =
@@ -207,7 +234,10 @@ interface FieldTokens {
 
 function fieldTokens(op: ChangeOp, current: RecordFields | undefined): FieldTokens[] {
   const fields = op as unknown as Record<string, unknown>;
-  const own = new Set(RECORD_KEY_FIELDS.flatMap(field => contentTokens(textOf(fields[field] ?? current?.[field]))));
+  const own = new Set([
+    ...DISPLAY_KEY_FIELDS.flatMap(field => contentTokens(textOf(fields[field] ?? current?.[field]))),
+    ...IDENTIFIER_KEY_FIELDS.flatMap(field => contentTokens(textOf(current?.[field]))),
+  ]);
   return (TEXT_FIELDS[op.op] ?? [])
     .filter(field => fields[field] !== undefined)
     .map(field => ({
@@ -266,6 +296,8 @@ export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCar
   if (op.op === 'premise.update') return STORY_FIELDS.some(field => fields[field] !== undefined && isFilled(current?.[field])) ? 'replaces_story' : undefined;
   if (op.op === 'bible_document.upsert') return isWriterExcludedBibleDoc({ section: op.section, slug: op.slug }) ? 'planner_only_page' : undefined;
   if (op.op === 'volume.upsert') return op.body !== undefined || (current && op.ordinal !== undefined) ? 'volume_structure' : undefined;
+  if (op.op === 'promise.create') return current && current['status'] !== 'open' ? 'promise_reuse' : undefined;
+  if (op.op === 'promise.update') return op.status !== undefined ? 'promise_disposition' : op.lastAdvancedChapter !== undefined ? 'promise_progress' : undefined;
   if (op.op !== 'fact.upsert') return undefined;
   if (current && op.body !== undefined) return 'secret_truth';
   const gates = Object.keys(fields).some(field => declaredOpFields(op.op).includes(field) && !FACT_DIRECT_FIELDS.has(field));
@@ -294,6 +326,8 @@ export function opReferences(op: ChangeOp): string[] {
     return [...subjects, ...unlock];
   }
   if (op.op === 'milestone.upsert') return op.subjectEntityKey ? [`entity:${op.subjectEntityKey}`] : [];
+  if (op.op === 'promise.set_payoff')
+    return [...(op.payoffMilestoneKey ? [`milestone:${op.payoffMilestoneKey}`] : []), ...(op.payoffVolumeKey ? [`volume:${op.payoffVolumeKey}`] : [])];
   if (op.op !== 'brief.update') return [];
 
   const entities = [

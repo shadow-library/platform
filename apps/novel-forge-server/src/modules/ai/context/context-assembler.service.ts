@@ -1260,7 +1260,9 @@ export class ContextAssembler {
     const notesPointer = renderNotesPointer(ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC)?.statement ?? '');
     if (notesPointer) stable.push(section('author_notes', notesPointer, 'approved_intent', caps.authorNotes, { required: true }));
     if (volumes.length > 0) stable.push(section('volume_plan', renderVolumeGoals(volumes), 'approved_intent', caps.volumes, { priority: 0 }));
-    const promises = renderPromises(threads, mysteries, next);
+    const milestoneStates = new Map(milestones.map(milestone => [milestone.milestoneKey, milestone.state]));
+    const volumeStates = new Map(volumes.map(volume => [volume.volumeKey, volume.state]));
+    const promises = renderPromises(threads, mysteries, next, milestoneStates, volumeStates);
     if (promises) stable.push(section('promises', promises, 'canonical', caps.promises, { priority: 1 }));
     const inventory = renderInventory({ entities, pages, facts, worldFacts, milestones });
     if (inventory) stable.push(section('inventory', inventory, 'canonical', caps.inventory, { priority: 2 }));

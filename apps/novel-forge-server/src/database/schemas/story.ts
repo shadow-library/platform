@@ -11,8 +11,8 @@ export namespace Story {
   export type MysteryStatus = InferEnum<typeof mysteryStatus>;
 }
 
-export const threadStatus = pgEnum('thread_status', ['open', 'closed']);
-export const mysteryStatus = pgEnum('mystery_status', ['open', 'resolved']);
+export const threadStatus = pgEnum('thread_status', ['open', 'closed', 'dropped']);
+export const mysteryStatus = pgEnum('mystery_status', ['open', 'resolved', 'dropped']);
 
 export const plotThreads = pgTable(
   'plot_threads',
@@ -33,8 +33,12 @@ export const plotThreads = pgTable(
     lastAdvancedChapter: integer('last_advanced_chapter'),
     // A single target chapter the thread is expected to pay off by. No automated writer yet; the dormant-thread report uses it when present.
     payoffWindow: integer('payoff_window'),
+    // The milestone/volume this promise is meant to pay off by — a loose key like truthFactKey, not an FK, so either can be named before it
+    // exists. A promise with none of payoffMilestoneKey/payoffVolumeKey/payoffWindow set pays off "someday".
+    payoffMilestoneKey: varchar('payoff_milestone_key'),
+    payoffVolumeKey: varchar('payoff_volume_key'),
     // Marked by the outliner/continuity-extraction as a deliberate running thread, not an oversight —
-    // novel-validation must not flag it as an unresolved-thread issue while this is true.
+    // novel-validation must not flag it as an unresolved-thread issue while this is true. Reused as "dormant on purpose" for the promises tracker.
     intentionallyOpen: boolean('intentionally_open').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -79,8 +83,11 @@ export const mysteries = pgTable(
     lastAdvancedChapter: integer('last_advanced_chapter'),
     // A single target chapter the mystery is expected to pay off by — see plotThreads.payoffWindow.
     payoffWindow: integer('payoff_window'),
+    // See plotThreads.payoffMilestoneKey/payoffVolumeKey.
+    payoffMilestoneKey: varchar('payoff_milestone_key'),
+    payoffVolumeKey: varchar('payoff_volume_key'),
     // Marked by the outliner/continuity-extraction as a deliberate running mystery, not an oversight —
-    // novel-validation must not flag it as an unresolved-mystery issue while this is true.
+    // novel-validation must not flag it as an unresolved-mystery issue while this is true. Reused as "dormant on purpose" for the promises tracker.
     intentionallyOpen: boolean('intentionally_open').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

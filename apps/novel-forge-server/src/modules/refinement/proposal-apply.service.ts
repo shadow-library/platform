@@ -26,7 +26,7 @@ import {
   volumeContentHash,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema, type Story } from '@server/database';
 
 import { defaultChapterMode } from '../ai/chapter-route';
 import { runWithCostTier } from '../ai/cost-tier-scope';
@@ -57,6 +57,11 @@ import {
   type MilestoneUpsertOp,
   OP_METADATA_FIELDS,
   type PremiseUpdateOp,
+  type PromiseCreateOp,
+  type PromiseDropOp,
+  type PromiseKind,
+  type PromiseSetPayoffOp,
+  type PromiseUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
@@ -117,6 +122,33 @@ type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
 
 // A removed milestone comes back with the chapter that reached it; its planned state is re-derived from the plans.
 type MilestoneRestoreOp = MilestoneUpsertOp & { reachedChapter?: number | null; boundRevision?: number | null };
+
+// The union of both promise tables' `status` columns — 'closed' is a thread's paid-off value, 'resolved' a mystery's.
+type PromiseDbStatus = 'open' | 'closed' | 'resolved' | 'dropped';
+
+// promise.update's public vocabulary can neither null a progress chapter, a paid-off chapter, or a label, nor name "dropped" (dropping goes
+// through promise.drop) — only a captured inverse needs any of those, so each rides in on its own field rather than widening the ones a
+// model or author can set.
+type PromiseUpdateRestoreOp = PromiseUpdateOp & {
+  restoreLabel?: string | null;
+  restoreLastAdvancedChapter?: number | null;
+  restoreStatus?: PromiseDbStatus;
+  restoreChapterColumn?: number | null;
+};
+// A drop never deletes the row — but the inverse of a promise.create must, since the promise never existed before it.
+type PromiseDropRestoreOp = PromiseDropOp & { hardDelete?: true };
+
+interface PromiseRow {
+  label: string | null;
+  status: PromiseDbStatus;
+  /** `closedChapter` for a thread, `resolvedChapter` for a mystery — the chapter it paid off in, if it has. */
+  chapterColumn: number | null;
+  lastAdvancedChapter: number | null;
+  payoffMilestoneKey: string | null;
+  payoffVolumeKey: string | null;
+  payoffWindow: number | null;
+  intentionallyOpen: boolean;
+}
 
 // The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
 type DraftRestoreOp = DraftUpdateOp & { isolated?: boolean; generator?: Project.ContentGenerator };
@@ -454,6 +486,11 @@ export class ProposalApplyService {
       case 'milestone.upsert':
       case 'milestone.remove':
         return this.inverseMilestone(ctx, op);
+      case 'promise.create':
+      case 'promise.update':
+      case 'promise.set_payoff':
+      case 'promise.drop':
+        return this.inversePromise(ctx, op);
       case 'organise.rule':
         return Promise.resolve(null);
     }
@@ -591,6 +628,82 @@ export class ProposalApplyService {
     return inverse;
   }
 
+  private async findPromiseRow(ctx: ApplyContext, kind: PromiseKind, key: string): Promise<PromiseRow | null> {
+    if (kind === 'thread') {
+      const where = and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.threadKey, key));
+      await ctx.tx.select({ id: schema.plotThreads.id }).from(schema.plotThreads).where(where).for('update');
+      const row = await ctx.tx.query.plotThreads.findFirst({ where });
+      return row
+        ? {
+            label: row.summary,
+            status: row.status,
+            chapterColumn: row.closedChapter,
+            lastAdvancedChapter: row.lastAdvancedChapter,
+            payoffMilestoneKey: row.payoffMilestoneKey,
+            payoffVolumeKey: row.payoffVolumeKey,
+            payoffWindow: row.payoffWindow,
+            intentionallyOpen: row.intentionallyOpen,
+          }
+        : null;
+    }
+    const where = and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.mysteryKey, key));
+    await ctx.tx.select({ id: schema.mysteries.id }).from(schema.mysteries).where(where).for('update');
+    const row = await ctx.tx.query.mysteries.findFirst({ where });
+    return row
+      ? {
+          label: row.question,
+          status: row.status,
+          chapterColumn: row.resolvedChapter,
+          lastAdvancedChapter: row.lastAdvancedChapter,
+          payoffMilestoneKey: row.payoffMilestoneKey,
+          payoffVolumeKey: row.payoffVolumeKey,
+          payoffWindow: row.payoffWindow,
+          intentionallyOpen: row.intentionallyOpen,
+        }
+      : null;
+  }
+
+  /** The highest chapter number that exists at all, drafted or finalized — the bound a promise's `lastAdvancedChapter` may not pass. */
+  private async latestChapterNumber(ctx: ApplyContext): Promise<number> {
+    const [chapter, draft] = await Promise.all([
+      ctx.tx.query.chapters.findFirst({ where: eq(schema.chapters.projectId, ctx.projectId), orderBy: desc(schema.chapters.number), columns: { number: true } }),
+      ctx.tx.query.drafts.findFirst({ where: eq(schema.drafts.projectId, ctx.projectId), orderBy: desc(schema.drafts.chapter), columns: { chapter: true } }),
+    ]);
+    return Math.max(chapter?.number ?? 0, draft?.chapter ?? 0);
+  }
+
+  /** A dropped promise's row is kept (drop never deletes), so only a create's inverse ever hard-deletes — nothing existed before it. */
+  private async inversePromise(ctx: ApplyContext, op: PromiseCreateOp | PromiseUpdateOp | PromiseSetPayoffOp | PromiseDropOp): Promise<ContentOp | null> {
+    const row = await this.findPromiseRow(ctx, op.kind, op.key);
+    if (!row) {
+      if (op.op !== 'promise.create') return null;
+      const inverse: PromiseDropRestoreOp = { op: 'promise.drop', kind: op.kind, key: op.key, hardDelete: true };
+      return inverse;
+    }
+    if (op.op === 'promise.set_payoff') {
+      const inverse: PromiseSetPayoffOp = {
+        op: 'promise.set_payoff',
+        kind: op.kind,
+        key: op.key,
+        payoffMilestoneKey: row.payoffMilestoneKey,
+        payoffVolumeKey: row.payoffVolumeKey,
+        payoffWindow: row.payoffWindow,
+        dormant: row.intentionallyOpen,
+      };
+      return inverse;
+    }
+    const inverse: PromiseUpdateRestoreOp = {
+      op: 'promise.update',
+      kind: op.kind,
+      key: op.key,
+      restoreLabel: row.label,
+      restoreLastAdvancedChapter: row.lastAdvancedChapter,
+      restoreStatus: row.status,
+      restoreChapterColumn: row.chapterColumn,
+    };
+    return inverse;
+  }
+
   private applyOp(ctx: ApplyContext, incoming: ChangeOp): Promise<void> {
     const op = withoutMetadata(incoming);
     switch (op.op) {
@@ -624,6 +737,14 @@ export class ProposalApplyService {
         return this.applyMilestoneUpsert(ctx, op);
       case 'milestone.remove':
         return this.applyMilestoneRemove(ctx, op);
+      case 'promise.create':
+        return this.applyPromiseCreate(ctx, op);
+      case 'promise.update':
+        return this.applyPromiseUpdate(ctx, op);
+      case 'promise.set_payoff':
+        return this.applyPromiseSetPayoff(ctx, op);
+      case 'promise.drop':
+        return this.applyPromiseDrop(ctx, op);
       case 'organise.rule':
         return Promise.resolve();
       default:
@@ -952,12 +1073,138 @@ export class ProposalApplyService {
   private async applyMilestoneRemove(ctx: ApplyContext, op: MilestoneRemoveOp): Promise<void> {
     const references = await findMilestoneReferences(ctx.tx, ctx.projectId, op.milestoneKey);
     if (references.length > 0) throw AppErrorCode.MIL_003.create({ milestoneKey: op.milestoneKey, references: references.join(', ') });
+
+    // A promise's payoff target dangling after the milestone goes is a soft inconsistency, not a correctness hazard like a claimed plan or a
+    // fact's unlock — diagnostic only, so it never blocks the removal a claim or an unlock would.
+    const [namingThreads, namingMysteries] = await Promise.all([
+      ctx.tx.query.plotThreads.findMany({
+        columns: { threadKey: true },
+        where: and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.payoffMilestoneKey, op.milestoneKey)),
+      }),
+      ctx.tx.query.mysteries.findMany({
+        columns: { mysteryKey: true },
+        where: and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.payoffMilestoneKey, op.milestoneKey)),
+      }),
+    ]);
+    if (namingThreads.length > 0 || namingMysteries.length > 0) {
+      this.logger.warn('applyMilestoneRemove: milestone named as a payoff target by promises that will be left pointing at nothing', {
+        projectId: ctx.projectId,
+        milestoneKey: op.milestoneKey,
+        threads: namingThreads.map(t => t.threadKey),
+        mysteries: namingMysteries.map(m => m.mysteryKey),
+      });
+    }
+
     const deleted = await ctx.tx
       .delete(schema.milestones)
       .where(and(eq(schema.milestones.projectId, ctx.projectId), eq(schema.milestones.milestoneKey, op.milestoneKey)))
       .returning();
     if (deleted.length === 0) throw AppErrorCode.MIL_001.create();
     ctx.applied.push({ artifactRef: `milestone:${op.milestoneKey}`, newRevision: null });
+  }
+
+  private async applyPromiseCreate(ctx: ApplyContext, op: PromiseCreateOp): Promise<void> {
+    const existing = await this.findPromiseRow(ctx, op.kind, op.key);
+    if (existing) throw AppErrorCode.PMS_002.create({ kind: op.kind });
+    const openedChapter = op.openedChapter ?? (await nextWritableChapter(ctx.tx, ctx.projectId));
+    if (op.kind === 'thread') {
+      await ctx.tx.insert(schema.plotThreads).values({ projectId: ctx.projectId, threadKey: op.key, status: 'open', summary: op.label, openedChapter });
+    } else {
+      await ctx.tx.insert(schema.mysteries).values({ projectId: ctx.projectId, mysteryKey: op.key, status: 'open', question: op.label, openedChapter });
+    }
+    ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
+  }
+
+  private async applyPromiseUpdate(ctx: ApplyContext, op: PromiseUpdateRestoreOp): Promise<void> {
+    const existing = await this.findPromiseRow(ctx, op.kind, op.key);
+    if (!existing) throw AppErrorCode.PMS_001.create();
+
+    if (op.lastAdvancedChapter !== undefined) {
+      const latest = await this.latestChapterNumber(ctx);
+      if (op.lastAdvancedChapter > latest) throw AppErrorCode.PMS_003.create({ lastAdvancedChapter: String(op.lastAdvancedChapter), latest: String(latest) });
+    }
+
+    const label = op.restoreLabel !== undefined ? op.restoreLabel : op.label !== undefined ? op.label.trim() || existing.label || op.key : existing.label;
+    const lastAdvancedChapter = op.restoreLastAdvancedChapter !== undefined ? op.restoreLastAdvancedChapter : (op.lastAdvancedChapter ?? existing.lastAdvancedChapter);
+    const dbStatus: PromiseDbStatus =
+      op.restoreStatus ?? (op.status === undefined ? existing.status : op.status === 'paid_off' ? (op.kind === 'thread' ? 'closed' : 'resolved') : op.status);
+    // Paying off a promise stamps it with the chapter it happens in; reopening it clears that chapter; leaving status alone keeps it.
+    const chapterColumn =
+      op.restoreChapterColumn !== undefined
+        ? op.restoreChapterColumn
+        : op.status === undefined
+          ? existing.chapterColumn
+          : op.status === 'paid_off'
+            ? await this.latestChapterNumber(ctx)
+            : null;
+
+    if (op.kind === 'thread') {
+      await ctx.tx
+        .update(schema.plotThreads)
+        .set({ summary: label, lastAdvancedChapter, status: dbStatus as Story.ThreadStatus, closedChapter: chapterColumn, updatedAt: new Date() })
+        .where(and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.threadKey, op.key)));
+    } else {
+      await ctx.tx
+        .update(schema.mysteries)
+        .set({
+          question: (label ?? existing.label ?? op.key) as string,
+          lastAdvancedChapter,
+          status: dbStatus as Story.MysteryStatus,
+          resolvedChapter: chapterColumn,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.mysteryKey, op.key)));
+    }
+    ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
+  }
+
+  private async applyPromiseSetPayoff(ctx: ApplyContext, op: PromiseSetPayoffOp): Promise<void> {
+    const existing = await this.findPromiseRow(ctx, op.kind, op.key);
+    if (!existing) throw AppErrorCode.PMS_001.create();
+    const merged = op.someday
+      ? { payoffMilestoneKey: null, payoffVolumeKey: null, payoffWindow: null, intentionallyOpen: op.dormant ?? existing.intentionallyOpen }
+      : {
+          payoffMilestoneKey: op.payoffMilestoneKey !== undefined ? op.payoffMilestoneKey : existing.payoffMilestoneKey,
+          payoffVolumeKey: op.payoffVolumeKey !== undefined ? op.payoffVolumeKey : existing.payoffVolumeKey,
+          payoffWindow: op.payoffWindow !== undefined ? op.payoffWindow : existing.payoffWindow,
+          intentionallyOpen: op.dormant ?? existing.intentionallyOpen,
+        };
+    if (op.kind === 'thread') {
+      await ctx.tx
+        .update(schema.plotThreads)
+        .set({ ...merged, updatedAt: new Date() })
+        .where(and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.threadKey, op.key)));
+    } else {
+      await ctx.tx
+        .update(schema.mysteries)
+        .set({ ...merged, updatedAt: new Date() })
+        .where(and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.mysteryKey, op.key)));
+    }
+    ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
+  }
+
+  /** A drop is a status change, not a delete — the row (and its history) stays; only a captured inverse of a create hard-deletes. */
+  private async applyPromiseDrop(ctx: ApplyContext, op: PromiseDropRestoreOp): Promise<void> {
+    const existing = await this.findPromiseRow(ctx, op.kind, op.key);
+    if (!existing) throw AppErrorCode.PMS_001.create();
+    if (op.hardDelete) {
+      if (op.kind === 'thread') await ctx.tx.delete(schema.plotThreads).where(and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.threadKey, op.key)));
+      else await ctx.tx.delete(schema.mysteries).where(and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.mysteryKey, op.key)));
+      ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
+      return;
+    }
+    if (op.kind === 'thread') {
+      await ctx.tx
+        .update(schema.plotThreads)
+        .set({ status: 'dropped', updatedAt: new Date() })
+        .where(and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.threadKey, op.key)));
+    } else {
+      await ctx.tx
+        .update(schema.mysteries)
+        .set({ status: 'dropped', updatedAt: new Date() })
+        .where(and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.mysteryKey, op.key)));
+    }
+    ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
   }
 
   /**

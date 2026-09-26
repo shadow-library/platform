@@ -25,8 +25,14 @@ export interface PlanObligation {
   text: string;
 }
 
-type ThreadRow = Pick<Story.PlotThread, 'threadKey' | 'summary' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow'>;
-type MysteryRow = Pick<Story.Mystery, 'mysteryKey' | 'question' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow'>;
+type ThreadRow = Pick<
+  Story.PlotThread,
+  'threadKey' | 'summary' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'payoffMilestoneKey' | 'payoffVolumeKey'
+>;
+type MysteryRow = Pick<
+  Story.Mystery,
+  'mysteryKey' | 'question' | 'status' | 'intentionallyOpen' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'payoffMilestoneKey' | 'payoffVolumeKey'
+>;
 
 export interface ObligationSources {
   chapter: number;
@@ -34,6 +40,10 @@ export interface ObligationSources {
   threads: readonly ThreadRow[];
   mysteries: readonly MysteryRow[];
   volume: Pick<Plan.Volume, 'volumeKey' | 'title' | 'objective'> | null;
+  /** Every milestone's state, keyed by milestoneKey — a promise due by milestone becomes the pressing one once its target is reached. */
+  milestoneStates?: ReadonlyMap<string, Knowledge.MilestoneState>;
+  /** Every volume's state, keyed by volumeKey — a promise due by volume becomes the pressing one once its target's goal is met. */
+  volumeStates?: ReadonlyMap<string, Plan.VolumeState>;
 }
 
 export type PlanFact = RevealFact & Pick<Knowledge.CanonFact, 'terms' | 'writerNote'>;
@@ -51,11 +61,17 @@ export interface VettedPlan {
   sanitised: RevealViolation[];
 }
 
+type PromiseDueBy = 'chapter' | 'milestone' | 'volume' | null;
+
 interface PromiseCandidate {
   ref: string;
   label: string;
   quietSince: number;
   payoffWindow: number | null;
+  due: boolean;
+  dueBy: PromiseDueBy;
+  /** P4-41b: a payoff volume's goal being met is past due, not merely due — ranked with an authored chapter window rather than below it. */
+  overdue: boolean;
 }
 
 function text(value: unknown): string | null {
@@ -72,37 +88,74 @@ function hookObligation(chapter: number, ending: unknown): PlanObligation | null
   return { kind: 'hook', ref: `chapter:${chapter - 1}`, text: `Chapter ${chapter - 1} ends on ${question ? `"${question}"` : 'its handoff'}${opens}` };
 }
 
-function byUrgency(chapter: number) {
-  const due = (candidate: PromiseCandidate): boolean => candidate.payoffWindow !== null && candidate.payoffWindow <= chapter;
-  return (left: PromiseCandidate, right: PromiseCandidate): number => {
-    if (due(left) !== due(right)) return due(left) ? -1 : 1;
-    if (due(left) && left.payoffWindow !== right.payoffWindow) return (left.payoffWindow as number) - (right.payoffWindow as number);
-    if (left.quietSince !== right.quietSince) return left.quietSince - right.quietSince;
-    return left.ref < right.ref ? -1 : left.ref > right.ref ? 1 : 0;
+/**
+ * Overdue (an authored chapter window passed, or a payoff volume's goal was already met) outranks merely due (a payoff milestone reached,
+ * or a payoff volume now active — P4-41b), which outranks not due; ties break by longest-quiet, then by ref.
+ */
+function byUrgency(left: PromiseCandidate, right: PromiseCandidate): number {
+  const rank = (candidate: PromiseCandidate): number => (candidate.overdue ? 0 : candidate.due ? 1 : 2);
+  const byRank = rank(left) - rank(right);
+  if (byRank !== 0) return byRank;
+  if (rank(left) === 0 && left.dueBy === 'chapter' && right.dueBy === 'chapter' && left.payoffWindow !== right.payoffWindow)
+    return (left.payoffWindow as number) - (right.payoffWindow as number);
+  if (left.quietSince !== right.quietSince) return left.quietSince - right.quietSince;
+  return left.ref < right.ref ? -1 : left.ref > right.ref ? 1 : 0;
+}
+
+type PromiseTiming = Pick<ThreadRow, 'lastAdvancedChapter' | 'openedChapter' | 'payoffWindow' | 'payoffMilestoneKey' | 'payoffVolumeKey'>;
+
+function candidate(
+  kind: 'thread' | 'mystery',
+  key: string,
+  label: string,
+  row: PromiseTiming,
+  chapter: number,
+  milestoneStates: ReadonlyMap<string, Knowledge.MilestoneState> | undefined,
+  volumeStates: ReadonlyMap<string, Plan.VolumeState> | undefined,
+): PromiseCandidate {
+  const dueByChapter = row.payoffWindow !== null && row.payoffWindow <= chapter;
+  const dueByMilestone = row.payoffMilestoneKey !== null && milestoneStates?.get(row.payoffMilestoneKey) === 'reached';
+  // P4-41b: the payoff volume being the one now underway is the reminder to close the promise before it wraps; the volume already having
+  // met its goal is the promise having missed that window — overdue, not merely due.
+  const volumeState = row.payoffVolumeKey !== null ? volumeStates?.get(row.payoffVolumeKey) : undefined;
+  const dueByVolume = volumeState === 'active';
+  const overdueByVolume = volumeState === 'goal_met';
+  const dueBy: PromiseDueBy = dueByChapter ? 'chapter' : dueByMilestone ? 'milestone' : dueByVolume || overdueByVolume ? 'volume' : null;
+  return {
+    ref: `${kind}:${key}`,
+    label,
+    quietSince: row.lastAdvancedChapter ?? row.openedChapter ?? 0,
+    payoffWindow: row.payoffWindow,
+    due: dueBy !== null,
+    dueBy,
+    overdue: dueByChapter || overdueByVolume,
   };
 }
 
-type PromiseTiming = Pick<ThreadRow, 'lastAdvancedChapter' | 'openedChapter' | 'payoffWindow'>;
-
-function candidate(kind: 'thread' | 'mystery', key: string, label: string, row: PromiseTiming): PromiseCandidate {
-  return { ref: `${kind}:${key}`, label, quietSince: row.lastAdvancedChapter ?? row.openedChapter ?? 0, payoffWindow: row.payoffWindow };
-}
-
-/** A promise due by this chapter comes first, then the one quiet the longest; a promise dormant on purpose is never an obligation. */
+/**
+ * A promise overdue — an authored chapter window passed, or its payoff volume already met its goal — comes first; then one merely due (its
+ * payoff milestone reached, or its payoff volume now active); otherwise the one quiet the longest. A promise dormant on purpose is never an
+ * obligation.
+ */
 function promiseObligation(sources: ObligationSources): PlanObligation | null {
-  const { chapter } = sources;
+  const { chapter, milestoneStates, volumeStates } = sources;
   const flagged = new Map(computeDormantThreads(sources.threads, sources.mysteries, chapter - 1).map(entry => [`${entry.kind}:${entry.key}`, entry.reason]));
   const open = <T extends { status: string; intentionallyOpen: boolean }>(row: T): boolean => row.status === 'open' && !row.intentionallyOpen;
   const candidates: PromiseCandidate[] = [
-    ...sources.threads.filter(open).map(row => candidate('thread', row.threadKey, row.summary?.trim() || row.threadKey, row)),
-    ...sources.mysteries.filter(open).map(row => candidate('mystery', row.mysteryKey, row.question, row)),
+    ...sources.threads.filter(open).map(row => candidate('thread', row.threadKey, row.summary?.trim() || row.threadKey, row, chapter, milestoneStates, volumeStates)),
+    ...sources.mysteries.filter(open).map(row => candidate('mystery', row.mysteryKey, row.question, row, chapter, milestoneStates, volumeStates)),
   ];
-  const [top] = candidates.sort(byUrgency(chapter));
+  const [top] = candidates.sort(byUrgency);
   if (!top) return null;
   const reason = flagged.get(top.ref);
-  if (top.payoffWindow !== null && top.payoffWindow <= chapter) {
+  if (top.dueBy === 'chapter') {
     const when = reason === 'overdue' ? `was due by chapter ${top.payoffWindow}` : `is due by chapter ${top.payoffWindow}`;
     return { kind: 'promise', ref: top.ref, text: `A promise that ${when}: ${top.label}` };
+  }
+  if (top.dueBy === 'milestone') return { kind: 'promise', ref: top.ref, text: `A promise due now that its payoff milestone is reached: ${top.label}` };
+  if (top.dueBy === 'volume') {
+    const line = top.overdue ? `A promise overdue — its payoff volume already met its goal: ${top.label}` : `A promise due while its payoff volume is active: ${top.label}`;
+    return { kind: 'promise', ref: top.ref, text: line };
   }
   const quiet = top.quietSince > 0 ? `quiet since chapter ${top.quietSince}` : 'not moved since it opened';
   const dormant = reason === 'dormant' ? ', dormant' : '';

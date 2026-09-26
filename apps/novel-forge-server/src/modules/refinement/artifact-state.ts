@@ -3,6 +3,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { computeContentHash } from '@server/common';
 import { type Bible, type DbExecutor, schema } from '@server/database';
 
+import { type PromiseKind } from './change-set';
+
 export interface ArtifactState {
   exists: boolean;
   revision: number | null;
@@ -18,12 +20,13 @@ interface ParsedRefs {
   entityKeys: string[];
   factKeys: string[];
   milestoneKeys: string[];
+  promiseKeys: { kind: PromiseKind; key: string; ref: string }[];
 }
 
 export const MISSING_ARTIFACT: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [], milestoneKeys: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], chapters: [], drafts: [], entityKeys: [], factKeys: [], milestoneKeys: [], promiseKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
@@ -35,6 +38,10 @@ function parseRefs(refs: string[]): ParsedRefs {
     else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
     else if (ref.startsWith('fact:')) parsed.factKeys.push(ref.slice(5));
     else if (ref.startsWith('milestone:')) parsed.milestoneKeys.push(ref.slice(10));
+    else if (ref.startsWith('promise:')) {
+      const [kind = '', ...rest] = ref.slice(8).split(':');
+      parsed.promiseKeys.push({ kind: kind as PromiseKind, key: rest.join(':'), ref });
+    }
   }
   return parsed;
 }
@@ -124,6 +131,41 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
     }
   }
 
+  const threadKeys = parsed.promiseKeys.filter(p => p.kind === 'thread').map(p => p.key);
+  const mysteryKeys = parsed.promiseKeys.filter(p => p.kind === 'mystery').map(p => p.key);
+  if (threadKeys.length > 0) {
+    const rows = await db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({
+        label: row.summary,
+        status: row.status,
+        closedChapter: row.closedChapter,
+        lastAdvancedChapter: row.lastAdvancedChapter,
+        payoffWindow: row.payoffWindow,
+        payoffMilestoneKey: row.payoffMilestoneKey,
+        payoffVolumeKey: row.payoffVolumeKey,
+        intentionallyOpen: row.intentionallyOpen,
+      });
+      states[`promise:thread:${row.threadKey}`] = { exists: true, revision: null, contentHash };
+    }
+  }
+  if (mysteryKeys.length > 0) {
+    const rows = await db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({
+        label: row.question,
+        status: row.status,
+        resolvedChapter: row.resolvedChapter,
+        lastAdvancedChapter: row.lastAdvancedChapter,
+        payoffWindow: row.payoffWindow,
+        payoffMilestoneKey: row.payoffMilestoneKey,
+        payoffVolumeKey: row.payoffVolumeKey,
+        intentionallyOpen: row.intentionallyOpen,
+      });
+      states[`promise:mystery:${row.mysteryKey}`] = { exists: true, revision: null, contentHash };
+    }
+  }
+
   return states;
 }
 
@@ -139,7 +181,9 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
   const parsed = parseRefs(existing);
   const records = new Map<string, RecordFields>(existing.map(ref => [ref, {}]));
 
-  const [project, docs, volumes, entities, facts] = await Promise.all([
+  const threadKeys = parsed.promiseKeys.filter(p => p.kind === 'thread').map(p => p.key);
+  const mysteryKeys = parsed.promiseKeys.filter(p => p.kind === 'mystery').map(p => p.key);
+  const [project, docs, volumes, entities, facts, threads, mysteries] = await Promise.all([
     parsed.premise ? db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }) : undefined,
     parsed.docs.length > 0
       ? db.query.bibleDocuments.findMany({
@@ -159,6 +203,8 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
     parsed.volumeKeys.length > 0 ? db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) }) : [],
     parsed.entityKeys.length > 0 ? db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, parsed.entityKeys)) }) : [],
     parsed.factKeys.length > 0 ? db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) }) : [],
+    threadKeys.length > 0 ? db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) }) : [],
+    mysteryKeys.length > 0 ? db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
   ]);
 
   if (project) records.set('premise', { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
@@ -182,5 +228,7 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
       allowedClues: row.allowedClues,
     });
   }
+  for (const row of threads) records.set(`promise:thread:${row.threadKey}`, { label: row.summary, lastAdvancedChapter: row.lastAdvancedChapter, status: row.status });
+  for (const row of mysteries) records.set(`promise:mystery:${row.mysteryKey}`, { label: row.question, lastAdvancedChapter: row.lastAdvancedChapter, status: row.status });
   return records;
 }

@@ -189,6 +189,37 @@ describe('renderVolumeGoals', () => {
 });
 
 describe('renderPromises', () => {
+  it('should exclude a dropped promise entirely', () => {
+    const threads = [
+      {
+        threadKey: 'gone',
+        status: 'dropped',
+        summary: 'Gone',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: null,
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+      {
+        threadKey: 'plain',
+        status: 'open',
+        summary: 'Plain',
+        openedChapter: 2,
+        lastAdvancedChapter: 2,
+        payoffWindow: null,
+        payoffMilestoneKey: null,
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+    ];
+    const rendered = renderPromises(threads as never, [], 3);
+
+    expect(rendered).not.toContain('gone');
+    expect(rendered).toContain('thread:plain');
+  });
+
   it('should list due promises first and those resting on purpose last', () => {
     const threads = [
       { threadKey: 'resting', status: 'open', summary: 'Resting', openedChapter: 1, lastAdvancedChapter: 1, payoffWindow: null, intentionallyOpen: true },
@@ -200,6 +231,113 @@ describe('renderPromises', () => {
     expect(lines[0]).toStartWith('thread:debt [due]');
     expect(lines[1]).toStartWith('thread:plain [open]');
     expect(lines[2]).toStartWith('thread:resting [dormant on purpose]');
+  });
+
+  it('should show what a promise pays off by', () => {
+    const threads = [
+      {
+        threadKey: 'someday',
+        status: 'open',
+        summary: 'Someday',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: null,
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+      {
+        threadKey: 'oath',
+        status: 'open',
+        summary: 'Oath',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: 'reveal_thief',
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+    ];
+    const lines = renderPromises(threads as never, [], 3).split('\n');
+
+    expect(lines.find(line => line.startsWith('thread:someday'))).toContain('pays off: someday');
+    expect(lines.find(line => line.startsWith('thread:oath'))).toContain('pays off: milestone reveal_thief');
+  });
+
+  it('should mark a promise due once its payoff milestone is reached', () => {
+    const threads = [
+      {
+        threadKey: 'oath',
+        status: 'open',
+        summary: 'Oath',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: 'reveal_thief',
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+    ];
+    const lines = renderPromises(threads as never, [], 3, new Map([['reveal_thief', 'reached']])).split('\n');
+
+    expect(lines[0]).toStartWith('thread:oath [due]');
+  });
+
+  it('should mark a promise due once its payoff volume is goal-met', () => {
+    const threads = [
+      {
+        threadKey: 'oath',
+        status: 'open',
+        summary: 'Oath',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: null,
+        payoffVolumeKey: 'vol_01',
+        intentionallyOpen: false,
+      },
+    ];
+    const lines = renderPromises(threads as never, [], 3, undefined, new Map([['vol_01', 'goal_met']])).split('\n');
+
+    expect(lines[0]).toStartWith('thread:oath [due]');
+  });
+
+  it('should mark a promise due while its payoff volume is active (P4-41b)', () => {
+    const threads = [
+      {
+        threadKey: 'oath',
+        status: 'open',
+        summary: 'Oath',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: null,
+        payoffVolumeKey: 'vol_01',
+        intentionallyOpen: false,
+      },
+    ];
+    const lines = renderPromises(threads as never, [], 3, undefined, new Map([['vol_01', 'active']])).split('\n');
+
+    expect(lines[0]).toStartWith('thread:oath [due]');
+  });
+
+  it('should never mark a payoff milestone or volume due before it is reached or goal-met', () => {
+    const threads = [
+      {
+        threadKey: 'oath',
+        status: 'open',
+        summary: 'Oath',
+        openedChapter: 1,
+        lastAdvancedChapter: 1,
+        payoffWindow: null,
+        payoffMilestoneKey: 'reveal_thief',
+        payoffVolumeKey: null,
+        intentionallyOpen: false,
+      },
+    ];
+    const lines = renderPromises(threads as never, [], 3, new Map([['reveal_thief', 'planned']])).split('\n');
+
+    expect(lines[0]).toStartWith('thread:oath [open]');
   });
 });
 

@@ -43,8 +43,14 @@ export type NovelChatStory = Pick<
 
 export type NovelChatLedgerEntry = Pick<Ledger.Entry, 'kind' | 'topic' | 'statement' | 'why' | 'rejectedAlternatives' | 'writerLine' | 'decidedBy'>;
 export type NovelChatVolume = Pick<Plan.Volume, 'volumeKey' | 'ordinal' | 'title' | 'objective' | 'state'>;
-export type NovelChatThread = Pick<Story.PlotThread, 'threadKey' | 'status' | 'summary' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'intentionallyOpen'>;
-export type NovelChatMystery = Pick<Story.Mystery, 'mysteryKey' | 'status' | 'question' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'intentionallyOpen'>;
+export type NovelChatThread = Pick<
+  Story.PlotThread,
+  'threadKey' | 'status' | 'summary' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'payoffMilestoneKey' | 'payoffVolumeKey' | 'intentionallyOpen'
+>;
+export type NovelChatMystery = Pick<
+  Story.Mystery,
+  'mysteryKey' | 'status' | 'question' | 'openedChapter' | 'lastAdvancedChapter' | 'payoffWindow' | 'payoffMilestoneKey' | 'payoffVolumeKey' | 'intentionallyOpen'
+>;
 export type NovelChatChapter = Pick<Chapter.Row, 'number' | 'title' | 'status' | 'summary' | 'isolated'>;
 export type NovelChatDraft = Pick<Generation.Draft, 'chapter' | 'title' | 'reviewStatus' | 'summary' | 'isolated' | 'staleReason'>;
 export type NovelChatBrief = Pick<
@@ -219,20 +225,56 @@ interface PromiseLine {
   line: string;
 }
 
-function promiseLine(ref: string, label: string, opened: number | null, moved: number | null, payoff: number | null, standing: PromiseStanding): PromiseLine {
-  const facts = [`opened ch ${opened ?? '?'}`, moved !== null ? `last moved ch ${moved}` : null, payoff !== null ? `payoff by ch ${payoff}` : null].filter(Boolean).join(', ');
+/** What a promise pays off by, for display — a milestone or volume key outranks a chapter window; none of the three means "someday". */
+export function payoffLabel(payoffWindow: number | null, payoffMilestoneKey: string | null, payoffVolumeKey: string | null): string {
+  if (payoffMilestoneKey) return `milestone ${payoffMilestoneKey}`;
+  if (payoffVolumeKey) return `volume ${payoffVolumeKey}`;
+  if (payoffWindow !== null) return `ch ${payoffWindow}`;
+  return 'someday';
+}
+
+function promiseLine(
+  ref: string,
+  label: string,
+  opened: number | null,
+  moved: number | null,
+  payoffWindow: number | null,
+  payoffMilestoneKey: string | null,
+  payoffVolumeKey: string | null,
+  standing: PromiseStanding,
+): PromiseLine {
+  const facts = [
+    `opened ch ${opened ?? '?'}`,
+    moved !== null ? `last moved ch ${moved}` : null,
+    `pays off: ${payoffLabel(payoffWindow, payoffMilestoneKey, payoffVolumeKey)}`,
+  ].join(', ');
   return { standing, line: `${ref} [${standing}] — ${label} (${facts})` };
 }
 
-export function renderPromises(threads: readonly NovelChatThread[], mysteries: readonly NovelChatMystery[], nextChapter: number): string {
+/**
+ * A promise stands "due" once an authored chapter window is reached, its payoff milestone is reached, or its payoff volume is active or
+ * has already met its goal (P4-41b) — the same due-ness the obligations selector (`chapter-plan.ts`) uses for the recap, though this coarser
+ * inventory does not distinguish due from overdue the way the recap's wording does.
+ */
+export function renderPromises(
+  threads: readonly NovelChatThread[],
+  mysteries: readonly NovelChatMystery[],
+  nextChapter: number,
+  milestoneStates?: ReadonlyMap<string, Knowledge.MilestoneState>,
+  volumeStates?: ReadonlyMap<string, Plan.VolumeState>,
+): string {
   const dormant = new Set(
     computeDormantThreads(threads, mysteries, Math.max(nextChapter - 1, 0))
       .filter(entry => entry.reason === 'dormant')
       .map(entry => `${entry.kind}:${entry.key}`),
   );
-  const standing = (ref: string, payoff: number | null, onPurpose: boolean): PromiseStanding => {
+  const standing = (ref: string, payoffWindow: number | null, payoffMilestoneKey: string | null, payoffVolumeKey: string | null, onPurpose: boolean): PromiseStanding => {
     if (onPurpose) return 'dormant on purpose';
-    if (payoff !== null && payoff <= nextChapter) return 'due';
+    const dueByChapter = payoffWindow !== null && payoffWindow <= nextChapter;
+    const dueByMilestone = payoffMilestoneKey !== null && milestoneStates?.get(payoffMilestoneKey) === 'reached';
+    const volumeState = payoffVolumeKey !== null ? volumeStates?.get(payoffVolumeKey) : undefined;
+    const dueByVolume = volumeState === 'active' || volumeState === 'goal_met';
+    if (dueByChapter || dueByMilestone || dueByVolume) return 'due';
     return dormant.has(ref) ? 'dormant' : 'open';
   };
   const lines = [
@@ -241,14 +283,31 @@ export function renderPromises(threads: readonly NovelChatThread[], mysteries: r
       .map(thread => {
         const ref = `thread:${thread.threadKey}`;
         const label = thread.summary?.trim() || thread.threadKey;
-        return promiseLine(ref, label, thread.openedChapter, thread.lastAdvancedChapter, thread.payoffWindow, standing(ref, thread.payoffWindow, thread.intentionallyOpen));
+        return promiseLine(
+          ref,
+          label,
+          thread.openedChapter,
+          thread.lastAdvancedChapter,
+          thread.payoffWindow,
+          thread.payoffMilestoneKey,
+          thread.payoffVolumeKey,
+          standing(ref, thread.payoffWindow, thread.payoffMilestoneKey, thread.payoffVolumeKey, thread.intentionallyOpen),
+        );
       }),
     ...mysteries
       .filter(mystery => mystery.status === 'open')
       .map(mystery => {
         const ref = `mystery:${mystery.mysteryKey}`;
-        const payoff = mystery.payoffWindow;
-        return promiseLine(ref, mystery.question, mystery.openedChapter, mystery.lastAdvancedChapter, payoff, standing(ref, payoff, mystery.intentionallyOpen));
+        return promiseLine(
+          ref,
+          mystery.question,
+          mystery.openedChapter,
+          mystery.lastAdvancedChapter,
+          mystery.payoffWindow,
+          mystery.payoffMilestoneKey,
+          mystery.payoffVolumeKey,
+          standing(ref, mystery.payoffWindow, mystery.payoffMilestoneKey, mystery.payoffVolumeKey, mystery.intentionallyOpen),
+        );
       }),
   ];
   const ordered = STANDING_ORDER.flatMap(order => lines.filter(line => line.standing === order).map(line => line.line));

@@ -67,17 +67,21 @@ export class ChapterPlanService {
     const { chapter } = request;
     const intent = request.intent?.trim() || null;
     const direction = request.direction?.trim() || null;
-    const [existing, previous, threads, mysteries, state] = await Promise.all([
+    const [existing, previous, threads, mysteries, state, milestoneStateRows, volumeStateRows] = await Promise.all([
       this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }),
       this.db.query.briefs.findFirst({ columns: { endingContract: true }, where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter - 1)) }),
       this.db.query.plotThreads.findMany({ where: eq(schema.plotThreads.projectId, projectId) }),
       this.db.query.mysteries.findMany({ where: eq(schema.mysteries.projectId, projectId) }),
       loadPlanState(this.db, projectId),
+      this.db.query.milestones.findMany({ columns: { milestoneKey: true, state: true }, where: eq(schema.milestones.projectId, projectId) }),
+      this.db.query.volumes.findMany({ columns: { volumeKey: true, state: true }, where: eq(schema.volumes.projectId, projectId) }),
     ]);
     if (request.empty && existing) throw AppErrorCode.PLN_007.create({ chapter: String(chapter) });
     const volumeKey = existing?.volumeKey ?? (await nearestVolumeKey(this.db, projectId, chapter));
     const volume = volumeKey ? await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) }) : undefined;
-    const obligations = selectObligations({ chapter, previousEnding: previous?.endingContract, threads, mysteries, volume: volume ?? null });
+    const milestoneStates = new Map(milestoneStateRows.map(row => [row.milestoneKey, row.state]));
+    const volumeStates = new Map(volumeStateRows.map(row => [row.volumeKey, row.state]));
+    const obligations = selectObligations({ chapter, previousEnding: previous?.endingContract, threads, mysteries, volume: volume ?? null, milestoneStates, volumeStates });
     const steer = intent ?? direction;
     if (request.empty) return emptyPlanOp({ chapter, steer, rationale: planRationale(obligations) });
 

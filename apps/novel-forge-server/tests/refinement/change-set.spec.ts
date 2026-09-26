@@ -254,6 +254,18 @@ describe('validateChangeSet draft containment', () => {
   });
 });
 
+describe('validateChangeSet promise restore fields', () => {
+  it.each([
+    ['hardDelete', { op: 'promise.drop', kind: 'thread', key: 'ledger', hardDelete: true }],
+    ['restoreStatus', { op: 'promise.update', kind: 'thread', key: 'ledger', restoreStatus: 'dropped' }],
+    ['restoreLastAdvancedChapter', { op: 'promise.update', kind: 'thread', key: 'ledger', restoreLastAdvancedChapter: 3 }],
+    ['restoreLabel', { op: 'promise.update', kind: 'thread', key: 'ledger', restoreLabel: null }],
+    ['restoreChapterColumn', { op: 'promise.update', kind: 'thread', key: 'ledger', restoreChapterColumn: 5 }],
+  ])('should refuse a promise op that carries %s, which only the revert engine carries', (field, op) => {
+    expect(validateChangeSet([op])).toContain(`changeSet[0]: unexpected field '${field}'`);
+  });
+});
+
 describe('removed planning vocabulary', () => {
   it.each([
     [{ op: 'arc.upsert', arcKey: 'a1', volumeKey: 'v1' }],

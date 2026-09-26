@@ -134,6 +134,14 @@ describe('ProposalApplyService — milestone ops', () => {
     expect(project.brief(4)?.['claimedMilestones']).toEqual(['lamp_rank_4']);
   });
 
+  it('should remove a milestone a promise names as its payoff without blocking, unlike a claimed plan or a fact unlock', async () => {
+    const project = engine({ milestones: [RANK_FOUR], plotThreads: [{ threadKey: 'the-ledger', summary: 'Who has the ledger.', payoffMilestoneKey: 'lamp_rank_4' }] });
+    const id = await project.propose([{ op: 'milestone.remove', milestoneKey: 'lamp_rank_4' }]);
+
+    await project.service.apply(7n, id);
+    expect(project.milestone('lamp_rank_4')).toBeUndefined();
+  });
+
   it('should edit only the authored fields of a milestone and put them back on revert', async () => {
     const project = engine({ milestones: [{ ...RANK_FOUR, subjectEntityKey: 'mira' }] });
     const id = await project.propose([{ op: 'milestone.upsert', milestoneKey: 'lamp_rank_4', label: 'The fourth rung', subjectEntityKey: null }]);
