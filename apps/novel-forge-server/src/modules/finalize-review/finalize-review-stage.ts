@@ -34,6 +34,7 @@ export async function stageFinalizeReview(tx: PrimaryTransaction, approved: Appr
     sourceHash: hashReviewedBody(approved.body),
     planHash: brief ? briefContentHash(brief) : null,
     isolated: approved.isolated,
+    bridgeOnly: false,
   };
   const [inserted] = await tx
     .insert(schema.finalizeReviews)
@@ -46,6 +47,7 @@ export async function stageFinalizeReview(tx: PrimaryTransaction, approved: Appr
     eq(schema.finalizeReviews.projectId, approved.projectId),
     eq(schema.finalizeReviews.chapter, approved.chapter),
     eq(schema.finalizeReviews.draftRevision, approved.revision),
+    eq(schema.finalizeReviews.bridgeOnly, false),
   );
   const [existing] = await tx.select().from(schema.finalizeReviews).where(where).for('update');
   if (!existing) throw AppError.internal(`[stageFinalizeReview] The review of chapter ${approved.chapter} vanished after its insert conflicted`);

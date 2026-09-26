@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { loadIsolationBridges } from '../../../finalize-review/isolation-bridge';
 import { standardReadableProse } from '../../isolation-read-policy';
 import { type RegisteredTool } from '../types';
 
@@ -14,7 +15,7 @@ const WALLED_OFF_EDIT_HINT = 'To change the text, propose action.revise_draft ra
 export const getDraftTool: RegisteredTool = {
   allowedNodes: ['chat-hub'],
   description:
-    'Retrieve a chapter draft: title, status, revision, summary and body (an isolated, unrestricted chapter returns header and summary only). Use before proposing draft.update.',
+    'Retrieve a chapter draft: title, status, revision, summary and body (an isolated, unrestricted chapter returns its header and approved bridge summary only). Use before proposing draft.update.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);
     const draft = await ctx.db.query.drafts.findFirst({
@@ -22,10 +23,13 @@ export const getDraftTool: RegisteredTool = {
     });
     if (!draft) return `Draft not found for chapter ${parsed.chapter}`;
 
-    const lines: string[] = [`**Chapter ${draft.chapter}**: ${draft.title ?? '(untitled)'} (${draft.status}, rev ${draft.revision}, review: ${draft.reviewStatus})`];
+    const title = draft.isolated ? '(title withheld)' : (draft.title ?? '(untitled)');
+    const lines: string[] = [`**Chapter ${draft.chapter}**: ${title} (${draft.status}, rev ${draft.revision}, review: ${draft.reviewStatus})`];
     if (draft.words) lines.push(`Words: ${draft.words}`);
-    if (draft.isolated) lines.push(standardReadableProse(draft), WALLED_OFF_EDIT_HINT);
-    else lines.push(...(draft.summary ? [`Summary: ${draft.summary}`] : []), draft.body);
+    if (draft.isolated) {
+      const bridges = await loadIsolationBridges(ctx.db, ctx.projectId, [draft]);
+      lines.push(standardReadableProse(draft, bridges.get(draft.chapter)?.summary ?? null), WALLED_OFF_EDIT_HINT);
+    } else lines.push(...(draft.summary ? [`Summary: ${draft.summary}`] : []), draft.body);
     return lines.join('\n');
   },
   inputSchema,

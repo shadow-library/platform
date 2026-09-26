@@ -321,11 +321,11 @@ export class ChapterSummarizeResponse {
   @Field({
     minLength: 1,
     description:
-      '2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated chapter; returned unsaved for an isolated one, for review alongside `state` before either is saved through PUT /drafts/:n.',
+      '2-3 sentence summary of what happened in the chapter, past tense. Saved (to the draft, and to the chapter once final) for a non-isolated or a final chapter; returned unsaved for an unfinished isolated one, for review alongside `state` before either is saved through PUT /drafts/:n. Standard calls read an isolated chapter only through its approved bridge, never this summary.',
   })
   summary: string;
 
-  @Field(() => Integer, { optional: true, description: 'The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated chapter.' })
+  @Field(() => Integer, { optional: true, description: 'The saved draft’s new `saveSeq`, present only when this call persisted the summary — a non-isolated or a final chapter.' })
   saveSeq?: number;
 
   @Field(() => Object, {

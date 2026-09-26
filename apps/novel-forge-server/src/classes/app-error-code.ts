@@ -409,4 +409,10 @@ export class AppErrorCode extends ServerErrorCode {
     'VER_002',
     'Chapter {chapter} is final — its prose is locked, so an earlier version cannot be restored; change it through Amend',
   );
+
+  /*!
+   * Isolation bridge errors
+   */
+  static readonly BRG_001 = AppErrorCode.badRequest('BRG_001', 'Chapter {chapter} is not an unrestricted chapter, so it has no bridge — standard chapters read its prose directly');
+  static readonly BRG_002 = AppErrorCode.badRequest('BRG_002', 'Chapter {chapter} is not final — its bridge is read when you approve it');
 }

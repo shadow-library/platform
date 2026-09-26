@@ -22,12 +22,13 @@ import {
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy, WriterDisclosurePolicy, type WriterField } from '../../bible/fact/writer-disclosure-policy';
+import { bridgedSummary, type BridgeLoader, bridgeLoader, type BridgeSubject, type IsolationBridge, loadIsolationBridges } from '../../finalize-review/isolation-bridge';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { withoutLapsedRejections } from '../../refinement/idea-rejections';
 import { hardLineError, screenTexts, sectionScreens } from '../hard-line';
-import { standardReadableState } from '../isolation-read-policy';
+import { NO_APPROVED_BRIDGE, NO_BRIDGE_SUMMARY, standardReadableState } from '../isolation-read-policy';
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { renderEventsAsOf } from './art-context';
@@ -361,6 +362,7 @@ interface ResolvedRefRows {
   factMap: Map<string, CanonFactRow>;
   hiddenFactKeys: ReadonlySet<string> | null;
   disclosure: WriterDisclosurePolicy;
+  bridges: ReadonlyMap<number, IsolationBridge>;
 }
 
 type CanonFactRow = typeof schema.canonFacts.$inferSelect;
@@ -419,6 +421,12 @@ interface CarriedDraft {
   chapter: number;
   summary: string | null;
   staleReason: string | null;
+}
+
+/** An isolated chapter as a standard call reads it: its title withheld and its summary replaced by the approved bridge, or by a walled-off note. */
+function walledOff<T extends { isolated: boolean; summary: string | null; title?: string | null }>(row: T, bridge: IsolationBridge | undefined): T {
+  if (!row.isolated) return row;
+  return { ...row, ...('title' in row ? { title: null } : {}), summary: bridgedSummary(row, bridge) ?? NO_BRIDGE_SUMMARY };
 }
 
 // A batch drafts chapter N before N-1 is finalized, so a chapter without a finalized row speaks through its draft's summary.
@@ -530,7 +538,14 @@ export class ContextAssembler {
     return { included: resolved.flatMap(section => section.sourceRefs), unresolved, withheld, constraints };
   }
 
-  private async resolveRefsFor(projectId: bigint, refs: string[], chapter: number | undefined, disclosure: WriterDisclosurePolicy, overlay?: PlanOverlay): Promise<ResolvedRefs> {
+  private async resolveRefsFor(
+    projectId: bigint,
+    refs: string[],
+    chapter: number | undefined,
+    disclosure: WriterDisclosurePolicy,
+    overlay?: PlanOverlay,
+    loadBridges: BridgeLoader = bridgeLoader(this.db, projectId),
+  ): Promise<ResolvedRefs> {
     const refused = refs.filter(ref => !disclosure.canResolve(ref));
     const uniqueRefs = [...new Set(refs)].filter(ref => disclosure.canResolve(ref));
     const entityKeys: string[] = [];
@@ -614,6 +629,7 @@ export class ContextAssembler {
     const bibleDocMap = new Map(bibleDocRows.map(d => [`${d.section}/${d.slug}`, d]));
     const factMap = new Map(factRows.map(f => [f.factKey, f]));
     const hiddenFactKeys = chapter !== undefined && factRows.length > 0 ? await loadWriterHiddenFactKeys(this.db, projectId, chapter, factRows, overlay) : null;
+    const bridges = await loadBridges(chapterRows.map(row => ({ chapter: row.number, isolated: row.isolated })));
 
     const resolved: ContextSection[] = [];
     const unresolved: string[] = [];
@@ -630,7 +646,7 @@ export class ContextAssembler {
         withheld.push(ref);
         continue;
       }
-      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, disclosure };
+      const rows = { entityMap, worldFactRows, threadMap, mysteryMap, chapterMap, volumeMap, bibleDocMap, factMap, hiddenFactKeys, disclosure, bridges };
       const section = this.resolveRef(ref, prefix, value, rows);
       if (!section) unresolved.push(ref);
       else resolved.push(section);
@@ -685,8 +701,9 @@ export class ContextAssembler {
       }
       case 'chapter': {
         const n = parseInt(value, 10);
-        const chapter = rows.chapterMap.get(n);
-        if (!chapter) return null;
+        const found = rows.chapterMap.get(n);
+        if (!found) return null;
+        const chapter = walledOff(found, rows.bridges.get(n));
         const isDraft = chapter.status !== 'done';
         const text = `${isDraft ? '[DRAFT — not yet canon] ' : ''}Ch ${n}: ${content(chapter.summary ?? '', 'summary')}`;
         return makeRefSection(ref, heading(`EARLIER CHAPTER: ${n}${chapter.title ? ` — ${chapter.title}` : ''}`), text, isDraft ? 'working' : 'canonical');
@@ -727,11 +744,11 @@ export class ContextAssembler {
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
         limit: RECENT_SUMMARY_COUNT,
-        columns: { number: true, summary: true },
+        columns: { number: true, summary: true, isolated: true },
       }),
       this.db.query.drafts.findMany({
         where: and(eq(schema.drafts.projectId, projectId), between(schema.drafts.chapter, chapter - RECENT_SUMMARY_COUNT, chapter - 1)),
-        columns: { chapter: true, summary: true, staleReason: true },
+        columns: { chapter: true, summary: true, staleReason: true, isolated: true },
       }),
       this.db.query.drafts.findFirst({
         where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter - 1)),
@@ -740,6 +757,7 @@ export class ContextAssembler {
     ]);
 
     const currentVolumeKey = brief?.volumeKey ?? (await nearestVolumeKey(this.db, projectId, chapter));
+    const loadBridges = bridgeLoader(this.db, projectId);
     const [disclosure, ledger, currentVolume] = await Promise.all([
       opts?.disclosure ?? loadWriterDisclosurePolicy(this.db, projectId, chapter),
       loadActiveLedger(this.db, projectId),
@@ -756,7 +774,7 @@ export class ContextAssembler {
     ]);
     const [writerBrief, completedVolumes, openCanon] = await Promise.all([
       loadWriterBrief(this.db, projectId, chapter, brief, disclosure),
-      this.completedVolumesSection(projectId, chapter, currentVolume, disclosure),
+      this.completedVolumesSection(projectId, chapter, currentVolume, disclosure, loadBridges),
       knowledgeContract ? null : this.openCanonSection(projectId, disclosure, chapterCast),
     ]);
     const prevStale = staleDraftPrefix(prevDraft);
@@ -774,12 +792,25 @@ export class ContextAssembler {
     const isolatedEndingRoom = sizedSectionCeiling('prev_ending', WRITER_SECTION_CAPS.prevEnding);
     const reservePrevEnding = (section: ContextSection): void => reserveDerived(section, "the previous chapter's ending", WRITER_SECTION_CAPS.prevEnding);
     const prevIsolated = Boolean(prevChapter?.isolated || prevDraft?.isolated);
-    const prevState = prevIsolated && opts?.policy?.writerClass !== 'permissive' ? standardReadableState(prevDraft?.state, await this.rosterKeys(projectId)) : prevDraft?.state;
+    // The unrestricted route may read an isolated chapter as written; every other reader gets only its approved bridge.
+    const rawIsolated = opts?.policy?.writerClass === 'permissive';
+    const bridgeSubjects: BridgeSubject[] = [
+      ...recentChapters.map(row => ({ chapter: row.number, isolated: row.isolated })),
+      ...recentDrafts,
+      { chapter: chapter - 1, isolated: prevIsolated },
+    ];
+    const bridges = rawIsolated ? new Map<number, IsolationBridge>() : await loadBridges(bridgeSubjects);
+    const prevBridge = bridges.get(chapter - 1);
+    const prevState = prevIsolated && !rawIsolated ? standardReadableState(prevBridge) : prevDraft?.state;
+    const isolatedEnding = (summary: string | null, room: number): string => {
+      if (rawIsolated) return renderIsolatedEnding(summary, prevState, disclosure, room);
+      return prevBridge ? renderIsolatedEnding(prevBridge.summary, prevState, disclosure, room) : NO_APPROVED_BRIDGE;
+    };
 
     if (prevChapter) {
       const tier: ContextTier = prevChapter.status === 'done' ? 'canonical' : 'working';
       if (prevChapter.isolated) {
-        reservePrevEnding(makeSection('prev_ending', renderIsolatedEnding(prevChapter.summary, prevState, disclosure, isolatedEndingRoom), tier, prevRefs));
+        reservePrevEnding(makeSection('prev_ending', isolatedEnding(prevChapter.summary, isolatedEndingRoom), tier, prevRefs));
       } else {
         reservePrevEnding(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, prevRefs));
       }
@@ -787,7 +818,7 @@ export class ContextAssembler {
       reservePrevEnding(
         makeSection(
           'prev_ending',
-          `[DRAFT — not yet canon]\n${prevStale}${renderIsolatedEnding(prevDraft.summary, prevState, disclosure, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
+          `[DRAFT — not yet canon]\n${prevStale}${isolatedEnding(prevDraft.summary, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
           'working',
           prevRefs,
         ),
@@ -894,7 +925,7 @@ export class ContextAssembler {
     let requiredCharacters = new Set<string>();
 
     if (refs.length > 0) {
-      const { resolved, unresolved, withheld, characters } = await this.resolveRefsFor(projectId, refs, chapter, disclosure);
+      const { resolved, unresolved, withheld, characters } = await this.resolveRefsFor(projectId, refs, chapter, disclosure, undefined, loadBridges);
       const carriedKeys = new Set(['hidden_constraints', 'open_canon', 'volume_objective', 'completed_volumes']);
       const carried = new Set(sections.filter(s => carriedKeys.has(s.key)).flatMap(s => s.sourceRefs));
       unresolvedRefs = unresolved;
@@ -932,7 +963,11 @@ export class ContextAssembler {
 
     for (const s of await this.dynamicCastSections(projectId, entityRefSections, pov, disclosure)) sections.push({ ...s, priority: WRITER_OPTIONAL_PRIORITY.castState });
 
-    const recent = recentSummaries(recentChapters, recentDrafts);
+    const readable = <T extends { isolated: boolean; summary: string | null }>(row: T, number: number): T => (rawIsolated ? row : walledOff(row, bridges.get(number)));
+    const recent = recentSummaries(
+      recentChapters.map(row => readable(row, row.number)),
+      recentDrafts.map(row => readable(row, row.chapter)),
+    );
     if (recent.length > 0) {
       const lines = recent.map((entry, index) =>
         recentSummaryLine({ ...entry, summary: truncateAtParagraph(disclosure.scrub(entry.summary, 'summary'), RECENT_SUMMARY_MAX).text }, index),
@@ -1009,6 +1044,7 @@ export class ContextAssembler {
     chapter: number,
     current: schema.Plan.Volume | undefined,
     disclosure: WriterDisclosurePolicy,
+    loadBridges: BridgeLoader,
   ): Promise<ContextSection | null> {
     const volumes = await this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal });
     const completed = volumes.filter(
@@ -1028,7 +1064,7 @@ export class ContextAssembler {
     const plannedChapters = [...plannedIn].filter(([, volumeKey]) => keys.has(volumeKey)).map(([number]) => number);
     const importedIn = inArray(schema.chapters.volumeKey, [...keys]);
     const rows = await this.db.query.chapters.findMany({
-      columns: { number: true, summary: true, volumeKey: true },
+      columns: { number: true, summary: true, volumeKey: true, isolated: true },
       where: and(
         eq(schema.chapters.projectId, projectId),
         eq(schema.chapters.status, 'done'),
@@ -1038,11 +1074,13 @@ export class ContextAssembler {
       orderBy: schema.chapters.number,
     });
 
+    const bridges = await loadBridges(rows.map(row => ({ chapter: row.number, isolated: row.isolated })));
     const byVolume = new Map<string, { number: number; summary: string }[]>();
     for (const row of [...rows].sort((left, right) => left.number - right.number)) {
       const volumeKey = plannedIn.get(row.number) ?? row.volumeKey;
-      if (!volumeKey || !keys.has(volumeKey) || row.number >= chapter || !row.summary?.trim()) continue;
-      byVolume.set(volumeKey, [...(byVolume.get(volumeKey) ?? []), { number: row.number, summary: row.summary }]);
+      const summary = bridgedSummary(row, bridges.get(row.number));
+      if (!volumeKey || !keys.has(volumeKey) || row.number >= chapter || !summary?.trim()) continue;
+      byVolume.set(volumeKey, [...(byVolume.get(volumeKey) ?? []), { number: row.number, summary }]);
     }
 
     const rendered = renderCompletedVolumes(
@@ -1147,9 +1185,15 @@ export class ContextAssembler {
       sections.push({ ...makeSection('volume_objective', currentVolume.objective, 'approved_intent', [`volume:${currentVolume.volumeKey}`]), required: true });
     }
 
+    const outlineBridges = await loadIsolationBridges(
+      this.db,
+      projectId,
+      recentChapters.map(row => ({ chapter: row.number, isolated: row.isolated })),
+    );
     const recentLines = recentChapters
       .slice()
       .reverse()
+      .map(row => walledOff(row, outlineBridges.get(row.number)))
       .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
     if (recentLines.length > 0) {
       sections.push({ ...makeSection('memory', recentLines.join('\n'), 'canonical', []), required: true });
@@ -1208,7 +1252,12 @@ export class ContextAssembler {
     const sections: ContextSection[] = [];
 
     if (chapterRows.length > 0) {
-      const lines = chapterRows.map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
+      const windowBridges = await loadIsolationBridges(
+        this.db,
+        projectId,
+        chapterRows.map(row => ({ chapter: row.number, isolated: row.isolated })),
+      );
+      const lines = chapterRows.map(row => walledOff(row, windowBridges.get(row.number))).map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
       sections.push(makeSection('chapter_window', lines.join('\n'), 'canonical', []));
     }
 
@@ -1250,7 +1299,7 @@ export class ContextAssembler {
    * whatever they ask for, since a stable one would move the cached prefix as the budget changes.
    */
   async forNovelChat(projectId: bigint, sessionStartedAt: Date, opts: NovelChatPackOptions): Promise<AssembledPack & { id: bigint | null }> {
-    const [project, ledger, volumes, threads, mysteries, entities, pages, facts, worldFacts, milestones, chapters, drafts, plannedBriefs] = await Promise.all([
+    const [project, ledger, volumes, threads, mysteries, entities, pages, facts, worldFacts, milestones, storedChapters, storedDrafts, plannedBriefs] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       loadActiveLedger(this.db, projectId),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
@@ -1280,6 +1329,9 @@ export class ContextAssembler {
       }),
       this.db.query.briefs.findMany({ columns: { chapter: true }, where: eq(schema.briefs.projectId, projectId) }),
     ]);
+    const chatBridges = await loadIsolationBridges(this.db, projectId, [...storedChapters.map(row => ({ chapter: row.number, isolated: row.isolated })), ...storedDrafts]);
+    const chapters = storedChapters.map(row => walledOff(row, chatBridges.get(row.number)));
+    const drafts = storedDrafts.map(row => walledOff(row, chatBridges.get(row.chapter)));
     const next = nextChapterNumber(chapters, drafts);
     const [handoffBriefs, pipelineStatus, changed] = await Promise.all([
       this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, [next - 1, next])) }),
@@ -1447,9 +1499,10 @@ export class ContextAssembler {
       this.db.query.entityAppearances.findMany({ where: and(eq(schema.entityAppearances.projectId, projectId), eq(schema.entityAppearances.chapter, chapter)) }),
     ]);
     if (!chapterRow) return [];
+    const subject = walledOff(chapterRow, (await loadIsolationBridges(this.db, projectId, [{ chapter, isolated: chapterRow.isolated }])).get(chapter));
 
     const sections = [
-      makeSection('subject_card', [`Chapter ${chapter}: ${chapterRow.title ?? ''}`, chapterRow.summary ?? ''].filter(Boolean).join('\n\n'), 'canonical', [`chapter:${chapter}`]),
+      makeSection('subject_card', [`Chapter ${chapter}: ${subject.title ?? ''}`, subject.summary ?? ''].filter(Boolean).join('\n\n'), 'canonical', [`chapter:${chapter}`]),
     ];
 
     const entityIds = appearances.map(a => a.entityId);
@@ -1513,11 +1566,6 @@ export class ContextAssembler {
   private async volumeByKey(projectId: bigint, volumeKey: string | null | undefined): Promise<schema.Plan.Volume | undefined> {
     if (!volumeKey) return undefined;
     return this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) });
-  }
-
-  private async rosterKeys(projectId: bigint): Promise<Set<string>> {
-    const rows = await this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } });
-    return new Set(rows.map(row => row.entityKey));
   }
 
   private async finalize(

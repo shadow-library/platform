@@ -180,6 +180,8 @@ export async function rowsTouchedBy(tx: PrimaryTransaction, target: ApplyTarget,
     }
     case 'milestone':
       return [{ table: 'milestones', match: { projectId: project, milestoneKey: change.milestoneKey } }];
+    case 'summary':
+      return [];
   }
 }
 
@@ -215,6 +217,9 @@ export async function applyChange(tx: PrimaryTransaction, target: ApplyTarget, c
         .update(schema.milestones)
         .set({ state: 'reached', plannedChapter: chapter, reachedChapter: chapter, boundRevision: target.draftRevision, updatedAt: new Date() })
         .where(and(eq(schema.milestones.projectId, projectId), eq(schema.milestones.milestoneKey, change.milestoneKey), ne(schema.milestones.state, 'reached')));
+      return;
+    case 'summary':
+      return;
   }
 }
 

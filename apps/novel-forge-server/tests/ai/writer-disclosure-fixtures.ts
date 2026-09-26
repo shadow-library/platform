@@ -4,6 +4,7 @@ import { type CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { schema } from '@server/database';
 
+import { bridgeSelect } from '../finalize-review/bridge-fixtures';
 import { queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
@@ -232,6 +233,7 @@ export function writerDb(rows: Map<string, Row[]>) {
   let nextId = 100n;
   return {
     query: new Proxy({} as Record<string, ReturnType<typeof finder>>, { get: (_, name: string) => finder(name) }),
+    select: bridgeSelect(() => ({ drafts: rows.get('drafts') ?? [], reviews: rows.get('finalizeReviews') ?? [], entities: rows.get('entities') ?? [] })),
     $count: async () => 0,
     insert: (table: unknown) => ({
       values: (values: Row) => ({

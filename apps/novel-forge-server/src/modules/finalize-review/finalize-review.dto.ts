@@ -102,6 +102,42 @@ export class FinalizeReviewItemResponse {
 }
 
 @Schema()
+export class BridgePositionResponse {
+  @Field()
+  entityKey: string;
+
+  @Field({ optional: true, nullable: true })
+  location?: string | null;
+
+  @Field(() => [String], { description: 'Injuries and other conditions, as approved.' })
+  conditions: string[];
+}
+
+@Schema()
+export class IsolationBridgeResponse {
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field(() => Integer, { description: "The chapter's current revision: a bridge approved against any other revision carries nothing." })
+  revision: number;
+
+  @Field({ description: 'False when nothing is approved against the current text: standard calls then read the chapter as walled off.' })
+  approved: boolean;
+
+  @Field({ optional: true, nullable: true, description: 'The approved bridge summary, the only account of the chapter standard calls read.' })
+  summary?: string | null;
+
+  @Field(() => [BridgePositionResponse], { description: 'Where approved characters stand and what condition they are in at the end of the chapter.' })
+  positions: BridgePositionResponse[];
+
+  @Field(() => Integer, { description: 'Approved lines left out because they cross the hard line; they never reach a standard call.' })
+  droppedByHardLine: number;
+
+  @Field(() => Integer, { description: 'Approved places and conditions left out because they run past a short line (60 characters).' })
+  droppedOverLength: number;
+}
+
+@Schema()
 export class FinalizeReviewDisclosureResponse {
   @Field()
   clear: boolean;
@@ -142,6 +178,11 @@ export class FinalizeReviewResponse {
   @Field()
   isolated: boolean;
 
+  @Field({
+    description: "A final isolated chapter's bridge read again after its text changed: only the bridge summary is asked, and nothing is applied to the Story Bible.",
+  })
+  bridgeOnly: boolean;
+
   @Field({ optional: true, nullable: true, description: 'Why reading the updates failed, when it did.' })
   error?: string | null;
 
@@ -162,6 +203,14 @@ export class FinalizeReviewResponse {
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
   appliedAt?: Date | null;
+
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    description:
+      'The revision whose Story Bible updates stand applied — Undo is available while it is set — even when the review shown is a later bridge-only one. Null once they are undone, or when none were applied.',
+  })
+  appliedRevision?: number | null;
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
   revertedAt?: Date | null;

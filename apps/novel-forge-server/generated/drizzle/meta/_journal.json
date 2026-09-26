@@ -134,6 +134,13 @@
       "when": 1790441574217,
       "tag": "0018_draft_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790442158514,
+      "tag": "0019_isolation_bridge",
+      "breakpoints": true
     }
   ]
 }

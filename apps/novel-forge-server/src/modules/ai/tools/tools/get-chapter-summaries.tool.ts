@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import * as schema from '@server/database/schemas';
 
+import { bridgedSummary, loadIsolationBridges } from '../../../finalize-review/isolation-bridge';
 import { type RegisteredTool } from '../types';
 
 const inputSchema = z
@@ -25,7 +26,17 @@ export const getChapterSummariesTool: RegisteredTool = {
       .where(and(eq(schema.chapters.projectId, ctx.projectId), between(schema.chapters.number, parsed.from, parsed.to)));
     if (rows.length === 0) return 'No chapters in range.';
     const sorted = rows.sort((a, b) => a.number - b.number);
-    return sorted.map(ch => `Ch ${ch.number}: ${ch.summary ?? '(no summary)'}`).join('\n');
+    const bridges = await loadIsolationBridges(
+      ctx.db,
+      ctx.projectId,
+      sorted.map(ch => ({ chapter: ch.number, isolated: ch.isolated })),
+    );
+    const line = (ch: (typeof sorted)[number]): string => {
+      const summary = bridgedSummary(ch, bridges.get(ch.number));
+      if (ch.isolated) return `Ch ${ch.number} [unrestricted]: ${summary ?? '(walled off — no approved bridge)'}`;
+      return `Ch ${ch.number}: ${summary ?? '(no summary)'}`;
+    };
+    return sorted.map(line).join('\n');
   },
   inputSchema,
   maxCallsPerRun: 5,

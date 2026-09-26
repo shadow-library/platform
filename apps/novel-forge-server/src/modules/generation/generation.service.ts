@@ -895,7 +895,8 @@ export class GenerationService {
       summary: string;
       state: Record<string, unknown>;
     };
-    if (draft.isolated) return { summary: result.summary, state: result.state };
+    // An isolated summary is shown only to the author — standard calls read the approved bridge — but an unfinished chapter still takes it with its state through PUT /drafts.
+    if (draft.isolated && draft.status !== 'final') return { summary: result.summary, state: result.state };
 
     const saved = await this.db.transaction(tx => saveDraftSummary(tx, { projectId, chapter, summary: result.summary, body: draft.body })).catch(asRetryableSave);
 

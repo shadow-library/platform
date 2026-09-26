@@ -26,8 +26,10 @@ import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { GenerationService } from '../generation/generation.service';
 import { JobExecutor } from '../jobs/job.executor';
+import { hashReviewedBody } from '../review/review-findings';
 import { dropBriefClaims, isReviewCurrent, loadChapterReviews, revertedMilestoneKeys, type ReviewWithItems } from './finalize-review-gate';
 import { buildReviewItems, editedChange, type ProposedChange, sameProposal } from './finalize-review-items';
+import { type BridgePosition, decidingBridges, readBridgeCandidates } from './isolation-bridge';
 import { drizzleRowStore, revertAppliedItems } from './review-event-apply';
 
 export interface FinalizeReviewItemView {
@@ -56,6 +58,7 @@ export interface FinalizeReviewView {
   /** False once the prose moved past the approved revision: the review then no longer applies. */
   current: boolean;
   isolated: boolean;
+  bridgeOnly: boolean;
   error: string | null;
   disclosure: { clear: boolean; findings: string[]; copy: string };
   open: { consequential: number; routine: number };
@@ -63,7 +66,20 @@ export interface FinalizeReviewView {
   routine: FinalizeReviewItemView[];
   autoKeep: FinalizeReview.Category[];
   appliedAt: Date | null;
+  /** The revision whose Story Bible updates stand applied, and can still be undone, whichever review is shown. */
+  appliedRevision: number | null;
   revertedAt: Date | null;
+}
+
+export interface IsolationBridgeView {
+  chapter: number;
+  revision: number;
+  /** False when nothing is approved against the current text: standard calls then read the chapter as walled off. */
+  approved: boolean;
+  summary: string | null;
+  positions: BridgePosition[];
+  droppedByHardLine: number;
+  droppedOverLength: number;
 }
 
 export interface ItemDecisionRequest {
@@ -111,11 +127,17 @@ function presentItem(item: FinalizeReview.Item, redacted: boolean): FinalizeRevi
   };
 }
 
+/** A bridge-only review never applies anything, so only a chapter's finalize reviews can hold applied updates. */
+export function appliedRevision(reviews: readonly Pick<FinalizeReview.Row, 'bridgeOnly' | 'status' | 'draftRevision'>[]): number | null {
+  return reviews.find(review => !review.bridgeOnly && review.status === 'applied')?.draftRevision ?? null;
+}
+
 /** Decision P4-39's rule for the finalize review: an isolated chapter's excerpts never leave it, whichever way isolation has moved since. */
 export function presentFinalizeReview(
   review: ReviewWithItems,
   draft: Pick<Draft, 'revision' | 'body' | 'isolated'> | null,
   autoKeep: FinalizeReview.Category[],
+  applied: number | null = null,
 ): FinalizeReviewView {
   const redacted = review.isolated || (draft?.isolated ?? false);
   const items = review.items.map(item => presentItem(item, redacted));
@@ -129,6 +151,7 @@ export function presentFinalizeReview(
     status: review.status,
     current: draft !== null && isReviewCurrent(review, draft),
     isolated: redacted,
+    bridgeOnly: review.bridgeOnly,
     error: review.error,
     disclosure: {
       clear,
@@ -140,6 +163,7 @@ export function presentFinalizeReview(
     routine: items.filter(item => item.triage === 'routine'),
     autoKeep,
     appliedAt: review.appliedAt,
+    appliedRevision: applied,
     revertedAt: review.revertedAt,
   };
 }
@@ -169,7 +193,7 @@ export class FinalizeReviewService {
   async get(projectId: bigint, chapter: number): Promise<FinalizeReviewView> {
     const [reviews, draft, autoKeep] = await Promise.all([loadChapterReviews(this.db, projectId, chapter), this.findDraft(this.db, projectId, chapter), this.autoKeep(projectId)]);
     const review = this.latest(reviews, draft);
-    return presentFinalizeReview(review, draft, autoKeep);
+    return presentFinalizeReview(review, draft, autoKeep, appliedRevision(reviews));
   }
 
   /** Enqueues the prepare job again for a review still preparing or one whose reading failed. */
@@ -189,6 +213,68 @@ export class FinalizeReviewService {
       return review.id;
     });
     if (reset !== null) await this.generationService.prepareFinalizeReview(projectId, chapter, reset);
+    return this.get(projectId, chapter);
+  }
+
+  /** Exactly what a standard call reads of an isolated chapter now: the items approved against its current text, or nothing. */
+  async bridge(projectId: bigint, chapter: number): Promise<IsolationBridgeView> {
+    const draft = await this.findDraft(this.db, projectId, chapter);
+    if (!draft) throw AppErrorCode.DRF_001.create();
+    if (!draft.isolated) throw AppErrorCode.BRG_001.create({ chapter: String(chapter) });
+    const bridge = decidingBridges(await readBridgeCandidates(this.db, projectId, [chapter])).get(chapter);
+    const summary = bridge?.summary ?? null;
+    const positions = bridge?.positions ?? [];
+    return {
+      chapter,
+      revision: draft.revision,
+      approved: summary !== null || positions.length > 0,
+      summary,
+      positions,
+      droppedByHardLine: bridge?.droppedByHardLine ?? 0,
+      droppedOverLength: bridge?.droppedOverLength ?? 0,
+    };
+  }
+
+  /**
+   * A final isolated chapter whose text changed (an amend) has no bridge until one is read from the new text: this stages a bridge-only review of
+   * the current revision. An unfinished chapter's bridge is its finalize review, staged on approval.
+   */
+  async prepareBridge(projectId: bigint, chapter: number): Promise<FinalizeReviewView> {
+    const staged = await this.db.transaction(async tx => {
+      await lockProjectPlan(tx, projectId);
+      const draft = await this.findDraft(tx, projectId, chapter, true);
+      if (!draft) throw AppErrorCode.DRF_001.create();
+      if (!draft.isolated) throw AppErrorCode.BRG_001.create({ chapter: String(chapter) });
+      if (draft.status !== 'final') throw AppErrorCode.BRG_002.create({ chapter: String(chapter) });
+      await tx
+        .select({ id: schema.finalizeReviews.id })
+        .from(schema.finalizeReviews)
+        .where(and(eq(schema.finalizeReviews.projectId, projectId), eq(schema.finalizeReviews.chapter, chapter)))
+        .for('update');
+      const existing = (await loadChapterReviews(tx, projectId, chapter))
+        .filter(review => review.bridgeOnly && review.draftRevision === draft.revision && isReviewCurrent(review, draft))
+        .sort((left, right) => Number(right.id - left.id))[0];
+      // A bridge already being read, or read and waiting for the author, is the one to answer; an applied or reverted review is never reused.
+      if (existing?.status === 'preparing') return existing.id;
+      if (existing?.status === 'ready') return null;
+      const bound = { draftId: draft.id, sourceHash: hashReviewedBody(draft.body), planHash: null, isolated: true, bridgeOnly: true, status: 'preparing' as const, error: null };
+      if (existing?.status === 'failed') {
+        await tx
+          .update(schema.finalizeReviews)
+          .set({ ...bound, updatedAt: new Date() })
+          .where(eq(schema.finalizeReviews.id, existing.id));
+        return existing.id;
+      }
+      const [inserted] = await tx
+        .insert(schema.finalizeReviews)
+        .values({ projectId, chapter, draftRevision: draft.revision, ...bound })
+        .returning({ id: schema.finalizeReviews.id });
+      return inserted?.id ?? null;
+    });
+    if (staged !== null) {
+      this.logger.info('isolation bridge staged for a final chapter', { projectId, chapter, reviewId: staged });
+      await this.generationService.prepareFinalizeReview(projectId, chapter, staged);
+    }
     return this.get(projectId, chapter);
   }
 
@@ -319,6 +405,7 @@ export class FinalizeReviewService {
     return buildReviewItems({
       extraction: review.isolated ? standardReadableExtraction(extracted) : extracted,
       isolated: review.isolated,
+      bridgeOnly: review.bridgeOnly,
       claimedMilestones: claimed,
       milestones,
       entityKeys: new Set(entities.map(entity => entity.entityKey)),
@@ -342,7 +429,8 @@ export class FinalizeReviewService {
       const earlier = chapterReviews.filter(other => other.draftRevision < review.draftRevision).sort((left, right) => right.draftRevision - left.draftRevision)[0];
       const own = chapterReviews.find(other => other.id === review.id)?.items ?? [];
       const answered = new Map<string, FinalizeReview.Item>();
-      for (const item of earlier?.items ?? []) if (item.decision === 'skipped') answered.set(item.itemKey, item);
+      // A bridge summary describes one text, so a skip of an earlier revision's summary says nothing about this one.
+      for (const item of earlier?.items ?? []) if (item.decision === 'skipped' && item.category !== 'summary') answered.set(item.itemKey, item);
       for (const item of own) if (item.decision !== null && !item.autoKept) answered.set(item.itemKey, item);
       const carried = (item: (typeof items)[number]): FinalizeReview.Item | undefined => {
         const prior = answered.get(item.itemKey);
@@ -405,8 +493,9 @@ export class FinalizeReviewService {
 
   /** The review of the revision on screen, else the newest one: a stale review is still shown, marked as no longer current. */
   private latest(reviews: readonly ReviewWithItems[], draft: Pick<Draft, 'revision'> | null): ReviewWithItems {
-    const current = draft ? reviews.find(review => review.draftRevision === draft.revision) : undefined;
-    const newest = [...reviews].sort((left, right) => right.draftRevision - left.draftRevision)[0];
+    const byRecency = [...reviews].sort((left, right) => right.draftRevision - left.draftRevision || Number(right.id - left.id));
+    const current = draft ? byRecency.find(review => review.draftRevision === draft.revision) : undefined;
+    const newest = byRecency[0];
     const review = current ?? newest;
     if (!review) throw AppErrorCode.FRV_001.create();
     return review;

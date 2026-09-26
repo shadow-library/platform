@@ -51,6 +51,7 @@ function review(items: Partial<FinalizeReview.Item>[], overrides: Partial<Review
     sourceHash: hashReviewedBody(PROSE),
     planHash: null,
     isolated: false,
+    bridgeOnly: false,
     status: 'ready',
     jobId: null,
     error: null,

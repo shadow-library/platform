@@ -2,11 +2,14 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { NO_APPROVED_BRIDGE } from '@modules/ai/isolation-read-policy';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { PROJECT_ADDITIONS_HEADING } from '@modules/ai/prompts/writing-instructions';
 import { WriterDisclosurePolicy } from '@modules/bible/fact/writer-disclosure-policy';
 import { emptyPolicy } from '@modules/plugins/plugin-policy.service';
+
+import { bridgeReview, bridgeSelect } from '../finalize-review/bridge-fixtures';
 
 describe('countTokens', () => {
   it('returns a positive integer for a non-empty string', () => {
@@ -154,6 +157,7 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
 
   return {
     insert,
+    select: bridgeSelect(() => ({ drafts: [], reviews: [] })),
     ...overrides,
     query: { ...defaultQuery, ...(overrides.query ?? {}) },
   };
@@ -167,8 +171,8 @@ function makeAssembler(dbOverrides: Record<string, unknown> = {}, catalogText = 
 }
 
 describe('ContextAssembler.forChapter — isolated-adjacency', () => {
-  async function prevEndingFor(prevChapter: Record<string, unknown>): Promise<string | undefined> {
-    const prevDraft = { chapter: 4, state: { power: 50 }, body: 'body text' };
+  async function prevEndingFor(prevChapter: Record<string, unknown>, reviews: Record<string, unknown>[] = []): Promise<string | undefined> {
+    const prevDraft = { chapter: 4, revision: 1, state: { power: 50 }, body: 'body text' };
 
     const dbOverrides = {
       query: {
@@ -187,6 +191,7 @@ describe('ContextAssembler.forChapter — isolated-adjacency', () => {
         contextPacks: { findFirst: mock(async () => null) },
         userFeedback: { findMany: mock(async () => []) },
       },
+      select: bridgeSelect(() => ({ drafts: [prevDraft], reviews, entities: [{ entityKey: 'mara' }] })),
     };
 
     const assembler = makeAssembler(dbOverrides);
@@ -194,27 +199,25 @@ describe('ContextAssembler.forChapter — isolated-adjacency', () => {
     return pack.sections.find(s => s.key === 'prev_ending')?.rendered;
   }
 
-  it('should render summary+state instead of the prose tail when the previous chapter is isolated', async () => {
-    const rendered = await prevEndingFor({
-      number: 4,
-      generator: 'unrestricted',
-      status: 'done',
-      summary: 'Iron treaty signed',
-      content: 'Long prose...',
-      title: 'Ch4',
-      isolated: true,
-    });
+  it('should render the approved bridge instead of the prose tail or the writer’s own summary when the previous chapter is isolated', async () => {
+    const bridge = bridgeReview({ chapter: 4, revision: 1, body: 'body text', summary: 'Iron treaty signed', positions: [{ entityKey: 'mara', location: 'the pier' }] });
+    const rendered = await prevEndingFor(
+      { number: 4, generator: 'unrestricted', status: 'done', summary: 'RAW_WRITER_SUMMARY', content: 'Long prose...', title: 'Ch4', isolated: true },
+      [bridge],
+    );
 
-    expect(rendered).toBeDefined();
-    expect(rendered).toContain('Summary:');
+    expect(rendered).toContain('Summary: Iron treaty signed');
+    expect(rendered).toContain('the pier');
     expect(rendered).not.toContain('Long prose...');
+    expect(rendered).not.toContain('RAW_WRITER_SUMMARY');
   });
 
-  it('should contain a human-written previous chapter that is isolated', async () => {
+  it('should contain a human-written previous chapter that is isolated and has no approved bridge', async () => {
     const rendered = await prevEndingFor({ number: 4, generator: 'human', status: 'done', summary: 'Iron treaty signed', content: 'Long prose...', title: 'Ch4', isolated: true });
 
-    expect(rendered).toContain('Summary:');
+    expect(rendered).toContain(NO_APPROVED_BRIDGE);
     expect(rendered).not.toContain('Long prose...');
+    expect(rendered).not.toContain('Iron treaty signed');
   });
 
   it('should render the verbatim prose tail for a human-written previous chapter that is not isolated', async () => {
@@ -326,6 +329,7 @@ describe('ContextAssembler.forChapter — established state carry', () => {
     finalized?: Record<string, unknown>[];
     facts?: Record<string, unknown>[];
     prevChapter?: Record<string, unknown>;
+    reviews?: Record<string, unknown>[];
   }) {
     return {
       query: {
@@ -335,6 +339,7 @@ describe('ContextAssembler.forChapter — established state carry', () => {
         canonFacts: { findMany: mock(async () => options.facts ?? []) },
         characterKnowledge: { findMany: mock(async () => []) },
       },
+      select: bridgeSelect(() => ({ drafts: options.drafts, reviews: options.reviews ?? [] })),
     };
   }
 
@@ -426,16 +431,18 @@ describe('ContextAssembler.forChapter — established state carry', () => {
     expect(continuation).not.toContain('salt vault');
   });
 
-  it('should render an isolated unfinalized predecessor as scrubbed summary, dropping its free-text state for a standard reader, never its prose tail', async () => {
+  it('should render an isolated unfinalized predecessor as its scrubbed bridge, dropping its free-text state for a standard reader, never its prose tail', async () => {
     const state = { lastBeat: 'She shuts the gate.', characterPositions: 'Mara at the gate.' };
-    const drafts = [{ chapter: 4, body: 'ISOLATED_PROSE_TAIL', summary: `Four. ${HIDDEN_TEXT}.`, state, isolated: true }];
+    const drafts = [{ chapter: 4, revision: 2, body: 'ISOLATED_PROSE_TAIL', summary: 'RAW_WRITER_SUMMARY', state, isolated: true }];
+    const reviews = [bridgeReview({ chapter: 4, revision: 2, body: 'ISOLATED_PROSE_TAIL', summary: `Four. ${HIDDEN_TEXT}.`, status: 'ready' })];
     const unrestricted = emptyPolicy('permissive');
-    const standardPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true });
-    const unrestrictedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact] })).forChapter(1n, 5, { dryRun: true, policy: unrestricted });
+    const standardPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], reviews })).forChapter(1n, 5, { dryRun: true });
+    const unrestrictedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], reviews })).forChapter(1n, 5, { dryRun: true, policy: unrestricted });
 
     const ending = standardPack.sections.find(s => s.key === 'prev_ending')?.rendered ?? '';
     expect(ending).toContain('[DRAFT — not yet canon]');
     expect(ending).toContain('Summary: Four. [withheld].');
+    expect(standardPack.rendered).not.toContain('RAW_WRITER_SUMMARY');
     expect(ending).not.toContain('Mara at the gate.');
     expect(standardPack.rendered).not.toContain('She shuts the gate.');
     expect(unrestrictedPack.sections.find(s => s.key === 'prev_ending')?.rendered).toContain('She shuts the gate.');
@@ -446,9 +453,10 @@ describe('ContextAssembler.forChapter — established state carry', () => {
   });
 
   it('should scrub the isolated finalized predecessor summary and the prose tail of a finalized one', async () => {
-    const drafts = [{ chapter: 4, body: 'x', summary: 'x', state: { lastBeat: HIDDEN_TEXT } }];
-    const isolated = { number: 4, status: 'done', summary: `Four. ${HIDDEN_TEXT}.`, content: 'x', isolated: true };
-    const isolatedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], prevChapter: isolated })).forChapter(1n, 5, { dryRun: true });
+    const drafts = [{ chapter: 4, revision: 1, body: 'x', summary: 'x', state: { lastBeat: HIDDEN_TEXT } }];
+    const isolated = { number: 4, status: 'done', summary: 'RAW_WRITER_SUMMARY', content: 'x', isolated: true };
+    const reviews = [bridgeReview({ chapter: 4, revision: 1, body: 'x', summary: `Four. ${HIDDEN_TEXT}.` })];
+    const isolatedPack = await makeAssembler(carryOverrides({ drafts, facts: [hiddenFact], prevChapter: isolated, reviews })).forChapter(1n, 5, { dryRun: true });
     expect(isolatedPack.rendered).not.toContain(HIDDEN_TEXT);
     expect(isolatedPack.sections.find(s => s.key === 'prev_ending')?.rendered).toContain('Summary: Four. [withheld].');
 
@@ -624,8 +632,10 @@ describe('ContextAssembler — writer-pack scrub', () => {
   });
 
   it('should label a stale isolated predecessor draft', async () => {
-    const drafts = [{ chapter: 4, body: 'x', summary: 'The barge crossed.', state: null, isolated: true, staleReason: 'a chapter was inserted after this point' }];
-    const pack = await makeAssembler(scrubDb({ drafts })).forChapter(1n, 5, { dryRun: true });
+    const drafts = [{ chapter: 4, revision: 1, body: 'x', summary: 'RAW', state: null, isolated: true, staleReason: 'a chapter was inserted after this point' }];
+    const fixture = scrubDb({ drafts });
+    const reviews = [bridgeReview({ chapter: 4, revision: 1, body: 'x', summary: 'The barge crossed.' })];
+    const pack = await makeAssembler({ ...fixture, select: bridgeSelect(() => ({ drafts, reviews })) }).forChapter(1n, 5, { dryRun: true });
 
     expect(sectionOf(pack, 'prev_ending')).toContain('[DRAFT — not yet canon]\n[STALE — may not match the current plan]\nSummary: The barge crossed.');
   });

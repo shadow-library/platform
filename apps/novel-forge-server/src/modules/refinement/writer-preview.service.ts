@@ -90,7 +90,10 @@ async function loadRefLabels(db: Reader, projectId: bigint, refs: readonly strin
       ? db.query.volumes.findMany({ columns: { volumeKey: true, title: true }, where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) })
       : [],
     chapters.length > 0
-      ? db.query.chapters.findMany({ columns: { number: true, title: true }, where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapters)) })
+      ? db.query.chapters.findMany({
+          columns: { number: true, title: true, isolated: true },
+          where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapters)),
+        })
       : [],
     pages.length > 0
       ? db.query.bibleDocuments.findMany({
@@ -108,7 +111,9 @@ async function loadRefLabels(db: Reader, projectId: bigint, refs: readonly strin
   const labels = new Map<string, string>([
     ...entities.map(entity => [`entity:${entity.entityKey}`, entity.name] as const),
     ...volumes.map(volume => [`volume:${volume.volumeKey}`, volume.title ?? humaniseSlug(volume.volumeKey)] as const),
-    ...chapterRows.map(chapter => [`chapter:${chapter.number}`, chapter.title ? `Chapter ${chapter.number}: ${chapter.title}` : `Chapter ${chapter.number}`] as const),
+    ...chapterRows.map(
+      chapter => [`chapter:${chapter.number}`, chapter.title && !chapter.isolated ? `Chapter ${chapter.number}: ${chapter.title}` : `Chapter ${chapter.number}`] as const,
+    ),
     ...docs.map(doc => [bibleDocRef(doc), bibleDocLabel(doc)] as const),
   ]);
   for (const ref of refs) {

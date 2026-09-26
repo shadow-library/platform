@@ -3,7 +3,9 @@ import { describe, expect, it, mock } from 'bun:test';
 import { ToolRegistryService } from '@modules/ai/tools/tool-registry.service';
 import { type ToolContext } from '@modules/ai/tools/types';
 
-function makeCtx(overrides: Record<string, { findFirst: ReturnType<typeof mock> }> = {}): ToolContext {
+import { bridgeReview, bridgeSelect } from '../finalize-review/bridge-fixtures';
+
+function makeCtx(overrides: Record<string, { findFirst?: ReturnType<typeof mock>; findMany?: ReturnType<typeof mock> }> = {}): ToolContext {
   return {
     chapter: 1,
     db: {
@@ -224,15 +226,19 @@ describe('get_draft handler', () => {
       title: 'The Sealed Corridor',
       words: 2800,
     };
+    const reviews = [bridgeReview({ chapter: 5, revision: 2, body: draft.body, summary: 'The lamplighter reaches a door.', status: 'ready' })];
     const ctx = makeCtx({ drafts: { findFirst: mock(async () => draft) } });
+    Object.assign(ctx.db, { select: bridgeSelect(() => ({ drafts: [draft], reviews })) });
 
     const result = await rawTool('get_draft').handler({ chapter: 5 }, ctx);
 
-    expect(result).toContain('**Chapter 5**: The Sealed Corridor (draft, rev 2, review: needs_review)');
+    expect(result).toContain('**Chapter 5**: (title withheld) (draft, rev 2, review: needs_review)');
     expect(result).toContain('Words: 2800');
-    expect(result).toContain('Summary: The lamplighter reaches the sealed door.');
+    expect(result).toContain('Bridge summary: The lamplighter reaches a door.');
     expect(result).toContain('walled off');
     expect(result).not.toContain(draft.body);
+    expect(result).not.toContain(draft.summary);
+    expect(result).not.toContain(draft.title);
   });
 
   it('should return the prose of a draft that is not isolated', async () => {

@@ -196,8 +196,8 @@ export class CatalogService {
     const shownChapters = sortedChapters.slice(-CATALOG_CHAPTER_CAP);
     const chapterLines = shownChapters.map(ch => {
       const tag = ch.isolated ? ' [unrestricted]' : ch.status === 'done' ? '' : ' [draft]';
-      const suffix = ch.status === 'done' && ch.summary && ch.summary.length <= 60 ? ` (${ch.summary})` : '';
-      return `${ch.number} — ${ch.title ?? `Chapter ${ch.number}`}${tag}${suffix}`;
+      const suffix = !ch.isolated && ch.status === 'done' && ch.summary && ch.summary.length <= 60 ? ` (${ch.summary})` : '';
+      return `${ch.number} — ${(!ch.isolated && ch.title) || `Chapter ${ch.number}`}${tag}${suffix}`;
     });
     part('chapters', 'CHAPTERS:', chapterLines, 'earlier chapters', sortedChapters.length - shownChapters.length, 'start');
 

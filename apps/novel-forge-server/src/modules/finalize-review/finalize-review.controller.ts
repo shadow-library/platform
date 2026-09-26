@@ -10,6 +10,7 @@ import {
   FinalizeReviewResponse,
   FinalizeReviewSettingsBody,
   FinalizeReviewSettingsResponse,
+  IsolationBridgeResponse,
 } from './finalize-review.dto';
 import { FinalizeReviewService } from './finalize-review.service';
 
@@ -60,6 +61,20 @@ export class FinalizeReviewController {
   @RespondFor(200, FinalizeReviewResponse)
   revert(@Params() params: ChapterParams): Promise<FinalizeReviewResponse> {
     return this.reviewService.revert(params.projectId, params.n);
+  }
+
+  @Get('/drafts/:n/bridge')
+  @RespondFor(200, IsolationBridgeResponse)
+  getBridge(@Params() params: ChapterParams): Promise<IsolationBridgeResponse> {
+    return this.reviewService.bridge(params.projectId, params.n);
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @BotPermission(GENERATION_RUN_PERMISSION)
+  @Post('/drafts/:n/bridge/prepare')
+  @RespondFor(200, FinalizeReviewResponse)
+  prepareBridge(@Params() params: ChapterParams): Promise<FinalizeReviewResponse> {
+    return this.reviewService.prepareBridge(params.projectId, params.n);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

@@ -7,6 +7,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { standardReadableDraft } from '../ai/isolation-read-policy';
+import { loadIsolationBridges } from '../finalize-review/isolation-bridge';
 import { type LoadedPlugin, loadPlugins, validateManifest } from './plugin-loader';
 import { type ForgePlugin, type PluginHostApi, type ScopedPluginHost } from './plugin.types';
 
@@ -124,8 +125,8 @@ export class ScopedPluginHostFactory {
   private async readDraft(projectId: bigint, chapter: number): Promise<unknown> {
     const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
     if (!draft?.isolated) return draft;
-    const roster = await this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } });
-    return standardReadableDraft(draft, new Set(roster.map(row => row.entityKey)));
+    const bridges = await loadIsolationBridges(this.db, projectId, [draft]);
+    return standardReadableDraft(draft, bridges.get(chapter));
   }
 
   private readEntities(projectId: bigint): Promise<unknown[]> {

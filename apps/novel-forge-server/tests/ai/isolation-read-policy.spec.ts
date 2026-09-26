@@ -4,9 +4,9 @@ import { type BaseMessage } from '@langchain/core/messages';
 
 import { PRODUCTION_DEFAULTS, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { createChapterGenerationNodes } from '@modules/ai/graphs/chapter-generation.graph';
-import { HARD_LINE_LEXICON } from '@modules/ai/hard-line';
 import {
   ISOLATED_EXTRACTION_NOTE,
+  NO_APPROVED_BRIDGE,
   standardReadableDraft,
   standardReadableExtraction,
   standardReadableProse,
@@ -16,22 +16,44 @@ import {
 import { ToolRegistryService } from '@modules/ai/tools/tool-registry.service';
 import { type ToolContext } from '@modules/ai/tools/types';
 import { ScopedPluginHostFactory } from '@modules/plugins/plugin-host.service';
+import { hashReviewedBody } from '@modules/review/review-findings';
 import { schema } from '@server/database';
 
+import { bridgeSelect } from '../finalize-review/bridge-fixtures';
 import { draftRow, fakeGenerationDb, makeGenerationService } from '../generation/generation-fixtures';
 import { writerAssembler, writerDb, writerTables } from './writer-disclosure-fixtures';
 
 const MARKER = 'ISOLATED_MARKER';
 const ISOLATED_PROSE = `${MARKER} walks the flooded cellar alone.`;
 const BRIDGE = 'The keeper spent the night in the cellar and came back changed.';
-const POSITIONS = [{ entityKey: 'keeper', location: 'the north pier' }];
+const RAW_SUMMARY = `${MARKER} spent the night in the cellar, as the unrestricted writer told it.`;
+const POSITIONS = [{ entityKey: 'keeper', location: 'the north pier', conditions: [] }];
 const ISOLATED_STATE = {
   characterPositions: [...POSITIONS, { entityKey: 'stranger', location: 'the cellar' }, { entityKey: 'apprentice', location: `${MARKER} ${'far '.repeat(20)}` }],
   lastBeat: `${MARKER} closes the cellar door.`,
   openConflict: MARKER,
   establishedFacts: [`${MARKER} is soaked.`],
 };
-const ROSTER = new Set(['keeper', 'apprentice']);
+
+/** The finalize review of chapter 4's current text, with its bridge summary and one position approved and one position left unanswered. */
+function approvedReview(body = ISOLATED_PROSE): Row {
+  const item = (itemKey: string, proposed: Row, decision: string | null): Row => ({ itemKey, category: proposed['category'], proposed, edited: null, decision });
+  return {
+    id: 40n,
+    projectId: 7n,
+    chapter: 4,
+    draftRevision: 1,
+    sourceHash: hashReviewedBody(body),
+    isolated: true,
+    bridgeOnly: false,
+    status: 'applied',
+    items: [
+      item('summary', { category: 'summary', text: BRIDGE }, 'kept'),
+      item('character_state:keeper', { category: 'character_state', state: { entityKey: 'keeper', location: 'the north pier', evidence: WALLED_OFF_EXCERPT } }, 'kept'),
+      item('character_state:apprentice', { category: 'character_state', state: { entityKey: 'apprentice', location: MARKER, evidence: WALLED_OFF_EXCERPT } }, null),
+    ],
+  };
+}
 const SHORT_BODY = 'The tide came in slowly. '.repeat(20);
 const LONG_BODY = 'The tide came in slowly. '.repeat(900);
 const POLICY = { writerClass: 'standard', raised: false, contextSections: [], systemMessages: [] };
@@ -49,11 +71,12 @@ function tables(mode5: 'standard' | 'unrestricted' | null = null): Map<string, R
   const rows = writerTables('locked');
   rows.set(
     'chapters',
-    (rows.get('chapters') ?? []).map(chapter => (chapter['number'] === 4 ? { ...chapter, isolated: true, content: ISOLATED_PROSE, summary: BRIDGE } : chapter)),
+    (rows.get('chapters') ?? []).map(chapter => (chapter['number'] === 4 ? { ...chapter, isolated: true, content: ISOLATED_PROSE, summary: RAW_SUMMARY, title: MARKER } : chapter)),
   );
   const draft = (chapter: number, extra: Row): Row => ({ id: BigInt(chapter), projectId: 7n, chapter, revision: 1, staleReason: null, ...extra });
+  rows.set('finalizeReviews', [approvedReview()]);
   rows.set('drafts', [
-    draft(4, { status: 'final', body: ISOLATED_PROSE, summary: BRIDGE, isolated: true, state: ISOLATED_STATE, judgeNote: `[soft] ${MARKER}` }),
+    draft(4, { status: 'final', body: ISOLATED_PROSE, summary: RAW_SUMMARY, title: MARKER, isolated: true, state: ISOLATED_STATE, judgeNote: `[soft] ${MARKER}` }),
     draft(5, { status: 'draft', body: 'The pier creaks under the morning tide.', summary: 'Morning.', isolated: false, state: null, judgeNote: null }),
   ]);
   rows.set(
@@ -106,7 +129,7 @@ const permissiveFor = (baseline?: { contentMode?: string | null }) => ({ ...POLI
 
 function graph(mode5: 'standard' | 'unrestricted' | null) {
   const calls: RecordedCall[] = [];
-  const db = { ...writerDb(tables(mode5)), select: () => undefined };
+  const db = writerDb(tables(mode5));
   const nodes = createChapterGenerationNodes({
     db: db as never,
     contextAssembler: writerAssembler(db),
@@ -208,7 +231,8 @@ describe('the chapter-generation graph on an unrestricted chapter', () => {
 describe('an isolated chapter never reaches a standard call', () => {
   it('should summarize an isolated chapter only on the unrestricted route and revise the next one from its bridge', async () => {
     const calls: RecordedCall[] = [];
-    const { generation } = service(calls);
+    const reads = [draftRow({ chapter: 4, status: 'final', isolated: true, body: ISOLATED_PROSE }), draftRow({ chapter: 5, body: 'The pier creaks under the morning tide.' })];
+    const { generation } = service(calls, tables(), undefined, reads);
 
     await generation.summarizeChapter(7n, 4);
     await generation.reviseDraft(7n, 5, { note: 'Slow the opening.' });
@@ -218,6 +242,16 @@ describe('an isolated chapter never reaches a standard call', () => {
       ['revision', 'standard'],
     ]);
     expectNoStandardCallReads(calls);
+  });
+
+  it('should save a final isolated chapter’s summary, which only the author reads, instead of returning it for a draft save final chapters refuse', async () => {
+    const calls: RecordedCall[] = [];
+    const { generation, fake } = service(calls, tables(), undefined, [draftRow({ chapter: 4, status: 'final', isolated: true, body: ISOLATED_PROSE })]);
+
+    const result = await generation.summarizeChapter(7n, 4);
+
+    expect(result.saveSeq).toBeDefined();
+    expect(fake.writesTo(schema.drafts).map(write => write.values?.['summary'])).toContain('Done.');
   });
 
   it('should extract continuity and canon from the standard chapter after it on the standard route, from the bridge', async () => {
@@ -280,10 +314,11 @@ describe('an isolated chapter never reaches a standard call', () => {
               words: 10,
               isolated: true,
               body: ISOLATED_PROSE,
-              summary: BRIDGE,
+              summary: RAW_SUMMARY,
             }),
           },
         },
+        select: bridgeSelect(() => ({ drafts: [{ chapter: 4, revision: 1, body: ISOLATED_PROSE }], reviews: [approvedReview()] })),
       } as never,
       retrieval: { searchProse: async () => [] } as never,
     };
@@ -307,43 +342,47 @@ describe('an isolated chapter never reaches a standard call', () => {
   });
 
   it('should hand a plugin the bridge in place of an isolated draft’s prose, state and judge note', async () => {
-    const row = { chapter: 4, isolated: true, body: ISOLATED_PROSE, summary: BRIDGE, state: ISOLATED_STATE, judgeNote: MARKER };
-    const query = { drafts: { findFirst: async () => row }, entities: { findMany: async () => [...ROSTER].map(entityKey => ({ entityKey })) } };
-    const host = new ScopedPluginHostFactory({ getPostgresClient: () => ({ query }) } as never).create('plugin', 7n);
+    const row = { chapter: 4, revision: 1, isolated: true, body: ISOLATED_PROSE, summary: RAW_SUMMARY, state: ISOLATED_STATE, judgeNote: MARKER };
+    const select = bridgeSelect(() => ({ drafts: [row], reviews: [approvedReview()], entities: [{ entityKey: 'keeper' }] }));
+    const host = new ScopedPluginHostFactory({ getPostgresClient: () => ({ query: { drafts: { findFirst: async () => row } }, select }) } as never).create('plugin', 7n);
 
     const draft = await host.read.draft(4);
 
     expect(JSON.stringify(draft)).not.toContain(MARKER);
-    expect(draft).toMatchObject({ state: { characterPositions: POSITIONS }, judgeNote: null });
+    expect(draft).toMatchObject({ summary: BRIDGE, state: { characterPositions: POSITIONS }, judgeNote: null });
+  });
+
+  it('should hand a plugin a walled-off draft once its text moved past the approved bridge', async () => {
+    const row = { chapter: 4, revision: 2, isolated: true, body: `${ISOLATED_PROSE} Amended.`, summary: RAW_SUMMARY, state: ISOLATED_STATE, judgeNote: MARKER };
+    const select = bridgeSelect(() => ({ drafts: [row], reviews: [approvedReview()], entities: [{ entityKey: 'keeper' }] }));
+    const host = new ScopedPluginHostFactory({ getPostgresClient: () => ({ query: { drafts: { findFirst: async () => row } }, select }) } as never).create('plugin', 7n);
+
+    const draft = await host.read.draft(4);
+
+    expect(JSON.stringify(draft)).not.toContain(MARKER);
+    expect(draft).toMatchObject({ summary: null, state: null, body: expect.stringContaining(NO_APPROVED_BRIDGE) });
   });
 });
 
 describe('standardReadableProse', () => {
-  it('should pass a standard chapter’s prose through and replace an isolated one with its summary', () => {
-    expect(standardReadableProse({ isolated: false, body: 'Open prose.', summary: 'Sum.' })).toBe('Open prose.');
-    expect(standardReadableProse({ isolated: true, body: ISOLATED_PROSE, summary: BRIDGE })).toContain(BRIDGE);
-    expect(standardReadableProse({ isolated: true, body: ISOLATED_PROSE, summary: null })).not.toContain(MARKER);
+  it('should pass a standard chapter’s prose through and replace an isolated one with its approved bridge summary', () => {
+    expect(standardReadableProse({ isolated: false, body: 'Open prose.' }, null)).toBe('Open prose.');
+    expect(standardReadableProse({ isolated: true, body: ISOLATED_PROSE }, BRIDGE)).toContain(BRIDGE);
+    expect(standardReadableProse({ isolated: true, body: ISOLATED_PROSE }, null)).toContain(NO_APPROVED_BRIDGE);
+    expect(standardReadableProse({ isolated: true, body: ISOLATED_PROSE }, null)).not.toContain(MARKER);
   });
 
   it('should leave a standard draft untouched', () => {
     const draft = { isolated: false, body: 'Open prose.', summary: null, chapter: 2 };
-    expect(standardReadableDraft(draft, ROSTER)).toBe(draft);
+    expect(standardReadableDraft(draft, undefined)).toBe(draft);
   });
 });
 
 describe('standardReadableState', () => {
-  it('should keep only who is where, as roster keys and short places', () => {
-    expect(standardReadableState(ISOLATED_STATE, ROSTER)).toEqual({ characterPositions: POSITIONS });
-    expect(standardReadableState({ lastBeat: MARKER }, ROSTER)).toBeNull();
-    expect(standardReadableState([MARKER], ROSTER)).toBeNull();
-    expect(standardReadableState(MARKER, ROSTER)).toBeNull();
-  });
-
-  it('should drop a legacy free-text position and a place the hard line refuses', () => {
-    const refused = (HARD_LINE_LEXICON.standalone[0] as RegExp).source.replace(/^\\b\(\?:|\)\\b$/g, '');
-
-    expect(standardReadableState({ characterPositions: 'Oren stands on the pier.' }, ROSTER)).toBeNull();
-    expect(standardReadableState({ characterPositions: [{ entityKey: 'keeper', location: `the ${refused} room` }] }, ROSTER)).toBeNull();
+  it('should carry only the approved positions, and nothing without an approved bridge', () => {
+    expect(standardReadableState({ positions: POSITIONS })).toEqual({ characterPositions: POSITIONS });
+    expect(standardReadableState({ positions: [] })).toBeNull();
+    expect(standardReadableState(undefined)).toBeNull();
   });
 });
 

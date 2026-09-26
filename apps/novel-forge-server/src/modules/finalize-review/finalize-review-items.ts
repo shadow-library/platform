@@ -19,7 +19,8 @@ export type ProposedChange =
   | { category: 'promise'; thread: Omit<ContinuityThread, 'confidence'> }
   | { category: 'promise'; mystery: Omit<ContinuityMystery, 'confidence'> }
   | { category: 'knowledge'; entityKey: string; factKey: string; how: string }
-  | { category: 'milestone'; milestoneKey: string; reached: boolean };
+  | { category: 'milestone'; milestoneKey: string; reached: boolean }
+  | { category: 'summary'; text: string };
 
 export interface ProposedItem {
   itemKey: string;
@@ -39,6 +40,8 @@ export interface ProposedItem {
 export interface ReviewMaterial {
   extraction: ContinuityOutput;
   isolated: boolean;
+  /** A final chapter's bridge read again after an amend: only its summary is asked, since an amend never touches the Story Bible. */
+  bridgeOnly?: boolean;
   /** Milestones the approved plan claims for this chapter. */
   claimedMilestones: readonly string[];
   milestones: readonly Pick<Knowledge.Milestone, 'milestoneKey' | 'label' | 'state'>[];
@@ -84,6 +87,8 @@ export function itemKeyOf(proposed: ProposedChange): string {
       return `knowledge:${proposed.entityKey}:${proposed.factKey}`;
     case 'milestone':
       return `milestone:${proposed.milestoneKey}`;
+    case 'summary':
+      return 'summary';
   }
 }
 
@@ -132,7 +137,7 @@ function entityItems(extraction: ContinuityOutput): Draft[] {
   return [...created, ...appeared];
 }
 
-function characterItems(extraction: ContinuityOutput): Draft[] {
+function characterItems(extraction: ContinuityOutput, isolated: boolean): Draft[] {
   const states = (extraction.characterStates ?? []).map(state => {
     const change = [
       state.location && `at ${state.location}`,
@@ -149,7 +154,8 @@ function characterItems(extraction: ContinuityOutput): Draft[] {
       claim: `${state.entityKey} is now ${change || 'unchanged'}`,
       evidence: state.evidence,
       proposed: { category: 'character_state' as const, state: withoutConfidence(state) },
-      consequential: state.confidence === 'low',
+      // An isolated chapter's positions cross into standard calls as its bridge, so each is asked one by one, never kept as a batch.
+      consequential: isolated || state.confidence === 'low',
     };
   });
   const relationships = (extraction.relationships ?? []).map(relationship => ({
@@ -268,6 +274,23 @@ function milestoneItems(material: ReviewMaterial): Draft[] {
   return drafts;
 }
 
+/** An isolated chapter's bridge summary: the only account of its events a standard call ever reads, so the author always answers it. */
+function summaryItems(material: ReviewMaterial): Draft[] {
+  const text = material.extraction.chapterSummary?.trim();
+  if (!material.isolated || !text) return [];
+  return [
+    {
+      category: 'summary',
+      basis: 'inferred',
+      subjectKey: 'summary',
+      claim: `What standard chapters will read about this chapter: ${text}`,
+      evidence: null,
+      proposed: { category: 'summary', text },
+      consequential: true,
+    },
+  ];
+}
+
 /**
  * Turns what the continuity extractor read from the approved revision into review items. Consequential items (rules, payoffs, knowledge,
  * milestones in doubt, anything inferred) wait for the author one by one; routine ones are batched, and kept at once in an auto-keep category.
@@ -275,13 +298,16 @@ function milestoneItems(material: ReviewMaterial): Draft[] {
  */
 export function buildReviewItems(material: ReviewMaterial): ProposedItem[] {
   const known = new Set([...material.entityKeys, ...(material.extraction.newEntities ?? []).map(entity => entity.entityKey)]);
-  const drafts = [
-    ...entityItems(material.extraction),
-    ...characterItems(material.extraction),
-    ...promiseItems(material.extraction),
-    ...knowledgeItems(material),
-    ...milestoneItems(material),
-  ];
+  const drafts = material.bridgeOnly
+    ? summaryItems(material)
+    : [
+        ...summaryItems(material),
+        ...entityItems(material.extraction),
+        ...characterItems(material.extraction, material.isolated),
+        ...promiseItems(material.extraction),
+        ...knowledgeItems(material),
+        ...milestoneItems(material),
+      ];
   // A record reported twice keeps its last report, as the direct continuity path's upserts do.
   const byKey = new Map<string, Draft>();
   for (const draft of drafts) {
@@ -326,6 +352,7 @@ const EDITABLE: Record<string, Record<string, Check>> = {
   mystery: { status: oneOf('open', 'resolved'), question: text, intentionallyOpen: flag },
   knowledge: { how: value => typeof value === 'string' && value.trim() !== '' },
   milestone: { reached: flag },
+  summary: { text: value => typeof value === 'string' && value.trim() !== '' },
 };
 
 function recordOf(change: ProposedChange): [string, Record<string, unknown>] {
@@ -342,6 +369,7 @@ function recordOf(change: ProposedChange): [string, Record<string, unknown>] {
       return 'thread' in change ? ['thread', change.thread as unknown as Record<string, unknown>] : ['mystery', change.mystery as unknown as Record<string, unknown>];
     case 'knowledge':
     case 'milestone':
+    case 'summary':
       return [change.category, change];
   }
 }
@@ -359,7 +387,7 @@ export function editedChange(proposed: ProposedChange, patch: Record<string, unk
     if (!check(value)) return { refused: `${field} has the wrong shape` };
   }
   const merged = { ...fields, ...Object.fromEntries(entries.map(([field, value]) => [field, value ?? undefined])) };
-  if (record === 'knowledge' || record === 'milestone') return { change: merged as unknown as ProposedChange };
+  if (record === 'knowledge' || record === 'milestone' || record === 'summary') return { change: merged as unknown as ProposedChange };
   const nested = record === 'state' ? 'state' : record;
   return { change: { category: proposed.category, [nested]: merged } as unknown as ProposedChange };
 }

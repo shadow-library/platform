@@ -1,53 +1,41 @@
-import { findHardLine } from './hard-line';
+import { type IsolationBridge } from '../finalize-review/isolation-bridge';
 
 export interface ChapterProse {
   isolated: boolean;
   body: string | null;
-  summary: string | null;
 }
 
 export interface IsolatableDraft extends ChapterProse {
+  summary: string | null;
   state?: unknown;
   judgeNote?: string | null;
 }
 
-const WALLED_OFF_PROSE = 'Prose: walled off. This is an unrestricted chapter, so its text is not available here; its approved summary stands in for it.';
+const WALLED_OFF_PROSE = 'Prose: walled off. This is an unrestricted chapter, so its text is not available here; only its approved bridge is.';
 
-export interface StandardPosition {
-  entityKey: string;
-  location: string;
-}
+export const NO_BRIDGE_SUMMARY = '(unrestricted chapter — walled off, no approved bridge)';
 
-const MAX_LOCATION_LENGTH = 60;
+export const NO_APPROVED_BRIDGE = 'Walled off: an unrestricted chapter with no approved bridge for its current text, so nothing from it is available here.';
 
 /**
  * Raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Anything that feeds a standard-route call
- * reads a chapter through this: the prose itself for a standard chapter, and for an isolated one only its summary, the bridge that exists today.
+ * reads a chapter through this: the prose itself for a standard chapter, and for an isolated one only the summary its author approved.
  */
-export function standardReadableProse(chapter: ChapterProse): string {
+export function standardReadableProse(chapter: ChapterProse, bridgeSummary: string | null): string {
   if (!chapter.isolated) return chapter.body ?? '';
-  return chapter.summary?.trim() ? `${WALLED_OFF_PROSE}\nSummary: ${chapter.summary.trim()}` : WALLED_OFF_PROSE;
+  return bridgeSummary?.trim() ? `${WALLED_OFF_PROSE}\nBridge summary: ${bridgeSummary.trim()}` : `${WALLED_OFF_PROSE}\n${NO_APPROVED_BRIDGE}`;
 }
 
-function isPosition(value: unknown, roster: ReadonlySet<string>): value is StandardPosition {
-  if (value === null || typeof value !== 'object') return false;
-  const { entityKey, location } = value as Record<string, unknown>;
-  if (typeof entityKey !== 'string' || !roster.has(entityKey)) return false;
-  return typeof location === 'string' && location.trim().length > 0 && location.length <= MAX_LOCATION_LENGTH && !findHardLine([location]);
+/** An isolated chapter's continuation state as a standard call may read it: the positions and conditions its author approved, never what the unrestricted writer carried. */
+export function standardReadableState(bridge: Pick<IsolationBridge, 'positions'> | undefined): { characterPositions: IsolationBridge['positions'] } | null {
+  return bridge && bridge.positions.length > 0 ? { characterPositions: bridge.positions } : null;
 }
 
-/** An isolated chapter's continuation state as a standard call may read it: roster keys and short places only, never what the unrestricted writer described. */
-export function standardReadableState(state: unknown, roster: ReadonlySet<string>): { characterPositions: StandardPosition[] } | null {
-  if (state === null || typeof state !== 'object' || Array.isArray(state)) return null;
-  const positions = (state as Record<string, unknown>)['characterPositions'];
-  if (!Array.isArray(positions)) return null;
-  const kept = positions.filter(position => isPosition(position, roster)).map(({ entityKey, location }) => ({ entityKey, location: location.trim() }));
-  return kept.length > 0 ? { characterPositions: kept } : null;
-}
-
-export function standardReadableDraft<T extends IsolatableDraft>(draft: T, roster: ReadonlySet<string>): T {
+export function standardReadableDraft<T extends IsolatableDraft>(draft: T, bridge: IsolationBridge | undefined): T {
   if (!draft.isolated) return draft;
-  return { ...draft, body: standardReadableProse(draft), state: standardReadableState(draft.state, roster), judgeNote: null };
+  const summary = bridge?.summary ?? null;
+  const withheld = { body: standardReadableProse(draft, summary), summary, state: standardReadableState(bridge), judgeNote: null };
+  return { ...draft, ...withheld, ...('title' in draft ? { title: null } : {}) };
 }
 
 export const WALLED_OFF_EXCERPT = '[excerpt withheld: unrestricted chapter]';

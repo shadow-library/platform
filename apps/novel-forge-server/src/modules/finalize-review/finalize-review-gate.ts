@@ -49,7 +49,7 @@ export function strandedReveals(items: readonly MilestoneItem[]): { milestone: s
  */
 export function reviewRefusal(reviews: readonly ReviewWithItems[], draft: ReviewedRevision): AppError | null {
   if (reviews.length === 0) return null;
-  const review = reviews.find(candidate => candidate.draftRevision === draft.revision);
+  const review = reviews.find(candidate => !candidate.bridgeOnly && candidate.draftRevision === draft.revision);
   if (!review || !isReviewCurrent(review, draft)) return AppErrorCode.FRV_004.create();
   if (review.status === 'applied' || review.status === 'reverted') return null;
   if (review.status === 'preparing') return AppErrorCode.FRV_002.create();
@@ -122,7 +122,7 @@ export async function applyReviewOnCommit(tx: PrimaryTransaction, commit: Review
   const reviews = await loadChapterReviews(tx, commit.projectId, commit.chapter);
   const refusal = reviewRefusal(reviews, { revision: commit.draftRevision, body: commit.prose });
   if (refusal) throw refusal;
-  const review = reviews.find(candidate => candidate.draftRevision === commit.draftRevision) as ReviewWithItems;
+  const review = reviews.find(candidate => !candidate.bridgeOnly && candidate.draftRevision === commit.draftRevision) as ReviewWithItems;
   if (review.status !== 'ready') return true;
 
   const kept = review.items.filter(item => item.decision === 'kept' || item.decision === 'edited');

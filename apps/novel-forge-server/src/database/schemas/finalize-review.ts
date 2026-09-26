@@ -1,5 +1,5 @@
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { drafts } from './generation';
 import { jobs } from './jobs';
@@ -31,7 +31,16 @@ export namespace FinalizeReview {
 }
 
 export const finalizeReviewStatus = pgEnum('finalize_review_status', ['preparing', 'ready', 'failed', 'applied', 'reverted']);
-export const finalizeReviewCategory = pgEnum('finalize_review_category', ['entity', 'appearance', 'character_state', 'relationship', 'promise', 'knowledge', 'milestone']);
+export const finalizeReviewCategory = pgEnum('finalize_review_category', [
+  'entity',
+  'appearance',
+  'character_state',
+  'relationship',
+  'promise',
+  'knowledge',
+  'milestone',
+  'summary',
+]);
 export const finalizeReviewTriage = pgEnum('finalize_review_triage', ['consequential', 'routine']);
 export const finalizeReviewBasis = pgEnum('finalize_review_basis', ['observed', 'inferred']);
 export const finalizeReviewDecision = pgEnum('finalize_review_decision', ['kept', 'edited', 'skipped']);
@@ -52,6 +61,8 @@ export const finalizeReviews = pgTable(
     /** The approved plan's hash: a plan change at the same revision re-prepares the review. */
     planHash: varchar('plan_hash'),
     isolated: boolean('isolated').notNull().default(false),
+    /** A final isolated chapter's bridge, read again after an amend: never applied, since an amend does not touch the Story Bible. */
+    bridgeOnly: boolean('bridge_only').notNull().default(false),
     status: finalizeReviewStatus('status').notNull().default('preparing'),
     jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'set null' }),
     error: text('error'),
@@ -61,7 +72,13 @@ export const finalizeReviews = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('finalize_reviews_project_id_chapter_revision_unique').on(t.projectId, t.chapter, t.draftRevision), index('finalize_reviews_draft_id_idx').on(t.draftId)],
+  // One finalize review per revision; a final chapter's bridge may be read again beside it, so bridge-only reviews are not unique.
+  t => [
+    uniqueIndex('finalize_reviews_project_id_chapter_revision_unique')
+      .on(t.projectId, t.chapter, t.draftRevision)
+      .where(sql`${t.bridgeOnly} = false`),
+    index('finalize_reviews_draft_id_idx').on(t.draftId),
+  ],
 );
 
 export const finalizeReviewItems = pgTable(

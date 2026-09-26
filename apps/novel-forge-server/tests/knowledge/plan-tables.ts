@@ -3,6 +3,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { schema } from '@server/database';
 
+import { bridgeCandidates } from '../finalize-review/bridge-fixtures';
 import { matchesWhere, queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
@@ -107,6 +108,10 @@ export function planTables(seed: PlanSeed = {}) {
     query: { ...query, finalizeReviews, projects: { findFirst: async () => project } },
     select: () => ({
       from: (table: unknown) => ({
+        innerJoin: () => ({
+          where: async (condition: SQL) =>
+            bridgeCandidates({ drafts: rows(schema.drafts), reviews: rows(schema.finalizeReviews).map(withItems), entities: rows(schema.entities) }, condition),
+        }),
         where: (condition: SQL) => ({
           for: async () => {
             locks.push(table);
@@ -145,7 +150,9 @@ export function planTables(seed: PlanSeed = {}) {
           table === schema.briefs
             ? rows(table).find(existing => existing['chapter'] === row['chapter'])
             : table === schema.finalizeReviews
-              ? rows(table).find(existing => existing['chapter'] === row['chapter'] && existing['draftRevision'] === row['draftRevision'])
+              ? rows(table).find(
+                  existing => !row['bridgeOnly'] && !existing['bridgeOnly'] && existing['chapter'] === row['chapter'] && existing['draftRevision'] === row['draftRevision'],
+                )
               : undefined;
         if (!clash) rows(table).push(row);
         return Object.assign(Promise.resolve(), {
