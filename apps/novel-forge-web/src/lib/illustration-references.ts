@@ -258,6 +258,8 @@ export function describeReferenceWarning(warning: ReferenceWarningResponse, meta
       return `${label} skipped: the file is too large to send as a reference`;
     case 'unsupported-format':
       return `${label} skipped: only PNG, JPEG and WebP images can be sent`;
+    case 'later-chapter':
+      return `${label} skipped: it shows a later chapter than this image`;
   }
 }
 

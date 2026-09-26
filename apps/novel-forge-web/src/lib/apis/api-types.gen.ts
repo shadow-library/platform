@@ -2298,7 +2298,8 @@ export interface paths {
     delete: operations['delete_api_v1_projects_projectId_entities_entityKey_image'];
     options?: never;
     head?: never;
-    patch?: never;
+    /** Date Portrait */
+    patch: operations['patch_api_v1_projects_projectId_entities_entityKey_image'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/entities/{entityKey}/images': {
@@ -2332,7 +2333,8 @@ export interface paths {
     delete: operations['delete_api_v1_projects_projectId_entities_entityKey_images_imageId'];
     options?: never;
     head?: never;
-    patch?: never;
+    /** Date Image */
+    patch: operations['patch_api_v1_projects_projectId_entities_entityKey_images_imageId'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/volumes': {
@@ -5169,6 +5171,8 @@ export interface components {
       references?: components['schemas']['AttachReferenceBody'][];
       /** @description Whether the auto-rules (the entity's portrait, a chapter's cast portraits) may add references. Defaults to true. */
       autoReferences?: boolean;
+      /** @description Entity subjects only (else ILL_017): draw the entity as of this chapter (0 = before the story), from canon up to it with the chapter writer's secrets withheld. Defaults to the latest final chapter; a later one is refused with ILL_016. The saved image reaches readers from this chapter on. */
+      depictsChapter?: number;
     };
     /** @enum {string} */
     IllustrationSubjectType: 'entity' | 'chapter' | 'cover';
@@ -5208,6 +5212,8 @@ export interface components {
       autoReferences: boolean;
       selectedRef?: null | string;
       selectedUrl?: null | string;
+      /** @description The chapter an entity illustration is drawn as of; null for other subjects and for sessions from before dating. */
+      depictsChapter: null | number;
       /** @description Appearance the composer derived because the entity had none; PATCH it onto the entity to make it canon. */
       suggestedAppearance?: string;
       /** @description Set when `suggestedAppearance` was described from a likeness reference rather than derived from canon. */
@@ -5277,7 +5283,7 @@ export interface components {
       reason: string;
     };
     /** @enum {string} */
-    IllustrationReferenceWarningCode: 'capacity-trimmed' | 'merged-with-edit-source' | 'missing-file' | 'too-large' | 'unsupported-format';
+    IllustrationReferenceWarningCode: 'capacity-trimmed' | 'later-chapter' | 'merged-with-edit-source' | 'missing-file' | 'too-large' | 'unsupported-format';
     /** @description Newest first. Setting a project cover by upload or import opens an 'uploaded' cover illustration on it. */
     ListIllustrationsResponse: {
       items: components['schemas']['IllustrationResponse'][];
@@ -5406,6 +5412,8 @@ export interface components {
       appearance?: null | string;
       /** @description Absolute public URL for the portrait, or null when the entity has no portrait. */
       imageUrl?: null | string;
+      /** @description The chapter the portrait shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on a portrait from before dating, which keeps its old visibility. */
+      imageDepictsChapter?: null | number;
       /** @description The entity's additional reference images. Included by the single-entity endpoint. */
       images?: components['schemas']['EntityImageResponse'][];
       /** Format: date-time */
@@ -5419,6 +5427,8 @@ export interface components {
       imageUrl: string;
       caption?: null | string;
       sortOrder: number;
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on an image from before dating, which keeps its old visibility. */
+      depictsChapter?: null | number;
     };
     ListEntityResponse: {
       total: number;
@@ -5470,12 +5480,20 @@ export interface components {
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016. */
+      depictsChapter?: number;
+    };
+    DateEntityImageBody: {
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. A chapter past the latest final one is refused with ILL_016. */
+      depictsChapter: number;
     };
     AddEntityImageBody: {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       /** @description Base64-encoded image bytes without a data URL prefix. */
       image: string;
+      /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Defaults to the latest final chapter; a later one is refused with ILL_016. */
+      depictsChapter?: number;
       caption?: string;
     };
     ListVolumeResponse: {
@@ -13106,6 +13124,51 @@ export interface operations {
       };
     };
   };
+  patch_api_v1_projects_projectId_entities_entityKey_image: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DateEntityImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_entities_entityKey_images: {
     parameters: {
       query?: never;
@@ -13163,6 +13226,52 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_projects_projectId_entities_entityKey_images_imageId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+        imageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DateEntityImageBody'];
+      };
+    };
     responses: {
       /** @description Default Response */
       200: {
@@ -15291,6 +15400,7 @@ export type CharacterEventSource = components['schemas']['CharacterEventSource']
 export type KnowledgeStatus = components['schemas']['KnowledgeStatus'];
 export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
 export type UploadImageBody = components['schemas']['UploadImageBody'];
+export type DateEntityImageBody = components['schemas']['DateEntityImageBody'];
 export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
 export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
