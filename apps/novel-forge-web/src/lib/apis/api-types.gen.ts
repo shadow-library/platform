@@ -2182,6 +2182,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/volumes/{volumeKey}/goal-met': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Goal Met */
+    post: operations['post_api_v1_projects_projectId_volumes_volumeKey_goal_met'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/bible': {
     parameters: {
       query?: never;
@@ -5110,6 +5127,14 @@ export interface components {
       body?: null | string;
       /** @description Where the story stands against the volume goal. */
       state: components['schemas']['VolumeState'];
+      /** @description Computed on read from the chapters that carry this volume key — never stored. */
+      chapterCount: number;
+      /** @description Lowest chapter number in the volume; null when it has none. */
+      firstChapter?: null | number;
+      /** @description Highest chapter number in the volume; null when it has none. */
+      lastChapter?: null | number;
+      /** @description Sum of word counts across the volume’s chapters. */
+      wordCount: number;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -5117,6 +5142,12 @@ export interface components {
     };
     /** @enum {string} */
     VolumeState: 'not_started' | 'active' | 'goal_met';
+    VolumeAdvanceResponse: {
+      /** @description The volume just marked goal met. */
+      completed: components['schemas']['VolumeResponse'];
+      /** @description The next volume, now active — null if none was waiting to start. */
+      activated?: components['schemas']['VolumeResponse'] | null;
+    };
     ListBibleDocResponse: {
       docs: components['schemas']['BibleDocListItem'][];
     };
@@ -12386,6 +12417,47 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_volumes_volumeKey_goal_met: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        volumeKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VolumeAdvanceResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_bible: {
     parameters: {
       query?: never;
@@ -14338,6 +14410,7 @@ export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
 export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
 export type VolumeState = components['schemas']['VolumeState'];
+export type VolumeAdvanceResponse = components['schemas']['VolumeAdvanceResponse'];
 export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
 export type BibleDocListItem = components['schemas']['BibleDocListItem'];
 export type BibleDocResponse = components['schemas']['BibleDocResponse'];
