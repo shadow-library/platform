@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 
-import { BookIcon, ChatIcon, EditIcon, ImageIcon, OverviewIcon, ReviewIcon, RunsIcon, SendIcon, SettingsIcon } from '../icons';
+import { BookIcon, ChatIcon, EditIcon, ImageIcon, OverviewIcon, ReviewIcon, RunsIcon, SendIcon, SettingsIcon, UsageIcon } from '../icons';
 import { type ProjectRoute } from './routes';
 
 export interface ProjectScreen {
@@ -31,6 +31,7 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },
   { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, adminOnly: true },
   { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon /> },
+  { segment: 'usage', to: '/novels/$novelId/usage', label: 'Usage & charges', icon: <UsageIcon /> },
   { segment: 'settings', to: '/novels/$novelId/settings', label: 'Project Settings', icon: <SettingsIcon />, trailing: true },
 ];
 

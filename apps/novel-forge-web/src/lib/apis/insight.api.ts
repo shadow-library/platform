@@ -23,6 +23,10 @@ export function useProjectCostQuery(projectId: string, enabled = true): UseQuery
   return useQuery({ ...projectCostQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
+export function invalidateProjectCost(queryClient: QueryClient, projectId: string): void {
+  invalidateSoon(queryClient, { queryKey: insightKeys.cost(projectId) });
+}
+
 export const hasActiveJob = (data?: ListGenerationJobResponse): boolean => data?.items.some(job => job.status === 'pending' || job.status === 'in_progress') ?? false;
 
 export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListGenerationJobResponse>): UseQueryResult<ListGenerationJobResponse, ApiError> {

@@ -66,6 +66,15 @@
   flex: 1;
 }
 
+.roleRowWrap {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.roleRowWrap .roleInfo {
+  flex: 1 1 260px;
+}
+
 .roleLabel {
   font-size: var(--sh-text-body-sm);
   font-weight: 600;
@@ -74,6 +83,42 @@
 .roleHint {
   font-size: 11px;
   color: var(--sh-text-tertiary);
+}
+
+.jobMap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.jobRow {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 120px;
+  gap: 12px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.jobRow dd {
+  margin: 0;
+  color: var(--sh-text-secondary);
+}
+
+.jobRow .jobPrice {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .jobRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .jobRow .jobPrice {
+    text-align: left;
+  }
 }
 
 .rolePicker {

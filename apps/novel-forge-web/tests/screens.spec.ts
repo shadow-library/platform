@@ -4,7 +4,18 @@ import { PROJECT_SCREENS, projectHomeRoute, SCREEN_LABEL } from '../src/componen
 
 describe('PROJECT_SCREENS', () => {
   it('should list the full authoring sidebar', () => {
-    expect(PROJECT_SCREENS.map(screen => screen.segment)).toEqual(['overview', 'story-bible', 'chapters', 'illustrations', 'review', 'chat', 'runs', 'publish', 'settings']);
+    expect(PROJECT_SCREENS.map(screen => screen.segment)).toEqual([
+      'overview',
+      'story-bible',
+      'chapters',
+      'illustrations',
+      'review',
+      'chat',
+      'runs',
+      'publish',
+      'usage',
+      'settings',
+    ]);
   });
 });
 
@@ -18,5 +29,6 @@ describe('SCREEN_LABEL', () => {
   it('should label every declared screen', () => {
     expect(SCREEN_LABEL.get('chapters')).toBe('Chapters');
     expect(SCREEN_LABEL.get('chat')).toBe('Refinement Chat');
+    expect(SCREEN_LABEL.get('usage')).toBe('Usage & charges');
   });
 });

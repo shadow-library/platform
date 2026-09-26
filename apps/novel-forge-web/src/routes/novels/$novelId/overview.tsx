@@ -5,6 +5,7 @@ import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
+import { BreakdownTable, EstimateNote, StatCard, StatGrid, StatValue, UsageBars } from '@/features/usage';
 import {
   type CostBreakdownItem,
   type GenerationJobItem,
@@ -30,6 +31,7 @@ import {
 } from '@/lib/apis';
 import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
+import { barPercent, breakdownRows, formatUsd, type UsageBarItem } from '@/lib/usage';
 
 import styles from './overview.module.css';
 
@@ -68,84 +70,11 @@ function LifecycleStepper({ labels, completed }: LifecycleStepperProps): React.J
   );
 }
 
-interface StatCardProps {
-  label: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}
-
-function StatCard({ label, children, footer }: StatCardProps): React.JSX.Element {
-  return (
-    <div className={styles.statCard}>
-      <div className={styles.statCardLabel}>{label}</div>
-      {children}
-      {footer && <div className={styles.statCardFooter}>{footer}</div>}
-    </div>
-  );
-}
-
-interface RoleBarProps {
-  usage: CostBreakdownItem;
-  maxTokens: number;
-}
-
-function roleLabel(role: string): string {
-  return role.replace(/^bible:/, '');
-}
-
-function formatUsd(value: number): string {
-  return `$${value.toFixed(2)}`;
-}
-
-function RoleBar({ usage, maxTokens }: RoleBarProps): React.JSX.Element {
+function roleBar(usage: CostBreakdownItem, maxTokens: number): UsageBarItem {
   const tokens = usage.inputTokens + usage.outputTokens;
-  const pct = maxTokens > 0 ? Math.max(4, Math.round((tokens / maxTokens) * 100)) : 4;
   const cost = usage.costUsd > 0 ? ` · ${formatUsd(usage.costUsd)}` : '';
   const tip = `${usage.key} · ${usage.calls} call${usage.calls === 1 ? '' : 's'} · ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${cost}`;
-  return (
-    <Tooltip content={tip}>
-      <div className={styles.barCol}>
-        <div className={styles.barTrack}>
-          <div className={styles.barFill} style={{ '--pct': `${pct}%` } as React.CSSProperties} />
-        </div>
-        <span className={styles.barLabel}>{roleLabel(usage.key)}</span>
-      </div>
-    </Tooltip>
-  );
-}
-
-interface ModelCostTableProps {
-  models: CostBreakdownItem[];
-}
-
-function ModelCostTable({ models }: ModelCostTableProps): React.JSX.Element {
-  return (
-    <table className={styles.costTable}>
-      <thead>
-        <tr>
-          <th>Model</th>
-          <th>Calls</th>
-          <th>Tokens in / out</th>
-          <th>Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        {models.map(model => (
-          <tr key={model.key}>
-            <td>{model.label}</td>
-            <td>{model.calls.toLocaleString()}</td>
-            <td>
-              {model.inputTokens.toLocaleString()} / {model.outputTokens.toLocaleString()}
-            </td>
-            <td>
-              {formatUsd(model.costUsd)}
-              {model.estimatedCostUsd > 0 && <span className={styles.estimateMark}>*</span>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  return { key: usage.key, label: usage.key.replace(/^bible:/, ''), pct: barPercent(tokens, maxTokens), tip };
 }
 
 interface RunIntentMeta {
@@ -340,6 +269,7 @@ function OverviewScreen(): React.JSX.Element {
 
   const roles = [...(cost?.byRole ?? [])].sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
   const maxTokens = roles.reduce((m, r) => Math.max(m, r.inputTokens + r.outputTokens), 0);
+  const roleBars = roles.map(role => roleBar(role, maxTokens));
 
   const doClone = (): void => {
     if (!cloneName.trim()) return;
@@ -491,26 +421,17 @@ function OverviewScreen(): React.JSX.Element {
             )}
           </SectionCard>
 
-          <div className={styles.statGrid}>
+          <StatGrid>
             <StatCard label="Chapters">
-              <div className={styles.statBig}>
-                <span className={styles.statNum}>{status?.chaptersFinal ?? 0}</span>
-                <span className={styles.statUnit}>/ {status?.chaptersTotal ?? 0} planned</span>
-              </div>
+              <StatValue value={status?.chaptersFinal ?? 0} unit={`/ ${status?.chaptersTotal ?? 0} planned`} />
             </StatCard>
             <StatCard label="Volumes" footer={<StatusChip intent="info">{status?.volumesTotal ?? 0} total</StatusChip>}>
-              <div className={styles.statBig}>
-                <span className={styles.statNum}>{status?.volumesTotal ?? 0}</span>
-                <span className={styles.statUnit}>total</span>
-              </div>
+              <StatValue value={status?.volumesTotal ?? 0} unit="total" />
             </StatCard>
             <StatCard label="Drafts">
-              <div className={styles.statBig}>
-                <span className={styles.statNum}>{status?.draftsFinal ?? 0}</span>
-                <span className={styles.statUnit}>/ {status?.draftsTotal ?? 0} final</span>
-              </div>
+              <StatValue value={status?.draftsFinal ?? 0} unit={`/ ${status?.draftsTotal ?? 0} final`} />
             </StatCard>
-          </div>
+          </StatGrid>
 
           <div className={styles.mainGrid}>
             <SectionCard>
@@ -526,13 +447,7 @@ function OverviewScreen(): React.JSX.Element {
                   </div>
                 </div>
               </div>
-              {roles.length > 0 && (
-                <div className={styles.bars}>
-                  {roles.map(r => (
-                    <RoleBar key={r.key} usage={r} maxTokens={maxTokens} />
-                  ))}
-                </div>
-              )}
+              {roles.length > 0 && <UsageBars label="Tokens per role" items={roleBars} />}
               <div className={styles.tokenGrid}>
                 <div>
                   <div className={styles.tokenLabel}>Input tokens</div>
@@ -547,12 +462,8 @@ function OverviewScreen(): React.JSX.Element {
                   <div className={styles.tokenValue}>{(cost?.calls ?? 0).toLocaleString()}</div>
                 </div>
               </div>
-              {cost && cost.byModel.length > 0 && <ModelCostTable models={cost.byModel} />}
-              {cost && cost.estimatedCostUsd > 0 && (
-                <p className={styles.estimateNote}>
-                  <span className={styles.estimateMark}>*</span> Includes {formatUsd(cost.estimatedCostUsd)} estimated from list prices for calls that recorded no cost.
-                </p>
-              )}
+              {cost && cost.byModel.length > 0 && <BreakdownTable heading="Model" rows={breakdownRows(cost.byModel, model => model.label, true)} showTokens />}
+              {cost && <EstimateNote estimatedCostUsd={cost.estimatedCostUsd} />}
             </SectionCard>
 
             <SectionCard

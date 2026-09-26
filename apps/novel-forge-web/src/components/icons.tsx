@@ -78,6 +78,13 @@ export const RunsIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const UsageIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M8 17v-5M13 17V8M18 17v-3" />
+  </SvgIcon>
+);
+
 export const SettingsIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <circle cx="12" cy="12" r="3" />

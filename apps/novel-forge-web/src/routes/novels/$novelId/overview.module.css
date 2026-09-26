@@ -238,51 +238,6 @@
   flex-shrink: 0;
 }
 
-.statGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.statCard {
-  background: var(--sh-surface-card);
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-lg);
-  padding: 16px 18px;
-}
-
-.statCardLabel {
-  font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
-}
-
-.statCardFooter {
-  margin-top: 10px;
-}
-
-.statBig {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.statNum {
-  font-size: 28px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-
-.statUnit {
-  font-size: 14px;
-  color: var(--sh-text-tertiary);
-}
-
 .mainGrid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -320,51 +275,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.bars {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  height: 116px;
-  margin-bottom: 14px;
-}
-
-.barCol {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  cursor: default;
-}
-
-.barTrack {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.barFill {
-  height: var(--pct);
-  background: var(--sh-indigo-400);
-  border-radius: 3px 3px 0 0;
-  transition: background 0.12s;
-}
-
-.barCol:hover .barFill {
-  background: var(--sh-indigo-500);
-}
-
-.barLabel {
-  margin-top: 6px;
-  font-size: 9px;
-  color: var(--sh-text-tertiary);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .tokenGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -382,44 +292,6 @@
   font-size: var(--sh-text-body-lg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-.costTable {
-  width: 100%;
-  margin-top: 14px;
-  border-collapse: collapse;
-  font-size: var(--sh-text-body-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.costTable th {
-  padding: 0 0 6px;
-  font-size: var(--sh-text-caption);
-  font-weight: 500;
-  color: var(--sh-text-tertiary);
-  text-align: right;
-}
-
-.costTable td {
-  padding: 6px 0;
-  border-top: 1px solid var(--sh-border-subtle);
-  text-align: right;
-}
-
-.costTable th:first-child,
-.costTable td:first-child {
-  text-align: left;
-}
-
-.estimateMark {
-  margin-left: 2px;
-  color: var(--sh-warning-solid);
-}
-
-.estimateNote {
-  margin: 10px 0 0;
-  font-size: var(--sh-text-caption);
-  color: var(--sh-text-tertiary);
 }
 
 .emptyRuns {

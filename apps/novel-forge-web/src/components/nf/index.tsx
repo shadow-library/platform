@@ -37,6 +37,7 @@ export { DefaultCatchBoundary } from './DefaultCatchBoundary';
 export { BibleHealth, type BibleHealthProps } from './BibleHealth';
 export { BibleReadiness, type BibleReadinessProps } from './BibleReadiness';
 export { type ChipIntent, StatusChip, type StatusChipProps } from './StatusChip';
+export { RunStatusChip, type RunStatusChipProps, runIntent } from './RunStatusChip';
 
 interface StopButtonProps {
   onStop: () => void;

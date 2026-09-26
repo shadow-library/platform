@@ -1,28 +1,44 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Accordion, Alert, Button, Dialog, FormField, Input, SegmentedControl, Tabs, Textarea, toast } from '@shadow-library/ui';
+import { Accordion, Alert, Button, Dialog, FormField, Input, SegmentedControl, Spinner, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import { PluginsTab } from '@/features/plugins/PluginsTab';
 import {
   aiModelsQueryOptions,
   type ContentMode,
-  type ProjectConfig,
+  type CostTier,
   type ProjectModelOverrides,
+  type ProjectModelRoute,
   type ProjectWordTarget,
   useAccountSettingsQuery,
   useAiModelsQuery,
   useDeleteProjectMutation,
   useListPluginsQuery,
+  useProjectModelsQuery,
   useProjectQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
-import { inheritedModel, modelLabel } from '@/lib/model-defaults';
+import { inheritedModel, modelLabel, modelSaveBody } from '@/lib/model-defaults';
+import { contentModeLabel, groupLabel, tierLabel } from '@/lib/usage';
 
 import styles from './settings.module.css';
 
+type SettingsTab = 'general' | 'models' | 'plugins' | 'danger';
+
+interface SettingsSearch {
+  tab?: SettingsTab;
+}
+
+const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'models', 'plugins', 'danger'];
+
+function isSettingsTab(value: unknown): value is SettingsTab {
+  return typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value);
+}
+
 export const Route = createFileRoute('/novels/$novelId/settings')({
+  validateSearch: (search: Record<string, unknown>): SettingsSearch => ({ tab: isSettingsTab(search.tab) ? search.tab : undefined }),
   loader: ({ context }) => context.queryClient.prefetchQuery(aiModelsQueryOptions()),
   component: SettingsScreen,
 });
@@ -108,8 +124,95 @@ function parseWordTargetInput(minInput: string, maxInput: string): WordTargetInp
   return { value: { min, max } };
 }
 
+const CONTENT_MODES: readonly ContentMode[] = ['standard', 'unrestricted'];
+const COST_TIERS: readonly CostTier[] = ['economy', 'balanced', 'performant'];
+const JOB_ORDER = ['writing', 'planning', 'review', 'chat', 'helper', 'image'];
+
+function isContentMode(value: string): value is ContentMode {
+  return (CONTENT_MODES as readonly string[]).includes(value);
+}
+
+function isCostTier(value: string): value is CostTier {
+  return (COST_TIERS as readonly string[]).includes(value);
+}
+
+function routePrice(route: ProjectModelRoute): string {
+  if (route.inputPricePerMToken == null || route.outputPricePerMToken == null) return '—';
+  return `$${route.inputPricePerMToken} in · $${route.outputPricePerMToken} out per 1M tokens`;
+}
+
+interface ModelCostDefaultsProps {
+  novelId: string;
+  contentMode: ContentMode;
+  costTier: CostTier;
+  onContentModeChange: (mode: ContentMode) => void;
+  onCostTierChange: (tier: CostTier) => void;
+}
+
+function ModelCostDefaults({ novelId, contentMode, costTier, onContentModeChange, onCostTierChange }: ModelCostDefaultsProps): React.JSX.Element {
+  const routesQuery = useProjectModelsQuery(novelId, { contentMode, costTier });
+  const routes = [...(routesQuery.data?.models ?? [])].sort((a, b) => JOB_ORDER.indexOf(a.group) - JOB_ORDER.indexOf(b.group));
+
+  return (
+    <section className={styles.modelGroup} aria-labelledby="model-cost-defaults">
+      <div id="model-cost-defaults" className={styles.modelGroupHead}>
+        Defaults for this novel
+      </div>
+      <div className={`${styles.roleRow} ${styles.roleRowWrap}`}>
+        <div className={styles.roleInfo}>
+          <div className={styles.roleLabel}>Model type</div>
+          <div className={styles.roleHint}>Standard uses Claude. Unrestricted uses models that allow dark content — for books that are dark throughout.</div>
+        </div>
+        <SegmentedControl size="sm" aria-label="Model type" value={contentMode} onValueChange={value => isContentMode(value) && onContentModeChange(value)}>
+          {CONTENT_MODES.map(mode => (
+            <SegmentedControl.Item key={mode} value={mode}>
+              {contentModeLabel(mode)}
+            </SegmentedControl.Item>
+          ))}
+        </SegmentedControl>
+      </div>
+      <div className={`${styles.roleRow} ${styles.roleRowWrap}`}>
+        <div className={styles.roleInfo}>
+          <div className={styles.roleLabel}>Cost tier</div>
+          <div className={styles.roleHint}>How much quality you buy per call. New chats, chapters and reviews use it.</div>
+        </div>
+        <SegmentedControl size="sm" aria-label="Cost tier" value={costTier} onValueChange={value => isCostTier(value) && onCostTierChange(value)}>
+          {COST_TIERS.map(tier => (
+            <SegmentedControl.Item key={tier} value={tier}>
+              {tierLabel(tier)}
+            </SegmentedControl.Item>
+          ))}
+        </SegmentedControl>
+      </div>
+      <div className={styles.roleRow}>
+        <div className={styles.roleInfo}>
+          <div className={styles.roleLabel}>What that means for each job</div>
+          {routesQuery.isLoading && <Spinner size="sm" label="Loading the models" />}
+          {routesQuery.error && <div className={styles.roleHint}>Couldn’t load the models: {routesQuery.error.message}</div>}
+          {routes.length > 0 && (
+            <dl className={styles.jobMap}>
+              {routes.map(route => (
+                <div key={route.group} className={styles.jobRow}>
+                  <dt>{groupLabel(route.group)}</dt>
+                  <dd>
+                    {route.label}
+                    {route.source === 'project' ? ' · your pick' : route.source === 'account' ? ' · your default' : ''}
+                  </dd>
+                  <dd className={styles.jobPrice}>{routePrice(route)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SettingsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
+  const { tab = 'general' } = Route.useSearch();
+  const goSearch = Route.useNavigate();
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const modelsQuery = useAiModelsQuery();
@@ -123,21 +226,29 @@ function SettingsScreen(): React.JSX.Element {
   const [brief, setBrief] = useState('');
   const [instructions, setInstructions] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
+  const [costTier, setCostTier] = useState<CostTier>('balanced');
   const [wordTargetMin, setWordTargetMin] = useState('');
   const [wordTargetMax, setWordTargetMax] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const unrestrictedAllowlist = modelsQuery.data?.unrestrictedAllowlist;
-  const [synced, setSynced] = useState<{ project: typeof project; allowlist: typeof unrestrictedAllowlist }>({ project: undefined, allowlist: undefined });
-  if (project && (synced.project !== project || synced.allowlist !== unrestrictedAllowlist)) {
-    setSynced({ project, allowlist: unrestrictedAllowlist });
+  const generalKey = project ? JSON.stringify([project.id, project.name, project.title, project.brief, project.instructions, project.wordTarget]) : undefined;
+  const modelKey = project ? JSON.stringify([project.id, project.contentMode, project.costTier, project.config?.models, unrestrictedAllowlist]) : undefined;
+  const [syncedGeneral, setSyncedGeneral] = useState<string>();
+  const [syncedModels, setSyncedModels] = useState<string>();
+  if (project && syncedGeneral !== generalKey) {
+    setSyncedGeneral(generalKey);
     setTitle(projectTitle(project));
     setBrief(project.brief ?? '');
     setInstructions(project.instructions ?? '');
-    setContentMode(project.contentMode);
     setWordTargetMin(project.wordTarget ? String(project.wordTarget.min) : '');
     setWordTargetMax(project.wordTarget ? String(project.wordTarget.max) : '');
+  }
+  if (project && syncedModels !== modelKey) {
+    setSyncedModels(modelKey);
+    setContentMode(project.contentMode);
+    setCostTier(project.costTier);
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
     const allowed = new Set(unrestrictedAllowlist ?? []);
@@ -159,25 +270,18 @@ function SettingsScreen(): React.JSX.Element {
       return;
     }
     updateProject.mutate(
-      { title: title.trim(), brief, instructions, contentMode, wordTarget: wordTarget.value },
+      { title: title.trim(), brief, instructions, wordTarget: wordTarget.value },
       { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) },
     );
   };
 
   const saveModels = (): void => {
-    // A group's choice fans out across every role it owns; INHERIT_MODEL groups are omitted so the router
-    // falls back to the profile default. The locked embedding override (if any) is preserved untouched.
-    const overrides: ProjectModelOverrides = {};
-    const existingEmbedding = project?.config?.models?.embedding;
-    if (existingEmbedding) overrides.embedding = existingEmbedding;
-    for (const group of ALL_ROLES) {
+    const picks = ALL_ROLES.map(group => {
       const value = models[group.key];
-      if (!value || value === INHERIT_MODEL) continue;
-      const ref = decodeModelRef(value);
-      for (const role of GROUP_ROLES[group.key]) overrides[role] = ref;
-    }
-    const config: ProjectConfig = { models: overrides };
-    updateProject.mutate({ config }, { onSuccess: () => toast.success('Models saved'), onError: err => toast.danger(err.message) });
+      return { roles: GROUP_ROLES[group.key], ref: value && value !== INHERIT_MODEL ? decodeModelRef(value) : null };
+    });
+    const body = modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks, embedding: project?.config?.models?.embedding });
+    updateProject.mutate(body, { onSuccess: () => toast.success('Model & cost settings saved'), onError: err => toast.danger(err.message) });
   };
 
   const doDelete = (): void => {
@@ -192,6 +296,7 @@ function SettingsScreen(): React.JSX.Element {
 
   // A deployment with no plugin directory answers `[]`, and the tab does not exist at all there.
   const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
+  const activeTab = tab === 'plugins' && !hasPlugins ? 'general' : tab;
   const unrestricted = contentMode === 'unrestricted';
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const registry = modelsQuery.data?.models ?? [];
@@ -205,10 +310,10 @@ function SettingsScreen(): React.JSX.Element {
         <>
           <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults and the models each AI operation uses.` : ''} />
 
-          <Tabs defaultValue="general">
+          <Tabs value={activeTab} onValueChange={value => isSettingsTab(value) && void goSearch({ search: { tab: value === 'general' ? undefined : value }, replace: true })}>
             <Tabs.List>
               <Tabs.Tab value="general">General</Tabs.Tab>
-              <Tabs.Tab value="models">Models</Tabs.Tab>
+              <Tabs.Tab value="models">Model &amp; cost</Tabs.Tab>
               {hasPlugins && <Tabs.Tab value="plugins">Plugins</Tabs.Tab>}
               <Tabs.Tab value="danger">Danger zone</Tabs.Tab>
             </Tabs.List>
@@ -273,12 +378,6 @@ function SettingsScreen(): React.JSX.Element {
                       </div>
                     </div>
                   </FormField>
-                  <FormField label="Content mode" helper="Unrestricted uses the alternate model map. Standard uses the default quality stack.">
-                    <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>
-                      <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
-                      <SegmentedControl.Item value="unrestricted">Unrestricted</SegmentedControl.Item>
-                    </SegmentedControl>
-                  </FormField>
                   <div>
                     <Button variant="primary" loading={updateProject.isPending} onClick={saveGeneral}>
                       Save changes
@@ -297,10 +396,13 @@ function SettingsScreen(): React.JSX.Element {
                 </Alert>
               </div>
 
+              <ModelCostDefaults novelId={novelId} contentMode={contentMode} costTier={costTier} onContentModeChange={setContentMode} onCostTierChange={setCostTier} />
               {modelsQuery.error ? (
-                <Alert intent="danger" title="Couldn’t load the model registry">
-                  {modelsQuery.error.message}
-                </Alert>
+                <div className={styles.alertWrap}>
+                  <Alert intent="danger" title="Couldn’t load the model registry">
+                    {modelsQuery.error.message}
+                  </Alert>
+                </div>
               ) : (
                 <>
                   {ROLE_GROUPS.map(section => (
@@ -335,15 +437,14 @@ function SettingsScreen(): React.JSX.Element {
                       })}
                     </div>
                   ))}
-
-                  <div className={styles.saveRow}>
-                    <div className={styles.spacer} />
-                    <Button variant="primary" loading={updateProject.isPending} onClick={saveModels}>
-                      Save changes
-                    </Button>
-                  </div>
                 </>
               )}
+              <div className={styles.saveRow}>
+                <div className={styles.spacer} />
+                <Button variant="primary" loading={updateProject.isPending} onClick={saveModels}>
+                  Save changes
+                </Button>
+              </div>
             </Tabs.Panel>
 
             {hasPlugins && (

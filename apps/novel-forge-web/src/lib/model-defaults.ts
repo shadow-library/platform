@@ -1,4 +1,13 @@
-import { type AccountModelDefaults, type AiModelOption, type AiRoleDefault } from './apis/api-types.gen';
+import {
+  type AccountModelDefaults,
+  type AiModelOption,
+  type AiRoleDefault,
+  type ContentMode,
+  type CostTier,
+  type ProjectModelOverrides,
+  type ProjectModelRef,
+  type UpdateProjectBody,
+} from './apis/api-types.gen';
 
 export type AccountModelGroup = keyof AccountModelDefaults;
 
@@ -35,4 +44,29 @@ export function inheritedModel(
   if (own && listed && (!allowlist || allowlist.has(own.model))) return { provider: own.provider, model: own.model, source: 'account' };
   const fallback = platform.find(entry => entry.role === group);
   return fallback && { provider: fallback.provider, model: fallback.model, source: 'platform' };
+}
+
+export interface ModelSavePick {
+  roles: readonly (keyof ProjectModelOverrides)[];
+  ref: ProjectModelRef | null;
+}
+
+export interface ModelSaveInput {
+  contentMode: ContentMode;
+  costTier: CostTier;
+  /** Absent while the registry is loading or failed: the allowlist is unknown, so the stored per-job picks must not be rewritten. */
+  unrestrictedAllowlist?: readonly string[];
+  picks: readonly ModelSavePick[];
+  embedding?: ProjectModelRef;
+}
+
+export function modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks, embedding }: ModelSaveInput): UpdateProjectBody {
+  if (!unrestrictedAllowlist) return { contentMode, costTier };
+  const allowed = contentMode === 'unrestricted' ? new Set(unrestrictedAllowlist) : undefined;
+  const models: ProjectModelOverrides = embedding ? { embedding } : {};
+  for (const { roles, ref } of picks) {
+    if (!ref || (allowed && !allowed.has(ref.model))) continue;
+    for (const role of roles) models[role] = ref;
+  }
+  return { contentMode, costTier, config: { models } };
 }

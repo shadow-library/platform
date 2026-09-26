@@ -4,7 +4,7 @@ import { Alert, Button, Dialog, Spinner, EmptyState as UiEmptyState } from '@sha
 
 import { LockIcon, RunsIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
-import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, StatusChip, StopButton } from '@/components/nf';
+import { CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RunStatusChip, StatusChip, StopButton } from '@/components/nf';
 import {
   hasRunningRun,
   listRunsQueryOptions,
@@ -62,34 +62,9 @@ function AdminRequired(): React.JSX.Element {
   );
 }
 
-const RUN_INTENT: Record<string, ChipIntent> = {
-  running: 'info',
-  completed: 'success',
-  awaiting_review: 'warning',
-  failed: 'danger',
-  cancelled: 'neutral',
-};
-
-function runIntent(status: string): ChipIntent {
-  return RUN_INTENT[status] ?? 'neutral';
-}
-
 interface RunFact {
   label: string;
   value: string;
-}
-
-interface RunStatusChipProps {
-  status: string;
-}
-
-function RunStatusChip({ status }: RunStatusChipProps): React.JSX.Element {
-  return (
-    <StatusChip intent={runIntent(status)} dot={status !== 'running'}>
-      {status === 'running' && <Spinner size="sm" />}
-      {status}
-    </StatusChip>
-  );
 }
 
 interface SectionLabelProps {

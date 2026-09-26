@@ -13,9 +13,11 @@ import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as NovelsNovelIdRouteImport } from './../src/routes/novels/$novelId'
+import { Route as AppUsageRouteImport } from './../src/routes/_app/usage'
 import { Route as AppSettingsRouteImport } from './../src/routes/_app/settings'
 import { Route as AppImportRouteImport } from './../src/routes/_app/import'
 import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
+import { Route as NovelsNovelIdUsageRouteImport } from './../src/routes/novels/$novelId/usage'
 import { Route as NovelsNovelIdStoryBibleRouteImport } from './../src/routes/novels/$novelId/story-bible'
 import { Route as NovelsNovelIdSettingsRouteImport } from './../src/routes/novels/$novelId/settings'
 import { Route as NovelsNovelIdRunsRouteImport } from './../src/routes/novels/$novelId/runs'
@@ -47,6 +49,11 @@ const NovelsNovelIdRoute = NovelsNovelIdRouteImport.update({
   path: '/novels/$novelId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppUsageRoute = AppUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -60,6 +67,11 @@ const AppImportRoute = AppImportRouteImport.update({
 const NovelsNovelIdIndexRoute = NovelsNovelIdIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
+const NovelsNovelIdUsageRoute = NovelsNovelIdUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdStoryBibleRoute = NovelsNovelIdStoryBibleRouteImport.update({
@@ -124,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/import': typeof AppImportRoute
   '/settings': typeof AppSettingsRoute
+  '/usage': typeof AppUsageRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
@@ -136,12 +149,14 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
+  '/novels/$novelId/usage': typeof NovelsNovelIdUsageRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/import': typeof AppImportRoute
   '/settings': typeof AppSettingsRoute
+  '/usage': typeof AppUsageRoute
   '/': typeof AppIndexRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
@@ -154,6 +169,7 @@ export interface FileRoutesByTo {
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
+  '/novels/$novelId/usage': typeof NovelsNovelIdUsageRoute
   '/novels/$novelId': typeof NovelsNovelIdIndexRoute
 }
 export interface FileRoutesById {
@@ -162,6 +178,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/import': typeof AppImportRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/usage': typeof AppUsageRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/novels/$novelId/canon-facts': typeof NovelsNovelIdCanonFactsRoute
@@ -175,6 +192,7 @@ export interface FileRoutesById {
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
+  '/novels/$novelId/usage': typeof NovelsNovelIdUsageRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -184,6 +202,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/import'
     | '/settings'
+    | '/usage'
     | '/novels/$novelId'
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
@@ -196,12 +215,14 @@ export interface FileRouteTypes {
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
     | '/novels/$novelId/story-bible'
+    | '/novels/$novelId/usage'
     | '/novels/$novelId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/import'
     | '/settings'
+    | '/usage'
     | '/'
     | '/novels/$novelId/canon-facts'
     | '/novels/$novelId/chapters'
@@ -214,6 +235,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
     | '/novels/$novelId/story-bible'
+    | '/novels/$novelId/usage'
     | '/novels/$novelId'
   id:
     | '__root__'
@@ -221,6 +243,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/import'
     | '/_app/settings'
+    | '/_app/usage'
     | '/novels/$novelId'
     | '/_app/'
     | '/novels/$novelId/canon-facts'
@@ -234,6 +257,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
     | '/novels/$novelId/story-bible'
+    | '/novels/$novelId/usage'
     | '/novels/$novelId/'
   fileRoutesById: FileRoutesById
 }
@@ -273,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/usage': {
+      id: '/_app/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof AppUsageRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -292,6 +323,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/novels/$novelId/'
       preLoaderRoute: typeof NovelsNovelIdIndexRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
+    '/novels/$novelId/usage': {
+      id: '/novels/$novelId/usage'
+      path: '/usage'
+      fullPath: '/novels/$novelId/usage'
+      preLoaderRoute: typeof NovelsNovelIdUsageRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/story-bible': {
@@ -377,12 +415,14 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppUsageRoute: typeof AppUsageRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppUsageRoute: AppUsageRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -400,6 +440,7 @@ interface NovelsNovelIdRouteChildren {
   NovelsNovelIdRunsRoute: typeof NovelsNovelIdRunsRoute
   NovelsNovelIdSettingsRoute: typeof NovelsNovelIdSettingsRoute
   NovelsNovelIdStoryBibleRoute: typeof NovelsNovelIdStoryBibleRoute
+  NovelsNovelIdUsageRoute: typeof NovelsNovelIdUsageRoute
   NovelsNovelIdIndexRoute: typeof NovelsNovelIdIndexRoute
 }
 
@@ -415,6 +456,7 @@ const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
   NovelsNovelIdRunsRoute: NovelsNovelIdRunsRoute,
   NovelsNovelIdSettingsRoute: NovelsNovelIdSettingsRoute,
   NovelsNovelIdStoryBibleRoute: NovelsNovelIdStoryBibleRoute,
+  NovelsNovelIdUsageRoute: NovelsNovelIdUsageRoute,
   NovelsNovelIdIndexRoute: NovelsNovelIdIndexRoute,
 }
 

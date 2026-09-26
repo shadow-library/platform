@@ -9,7 +9,7 @@ import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/com
 import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
-import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon } from '../icons';
+import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UsageIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
@@ -17,6 +17,8 @@ import { type NovelParams } from './routes';
 import { PROJECT_SCREENS, type ProjectScreen, SCREEN_LABEL } from './screens';
 
 const PROJECT_LIMIT = 50;
+
+const ACCOUNT_CRUMBS: Record<string, string> = { '/settings': 'Settings', '/usage': 'Usage & charges' };
 
 function ThemeToggle(): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
@@ -110,7 +112,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
             hidden: projects.length === 0,
             items: projects.slice(0, 3).map(pinned => ({ to: '/novels/$novelId', params: { novelId: pinned.id }, label: projectTitle(pinned), icon: <BookIcon /> })),
           },
-          { items: [{ to: '/settings', label: 'Settings', icon: <SettingsIcon /> }] },
+          {
+            items: [
+              { to: '/usage', label: 'Usage & charges', icon: <UsageIcon /> },
+              { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
+            ],
+          },
         ],
       };
 
@@ -128,6 +135,14 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       }
     }
     items.push({ id: 'go-projects', group: 'Go to', label: 'All projects', icon: <GridIcon />, onRun: () => navigate({ to: '/' }) });
+    items.push({
+      id: 'go-usage',
+      group: 'Go to',
+      label: 'Usage & charges',
+      icon: <UsageIcon />,
+      keywords: ['cost', 'charges', 'quota', 'limit'],
+      onRun: () => navigate({ to: '/usage' }),
+    });
     items.push({ id: 'go-settings', group: 'Go to', label: 'Settings', icon: <SettingsIcon />, keywords: ['models', 'defaults'], onRun: () => navigate({ to: '/settings' }) });
     for (const candidate of projects) {
       items.push({
@@ -162,7 +177,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const segments = pathname.split('/').filter(Boolean);
   const leafSegment = segments.at(-1);
   const crumbLeaf = !inProject || leafSegment == null ? undefined : SCREEN_LABEL.get(leafSegment);
-  const crumbRoot = inProject && project ? projectTitle(project) : pathname === '/settings' ? 'Settings' : 'Projects';
+  const crumbRoot = inProject && project ? projectTitle(project) : (ACCOUNT_CRUMBS[pathname] ?? 'Projects');
 
   const breadcrumb = crumbLeaf != null ? `${crumbRoot} / ${crumbLeaf}` : crumbRoot;
 
@@ -175,6 +190,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           name: userDisplayName(meQuery.data),
           items: [
             { id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
+            { id: 'usage', label: 'Usage & charges', icon: <UsageIcon />, onSelect: () => void navigate({ to: '/usage' }) },
             { id: 'settings', label: 'Settings', icon: <SettingsIcon />, onSelect: () => void navigate({ to: '/settings' }) },
           ],
           onSignOut: signOut,
