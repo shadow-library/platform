@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { type APIRequestContext } from '@playwright/test';
+import { type Sql, type TransactionSql } from 'postgres';
 
 /**
  * Importing user defined packages
@@ -176,7 +177,11 @@ export interface JobSeed {
 }
 
 export interface AuthoringClaimOptions {
-  /** A reservation for an arranged authoring job, which keeps the janitor from re-dispatching it. */
+  /**
+   * Reserves the claim for this arranged authoring job the way enqueueing does, with no holder token: the janitor leaves the job alone until
+   * the heartbeat goes stale, and cancelling the job releases the reservation. Without it the claim is a job-less holder's, as a synchronous
+   * action (finalize, insert) takes it.
+   */
   jobId?: string | null;
   kind?: JobKind;
   /** How long ago the holder last heartbeated; past `jobs.authoring-claim.ttl-ms` (120 s by default) the claim may be taken over. */
@@ -530,36 +535,52 @@ export async function insertContextPack(seed: ContextPackSeed): Promise<string> 
   return row.id;
 }
 
-/**
- * A job row. A pending authoring job is re-dispatched by the janitor within one claim TTL unless `holdAuthoringClaim` reserves it (and again
- * once that reservation's heartbeat goes stale); pending non-authoring jobs run at the next boot. So a live model-capable job is refused
- * unless the project is quota-pinned.
- */
-export async function insertJob(seed: JobSeed): Promise<string> {
-  const status = seed.status ?? 'pending';
-  if (MODEL_CAPABLE_JOB_KINDS.includes(seed.kind) && LIVE_JOB_STATUSES.includes(status)) await assertSpendGuarded(seed.projectId, { requireQuota: true });
-  const sql = novelForgeDb();
+async function writeJob(sql: Sql | TransactionSql, seed: JobSeed): Promise<string> {
   const [row] = await sql<{ id: string }[]>`
     INSERT INTO jobs (project_id, kind, target, status, payload)
-    VALUES (${seed.projectId}, ${seed.kind}::job_kind, ${seed.target}, ${status}::job_status, ${seed.payload ? sql.json(seed.payload as never) : null})
+    VALUES (${seed.projectId}, ${seed.kind}::job_kind, ${seed.target}, ${seed.status ?? 'pending'}::job_status, ${seed.payload ? sql.json(seed.payload as never) : null})
     RETURNING id::text
   `;
   if (!row) throw new ForgeDbError(`job insert on project ${seed.projectId} returned no row`);
   return row.id;
 }
 
-/** Holds the project's one authoring claim as a live holder would, replacing any claim already there; a reservation needs a quota pin. */
-export async function holdAuthoringClaim(projectId: string, options: AuthoringClaimOptions = {}): Promise<void> {
-  if (options.jobId) await assertSpendGuarded(projectId, { requireQuota: true });
-  await novelForgeDb()`
+async function writeAuthoringClaim(sql: Sql | TransactionSql, projectId: string, options: AuthoringClaimOptions): Promise<void> {
+  await sql`
     INSERT INTO authoring_claims (project_id, job_id, kind, claimed_by, claimed_at, heartbeat_at)
     VALUES (
-      ${projectId}, ${options.jobId ?? null}, ${options.kind ?? 'generate'}::job_kind, 'e2e', timezone('utc', now()),
+      ${projectId}, ${options.jobId ?? null}, ${options.kind ?? 'generate'}::job_kind, ${options.jobId ? null : 'e2e'}, timezone('utc', now()),
       timezone('utc', now()) - ${ago(options.heartbeatAgoMs)}::interval
     )
     ON CONFLICT (project_id) DO UPDATE SET job_id = EXCLUDED.job_id, kind = EXCLUDED.kind, claimed_by = EXCLUDED.claimed_by, claimed_at = EXCLUDED.claimed_at,
       heartbeat_at = EXCLUDED.heartbeat_at
   `;
+}
+
+/**
+ * A job row. A pending authoring job is re-dispatched by the janitor within one claim TTL unless a reservation names it (`insertReservedJob`,
+ * or `holdAuthoringClaim` with its id), and again once that reservation's heartbeat goes stale; pending non-authoring jobs run at the next
+ * boot. So a live model-capable job is refused unless the project is quota-pinned.
+ */
+export async function insertJob(seed: JobSeed): Promise<string> {
+  if (MODEL_CAPABLE_JOB_KINDS.includes(seed.kind) && LIVE_JOB_STATUSES.includes(seed.status ?? 'pending')) await assertSpendGuarded(seed.projectId, { requireQuota: true });
+  return writeJob(novelForgeDb(), seed);
+}
+
+/** A pending authoring job and the reservation enqueueing takes for it, written together as the server writes them; it needs a quota pin. */
+export async function insertReservedJob(seed: Omit<JobSeed, 'status'>): Promise<string> {
+  await assertSpendGuarded(seed.projectId, { requireQuota: true });
+  return novelForgeDb().begin(async tx => {
+    const jobId = await writeJob(tx, seed);
+    await writeAuthoringClaim(tx, seed.projectId, { jobId, kind: seed.kind });
+    return jobId;
+  });
+}
+
+/** Holds the project's one authoring claim, replacing any claim already there — a job-less holder's, or a job's reservation, which needs a quota pin. */
+export async function holdAuthoringClaim(projectId: string, options: AuthoringClaimOptions = {}): Promise<void> {
+  if (options.jobId) await assertSpendGuarded(projectId, { requireQuota: true });
+  await writeAuthoringClaim(novelForgeDb(), projectId, options);
 }
 
 export async function releaseAuthoringClaim(projectId: string): Promise<void> {
