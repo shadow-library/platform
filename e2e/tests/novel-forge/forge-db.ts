@@ -127,6 +127,8 @@ export interface WorkflowRunSeed {
   jobId?: string | null;
   contextPackId?: string | null;
   parentRunId?: string | null;
+  /** `{code, message}`, as a chat turn's `failedTurn.code` reads it back. */
+  error?: { code?: string; message?: string } | null;
   /** How long ago the run started; default now. */
   startedAgoMs?: number;
   /** How long ago the run ended; omitted leaves a `running` run open and closes any other run when it started. */
@@ -492,14 +494,16 @@ export async function assertSpendGuarded(projectId: string, options: { requireQu
 }
 
 export async function insertWorkflowRun(seed: WorkflowRunSeed): Promise<string> {
+  const sql = novelForgeDb();
   const status = seed.status ?? 'completed';
   const startedAgoMs = seed.startedAgoMs ?? 0;
   const endedAgoMs = seed.endedAgoMs ?? (status === 'running' ? undefined : startedAgoMs);
-  const [row] = await novelForgeDb()<{ id: string }[]>`
-    INSERT INTO workflow_runs (project_id, job_id, graph, target, status, outcome, context_pack_id, parent_run_id, started_at, ended_at)
+  const [row] = await sql<{ id: string }[]>`
+    INSERT INTO workflow_runs (project_id, job_id, graph, target, status, outcome, context_pack_id, parent_run_id, error, started_at, ended_at)
     VALUES (
       ${seed.projectId}, ${seed.jobId ?? null}, ${seed.graph}, ${seed.target ?? 'e2e'}, ${status}::workflow_run_status, ${seed.outcome ?? null}, ${seed.contextPackId ?? null},
-      ${seed.parentRunId ?? null}, now() - ${ago(startedAgoMs)}::interval, now() - ${endedAgoMs === undefined ? null : ago(endedAgoMs)}::interval
+      ${seed.parentRunId ?? null}, ${seed.error === undefined ? null : sql.json(seed.error as never)}, now() - ${ago(startedAgoMs)}::interval,
+      now() - ${endedAgoMs === undefined ? null : ago(endedAgoMs)}::interval
     )
     RETURNING id::text
   `;
