@@ -274,6 +274,47 @@ export async function approveAsRead(ctx: APIRequestContext, projectId: string, d
   return approved;
 }
 
+/**
+ * Finalizes a chapter with no model call: approves the read revision, waits for its finalize-review job to fail under the fail-pin, marks the
+ * review ready with no items, and finalizes through it. Real application logic throughout — only the model's finalize-review read is stood in
+ * for by {@link readyFinalizeReview}. Callers only need "this chapter is final"; the finalize-review mechanics belong to batch 5.
+ */
+export async function finalizeChapterNoReview(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
+  const approved = await approveAsRead(ctx, projectId, draft);
+  await readyFinalizeReview(projectId, approved);
+  await assertSpendGuarded(projectId);
+  const finalized = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${approved.chapter}/finalize-review/finalize`, { data: {} });
+  expect(finalized.status(), `finalizing chapter ${approved.chapter} — body ${await finalized.text()}`).toBe(200);
+  return readDraft(ctx, projectId, approved.chapter);
+}
+
+/**
+ * A `drafts` row at `status: 'final'` alongside its matching finalized `chapters` row, for tests that need "this chapter is already final" as a
+ * precondition without paying for a real finalize (used repeatedly across the chapter-lifecycle specs). Bypasses the app entirely — it arranges
+ * a state the finalize pipeline would leave, it does not assert that the pipeline produces it.
+ */
+export async function insertFinalDraft(projectId: string, chapter: number, body = `Chapter ${chapter}, finalized by arrangement.`): Promise<void> {
+  const sql = novelForgeDb();
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
+  await sql`
+    INSERT INTO chapters (project_id, number, content, summary, word_count, status, generator, isolated, locked, continuity_applied)
+    VALUES (${projectId}, ${chapter}, ${body}, 'Finalized by arrangement.', ${wordCount}, 'done', 'human', false, true, true)
+  `;
+  await sql`
+    INSERT INTO drafts (project_id, chapter, status, revision, save_seq, approved_revision, summary, body, generator, isolated, review_status)
+    VALUES (${projectId}, ${chapter}, 'final', 1, 1, 1, 'Finalized by arrangement.', ${body}, 'human', false, 'final')
+  `;
+}
+
+/** A pending `continuity_proposals` row for a chapter, for tests that only need one to exist (no route creates one directly). */
+export async function insertContinuityProposal(projectId: string, chapter: number): Promise<void> {
+  const sql = novelForgeDb();
+  await sql`
+    INSERT INTO continuity_proposals (project_id, chapter, status, proposal)
+    VALUES (${projectId}, ${chapter}, 'pending', ${sql.json({ relationships: [] } as never)})
+  `;
+}
+
 export function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
@@ -430,4 +471,68 @@ export async function readyFinalizeReview(projectId: string, draft: Pick<Draft, 
       })),
     )}
   `;
+}
+
+/**
+ * Waits for a job to reach a terminal status, read from the database rather than `GET /api/v1/jobs/:jobId` — that route (and the per-project
+ * job list) joins `workflow_runs.id` (uuid) to `model_calls.run_id` (varchar) and 500s for every job (`job.service.ts:410`, parked as fixmes in
+ * `org-sharing.spec.ts`), so a job's settled status is only observable this way until that join is fixed.
+ */
+export async function pollJobStatus(jobId: string, timeoutMs = 30_000): Promise<{ status: string; lastError: string | null }> {
+  const terminal = new Set(['done', 'failed', 'cancelled']);
+  const last = await pollUntil(
+    async () => {
+      const [row] = await novelForgeDb()<{ status: string; lastError: string | null }[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`;
+      return row ?? { status: 'missing', lastError: null };
+    },
+    row => terminal.has(row.status),
+    { timeoutMs, intervalMs: 500 },
+  );
+  if (!terminal.has(last.status)) throw new Error(`job ${jobId} did not reach a terminal status within ${timeoutMs}ms; last status was "${last.status}"`);
+  return last;
+}
+
+/** How many `approved` `user_feedback` rows a chapter's draft has recorded — the row an approval writes exactly one of per call. */
+export async function countApprovals(projectId: string, chapter: number): Promise<number> {
+  const [row] = await novelForgeDb()<{ count: number }[]>`
+    SELECT count(*)::int AS count FROM user_feedback WHERE project_id = ${projectId} AND artifact_type = 'draft' AND artifact_ref = ${String(chapter)} AND disposition = 'approved'
+  `;
+  return row?.count ?? 0;
+}
+
+/**
+ * Confirms a write that shares the fastify-router POST-defaults-to-201 bug (`packages/fastify/src/module/fastify-router.ts:322-327`):
+ * a POST with two or more `@RespondFor` entries and no `@HttpStatus` defaults to 201, which has no bigint-safe response transformer, so
+ * the write commits but answers 500 `S001` instead of `expectedStatus`. Callers read the row back afterward rather than trust this
+ * response's body either way.
+ */
+export async function expectCommittedDespiteSerializerBug(response: APIResponse, expectedStatus: number, what: string): Promise<void> {
+  if (response.status() === 500 && (await errorCode(response)) === 'S001') return;
+  expect(response.status(), `${what} — body ${await response.text()}`).toBe(expectedStatus);
+}
+
+/** Restores a version through the route that shares {@link expectCommittedDespiteSerializerBug}'s bug, then reads the draft back. */
+export async function restoreVersionAsRead(ctx: APIRequestContext, projectId: string, chapter: number, revision: number, base?: Draft): Promise<Draft> {
+  const data = base ? { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq } : {};
+  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${chapter}/versions/${revision}/restore`, { data });
+  await expectCommittedDespiteSerializerBug(response, 200, `restoring revision ${revision} of chapter ${chapter}`);
+  return readDraft(ctx, projectId, chapter);
+}
+
+/** Same fastify-router bug as {@link restoreVersionAsRead}, on `POST .../passage-suggestions/:id/apply`. */
+export async function applySuggestionAsRead(ctx: APIRequestContext, projectId: string, chapter: number, suggestionId: string, base: Draft): Promise<Draft> {
+  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${chapter}/passage-suggestions/${suggestionId}/apply`, {
+    data: { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq },
+  });
+  await expectCommittedDespiteSerializerBug(response, 200, `applying suggestion ${suggestionId} on chapter ${chapter}`);
+  return readDraft(ctx, projectId, chapter);
+}
+
+/** `Draft` (`forge-helpers.ts`) omits `staleReason`, which the API does return — read through this instead of an ad hoc cast. */
+export interface StaleDraft extends Draft {
+  readonly staleReason: string | null;
+}
+
+export async function readStaleDraft(ctx: APIRequestContext, projectId: string, chapter: number): Promise<StaleDraft> {
+  return (await readDraft(ctx, projectId, chapter)) as StaleDraft;
 }
