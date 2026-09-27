@@ -1,5 +1,6 @@
 export * from './api';
 export * from './client-ip';
+export * from './config-probe';
 export * from './db';
 export * from './env';
 export * from './harness';

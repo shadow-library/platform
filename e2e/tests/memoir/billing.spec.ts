@@ -1,16 +1,14 @@
 /**
  * Importing npm packages
  */
-import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { promisify } from 'node:util';
 
 import { type APIResponse } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { KUBE_CONTEXT, memoirDb } from '../../lib';
+import { memoirDb, probeMemoirConfigKeys } from '../../lib';
 import { expect, test } from './fixtures';
 import { errorCodeOf, memoirMutate, pullDeltaWith } from './helpers';
 
@@ -29,32 +27,20 @@ interface EntitlementRow {
  * `POST /billing/checkout`, `POST /billing/webhooks/{provider}` and the read-only entitlement surface (T-16,
  * ARCHITECTURE §16). `billing.webhook-secret` and `billing.checkout-url` are both unset in this cluster today:
  * `memoir-server-secrets` — the Secret the Deployment's `envFrom` names for them — does not exist at all, and
- * neither `BILLING_WEBHOOK_SECRET` nor `BILLING_CHECKOUT_URL` appears in any configmap/secret memoir loads
- * (verified read-only via `kubectl get configmap/secret -n memoir -o go-template=…`, key names only — the
- * template never expands `$v`, so a Secret's base64 values never transit stdout). The test that depends on
- * that state (`should reach application-ready...`) reads live cluster state itself before asserting: a
- * `NotFound` reads as "unconfigured" (today's actual shape), any other kubectl failure (off PATH, wrong
- * context, RBAC) is a probe failure that skips the test with its own reason rather than being misread as
- * "unconfigured", and a future environment that names a provider also skips it — never a false failure either
- * way. The grace/lapse read (`resolveEffectiveState`, `entitlement-lifecycle.ts`) is a pure function of stored
- * columns and server time — independent of the webhook secret and of the hourly `EntitlementLapseService`
- * sweep — so the grace/lapse test needs no such guard.
+ * neither `BILLING_WEBHOOK_SECRET` nor `BILLING_CHECKOUT_URL` appears in any configmap/secret memoir loads.
+ * `probeMemoirConfigKeys` (`../../lib/config-probe.ts`) does that read live, read-only, key NAMES only — never
+ * a value — via `kubectl get configmap/secret -n memoir -o go-template=…`. The test that depends on that state
+ * (`should reach application-ready...`) reads live cluster state itself before asserting: a `NotFound` reads as
+ * "unconfigured" (today's actual shape), any other kubectl failure (off PATH, wrong context, RBAC) is a probe
+ * failure that skips the test with its own reason rather than being misread as "unconfigured", and a future
+ * environment that names a provider also skips it — never a false failure either way. The grace/lapse read
+ * (`resolveEffectiveState`, `entitlement-lifecycle.ts`) is a pure function of stored columns and server time —
+ * independent of the webhook secret and of the hourly `EntitlementLapseService` sweep — so the grace/lapse
+ * test needs no such guard.
  */
 
 const CONFIGURED_PROVIDER = 'generic-hmac';
 const BILLING_ENV_KEYS: readonly string[] = ['BILLING_WEBHOOK_SECRET', 'BILLING_CHECKOUT_URL'];
-const MEMOIR_CONFIG_SOURCES: readonly (readonly ['configmap' | 'secret', string])[] = [
-  ['configmap', 'cluster-config'],
-  ['configmap', 'common-config'],
-  ['configmap', 'memoir-server-config'],
-  ['secret', 'common-secrets'],
-  ['secret', 'memoir-server-secrets'],
-];
-
-const run = promisify(execFile);
-
-/** `{{println $k}}` per data key — never `{{$v}}`, so a Secret's base64 values never transit stdout. */
-const KEY_NAMES_TEMPLATE = '{{range $k,$v := .data}}{{println $k}}{{end}}';
 
 function webhookPath(provider: string): string {
   return `/api/v1/billing/webhooks/${provider}`;
@@ -62,49 +48,6 @@ function webhookPath(provider: string): string {
 
 function webhookEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return { id: `evt_${randomUUID()}`, type: 'subscription.activated', occurredAt: new Date().toISOString(), ...overrides };
-}
-
-class KubectlProbeError extends Error {
-  override readonly name = 'KubectlProbeError';
-}
-
-/**
- * Key NAMES only, never values. A resource kubectl reports missing (`NotFound`) is read as "contributes no
- * keys" — that's the ordinary unconfigured shape (no `memoir-server-secrets` Secret exists in dev at all).
- * Any other failure (kubectl off PATH, the wrong/unreachable context, RBAC) must not collapse to the same
- * "no keys" result, since that would silently misread "couldn't check" as "unconfigured" — it's raised instead
- * so the caller can tell the two apart, mirroring `clusterTokensAvailable`'s own availability-vs-refusal split.
- */
-async function resourceDataKeys(kind: 'configmap' | 'secret', name: string): Promise<string[]> {
-  try {
-    const { stdout } = await run('kubectl', ['--context', KUBE_CONTEXT, '-n', 'memoir', 'get', kind, name, '-o', `go-template=${KEY_NAMES_TEMPLATE}`]);
-    return stdout
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean);
-  } catch (error) {
-    const stderr = error && typeof error === 'object' && 'stderr' in error ? String((error as { stderr?: unknown }).stderr ?? '') : '';
-    if (/\(NotFound\)/.test(stderr)) return [];
-    const reason = stderr || (error instanceof Error ? error.message : String(error));
-    throw new KubectlProbeError(`could not read ${kind}/${name} in namespace memoir: ${reason}`);
-  }
-}
-
-interface BillingConfigProbe {
-  /** Whether either billing env var is set anywhere memoir-server's `envFrom` reads from. Meaningless when `probeFailed`. */
-  configured: boolean;
-  /** The cluster couldn't be read at all (not merely "resource absent") — the unconfigured-503 assertion cannot be trusted either way. */
-  probeFailed: boolean;
-}
-
-async function probeBillingConfig(): Promise<BillingConfigProbe> {
-  try {
-    const keysBySource = await Promise.all(MEMOIR_CONFIG_SOURCES.map(([kind, name]) => resourceDataKeys(kind, name)));
-    const keys = new Set(keysBySource.flat());
-    return { configured: BILLING_ENV_KEYS.some(key => keys.has(key)), probeFailed: false };
-  } catch {
-    return { configured: false, probeFailed: true };
-  }
 }
 
 async function expectRefusal(response: APIResponse, status: number, code: string): Promise<void> {
@@ -117,7 +60,7 @@ test.describe('memoir billing', () => {
   let probeFailed: boolean;
 
   test.beforeAll(async () => {
-    ({ configured, probeFailed } = await probeBillingConfig());
+    ({ configured, probeFailed } = await probeMemoirConfigKeys(BILLING_ENV_KEYS));
   });
 
   test('should reject a webhook delivery for an unrecognized provider segment with 404 BIL_002', async ({ memoir }) => {
