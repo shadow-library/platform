@@ -1,6 +1,7 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, index, pgEnum, pgTable, smallint, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
+import { jsonb } from './jsonb';
 import { templates, templateVersions } from './templates';
 
 export namespace Notification {

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { and, between, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, between, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -1549,9 +1549,9 @@ export class ContextAssembler {
 
   private async changedSince(projectId: bigint, since: Date): Promise<string[]> {
     const [volumes, briefs, docs] = await Promise.all([
-      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), sql`${schema.volumes.updatedAt} > ${since}`) }),
-      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), sql`${schema.briefs.updatedAt} > ${since}`) }),
-      this.db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), sql`${schema.bibleDocuments.updatedAt} > ${since}`) }),
+      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), gt(schema.volumes.updatedAt, since)) }),
+      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.updatedAt, since)) }),
+      this.db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), gt(schema.bibleDocuments.updatedAt, since)) }),
     ]);
     return [
       ...volumes.map(v => `volume:${v.volumeKey} is now at revision ${v.revision}`),

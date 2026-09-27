@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, lt, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -110,7 +110,7 @@ export class AiWorkerRepository {
           eq(schema.aiTasks.quotaMonth, task.quotaMonth),
           eq(schema.aiTasks.quotaConsumed, true),
           eq(schema.aiTasks.kind, 'adhoc'),
-          sql`${schema.aiTasks.submittedAt} <= ${task.submittedAt}`,
+          lte(schema.aiTasks.submittedAt, task.submittedAt),
         ),
       );
     return Number(row?.count ?? 0);

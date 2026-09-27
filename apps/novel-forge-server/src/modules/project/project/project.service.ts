@@ -220,7 +220,7 @@ export class ProjectService {
     // `finalizeReview` has its own writer (the finalize-review settings route), so replacing the config keeps it, atomically with the write.
     if (update.config !== undefined) {
       const kept = sql`CASE WHEN jsonb_exists(coalesce(${schema.projects.config}, '{}'::jsonb), 'finalizeReview') THEN jsonb_build_object('finalizeReview', ${schema.projects.config} -> 'finalizeReview') ELSE '{}'::jsonb END`;
-      set.config = sql`${JSON.stringify(update.config ?? {})}::jsonb || ${kept}`;
+      set.config = sql`${JSON.stringify(update.config ?? {})}::text::jsonb || ${kept}`;
     }
 
     const [result] = await this.db

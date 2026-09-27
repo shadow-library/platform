@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { inArray, or, sql } from 'drizzle-orm';
+import { and, inArray, lte, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -40,10 +40,7 @@ export class BillingReminderRepository {
       })
       .from(schema.entitlements)
       .where(
-        or(
-          inArray(schema.entitlements.state, ['grace', 'lapsed']),
-          sql`${schema.entitlements.state} IN ('trial', 'active') AND ${schema.entitlements.expiresAt} IS NOT NULL AND ${schema.entitlements.expiresAt} <= ${horizon}`,
-        ),
+        or(inArray(schema.entitlements.state, ['grace', 'lapsed']), and(inArray(schema.entitlements.state, ['trial', 'active']), lte(schema.entitlements.expiresAt, horizon))),
       );
   }
 }

@@ -1,6 +1,7 @@
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
+import { jsonb } from './jsonb';
 import { notificationChannel, priority as priorityEnum } from './notification-jobs';
 
 export namespace Template {

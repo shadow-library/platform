@@ -48,7 +48,7 @@ export async function authorMessagesFor(db: Pick<DbExecutor, 'query'>, context: 
     where: and(
       eq(proposals.sessionId, sessionId),
       lt(proposals.id, context.proposalId),
-      or(eq(proposals.kind, 'chapter_plan'), sql`${proposals.changeSet} @> ${PLAN_ACTION}::jsonb`),
+      or(eq(proposals.kind, 'chapter_plan'), sql`${proposals.changeSet} @> ${PLAN_ACTION}::text::jsonb`),
     ),
     orderBy: desc(proposals.id),
   });

@@ -30,3 +30,41 @@ describe('CheckpointJanitor.purgeJobEvents', () => {
     expect(cutoff.getTime()).toBeLessThanOrEqual(after - 7 * 86_400_000);
   });
 });
+
+describe('CheckpointJanitor.purge', () => {
+  const settledThreads = '(select "id"::text from "workflow_runs" where ("workflow_runs"."status" in ($1, $2, $3) and "workflow_runs"."ended_at" < $4))';
+
+  const fakeDb = (settledRuns: number) => {
+    const executed: SQL[] = [];
+    const db = {
+      $count: async () => settledRuns,
+      select: (fields: Parameters<QueryBuilder['select']>[0]) => new QueryBuilder().select(fields),
+      execute: async (query: SQL) => void executed.push(query),
+    };
+    return { db, executed };
+  };
+
+  it('should delete the checkpoints of settled runs through a subquery rather than a list of ids', async () => {
+    const { db, executed } = fakeDb(2);
+    const janitor = new CheckpointJanitor({ getPostgresClient: () => db } as never);
+
+    const purged = await janitor.purge(db as never, 7);
+
+    expect(purged).toBe(2);
+    const queries = executed.map(query => dialect.sqlToQuery(query));
+    expect(queries.map(query => query.sql)).toEqual([
+      `DELETE FROM checkpoints WHERE thread_id IN ${settledThreads}`,
+      `DELETE FROM checkpoint_writes WHERE thread_id IN ${settledThreads}`,
+      `DELETE FROM checkpoint_blobs WHERE thread_id IN ${settledThreads}`,
+    ]);
+    expect(queries[0]?.params.slice(0, 3)).toEqual(['completed', 'failed', 'cancelled']);
+  });
+
+  it('should delete nothing when no run has settled', async () => {
+    const { db, executed } = fakeDb(0);
+    const janitor = new CheckpointJanitor({ getPostgresClient: () => db } as never);
+
+    expect(await janitor.purge(db as never, 7)).toBe(0);
+    expect(executed).toHaveLength(0);
+  });
+});

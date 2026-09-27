@@ -54,9 +54,10 @@ export interface PostgresConnectionConfig {
   maxConnections?: number;
 
   /**
-   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `true` (`database.postgres.prepare`):
-   * Bun SQL 1.3.14 infers no parameter types for unnamed statements, so an object bound to a jsonb column arrives as "[object Object]".
-   * Its stall on pipelined prepared statements is prevented by `BUN_FEATURE_FLAG_DISABLE_SQL_AUTO_PIPELINING` instead, which boot enforces.
+   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `false` (`database.postgres.prepare`):
+   * Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, leaving connections idle in transaction, so a production deployment
+   * under Bun refuses to boot with it on and anywhere else only warns. Unnamed statements get no parameter type inference, so an object or a
+   * Date must never reach the driver raw: jsonb is bound as JSON text cast `::text::jsonb`, which stores the same value under either setting.
    */
   prepare: boolean;
 }

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Module, ShadowFactory } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -15,18 +15,6 @@ import { DatabaseModule, DatabaseService, type PostgresClient } from '@shadow-li
 describe('Database Module', () => {
   const postgresMock = { execute: mock() } as unknown as PostgresClient;
   const postgresFactory = mock((): PostgresClient => postgresMock);
-
-  const PIPELINING_FLAG = 'BUN_FEATURE_FLAG_DISABLE_SQL_AUTO_PIPELINING';
-  const originalPipeliningFlag = process.env[PIPELINING_FLAG];
-
-  const setPipeliningFlag = (value: string | undefined) => {
-    if (value === undefined) delete process.env[PIPELINING_FLAG];
-    else process.env[PIPELINING_FLAG] = value;
-  };
-
-  beforeAll(() => setPipeliningFlag('1'));
-
-  afterAll(() => setPipeliningFlag(originalPipeliningFlag));
 
   beforeEach(() => {
     mock.clearAllMocks();
@@ -65,8 +53,8 @@ describe('Database Module', () => {
       expect(postgresFactory).toHaveBeenCalledTimes(1);
     });
 
-    it('should pass prepare true to the factory by default', () => {
-      expect(postgresFactory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: true }));
+    it('should pass prepare false to the factory by default', () => {
+      expect(postgresFactory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: false }));
     });
 
     it('should have redis disabled', () => {
@@ -95,45 +83,44 @@ describe('Database Module', () => {
       return ShadowFactory.create(PrepareAppModule);
     };
 
-    it('should pass a configured prepare false to the factory', async () => {
-      const factory = mock((): PostgresClient => clientWithDriverPrepare(false));
-      const restoreConfig = setConfig({ 'database.postgres.prepare': false });
+    it('should pass a configured prepare true to the factory', async () => {
+      const factory = mock((): PostgresClient => clientWithDriverPrepare(true));
+      const restoreConfig = setConfig({ 'app.env': 'development', 'app.stage': 'dev', 'database.postgres.prepare': true });
       try {
         @Module({ imports: [DatabaseModule.forRoot({ postgres: { factory } })] })
-        class PrepareDisabledAppModule {}
-        await ShadowFactory.create(PrepareDisabledAppModule);
+        class PrepareEnabledAppModule {}
+        await ShadowFactory.create(PrepareEnabledAppModule);
       } finally {
         restoreConfig();
       }
-      expect(factory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: false }));
+      expect(factory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: true }));
     });
 
     it('should boot when the driver honours the requested prepare option', async () => {
-      const app = await createApp(clientWithDriverPrepare(true));
+      const app = await createApp(clientWithDriverPrepare(false));
       expect(app.get(DatabaseService).isPostgresEnabled()).toBe(true);
     });
 
     it('should close the client and refuse to boot when the factory drops the prepare option', async () => {
-      const client = clientWithDriverPrepare(false);
+      const client = clientWithDriverPrepare(true);
       await expect(createApp(client)).rejects.toThrow('Postgres factory ignored connection.prepare');
       expect((client as unknown as { $client: { close: ReturnType<typeof mock> } }).$client.close).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('auto-pipelining guard', () => {
+  describe('prepared statement guard', () => {
     const factory = mock((): PostgresClient => postgresMock);
+    const STALL_MESSAGE = 'Bun SQL 1.3.14 stalls pipelined queries on named prepared statements';
     const productionDeployment = { 'app.env': 'production', 'app.stage': 'prod' } as const;
     const localDevelopment = { 'app.env': 'development', 'app.stage': 'dev' } as const;
 
-    const bootWith = async (flag: string | undefined, config: Parameters<typeof setConfig>[0]) => {
+    const bootWith = async (config: Parameters<typeof setConfig>[0]) => {
       const restoreConfig = setConfig(config);
-      setPipeliningFlag(flag);
       try {
         @Module({ imports: [DatabaseModule.forRoot({ postgres: { factory } })] })
         class GuardedAppModule {}
         return await ShadowFactory.create(GuardedAppModule);
       } finally {
-        setPipeliningFlag('1');
         restoreConfig();
       }
     };
@@ -147,34 +134,25 @@ describe('Database Module', () => {
       return { warn, restore: () => spy.mockRestore() };
     };
 
-    it('should refuse to boot a production deployment without the flag', async () => {
-      await expect(bootWith(undefined, productionDeployment)).rejects.toThrow(PIPELINING_FLAG);
+    it('should refuse to boot a production deployment with prepared statements on', async () => {
+      await expect(bootWith({ ...productionDeployment, 'database.postgres.prepare': true })).rejects.toThrow(STALL_MESSAGE);
       expect(factory).not.toHaveBeenCalled();
     });
 
-    it('should refuse to boot a production deployment whose flag is set to a value Bun reads as off', async () => {
-      await expect(bootWith('FALSE', productionDeployment)).rejects.toThrow(PIPELINING_FLAG);
-    });
-
-    it('should boot a production deployment with the flag set', async () => {
-      const app = await bootWith('true', productionDeployment);
-      expect(app.get(DatabaseService).isPostgresEnabled()).toBe(true);
-    });
-
-    it('should skip the check when prepared statements are off', async () => {
-      const app = await bootWith(undefined, { ...productionDeployment, 'database.postgres.prepare': false });
+    it('should boot a production deployment on the default prepare setting', async () => {
+      const app = await bootWith(productionDeployment);
       expect(app.get(DatabaseService).isPostgresEnabled()).toBe(true);
     });
 
     it('should only warn outside a production deployment', async () => {
       const { warn, restore } = captureDatabaseWarnings();
       try {
-        const app = await bootWith(undefined, localDevelopment);
+        const app = await bootWith({ ...localDevelopment, 'database.postgres.prepare': true });
         expect(app.get(DatabaseService).isPostgresEnabled()).toBe(true);
       } finally {
         restore();
       }
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining(PIPELINING_FLAG), { flag: PIPELINING_FLAG, value: null });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(STALL_MESSAGE));
     });
   });
 

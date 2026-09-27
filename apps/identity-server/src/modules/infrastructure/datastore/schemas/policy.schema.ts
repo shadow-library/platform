@@ -1,6 +1,7 @@
 import { InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, jsonb, pgTable, primaryKey, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { bigint, pgTable, primaryKey, timestamp, varchar } from 'drizzle-orm/pg-core';
 
+import { jsonb } from './jsonb';
 import { organisations } from './organisations.schema';
 
 export type OrganisationPolicy = InferSelectModel<typeof organisationPolicies>;

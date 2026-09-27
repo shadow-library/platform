@@ -319,7 +319,7 @@ export class FinalizeReviewService {
     const [row] = await this.db
       .update(schema.projects)
       .set({
-        config: sql`coalesce(${schema.projects.config}, '{}'::jsonb) || jsonb_build_object('finalizeReview', jsonb_build_object('autoKeep', ${JSON.stringify(autoKeep)}::jsonb))`,
+        config: sql`coalesce(${schema.projects.config}, '{}'::jsonb) || jsonb_build_object('finalizeReview', jsonb_build_object('autoKeep', ${JSON.stringify(autoKeep)}::text::jsonb))`,
         updatedAt: new Date(),
       })
       .where(eq(schema.projects.id, projectId))

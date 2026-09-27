@@ -1,5 +1,7 @@
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
-import { integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+
+import { jsonb } from './jsonb';
 
 export type SigningKey = InferSelectModel<typeof signingKeys>;
 

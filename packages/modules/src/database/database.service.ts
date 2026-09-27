@@ -10,7 +10,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { BUN_DISABLED_FLAG_VALUES, DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE, SQL_AUTO_PIPELINING_FLAG } from './database.constants';
+import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE } from './database.constants';
 import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
 import { renderPostgresQuery } from './database.utils';
 
@@ -74,7 +74,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       };
       const maxConnections = Config.register('database.postgres.max-connections', DEFAULT_CONFIGS['database.postgres.max-connections']);
       if (maxConnections) connectionConfig.maxConnections = maxConnections;
-      this.assertPipeliningDisabled(connectionConfig.prepare);
+      this.assertPreparedStatementsSafe(connectionConfig.prepare);
 
       /** Initialize client and verify connection */
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
@@ -153,15 +153,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Bun SQL 1.3.14 stalls a connection forever when an unprepared statement is pipelined between an in-flight query and a prepared one */
-  private assertPipeliningDisabled(prepare: boolean): void {
+  private assertPreparedStatementsSafe(prepare: boolean): void {
     if (!prepare || Config.getRuntime() !== 'bun') return;
-    const flag = process.env[SQL_AUTO_PIPELINING_FLAG];
-    if (flag !== undefined && !BUN_DISABLED_FLAG_VALUES.includes(flag.toLowerCase())) return;
-
-    const message = `Prepared statements under Bun need ${SQL_AUTO_PIPELINING_FLAG}=1 in the environment bun starts with; a .env file is loaded too late for it`;
+    const message = 'Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, leaving connections idle in transaction; set database.postgres.prepare to false';
     if (Config.isProductionDeployment()) throw AppError.internal(message);
-    this.logger.warn(message, { flag: SQL_AUTO_PIPELINING_FLAG, value: flag ?? null });
+    this.logger.warn(message);
   }
 
   /** Bun SQL and postgres.js both expose their resolved options on the client Drizzle keeps as `$client`; other drivers are not checked. */

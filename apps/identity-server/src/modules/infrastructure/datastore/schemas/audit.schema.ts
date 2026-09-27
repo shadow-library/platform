@@ -1,5 +1,7 @@
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
-import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+
+import { jsonb } from './jsonb';
 
 export type AuditEvent = InferSelectModel<typeof auditEvents>;
 
