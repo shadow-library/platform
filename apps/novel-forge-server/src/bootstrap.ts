@@ -1,5 +1,7 @@
 import { Config } from '@shadow-library/common';
 
+import { assertModelOverrideTarget } from './modules/ai/model-override';
+
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
     'server.port': number;
@@ -13,6 +15,11 @@ declare module '@shadow-library/common' {
     /** Host of the local Ollama used for embeddings only; no chat call routes there. */
     'ai.ollama.host': string;
     'ai.embedding.model': string;
+
+    /** Local-model test environments only: every chat call is sent as this one model id, while routing, quota, telemetry and cache keep the resolved id. Unset sends the resolved id. */
+    'ai.model-override': string | undefined;
+    /** `json-schema` also sends each structured call's schema as a constrained `response_format`; `prompt` keeps it in-band only. */
+    'ai.structured-output': 'prompt' | 'json-schema';
 
     'ai.llm.timeout-ms': number;
     'ai.llm.max-retries': number;
@@ -50,6 +57,9 @@ Config.load('ai.openrouter.api.key');
 Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
 Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });
+Config.load('ai.model-override');
+Config.load('ai.structured-output', { allowedValues: ['prompt', 'json-schema'], defaultValue: 'prompt' });
+assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));
 Config.load('ai.llm.timeout-ms', { defaultValue: '300000', validateType: 'number' });
 Config.load('ai.llm.max-retries', { defaultValue: '2', validateType: 'number' });
 Config.load('ai.llm.backoff-ms', { defaultValue: '500', validateType: 'number' });

@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
+import { changeSetItemSchema, renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type BibleContradictionOutput, BibleContradictionSchema } from '../schemas/bible-contradiction.schema';
 import { type PromptModule } from './types';
 
@@ -35,4 +35,5 @@ export const bibleContradictionPrompt: PromptModule<BibleContradictionOutput> = 
         ? []
         : validateChangeSet(item.changeSet, [...CONTRADICTION_OPS], { entityMaterialization: false }).map(error => `contradictions[${index}].${error}`),
     ),
+  constrainedProperties: { 'contradictions[].changeSet': { items: changeSetItemSchema(CONTRADICTION_OPS) } },
 };

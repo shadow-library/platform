@@ -102,3 +102,30 @@ export function toHostedPromptSchema(Class: SchemaClass): Record<string, unknown
 
   return deref(raw) as Record<string, unknown>;
 }
+
+type JsonSchema = Record<string, unknown>;
+
+/**
+ * The hosted schema with each override merged over the property its path addresses, for a grammar-constrained `response_format`. A path
+ * starts at the root: `name` is a top-level property and `[]` steps into an array's items, as in `contradictions[].changeSet` or
+ * `[].readerValue` under a top-level array — so a nested field that merely shares a name is never overridden by accident. An override may
+ * only narrow what the AJV pass accepts, so every constrained reply still validates.
+ */
+export function toConstrainedSchema(Class: SchemaClass, overrides: Readonly<Record<string, JsonSchema>> = {}): JsonSchema {
+  const schema = toHostedPromptSchema(Class);
+  for (const [path, override] of Object.entries(overrides)) {
+    const segments = path.split('.');
+    const name = segments.pop() as string;
+    let node: JsonSchema | undefined = schema;
+    for (const segment of segments) {
+      const property = segment.replace(/\[\]$/, '');
+      if (property) node = (node?.['properties'] as Record<string, JsonSchema> | undefined)?.[property];
+      if (segment.endsWith('[]')) node = node?.['items'] as JsonSchema | undefined;
+    }
+    const properties = node?.['properties'] as Record<string, JsonSchema> | undefined;
+    const target = properties?.[name];
+    if (!properties || !target) throw AppError.internal(`[toConstrainedSchema] '${path}' addresses no property of the schema`);
+    properties[name] = { ...target, ...override };
+  }
+  return schema;
+}

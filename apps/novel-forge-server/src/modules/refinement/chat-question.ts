@@ -1,3 +1,5 @@
+import { PROGRESS_ITEM_KEYS } from '@server/common';
+
 import { clipAtBoundary } from '../ai/context/bible-docs';
 
 export interface ChatQuestionAnswer {
@@ -18,6 +20,31 @@ const MIN_ANSWERS = 2;
 const MAX_ANSWERS = 4;
 const HISTORY_QUESTION_CHARS = 160;
 const HISTORY_TITLE_CHARS = 60;
+
+const NON_BLANK_TEXT = { type: 'string', minLength: 1 };
+
+/** The card as a grammar-constrained reply must write it: the shape `sanitizeChatQuestion` keeps, which the loose in-band schema only describes. */
+export const CHAT_QUESTION_WIRE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    question: NON_BLANK_TEXT,
+    why: { type: 'string' },
+    answers: {
+      type: 'array',
+      minItems: MIN_ANSWERS,
+      maxItems: MAX_ANSWERS,
+      items: {
+        type: 'object',
+        properties: { title: NON_BLANK_TEXT, why: { type: 'string' }, tradeOff: { type: 'string' }, recommended: { type: 'boolean' } },
+        required: ['title'],
+        additionalProperties: false,
+      },
+    },
+    progressKey: { type: 'string', enum: [...PROGRESS_ITEM_KEYS] },
+  },
+  required: ['question', 'answers'],
+  additionalProperties: false,
+};
 
 function isValidAnswer(answer: unknown): answer is { title: string; why?: unknown; tradeOff?: unknown; recommended?: unknown } {
   return typeof answer === 'object' && answer !== null && typeof (answer as { title?: unknown }).title === 'string' && (answer as { title: string }).title.trim().length > 0;

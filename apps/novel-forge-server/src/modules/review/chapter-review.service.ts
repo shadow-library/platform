@@ -338,7 +338,7 @@ export class ChapterReviewService {
 
     const judge = PROMPT_REGISTRY.judge;
     const telemetry = { projectId, runId, node: 'judge', promptKey: judge.key, promptVersion: judge.version, role: 'judge', chapter };
-    const model = await this.modelRouter.chatFor('judge', telemetry, route.project, route.policy);
+    const model = await this.modelRouter.chatFor('judge', telemetry, route.project, route.policy, judge);
     const toolContext = { chapter, db: this.db, node: 'judge', projectId, retrieval: this.retrievalService, runId };
     const tools = this.toolRegistry.forNode('judge', toolContext);
     const rawTools = this.toolRegistry.getRaw('judge');

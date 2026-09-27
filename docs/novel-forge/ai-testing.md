@@ -259,6 +259,8 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 | `AI_OPENROUTER_API_URL`       | `https://openrouter.ai/api/v1`                   | `bootstrap.ts:44`                           | point at any OpenAI-compatible gateway                                                                                                             |
 | `AI_OLLAMA_HOST`              | `http://localhost:11434`                         | `bootstrap.ts:45`                           | embeddings only                                                                                                                                    |
 | `AI_EMBEDDING_MODEL`          | `qwen3-embedding:8b`                             | `bootstrap.ts:46`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap                                                                                |
+| `AI_MODEL_OVERRIDE`           | —                                                | `bootstrap.ts`                              | local-model test environments only — see below; unset is inert                                                                                     |
+| `AI_STRUCTURED_OUTPUT`        | `prompt`                                         | `bootstrap.ts`                              | `prompt` \| `json-schema` — see below; `prompt` is inert                                                                                           |
 | `AI_LLM_TIMEOUT_MS`           | `300000`                                         | `bootstrap.ts:47`                           | per-call budget (`model-router.service.ts:186`)                                                                                                    |
 | `AI_LLM_MAX_RETRIES`          | `2`                                              | `bootstrap.ts:48`                           | **transport** retries only → 3 attempts (`model-router.service.ts:609-630`)                                                                        |
 | `AI_LLM_BACKOFF_MS`           | `500`                                            | `bootstrap.ts:49`                           | exponential                                                                                                                                        |
@@ -273,6 +275,31 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 | `STORAGE_DRIVER`              | `s3` in the example                              | `.env.example:46`                           | **set `local`** off-cluster; declared by `StorageModule`, not `bootstrap.ts`                                                                       |
 | `STORAGE_LOCAL_DIR`           | `./storage-data`                                 | `.env.example:58`                           |                                                                                                                                                    |
 | `STORAGE_PUBLIC_ORIGIN`       | —                                                | `.env.example:47`                           | the origin image URLs are resolved against                                                                                                         |
+
+#### Local-model test environments
+
+Two settings exist so a test environment can serve every chat call from one small local model (Ollama's OpenAI-compatible
+`/v1`, reached through `AI_OPENROUTER_API_URL`) and still get output the cards can render. Both are inert unless set: a deployment
+that leaves them alone sends exactly the requests it always did.
+
+- `AI_MODEL_OVERRIDE=<model id>` puts that one id on the wire for every chat call — structured, streamed, image-attached and the
+  judge/validation tool loops — with `reasoning: { effort: 'none' }`, because Ollama maps any reasoning field to thinking. Routing,
+  the registry checks (`AI_002`/`AI_003`), quota, `model_calls.model`, cost and `llm_cache` keys all keep the resolved id, so a spec
+  learns which model a role routed to from `model_calls`, never from behaviour. The server refuses to boot (`AI_017`) when the
+  override is set and `AI_OPENROUTER_API_URL` is unset or points at OpenRouter, so it can never re-route paid traffic. Image generation
+  and vision are not local: images keep the logical image model and fail closed with `AI_005`, and an image-attached call reaches the
+  text-only local model and fails closed with `AI_007`.
+- `AI_STRUCTURED_OUTPUT=json-schema` also sends each structured call's schema as a grammar-constrained
+  `response_format: { type: 'json_schema' }`, with change-set ops, the chat question card and `readerValue` typed there
+  (`PromptModule.constrainedProperties`) — a small model cannot write them from the loose in-band schema. The in-band schema and every
+  prompt are unchanged, and a constrained reply still goes through AJV, `postValidate` and the repair round like any other.
+
+Two flows are never exercised in json-schema mode, so an e2e spec must not depend on them:
+
+- **Chat lookups.** The chat turn's `lookups` is constrained to an empty array (`chat-refine.prompt.ts`), because a schema cannot keep
+  lookups apart from a changeSet; a turn never fetches before it edits, and answers from the provided context only.
+- **Judge and validation tool calls.** The grammar leaves the model no way to call a tool, so the judge and validation tool loops answer
+  in one round from the pack they were given.
 
 #### Model groups and defaults — there is no env var for these
 

@@ -5,7 +5,8 @@ import { z } from 'zod';
 
 import { type Refinement } from '@server/database';
 
-import { type OpType, validateChangeSet } from '../../refinement/change-set';
+import { changeSetItemSchema, type OpType, validateChangeSet } from '../../refinement/change-set';
+import { CHAT_QUESTION_WIRE_SCHEMA } from '../../refinement/chat-question';
 import { countTokens } from '../context/token-budget';
 import { type RegisteredTool } from '../tools/types';
 import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
@@ -54,6 +55,12 @@ export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   template: buildTemplate(),
   schema: ChatRefineSchema,
   postValidate: data => validateTurnOutput(data),
+  // No lookups under a grammar: a schema cannot keep them apart from a changeSet, and a small local model mixes the two on most turns.
+  constrainedProperties: {
+    changeSet: { items: changeSetItemSchema(HUB_ALLOWED_OPS, { quotes: true }) },
+    question: CHAT_QUESTION_WIRE_SCHEMA,
+    lookups: { maxItems: 0 },
+  },
 };
 
 export interface ChatTurnPermissions {

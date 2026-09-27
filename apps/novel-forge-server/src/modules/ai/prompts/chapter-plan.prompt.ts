@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { chapterPlanIssues, type ChapterPlanOutput, ChapterPlanSchema } from '../schemas/chapter-plan.schema';
+import { READER_VALUE_CHANGES } from '../schemas/outline.schema';
 import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
 
@@ -48,4 +49,5 @@ export const chapterPlanPrompt: PromptModule<ChapterPlanOutput> = {
   ]),
   schema: ChapterPlanSchema,
   postValidate: chapterPlanIssues,
+  constrainedProperties: { readerValue: { items: { type: 'string', enum: [...READER_VALUE_CHANGES] } } },
 };

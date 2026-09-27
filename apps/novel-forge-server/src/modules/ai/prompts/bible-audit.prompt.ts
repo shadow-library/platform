@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
+import { changeSetItemSchema, renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type BibleAuditOutput, BibleAuditSchema } from '../schemas/bible-audit.schema';
 import { EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
@@ -35,4 +35,5 @@ export const bibleAuditPrompt: PromptModule<BibleAuditOutput> = {
   ]),
   schema: BibleAuditSchema,
   postValidate: data => (data.changeSet.length === 0 ? [] : validateChangeSet(data.changeSet, [...AUDIT_OPS])),
+  constrainedProperties: { changeSet: { items: changeSetItemSchema(AUDIT_OPS) } },
 };

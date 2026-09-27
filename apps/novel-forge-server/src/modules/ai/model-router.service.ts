@@ -35,7 +35,7 @@ import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { ReplyStreamScanner } from './reply-stream-scanner';
-import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toHostedPromptSchema } from './schemas/validate';
+import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toConstrainedSchema, toHostedPromptSchema } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
 
@@ -60,6 +60,15 @@ interface TelemetryConfig {
   callbacks: TelemetryHandler[];
   metadata: Record<string, unknown>;
 }
+
+/** A structured call's output schema, sent as a grammar-constrained `response_format` under `ai.structured-output=json-schema`. */
+export interface ResponseSchema {
+  /** `^[A-Za-z0-9_-]+$`, the OpenAI rule for a schema name. */
+  name: string;
+  schema: Record<string, unknown>;
+}
+
+export type ConstrainableOutput = Pick<PromptModule<unknown>, 'key' | 'schema' | 'constrainedProperties'>;
 
 export interface ImageRequest {
   prompt: string;
@@ -316,7 +325,7 @@ export class ModelRouterService {
   // Every vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client covers them
   // all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the same wire
   // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
-  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard }): BaseChatModel {
+  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard; responseSchema?: ResponseSchema }): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
     // design (see resolveProvider) and must not silently route to the platform's OpenRouter key.
@@ -325,7 +334,14 @@ export class ModelRouterService {
     // OpenRouter takes reasoning control as a top-level `reasoning: { effort }` body field, which is
     // not part of the OpenAI chat-completions schema — modelKwargs is what ChatOpenAI splices into
     // the request verbatim. Omitting it entirely is what disables reasoning on `optional` models.
-    const effort = opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
+    // A local-model override is always sent `none`: Ollama maps any `reasoning` field to thinking, so a non-thinking model answers any other
+    // effort with a 400, and a thinking one would think on every call.
+    const override = Config.get('ai.model-override');
+    const effort = override ? 'none' : opts?.role ? resolveReasoningEffort(resolved.model, ROLE_GROUP[opts.role]) : undefined;
+    const modelKwargs = {
+      ...(effort ? { reasoning: { effort } } : {}),
+      ...(opts?.responseSchema ? { response_format: { type: 'json_schema', json_schema: opts.responseSchema } } : {}),
+    };
     // Without this, ChatOpenAI falls back to OPENAI_API_KEY, fails deep inside the SDK, and the
     // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
     const apiKey = Config.get('ai.openrouter.api.key');
@@ -337,12 +353,12 @@ export class ModelRouterService {
     // completions client built from its fields, and `bindTools` rebuilds from them too, so assigning it afterwards is lost.
     return new GatewayChatOpenAI(
       {
-        model: resolved.model,
+        model: override || resolved.model,
         apiKey,
         maxRetries: 0,
         configuration: { baseURL: Config.get('ai.openrouter.api.url') },
         __includeRawResponse: true,
-        ...(effort ? { modelKwargs: { reasoning: { effort } } } : {}),
+        ...(Object.keys(modelKwargs).length > 0 ? { modelKwargs } : {}),
         ...opts?.telemetry,
       },
       opts?.guard,
@@ -350,13 +366,20 @@ export class ModelRouterService {
   }
 
   // `ctx` is optional only for the smoke harness, which has no project. Telemetry is bound into the client rather than
-  // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row.
-  async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<BaseChatModel> {
+  // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row. `output` is the module whose
+  // schema the final answer must match, constrained only under `ai.structured-output=json-schema`.
+  async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy, output?: ConstrainableOutput): Promise<BaseChatModel> {
     if (ctx) await this.quota.enforce(ctx.projectId);
     const route = this.routeModel(role, project, policy);
     const { resolved } = route;
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
-    return this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}) });
+    const responseSchema = output ? this.responseSchemaFor(output) : undefined;
+    return this.buildClient(resolved, {
+      role,
+      guard: this.hardLineGuard(route),
+      ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}),
+      ...(responseSchema ? { responseSchema } : {}),
+    });
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
@@ -409,7 +432,8 @@ export class ModelRouterService {
     const { resolved } = route;
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
-    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route) });
+    const responseSchema = this.responseSchemaFor(promptModule);
+    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...(responseSchema ? { responseSchema } : {}) });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
     if (ctx.onMessages) {
       try {
@@ -677,6 +701,12 @@ export class ModelRouterService {
         `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`,
       ),
     ];
+  }
+
+  // Default `prompt` mode returns nothing, so a deployment that never sets the key sends exactly the request it always did.
+  private responseSchemaFor(output: ConstrainableOutput): ResponseSchema | undefined {
+    if (Config.get('ai.structured-output') !== 'json-schema') return undefined;
+    return { name: output.key.replace(/[^A-Za-z0-9_-]/g, '_'), schema: toConstrainedSchema(output.schema, output.constrainedProperties) };
   }
 
   /** The parsed answer of a `chatFor` client (judge, validation), screened for its role before the caller keeps or forwards it. */

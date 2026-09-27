@@ -1,7 +1,7 @@
 import { type CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { type BaseMessage } from '@langchain/core/messages';
 import { type ChatGenerationChunk } from '@langchain/core/outputs';
-import { ChatOpenAI, ChatOpenAICompletions, type ChatOpenAIFields, ChatOpenAIResponses, type OpenAIClient } from '@langchain/openai';
+import { ChatOpenAI, ChatOpenAICompletions, type ChatOpenAIFields, ChatOpenAIResponses, type OpenAIClient, wrapOpenAIClientError } from '@langchain/openai';
 
 export interface RawGatewayInfo {
   served_by?: string;
@@ -79,7 +79,7 @@ class GatewayTappingCompletions extends ChatOpenAICompletions {
       this.guard.screen(request.messages);
       request = { ...request, messages: [{ role: 'system', content: this.guard.systemLine }, ...request.messages] };
     }
-    if (!request.stream) return super.completionWithRetry(request, requestOptions);
+    if (!request.stream) return request.response_format?.type === 'json_schema' ? this.createUnparsed(request, requestOptions) : super.completionWithRetry(request, requestOptions);
     const result = await super.completionWithRetry(request, requestOptions);
     const box = (requestOptions as Record<symbol, GatewayBox> | undefined)?.[GATEWAY_BOX];
     if (!box) return result;
@@ -87,6 +87,22 @@ class GatewayTappingCompletions extends ChatOpenAICompletions {
       result as unknown as AsyncIterable<GatewayFrame>,
       gateway => (box.gateway = gateway),
     ) as unknown as AsyncIterable<OpenAIClient.Chat.Completions.ChatCompletionChunk>;
+  }
+
+  // @langchain/openai sends a non-streamed `json_schema` request through the SDK's `parse()`, which throws on a truncated or non-JSON reply and
+  // on any non-strict tool. `create()` hands that reply to the router's repair ladder, as it does every other response.
+  private createUnparsed(
+    request: OpenAIClient.Chat.ChatCompletionCreateParamsNonStreaming,
+    requestOptions?: OpenAIClient.RequestOptions,
+  ): Promise<OpenAIClient.Chat.Completions.ChatCompletion> {
+    const clientOptions = this._getClientOptions(requestOptions);
+    return this.caller.call(async () => {
+      try {
+        return await this.client.chat.completions.create(request, clientOptions);
+      } catch (err) {
+        throw wrapOpenAIClientError(err);
+      }
+    });
   }
 
   override async *_streamResponseChunks(messages: BaseMessage[], options: this['ParsedCallOptions'], runManager?: CallbackManagerForLLMRun): AsyncGenerator<ChatGenerationChunk> {

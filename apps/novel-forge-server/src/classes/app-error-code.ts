@@ -148,6 +148,11 @@ export class AppErrorCode extends ServerErrorCode {
     422,
   );
   static readonly AI_016 = AppErrorCode.forbidden('AI_016', 'A bot has no account settings; its projects start on the Balanced cost tier');
+  static readonly AI_017 = new AppErrorCode(
+    'AI_017',
+    'AI_MODEL_OVERRIDE is for local-model test environments — AI_OPENROUTER_API_URL must point at the local model server, not {url}',
+    500,
+  );
 
   /*!
    * Illustration Errors

@@ -618,7 +618,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       role: 'judge',
       chapter: state.chapter,
     };
-    const model = await modelRouter.chatFor('judge', judgeTelemetry, judgeProject, judgePolicy);
+    const model = await modelRouter.chatFor('judge', judgeTelemetry, judgeProject, judgePolicy, PROMPT_REGISTRY.judge);
 
     const renderedContract = renderEndingContract(brief?.endingContract);
     const contractBlock = renderedContract

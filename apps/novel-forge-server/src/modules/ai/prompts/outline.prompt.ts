@@ -3,7 +3,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type ResolvedWordTarget } from '../../eval/deterministic-metrics';
 import { findBriefRevealViolations, renderRevealViolation, type ScheduledReveal } from '../context/canon-guard';
-import { minScenesFor, type OutlineOutput, OutlineSchema, validateOutlineCoverage } from '../schemas/outline.schema';
+import { minScenesFor, type OutlineOutput, OutlineSchema, READER_VALUE_CHANGES, validateOutlineCoverage } from '../schemas/outline.schema';
 import { generationWordTargetVars } from './generation.prompt';
 import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
@@ -38,6 +38,7 @@ export const outlinePrompt: PromptModule<OutlineOutput> = {
   // An empty array is schema-valid (root array) but means the model refused the task — reject it
   // so the repair ladder retries instead of reporting success with zero briefs.
   postValidate: briefs => (briefs.length === 0 ? ['outline must contain at least one chapter brief'] : []),
+  constrainedProperties: { '[].readerValue': { items: { type: 'string', enum: [...READER_VALUE_CHANGES] } } },
 };
 
 export function outlineWordTargetVars(target: ResolvedWordTarget): Record<'wordTargetMin' | 'wordTargetAim' | 'wordTargetMax' | 'minScenes', string> {

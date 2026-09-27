@@ -133,7 +133,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
           promptVersion: PROMPT_REGISTRY.validation.version,
           role: 'validation',
         };
-        const model = await modelRouter.chatFor('validation', telemetry, projectRow as ProjectConfig | undefined, policy);
+        const model = await modelRouter.chatFor('validation', telemetry, projectRow as ProjectConfig | undefined, policy, PROMPT_REGISTRY.validation);
 
         const systemMsg = new SystemMessage(PROMPT_REGISTRY.validation.system);
         const humanMsg = new HumanMessage(

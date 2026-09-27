@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
+import { changeSetItemSchema, renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type ChapterExtractOutput, ChapterExtractSchema } from '../schemas/chapter-extract.schema';
 import { type PromptModule } from './types';
 
@@ -22,4 +22,5 @@ export const chapterExtractPrompt: PromptModule<ChapterExtractOutput> = {
   template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', '{contextPack}'], ['human', 'Chapter {chapterNumber} prose:\n{chapterProse}']]),
   schema: ChapterExtractSchema,
   postValidate: data => (data.changeSet.length === 0 ? [] : validateChangeSet(data.changeSet, [...ALLOWED_OPS])),
+  constrainedProperties: { changeSet: { items: changeSetItemSchema(ALLOWED_OPS) } },
 };
