@@ -125,6 +125,23 @@ export async function pullDelta(ctx: APIRequestContext, since = '0'): Promise<De
   return (await response.json()) as DeltaPage;
 }
 
+export interface PullDeltaOptions {
+  since?: string;
+  /** Comma-separated domain names, sent verbatim as the `domains` query param. */
+  domains?: string;
+  limit?: number;
+}
+
+/** Like {@link pullDelta}, but exposes `domains`/`limit` and the raw response — for cursor-paging and header assertions `pullDelta`/`pullFullDelta` have no room for. */
+export async function pullDeltaWith(ctx: APIRequestContext, options: PullDeltaOptions = {}): Promise<{ response: APIResponse; page: DeltaPage }> {
+  const params = new URLSearchParams({ since: options.since ?? '0' });
+  if (options.domains) params.set('domains', options.domains);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  const response = await ctx.get(`/api/v1/sync/delta?${params.toString()}`);
+  if (!response.ok()) throw new Error(`sync/delta failed: ${response.status()} ${await response.text()}`);
+  return { response, page: (await response.json()) as DeltaPage };
+}
+
 /** Pulls every delta page from `since=0` until `hasMore` clears, merging each domain's rows and the tombstones in arrival order. */
 export async function pullFullDelta(ctx: APIRequestContext, maxPages = 50): Promise<DeltaPage> {
   const merged: DeltaPage = { cursor: '0', hasMore: true, domains: {}, tombstones: [] };
