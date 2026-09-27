@@ -1,13 +1,25 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { type APIRequestContext } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, mutate, pollJob, subFor, webNovelDb } from '../../lib';
-import { buildFinalBundle, deleteProjectQuietly, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
+import { apiContext, mutate, runAll, subFor, webNovelDb } from '../../lib';
+import { expect, test } from '../web-novel/forge-fixtures';
+import {
+  type ForgePublication,
+  publishForge,
+  publishForgeChapter,
+  readForgeWikiLedger,
+  reconcileSettled,
+  removeForgePublication,
+  repeatForgeWikiPush,
+  setForgeWikiVisibility,
+} from '../web-novel/forge-publication';
+import { auditWatermark, publishAuditSince, readServedWikiEntry, setServedWikiRevision } from '../web-novel/helpers';
+import { type BibleEntity, createEntity, expectImportLanded, pollWebNovel, reconcileUntilConverged, startFinalImport, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -49,15 +61,45 @@ interface WikiEntry {
  *                   Hidden from a guest (gate 0); visible once a reader's furthestOrdinal reaches 2.
  *
  * Serial: every step builds on the previous project's state.
+ *
+ * The second half reads web-novel's wiki ingest outcomes from its own tables, one project per test. A reader revision newer than the
+ * forge's is written straight into the reader; the push that meets it is real. The ingest audit row names no entry key, so each step reads
+ * the trail of one entry at a time. Out of reach this way: a wiki push for an unknown novel or under an end-user token, and a repeated
+ * delete reaching the reader (the forge deletes only what the reader's wiki manifest still lists).
  */
 
-test.describe.configure({ mode: 'serial', timeout: 150_000 });
+const RED_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4oaEBAALUARkFUI+kAAAAAElFTkSuQmCC';
+const BLUE_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQ0DgBAAGUARn8OyyYAAAAAElFTkSuQmCC';
+
+const KEEPER: BibleEntity = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
+const RIVAL: BibleEntity = { entityKey: 'e2e-rival', type: 'character', name: 'Odo the Assessor', body: 'A guild assessor who wants the coast light dark.' };
+
+async function revealFact(publication: ForgePublication, factKey: string, text: string): Promise<void> {
+  const { ctx, projectId } = publication;
+  const fact = await mutate(ctx, 'put', `/api/v1/projects/${projectId}/facts/${factKey}`, { data: { text, subjects: [KEEPER.entityKey] } });
+  expect(fact.status(), await fact.text()).toBe(200);
+  const reveal = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/facts/${factKey}/reveal`, { data: { entityKey: KEEPER.entityKey, chapter: 1 } });
+  expect(reveal.status(), await reveal.text()).toBe(200);
+}
+
+/** Adds a gallery image of the keeper dated before the story, and answers its id. */
+async function addGalleryImage(publication: ForgePublication, image: string, caption: string): Promise<string> {
+  const { ctx, projectId } = publication;
+  const added = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}/images`, { data: { mime: 'image/png', image, caption, depictsChapter: 0 } });
+  expect(added.status(), await added.text()).toBe(201);
+  const { images } = (await added.json()) as { images: { id: string; caption?: string | null }[] };
+  const id = images.find(candidate => candidate.caption === caption)?.id;
+  expect(id, `the gallery lists the image captioned ${caption}`).toBeDefined();
+  return id ?? '';
+}
 
 const VISIBLE_KEY = 'e2e-hero';
 const GATED_KEY = 'e2e-order';
 const FACT_KEY = 'e2e-order-origin';
 
 test.describe('novel-forge wiki publish → reader', () => {
+  test.describe.configure({ mode: 'serial', timeout: 150_000 });
+
   const slug = `e2e-wiki-${uniqueSuffix()}`;
   const novelTitle = `E2E Wiki Novel ${uniqueSuffix()}`;
   let forgeCtx: APIRequestContext;
@@ -72,21 +114,14 @@ test.describe('novel-forge wiki publish → reader', () => {
   });
 
   test.afterAll(async () => {
-    if (projectId) await deleteProjectQuietly(forgeCtx, projectId);
-    await forgeCtx.dispose();
-    await webGuestCtx.dispose();
-    await webUser1Ctx.dispose();
+    await runAll([() => removeForgePublication(forgeCtx, projectId, slug), () => forgeCtx.dispose(), () => webGuestCtx.dispose(), () => webUser1Ctx.dispose()]);
   });
 
   test('should import a final bundle with three chapters', async () => {
-    const importRes = await mutate(forgeCtx, 'post', '/api/v1/import', { data: { bundle: buildFinalBundle(novelTitle) } });
-    expect(importRes.status(), await importRes.text()).toBe(202);
-    const { projectId: pid, jobId } = (await importRes.json()) as { projectId: string; jobId: string };
+    const { projectId: pid, jobId } = await startFinalImport(forgeCtx, novelTitle);
     projectId = pid;
     expect(projectId).toMatch(/^[0-9]+$/);
-
-    const job = await pollJob<{ status: string; lastError?: string }>(forgeCtx, jobId, { timeoutMs: 60_000 });
-    expect(job.status, `import job failed: ${job.lastError ?? ''}`).toBe('done');
+    await expectImportLanded(jobId);
 
     const chapters = await forgeCtx.get(`/api/v1/projects/${projectId}/source/chapters`);
     expect(chapters.status()).toBe(200);
@@ -218,5 +253,153 @@ test.describe('novel-forge wiki publish → reader', () => {
     // would retire explicitly. Observed, not asserted as desired behaviour.
     const stillThere = await webGuestCtx.get(`/api/novels/${slug}`);
     test.info().annotations.push({ type: 'reader after forge delete', description: `GET /api/novels/${slug} → ${stillThere.status()} (200 = orphaned, not cascaded)` });
+  });
+});
+
+test.describe('web-novel wiki ingest through novel-forge', () => {
+  test.describe.configure({ timeout: 120_000 });
+
+  test('should create, skip, repush and wholly replace a wiki entry on the revision ladder', async ({ forge }) => {
+    const publication = await forge.project('wiki-ladder', { chapters: true });
+    const { ctx, projectId, slug } = publication;
+    expect((await publishForge(ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
+    await publishForgeChapter(ctx, projectId, 1);
+    await reconcileUntilConverged(ctx, projectId, [1], []);
+
+    await createEntity(ctx, projectId, KEEPER);
+    await revealFact(publication, 'e2e-keeper-oath', 'Mira swore an oath to the flame on her first night in the tower.');
+    const portrait = await addGalleryImage(publication, RED_PIXEL, 'Before the story');
+    await reconcileUntilConverged(ctx, projectId, [1], [KEEPER.entityKey]);
+
+    const [ledgered] = await readForgeWikiLedger(projectId);
+    expect(ledgered).toEqual(expect.objectContaining({ entryKey: KEEPER.entityKey, state: 'pushed', revision: 1 }));
+    const served = await readServedWikiEntry(slug, KEEPER.entityKey);
+    expect(served).toEqual(expect.objectContaining({ revision: 1, contentHash: ledgered?.contentHash }));
+    expect(served?.facets.map(facet => [facet.facetKey, facet.visibleFromOrdinal])).toEqual([
+      ['profile', 0],
+      ['fact:e2e-keeper-oath', 1],
+    ]);
+    expect(served?.images).toEqual([{ imageRef: expect.any(String), caption: 'Before the story' }]);
+    const created = (await publishAuditSince(slug, '0', 'wiki.upsert')).filter(row => row.outcome !== 'noop');
+    expect(created).toEqual([expect.objectContaining({ outcome: 'applied', incomingRevision: 1, storedRevision: null, contentHash: ledgered?.contentHash })]);
+
+    const idle = await auditWatermark(slug);
+    const unchanged = await reconcileSettled(publication);
+    expect(unchanged.wiki).toEqual(expect.objectContaining({ pushed: [], skipped: [KEEPER.entityKey], failed: [] }));
+    expect(await publishAuditSince(slug, idle, 'wiki.upsert'), 'an in-sync entry is never sent again').toEqual([]);
+
+    await repeatForgeWikiPush(projectId, KEEPER.entityKey);
+    const repushing = await auditWatermark(slug);
+    await reconcileSettled(publication);
+    const repushed = await publishAuditSince(slug, repushing, 'wiki.upsert');
+    expect(repushed.length, 'a push whose acknowledgement was lost is sent again').toBeGreaterThan(0);
+    expect(repushed).toEqual(repushed.map(() => expect.objectContaining({ outcome: 'noop', incomingRevision: 1, storedRevision: 1 })));
+    expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toEqual(served);
+
+    await setServedWikiRevision(slug, KEEPER.entityKey, 2);
+    const retracted = await mutate(ctx, 'delete', `/api/v1/projects/${projectId}/facts/e2e-keeper-oath`);
+    expect(retracted.ok(), await retracted.text()).toBe(true);
+    await revealFact(publication, 'e2e-keeper-vow', 'Mira vowed never to let the tide take the flame.');
+    const removed = await mutate(ctx, 'delete', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}/images/${portrait}`);
+    expect(removed.status(), await removed.text()).toBe(200);
+    await addGalleryImage(publication, BLUE_PIXEL, 'As of the story');
+    const replacing = await auditWatermark(slug);
+    expect((await reconcileSettled(publication)).wiki.pushed).toEqual([KEEPER.entityKey]);
+
+    const [relisted] = await readForgeWikiLedger(projectId);
+    const replaced = await readServedWikiEntry(slug, KEEPER.entityKey);
+    expect(replaced).toEqual(expect.objectContaining({ id: served?.id, revision: 2, contentHash: relisted?.contentHash }));
+    expect(
+      replaced?.facets.map(facet => facet.facetKey),
+      'an equal-revision push replaces the facet set rather than merging it',
+    ).toEqual(['profile', 'fact:e2e-keeper-vow']);
+    expect(replaced?.images).toEqual([{ imageRef: expect.any(String), caption: 'As of the story' }]);
+    expect(replaced?.images[0]?.imageRef).not.toBe(served?.images[0]?.imageRef);
+    expect(await publishAuditSince(slug, replacing, 'wiki.upsert')).toEqual([expect.objectContaining({ outcome: 'applied', incomingRevision: 2, storedRevision: 2 })]);
+  });
+
+  test('should refuse a stale wiki revision and leave the stored entry untouched', async ({ forge }) => {
+    const publication = await forge.project('wiki-stale');
+    const { ctx, projectId, slug } = publication;
+    await createEntity(ctx, projectId, KEEPER);
+    expect((await publishForge(ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
+    expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toEqual(expect.objectContaining({ revision: 1 }));
+
+    await setServedWikiRevision(slug, KEEPER.entityKey, 9);
+    const held = await readServedWikiEntry(slug, KEEPER.entityKey);
+    const body = 'The keeper of the coast light, and of its oldest secret.';
+    const edited = await mutate(ctx, 'patch', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}`, { data: { body } });
+    expect(edited.status(), await edited.text()).toBe(200);
+    const pushing = await auditWatermark(slug);
+    const refused = await reconcileSettled(publication);
+
+    const staleError = expect.stringMatching(/^stale revision:/);
+    expect(refused.wiki.failed).toEqual([{ entryKey: KEEPER.entityKey, error: staleError }]);
+    expect(await readForgeWikiLedger(projectId)).toEqual([expect.objectContaining({ entryKey: KEEPER.entityKey, state: 'failed', revision: 2, error: staleError })]);
+    expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toEqual(held);
+    expect(await publishAuditSince(slug, pushing, 'wiki.upsert')).toEqual([expect.objectContaining({ outcome: 'stale_rejected', incomingRevision: 2, storedRevision: 9 })]);
+
+    await setServedWikiRevision(slug, KEEPER.entityKey, 1);
+    expect((await reconcileSettled(publication)).wiki.pushed).toEqual([KEEPER.entityKey]);
+    expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toEqual(
+      expect.objectContaining({ revision: 2, facets: [expect.objectContaining({ facetKey: 'profile', content: body })] }),
+    );
+  });
+
+  test('should delete a removed or hidden entity from the reader once, and restore a hidden one shown again', async ({ forge }) => {
+    const publication = await forge.project('wiki-delete');
+    const { ctx, projectId, slug } = publication;
+    await createEntity(ctx, projectId, KEEPER);
+    await createEntity(ctx, projectId, RIVAL);
+    expect((await publishForge(ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
+    const pushed = await readForgeWikiLedger(projectId);
+    expect(pushed.map(row => [row.entryKey, row.state])).toEqual([
+      [KEEPER.entityKey, 'pushed'],
+      [RIVAL.entityKey, 'pushed'],
+    ]);
+    const hashOf = (entryKey: string): string | undefined => pushed.find(row => row.entryKey === entryKey)?.contentHash;
+    const servedKeys = async (): Promise<string[]> => ((await (await forge.guest.get(`/api/novels/${slug}/wiki`)).json()) as WikiIndex).items.map(item => item.entryKey);
+
+    const deleting = await auditWatermark(slug);
+    expect((await mutate(ctx, 'delete', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}`)).status()).toBe(204);
+    expect((await reconcileSettled(publication)).wiki).toEqual(expect.objectContaining({ deleted: [KEEPER.entityKey], failed: [] }));
+    expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toBeUndefined();
+    expect(await servedKeys()).toEqual([RIVAL.entityKey]);
+    expect((await forge.guest.get(`/api/novels/${slug}/wiki/${KEEPER.entityKey}`)).status()).toBe(404);
+    expect(await publishAuditSince(slug, deleting, 'wiki.delete')).toEqual([
+      expect.objectContaining({ outcome: 'applied', contentHash: hashOf(KEEPER.entityKey), storedRevision: 1 }),
+    ]);
+    expect(await readForgeWikiLedger(projectId)).toEqual(expect.arrayContaining([expect.objectContaining({ entryKey: KEEPER.entityKey, state: 'deleted' })]));
+
+    const repeating = await auditWatermark(slug);
+    const repeated = await reconcileSettled(publication);
+    expect(repeated.wiki).toEqual(expect.objectContaining({ deleted: [], failed: [] }));
+    expect(repeated.wiki.skipped).toContain(KEEPER.entityKey);
+    expect(await publishAuditSince(slug, repeating, 'wiki.delete'), 'a tombstoned entry is never deleted again').toEqual([]);
+
+    const hiding = await auditWatermark(slug);
+    await setForgeWikiVisibility(projectId, RIVAL.entityKey, 'hidden');
+    expect((await reconcileSettled(publication)).wiki).toEqual(expect.objectContaining({ deleted: [RIVAL.entityKey], failed: [] }));
+    expect(await readServedWikiEntry(slug, RIVAL.entityKey)).toBeUndefined();
+    expect(await servedKeys()).toEqual([]);
+    expect(await readForgeWikiLedger(projectId), 'hiding tombstones the ledger row').toEqual(
+      expect.arrayContaining([expect.objectContaining({ entryKey: RIVAL.entityKey, state: 'deleted' })]),
+    );
+    expect(await publishAuditSince(slug, hiding, 'wiki.delete')).toEqual([
+      expect.objectContaining({ outcome: 'applied', contentHash: hashOf(RIVAL.entityKey), storedRevision: 1 }),
+    ]);
+    const rehiding = await auditWatermark(slug);
+    expect((await reconcileSettled(publication)).wiki.deleted).toEqual([]);
+    expect(await publishAuditSince(slug, rehiding, 'wiki.delete'), 'a hidden entry is never deleted again').toEqual([]);
+
+    const showing = await auditWatermark(slug);
+    await setForgeWikiVisibility(projectId, RIVAL.entityKey, 'default');
+    expect((await reconcileSettled(publication)).wiki.pushed).toEqual([RIVAL.entityKey]);
+    expect(await readServedWikiEntry(slug, RIVAL.entityKey)).toEqual(expect.objectContaining({ revision: 2, contentHash: hashOf(RIVAL.entityKey) }));
+    expect(await readForgeWikiLedger(projectId)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ entryKey: RIVAL.entityKey, state: 'pushed', revision: 2, contentHash: hashOf(RIVAL.entityKey) })]),
+    );
+    expect(await servedKeys()).toEqual([RIVAL.entityKey]);
+    expect(await publishAuditSince(slug, showing, 'wiki.upsert')).toEqual([expect.objectContaining({ outcome: 'applied', incomingRevision: 2, storedRevision: null })]);
   });
 });

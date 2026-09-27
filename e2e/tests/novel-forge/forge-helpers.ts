@@ -9,7 +9,7 @@ import { type APIRequestContext, type APIResponse, expect } from '@playwright/te
 /**
  * Importing user defined packages
  */
-import { apiContext, AUTH_DIR, csrfHeaders, type LoginPersona, mutate, pollUntil } from '../../lib';
+import { apiContext, AUTH_DIR, csrfHeaders, type LoginPersona, mutate, novelForgeDb, pollUntil } from '../../lib';
 
 /**
  * Defining types
@@ -28,6 +28,13 @@ export interface NovelBundle {
   novel: { title: string; synopsis: string; tags?: string[]; genre?: string; cover?: string };
   volumes: { ordinal: number; title?: string; chapters: { title: string; content: string }[] }[];
   assets?: { name: string; mimeType: string; dataBase64: string }[];
+}
+
+export interface BibleEntity {
+  entityKey: string;
+  type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
+  name: string;
+  body?: string;
 }
 
 export type ContentMode = 'standard' | 'unrestricted';
@@ -92,9 +99,16 @@ export interface FinalizeReviewItem {
 export interface ReconcileResult {
   novel: string;
   pushed: number[];
+  deleted?: number[];
   skipped: number[];
   failed: { ordinal: number; error: string }[];
-  wiki: { pushed: string[]; skipped: string[]; failed: { entryKey: string; error: string }[] };
+  unknownOrdinals?: number[];
+  wiki: { pushed: string[]; deleted?: string[]; skipped: string[]; failed: { entryKey: string; error: string }[] };
+}
+
+export interface ForgeJob {
+  status: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
+  lastError: string | null;
 }
 
 export interface FinalizeReview {
@@ -118,6 +132,10 @@ export interface FinalizeReview {
  */
 
 export const MODEL_TAG = '@model';
+
+export class ForgeJobTimeoutError extends Error {
+  override readonly name = 'ForgeJobTimeoutError';
+}
 
 /** A whole model-backed flow: the dev gateway serialises AI work at concurrency 1 with a 5-minute ceiling per call. */
 export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
@@ -311,6 +329,35 @@ export function buildFinalBundle(title: string): NovelBundle {
       },
     ],
   };
+}
+
+/** Waits for a job to leave pending/in-progress, read from the forge's own table: `GET /api/v1/jobs/:id` answers 500 for every job — job.service.ts:409 joins uuid workflow_runs.id to varchar model_calls.run_id. */
+export async function settleForgeJob(jobId: string, timeoutMs = 60_000): Promise<ForgeJob> {
+  const job = await pollUntil(
+    async () => (await novelForgeDb()<ForgeJob[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`)[0],
+    current => current !== undefined && current.status !== 'pending' && current.status !== 'in_progress',
+    { timeoutMs, intervalMs: 500 },
+  );
+  if (!job || job.status === 'pending' || job.status === 'in_progress') throw new ForgeJobTimeoutError(`job ${jobId} still ${job?.status ?? 'missing'} after ${timeoutMs}ms`);
+  return job;
+}
+
+/** Starts importing {@link buildFinalBundle} as a new project; the import job writes rows only and calls no model. */
+export async function startFinalImport(ctx: APIRequestContext, title: string): Promise<{ projectId: string; jobId: string }> {
+  const response = await mutate(ctx, 'post', '/api/v1/import', { data: { bundle: buildFinalBundle(title) } });
+  expect(response.status(), await response.text()).toBe(202);
+  return (await response.json()) as { projectId: string; jobId: string };
+}
+
+export async function expectImportLanded(jobId: string): Promise<void> {
+  const job = await settleForgeJob(jobId);
+  expect(job.status, `import job failed: ${job.lastError ?? ''}`).toBe('done');
+}
+
+/** Adds a Story Bible entity; one with a `body` projects a reader wiki entry visible before the first chapter. */
+export async function createEntity(ctx: APIRequestContext, projectId: string, entity: BibleEntity): Promise<void> {
+  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, { data: entity });
+  expect(response.status(), await response.text()).toBe(201);
 }
 
 /** Polls a web-novel GET until it returns `wantStatus`, so an in-flight reader push has time to arrive. */

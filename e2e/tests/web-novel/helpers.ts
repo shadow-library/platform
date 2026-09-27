@@ -52,13 +52,60 @@ export interface ServedAccess {
   readonly subjectIds: string[];
 }
 
+export type PublishAction = 'novel.upsert' | 'novel.access' | 'chapter.upsert' | 'chapter.unpublish' | 'wiki.upsert' | 'wiki.delete';
+
 export interface PublishAuditRow {
   readonly id: string;
-  readonly action: string;
+  readonly action: PublishAction;
   readonly outcome: 'applied' | 'noop' | 'stale_rejected' | 'unauthorized' | 'error';
+  readonly ordinal: number | null;
+  readonly contentHash: string | null;
   readonly incomingRevision: number | null;
   readonly storedRevision: number | null;
   readonly callerClientId: string | null;
+}
+
+export interface ServedNovel {
+  readonly id: string;
+  readonly slug: string;
+  readonly sourceClientId: string;
+  readonly sourceRef: string;
+  readonly publishToken: string | null;
+  readonly title: string;
+  readonly originalAuthor: string | null;
+  readonly blurb: string | null;
+  readonly revision: number;
+  readonly updatedAt: Date;
+}
+
+export interface ServedNovelPatch {
+  title?: string;
+  revision?: number;
+  publishToken?: string | null;
+}
+
+export interface ServedChapter {
+  readonly id: string;
+  readonly ordinal: number;
+  readonly title: string;
+  readonly content: string;
+  readonly contentHash: string;
+  readonly revision: number;
+  readonly contentRating: Record<string, string> | null;
+}
+
+export interface ServedChapterPatch {
+  content?: string;
+  contentHash?: string;
+  revision?: number;
+}
+
+export interface ServedWikiEntry {
+  readonly id: string;
+  readonly revision: number;
+  readonly contentHash: string;
+  readonly facets: { facetKey: string; content: string; visibleFromOrdinal: number }[];
+  readonly images: { imageRef: string; caption: string | null }[];
 }
 
 interface ReaderListing {
@@ -87,6 +134,11 @@ const ARRANGED_SOURCE_CLIENT_ID = 'e2e-seed';
 
 export class WebNovelSessionError extends Error {
   override readonly name = 'WebNovelSessionError';
+}
+
+/** A reader-side arrangement that could not be made: the row it targets is missing, or the state it needed did not take. */
+export class ServedStateError extends Error {
+  override readonly name = 'ServedStateError';
 }
 
 /** Follows one hop of the OIDC login chain without following the next, and hands back where it points. */
@@ -168,7 +220,7 @@ export async function arrangeNovel(options: ArrangedNovelOptions): Promise<Arran
       VALUES (${options.slug}, ${ARRANGED_SOURCE_CLIENT_ID}, ${options.slug}, ${`E2E ${options.slug}`}, ${options.visibility}::novel_visibility, 1)
       RETURNING id::text AS id
     `;
-    if (!novel) throw new WebNovelSessionError(`novel insert for ${options.slug} returned no row`);
+    if (!novel) throw new ServedStateError(`novel insert for ${options.slug} returned no row`);
     for (let ordinal = 1; ordinal <= options.chapters; ordinal++) {
       const content = `Chapter ${ordinal} of ${options.slug}.`;
       await tx`
@@ -233,24 +285,99 @@ export async function setServedAccessRevision(slug: string, accessRevision: numb
 export async function reverseServedGrantOrder(slug: string, pushedOrder: string[]): Promise<void> {
   await webNovelDb().begin(async tx => {
     const [novel] = await tx<{ id: string }[]>`SELECT id::text AS id FROM novels WHERE slug = ${slug}`;
-    if (!novel) throw new WebNovelSessionError(`no served novel ${slug}`);
+    if (!novel) throw new ServedStateError(`no served novel ${slug}`);
     const grants = await tx<{ subjectId: string }[]>`SELECT subject_id AS "subjectId" FROM novel_grants WHERE novel_id = ${novel.id} ORDER BY ctid`;
     await tx`DELETE FROM novel_grants WHERE novel_id = ${novel.id}`;
     for (const grant of grants.reverse()) await tx`INSERT INTO novel_grants (novel_id, subject_id) VALUES (${novel.id}, ${grant.subjectId})`;
     const held = (await tx<{ subjectId: string }[]>`SELECT subject_id AS "subjectId" FROM novel_grants WHERE novel_id = ${novel.id}`).map(grant => grant.subjectId);
-    if (held.length < 2 || held.join() === pushedOrder.join()) throw new WebNovelSessionError(`the held grant order ${held.join()} still matches the pushed ${pushedOrder.join()}`);
+    if (held.length < 2 || held.join() === pushedOrder.join()) throw new ServedStateError(`the held grant order ${held.join()} still matches the pushed ${pushedOrder.join()}`);
   });
 }
 
-/** The newest audit row id for `slug`, as a watermark for {@link accessAuditSince}. */
+/** The newest audit row id for `slug`, as a watermark for {@link publishAuditSince}. */
 export async function auditWatermark(slug: string): Promise<string> {
   const [row] = await webNovelDb()<{ id: string }[]>`SELECT coalesce(max(id), 0)::text AS id FROM publish_audit_log WHERE novel_slug = ${slug}`;
   return row?.id ?? '0';
 }
 
-export async function accessAuditSince(slug: string, watermark: string): Promise<PublishAuditRow[]> {
+export async function publishAuditSince(slug: string, watermark: string, action: PublishAction): Promise<PublishAuditRow[]> {
   return webNovelDb()<PublishAuditRow[]>`
-    SELECT id::text AS id, action, outcome, incoming_revision AS "incomingRevision", stored_revision AS "storedRevision", caller_client_id AS "callerClientId"
-    FROM publish_audit_log WHERE novel_slug = ${slug} AND action = 'novel.access' AND id > ${watermark}::bigint ORDER BY id
+    SELECT id::text AS id, action, outcome, ordinal, content_hash AS "contentHash", incoming_revision AS "incomingRevision", stored_revision AS "storedRevision",
+      caller_client_id AS "callerClientId"
+    FROM publish_audit_log WHERE novel_slug = ${slug} AND action = ${action} AND id > ${watermark}::bigint ORDER BY id
   `;
+}
+
+export function accessAuditSince(slug: string, watermark: string): Promise<PublishAuditRow[]> {
+  return publishAuditSince(slug, watermark, 'novel.access');
+}
+
+/** Every novel one publisher holds under one of its own refs; the reader's unique index makes more than one a defect. */
+export async function readServedNovelsByRef(sourceClientId: string, sourceRef: string): Promise<ServedNovel[]> {
+  return webNovelDb()<ServedNovel[]>`
+    SELECT id::text AS id, slug, source_client_id AS "sourceClientId", source_ref AS "sourceRef", publish_token AS "publishToken", title,
+      original_author AS "originalAuthor", blurb, revision, updated_at AS "updatedAt"
+    FROM novels WHERE source_client_id = ${sourceClientId} AND source_ref = ${sourceRef}
+  `;
+}
+
+export async function readServedNovel(slug: string): Promise<ServedNovel | undefined> {
+  const [novel] = await webNovelDb()<ServedNovel[]>`
+    SELECT id::text AS id, slug, source_client_id AS "sourceClientId", source_ref AS "sourceRef", publish_token AS "publishToken", title,
+      original_author AS "originalAuthor", blurb, revision, updated_at AS "updatedAt"
+    FROM novels WHERE slug = ${slug}
+  `;
+  return novel;
+}
+
+export async function updateServedNovel(slug: string, patch: ServedNovelPatch): Promise<void> {
+  const sql = webNovelDb();
+  const columns = { title: patch.title, revision: patch.revision, publish_token: patch.publishToken };
+  const updated = await sql`UPDATE novels SET ${sql(Object.fromEntries(Object.entries(columns).filter(([, value]) => value !== undefined)))} WHERE slug = ${slug}`;
+  if (updated.count !== 1) throw new ServedStateError(`no served novel ${slug} to update`);
+}
+
+export async function readServedChapters(slug: string): Promise<ServedChapter[]> {
+  return webNovelDb()<ServedChapter[]>`
+    SELECT c.id::text AS id, c.ordinal, c.title, c.content, c.content_hash AS "contentHash", c.revision, c.content_rating AS "contentRating"
+    FROM published_chapters c JOIN novels n ON n.id = c.novel_id WHERE n.slug = ${slug} ORDER BY c.ordinal
+  `;
+}
+
+export async function updateServedChapter(slug: string, ordinal: number, patch: ServedChapterPatch): Promise<void> {
+  const sql = webNovelDb();
+  const columns = { content: patch.content, content_hash: patch.contentHash, revision: patch.revision };
+  const updated = await sql`
+    UPDATE published_chapters SET ${sql(Object.fromEntries(Object.entries(columns).filter(([, value]) => value !== undefined)))}
+    WHERE ordinal = ${ordinal} AND novel_id = (SELECT id FROM novels WHERE slug = ${slug})
+  `;
+  if (updated.count !== 1) throw new ServedStateError(`no served chapter ${ordinal} of ${slug} to update`);
+}
+
+/** A chapter the reader serves that no publisher ledger knows about. */
+export async function insertServedChapter(slug: string, ordinal: number): Promise<void> {
+  const content = `A stray chapter ${ordinal} of ${slug}.`;
+  await webNovelDb()`
+    INSERT INTO published_chapters (novel_id, ordinal, title, content, content_hash, revision, word_count, published_at)
+    SELECT id, ${ordinal}, ${`Chapter ${ordinal}`}, ${content}, ${createHash('sha256').update(content).digest('hex')}, 1, ${content.split(' ').length}, now() FROM novels WHERE slug = ${slug}
+  `;
+}
+
+export async function readServedWikiEntry(slug: string, entryKey: string): Promise<ServedWikiEntry | undefined> {
+  const [entry] = await webNovelDb()<ServedWikiEntry[]>`
+    SELECT e.id::text AS id, e.revision, e.content_hash AS "contentHash",
+      coalesce((SELECT json_agg(json_build_object('facetKey', f.facet_key, 'content', f.content, 'visibleFromOrdinal', f.visible_from_ordinal) ORDER BY f.sort_order)
+        FROM wiki_entry_facets f WHERE f.entry_id = e.id), '[]') AS facets,
+      coalesce((SELECT json_agg(json_build_object('imageRef', i.image_ref, 'caption', i.caption) ORDER BY i.sort_order)
+        FROM wiki_entry_images i WHERE i.entry_id = e.id), '[]') AS images
+    FROM wiki_entries e JOIN novels n ON n.id = e.novel_id WHERE n.slug = ${slug} AND e.entry_key = ${entryKey}
+  `;
+  return entry;
+}
+
+export async function setServedWikiRevision(slug: string, entryKey: string, revision: number): Promise<void> {
+  const updated = await webNovelDb()`
+    UPDATE wiki_entries SET revision = ${revision} WHERE entry_key = ${entryKey} AND novel_id = (SELECT id FROM novels WHERE slug = ${slug})
+  `;
+  if (updated.count !== 1) throw new ServedStateError(`no served wiki entry ${entryKey} of ${slug} to update`);
 }
