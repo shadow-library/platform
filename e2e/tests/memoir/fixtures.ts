@@ -116,7 +116,7 @@ export async function deleteMemoirAccounts(identitySub: string): Promise<void> {
 }
 
 /** Identity's per-client token-endpoint counters (`rl:<bucket>:<clientId>` and `rl:<bucket>:<clientId>:<ip>`), which outlive the client. */
-async function clearClientRateLimits(clientId: string): Promise<void> {
+export async function clearClientRateLimits(clientId: string): Promise<void> {
   const keys = [...(await redisScan(`rl:*:${clientId}`)), ...(await redisScan(`rl:*:${clientId}:*`))];
   if (keys.length > 0) await redisDel(...keys);
 }

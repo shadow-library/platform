@@ -125,6 +125,14 @@ export interface AccountView {
   id: string;
   onboardingCompletedAt: string | null;
   defaultCurrency: string;
+  enabledCurrencies: string[];
+  timezone: string;
+  pendingTimezone?: string | null;
+  intensityMode: string;
+  pendingIntensityMode?: string | null;
+  weekStart: number;
+  returnerThresholdDays: number;
+  monthlyBudgetMinor?: number | null;
   level: number;
   totalXp: string;
   coins: number;

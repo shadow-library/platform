@@ -19,11 +19,13 @@ import {
   type OAuthTestClient,
   pollUntil,
   type ProductKey,
+  registerOAuthClient,
   relyingPartyClient,
   requireProductUrl,
+  sleep,
 } from '../../lib';
 import { cookieFromStorageState } from '../cross-app/helpers';
-import { expect, type MemoirPersona, test } from './fixtures';
+import { clearClientRateLimits, expect, type MemoirPersona, test } from './fixtures';
 import { type CommandOutcome, dailyQuestDraft, type DeltaPage, errorCodeOf, getAccount, memoirMutate, pullFullDelta, submitCommand, todayLocal } from './helpers';
 
 /**
@@ -81,6 +83,15 @@ const GLOBAL_ID_DOMAINS: ReadonlySet<string> = new Set([
  * leaving half the pool free.
  */
 const FIRST_CONTACT_BURST = 5;
+
+/** Identity's admin API floors `accessTokenTtl` at 60s (admin-client.dto.ts:48) and the `auth.access_token.ttl` policy clamps to
+ *  the same floor no matter how low a client's own value goes (policy.service.ts's `clamp`), so 60s is the shortest TTL reachable
+ *  through the API. Memoir accepts an unexpired token up to a further 60s of clock skew (auth-client.ts:74), so the token is only
+ *  provably expired once `TOKEN_TTL_SECONDS + CLOCK_SKEW_SECONDS` has passed — the wait below adds a margin on top of that. */
+const TOKEN_TTL_SECONDS = 60;
+const CLOCK_SKEW_SECONDS = 60;
+const EXPIRY_MARGIN_SECONDS = 20;
+const EXPIRY_WAIT_MS = (TOKEN_TTL_SECONDS + CLOCK_SKEW_SECONDS + EXPIRY_MARGIN_SECONDS) * 1000;
 
 function bearer(token: string): { headers: Record<string, string> } {
   return { headers: { authorization: `Bearer ${token}` } };
@@ -408,5 +419,45 @@ test.describe('memoir cross-account isolation', () => {
 
     expect(await submitCommand(alice.ctx, 'quest.update', { questId: aliceQuestId, patch: { name: `${aliceQuestName} renamed` } })).toMatchObject({ status: 'applied' });
     expect((await memoirMutate(bob.ctx, 'delete', `/api/v1/account/devices/${bobDevice}`)).status()).toBe(204);
+  });
+});
+
+test.describe('memoir credential expiry', () => {
+  test('should accept a fresh api://memoir user access token and refuse the identical token once it has expired', async ({ memoir }) => {
+    test.setTimeout(EXPIRY_WAIT_MS + 90_000);
+
+    const persona = await memoir.persona({ label: 'token-expiry' });
+    const application = await memoir.createOAuthApp('memoir-expiry');
+    const admin = (await memoir.identityAdmin()).ctx;
+    const client = await registerOAuthClient(admin, application, { kind: 'WEB_CONFIDENTIAL', accessTokenTtl: TOKEN_TTL_SECONDS });
+    try {
+      await grantClientScope(admin, client.clientId, await findResourceScopeId(admin, MEMOIR_AUDIENCE, ACCOUNT_SCOPE));
+
+      const identityCtx = await memoir.identityCaller(persona);
+      const tokenCtx = await memoir.identityAnonymous();
+      const mint = async (): Promise<string> => {
+        const exchanged = await exchangeCode(tokenCtx, client, await authorizeCode(identityCtx, client, { resource: MEMOIR_AUDIENCE, scope: `openid ${ACCOUNT_SCOPE}` }));
+        expect(exchanged.status(), await exchanged.text()).toBe(200);
+        const body = (await exchanged.json()) as { access_token: string; expires_in: number };
+        expect(body.expires_in, 'the requested 60s TTL must survive the policy floor unshortened').toBe(TOKEN_TTL_SECONDS);
+        return body.access_token;
+      };
+
+      const token = await mint();
+      const guest = await memoir.guest();
+      const beforeExpiry = await guest.get('/api/v1/account', bearer(token));
+      expect(beforeExpiry.status(), `a token still inside its TTL must be admitted — ${await beforeExpiry.text()}`).toBe(200);
+
+      await sleep(EXPIRY_WAIT_MS);
+
+      const afterExpiry = await guest.get('/api/v1/account', bearer(token));
+      await expectRefusal(afterExpiry, 401, 'IAM_001');
+
+      // Same client, same audience, same scope — only time moved, so a fresh token proves the refusal above was expiry, not audience/scope.
+      const renewed = await guest.get('/api/v1/account', bearer(await mint()));
+      expect(renewed.status(), `a fresh token from the same client must still be admitted — ${await renewed.text()}`).toBe(200);
+    } finally {
+      await clearClientRateLimits(client.clientId);
+    }
   });
 });
