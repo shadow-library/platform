@@ -1,13 +1,14 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { type APIRequestContext } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, mutate, pollJob, subFor, webNovelDb } from '../../lib';
-import { buildFinalBundle, deleteProjectQuietly, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
+import { apiContext, mutate, runAll, subFor, webNovelDb } from '../../lib';
+import { buildBundle, expect, solidPng, test } from './forge-bundles';
+import { pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -22,17 +23,15 @@ interface ReaderWikiEntry {
  *
  * A portrait dated "as of chapter N" reaches readers only from chapter N on, AI-free. Two gallery images of one entity are dated to
  * before the story and to chapter 3; the reader wiki shows the first to everyone and the second only to a reader who has reached
- * chapter 3. Progress is written straight to the reader DB, as in the wiki spec, because the shared CSRF helper cannot mint a
- * web-novel token from a multi-app jar.
+ * chapter 3. The novel belongs to a fresh actor; user1 only reads it. Progress is written straight to the reader DB, as in the wiki
+ * spec, because the shared CSRF helper cannot mint a web-novel token from a multi-app jar; the rows cascade with the novel.
  */
-
-test.describe.configure({ mode: 'serial', timeout: 150_000 });
 
 const ENTITY_KEY = 'e2e-portrait-keeper';
 const EARLY_CAPTION = 'Before the story';
 const LATE_CAPTION = 'As of chapter 3';
-const RED_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4oaEBAALUARkFUI+kAAAAAElFTkSuQmCC';
-const BLUE_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQ0DgBAAGUARn8OyyYAAAAAElFTkSuQmCC';
+const EARLY_PORTRAIT = solidPng(210, 90, 70).toString('base64');
+const LATE_PORTRAIT = solidPng(70, 90, 210).toString('base64');
 
 async function setFurthestOrdinal(slug: string, ordinal: number): Promise<void> {
   await webNovelDb()`
@@ -42,83 +41,63 @@ async function setFurthestOrdinal(slug: string, ordinal: number): Promise<void> 
   `;
 }
 
+async function readerCaptions(ctx: APIRequestContext, slug: string): Promise<(string | undefined)[]> {
+  return ((await (await ctx.get(`/api/novels/${slug}/wiki/${ENTITY_KEY}`)).json()) as ReaderWikiEntry).images.map(image => image.caption);
+}
+
 test.describe('novel-forge chapter-dated portrait → reader', () => {
-  const slug = `e2e-portrait-${uniqueSuffix()}`;
-  const novelTitle = `E2E Portrait Novel ${uniqueSuffix()}`;
-  let forgeCtx: APIRequestContext;
-  let webGuestCtx: APIRequestContext;
-  let webUser1Ctx: APIRequestContext;
-  let projectId = '';
+  test('should show a portrait dated to chapter 3 only to a reader who has reached chapter 3', async ({ forge, lane }) => {
+    test.setTimeout(180_000);
+    const owner = await forge.actor({ label: 'portrait' });
+    const webGuestCtx = await apiContext('webNovel');
+    const webUser1Ctx = await apiContext('webNovel', 'user1');
+    try {
+      const novelTitle = `E2E Portrait Novel ${uniqueSuffix()}`;
+      const slug = lane.slug('portrait');
+      const { projectId } = await lane.imported(owner, buildBundle({ title: novelTitle }));
 
-  test.beforeAll(async () => {
-    forgeCtx = await apiContext('novelForge', 'user1');
-    webGuestCtx = await apiContext('webNovel');
-    webUser1Ctx = await apiContext('webNovel', 'user1');
-  });
+      const entity = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/entities`, {
+        data: { entityKey: ENTITY_KEY, type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.', significance: 'major' },
+      });
+      expect(entity.status(), await entity.text()).toBe(201);
+      for (const [image, depictsChapter, caption] of [
+        [EARLY_PORTRAIT, 0, EARLY_CAPTION],
+        [LATE_PORTRAIT, 3, LATE_CAPTION],
+      ] as const) {
+        const added = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/entities/${ENTITY_KEY}/images`, {
+          data: { mime: 'image/png', image, depictsChapter, caption },
+        });
+        expect(added.status(), await added.text()).toBe(201);
+      }
+      const stored = (await (await owner.ctx.get(`/api/v1/projects/${projectId}/entities/${ENTITY_KEY}`)).json()) as { images?: { caption?: string; depictsChapter?: number }[] };
+      expect(stored.images?.map(image => [image.caption, image.depictsChapter])).toEqual(
+        expect.arrayContaining([
+          [EARLY_CAPTION, 0],
+          [LATE_CAPTION, 3],
+        ]),
+      );
 
-  test.afterAll(async () => {
-    if (projectId) await deleteProjectQuietly(forgeCtx, projectId);
-    await forgeCtx.dispose();
-    await webGuestCtx.dispose();
-    await webUser1Ctx.dispose();
-  });
+      const publish = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/publish`, { data: { novelSlug: slug, title: novelTitle, genres: ['Fantasy'] } });
+      expect(publish.status(), await publish.text()).toBe(200);
+      for (const n of [1, 2, 3]) {
+        const chapter = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/${n}/publish`, { data: {} });
+        expect(chapter.status(), await chapter.text()).toBe(202);
+      }
+      const result = await reconcileUntilConverged(owner.ctx, projectId, [1, 2, 3], [ENTITY_KEY]);
+      expect(result.failed, JSON.stringify(result.failed)).toEqual([]);
+      expect(result.wiki.failed, JSON.stringify(result.wiki.failed)).toEqual([]);
+      expect([...result.wiki.pushed, ...result.wiki.skipped]).toContain(ENTITY_KEY);
 
-  test('should date two gallery images of one entity to before the story and to chapter 3', async () => {
-    const importRes = await mutate(forgeCtx, 'post', '/api/v1/import', { data: { bundle: buildFinalBundle(novelTitle) } });
-    expect(importRes.status(), await importRes.text()).toBe(202);
-    const { projectId: pid, jobId } = (await importRes.json()) as { projectId: string; jobId: string };
-    projectId = pid;
-    expect((await pollJob<{ status: string }>(forgeCtx, jobId, { timeoutMs: 60_000 })).status).toBe('done');
+      const entry = await pollWebNovel(webGuestCtx, `/api/novels/${slug}/wiki/${ENTITY_KEY}`, 200);
+      expect(entry.status(), await entry.text()).toBe(200);
+      expect(await readerCaptions(webGuestCtx, slug), 'a guest sees only the portrait dated before the story').toEqual([EARLY_CAPTION]);
 
-    const entity = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/entities`, {
-      data: { entityKey: ENTITY_KEY, type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.', significance: 'major' },
-    });
-    expect(entity.status(), await entity.text()).toBe(201);
-
-    for (const [image, depictsChapter, caption] of [
-      [RED_PIXEL, 0, EARLY_CAPTION],
-      [BLUE_PIXEL, 3, LATE_CAPTION],
-    ] as const) {
-      const added = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/entities/${ENTITY_KEY}/images`, { data: { mime: 'image/png', image, depictsChapter, caption } });
-      expect(added.status(), await added.text()).toBe(201);
+      await setFurthestOrdinal(slug, 2);
+      expect(await readerCaptions(webUser1Ctx, slug)).toEqual([EARLY_CAPTION]);
+      await setFurthestOrdinal(slug, 3);
+      expect(await readerCaptions(webUser1Ctx, slug)).toEqual(expect.arrayContaining([EARLY_CAPTION, LATE_CAPTION]));
+    } finally {
+      await runAll([() => webGuestCtx.dispose(), () => webUser1Ctx.dispose()]);
     }
-
-    const stored = (await (await forgeCtx.get(`/api/v1/projects/${projectId}/entities/${ENTITY_KEY}`)).json()) as { images?: { caption?: string; depictsChapter?: number }[] };
-    expect(stored.images?.map(image => [image.caption, image.depictsChapter])).toEqual(
-      expect.arrayContaining([
-        [EARLY_CAPTION, 0],
-        [LATE_CAPTION, 3],
-      ]),
-    );
-  });
-
-  test('should publish the novel and converge its chapters and the wiki entry', async () => {
-    const publish = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/publish`, { data: { novelSlug: slug, title: novelTitle, genres: ['Fantasy'] } });
-    expect(publish.status(), await publish.text()).toBe(200);
-    for (const n of [1, 2, 3]) {
-      const chapter = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/chapters/${n}/publish`, { data: {} });
-      expect(chapter.status(), await chapter.text()).toBe(202);
-    }
-
-    const result = await reconcileUntilConverged(forgeCtx, projectId, [1, 2, 3], [ENTITY_KEY]);
-    expect(result.failed, JSON.stringify(result.failed)).toEqual([]);
-    expect(result.wiki.failed, JSON.stringify(result.wiki.failed)).toEqual([]);
-    expect([...result.wiki.pushed, ...result.wiki.skipped]).toContain(ENTITY_KEY);
-  });
-
-  test('should show a guest only the portrait dated before the story', async () => {
-    const entry = await pollWebNovel(webGuestCtx, `/api/novels/${slug}/wiki/${ENTITY_KEY}`, 200);
-    expect(entry.status(), await entry.text()).toBe(200);
-    expect(((await entry.json()) as ReaderWikiEntry).images.map(image => image.caption)).toEqual([EARLY_CAPTION]);
-  });
-
-  test('should keep the chapter-3 portrait from a reader at chapter 2 and show it once they reach chapter 3', async () => {
-    await setFurthestOrdinal(slug, 2);
-    const atTwo = (await (await webUser1Ctx.get(`/api/novels/${slug}/wiki/${ENTITY_KEY}`)).json()) as ReaderWikiEntry;
-    expect(atTwo.images.map(image => image.caption)).toEqual([EARLY_CAPTION]);
-
-    await setFurthestOrdinal(slug, 3);
-    const atThree = (await (await webUser1Ctx.get(`/api/novels/${slug}/wiki/${ENTITY_KEY}`)).json()) as ReaderWikiEntry;
-    expect(atThree.images.map(image => image.caption)).toEqual(expect.arrayContaining([EARLY_CAPTION, LATE_CAPTION]));
   });
 });
