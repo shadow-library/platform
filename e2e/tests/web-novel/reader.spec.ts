@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
 import { apiContext, readSeedManifest, requireProductUrl, storageStateFor } from '../../lib';
-import { webNovelMutate } from './helpers';
+import { expect, test } from './fixtures';
+import { listShelf, webNovelMutate } from './helpers';
 
 /**
  * Defining types
@@ -115,6 +115,42 @@ test.describe('reader features', () => {
     const body = (await response.json()) as { code?: string };
     expect(body.code).toBe('WBN_001');
   });
+});
+
+/**
+ * Per-reader scoping on fresh factory readers, so neither persona's shelf is touched: the seeded public novel is the one shared row both
+ * readers point at, which is exactly the case where a query missing its user filter would leak or delete across readers.
+ */
+test.describe('reader data scoping', () => {
+  const { webNovel: seeded } = readSeedManifest();
+
+  test("should list and remove only the signed-in reader's own library rows", async ({ webNovel }) => {
+    const { ctx: owner } = await webNovel.signIn(await webNovel.reader('shelf-owner'));
+    const { ctx: other } = await webNovel.signIn(await webNovel.reader('shelf-other'));
+
+    expect((await webNovelMutate(owner, 'post', '/api/library', { data: { slug: seeded.publicSlug } })).status()).toBe(204);
+    expect(await listShelf(owner, '/api/library')).toContain(seeded.publicSlug);
+    expect(await listShelf(other, '/api/library'), "another reader's shelf row must never surface").not.toContain(seeded.publicSlug);
+
+    expect((await webNovelMutate(other, 'post', '/api/library', { data: { slug: seeded.publicSlug } })).status()).toBe(204);
+    expect((await webNovelMutate(other, 'delete', `/api/library/${seeded.publicSlug}`)).status()).toBe(204);
+    expect(await listShelf(other, '/api/library')).not.toContain(seeded.publicSlug);
+    expect(await listShelf(owner, '/api/library'), "a reader's removal must not reach another reader's row for the same novel").toContain(seeded.publicSlug);
+  });
+
+  for (const path of ['/api/library', '/api/shared', '/api/me/progress'] as const) {
+    test(`should 401 IAM_001 on GET ${path} for a guest and answer a signed-in reader`, async ({ webNovel }) => {
+      const guest = await webNovel.guest();
+      const refused = await guest.get(path);
+      expect(refused.status()).toBe(401);
+      expect(((await refused.json()) as { code?: string }).code).toBe('IAM_001');
+
+      const { ctx } = await webNovel.signIn(await webNovel.reader('listing'));
+      const answered = await ctx.get(path);
+      expect(answered.status()).toBe(200);
+      expect(((await answered.json()) as { items: unknown[] }).items).toEqual([]);
+    });
+  }
 });
 
 test.describe('library screen (signed in)', () => {

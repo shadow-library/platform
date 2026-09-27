@@ -21,7 +21,7 @@ import {
   requireProductUrl,
   runAll,
 } from '../../lib';
-import { followRedirect, WEB_NOVEL_SESSION_COOKIE, WebNovelSessionError } from './helpers';
+import { deleteReaderData, followRedirect, WEB_NOVEL_SESSION_COOKIE, WebNovelSessionError } from './helpers';
 
 /**
  * Defining types
@@ -57,7 +57,8 @@ export interface WebNovelHarness {
  * Readers are built per test rather than taken from the saved personas: logging out revokes the handle a persona's
  * storage state carries, which every other web-novel spec reads. Each reader's central session is written straight into
  * identity, so a test spends no `login/init` budget, and the chain is walked hop by hop so it never renders the SSR page
- * the callback lands on. Deleting the user cascades its central and app sessions.
+ * the callback lands on. Deleting the user cascades its central and app sessions; web-novel keys its shelves and progress by the bare
+ * subject, so those are removed by hand.
  */
 
 export const test = base.extend<{ webNovel: WebNovelHarness }>({
@@ -102,6 +103,7 @@ export const test = base.extend<{ webNovel: WebNovelHarness }>({
     await runAll([
       ...contexts.map(ctx => () => ctx.dispose()),
       ...readers.map(reader => () => evictSessionCache(reader.session.secret)),
+      () => deleteReaderData(users.map(user => user.userId)),
       ...users.map(user => () => deleteIdentityUser(user)),
       () => clearIpState(clientIp),
     ]);
