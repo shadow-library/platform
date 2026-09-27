@@ -26,7 +26,7 @@ import {
 } from '../../lib';
 import { cookieFromStorageState } from '../cross-app/helpers';
 import { clearClientRateLimits, expect, type MemoirPersona, test } from './fixtures';
-import { type CommandOutcome, dailyQuestDraft, type DeltaPage, errorCodeOf, getAccount, memoirMutate, pullFullDelta, submitCommand, todayLocal } from './helpers';
+import { type CommandOutcome, dailyQuestDraft, type DeltaPage, errorCodeOf, getAccount, memoirMutate, pullFullDelta, submitCommand, todayLocal, waitersBlockedBy } from './helpers';
 
 /**
  * Defining types
@@ -78,11 +78,11 @@ const GLOBAL_ID_DOMAINS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Memoir-server's pool (Bun SQL, default 10 connections, not overridden in dev) is shared with every other lane's memoir traffic, and
- * each blocked first-contact insert pins one connection until the blocker rolls back; five losers-in-waiting prove the path while
- * leaving half the pool free.
+ * Memoir-server's pool (Bun SQL, default 10 connections, not overridden in dev) is shared with every other concurrent memoir test, and
+ * each blocked first-contact insert pins one connection until the blocker rolls back. Two copies of this test run at once under two
+ * workers, so three waiters each prove the path while leaving room for everything else.
  */
-const FIRST_CONTACT_BURST = 5;
+const FIRST_CONTACT_BURST = 3;
 
 /** Identity's admin API floors `accessTokenTtl` at 60s (admin-client.dto.ts:48) and the `auth.access_token.ttl` policy clamps to
  *  the same floor no matter how low a client's own value goes (policy.service.ts's `clamp`), so 60s is the shortest TTL reachable
@@ -126,11 +126,6 @@ async function accountSequenceValue(): Promise<bigint> {
   const [row] = await memoirDb()<{ value: string }[]>`SELECT last_value::text AS value FROM accounts_id_seq`;
   if (!row) throw new Error('accounts_id_seq returned no row');
   return BigInt(row.value);
-}
-
-async function waitersBlockedBy(pid: number): Promise<number> {
-  const [row] = await memoirDb()<{ waiters: number }[]>`SELECT count(*)::int AS waiters FROM pg_stat_activity WHERE ${pid}::int = ANY(pg_blocking_pids(pid))`;
-  return row?.waiters ?? 0;
 }
 
 /** A context presenting `handle` as the app-session cookie of `product`'s origin, and nothing else. */

@@ -6,7 +6,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { getProductUrl } from '../../lib';
+import { getProductUrl, memoirDb } from '../../lib';
 
 /**
  * Defining types
@@ -53,20 +53,51 @@ export interface DeltaPage {
  * shared helper's cookie lookup has no origin filter, so it nondeterministically echoes a foreign-origin token.
  */
 export async function memoirMutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MemoirMutateOptions = {}): Promise<APIResponse> {
-  await ctx.get(options.csrfSeedPath ?? '/api/auth/session');
+  const headers = { ...(await memoirCsrfHeaders(ctx, options.csrfSeedPath)), ...options.headers };
+  return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
+}
+
+/**
+ * Seeds memoir's CSRF cookie and returns the matching header. Each seed may rotate the token, so requests fired concurrently on one
+ * context must share a single seed taken beforehand — seeding per request lets a later seed invalidate an earlier request's header (`S010`).
+ */
+export async function memoirCsrfHeaders(ctx: APIRequestContext, seedPath = '/api/auth/session'): Promise<Record<string, string>> {
+  await ctx.get(seedPath);
 
   const memoirOrigin = new URL(getProductUrl('memoir') ?? 'https://memoir.shadow-apps.test').hostname;
   const { cookies } = await ctx.storageState();
   const cookie = cookies.find(c => c.name === 'csrf-token' && c.domain.replace(/^\./, '') === memoirOrigin);
   const token = cookie?.value.split(':')[1];
-
-  const headers = { ...(token ? { 'x-csrf-token': token } : {}), ...options.headers };
-  return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
+  return token ? { 'x-csrf-token': token } : {};
 }
 
 /** Today's date in `YYYY-MM-DD`, in the runner's local timezone — good enough for a command's `localDate`/`recurrence.startDate` in dev, where the seeded accounts run UTC-adjacent timezones. */
 export function todayLocal(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+export function commandEnvelope(type: string, payload: Record<string, unknown>, overrides: Partial<CommandEnvelopeInput> = {}): CommandEnvelopeInput {
+  return { commandId: crypto.randomUUID(), type, payload, localDate: todayLocal(), ...overrides };
+}
+
+/**
+ * Posts one sync batch and hands back the raw response, for callers asserting on a refusal or racing the request. Pass `csrfHeaders`
+ * from {@link memoirCsrfHeaders} when firing several at once.
+ */
+export function postCommands(ctx: APIRequestContext, commands: CommandEnvelopeInput[], csrfHeaders?: Record<string, string>): Promise<APIResponse> {
+  if (csrfHeaders) return ctx.post('/api/v1/sync/commands', { headers: csrfHeaders, data: { commands } });
+  return memoirMutate(ctx, 'post', '/api/v1/sync/commands', { data: { commands } });
+}
+
+/** Reads the outcomes out of a sync batch response, throwing if the batch itself was refused. */
+export async function commandOutcomesOf(response: APIResponse): Promise<CommandOutcome[]> {
+  if (!response.ok()) throw new Error(`sync/commands failed: ${response.status()} ${await response.text()}`);
+  return ((await response.json()) as { outcomes: CommandOutcome[] }).outcomes;
+}
+
+/** Submits `commands` as one batch; a command that fails is reported with status `failed` and the batch stops after it, so nothing later has an outcome. */
+export async function submitCommands(ctx: APIRequestContext, commands: CommandEnvelopeInput[]): Promise<CommandOutcome[]> {
+  return commandOutcomesOf(await postCommands(ctx, commands));
 }
 
 /** Submits a single sync command and returns its outcome, throwing if the batch response is not ok. */
@@ -76,13 +107,15 @@ export async function submitCommand(
   payload: Record<string, unknown>,
   overrides: Partial<CommandEnvelopeInput> = {},
 ): Promise<CommandOutcome> {
-  const envelope: CommandEnvelopeInput = { commandId: crypto.randomUUID(), type, payload, localDate: todayLocal(), ...overrides };
-  const response = await memoirMutate(ctx, 'post', '/api/v1/sync/commands', { data: { commands: [envelope] } });
-  if (!response.ok()) throw new Error(`sync/commands failed: ${response.status()} ${await response.text()}`);
-  const body = (await response.json()) as { outcomes: CommandOutcome[] };
-  const outcome = body.outcomes[0];
+  const [outcome] = await submitCommands(ctx, [commandEnvelope(type, payload, overrides)]);
   if (!outcome) throw new Error('sync/commands returned no outcome for the submitted command');
   return outcome;
+}
+
+/** How many memoir-database backends are currently waiting on a lock `pid` holds. */
+export async function waitersBlockedBy(pid: number): Promise<number> {
+  const [row] = await memoirDb()<{ waiters: number }[]>`SELECT count(*)::int AS waiters FROM pg_stat_activity WHERE ${pid}::int = ANY(pg_blocking_pids(pid))`;
+  return row?.waiters ?? 0;
 }
 
 /** Pulls one delta page starting from `since` (defaults to a full initial sync). */
