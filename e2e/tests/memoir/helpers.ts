@@ -92,6 +92,26 @@ export async function pullDelta(ctx: APIRequestContext, since = '0'): Promise<De
   return (await response.json()) as DeltaPage;
 }
 
+/** Pulls every delta page from `since=0` until `hasMore` clears, merging each domain's rows and the tombstones in arrival order. */
+export async function pullFullDelta(ctx: APIRequestContext, maxPages = 50): Promise<DeltaPage> {
+  const merged: DeltaPage = { cursor: '0', hasMore: true, domains: {}, tombstones: [] };
+  for (let page = 0; page < maxPages && merged.hasMore; page++) {
+    const delta = await pullDelta(ctx, merged.cursor);
+    for (const [domain, rows] of Object.entries(delta.domains)) merged.domains[domain] = [...(merged.domains[domain] ?? []), ...rows];
+    merged.tombstones.push(...delta.tombstones);
+    merged.cursor = delta.cursor;
+    merged.hasMore = delta.hasMore;
+  }
+  if (merged.hasMore) throw new Error(`sync/delta still had more after ${maxPages} pages`);
+  return merged;
+}
+
+/** The `code` of an error response body, or `undefined` when the body carries none. */
+export async function errorCodeOf(response: APIResponse): Promise<string | undefined> {
+  const body = (await response.json().catch(() => ({}))) as { code?: unknown };
+  return typeof body.code === 'string' ? body.code : undefined;
+}
+
 /**
  * `quest_logs` delta rows carry `questId` and `date` — there is no `occurrenceId` column — so an occurrence
  * is looked up by reassembling the id the client sends, never by a field the wire does not have.
@@ -135,15 +155,15 @@ export async function ensureOnboarded(ctx: APIRequestContext): Promise<AccountVi
   return (await response.json()) as AccountView;
 }
 
+/** A `quest.create` payload for an open-ended daily routine quest starting on `startDate`. */
+export function dailyQuestDraft(name: string, startDate = todayLocal()): Record<string, unknown> {
+  return { name, statAffinity: 'discipline', strictness: 'routine', recurrence: { frequency: 'daily', startDate, end: { kind: 'never' } } };
+}
+
 /** Creates a simple daily quest via `quest.create` and returns its id and the occurrence id for today. */
 export async function createDailyQuest(ctx: APIRequestContext, name: string): Promise<{ questId: string; occurrenceId: string }> {
   const today = todayLocal();
-  const outcome = await submitCommand(ctx, 'quest.create', {
-    name,
-    statAffinity: 'discipline',
-    strictness: 'routine',
-    recurrence: { frequency: 'daily', startDate: today, end: { kind: 'never' } },
-  });
+  const outcome = await submitCommand(ctx, 'quest.create', dailyQuestDraft(name, today));
   if (outcome.status !== 'applied') throw new Error(`quest.create was not applied: ${JSON.stringify(outcome)}`);
   const questId = String(outcome.result['id']);
   return { questId, occurrenceId: `${questId}:${today}` };
