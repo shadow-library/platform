@@ -28,7 +28,7 @@ export interface ServiceAccountTokenOptions {
  * The minted tokens are credentials: they are passed straight to the token endpoint and never logged or written to disk.
  */
 
-export const KUBE_CONTEXT = 'k3d-shadow-apps-dev';
+export const KUBE_CONTEXT = process.env.E2E_KUBE_CONTEXT || 'k3d-shadow-apps-dev';
 
 /** `AUTH_WORKLOAD_ISSUER` in the dev cluster — the `iss` every cluster-signed assertion carries. */
 export const WORKLOAD_ISSUER = 'https://kubernetes.default.svc.cluster.local';
