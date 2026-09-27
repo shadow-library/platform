@@ -21,6 +21,7 @@ declare module '@shadow-library/common' {
     'database.postgres.url'?: string;
     'database.postgres.max-connections'?: number;
     'database.postgres.lazy-connection': boolean;
+    'database.postgres.prepare': boolean;
     'database.redis.url'?: string;
     'database.memcache.hosts'?: string;
   }
@@ -51,6 +52,13 @@ export interface PostgresConnectionConfig {
 
   /** Maximum number of connections. Resolved from `Config.get('database.postgres.max-connections')` if not provided */
   maxConnections?: number;
+
+  /**
+   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `false` (`database.postgres.prepare`):
+   * Bun SQL 1.3.14 stalls a connection forever, pooled or in a transaction, when a query is in flight and a statement it has not prepared is
+   * queued ahead of one it has. Re-enable only after a Bun upgrade passes that reproduction.
+   */
+  prepare: boolean;
 }
 
 export interface PostgresConfig {

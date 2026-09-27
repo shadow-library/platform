@@ -15,7 +15,7 @@ declare module '@shadow-library/modules' {
 
 export const DatastoreModule = CoreDatabaseModule.forRoot({
   postgres: {
-    factory: (config, connection) => drizzle({ ...config, schema, connection: { url: connection.url, max: connection.maxConnections } }),
+    factory: (config, connection) => drizzle({ ...config, schema, connection: { url: connection.url, max: connection.maxConnections, prepare: connection.prepare } }),
     /**
      * Two pushes can race past the lookup and both insert; whichever index rejects the loser, its re-read
      * decides whether the row is its own or truly foreign. Both map to WBN_010 because both are answered

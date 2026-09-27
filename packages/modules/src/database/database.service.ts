@@ -68,13 +68,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       if (isLogEnabled) drizzleConfig.logger = { logQuery: (query, params) => this.logger.debug(`SQL: ${renderPostgresQuery(query, params)}`) };
 
       /** Connection Configs */
-      const connectionConfig: PostgresConnectionConfig = { url: this.resolveConnectionUrl('PostgreSQL', 'database.postgres.url') };
+      const connectionConfig: PostgresConnectionConfig = {
+        url: this.resolveConnectionUrl('PostgreSQL', 'database.postgres.url'),
+        prepare: Config.register('database.postgres.prepare', DEFAULT_CONFIGS['database.postgres.prepare']),
+      };
       const maxConnections = Config.register('database.postgres.max-connections', DEFAULT_CONFIGS['database.postgres.max-connections']);
       if (maxConnections) connectionConfig.maxConnections = maxConnections;
 
       /** Initialize client and verify connection */
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
       if (!this.postgresClient) throw AppError.internal('Postgres client is in an impossible state: undefined after initialization');
+      await this.assertPrepareHonoured(this.postgresClient, connectionConfig.prepare);
 
       const isLazyConnection = postgres.lazyConnection ?? Config.register('database.postgres.lazy-connection', DEFAULT_CONFIGS['database.postgres.lazy-connection']);
       if (isLazyConnection) this.logger.info('Postgres client initialized with lazy connection');
@@ -133,9 +137,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
        * Without this, dozens of suites each holding `database.postgres.max-connections` connections open
        * exhausts Postgres well before the run finishes.
        */
-      const client = (this.postgresClient as unknown as { $client?: { close?: () => Promise<void>; end?: () => Promise<void> } }).$client;
-      const close = client?.close ?? client?.end;
-      if (close) await close.call(client);
+      await this.closePostgresClient(this.postgresClient);
       this.logger.info('Postgres client disconnected');
     }
 
@@ -148,6 +150,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.redisClient.quit();
       this.logger.info('Redis client disconnected');
     }
+  }
+
+  /** Bun SQL and postgres.js both expose their resolved options on the client Drizzle keeps as `$client`; other drivers are not checked. */
+  private async assertPrepareHonoured(client: PostgresClient, prepare: boolean): Promise<void> {
+    const driverPrepare = (client as unknown as { $client?: { options?: { prepare?: unknown } } }).$client?.options?.prepare;
+    if (typeof driverPrepare !== 'boolean' || driverPrepare === prepare) return;
+    await this.closePostgresClient(client);
+    this.postgresClient = undefined;
+    throw AppError.internal(`Postgres factory ignored connection.prepare: requested ${prepare}, driver has ${driverPrepare}. Pass it to the driver's 'prepare' option`);
+  }
+
+  private async closePostgresClient(postgresClient: PostgresClient): Promise<void> {
+    const client = (postgresClient as unknown as { $client?: { close?: () => Promise<void>; end?: () => Promise<void> } }).$client;
+    const close = client?.close ?? client?.end;
+    if (close) await close.call(client);
   }
 
   getPostgresClient(): PostgresClient {

@@ -19,6 +19,6 @@ declare module '@shadow-library/modules' {
 export const DatabaseModule = CoreDatabaseModule.forRoot({
   postgres: {
     constraintErrorMap,
-    factory: (config, connection) => drizzle({ ...config, schema, connection: { url: connection.url, max: connection.maxConnections } }),
+    factory: (config, connection) => drizzle({ ...config, schema, connection: { url: connection.url, max: connection.maxConnections, prepare: connection.prepare } }),
   },
 });

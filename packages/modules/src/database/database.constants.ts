@@ -26,4 +26,5 @@ export const DEFAULT_CONFIGS = {
 
   'database.postgres.lazy-connection': { defaultValue: 'false', validateType: 'boolean' },
   'database.postgres.max-connections': { validateType: 'number' },
+  'database.postgres.prepare': { defaultValue: 'false', validateType: 'boolean' },
 } as const satisfies Partial<Record<keyof ConfigRecords, ConfigOptions>>;

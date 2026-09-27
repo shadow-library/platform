@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { Module, ShadowFactory } from '@shadow-library/app';
+import { setConfig } from '@shadow-library/common/testing';
 
 /**
  * Importing user defined packages
@@ -51,6 +52,10 @@ describe('Database Module', () => {
       expect(postgresFactory).toHaveBeenCalledTimes(1);
     });
 
+    it('should pass prepare false to the factory by default', () => {
+      expect(postgresFactory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: false }));
+    });
+
     it('should have redis disabled', () => {
       expect(databaseService.isRedisEnabled()).toBe(false);
     });
@@ -65,6 +70,40 @@ describe('Database Module', () => {
 
     it('should throw when getting memcache client while not enabled', () => {
       expect(() => databaseService.getMemcacheClient()).toThrow('Memcached client is not initialized');
+    });
+  });
+
+  describe('prepared statements', () => {
+    const clientWithDriverPrepare = (prepare: boolean) => ({ execute: mock(), $client: { options: { prepare }, close: mock(async () => {}) } }) as unknown as PostgresClient;
+
+    const createApp = (client: PostgresClient) => {
+      @Module({ imports: [DatabaseModule.forRoot({ postgres: { factory: () => client } })] })
+      class PrepareAppModule {}
+      return ShadowFactory.create(PrepareAppModule);
+    };
+
+    it('should pass a configured prepare true to the factory', async () => {
+      const factory = mock((): PostgresClient => clientWithDriverPrepare(true));
+      const restoreConfig = setConfig({ 'database.postgres.prepare': true });
+      try {
+        @Module({ imports: [DatabaseModule.forRoot({ postgres: { factory } })] })
+        class PrepareEnabledAppModule {}
+        await ShadowFactory.create(PrepareEnabledAppModule);
+      } finally {
+        restoreConfig();
+      }
+      expect(factory).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prepare: true }));
+    });
+
+    it('should boot when the driver honours the requested prepare option', async () => {
+      const app = await createApp(clientWithDriverPrepare(false));
+      expect(app.get(DatabaseService).isPostgresEnabled()).toBe(true);
+    });
+
+    it('should close the client and refuse to boot when the factory drops the prepare option', async () => {
+      const client = clientWithDriverPrepare(true);
+      await expect(createApp(client)).rejects.toThrow('Postgres factory ignored connection.prepare');
+      expect((client as unknown as { $client: { close: ReturnType<typeof mock> } }).$client.close).toHaveBeenCalledTimes(1);
     });
   });
 
