@@ -15,6 +15,13 @@
       "when": 1790456768171,
       "tag": "0001_account_default_cost_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790544718760,
+      "tag": "0002_repair_double_encoded_jsonb",
+      "breakpoints": true
     }
   ]
 }

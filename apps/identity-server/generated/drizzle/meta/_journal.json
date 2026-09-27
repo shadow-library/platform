@@ -50,6 +50,13 @@
       "when": 1789400240265,
       "tag": "0006_public_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790544718297,
+      "tag": "0007_repair_double_encoded_jsonb",
+      "breakpoints": true
     }
   ]
 }

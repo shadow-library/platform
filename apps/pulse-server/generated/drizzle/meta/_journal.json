@@ -22,6 +22,13 @@
       "when": 1786286759897,
       "tag": "0002_glossy_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790544718507,
+      "tag": "0003_repair_double_encoded_jsonb",
+      "breakpoints": true
     }
   ]
 }
