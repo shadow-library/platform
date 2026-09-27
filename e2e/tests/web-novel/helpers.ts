@@ -38,10 +38,25 @@ export interface ArrangedNovel {
   readonly slug: string;
 }
 
+export type NovelStatus = 'live' | 'retired';
+
+export type SexualContentLevel = 'none' | 'suggestive' | 'moderate' | 'explicit';
+
+export type ViolenceLevel = 'none' | 'mild' | 'graphic' | 'extreme';
+
+export type DarkContentLevel = 'none' | 'mild' | 'heavy';
+
 export interface ArrangedNovelOptions {
   slug: string;
   visibility: NovelVisibility;
   chapters: number;
+  title?: string;
+  genres?: string[];
+  tags?: string[];
+  status?: NovelStatus;
+  sexualContent?: SexualContentLevel;
+  violence?: ViolenceLevel;
+  darkContent?: DarkContentLevel;
 }
 
 export interface ServedAccess {
@@ -216,8 +231,12 @@ export async function listProgressSlugs(ctx: APIRequestContext): Promise<string[
 export async function arrangeNovel(options: ArrangedNovelOptions): Promise<ArrangedNovel> {
   return webNovelDb().begin(async tx => {
     const [novel] = await tx<{ id: string }[]>`
-      INSERT INTO novels (slug, source_client_id, source_ref, title, visibility, revision)
-      VALUES (${options.slug}, ${ARRANGED_SOURCE_CLIENT_ID}, ${options.slug}, ${`E2E ${options.slug}`}, ${options.visibility}::novel_visibility, 1)
+      INSERT INTO novels (slug, source_client_id, source_ref, title, visibility, genres, tags, status, sexual_content, violence, dark_content, revision)
+      VALUES (
+        ${options.slug}, ${ARRANGED_SOURCE_CLIENT_ID}, ${options.slug}, ${options.title ?? `E2E ${options.slug}`}, ${options.visibility}::novel_visibility,
+        ${options.genres ?? []}, ${options.tags ?? []}, ${options.status ?? 'live'}::novel_status,
+        ${options.sexualContent ?? null}, ${options.violence ?? null}, ${options.darkContent ?? null}, 1
+      )
       RETURNING id::text AS id
     `;
     if (!novel) throw new ServedStateError(`novel insert for ${options.slug} returned no row`);
@@ -380,4 +399,80 @@ export async function setServedWikiRevision(slug: string, entryKey: string, revi
     UPDATE wiki_entries SET revision = ${revision} WHERE entry_key = ${entryKey} AND novel_id = (SELECT id FROM novels WHERE slug = ${slug})
   `;
   if (updated.count !== 1) throw new ServedStateError(`no served wiki entry ${entryKey} of ${slug} to update`);
+}
+
+export interface ArrangedWikiFacet {
+  facetKey: string;
+  content: string;
+  visibleFromOrdinal: number;
+  sortOrder?: number;
+}
+
+export interface ArrangedWikiImage {
+  imageRef: string;
+  caption?: string;
+  visibleFromOrdinal: number;
+  sortOrder?: number;
+}
+
+export interface ArrangedWikiEntryOptions {
+  entryKey: string;
+  type?: string;
+  name?: string;
+  firstVisibleOrdinal?: number;
+  /** An ungated headline ref; masked out in SQL whenever `gatedImageRef` is the one meant to be served instead. */
+  imageRef?: string | null;
+  /** A headline that only becomes servable once the reader's gate reaches `imageVisibleFromOrdinal`. */
+  gatedImageRef?: string | null;
+  imageVisibleFromOrdinal?: number | null;
+  facets?: ArrangedWikiFacet[];
+  images?: ArrangedWikiImage[];
+}
+
+export interface ArrangedWikiEntry {
+  readonly id: string;
+  readonly entryKey: string;
+}
+
+/** A ref matching the reader's own content-address minting pattern (`<sha256hex>.<ext>`), so `isImageRef` resolves it to a URL. */
+export function fakeImageRef(label: string): string {
+  return `${createHash('sha256').update(label).digest('hex')}.webp`;
+}
+
+/** A wiki entry written straight into the reader's projection, with its facets and images gated per the options given. */
+export async function arrangeWikiEntry(novel: ArrangedNovel, options: ArrangedWikiEntryOptions): Promise<ArrangedWikiEntry> {
+  return webNovelDb().begin(async tx => {
+    const [entry] = await tx<{ id: string; entryKey: string }[]>`
+      INSERT INTO wiki_entries (novel_id, entry_key, type, name, image_ref, gated_image_ref, image_visible_from_ordinal, first_visible_ordinal, content_hash, revision)
+      VALUES (
+        ${novel.id}, ${options.entryKey}, ${options.type ?? 'character'}, ${options.name ?? options.entryKey},
+        ${options.imageRef ?? null}, ${options.gatedImageRef ?? null}, ${options.imageVisibleFromOrdinal ?? null},
+        ${options.firstVisibleOrdinal ?? 0}, ${createHash('sha256').update(options.entryKey).digest('hex')}, 1
+      )
+      RETURNING id::text AS id, entry_key AS "entryKey"
+    `;
+    if (!entry) throw new ServedStateError(`wiki entry insert for ${options.entryKey} returned no row`);
+    for (const facet of options.facets ?? []) {
+      await tx`
+        INSERT INTO wiki_entry_facets (entry_id, facet_key, content, sort_order, visible_from_ordinal)
+        VALUES (${entry.id}, ${facet.facetKey}, ${facet.content}, ${facet.sortOrder ?? 0}, ${facet.visibleFromOrdinal})
+      `;
+    }
+    for (const image of options.images ?? []) {
+      await tx`
+        INSERT INTO wiki_entry_images (entry_id, image_ref, caption, sort_order, visible_from_ordinal)
+        VALUES (${entry.id}, ${image.imageRef}, ${image.caption ?? null}, ${image.sortOrder ?? 0}, ${image.visibleFromOrdinal})
+      `;
+    }
+    return entry;
+  });
+}
+
+/** Moves a reader's spoiler gate directly, bypassing the progress PUT endpoint's monotonic clamp so a test can walk it forward or back at will. */
+export async function setFurthestOrdinal(novel: ArrangedNovel, userId: string, ordinal: number): Promise<void> {
+  await webNovelDb()`
+    INSERT INTO reading_progress (user_id, novel_id, ordinal, position, furthest_ordinal)
+    VALUES (${userId}, ${novel.id}, ${ordinal}, 0, ${ordinal})
+    ON CONFLICT (user_id, novel_id) DO UPDATE SET ordinal = excluded.ordinal, furthest_ordinal = excluded.furthest_ordinal
+  `;
 }
