@@ -41,35 +41,18 @@ test.describe('console UI', () => {
   });
 
   /**
-   * The task brief asked to search for the baseline `auth.register.otp` template. This deployment's pulse
-   * database currently has zero rows in `templates` — the baseline seed was never run (see
-   * `send-delivery.spec.ts`'s file-level doc comment for the full evidence trail: a live `GET
-   * /api/v1/templates` returns `{"total":0}` and a real identity notification 404s `TPL_001`).
+   * The baseline seed (`apps/pulse-server/src/database/seed/baseline.seed.ts`) has run on this deployment —
+   * confirmed live: `auth.register.otp` has a PUBLISHED version, one of 23 seeded catalog keys — so this
+   * searches for a real row rather than one this file would have to create.
    */
-  test.fixme('should find auth.register.otp when searching /templates by key (pulse baseline seed was never run for this deployment)', async ({ page }) => {
+  test('should find auth.register.otp when searching /templates by key', async ({ page }) => {
     const url = requireProductUrl('pulse');
     await page.goto(`${url}/templates`);
     await page.getByPlaceholder('Search by template key').fill('auth.register.otp');
     await expect(page.getByRole('table', { name: 'Templates' }).getByText('auth.register.otp')).toBeVisible();
   });
 
-  /**
-   * A second, independent app bug found while writing the test above: the `/templates` search box never
-   * actually filters. `TemplateList.tsx` writes the typed value to the URL via `useDebouncedParam` →
-   * `appendSearch` (`features/shared/pagination.ts:60-71`, `packages/web/src/router/use-search-params.ts:39`)
-   * and the address bar does update (`?key=...&offset=...`), but the outgoing `GET /api/v1/templates` request
-   * `useListTemplatesQuery` fires carries **no query string at all** — confirmed by listening for the request
-   * in a real browser: typing a just-created template's exact key into the search box updates the URL, yet the
-   * network request is bare `GET /api/v1/templates` and the table keeps showing every template, unfiltered.
-   * The backend's own `key` filter works correctly in isolation (`curl .../api/v1/templates?key=...` returns
-   * exactly the one match) — the break is client-side, somewhere between `appendSearch`'s `router.navigate`
-   * and `useListTemplatesQuery(search)` reading the resulting search params back out. The same
-   * `useDebouncedParam`/`appendSearch` pair backs the Sender Profiles and Routing Rules search/filter inputs
-   * too, so this is very likely not template-search-specific.
-   */
-  test.fixme('the /templates search box should filter the table (app bug: the debounced search value reaches the URL but never reaches the outgoing GET /api/v1/templates request — see file-level doc comment)', async ({
-    page,
-  }) => {
+  test('the /templates search box should filter the table', async ({ page }) => {
     const templateKey = uniqueKey('console-search-probe');
     const ctx = await apiContext('pulse', 'admin');
     await ctx.post('/api/v1/templates', { data: { templateKey, name: 'Search probe', messageType: 'TRANSACTIONAL' } });
@@ -114,8 +97,7 @@ test.describe('console UI', () => {
     await dialog.getByRole('button', { name: 'Create template' }).click();
     await expect(dialog).toBeHidden();
 
-    // The search box doesn't actually filter (see the fixme above) — go straight to the detail page by id
-    // instead of hunting the table for the new row.
+    // Go straight to the detail page by id via the API rather than hunting the (debounced, animated) table row.
     const ctx = await apiContext('pulse', 'admin');
     const listResponse = await ctx.get(`/api/v1/templates?key=${templateKey}`);
     const listBody = (await listResponse.json()) as { items: { id: string }[] };
@@ -154,8 +136,7 @@ test.describe('console UI', () => {
     await page.getByLabel('Display name').fill('E2E console sender');
     await page.getByRole('button', { name: 'Create profile' }).click();
 
-    // Not using the search box: it shares the same broken filtering as /templates' (see console.spec.ts's
-    // template-search fixme) — the table defaults to `updatedAt desc`, so the profile just created is
+    // Not using the search box: the table defaults to `updatedAt desc`, so the profile just created is
     // reliably the first row without needing to filter for it.
     const row = page.getByRole('table', { name: 'Sender profiles' }).locator('tr').filter({ hasText: key });
     await expect(row).toBeVisible();

@@ -53,21 +53,14 @@ test.describe('send + delivery', () => {
    * catch-all `e2e-dev` rule), rendering (the code appears in the rendered text, not the raw `{{ code }}`),
    * and cross-service M2M auth (identity's own service token got through `RequireScope`) all at once.
    *
-   * Skips (does not fail) if `auth.register.otp` has no published version — this deployment's pulse database
-   * currently has **zero rows in `templates`** (confirmed via direct query and via a live `GET
-   * /api/v1/templates` returning `{"total":0,...}`): `pulse-server-migrate`'s Kubernetes Job only runs Drizzle
-   * migrations (`apps/pulse-server/src/migrate.ts`) — the separate, idempotent baseline seed
-   * (`apps/pulse-server/tests/fixtures/seed.ts`, invoked via `bun scripts/db.ts apps/pulse-server seed`) is
-   * never run as part of this deployment's rollout. Corroborated by live pulse-server logs: a real identity
-   * `security.new-signin` notification 404s with `TPL_001 "Template not found"` right now. This is a
-   * deployment/rollout gap, not application code — flagged here with hard evidence rather than "fixed" by
-   * seeding data into a shared cluster from a test run.
+   * `hasPublishedTemplate` is asserted as a hard precondition, not a skip: `pulse-server`'s migration Job runs
+   * `apps/pulse-server/src/migrate.ts`, which calls the idempotent `seedBaseline()`
+   * (`apps/pulse-server/src/database/seed/baseline.seed.ts`) unconditionally right after Drizzle migrations,
+   * seeding `auth.register.otp` and the rest of the 23-key catalogue on every rollout — this is part of the
+   * deployed contract, not an incidental gap, so a deployment missing it must show red, not a silent skip.
    */
   test('should deliver a real registration OTP end-to-end through identity -> pulse -> DEV provider', async () => {
-    test.skip(
-      !(await hasPublishedTemplate('auth.register.otp')),
-      'auth.register.otp has no published version — pulse baseline seed was never run for this deployment (see file-level doc comment)',
-    );
+    expect(await hasPublishedTemplate('auth.register.otp'), 'auth.register.otp has no published version — the baseline seed did not run on this deployment').toBe(true);
 
     const identityCtx = await request.newContext({ baseURL: 'https://identity.shadow-apps.test', ignoreHTTPSErrors: true });
     const email = `e2e.send-delivery.${Date.now()}@shadow-apps.test`;

@@ -25,6 +25,20 @@ export interface TemplateOverrides {
   isActive?: boolean;
 }
 
+export interface LayoutOverrides {
+  layoutKey: string;
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface PartialOverrides {
+  partialKey: string;
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
 export interface SenderProfileOverrides {
   key: string;
   displayName?: string;
@@ -117,6 +131,54 @@ export async function putDraftContent(
 /** Publishes the open draft. */
 export async function publishDraft(ctx: APIRequestContext, templateId: string, notes?: string): Promise<APIResponse> {
   return mutate(ctx, 'post', `/api/v1/templates/${templateId}/versions/draft/publish`, { data: notes ? { notes } : {} });
+}
+
+/** Creates a layout via `POST /api/v1/layouts` and returns the parsed 201 body (or throws with the raw body on failure). */
+export async function createLayout(ctx: APIRequestContext, overrides: LayoutOverrides): Promise<{ id: string; layoutKey: string }> {
+  const response = await mutate(ctx, 'post', '/api/v1/layouts', { data: { name: overrides.layoutKey, ...overrides } });
+  if (response.status() !== 201) throw new Error(`createLayout(${overrides.layoutKey}) failed: ${response.status()} ${await response.text()}`);
+  return response.json();
+}
+
+/** Opens (or updates, idempotently) the draft body for `layoutId` — unlike a template draft, a second call never 409s. */
+export async function saveLayoutDraft(ctx: APIRequestContext, layoutId: string, data: { body: string; notes?: string }): Promise<APIResponse> {
+  return mutate(ctx, 'put', `/api/v1/layouts/${layoutId}/draft`, { data });
+}
+
+/** Publishes the open draft for `layoutId`. */
+export async function publishLayout(ctx: APIRequestContext, layoutId: string, notes?: string): Promise<APIResponse> {
+  return mutate(ctx, 'post', `/api/v1/layouts/${layoutId}/publish`, { data: notes ? { notes } : {} });
+}
+
+/** Removes layout rows created for a test; `layout_versions` cascades off `layouts`. No DELETE route exists to do this via the API. */
+export async function deleteLayouts(layoutIds: readonly string[]): Promise<void> {
+  if (layoutIds.length === 0) return;
+  const sql = pulseDb();
+  await sql`DELETE FROM layouts WHERE id IN ${sql(layoutIds as string[])}`;
+}
+
+/** Creates a partial via `POST /api/v1/partials` and returns the parsed 201 body (or throws with the raw body on failure). */
+export async function createPartial(ctx: APIRequestContext, overrides: PartialOverrides): Promise<{ id: string; partialKey: string }> {
+  const response = await mutate(ctx, 'post', '/api/v1/partials', { data: { name: overrides.partialKey, ...overrides } });
+  if (response.status() !== 201) throw new Error(`createPartial(${overrides.partialKey}) failed: ${response.status()} ${await response.text()}`);
+  return response.json();
+}
+
+/** Opens (or updates, idempotently) the draft body for `partialId` — same upsert semantics as a layout draft. */
+export async function savePartialDraft(ctx: APIRequestContext, partialId: string, data: { body: string; notes?: string }): Promise<APIResponse> {
+  return mutate(ctx, 'put', `/api/v1/partials/${partialId}/draft`, { data });
+}
+
+/** Publishes the open draft for `partialId`. */
+export async function publishPartial(ctx: APIRequestContext, partialId: string, notes?: string): Promise<APIResponse> {
+  return mutate(ctx, 'post', `/api/v1/partials/${partialId}/publish`, { data: notes ? { notes } : {} });
+}
+
+/** Removes partial rows created for a test; `partial_versions` cascades off `partials`. No DELETE route exists to do this via the API. */
+export async function deletePartials(partialIds: readonly string[]): Promise<void> {
+  if (partialIds.length === 0) return;
+  const sql = pulseDb();
+  await sql`DELETE FROM partials WHERE id IN ${sql(partialIds as string[])}`;
 }
 
 /** Creates a sender profile via `POST /api/v1/sender-profiles`. */
