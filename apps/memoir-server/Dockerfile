@@ -51,6 +51,8 @@ ENV APP_VERSION=${APP_VERSION} \
     APP_PORT=8080 \
     APP_HOST=0.0.0.0 \
     HEALTH_HOST=0.0.0.0
+# Bun 1.3.14 reads this only from the exec environment; without it pipelined prepared statements can stall a Postgres connection forever
+ENV BUN_FEATURE_FLAG_DISABLE_SQL_AUTO_PIPELINING=1
 USER bun
 WORKDIR /app
 COPY --from=build --chown=bun:bun /workspace/apps/memoir-server/dist .

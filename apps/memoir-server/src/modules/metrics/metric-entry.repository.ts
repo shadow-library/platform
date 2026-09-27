@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
@@ -63,7 +63,7 @@ export class MetricEntryRepository extends OwnerScopedRepository {
       .values({ accountId, metricId: entry.metricId, date: entry.date, value: entry.value, source: entry.source, questLogId: null })
       .onConflictDoUpdate({
         target: [schema.metricEntries.accountId, schema.metricEntries.metricId, schema.metricEntries.date, schema.metricEntries.source],
-        targetWhere: ne(schema.metricEntries.source, 'quest_log'),
+        targetWhere: sql`${schema.metricEntries.source} <> 'quest_log'`,
         set: { value: entry.value },
       })
       .returning();

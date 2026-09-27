@@ -54,9 +54,9 @@ export interface PostgresConnectionConfig {
   maxConnections?: number;
 
   /**
-   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `false` (`database.postgres.prepare`):
-   * Bun SQL 1.3.14 stalls a connection forever, pooled or in a transaction, when a query is in flight and a statement it has not prepared is
-   * queued ahead of one it has. Re-enable only after a Bun upgrade passes that reproduction.
+   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `true` (`database.postgres.prepare`):
+   * Bun SQL 1.3.14 infers no parameter types for unnamed statements, so an object bound to a jsonb column arrives as "[object Object]".
+   * Its stall on pipelined prepared statements is prevented by `BUN_FEATURE_FLAG_DISABLE_SQL_AUTO_PIPELINING` instead, which boot enforces.
    */
   prepare: boolean;
 }
