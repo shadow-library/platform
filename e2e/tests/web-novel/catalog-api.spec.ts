@@ -60,40 +60,34 @@ test.describe('catalog api', () => {
   });
 
   /**
-   * APP BUG (suspected) — `NovelCatalogQuery` (`apps/web-novel-server/src/modules/catalog/catalog.dto.ts:27`)
-   * extends the shared `PaginationQuery` (`packages/modules/src/http-core/dtos/pagination.dto.ts:64-74`), whose
-   * `@Field` decorators declare `limit: {minimum: 1, maximum: 100}`, `offset: {minimum: 0}`, and a `sortBy` enum
-   * restricted to `NOVEL_SORT_FIELDS`. `@Params()` on the same controller family enforces its schema correctly
-   * (a malformed slug 422s below), but `@Query() query: NovelCatalogQuery` on `GET /api/novels`
-   * (`catalog.controller.ts:40-42`) does not: every value tried here — `limit=0`, `limit=101`, `limit=-5`,
-   * `limit=abc` (not even numeric), `offset=-1`, `sortBy=bogus` — comes back `200` with the *declared default*
-   * silently substituted (`limit:20, offset:0`), never a validation error. Confirmed live against the deployed
-   * cluster with direct `curl`, not just through this harness. Suspected file: whatever query-string binding
-   * `@shadow-library/class-schema`'s HTTP adapter uses for `@Query()` — it isn't running the same validator
-   * `@Params()` goes through. Filed as `test.fixme()` rather than asserted as passing, since silently
-   * discarding invalid pagination input is a real behavior difference from the schema's own declared contract,
-   * not a test-authoring mistake.
+   * `NovelCatalogQuery` extends the shared `PaginationQuery`, whose `@Field` decorators bound `limit` to 1–100, `offset` to
+   * 0 and up, and `sortBy` to `NOVEL_SORT_FIELDS`. A value outside them is refused with the platform's 422 validation
+   * envelope naming the query field, never answered 200 with the default substituted.
    */
-  const invalidQueries: { name: string; query: string }[] = [
-    { name: 'limit=0', query: '?limit=0' },
-    { name: 'limit=101', query: '?limit=101' },
-    { name: 'offset=-1', query: '?offset=-1' },
-    { name: 'sortBy=bogus', query: '?sortBy=bogus' },
+  const invalidQueries: { name: string; query: string; field: string }[] = [
+    { name: 'limit=0', query: '?limit=0', field: 'querystring.limit' },
+    { name: 'limit=101', query: '?limit=101', field: 'querystring.limit' },
+    { name: 'limit=abc', query: '?limit=abc', field: 'querystring.limit' },
+    { name: 'offset=-1', query: '?offset=-1', field: 'querystring.offset' },
+    { name: 'sortBy=bogus', query: '?sortBy=bogus', field: 'querystring.sortBy' },
   ];
-  for (const { name, query } of invalidQueries) {
-    test.fixme(`should 400 on ${name}`, async () => {
+  for (const { name, query, field } of invalidQueries) {
+    test(`should 422 with VALIDATION_ERROR on ${name}`, async () => {
       const ctx = await apiContext('webNovel');
       const response = await ctx.get(`/api/novels${query}`);
-      expect(response.status()).toBe(400);
+      expect(response.status()).toBe(422);
+      const body = (await response.json()) as { code?: string; fields?: { field: string }[] };
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.fields?.map(entry => entry.field)).toEqual([field]);
     });
   }
 
-  /**
-   * Unlike the query-param cases above, `@Params()` path validation on `NovelSlugParams` is enforced — but the
-   * status is `422 Unprocessable Entity` with `{code:"VALIDATION_ERROR", fields:[...]}`, not the `400` the
-   * web-novel report anticipated. Confirmed live: `curl .../api/novels/BAD_SLUG!` → `422`. Asserting the real
-   * status/shape here (not a bug — 422 is the platform's actual, consistent validation-error status).
-   */
+  test('should accept the bounds of the pagination contract', async () => {
+    const ctx = await apiContext('webNovel');
+    for (const query of ['?limit=1', '?limit=100&offset=0', '?sortBy=title']) expect((await ctx.get(`/api/novels${query}`)).status(), query).toBe(200);
+  });
+
+  /** Path validation answers with the same 422 envelope as the query string. */
   test('should 422 with VALIDATION_ERROR on a slug containing characters outside the allowed pattern', async () => {
     const ctx = await apiContext('webNovel');
     const response = await ctx.get('/api/novels/BAD_SLUG!');
