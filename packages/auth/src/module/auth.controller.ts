@@ -10,6 +10,7 @@ import { Body, ContextService, Get, HttpController, type HttpResponse, Post, Que
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
+import { isThrottled, retryAfterHint } from '../lib/transport';
 import { AppSessionService } from './app-session.service';
 import {
   AuthCallbackQuery,
@@ -105,7 +106,7 @@ export class AuthController {
   async callback(@Query() query: AuthCallbackQuery): Promise<void> {
     if (query.error) throw this.authorizationRefused(query.error);
 
-    const result = await this.sessions.completeLogin(query, this.cookies(), this.requestOrigin());
+    const result = await this.sessions.completeLogin(query, this.cookies(), this.requestOrigin()).catch((error: unknown) => this.rethrowWithRetryAfter(error));
     this.send(this.context.getResponse(), result.cookies, result.returnTo);
   }
 
@@ -225,6 +226,7 @@ export class AuthController {
       .claimElevation(handle)
       .then((): 'claimed' => 'claimed')
       .catch((error: unknown) => {
+        if (isThrottled(error)) this.rethrowWithRetryAfter(error);
         if (AppError.is(error, AuthErrorCode.ELEVATION_INTENT_MISMATCH)) {
           if (query.retried) throw error;
           this.logger.warn('the step-up named another beneficiary; restarting the prompt with this application intent');
@@ -248,6 +250,13 @@ export class AuthController {
     if (error === 'access_denied') return AuthErrorCode.AUTHORIZATION_DENIED.create();
     if (TRANSIENT_AUTHORIZATION_ERRORS.has(error)) return AuthErrorCode.EXCHANGE_FAILED.create({ reason: 'identity could not complete the authorization' });
     return AuthErrorCode.AUTHORIZATION_REFUSED.create();
+  }
+
+  /** A throttle carries identity's hint forward, as the guard does, so the browser is told when to come back rather than sent round again */
+  private rethrowWithRetryAfter(error: unknown): never {
+    const retryAfterSeconds = retryAfterHint(error);
+    if (isThrottled(error) && retryAfterSeconds !== undefined) this.context.getResponse().header('retry-after', String(retryAfterSeconds));
+    throw error;
   }
 
   private cookies(): Record<string, string> {
