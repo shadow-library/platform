@@ -25,3 +25,6 @@ export function buildRenderGlobals(): Record<string, unknown> {
     productUrl: 'https://shadow.app',
   };
 }
+
+/** Payload keys a send could use to replace what the framework renders: the globals above and the layout's `content` slot. */
+export const RENDER_GLOBAL_KEYS: ReadonlySet<string> = new Set([...Object.keys(buildRenderGlobals()), 'content']);

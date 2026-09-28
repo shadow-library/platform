@@ -253,6 +253,10 @@ export class NotificationService {
 
   async send(config: SendNotificationConfig): Promise<SendNotificationResult> {
     const resolved = await this.templateResolver.resolveForSend(config.templateKey);
+    return this.sendResolved(resolved, config);
+  }
+
+  async sendResolved(resolved: ResolvedTemplate, config: SendNotificationConfig): Promise<SendNotificationResult> {
     if (resolved.enabledChannels.length === 0) return { status: NotificationStatus.ACCEPTED, channelResults: [] };
 
     /** The variable contract is enforced once for the whole send — a breach is a producer bug, not a per-channel outcome. */
