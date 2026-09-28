@@ -19,16 +19,18 @@ Notification service and operations console. Other apps send a message by templa
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
 - A baseline seed (every migration, prod included) creates the default layout, partials and the template catalogue producers rely on. Each version it writes records
   the fixture's content hash; while the PUBLISHED version is one of those, a changed fixture is published as a new version (archive-then-insert, like rollback).
-  An operator's publish or rollback writes a version without a hash, and from then on the seed never touches that item; an open draft or a changed variable
-  contract withholds the update with a warning. Template metadata, variables and channel settings are only ever created, never updated.
+  An operator's publish or rollback writes a version without a hash, and from then on the seed never touches that item; an open draft, a changed variable
+  contract or a failed render withholds the update with a warning. Template metadata, variables and channel settings are only ever created, never updated.
 - Published content is cached in-process; change it only through publish, never by editing rows.
 - `pulse-web` calls same-origin `/api/*` in the browser and `pulse-server` directly during SSR, and authenticates via Identity; its `api-types.gen.ts` is generated from `pulse-server`.
 
 ## Hard rules
 
 - NEVER edit content in place: edits go to the single DRAFT; only PUBLISHED serves live sends.
-- MUST keep exactly one PUBLISHED version per template/layout/partial. Only the transactional publish/rollback code enforces it (no DB index); never write statuses elsewhere.
-- Template and layout publish MUST be render-gated on sample data; partial publish is NOT. Rollback creates a NEW published copy (history never deleted), templates only.
+- MUST keep exactly one PUBLISHED version per template/layout/partial. Only the transactional publish/rollback code and the baseline seed's supersede (archive-then-insert
+  in one transaction) enforce it (no DB index); never write statuses elsewhere.
+- Template and layout publish MUST be render-gated on sample data; partial publish is NOT. The baseline seed is gated too: a layout or template it writes must render
+  against the live design system, and a partial only while the whole fixture catalogue renders; a failure withholds the write with a warning. Rollback creates a NEW published copy (history never deleted), templates only.
 - A job MUST pin `templateVersionId`; NEVER resolve "latest" at delivery. Layout/partial publishes still hit every template at once, including retries of pinned jobs.
 - Missing required payload variables abort the whole send (a producer bug); extra keys pass through and can override globals.
 - Locale falls back to `en-ZZ`: keep `en-ZZ` content on every template or an unmatched locale fails that channel.

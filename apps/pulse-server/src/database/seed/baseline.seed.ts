@@ -1,13 +1,15 @@
 import assert from 'node:assert';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { Config, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema, type Template } from '@server/database';
+import { TemplateEngineService } from '@modules/template/rendering/template-engine.service';
 
-import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_SENDER_PROFILE, BASELINE_TEMPLATES } from './baseline.data';
+import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_SENDER_PROFILE, BASELINE_TEMPLATES, type LayoutFixture, type PartialFixture, type TemplateFixture } from './baseline.data';
+import { BaselineRenderGate, loadPublishedDesignSystem } from './baseline.render-gate';
 import { type BaselineStep, hashBaseline, hashTemplateContents, isSameContract, planBaselineStep, templateFixtureContents } from './baseline.versioning';
 
 const logger = Logger.getLogger(APP_NAME, 'BaselineSeed');
@@ -32,67 +34,44 @@ const SEQUENCE_RESET = `
 type SeedTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
 interface VersionWriter {
+  renders(): Promise<boolean>;
   insert(tx: SeedTransaction, version: number): Promise<unknown>;
-  archive(tx: SeedTransaction, versionId: bigint): Promise<unknown>;
+  archivePublished(tx: SeedTransaction): Promise<unknown>;
   stamp(versionId: bigint): Promise<unknown>;
 }
+
+export type BaselineGate = Pick<BaselineRenderGate, 'catalogueRenders' | 'layoutRenders' | 'templateRenders'>;
 
 const BASELINE_NOTES = 'Baseline';
 
 /**
- * A superseding publish mirrors rollback: the current PUBLISHED version is archived and the new one inserted in one transaction, so there
- * is never a moment with two or none. A failed update is logged and skipped rather than failing the migration: the old copy keeps serving.
+ * Nothing goes live without passing the render gate. A superseding publish mirrors `publishDraft`: every PUBLISHED version of the item is
+ * archived and the new one inserted in one transaction, so there is never a moment with two or none. A failed update is logged and skipped
+ * rather than failing the migration, since the old copy keeps serving.
  */
 async function applyBaselineStep(db: PrimaryDatabase, subject: string, step: BaselineStep, writer: VersionWriter): Promise<void> {
-  switch (step.action) {
-    case 'keep':
-      if (step.reason === 'draft-open' || step.reason === 'contract-changed') logger.warn('baseline update withheld', { subject, reason: step.reason });
-      return;
-    case 'create':
-      await db.transaction(tx => writer.insert(tx, step.version));
-      return;
-    case 'adopt':
-      await writer.stamp(step.versionId);
-      return;
-    case 'supersede':
-      try {
-        await db.transaction(async tx => {
-          await writer.archive(tx, step.publishedId);
-          await writer.insert(tx, step.version);
-        });
-        logger.info('published an updated baseline version', { subject, version: step.version });
-      } catch (error) {
-        logger.error('failed to publish an updated baseline version', { subject, version: step.version, error });
-      }
+  if (step.action === 'keep') {
+    if (step.reason === 'draft-open' || step.reason === 'contract-changed') logger.warn('baseline update withheld', { subject, reason: step.reason });
+    return;
   }
-}
+  if (step.action === 'adopt') return void (await writer.stamp(step.versionId));
+  if (!(await writer.renders())) return logger.warn('baseline update withheld', { subject, reason: 'render-failed' });
+  if (step.action === 'create') return void (await db.transaction(tx => writer.insert(tx, step.version)));
 
-export async function bootstrapLayouts(db: PrimaryDatabase): Promise<void> {
-  for (const fixture of BASELINE_LAYOUTS) {
-    const [inserted] = await db
-      .insert(schema.layouts)
-      .values({ layoutKey: fixture.layoutKey, name: fixture.name, description: fixture.description })
-      .onConflictDoNothing({ target: schema.layouts.layoutKey })
-      .returning();
-    const [layout] = inserted ? [inserted] : await db.select().from(schema.layouts).where(eq(schema.layouts.layoutKey, fixture.layoutKey));
-    if (!layout) continue;
-
-    const baselineHash = hashBaseline({ body: fixture.body });
-    const versions = await db.select().from(schema.layoutVersions).where(eq(schema.layoutVersions.layoutId, layout.id));
-    const step = await planBaselineStep(baselineHash, versions, published => hashBaseline({ body: published.body }));
-    await applyBaselineStep(db, `layout ${fixture.layoutKey}`, step, {
-      insert: (tx, version) =>
-        tx
-          .insert(schema.layoutVersions)
-          .values({ layoutId: layout.id, version, status: 'PUBLISHED', body: fixture.body, notes: BASELINE_NOTES, baselineHash, publishedAt: new Date() }),
-      archive: (tx, versionId) => tx.update(schema.layoutVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(eq(schema.layoutVersions.id, versionId)),
-      stamp: versionId => db.update(schema.layoutVersions).set({ baselineHash }).where(eq(schema.layoutVersions.id, versionId)),
+  try {
+    await db.transaction(async tx => {
+      await writer.archivePublished(tx);
+      await writer.insert(tx, step.version);
     });
+    logger.info('published an updated baseline version', { subject, version: step.version, superseded: step.publishedId });
+  } catch (error) {
+    logger.error('failed to publish an updated baseline version', { subject, version: step.version, error });
   }
 }
 
-export async function bootstrapPartials(db: PrimaryDatabase): Promise<void> {
-  for (const fixture of BASELINE_PARTIALS) {
+export async function bootstrapPartials(db: PrimaryDatabase, gate: BaselineGate, fixtures: PartialFixture[] = BASELINE_PARTIALS): Promise<void> {
+  let catalogueRenders: Promise<boolean> | undefined;
+  for (const fixture of fixtures) {
     const [inserted] = await db
       .insert(schema.partials)
       .values({ partialKey: fixture.partialKey, name: fixture.name, description: fixture.description })
@@ -104,13 +83,41 @@ export async function bootstrapPartials(db: PrimaryDatabase): Promise<void> {
     const baselineHash = hashBaseline({ body: fixture.body });
     const versions = await db.select().from(schema.partialVersions).where(eq(schema.partialVersions.partialId, partial.id));
     const step = await planBaselineStep(baselineHash, versions, published => hashBaseline({ body: published.body }));
+    const published = and(eq(schema.partialVersions.partialId, partial.id), eq(schema.partialVersions.status, 'PUBLISHED'));
     await applyBaselineStep(db, `partial ${fixture.partialKey}`, step, {
+      renders: () => (catalogueRenders ??= gate.catalogueRenders()),
       insert: (tx, version) =>
         tx
           .insert(schema.partialVersions)
           .values({ partialId: partial.id, version, status: 'PUBLISHED', body: fixture.body, notes: BASELINE_NOTES, baselineHash, publishedAt: new Date() }),
-      archive: (tx, versionId) => tx.update(schema.partialVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(eq(schema.partialVersions.id, versionId)),
+      archivePublished: tx => tx.update(schema.partialVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(published),
       stamp: versionId => db.update(schema.partialVersions).set({ baselineHash }).where(eq(schema.partialVersions.id, versionId)),
+    });
+  }
+}
+
+export async function bootstrapLayouts(db: PrimaryDatabase, gate: BaselineGate, fixtures: LayoutFixture[] = BASELINE_LAYOUTS): Promise<void> {
+  for (const fixture of fixtures) {
+    const [inserted] = await db
+      .insert(schema.layouts)
+      .values({ layoutKey: fixture.layoutKey, name: fixture.name, description: fixture.description })
+      .onConflictDoNothing({ target: schema.layouts.layoutKey })
+      .returning();
+    const [layout] = inserted ? [inserted] : await db.select().from(schema.layouts).where(eq(schema.layouts.layoutKey, fixture.layoutKey));
+    if (!layout) continue;
+
+    const baselineHash = hashBaseline({ body: fixture.body });
+    const versions = await db.select().from(schema.layoutVersions).where(eq(schema.layoutVersions.layoutId, layout.id));
+    const step = await planBaselineStep(baselineHash, versions, published => hashBaseline({ body: published.body }));
+    const published = and(eq(schema.layoutVersions.layoutId, layout.id), eq(schema.layoutVersions.status, 'PUBLISHED'));
+    await applyBaselineStep(db, `layout ${fixture.layoutKey}`, step, {
+      renders: () => gate.layoutRenders(fixture),
+      insert: (tx, version) =>
+        tx
+          .insert(schema.layoutVersions)
+          .values({ layoutId: layout.id, version, status: 'PUBLISHED', body: fixture.body, notes: BASELINE_NOTES, baselineHash, publishedAt: new Date() }),
+      archivePublished: tx => tx.update(schema.layoutVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(published),
+      stamp: versionId => db.update(schema.layoutVersions).set({ baselineHash }).where(eq(schema.layoutVersions.id, versionId)),
     });
   }
 }
@@ -119,8 +126,8 @@ export async function bootstrapPartials(db: PrimaryDatabase): Promise<void> {
  * Template metadata, variable contract and channel enablement are created once and never updated: they are not versioned, so the seed
  * cannot tell an operator's edit from an older fixture. Content is versioned (see `planBaselineStep`).
  */
-export async function bootstrapTemplates(db: PrimaryDatabase): Promise<void> {
-  for (const fixture of BASELINE_TEMPLATES) {
+export async function bootstrapTemplates(db: PrimaryDatabase, gate: BaselineGate, fixtures: TemplateFixture[] = BASELINE_TEMPLATES): Promise<void> {
+  for (const fixture of fixtures) {
     const variableSchema: Template.VariableSchema = { variables: fixture.variables };
     const [inserted] = await db
       .insert(schema.templates)
@@ -149,7 +156,9 @@ export async function bootstrapTemplates(db: PrimaryDatabase): Promise<void> {
     const storedHash = async (published: Template.Version): Promise<string> =>
       hashTemplateContents(await db.select().from(schema.templateContents).where(eq(schema.templateContents.templateVersionId, published.id)));
     const step = await planBaselineStep(baselineHash, versions, storedHash, { contractChanged: !isSameContract(template.variableSchema, variableSchema) });
+    const published = and(eq(schema.templateVersions.templateId, template.id), eq(schema.templateVersions.status, 'PUBLISHED'));
     await applyBaselineStep(db, `template ${fixture.templateKey}`, step, {
+      renders: () => gate.templateRenders(fixture),
       insert: async (tx, version) => {
         const [row] = await tx
           .insert(schema.templateVersions)
@@ -158,7 +167,7 @@ export async function bootstrapTemplates(db: PrimaryDatabase): Promise<void> {
         assert(row, `Failed to seed a baseline version of template ${fixture.templateKey}`);
         await tx.insert(schema.templateContents).values(contents.map(content => ({ templateVersionId: row.id, ...content })));
       },
-      archive: (tx, versionId) => tx.update(schema.templateVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(eq(schema.templateVersions.id, versionId)),
+      archivePublished: tx => tx.update(schema.templateVersions).set({ status: 'ARCHIVED', updatedAt: new Date() }).where(published),
       stamp: versionId => db.update(schema.templateVersions).set({ baselineHash }).where(eq(schema.templateVersions.id, versionId)),
     });
   }
@@ -209,9 +218,9 @@ export async function resetSequences(db: PrimaryDatabase): Promise<void> {
 
 /**
  * Idempotently bootstraps the datastore to its baseline — the branded layouts, reusable partials, and the template catalogue (including the
- * identity `auth.*`/`security.*`/`user.*` keys) run on every environment. Each is created when absent and, while the seed still owns its
- * PUBLISHED version, superseded by a new version when its fixture changes; once an operator publishes their own version it is never touched
- * again. The catch-all `DEV` sender profile and its global fallback routing rule are dev/staging/CI-only (`!Config.isProductionDeployment()`):
+ * identity `auth.*`/`security.*`/`user.*` keys) run on every environment, partials first so layouts and templates are gated against them.
+ * Each is created when absent and, while the seed still owns its PUBLISHED version, superseded by a new version when its fixture changes;
+ * once an operator publishes their own version it is never touched again. Nothing is written that fails `BaselineRenderGate`. The catch-all `DEV` sender profile and its global fallback routing rule are dev/staging/CI-only (`!Config.isProductionDeployment()`):
  * a fresh *production* deployment gets none of it, so a misrouted OTP or security alert fails loudly instead of being silently swallowed by
  * the `DEV` provider. It seeds no demo messages.
  */
@@ -222,9 +231,10 @@ export async function seedBaseline(db?: PrimaryDatabase): Promise<void> {
     logger.debug(`Connected to database '${url.split('/').pop()}' for baseline seeding`);
   }
 
-  await bootstrapLayouts(db);
-  await bootstrapPartials(db);
-  await bootstrapTemplates(db);
+  const gate = new BaselineRenderGate(new TemplateEngineService(), () => loadPublishedDesignSystem(db));
+  await bootstrapPartials(db, gate);
+  await bootstrapLayouts(db, gate);
+  await bootstrapTemplates(db, gate);
   await bootstrapSenderConfiguration(db);
   await resetSequences(db);
   logger.info('Baseline seeding completed successfully');
