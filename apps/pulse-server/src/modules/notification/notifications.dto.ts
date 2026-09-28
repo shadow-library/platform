@@ -3,9 +3,10 @@ import { type AppErrorObject } from '@shadow-library/common';
 import { ErrorResponseDto } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
-import { ChannelNotificationStatus, NotificationStatus } from '@modules/notification';
 import { MessageType, NotificationChannel, SortByCreatedAt } from '@server/common';
 import { type Notification, type Template } from '@server/database';
+
+import { ChannelNotificationStatus, NotificationStatus } from './notification.service';
 
 @Schema({ minProperties: 1 })
 export class NotificationRecipients {

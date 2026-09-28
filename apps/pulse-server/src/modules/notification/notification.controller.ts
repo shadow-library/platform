@@ -4,8 +4,8 @@ import { Config } from '@shadow-library/common';
 import { Body, Get, HttpController, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 import { PULSE_PERMISSIONS, PULSE_SCOPES } from '@modules/auth';
-import { NotificationService } from '@modules/notification';
 
+import { NotificationService } from './notification.service';
 import { CreateNotificationBody, CreateNotificationResponse, ListNotificationMessagesQuery, ListNotificationMessagesResponse } from './notifications.dto';
 
 @HttpController('/api/v1/notifications')
@@ -16,6 +16,17 @@ export class NotificationController {
   @RequireScope(PULSE_SCOPES.notificationsSend)
   @RespondFor(201, CreateNotificationResponse)
   createNotification(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
+    return this.notificationService.send(body);
+  }
+
+  /**
+   * The console's manual send. It cannot share the producer route: a session never carries the service-only
+   * scope, and a service token names no organisation to evaluate a permission in, so each caller has its own guard.
+   */
+  @Post('/console')
+  @RequirePermission(PULSE_PERMISSIONS.sendersWrite, { highRisk: true })
+  @RespondFor(201, CreateNotificationResponse)
+  sendFromConsole(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
     return this.notificationService.send(body);
   }
 
