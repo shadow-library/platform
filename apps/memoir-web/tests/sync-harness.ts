@@ -1,8 +1,8 @@
 import { type QueryClient } from '@tanstack/react-query';
 
-import { memoirQueryClient } from '@/lib/data';
 import {
   type AccountMarker,
+  composeSyncedMemoirData,
   coverageKey,
   type DeltaPage,
   type FetchLike,
@@ -12,13 +12,7 @@ import {
   SYNC_DOMAINS,
   SyncClient,
   type SyncDomain,
-  SyncedAccountProvider,
-  SyncedDataProvider,
-  SyncedFinanceProvider,
-  SyncedHeroProvider,
   type SyncedMemoirData,
-  SyncedQuickLogProvider,
-  SyncedReflectProvider,
   SyncEngine,
   type SyncSnapshot,
   type UnloadBacking,
@@ -294,21 +288,5 @@ export function createLiveTestEngine(options: Omit<TestEngineOptions, 'fetchImpl
 
 /** The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer rather than the fixtures. */
 export function createSyncedTestData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
-  const account = new SyncedAccountProvider(engine, principal);
-  const finance = new SyncedFinanceProvider(engine);
-  const quickLogs = new SyncedQuickLogProvider(engine);
-  return {
-    engine,
-    provider: new SyncedDataProvider(engine),
-    hero: new SyncedHeroProvider(engine, account),
-    reflect: new SyncedReflectProvider(engine),
-    account,
-    finance,
-    quickLogs,
-    queryClient: memoirQueryClient(),
-    get today() {
-      return engine.today;
-    },
-    persona: 'active',
-  };
+  return composeSyncedMemoirData(engine, principal);
 }

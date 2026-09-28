@@ -8,7 +8,7 @@ import { type FinanceProvider, FixtureFinanceProvider, setFinanceProvider } from
 import { createFixtureProvider, type FixtureProviderOptions } from './fixture-provider';
 import { type Persona, seed } from './fixtures';
 import { createHeroProvider, type HeroProvider } from './hero.provider';
-import { FixtureQuickLogProvider, type QuickLogProvider, setQuickLogProvider } from './quick-logs.provider';
+import { FixtureQuickLogProvider, type QuickLogProvider, setQuickLogProvider, setTodaySource } from './quick-logs.provider';
 import { createReflectProvider, type ReflectProvider } from './reflect.provider';
 
 export interface MemoirData {
@@ -45,6 +45,7 @@ export function createMemoirData(options: FixtureProviderOptions = {}): MemoirDa
   const quickLogs = new FixtureQuickLogProvider();
   setFinanceProvider(finance);
   setQuickLogProvider(quickLogs);
+  setTodaySource();
 
   return {
     provider: createFixtureProvider(options),

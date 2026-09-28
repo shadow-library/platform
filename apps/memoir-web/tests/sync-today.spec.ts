@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, setSystemTime } from 'bun:test';
 
+import { createMemoirData, todayISODate } from '@/lib/data';
 import { type DeltaPage } from '@/lib/sync';
 
 import { withTimeZone } from './setup';
@@ -69,5 +70,25 @@ describe('SyncEngine today', () => {
       await engine.start();
 
       expect(engine.today).toBe(ACCOUNT_DAY);
+    }));
+});
+
+describe('quick-log and expense day', () => {
+  afterEach(() => {
+    setSystemTime();
+    createMemoirData();
+  });
+
+  it('should default a quick log or expense to the account day once the synced data is composed, and to the browser day in fixtures', () =>
+    withTimeZone('America/Los_Angeles', async () => {
+      setSystemTime(NOW);
+      const { engine } = createTestEngine({ today: null, pages: [accountPage('Pacific/Kiritimati')] });
+      await engine.start();
+
+      createSyncedTestData(engine);
+      expect(todayISODate()).toBe(ACCOUNT_DAY);
+
+      createMemoirData();
+      expect(todayISODate()).toBe(BROWSER_DAY);
     }));
 });

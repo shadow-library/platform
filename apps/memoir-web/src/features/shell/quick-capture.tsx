@@ -75,14 +75,10 @@ const SUBJECT_MAX_CHARS = 40;
 
 const IME_COMPOSITION_KEY_CODE = 229;
 
-const DAY_ROLLOVER_MARGIN_MS = 1_000;
+/** The account's day turns over at the account zone's midnight, which the device clock does not know, so the open sheet looks every so often. */
+const DAY_CHECK_INTERVAL_MS = 60_000;
 
 const NEW_DAY_NOTICE = 'It’s a new day, so this line now saves to today. Check it and save again.';
-
-function msUntilNextLocalDay(): number {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime() + DAY_ROLLOVER_MARGIN_MS;
-}
 
 function subjectOf(text: string): string {
   const trimmed = text.trim();
@@ -233,17 +229,18 @@ function CaptureBody({ text, onTextChange, field, pending, replacing, rejection,
   const candidates = useRef<HTMLDivElement>(null);
   const questionId = useId();
 
-  // The engine's `today` is fixed at start, so this reads the device clock: `tick` re-arms a timer that fired early, and the save re-checks for a device that slept through it.
+  // The save re-checks too, for a device that slept through a check.
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setInterval(() => {
       const next = todayISODate();
-      if (next !== clock.today && text.trim() !== '') {
+      if (next === clock.today) return;
+      if (text.trim() !== '') {
         setDayChangedFor(text);
         setNotice({ text, message: NEW_DAY_NOTICE });
       }
       setClock(current => ({ today: next, tick: current.tick + 1 }));
-    }, msUntilNextLocalDay());
-    return () => clearTimeout(timer);
+    }, DAY_CHECK_INTERVAL_MS);
+    return () => clearInterval(timer);
   }, [clock, text]);
 
   const money = useMemo<CaptureMoney | null>(() => {

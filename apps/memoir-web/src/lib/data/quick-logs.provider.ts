@@ -59,8 +59,17 @@ export interface QuickLogProvider {
   backupJournalDraft(text: string, mood: MoodValence | null): void;
 }
 
+const browserDay = (): string => toISODate(new Date());
+
+let todaySource: () => string = browserDay;
+
+/** Which calendar day a log or expense defaults to. The synced app points it at the account's day, the one the server files logs under; fixtures keep the browser's. */
+export function setTodaySource(source: () => string = browserDay): void {
+  todaySource = source;
+}
+
 function today(): string {
-  return toISODate(new Date());
+  return todaySource();
 }
 
 function shiftDays(days: number): string {
