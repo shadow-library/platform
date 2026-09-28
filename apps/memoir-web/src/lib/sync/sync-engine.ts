@@ -1,3 +1,5 @@
+import { isApiError } from '@shadow-library/web';
+
 import { type DispatchOptions, type OutcomeTicket, type ServerSettlement, type UnconfirmedReason } from '@/lib/data/command.types';
 import { accountDay } from '@/lib/format';
 
@@ -80,6 +82,8 @@ const DEFAULT_MAX_PAGES = 50;
 const DEFAULT_OUTCOME_TIMEOUT_MS = 8_000;
 const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 const TOO_MANY_REQUESTS = 429;
+const DELETION_PENDING_CODE = 'ACC_002';
+const NETWORK_ERROR_CODE = 'NETWORK_ERROR';
 const MAX_PULL_ROUNDS = 20;
 
 const UNKNOWN_DOMAIN_CODE = 'SYN_001';
@@ -126,11 +130,23 @@ function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
-/** A refused CSRF token, a busy or failing server and an unreachable one can all clear on their own; a dead session, a deletion or a malformed request cannot. */
+/**
+ * A refused CSRF token, a busy or failing server and an unreachable one can all clear on their own; a dead session, a deletion or a malformed request
+ * cannot. The session check fails as an `ApiError` rather than a sync transport error, and is read by the same rules.
+ */
 function isRetryable(error: unknown): boolean {
-  if (!(error instanceof SyncTransportError)) return false;
-  if (error.kind === 'offline') return isOnline();
-  return error.kind === 'forbidden' || error.kind === 'server' || error.status === TOO_MANY_REQUESTS;
+  if (error instanceof SyncTransportError) {
+    if (error.kind === 'offline') return isOnline();
+    return error.kind === 'forbidden' || error.kind === 'server' || error.status === TOO_MANY_REQUESTS;
+  }
+  if (!isApiError(error) || error.code === DELETION_PENDING_CODE) return false;
+  if (error.code === NETWORK_ERROR_CODE) return isOnline();
+  return error.status === 403 || error.status === TOO_MANY_REQUESTS || error.status >= 500;
+}
+
+function retryAfterMsOf(error: unknown): number | null {
+  if (error instanceof SyncTransportError) return error.retryAfterMs;
+  return isApiError(error) && error.retryAfterSeconds !== undefined ? error.retryAfterSeconds * 1_000 : null;
 }
 
 /** The wire envelope, without the fields that exist only to order and settle the local queue. */
@@ -446,7 +462,7 @@ export class SyncEngine {
     this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
     const held = UNSENDABLE[reason];
     this.settleClaims(held ? { status: 'unconfirmed', reason: held } : undefined);
-    if (isRetryable(error)) this.scheduleRetry(error instanceof SyncTransportError ? error.retryAfterMs : null);
+    if (isRetryable(error)) this.scheduleRetry(retryAfterMsOf(error));
   }
 
   /** One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm; a server's `Retry-After` only ever lengthens the wait. */

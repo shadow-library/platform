@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { ApiError } from '@shadow-library/web';
 
 import { type Command } from '@/lib/data';
 import { SyncClient, SyncTransportError } from '@/lib/sync';
@@ -122,12 +123,58 @@ describe('SyncEngine retry', () => {
   });
 });
 
+describe('SyncEngine retry of a failed session check', () => {
+  const engines: { stop: () => void }[] = [];
+
+  afterEach(() => {
+    for (const engine of engines.splice(0)) engine.stop();
+  });
+
+  function principalFailingOnce(failure: ApiError): { principal: () => Promise<string>; calls: () => number } {
+    let calls = 0;
+    return {
+      principal: async () => {
+        calls += 1;
+        if (calls === 1) throw failure;
+        return 'account-1';
+      },
+      calls: () => calls,
+    };
+  }
+
+  it.each([
+    ['a 503', new ApiError(503, { code: 'S001', type: 'ServiceUnavailable', message: 'down' })],
+    ['an unreachable server', new ApiError(-1, { code: 'NETWORK_ERROR', type: 'NetworkError', message: 'Unable to reach the server' })],
+  ])('should retry a pass whose session check failed with %s', async (_label, failure) => {
+    const session = principalFailingOnce(failure);
+    const { engine } = createTestEngine({ today: TODAY, accountId: 'account-1', principal: session.principal, retryDelaysMs: RETRY_DELAYS_MS });
+    engines.push(engine);
+
+    await engine.start();
+
+    await waitForState(engine, snapshot => snapshot.state === 'online');
+  });
+
+  it('should not retry a session check the server refused as signed out', async () => {
+    const session = principalFailingOnce(new ApiError(401, { code: 'IAM_001', type: 'Unauthorized', message: 'expired' }));
+    const { engine } = createTestEngine({ today: TODAY, accountId: 'account-1', principal: session.principal, retryDelaysMs: RETRY_DELAYS_MS });
+    engines.push(engine);
+
+    await engine.start();
+    await settle(3);
+
+    expect(session.calls()).toBe(1);
+    expect(engine.getSnapshot().state).toBe('signed-out');
+  });
+});
+
 describe('SyncTransportError retryAfterMs', () => {
   it.each([
-    ['120', 120_000],
-    ['0', 0],
-    [new Date(Date.now() + 30_000).toUTCString(), 30_000],
-  ])('should read Retry-After %s', async (header, expected) => {
+    ['delay-seconds', () => '120', 120_000],
+    ['zero', () => '0', 0],
+    ['an HTTP date', () => new Date(Date.now() + 30_000).toUTCString(), 30_000],
+  ])('should read Retry-After given as %s', async (_label, retryAfter, expected) => {
+    const header = retryAfter();
     const client = new SyncClient({ fetchImpl: async () => new Response('{}', { status: 429, headers: { 'retry-after': header } }) });
 
     const failure = await client.pullDelta({ since: '0' }).catch((error: unknown) => error);
