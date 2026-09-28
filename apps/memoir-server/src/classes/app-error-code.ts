@@ -104,9 +104,6 @@ export class AppErrorCode extends ServerErrorCode {
    * Cosmetic Errors
    */
 
-  /** The cosmetic is already unlocked for this account, so a repeat purchase must not charge again */
-  static readonly CSM_001 = AppErrorCode.conflict('CSM_001', 'This cosmetic is already unlocked');
-
   /** The command named a `cosmeticId` that is not in the T-21 catalogue */
   static readonly CSM_002 = AppErrorCode.notFound('CSM_002', 'Unknown cosmetic');
 

@@ -33,7 +33,6 @@ const ERROR_CATALOGUE: Record<string, ErrorEntry> = {
   RCV_001: { kind: 'refusal', copy: 'There’s no recovery quest waiting today.' },
   LCK_001: { kind: 'refusal', copy: 'That quest isn’t in your plan any more.' },
   LCK_002: { kind: 'refusal', copy: 'That day is already closed.' },
-  CSM_001: { kind: 'refusal', copy: 'It’s already yours.' },
   CSM_002: { kind: 'refusal', copy: 'That item isn’t available.' },
   CSM_003: { kind: 'refusal', copy: 'Unlock it before equipping it.' },
   CSM_004: { kind: 'refusal', copy: 'That item comes with an achievement, not with coins.' },
