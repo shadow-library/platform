@@ -324,15 +324,19 @@ test.describe('identity WebAuthn — removal', () => {
     expect(await findSessionBySecret(expectSessionCookie(response))).toMatchObject({ aal: 'AAL1' });
   });
 
-  // App bug: `remove` deletes by credential id and only then checks the owner, so the refused call has already destroyed
-  // another account's passkey (apps/identity-server/src/modules/auth/mfa/webauthn.service.ts:301-305).
-  test.fixme('should leave another account’s passkey untouched when its credential id is submitted', async ({ identity }) => {
+  test('should leave another account’s passkey untouched when its credential id is submitted', async ({ identity }) => {
     const victim = await passkeyUser(identity, 'passkey-victim');
     const attacker = await identity.createUser({ label: 'passkey-attacker' });
     const { ctx } = await identity.signIn(attacker, { aal: 'AAL2' });
+    const path = `${WEBAUTHN_PATH}/${encodeURIComponent(victim.authenticator.credentialId)}`;
 
-    await expectRefused(await identityMutate(ctx, 'delete', `${WEBAUTHN_PATH}/${encodeURIComponent(victim.authenticator.credentialId)}`), 404, 'MFA_001');
+    await expectRefused(await identityMutate(ctx, 'delete', path), 404, 'MFA_001');
     expect(await credentialRows(victim.user.userId), 'a refused removal must keep the victim’s credential').toHaveLength(1);
+
+    const { ctx: owner } = await identity.signIn(victim.user, { aal: 'AAL2' });
+    const removed = await identityMutate(owner, 'delete', path);
+    expect(removed.status(), await removed.text()).toBe(200);
+    expect(await credentialRows(victim.user.userId), 'the owner can still remove it').toEqual([]);
   });
 });
 
