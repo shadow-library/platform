@@ -643,6 +643,13 @@ export class BriefResponse {
   })
   endingContract?: unknown;
 
+  @Field(() => KnowledgeContractSchema, {
+    optional: true,
+    nullable: true,
+    description: 'Who bounds what the chapter may state and which facts they learn on-page; null when the chapter is unfiltered.',
+  })
+  knowledgeContract?: KnowledgeContractSchema | null;
+
   @Field({ optional: true, nullable: true, description: "The author's standing guidance for this chapter's writer." })
   guidance?: string | null;
 

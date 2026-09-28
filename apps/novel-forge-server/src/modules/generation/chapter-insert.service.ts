@@ -15,6 +15,8 @@ import {
   shiftBriefBody,
   shiftChapterReferences,
   shiftFactUnlocks,
+  withParsedContract,
+  type WithParsedContract,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Generation, type PrimaryDatabase, schema } from '@server/database';
@@ -50,7 +52,7 @@ export interface PlannedSlotBrief {
 }
 
 export interface InsertResult {
-  brief: Generation.Brief;
+  brief: WithParsedContract<Generation.Brief>;
   newChapter: number;
   shiftedChapters: number;
 }
@@ -234,7 +236,7 @@ export class ChapterInsertService {
 
       await markDescendantDraftsStale(tx, projectId, afterChapter, INSERT_STALE_REASON);
       await enforcePlanWrite(tx, projectId, [newChapter]);
-      return { brief, newChapter, shiftedChapters: shifted.length };
+      return { brief: withParsedContract(brief), newChapter, shiftedChapters: shifted.length };
     });
 
     this.logger.info('inserted a chapter', { projectId, afterChapter, newChapter, shiftedBriefs: result.shiftedChapters, briefOrigin: opts.briefOrigin });

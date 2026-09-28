@@ -28,6 +28,8 @@ import {
   selectGenerationBatch,
   untilFirstTeacher,
   validateBriefScenes,
+  withParsedContract,
+  type WithParsedContract,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type Job, type PrimaryDatabase, type Project, type Refinement, schema } from '@server/database';
@@ -238,13 +240,13 @@ export class GenerationService {
     });
   }
 
-  async getBrief(projectId: bigint, chapter: number): Promise<Generation.Brief> {
+  async getBrief(projectId: bigint, chapter: number): Promise<WithParsedContract<Generation.Brief>> {
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     if (!brief) throw AppErrorCode.DRF_001.create();
-    return brief;
+    return withParsedContract(brief);
   }
 
-  async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
+  async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<WithParsedContract<Generation.Brief>> {
     const sceneErrors = body.scenes ? validateBriefScenes(body.scenes) : [];
     if (sceneErrors.length > 0) throw AppErrorCode.BRF_004.create({ reason: sceneErrors.join('; ') });
     const scenes = body.scenes === undefined ? undefined : body.scenes && normalizeBriefScenes(body.scenes);
@@ -289,7 +291,7 @@ export class GenerationService {
       return upserted;
     });
     if (!result) throw AppErrorCode.DRF_001.create();
-    return result;
+    return withParsedContract(result);
   }
 
   async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {

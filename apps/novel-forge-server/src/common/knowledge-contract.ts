@@ -23,3 +23,10 @@ export function parseKnowledgeContract(raw: unknown): KnowledgeContract | null {
     : [];
   return { pov, learns };
 }
+
+export type WithParsedContract<T> = Omit<T, 'knowledgeContract'> & { knowledgeContract: KnowledgeContract | null };
+
+/** A plan or insert can store a contract the response schema's required `pov` would refuse at serialisation, so a brief leaves the server as the pipeline reads it. */
+export function withParsedContract<T extends { knowledgeContract: unknown }>(brief: T): WithParsedContract<T> {
+  return { ...brief, knowledgeContract: parseKnowledgeContract(brief.knowledgeContract) };
+}
