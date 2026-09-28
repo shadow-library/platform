@@ -75,12 +75,12 @@ export class CSRFTokenService {
     if ('reason' in cookie) return { isValid: false, reason: cookie.reason };
 
     if (headerToken !== cookie.token) {
-      this.logger.warn('CSRF token mismatch', { headerToken, cookieToken: cookie.token });
+      this.logger.warn('CSRF token mismatch');
       return { isValid: false, reason: 'mismatch' };
     }
 
     const shouldRefresh = this.shouldRefresh(cookie.expiresAt);
-    this.logger.debug('CSRF token verified successfully', { expiresAt: cookie.expiresAt, shouldRefresh, csrfCookie: request.cookies[this.options.cookieName] });
+    this.logger.debug('CSRF token verified successfully', { expiresAt: cookie.expiresAt, shouldRefresh });
     return { isValid: true, shouldRefresh };
   }
 
@@ -92,7 +92,7 @@ export class CSRFTokenService {
     }
     const [expiryTime, token] = csrfCookie.split(':');
     if (!expiryTime || !token) {
-      this.logger.warn('Invalid CSRF token found in cookies', { expiryTime, cookieToken: token });
+      this.logger.warn('Malformed CSRF cookie', { hasExpiry: Boolean(expiryTime), hasToken: Boolean(token) });
       return { reason: 'invalid' };
     }
 

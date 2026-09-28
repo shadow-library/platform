@@ -48,7 +48,7 @@ export class CsrfProtectionMiddleware implements MiddlewareGenerator {
       if (!result.isValid || result.shouldRefresh) {
         const token = this.csrfTokenService.generateToken();
         response.setCookie(token.name, token.value, token.options);
-        this.logger.debug('CSRF token set/updated', { token });
+        this.logger.debug('CSRF token set/updated', { expires: token.options.expires });
       }
     };
   }

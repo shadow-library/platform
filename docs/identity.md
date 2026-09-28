@@ -63,7 +63,7 @@ Identity and never stores credentials. This is the only doc that describes the a
 
 ## Hard rules
 
-- NEVER put tokens, secrets, session handles, PKCE verifiers, bot keys or `Authorization` headers in logs, audit payloads or URLs (the CSRF token is the one thing logged).
+- NEVER put tokens, secrets, session handles, PKCE verifiers, bot keys or `Authorization` headers in logs, audit payloads or URLs; the CSRF token is no exception.
   Secrets appear in a response only once, at mint (app-session handle, bot key, client/webhook secret). Refresh secrets, handles and session cookie secrets are stored only as
   hashes (the numeric session id ships as `sid`). NEVER return fields not declared on a `@RespondFor` DTO (SCIM, SAML and federated-callback routes own their wire format).
 - MUST require PKCE S256 and exact-string redirect-URI match for every client; no wildcards, open `redirect_uri`, implicit, ROPC or dynamic client registration. Sanitize

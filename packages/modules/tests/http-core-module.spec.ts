@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { Response } from 'light-my-request';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
@@ -405,6 +405,22 @@ describe('HttpCore Module', () => {
         expect(inspect()).toStrictEqual({ isValid: false, reason: 'missing' });
         expect(inspect('malformed')).toStrictEqual({ isValid: false, reason: 'invalid' });
         expect(inspect(`${expiredTime}:token`)).toStrictEqual({ isValid: false, reason: 'expired' });
+      });
+
+      it('should never log a token value', () => {
+        const logger = csrfTokenService['logger'];
+        const calls = [spyOn(logger, 'warn'), spyOn(logger, 'debug')];
+        const futureTime = (Date.now() + 5000).toString(36);
+        const validate = (header: string, cookie: string) => csrfTokenService.validateToken({ headers: { 'x-csrf-token': header }, cookies: { 'csrf-token': cookie } } as any);
+
+        validate('headersecret', `${futureTime}:cookiesecret`);
+        validate('cookiesecret', `${futureTime}:cookiesecret`);
+        validate('headersecret', `${futureTime}:`);
+        validate('headersecret', ':cookiesecret');
+
+        const logged = JSON.stringify(calls.flatMap(spy => spy.mock.calls));
+        expect(logged).not.toContain('headersecret');
+        expect(logged).not.toContain('cookiesecret');
       });
 
       it('should set shouldRefresh to false when token is not close to expiry', () => {
