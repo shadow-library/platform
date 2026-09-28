@@ -38,7 +38,7 @@ function executorOver(job: ReturnType<typeof reviewJob>) {
     settleCancelled: mock(async () => undefined),
   };
   const settled: unknown[][] = [];
-  const workflowRunService = { cancel: () => undefined, settleJobRuns: async (...args: unknown[]) => void settled.push(args) };
+  const workflowRunService = { cancel: () => undefined, forgetJobRuns: () => undefined, settleJobRuns: async (...args: unknown[]) => void settled.push(args) };
   const db = { select: () => ({ from: () => ({ where: async () => [] }) }) };
   const jobHandlers = new JobHandlerRegistry();
   const executor = new JobExecutor(

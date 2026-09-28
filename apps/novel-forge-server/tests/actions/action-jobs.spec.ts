@@ -95,6 +95,7 @@ function recorder() {
       result: await fn('run-1'),
     }),
     settleJobRuns: async (...args: unknown[]) => void settled.push(args),
+    forgetJobRuns: () => undefined,
   };
   const proposals = { create: async (_projectId: bigint, input: Record<string, unknown>) => (created.push(input), { id: 42n }) };
   return { progress, settled, created, models, jobService, workflowRunService, proposals };
@@ -326,7 +327,7 @@ describe('ActionJobService', () => {
     const executor = new JobExecutor(
       jobs as never,
       new FakeAuthoringClaims().asService(),
-      { cancel: () => undefined, settleJobRuns: async () => undefined } as never,
+      { cancel: () => undefined, forgetJobRuns: () => undefined, settleJobRuns: async () => undefined } as never,
       {} as never,
       { getPostgresClient: () => ({ select: () => ({ from: () => ({ where: async () => [] }) }) }) } as never,
       {} as never,

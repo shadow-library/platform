@@ -124,6 +124,7 @@ function organiser(stored: Stored) {
         result: await fn('run-1'),
       }),
       settleJobRuns: async (...args: unknown[]) => void settled.push(args),
+      forgetJobRuns: () => undefined,
     } as never,
     modelRouter as never,
     { resolve: async () => ({}) } as never,

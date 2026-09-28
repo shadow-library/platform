@@ -194,6 +194,7 @@ export class JobExecutor {
       return nextAttemptAt ? { status: 'retry', error, cause: err, nextAttemptAt } : { status: 'failed', error, cause: err };
     } finally {
       stopWatching();
+      this.workflowRunService.forgetJobRuns(job.id);
     }
   }
 
@@ -276,7 +277,8 @@ export class JobExecutor {
     if (job && !job.cancelRequestedAt) return false;
     if (watch) watch.observed = true;
     if (!job) {
-      this.logger.info('Job row gone with its project; stopping', { jobId });
+      this.logger.info('Job row gone with its project; stopping its runs', { jobId });
+      this.workflowRunService.cancelJobRuns(jobId);
       return true;
     }
     this.logger.info('Job cancellation observed', { jobId });

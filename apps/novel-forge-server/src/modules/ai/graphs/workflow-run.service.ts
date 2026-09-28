@@ -110,6 +110,8 @@ export class WorkflowRunService {
   private readonly logger = Logger.getLogger(APP_NAME, WorkflowRunService.name);
   private readonly db: PrimaryDatabase;
   private readonly checkpointer: PostgresSaver;
+  /** The runs this replica opened per job, so a job whose rows went with its project can still abort them. */
+  private readonly jobRuns = new Map<string, Set<string>>();
 
   constructor(
     private readonly databaseService: DatabaseService,
@@ -157,7 +159,7 @@ export class WorkflowRunService {
       });
       if (existing) {
         this.logger.warn('Resuming existing workflow run from checkpoint after crash', { runId: existing.id, jobId, graph, target });
-        return existing.id;
+        return this.trackJobRun(jobId, existing.id);
       }
     }
 
@@ -169,7 +171,22 @@ export class WorkflowRunService {
     this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId, parentRunId });
     this.events.publish(projectId, { type: 'run', runId: run.id, graph, target, status: 'running' });
     this.logger.debug('workflow run input', { runId: run.id, graph, input });
-    return run.id;
+    return jobId ? this.trackJobRun(jobId, run.id) : run.id;
+  }
+
+  private trackJobRun(jobId: string, runId: string): string {
+    const runs = this.jobRuns.get(jobId) ?? new Set<string>();
+    runs.add(runId);
+    this.jobRuns.set(jobId, runs);
+    return runId;
+  }
+
+  cancelJobRuns(jobId: string): void {
+    for (const runId of this.jobRuns.get(jobId) ?? []) this.cancel(runId);
+  }
+
+  forgetJobRuns(jobId: string): void {
+    this.jobRuns.delete(jobId);
   }
 
   /** Links a run created before its parent existed (compaction runs before the turn run) — every other run names its parent at creation. */

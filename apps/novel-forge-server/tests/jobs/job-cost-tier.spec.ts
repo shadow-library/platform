@@ -62,6 +62,7 @@ describe('JobExecutor.dispatch', () => {
       fail: mock(async () => undefined),
     };
     const workflowRunService = {
+      forgetJobRuns: () => undefined,
       runChapterGeneration: async () => {
         seen.push(scopedCostTier());
         return { runId: 'r', outcome: 'accepted', status: 'completed' };

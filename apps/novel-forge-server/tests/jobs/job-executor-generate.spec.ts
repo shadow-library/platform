@@ -17,14 +17,15 @@ function makeExecutor(runChapterGeneration: (input: unknown) => Promise<Workflow
   const jobService = { progress, cancellation: readJob } as never;
   const claims = new FakeAuthoringClaims().asService();
   const runChapterGenerationMock = mock(runChapterGeneration);
-  const workflowRunService = { runChapterGeneration: runChapterGenerationMock } as never;
+  const cancelJobRuns = mock((jobId: string) => void jobId);
+  const workflowRunService = { runChapterGeneration: runChapterGenerationMock, cancelJobRuns } as never;
   const indexingService = {} as never;
   const databaseService = { getPostgresClient: () => ({}) } as never;
   const publishRunner = {} as never;
   const storage = {} as never;
 
   const executor = new JobExecutor(jobService, claims, workflowRunService, indexingService, databaseService, publishRunner, storage, new JobHandlerRegistry());
-  return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock };
+  return { executor, progressCalls, runChapterGeneration: runChapterGenerationMock, cancelJobRuns };
 }
 
 function makeJob(chapters: number[]): Job.Row {
@@ -92,7 +93,7 @@ describe('JobExecutor.runGenerate — batch adjacency halt', () => {
 describe('JobExecutor.runGenerate — project deleted mid-batch', () => {
   it('should stop at the next chapter boundary once its job row is gone', async () => {
     let jobRow: unknown = { cancelRequestedAt: null };
-    const { executor, runChapterGeneration } = makeExecutor(
+    const { executor, runChapterGeneration, cancelJobRuns } = makeExecutor(
       async () => {
         jobRow = undefined;
         return { runId: 'r', outcome: 'accepted', status: 'completed' };
@@ -103,5 +104,6 @@ describe('JobExecutor.runGenerate — project deleted mid-batch', () => {
     await (executor as unknown as { runGenerate(job: Job.Row): Promise<void> }).runGenerate(makeJob([5, 6, 7]));
 
     expect(runChapterGeneration).toHaveBeenCalledTimes(1);
+    expect(cancelJobRuns).toHaveBeenCalledWith('job-1');
   });
 });

@@ -68,6 +68,7 @@ function worker(jobs: FakeJobs, claims: FakeAuthoringClaims, runChapter: Chapter
     runChapterGeneration: async (input: { chapter: number; jobId: string }) => (chapters.push(input.chapter), runChapter(input)),
     cancel: () => undefined,
     settleJobRuns: async () => undefined,
+    forgetJobRuns: () => undefined,
   };
   const databaseService = { getPostgresClient: () => ({ select: () => ({ from: () => ({ where: async () => [] }) }) }) };
   const executor = new JobExecutor(
@@ -201,7 +202,7 @@ describe('JobExecutor — authoring claim', () => {
     jobs.add('job-a');
     await claims.acquire(1n, 'job-a', 'generate');
     jobs.add('job-index', { kind: 'backfill' });
-    const workflowRunService = { cancel: () => undefined, settleJobRuns: async () => undefined };
+    const workflowRunService = { cancel: () => undefined, forgetJobRuns: () => undefined, settleJobRuns: async () => undefined };
     const indexing = { backfill: async () => undefined };
     const databaseService = { getPostgresClient: () => ({}) };
     const executor = new JobExecutor(
