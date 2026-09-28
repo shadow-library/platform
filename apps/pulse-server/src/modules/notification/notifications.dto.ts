@@ -25,7 +25,7 @@ export class NotificationRecipients {
 
 @Schema()
 export class CreateNotificationBody {
-  @Field()
+  @Field({ maxLength: 255 })
   templateKey: string;
 
   @Field()

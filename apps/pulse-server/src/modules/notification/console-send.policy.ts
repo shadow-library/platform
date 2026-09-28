@@ -1,5 +1,6 @@
 import { RENDER_GLOBAL_KEYS } from '@modules/template';
 import { type Template } from '@server/database';
+import { BASELINE_TEMPLATES } from '@server/database/seed/baseline.data';
 
 import { type Recipients } from './notification.service';
 
@@ -8,19 +9,24 @@ export interface ConsolePayload {
   strippedKeys: string[];
 }
 
+const IDENTITY_TEMPLATE_KEYS = new Set(BASELINE_TEMPLATES.filter(fixture => fixture.producer === 'identity').map(fixture => fixture.templateKey));
 const REFUSED_KEY_FAMILIES = ['auth.', 'security.', 'user.'];
 const REFUSED_KEYS = new Set(['password-reset']);
 const REFUSED_CATEGORIES = new Set(['auth', 'security']);
 
+const normalise = (value: string | null): string => (value ?? '').trim().toLowerCase();
+
 /**
- * Identity's account-security families, the legacy reset link, any one-time code and anything filed as auth or security: a console send of one
- * reaches an arbitrary recipient with a caller-chosen payload under the platform's brand, which is a phishing or spoofed-alert kit.
+ * Everything identity sends, operator templates squatting on its account-security namespaces, the legacy reset link, any one-time code and
+ * anything filed as auth or security: a console send of one reaches an arbitrary recipient with a caller-chosen payload under the platform's
+ * brand, which is a phishing or spoofed-notice kit.
  */
 export function isConsoleSendable(template: Pick<Template.Template, 'templateKey' | 'messageType' | 'category'>): boolean {
-  if (REFUSED_KEY_FAMILIES.some(family => template.templateKey.startsWith(family))) return false;
-  if (REFUSED_KEYS.has(template.templateKey)) return false;
+  const key = normalise(template.templateKey);
+  if (IDENTITY_TEMPLATE_KEYS.has(key) || REFUSED_KEYS.has(key)) return false;
+  if (REFUSED_KEY_FAMILIES.some(family => key.startsWith(family))) return false;
   if (template.messageType === 'OTP') return false;
-  return !REFUSED_CATEGORIES.has(template.category ?? '');
+  return !REFUSED_CATEGORIES.has(normalise(template.category));
 }
 
 export function withoutRenderGlobals(schema: Template.VariableSchema, payload: Record<string, unknown> = {}): ConsolePayload {

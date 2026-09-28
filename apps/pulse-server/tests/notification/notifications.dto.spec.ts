@@ -36,4 +36,9 @@ describe('notification DTO log masks', () => {
   it('should mask the sample data of a template preview', () => {
     expect(logMask(PreviewBody, { channel: 'EMAIL', data: PAYLOAD })).toEqual({ channel: 'EMAIL', data: '<masked:secret>' });
   });
+
+  it('should bound the template key at the column width', () => {
+    const schema = ClassSchema.generate(CreateNotificationBody) as JSONSchema & { properties: Record<string, JSONSchema> };
+    expect(schema.properties['templateKey']?.maxLength).toBe(255);
+  });
 });

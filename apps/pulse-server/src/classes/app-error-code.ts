@@ -132,8 +132,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly NTF_003 = AppErrorCode.badRequest('NTF_003', 'No valid recipients provided for Push notification');
   /** The payload does not satisfy the template's declared variable contract */
   static readonly NTF_004 = AppErrorCode.badRequest('NTF_004', 'Payload does not satisfy the template variable contract');
-  /** The console refuses authentication and security templates: a manual send of one could phish or spoof an account notice */
-  static readonly NTF_005 = AppErrorCode.forbidden('NTF_005', 'Authentication and security templates cannot be sent from the console');
+  /** The console refuses identity's and other authentication or security templates: a manual send of one could phish or spoof an account notice */
+  static readonly NTF_005 = AppErrorCode.forbidden('NTF_005', 'Identity, authentication and security templates cannot be sent from the console');
   /** The actor has used up the console's send budget for the current window */
   static readonly NTF_006 = AppErrorCode.badRequest('NTF_006', 'Too many console sends; try again later', 429);
 

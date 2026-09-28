@@ -9,6 +9,7 @@ import { ConsoleSendService } from '@modules/notification/console-send.service';
 import { ChannelNotificationStatus, type NotificationService, NotificationStatus } from '@modules/notification/notification.service';
 import { type ResolvedTemplate, type TemplateResolverService } from '@modules/template';
 import { type Notification, type Template } from '@server/database';
+import { BASELINE_TEMPLATES } from '@server/database/seed/baseline.data';
 
 const ADMIN: AuthPrincipal = { kind: 'user', sub: 'admin-sub', org: '7', scopes: [], claims: {} };
 const EMAIL = 'jane.doe@example.com';
@@ -30,6 +31,12 @@ const TEMPLATES: Record<string, TemplateShape> = {
   'password-reset': { messageType: 'TRANSACTIONAL', category: 'account' },
   'acme.login-code': { messageType: 'OTP', category: 'onboarding' },
   'acme.alert': { messageType: 'TRANSACTIONAL', category: 'security' },
+  'organisation-invitation': { messageType: 'TRANSACTIONAL', category: 'organisation' },
+  'organisation-role-changed': { messageType: 'TRANSACTIONAL', category: 'organisation' },
+  'bot.key.expiring': { messageType: 'TRANSACTIONAL', category: 'organisation' },
+  '  Auth.Welcome ': { messageType: 'TRANSACTIONAL', category: 'onboarding' },
+  'acme.notice': { messageType: 'TRANSACTIONAL', category: ' Security ' },
+  'organisation-newsletter': { messageType: 'PROMOTIONAL', category: 'organisation' },
   'year-in-review': { messageType: 'PROMOTIONAL', category: 'marketing', variables: { year: { type: 'number', required: true } }, channels: ['EMAIL'] },
 };
 
@@ -96,6 +103,26 @@ describe('ConsoleSendService', () => {
       expect((await refusal(service.send({ templateKey: 'acme.alert', recipients: { email: EMAIL } }))).code).toBe('NTF_005');
     });
 
+    it.each(['organisation-invitation', 'organisation-role-changed', 'bot.key.expiring'])('should refuse %s, which identity sends', async templateKey => {
+      const { service } = setup();
+      expect((await refusal(service.send({ templateKey, recipients: { email: EMAIL } }))).code).toBe('NTF_005');
+    });
+
+    it('should keep an operator-created template sendable even when it shares a prefix with an identity template', async () => {
+      const { service, sendResolved } = setup();
+
+      await service.send({ templateKey: 'organisation-newsletter', recipients: { email: EMAIL } });
+
+      expect(sendResolved).toHaveBeenCalledTimes(1);
+    });
+
+    it('should refuse a key or category that only differs from a refused one in case or surrounding space', async () => {
+      const { service } = setup();
+
+      expect((await refusal(service.send({ templateKey: '  Auth.Welcome ', recipients: { email: EMAIL } }))).code).toBe('NTF_005');
+      expect((await refusal(service.send({ templateKey: 'acme.notice', recipients: { email: EMAIL } }))).code).toBe('NTF_005');
+    });
+
     it('should send an ordinary template', async () => {
       const { service, sendResolved } = setup();
 
@@ -103,6 +130,17 @@ describe('ConsoleSendService', () => {
 
       expect(result.status).toBe(NotificationStatus.ACCEPTED);
       expect(sendResolved).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('baseline producers', () => {
+    it("should name identity as the producer of every baseline template in identity's families, and memoir of memoir's", () => {
+      const producerOf = (prefixes: string[]): (string | undefined)[] => [
+        ...new Set(BASELINE_TEMPLATES.filter(fixture => prefixes.some(prefix => fixture.templateKey.startsWith(prefix))).map(fixture => fixture.producer)),
+      ];
+
+      expect(producerOf(['auth.', 'security.', 'user.', 'organisation-', 'bot.'])).toEqual(['identity']);
+      expect(producerOf(['memoir-'])).toEqual(['memoir']);
     });
   });
 

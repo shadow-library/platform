@@ -33,8 +33,12 @@ export interface ChannelContent {
   layoutKey?: string;
 }
 
+/** The application whose code sends a baseline template; unset for demo templates nothing sends. */
+export type TemplateProducer = 'identity' | 'memoir';
+
 export interface TemplateFixture {
   templateKey: string;
+  producer?: TemplateProducer;
   name: string;
   description: string;
   messageType: Template.MessageType;
@@ -265,6 +269,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
 
   {
     templateKey: 'auth.register.otp',
+    producer: 'identity',
     name: 'Registration OTP',
     description: 'OTP delivered during new account registration',
     messageType: 'OTP',
@@ -283,6 +288,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.login.otp',
+    producer: 'identity',
     name: 'Sign-in OTP',
     description: 'OTP delivered during sign-in and account linking',
     messageType: 'OTP',
@@ -301,6 +307,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.recovery.otp',
+    producer: 'identity',
     name: 'Account recovery OTP',
     description: 'OTP delivered during account recovery',
     messageType: 'OTP',
@@ -318,6 +325,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.password.changed',
+    producer: 'identity',
     name: 'Password changed alert',
     description: 'Alert sent after an account password change',
     messageType: 'TRANSACTIONAL',
@@ -338,6 +346,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.mfa.enrolled',
+    producer: 'identity',
     name: 'MFA enrolled alert',
     description: 'Alert sent when a multi-factor authentication method is enrolled',
     messageType: 'TRANSACTIONAL',
@@ -357,6 +366,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.mfa.disabled',
+    producer: 'identity',
     name: 'MFA disabled alert',
     description: 'Alert sent when a multi-factor authentication method is disabled',
     messageType: 'TRANSACTIONAL',
@@ -378,6 +388,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'auth.mfa.recovery-code-used',
+    producer: 'identity',
     name: 'Recovery code used alert',
     description: 'Alert sent when an MFA recovery code is used',
     messageType: 'TRANSACTIONAL',
@@ -397,6 +408,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'security.new-signin',
+    producer: 'identity',
     name: 'New sign-in alert',
     description: 'Alert sent for a sign-in from an unseen device or IP address',
     messageType: 'TRANSACTIONAL',
@@ -425,6 +437,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'user.email.verification',
+    producer: 'identity',
     name: 'Email verification OTP',
     description: 'OTP delivered to verify a newly added email address',
     messageType: 'OTP',
@@ -442,6 +455,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'user.phone.verification',
+    producer: 'identity',
     name: 'Phone verification OTP',
     description: 'OTP delivered to verify a newly added phone number',
     messageType: 'OTP',
@@ -452,6 +466,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'user.contact.changed',
+    producer: 'identity',
     name: 'Contact details changed alert',
     description: 'Alert sent when account contact details change',
     messageType: 'TRANSACTIONAL',
@@ -473,6 +488,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'organisation-invitation',
+    producer: 'identity',
     name: 'Organisation invitation',
     description: 'Invitation to join an organisation',
     messageType: 'TRANSACTIONAL',
@@ -493,6 +509,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'organisation-role-changed',
+    producer: 'identity',
     name: 'Organisation role changed',
     description: 'Notice that an organisation member role changed',
     messageType: 'TRANSACTIONAL',
@@ -512,6 +529,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'organisation-member-removed',
+    producer: 'identity',
     name: 'Organisation member removed',
     description: 'Notice that a member was removed from an organisation',
     messageType: 'TRANSACTIONAL',
@@ -532,6 +550,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
 
   {
     templateKey: 'bot.key.expiring',
+    producer: 'identity',
     name: 'Bot API key expiring',
     description: 'Reminder that an organisation bot API key is about to expire',
     messageType: 'TRANSACTIONAL',
@@ -559,6 +578,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
 
   {
     templateKey: 'memoir-ai-result-ready',
+    producer: 'memoir',
     name: 'Memoir: AI review ready',
     description: 'Notice that a Memoir AI review has finished and is ready to read',
     messageType: 'TRANSACTIONAL',
@@ -578,6 +598,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'memoir-weekly-digest',
+    producer: 'memoir',
     name: 'Memoir: weekly review digest',
     description: 'Opt-in weekly review summary of quest, money, and body-trend aggregates',
     messageType: 'TRANSACTIONAL',
@@ -610,6 +631,7 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
   },
   {
     templateKey: 'memoir-billing-reminder',
+    producer: 'memoir',
     name: 'Memoir: billing reminder',
     description: 'Reminder of upcoming or changed subscription billing state',
     messageType: 'TRANSACTIONAL',
