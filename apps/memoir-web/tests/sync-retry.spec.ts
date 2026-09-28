@@ -198,7 +198,8 @@ describe('SyncTransportError retryAfterMs', () => {
   });
 
   it('should carry no delay when the header is missing or unreadable', async () => {
-    for (const headers of [{}, { 'retry-after': 'soon' }]) {
+    const answers: Record<string, string>[] = [{}, { 'retry-after': 'soon' }];
+    for (const headers of answers) {
       const client = new SyncClient({ fetchImpl: async () => new Response('{}', { status: 503, headers }) });
       const failure = (await client.pullDelta({ since: '0' }).catch((error: unknown) => error)) as SyncTransportError;
       expect(failure.retryAfterMs).toBeNull();
