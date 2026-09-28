@@ -9,7 +9,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
-import { formatLocalDate, localDateAt, type TimeZone } from '@modules/rules';
+import { accountToday, formatLocalDate } from '@modules/rules';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type Meal, type Quest, schema } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
@@ -153,8 +153,7 @@ export class QuickLogsCommandsService implements OnModuleInit {
       tags: optionalTags(draftPayload),
     };
 
-    const timezone = await this.timezoneOf(tx, accountId);
-    const today = this.todayLocal(timezone);
+    const today = await this.accountTodayOf(tx, accountId);
     const backdated = draft.date !== today;
     const linkage = backdated ? null : await findLinkageMatch(tx, accountId, 'journal', draft.date);
 
@@ -216,8 +215,7 @@ export class QuickLogsCommandsService implements OnModuleInit {
   }
 
   private async recordMeal(accountId: bigint, tx: DatabaseTransaction, draft: MealDraft): Promise<CommandResult> {
-    const timezone = await this.timezoneOf(tx, accountId);
-    const today = this.todayLocal(timezone);
+    const today = await this.accountTodayOf(tx, accountId);
     const backdated = draft.date !== today;
     const linkage = backdated ? null : await findLinkageMatch(tx, accountId, 'meal', draft.date);
 
@@ -300,8 +298,7 @@ export class QuickLogsCommandsService implements OnModuleInit {
       return { status: 'applied', result: { date, rewarded: updated.rewarded, xpAwarded: 0, coinsAwarded: 0, statTicked: false, linkageOffer: null, replaced: true } };
     }
 
-    const timezone = await this.timezoneOf(tx, accountId);
-    const today = this.todayLocal(timezone);
+    const today = await this.accountTodayOf(tx, accountId);
     const backdated = date !== today;
     const linkage = backdated ? null : await findLinkageMatch(tx, accountId, 'weight', date);
 
@@ -339,8 +336,7 @@ export class QuickLogsCommandsService implements OnModuleInit {
       statAffinity: 'statAffinity' in draftPayload ? requireEnum(draftPayload, 'statAffinity', STAT_AFFINITIES) : null,
     };
 
-    const timezone = await this.timezoneOf(tx, accountId);
-    const today = this.todayLocal(timezone);
+    const today = await this.accountTodayOf(tx, accountId);
     const backdated = draft.date !== today;
 
     let reward: RewardOutcome = { rewarded: false, xpAwarded: 0, coinsAwarded: 0 };
@@ -413,14 +409,14 @@ export class QuickLogsCommandsService implements OnModuleInit {
     return { rewarded: applied, xpAwarded: applied ? grant.xpDelta : 0, coinsAwarded: applied ? grant.coinsDelta : 0 };
   }
 
-  private async timezoneOf(tx: DatabaseTransaction, accountId: bigint): Promise<TimeZone> {
-    const [account] = await tx.select({ timezone: schema.accounts.timezone }).from(schema.accounts).where(eq(schema.accounts.id, accountId));
+  /** The same day the web dates a log on: the zone's date, or the open day a backward timezone change left ahead of it. */
+  private async accountTodayOf(tx: DatabaseTransaction, accountId: bigint): Promise<string> {
+    const [account] = await tx
+      .select({ timezone: schema.accounts.timezone, lastHpDate: schema.accounts.lastHpDate })
+      .from(schema.accounts)
+      .where(eq(schema.accounts.id, accountId));
     if (!account) throw AppError.internal(`quick-log command addressed account '${accountId}' which does not exist`);
-    return account.timezone as TimeZone;
-  }
-
-  private todayLocal(timezone: TimeZone): string {
-    return formatLocalDate(localDateAt(Date.now(), timezone));
+    return formatLocalDate(accountToday(Date.now(), account.timezone, account.lastHpDate));
   }
 
   private monthStart(today: string): string {
