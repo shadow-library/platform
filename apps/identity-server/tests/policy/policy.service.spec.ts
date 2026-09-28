@@ -1,14 +1,15 @@
-import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 import { FakeDatabaseService, InMemoryRedis } from '@shadow-library/modules/testing';
 
 import { AppErrorCode } from '@server/classes';
-import { type PolicyKey } from '@server/modules/system/policy/policy.registry';
+import { POLICY_REGISTRY, type PolicyDefinition, type PolicyKey } from '@server/modules/system/policy/policy.registry';
 import { PolicyService } from '@server/modules/system/policy/policy.service';
 
 const REMOVED_EMAIL_OTP_FALLBACK = 'mfa.email_otp_fallback.enabled' as PolicyKey;
 const ACCESS_TOKEN_TTL = 'auth.access_token.ttl';
+const SWITCH = 'test.switch.enabled' as PolicyKey;
 const ORGANISATION = 7n;
 
 function serviceWith(stored: Record<string, unknown>, redis = new InMemoryRedis()): PolicyService {
@@ -30,6 +31,26 @@ describe('PolicyService', () => {
   afterEach(() => mock.restore());
 
   describe('resolve', () => {
+    describe('with a switch under AND resolution', () => {
+      const registry = POLICY_REGISTRY as Record<string, PolicyDefinition>;
+      beforeEach(() => (registry[SWITCH] = { label: 'Switch', description: 'Switch', type: 'boolean', default: true, resolution: 'AND' }));
+      afterEach(() => delete registry[SWITCH]);
+
+      it('should honour a switch turned off by a string-wrapped boolean instead of failing open', async () => {
+        const service = serviceWith({ [SWITCH]: 'false' });
+
+        expect(await service.resolve(SWITCH, { organisationIds: [ORGANISATION] })).toBe(false);
+      });
+
+      it('should fold an unreadable switch as off, failing closed', async () => {
+        const service = serviceWith({ [SWITCH]: 'maybe' });
+        const error = spyOn(service['logger'], 'error');
+
+        expect(await service.resolve(SWITCH, { organisationIds: [ORGANISATION] })).toBe(false);
+        expect(error).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('should honour a duration stored as a numeric string', async () => {
       const service = serviceWith({ [ACCESS_TOKEN_TTL]: '300' });
 
@@ -76,15 +97,19 @@ describe('PolicyService', () => {
     });
   });
 
-  describe('writes', () => {
+  describe('selectValue', () => {
     it('should refuse a value for the removed email-OTP fallback switch as an unknown policy', async () => {
       expect(AppError.is(await refusal(() => serviceWith({}).selectValue(REMOVED_EMAIL_OTP_FALLBACK, { enabled: false })), AppErrorCode.POL_001)).toBe(true);
     });
+  });
 
+  describe('set', () => {
     it('should refuse to store the removed email-OTP fallback switch as an unknown policy', async () => {
       expect(AppError.is(await refusal(() => serviceWith({}).set(ORGANISATION, REMOVED_EMAIL_OTP_FALLBACK, false as never)), AppErrorCode.POL_001)).toBe(true);
     });
+  });
 
+  describe('clear', () => {
     it('should refuse to clear the removed email-OTP fallback switch as an unknown policy', async () => {
       expect(AppError.is(await refusal(() => serviceWith({}).clear(ORGANISATION, REMOVED_EMAIL_OTP_FALLBACK)), AppErrorCode.POL_001)).toBe(true);
     });
