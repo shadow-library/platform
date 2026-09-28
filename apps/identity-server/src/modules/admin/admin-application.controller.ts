@@ -150,10 +150,8 @@ export class AdminApplicationController {
     if (update.publicUrls !== undefined) await this.regenerateRelyingPartyRedirectUris(application.id, update.publicUrls);
     await this.record(actor, 'admin.application.updated', String(application.id), { fields });
 
-    if (body.visibility !== undefined) {
-      await this.accessService.invalidateGlobal();
-      await this.record(actor, 'application.visibility.changed', String(application.id), { visibility: body.visibility });
-    }
+    if (body.visibility !== undefined || body.isActive !== undefined) await this.accessService.invalidateGlobal();
+    if (body.visibility !== undefined) await this.record(actor, 'application.visibility.changed', String(application.id), { visibility: body.visibility });
     return { success: true };
   }
 
