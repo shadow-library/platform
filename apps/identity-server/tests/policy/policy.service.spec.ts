@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { FakeDatabaseService, InMemoryRedis } from '@shadow-library/modules/testing';
 
@@ -15,6 +15,8 @@ function serviceWith(stored: Record<string, unknown>, redis = new InMemoryRedis(
 }
 
 describe('PolicyService', () => {
+  afterEach(() => mock.restore());
+
   describe('resolve', () => {
     it('should honour a switch turned off by a string-wrapped boolean instead of failing open', async () => {
       const service = serviceWith({ [EMAIL_OTP]: 'false' });
@@ -28,11 +30,20 @@ describe('PolicyService', () => {
       expect(await service.resolve(ACCESS_TOKEN_TTL, { organisationIds: [ORGANISATION] })).toBe(300);
     });
 
-    it('should drop stored values that do not fit the policy type and fall back to the default', async () => {
-      const service = serviceWith({ [EMAIL_OTP]: 'maybe', [ACCESS_TOKEN_TTL]: 300.5 });
+    it('should fold an unreadable switch under AND resolution as off, failing closed', async () => {
+      const service = serviceWith({ [EMAIL_OTP]: 'maybe' });
+      const error = spyOn(service['logger'], 'error');
 
-      expect(await service.resolve(EMAIL_OTP, { organisationIds: [ORGANISATION] })).toBe(true);
+      expect(await service.resolve(EMAIL_OTP, { organisationIds: [ORGANISATION] })).toBe(false);
+      expect(error).toHaveBeenCalledTimes(1);
+    });
+
+    it('should drop an unreadable duration with an error and fall back to the other candidates', async () => {
+      const service = serviceWith({ [ACCESS_TOKEN_TTL]: 300.5 });
+      const error = spyOn(service['logger'], 'error');
+
       expect(await service.resolve(ACCESS_TOKEN_TTL, { organisationIds: [ORGANISATION] })).toBe(3600);
+      expect(error).toHaveBeenCalledTimes(1);
     });
 
     it('should coerce an override the cache still holds in its string-wrapped form', async () => {

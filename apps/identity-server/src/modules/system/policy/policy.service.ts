@@ -126,14 +126,23 @@ export class PolicyService {
     return overrides;
   }
 
-  /** A value that does not fit its key's type is dropped rather than folded: a truthy string would otherwise defeat an AND veto. */
+  /**
+   * A value that does not fit its key's type is never folded as stored, since a truthy string would defeat an AND veto. An unreadable
+   * AND switch folds as off, failing closed; anything else is dropped so the key falls back to its other candidates.
+   */
   private coerceAll(organisationId: bigint, entries: [string, unknown][]): Partial<Record<PolicyKey, number | boolean>> {
     const overrides: Partial<Record<PolicyKey, number | boolean>> = {};
     for (const [key, raw] of entries) {
       if (!isPolicyKey(key)) continue;
-      const value = this.coerce(POLICY_REGISTRY[key] as PolicyDefinition, raw);
-      if (value === undefined) this.logger.warn('ignoring an organisation policy value that does not fit its type', { organisationId, policyKey: key });
-      else overrides[key] = value;
+      const definition = POLICY_REGISTRY[key] as PolicyDefinition;
+      const coerced = this.coerce(definition, raw);
+      if (coerced !== undefined) {
+        overrides[key] = coerced;
+        continue;
+      }
+      const closed = definition.resolution === 'AND' ? false : undefined;
+      this.logger.error('organisation policy value does not fit its type', { organisationId, policyKey: key, foldedAs: closed ?? null });
+      if (closed !== undefined) overrides[key] = closed;
     }
     return overrides;
   }
