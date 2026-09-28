@@ -4,7 +4,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME, isNumericId, REGEX } from '@server/constants';
+import { APP_NAME, CACHE_VERSION_TTL_SECONDS, isNumericId, REGEX } from '@server/constants';
 import { DatabaseService, Permission, PrimaryDatabase, RoleAssignment, schema } from '@server/modules/infrastructure/datastore';
 
 /** Read side of the primary database, so a caller may resolve permissions through its own open transaction. */
@@ -80,7 +80,9 @@ export class PolicyDecisionService {
   }
 
   private async bumpAuthzVersion(principal: Principal): Promise<void> {
-    const version = await this.redis.incr(this.versionKey(principal));
+    const key = this.versionKey(principal);
+    const results = await this.redis.multi().incr(key).call('EXPIRE', key, CACHE_VERSION_TTL_SECONDS).exec();
+    const version = results?.[0]?.[1];
     this.logger.debug('bumped authz version, cached decisions invalidated', { principal, version });
   }
 

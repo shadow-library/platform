@@ -4,7 +4,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, CACHE_VERSION_TTL_SECONDS } from '@server/constants';
 import { Application, DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 interface QualifyingMembership {
@@ -35,7 +35,9 @@ export class ApplicationAccessService {
   }
 
   async invalidateOrganisation(organisationId: string): Promise<void> {
-    const version = await this.redis.incr(this.orgVersionKey(organisationId));
+    const key = this.orgVersionKey(organisationId);
+    const results = await this.redis.multi().incr(key).call('EXPIRE', key, CACHE_VERSION_TTL_SECONDS).exec();
+    const version = results?.[0]?.[1];
     this.logger.debug('bumped organisation app-access version, cached grant set invalidated', { organisationId, version });
   }
 

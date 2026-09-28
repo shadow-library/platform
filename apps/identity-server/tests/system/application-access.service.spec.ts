@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { FakeDatabaseService } from '@shadow-library/modules/testing';
+import { FakeDatabaseService, InMemoryRedis } from '@shadow-library/modules/testing';
 
 import { PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { type Application, type Organisation } from '@server/modules/infrastructure/datastore';
@@ -23,6 +23,7 @@ const organisationRow = (overrides: Partial<Organisation> = {}): Organisation =>
 const applicationRow = (id: number, visibility: Application.Visibility): Application =>
   ({ id, name: `app-${id}`, visibility, isActive: true, ownerOrganisationId: null }) as unknown as Application;
 
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
 const PUBLIC_APP = applicationRow(1, 'PUBLIC');
 const INTERNAL_APP = applicationRow(2, 'INTERNAL');
 
@@ -52,5 +53,26 @@ describe('ApplicationAccessService', () => {
     const granted = await serviceFor(platform).listOrganisationApplicationIds(platform.id);
 
     expect([...granted].sort()).toEqual([PUBLIC_APP.id, INTERNAL_APP.id]);
+  });
+
+  describe('version keys', () => {
+    it('should bump an organisation grant version and let it lapse long after every grant set cached under it expired', async () => {
+      const redis = new InMemoryRedis();
+      const service = new ApplicationAccessService(new FakeDatabaseService({ redis }));
+
+      await service.invalidateOrganisation('7');
+      await service.invalidateOrganisation('7');
+
+      expect(await redis.get('app_access_version:org:7')).toBe('2');
+      expect(await redis.ttl('app_access_version:org:7')).toBe(THIRTY_DAYS);
+    });
+
+    it('should keep the single global version without expiry', async () => {
+      const redis = new InMemoryRedis();
+
+      await new ApplicationAccessService(new FakeDatabaseService({ redis })).invalidateGlobal();
+
+      expect(await redis.ttl('app_access_version:global')).toBe(-1);
+    });
   });
 });
