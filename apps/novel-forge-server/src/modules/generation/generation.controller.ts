@@ -243,6 +243,7 @@ export class GenerationController {
     return this.generationService.regenerateChapter(params.projectId, params.n);
   }
 
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @BotPermission(GENERATION_RUN_PERMISSION)
   @Post('/chapters/:n/summarize')
   @RespondFor(200, ChapterSummarizeResponse)
