@@ -27,6 +27,8 @@ export type IdentityCloseOutcome = 'closed' | 'unconfigured' | 'unavailable';
  * platform's deletion semantic.
  */
 export abstract class IdentityCloseClient {
+  abstract isConfigured(): boolean;
+
   abstract close(identitySub: string): Promise<IdentityCloseOutcome>;
 }
 
@@ -46,10 +48,14 @@ export class HttpIdentityCloseClient extends IdentityCloseClient {
     super();
   }
 
-  async close(identitySub: string): Promise<IdentityCloseOutcome> {
-    const path = Config.get('identity.close-path');
-    if (!path) return 'unconfigured';
+  isConfigured(): boolean {
+    return Config.get('identity.close-path') !== '';
+  }
 
+  async close(identitySub: string): Promise<IdentityCloseOutcome> {
+    if (!this.isConfigured()) return 'unconfigured';
+
+    const path = Config.get('identity.close-path');
     const service = Config.get('identity.close-service');
     const scope = Config.get('identity.close-scope');
     const target = path.replace('{sub}', encodeURIComponent(identitySub));

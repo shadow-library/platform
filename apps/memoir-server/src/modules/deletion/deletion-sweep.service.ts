@@ -34,6 +34,8 @@ const MS_PER_MINUTE = 60_000;
 @Injectable()
 export class DeletionSweepService implements OnModuleInit {
   private readonly logger = Logger.getLogger(APP_NAME, DeletionSweepService.name);
+  /** Each pass resumes after the last account the previous one reached, so accounts that never advance cannot hold the page and starve the ones behind them. */
+  private cursor = 0n;
 
   constructor(
     private readonly scheduler: SchedulerService,
@@ -48,7 +50,9 @@ export class DeletionSweepService implements OnModuleInit {
 
   async sweep(): Promise<void> {
     const staleBefore = new Date(Date.now() - Config.get('deletion.resume-after-minutes') * MS_PER_MINUTE);
-    const stalled = await this.deletionRepository.findStalled(staleBefore, SWEEP_PAGE_SIZE);
+    const stalled = await this.deletionRepository.findStalled(staleBefore, this.cursor, SWEEP_PAGE_SIZE, this.deletionService.parkedStates());
+    const last = stalled.at(-1);
+    this.cursor = stalled.length < SWEEP_PAGE_SIZE || !last ? 0n : last.accountId;
 
     let resumed = 0;
     for (const account of stalled) {

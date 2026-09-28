@@ -67,6 +67,11 @@ export class DeletionService {
     return (await this.deletionRepository.findState(accountId)) ?? 'done';
   }
 
+  /** States the machine rests in rather than stalls in: without a machine-side identity close, `data_deleted` is §21.3's legitimate resting state and no sweep can move it. */
+  parkedStates(): DeletionStatus[] {
+    return this.identityCloseClient.isConfigured() ? [] : ['data_deleted'];
+  }
+
   /**
    * Steps 3–6. Every step is idempotent and every transition is a single guarded UPDATE, so a crash
    * anywhere resumes by re-reading the state and re-running from there: a lost transition re-runs a

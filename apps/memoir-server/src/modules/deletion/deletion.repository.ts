@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, asc, eq, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, lt, notInArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -169,12 +169,12 @@ export class DeletionRepository {
     return { accountId: BigInt(row.id), identitySub: row.identity_sub, createdAt: row.created_at, deletionStartedAt: row.deletion_started_at };
   }
 
-  /** Accounts parked in a non-terminal state since before `staleBefore` — the resumption sweep's work queue (§21, step 3–6 crash resumability). */
-  async findStalled(staleBefore: Date, limit: number): Promise<StalledDeletion[]> {
+  /** One page, after `afterId`, of accounts parked since before `staleBefore` in a state that is neither terminal nor `resting` — the resumption sweep's work queue (§21, step 3–6 crash resumability). */
+  async findStalled(staleBefore: Date, afterId: bigint, limit: number, resting: Account.DeletionState[]): Promise<StalledDeletion[]> {
     const rows = await this.db
       .select({ accountId: schema.accounts.id, deletionState: schema.accounts.deletionState })
       .from(schema.accounts)
-      .where(and(notInArray(schema.accounts.deletionState, TERMINAL_STATES), lt(schema.accounts.deletionStartedAt, staleBefore)))
+      .where(and(notInArray(schema.accounts.deletionState, [...TERMINAL_STATES, ...resting]), lt(schema.accounts.deletionStartedAt, staleBefore), gt(schema.accounts.id, afterId)))
       .orderBy(asc(schema.accounts.id))
       .limit(limit);
     return rows;
