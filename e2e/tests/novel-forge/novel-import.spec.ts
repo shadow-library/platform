@@ -2,10 +2,15 @@
  * Importing npm packages
  */
 
+import { type ClientRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+
+import { type APIRequestContext, type APIResponse } from '@playwright/test';
+
 /**
  * Importing user defined packages
  */
-import { csrfHeaders, novelForgeDb } from '../../lib';
+import { csrfHeaders, novelForgeDb, pollUntil, requireProductUrl } from '../../lib';
 import { expectCode } from './forge-arrange';
 import {
   buildBundle,
@@ -13,6 +18,7 @@ import {
   countBibleDocuments,
   countProjectsOwnedBy,
   expect,
+  ForgeBundleError,
   type ImportAccepted,
   postImport,
   readIllustrationRows,
@@ -23,6 +29,7 @@ import {
   storageRef,
   test,
 } from './forge-bundles';
+import { errorCode } from './forge-helpers';
 import { readJobRow } from './forge-rows';
 
 /**
@@ -63,6 +70,14 @@ const OVERSIZED_CHAPTERS = 13;
 
 const MEGABYTE_CHAPTER = `${'The tide came in and the keeper counted the waves again. '.repeat(20_000).slice(0, 1024 * 1024 - 1)}.`;
 
+/** The import route's own body limit. */
+const IMPORT_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
+
+const IMPORT_PERMITS = 2;
+
+/** A permit an upload holds is returned when the client drops it, or at the latest by the server's 60-second receive deadline. */
+const PERMIT_RETURN_MS = 75_000;
+
 function uniqueTitle(label: string): string {
   return `E2E ${label} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -73,6 +88,71 @@ async function readImportedProject(projectId: string, jobId: string): Promise<Im
     WHERE p.id = ${projectId} AND j.id = ${jobId}
   `;
   return row;
+}
+
+/**
+ * Opens a POST declaring `declaredBytes` of JSON body on its own connection, with the actor's cookies and CSRF token, and sends none of it
+ * yet; an `APIRequestContext` only sends whole bodies. The server sees the request before any body arrives.
+ */
+async function openUpload(ctx: APIRequestContext, path: string, declaredBytes: number): Promise<ClientRequest> {
+  const url = new URL(path, requireProductUrl('novelForge'));
+  const cookies = (await ctx.storageState()).cookies.filter(cookie => url.hostname.endsWith(cookie.domain.replace(/^\./, '')));
+  const upload = httpsRequest(url, {
+    method: 'POST',
+    rejectUnauthorized: false,
+    headers: {
+      ...(await csrfHeaders(ctx)),
+      cookie: cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; '),
+      'content-type': 'application/json',
+      'content-length': String(declaredBytes),
+    },
+  });
+  upload.on('error', () => undefined);
+  upload.flushHeaders();
+  return upload;
+}
+
+/** An import whose body never finishes arriving, so it holds one of the replica's import permits until it is destroyed. */
+async function holdImportUpload(ctx: APIRequestContext): Promise<ClientRequest> {
+  const upload = await openUpload(ctx, '/api/v1/import', 1024 * 1024);
+  upload.write('{"bundle":');
+  return upload;
+}
+
+/**
+ * Streams `bytes` of body and returns the status the server answers, stopping the upload as soon as it answers. Posting a whole oversized
+ * body races the refusal: the server answers and closes while the client is still writing, which the client sees as a hung-up socket.
+ */
+async function statusForOversizedBody(ctx: APIRequestContext, path: string, bytes: number): Promise<number> {
+  const upload = await openUpload(ctx, path, bytes);
+  const chunk = Buffer.alloc(64 * 1024, 0x20);
+  let answered = false;
+  try {
+    return await new Promise<number>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new ForgeBundleError(`no answer to a ${bytes}-byte POST ${path}`)), 60_000);
+      upload.once('response', response => {
+        answered = true;
+        clearTimeout(timer);
+        response.resume();
+        resolve(response.statusCode ?? 0);
+      });
+      const pump = (sent: number): void => {
+        if (answered || upload.destroyed) return;
+        if (sent >= bytes) return void upload.end();
+        const size = Math.min(chunk.length, bytes - sent);
+        if (upload.write(size === chunk.length ? chunk : chunk.subarray(0, size))) setImmediate(() => pump(sent + size));
+        else upload.once('drain', () => pump(sent + size));
+      };
+      pump(0);
+    });
+  } finally {
+    upload.destroy();
+  }
+}
+
+/** An import the server refuses as malformed once admitted, so a probe never creates a project. */
+async function probeAdmission(ctx: APIRequestContext): Promise<APIResponse> {
+  return ctx.post('/api/v1/import', { headers: await csrfHeaders(ctx), data: { bundle: { format: 'not-a-bundle', novel: {} } } });
 }
 
 async function insertDraft(projectId: string, chapter: number, title: string | null, body: string): Promise<void> {
@@ -164,13 +244,46 @@ test.describe('novel-forge novel import', () => {
     const lengths = await novelForgeDb()<{ length: number }[]>`SELECT length(content)::int AS length FROM chapters WHERE project_id = ${accepted.projectId} ORDER BY number`;
     expect(lengths.map(row => row.length)).toEqual(Array<number>(OVERSIZED_CHAPTERS).fill(MEGABYTE_CHAPTER.length));
 
-    const oversized = await owner.ctx.post('/api/v1/projects', {
-      headers: await csrfHeaders(owner.ctx),
-      data: { name: 'e2e-forge-oversized', kind: 'new_novel', brief: 'x'.repeat(13 * 1024 * 1024) },
-      timeout: 60_000,
-    });
-    expect(oversized.status(), 'a 13 MB body on an ordinary write route').toBe(413);
+    expect(await statusForOversizedBody(owner.ctx, '/api/v1/projects', 13 * 1024 * 1024), 'a 13 MB body on an ordinary write route').toBe(413);
     expect(await countProjectsOwnedBy(owner)).toBe(1);
+  });
+});
+
+test.describe('novel-forge import admission', () => {
+  test('should refuse an import body past the route limit with a 413 and create nothing', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'imp-limit' });
+    expect(await statusForOversizedBody(owner.ctx, '/api/v1/import', IMPORT_BODY_LIMIT_BYTES + 1024 * 1024), 'a 17 MiB import').toBe(413);
+    expect(await countProjectsOwnedBy(owner), 'a refused import creates no project').toBe(0);
+  });
+
+  test('should refuse a third concurrent import with 429 IMP_001 and admit imports again once an upload is dropped', async ({ forge, lane }) => {
+    test.setTimeout(PERMIT_RETURN_MS + 60_000);
+    const owner = await forge.actor({ label: 'imp-admission' });
+    const held: ClientRequest[] = [];
+    try {
+      for (let permit = 0; permit < IMPORT_PERMITS; permit++) held.push(await holdImportUpload(owner.ctx));
+      const refused = await pollUntil(
+        () => probeAdmission(owner.ctx),
+        response => response.status() === 429,
+        { timeoutMs: 10_000, intervalMs: 100 },
+      );
+      expect(refused.status(), `a third import while two uploads are in flight — body ${await refused.text()}`).toBe(429);
+      expect(await errorCode(refused)).toBe('IMP_001');
+      expect(Number(refused.headers()['retry-after']), 'the refusal says when to retry').toBeGreaterThan(0);
+    } finally {
+      for (const upload of held) upload.destroy();
+    }
+
+    const readmitted = await pollUntil(
+      () => probeAdmission(owner.ctx),
+      response => response.status() !== 429,
+      { timeoutMs: PERMIT_RETURN_MS, intervalMs: 500 },
+    );
+    await expectCode(readmitted, 422, 'VALIDATION_ERROR', 'an import once the dropped uploads returned their permits');
+    expect(await countProjectsOwnedBy(owner), 'no probe created a project').toBe(0);
+
+    const accepted = await lane.imported(owner, buildBundle({ title: uniqueTitle('Admitted') }));
+    expect((await readLandedChapters(accepted.projectId)).map(chapter => chapter.number)).toEqual([1, 2, 3]);
   });
 });
 

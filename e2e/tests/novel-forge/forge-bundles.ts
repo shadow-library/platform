@@ -130,6 +130,8 @@ const DEFAULT_SYNOPSIS = 'A retired lighthouse keeper discovers the tide itself 
 /** An import writes rows only, but queues behind whatever else the executor is running. */
 const IMPORT_SETTLE_MS = 60_000;
 
+const IMPORT_ADMISSION_WAIT_MS = 45_000;
+
 const FINAL_CHAPTERS: readonly { title: string; content: string }[] = [
   {
     title: 'The Last Watch',
@@ -225,9 +227,17 @@ export function buildBundle(options: BundleOptions): ImportBundle {
   };
 }
 
-/** `POST /api/v1/import` with any body, valid or not; `timeoutMs` covers a bundle of many megabytes. */
+/**
+ * `POST /api/v1/import` with any body, valid or not; `timeoutMs` covers a bundle of many megabytes. A replica admits two imports at once and
+ * refuses a third with 429 and a `Retry-After`, which this waits out as a client would, so a spec holding both permits cannot fail another.
+ */
 export async function postImport(ctx: APIRequestContext, body: unknown, timeoutMs = 30_000): Promise<APIResponse> {
-  return ctx.post('/api/v1/import', { headers: await csrfHeaders(ctx), data: body, timeout: timeoutMs });
+  const deadline = Date.now() + IMPORT_ADMISSION_WAIT_MS;
+  for (;;) {
+    const response = await ctx.post('/api/v1/import', { headers: await csrfHeaders(ctx), data: body, timeout: timeoutMs });
+    if (response.status() !== 429 || Date.now() >= deadline) return response;
+    await new Promise(resolve => setTimeout(resolve, Number(response.headers()['retry-after'] ?? 1) * 1000));
+  }
 }
 
 /** Starts importing {@link FINAL_BUNDLE} as a new project; the import job writes rows only and calls no model. */
