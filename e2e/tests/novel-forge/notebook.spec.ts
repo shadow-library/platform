@@ -402,7 +402,7 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
 });
 
 test.fixme(
-  'should return the entry body with a real supersedesId — ledger.dto.ts:177 (`supersedesId: bigint | null`) and bible-audit.dto.ts:191 (`proposalId?: bigint | null`) ' +
+  'should return the entry body with a real supersedesId — ledger.dto.ts:178 (`supersedesId: bigint | null`) and bible-audit.dto.ts:191 (`proposalId?: bigint | null`) ' +
     "are nullable-bigint response fields that class-schema's nullable/anyOf handling (packages/class-schema/src/class-schema.ts:194-200) fails to serialize once non-null, " +
     '500ing every second supersede/reject and every decision on a linked audit card, after the write commits',
   async ({ forge }) => {

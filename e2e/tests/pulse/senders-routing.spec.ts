@@ -65,17 +65,6 @@ test.describe('sender & routing CRUD', () => {
     const duplicateBody = (await duplicate.json()) as { code?: string };
     expect(duplicateBody.code).toBe('SND_RTR_002');
 
-    /**
-     * `SenderRoutingRuleResponse` (`sender-routing-rule.dto.ts:37-52`) declares no `id` field, and neither does
-     * `SenderRoutingRuleDetailResponse` (`:56-59`, adds only `profile`) — confirmed empirically: a live
-     * `GET /api/v1/sender-routing-rules` against the deployed API returns rows shaped exactly
-     * `{ senderProfileId, messageType, region, service, createdAt, updatedAt }`, no `id`/`routingRuleId`
-     * anywhere. Yet `PATCH`/`DELETE /api/v1/sender-routing-rules/:routingRuleId` require that id
-     * (`sender-routing-rule.controller.ts:55-67`) — `apps/pulse-web`'s own `RuleList.tsx` flags this with an
-     * inline comment ("the generated SenderRoutingRuleResponse omits id ... typed optional here and read
-     * defensively"). This is a suspected app bug: the create/list/get responses give a caller no way to
-     * address the very resource they just created. `findRoutingRuleId` is the DB-backed workaround.
-     */
     const routingRuleId = await findRoutingRuleId(profile.id, service, 'US', 'TRANSACTIONAL');
     const deletedRule = await deleteRoutingRule(ctx, routingRuleId);
     expect(deletedRule.status()).toBe(204);
@@ -84,13 +73,28 @@ test.describe('sender & routing CRUD', () => {
     expect(deletedProfile.status()).toBe(204);
   });
 
-  test.fixme('the routing rule create/list/get response never includes the row id (app bug: sender-routing-rule.dto.ts:37-59 declares no `id` field on SenderRoutingRuleResponse/SenderRoutingRuleDetailResponse; confirmed live against GET /api/v1/sender-routing-rules)', async () => {
+  test('should return the routing rule id on create, list and get, and address the rule by it', async () => {
     const ctx = await apiContext('pulse', 'admin');
-    const key = uniqueKey('routing-id-probe');
-    const profile = await createSenderProfile(ctx, { key, isActive: true });
-    const response = await createRoutingRule(ctx, { senderProfileId: profile.id, service: uniqueKey('svc') });
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toHaveProperty('id');
+    const profile = await createSenderProfile(ctx, { key: uniqueKey('routing-id'), isActive: true });
+    const service = uniqueKey('svc-id');
+    try {
+      const created = await createRoutingRule(ctx, { senderProfileId: profile.id, service });
+      expect(created.status()).toBe(201);
+      const { id } = (await created.json()) as { id?: string };
+      expect(id).toEqual(await findRoutingRuleId(profile.id, service));
+
+      const listed = await ctx.get('/api/v1/sender-routing-rules', { params: { serviceName: service } });
+      expect(((await listed.json()) as { items: { id?: string }[] }).items.map(rule => rule.id)).toEqual([id]);
+      const fetched = await ctx.get(`/api/v1/sender-routing-rules/${id}`);
+      expect(((await fetched.json()) as { id?: string }).id).toBe(id);
+
+      expect((await deleteRoutingRule(ctx, id ?? '')).status()).toBe(204);
+      expect((await ctx.get(`/api/v1/sender-routing-rules/${id}`)).status()).toBe(404);
+    } finally {
+      const leftover = await findRoutingRuleId(profile.id, service).catch(() => undefined);
+      if (leftover) await deleteRoutingRule(ctx, leftover);
+      await deleteSenderProfile(ctx, profile.id);
+    }
   });
 
   test('should reject a routing rule against an inactive sender profile with SND_RTR_003', async () => {

@@ -222,14 +222,7 @@ export async function createRoutingRule(ctx: APIRequestContext, overrides: Routi
   return mutate(ctx, 'post', '/api/v1/sender-routing-rules', { data: overrides });
 }
 
-/**
- * `POST/GET /api/v1/sender-routing-rules` never echoes the row's own id (`SenderRoutingRuleResponse` /
- * `SenderRoutingRuleDetailResponse` declare no `id` field — confirmed empirically against the deployed
- * API: `GET /api/v1/sender-routing-rules` returns only `{ senderProfileId, messageType, region, service,
- * createdAt, updatedAt }`), yet `PATCH`/`DELETE /api/v1/sender-routing-rules/:routingRuleId` require that
- * id. This is a suspected app bug (see the report); this helper is the DB-backed workaround every spec
- * needing a routing rule's id must use instead of the (nonexistent) API field.
- */
+/** Reads a rule's id from the table, so cleanup can find a rule whose create response was never read. */
 export async function findRoutingRuleId(senderProfileId: string, service?: string, region?: string, messageType?: string): Promise<string> {
   const rows = await pulseDb()<{ id: string }[]>`
     SELECT id FROM sender_routing_rules

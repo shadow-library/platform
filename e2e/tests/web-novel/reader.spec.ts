@@ -156,25 +156,7 @@ test.describe('reader data scoping', () => {
 test.describe('library screen (signed in)', () => {
   test.use({ storageState: storageStateFor('user1') });
 
-  /**
-   * APP BUG (suspected) — `GET /api/library` itself is correct (confirmed both by the API-level test above and
-   * by direct `curl` with `user1`'s session cookie: `{"items":[{"slug":"e2e-public-novel", ...}]}`), but the
-   * `/library` screen renders "0 saved novels" / the "Nothing here yet" empty state instead, every time, not
-   * flakily. Root cause traced to `apps/web-novel-web/src/lib/apis/library.api.ts:75-91` —
-   * `libraryQueryOptions(userId)` builds its React Query cache entry under the **static** key
-   * `libraryKeys.all = ['library']` (`:34-36`), which does not include `userId`, and the query has no `enabled`
-   * gate on the session having resolved. `library-screen.tsx:90-91` mounts `useQuery(sessionQueryOptions())`
-   * and `useQuery(libraryQueryOptions(session.data?.userId))` side by side; on first render `session.data` is
-   * still `undefined`, so the library query fires immediately with `userId=undefined`, its `queryFn` returns
-   * the (empty, for a fresh browser context) local-only device shelf, and that result is cached permanently
-   * under the same `['library']` key. Once the session resolves a render later, `libraryQueryOptions` is
-   * reconstructed with the real `userId`, but because the query key never changed, React Query treats it as
-   * the same already-`success` query and never refetches — the server truth is never merged in. The "shared"
-   * section renders correctly because `sharedQueryOptions` is a *separate* query, unaffected by this key
-   * collision. Suspected fix: key the query on `userId` (e.g. `['library', userId]`) and/or `enabled:
-   * session.isSuccess`.
-   */
-  test.fixme('should show the seeded library entry for a signed-in user', async ({ page }) => {
+  test('should show the seeded library entry for a signed-in user', async ({ page }) => {
     const { webNovel } = readSeedManifest();
     const url = requireProductUrl('webNovel');
     await page.goto(`${url}/library`, { waitUntil: 'domcontentloaded' });

@@ -51,10 +51,16 @@ test.describe('single sign-on across apps', () => {
       await loginIdentity(page.request, identityUrl, user2.email, user2.password);
 
       // Novel Forge: hitting a gated route with no app session kicks off the OIDC hop, which finds `__Host-sid`
-      // and completes without a prompt — the browser is expected to settle back on Novel Forge's own origin.
+      // and completes without a prompt — the browser is expected to settle back on Novel Forge's own origin. The web
+      // app starts that hop client-side after `goto` has already resolved on its own origin (`routes/login.tsx`), so
+      // only the callback's response proves the hop ran; asserting the URL alone passed before it had begun.
+      const forgeCallback = page.waitForResponse(response => response.url().startsWith(`${novelForgeUrl}/api/auth/callback`), { timeout: 30_000 });
       await page.goto(`${novelForgeUrl}/`);
+      expect((await forgeCallback).status(), 'the Novel Forge OIDC callback should establish the app session and redirect').toBe(302);
       await expect(page, 'SSO should land back on Novel Forge, not stall on identity login').not.toHaveURL(IDENTITY_LOGIN_PATTERN, { timeout: 30_000 });
-      expect(new URL(page.url()).origin, 'expected to end up on the Novel Forge origin after the silent hop').toBe(new URL(novelForgeUrl).origin);
+      await expect(page, 'expected to end up on the Novel Forge origin after the silent hop').toHaveURL(
+        url => url.origin === new URL(novelForgeUrl).origin && !url.pathname.startsWith('/api/auth'),
+      );
       const forgeSession = await page.request.get(`${novelForgeUrl}/api/auth/session`);
       expect(forgeSession.status(), 'Novel Forge should now report an authenticated session').toBe(200);
 
