@@ -16,7 +16,8 @@ Notification service and operations console. Other apps send a message by templa
 - Producers call Pulse server-to-server: `identity` (auth/security/user/org/bot templates) and `memoir-server` (memoir-*). Each needs a service-access rule in Identity.
 - Producers send on `POST /api/v1/notifications` (service-only `notifications:send` scope). An admin's manual send from the console goes to
   `POST /api/v1/notifications/console` (`pulse:notifications:send`, PulseAdmin only, high-risk decision TTL, stepped-up session). Neither route admits the
-  other's caller. On IAM_003 pulse-web stashes the form in sessionStorage, walks through `/api/auth/step-up` and restores it on return.
+  other's caller. On IAM_003 pulse-web stashes the form in sessionStorage, walks through `/api/auth/step-up` and restores it on return; a draft
+  older than ten minutes is dropped.
 - Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
@@ -49,7 +50,8 @@ Notification service and operations console. Other apps send a message by templa
 - Identity's seed reconciles additively on every boot and re-grants `pulse:notifications:send` to PulseAdmin, so revoking it in the console does not last:
   removing the capability durably means editing the seed (and the pulse catalogue with it).
 - Recipients are masked in info logs and the message-log API, which exists only when `app.stage` is `dev`. The request log masks request DTO fields marked
-  `@Sensitive` (send recipients and payload, the message-log recipient filter, preview data): a new recipient or payload field MUST carry it, since the framework's
+  `@Sensitive` (send recipients and payload, the message-log recipient filter, preview data), but only when `Config.isProd()`: the dev and prod images run
+  `NODE_ENV=production`, while a local `bun dev` logs raw bodies; a new recipient or payload field MUST carry `@Sensitive`, since the framework's
   default redaction only knows credential-shaped keys. The job and message tables still hold raw recipient, payload and rendered body (OTP codes, reset links),
   and the `debug` line "Notification job details" logs the whole job row, raw recipient and payload included: NEVER widen that exposure.
 - The global routing rule cannot be deleted and rules cannot be created or edited to point at an inactive profile (deactivating a profile later is not checked). No matching rule/endpoint makes the job PERMANENTLY_FAILED.
