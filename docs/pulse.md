@@ -15,7 +15,8 @@ Notification service and operations console. Other apps send a message by templa
 
 - Producers call Pulse server-to-server: `identity` (auth/security/user/org/bot templates) and `memoir-server` (memoir-*). Each needs a service-access rule in Identity.
 - Producers send on `POST /api/v1/notifications` (service-only `notifications:send` scope). An admin's manual send from the console goes to
-  `POST /api/v1/notifications/console` (`pulse:notifications:send`, PulseAdmin only, high-risk decision TTL). Neither route admits the other's caller.
+  `POST /api/v1/notifications/console` (`pulse:notifications:send`, PulseAdmin only, high-risk decision TTL, stepped-up session). Neither route admits the
+  other's caller. On IAM_003 pulse-web stashes the form in sessionStorage, walks through `/api/auth/step-up` and restores it on return.
 - Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
@@ -39,11 +40,14 @@ Notification service and operations console. Other apps send a message by templa
 - A null layout sends the email fragment unwrapped; layouts never apply to SMS/PUSH.
 - Auto-escaping is a security boundary on EMAIL bodies (SMS/PUSH and all subjects are plain text): only the framework's `content` slot is unescaped (`| raw` and
   `{% echo %}` are overridden). NEVER weaken it.
-- The console send is a test tool, not a second producer. It MUST refuse identity's account-security templates with NTF_005: `auth.*`, `security.*`, `user.*`,
-  `password-reset`, any OTP message type and the `auth`/`security` categories. It strips payload keys that name a render global or `content` unless the template
-  declares them. It logs one info line per send (actor, organisation, template, channels, masked recipients, job ids, stripped keys), never the raw recipient or
-  payload; pulse has no audit table, so that line is the trail. Each actor gets 20 sends per sliding 10 minutes (429 NTF_006 with `Retry-After`), counted in
-  process: per replica and reset on restart.
+- The console send is a test tool, not a second producer. It MUST refuse with NTF_005 every template the baseline marks `producer: 'identity'`, any key in
+  identity's `auth.*`, `security.*` or `user.*` namespaces, `password-reset`, any OTP message type and the `auth`/`security` categories, comparing the key and
+  category trimmed and lower-cased. A new identity template MUST carry `producer: 'identity'` in the baseline. It strips payload keys that name a render global or
+  `content` unless the template declares them. It logs one info line per send, failed sends included (actor, organisation, template, routing service, locale,
+  channels, masked recipients, job ids, status, stripped keys), never the raw recipient or payload; pulse has no audit table, so that line is the trail. Each actor
+  gets 20 sends per sliding 10 minutes (429 NTF_006 with `Retry-After`), counted in process: per replica and reset on restart.
+- Identity's seed reconciles additively on every boot and re-grants `pulse:notifications:send` to PulseAdmin, so revoking it in the console does not last:
+  removing the capability durably means editing the seed (and the pulse catalogue with it).
 - Recipients are masked in info logs and the message-log API, which exists only when `app.stage` is `dev`. The request log masks request DTO fields marked
   `@Sensitive` (send recipients and payload, the message-log recipient filter, preview data): a new recipient or payload field MUST carry it, since the framework's
   default redaction only knows credential-shaped keys. The job and message tables still hold raw recipient, payload and rendered body (OTP codes, reset links),
