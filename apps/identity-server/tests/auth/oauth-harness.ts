@@ -7,7 +7,7 @@ import { type AccessTokenInput, type AccessTokenService } from '@server/modules/
 import { AuthorizationCodeService } from '@server/modules/auth/oauth/authorization-code.service';
 import { type GrantedScope, type OAuthClientService } from '@server/modules/auth/oauth/oauth-client.service';
 import { OAuthService } from '@server/modules/auth/oauth/oauth.service';
-import { type RefreshTokenService } from '@server/modules/auth/token';
+import { type FamilyContext, type RefreshTokenService } from '@server/modules/auth/token';
 import { type OAuthClient } from '@server/modules/infrastructure/datastore';
 import { RateLimiterService } from '@server/modules/infrastructure/security/rate-limiter.service';
 import { type ApplicationAccessService } from '@server/modules/system/application';
@@ -21,6 +21,7 @@ export const CODE_CHALLENGE = 'ZtNPunH49FD35FWYhT5Tv8I7vRKQJ8uxMaL0_9eHjNA';
 export interface HarnessOptions {
   client?: Partial<OAuthClient>;
   scopes?: GrantedScope[];
+  refreshFamily?: Partial<FamilyContext>;
 }
 
 export interface OAuthHarness {
@@ -28,6 +29,7 @@ export interface OAuthHarness {
   client: OAuthClient;
   redis: InMemoryRedis;
   minted: AccessTokenInput[];
+  codeService: AuthorizationCodeService;
   issueCode(scope: string, resource?: string): Promise<string>;
   issueRefresh: Mock<RefreshTokenService['issue']>;
   revokeFamily: Mock<RefreshTokenService['revokeFamily']>;
@@ -76,16 +78,32 @@ export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
     getAvailableScopes: (_client: OAuthClient, audience: string) =>
       Promise.resolve(new Map(scopes.filter(scope => scope.resourceIdentifier === audience).map(scope => [scope.name, scope]))),
     isOwnAudience: () => Promise.resolve(false),
+    isRedirectUriAllowed: (_id: string, uri: string) => Promise.resolve(uri === REDIRECT_URI),
     filterScopesForPrincipal: (names: string[]) => Promise.resolve(names),
   } as unknown as OAuthClientService;
 
   const issueRefresh = mock<RefreshTokenService['issue']>(() => Promise.resolve({ secret: 'refresh-secret', familyId: 'family-1', tokenId: 'token-1' } as never));
   const revokeFamily = mock<RefreshTokenService['revokeFamily']>(() => Promise.resolve());
-  const refreshTokenService = { issue: issueRefresh, revokeFamily } as unknown as RefreshTokenService;
+  const family: FamilyContext = {
+    userId: BigInt(USER_ID),
+    clientId: client.id,
+    scope: null,
+    audience: null,
+    organisationId: 3n,
+    sessionId: BigInt(SESSION_ID),
+    ...options.refreshFamily,
+  };
+  const rotate = (): Promise<unknown> => Promise.resolve({ secret: 'next-refresh-secret', familyId: 'family-1', tokenId: 'token-2', context: family });
+  const refreshTokenService = { issue: issueRefresh, revokeFamily, rotate } as unknown as RefreshTokenService;
+
+  const session = { id: BigInt(SESSION_ID), userId: BigInt(USER_ID), aal: 'AAL1', elevatedUntil: null };
+  const sessionService = { validate: () => Promise.resolve(session), validateById: () => Promise.resolve(session) };
+  const consentService = { record: () => Promise.resolve(), getActive: () => Promise.resolve(null) };
 
   const applicationAccessService = {
     resolveActiveOrganisationId: () => Promise.resolve(3n),
     assertUserAccess: () => Promise.resolve(),
+    listGrantingOrganisations: () => Promise.resolve([{ id: 3n }]),
   } as unknown as ApplicationAccessService;
 
   const rateLimiterService = new RateLimiterService(databaseService);
@@ -99,12 +117,12 @@ export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
     codeService,
     accessTokenService,
     refreshTokenService,
-    {} as never,
+    sessionService as never,
     userService as never,
     userEmailService as never,
     { record: () => Promise.resolve() } as never,
     {} as never,
-    {} as never,
+    consentService as never,
     {} as never,
     policyService as never,
     rateLimiterService,
@@ -124,5 +142,5 @@ export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
       sessionId: SESSION_ID,
     });
 
-  return { service, client, redis, minted, issueCode, issueRefresh, revokeFamily, rateLimiterService };
+  return { service, client, redis, minted, codeService, issueCode, issueRefresh, revokeFamily, rateLimiterService };
 }

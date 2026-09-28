@@ -6,7 +6,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
-import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
+import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, isReleasableAt, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -152,13 +152,13 @@ export class AppSessionService {
     }
 
     const elevation = input.elevated ? await this.requireElevation(session, audience) : null;
+    const aal = elevation ? 'AAL2' : 'AAL1';
     const consented = new Set(session.grantedScope.split(' ').filter(Boolean));
     const requested = (input.scope ?? session.grantedScope).split(' ').filter(Boolean);
     const scopes = requested.filter(name => {
       if (OIDC_PROTOCOL_SCOPES.has(name)) return consented.has(name);
       const scope = availableHere.get(name);
-      if (!scope || !consented.has(name)) return false;
-      return scope.isSensitive ? elevation !== null : true;
+      return scope !== undefined && consented.has(name) && isReleasableAt(scope, aal);
     });
 
     const organisationIds = [session.organisationId, input.client.organisationId];
@@ -167,7 +167,6 @@ export class AppSessionService {
       : await this.policyService.resolve('auth.access_token.ttl', { organisationIds, clientValue: input.client.accessTokenTtl });
 
     const scope = scopes.join(' ');
-    const aal = elevation ? 'AAL2' : 'AAL1';
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
       subject: session.userId.toString(),
       audience,

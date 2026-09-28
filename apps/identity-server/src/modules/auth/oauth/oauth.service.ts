@@ -21,6 +21,7 @@ import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
 import { ACCESS_TOKEN_TYPE, BOT_KEY_TOKEN_TYPE, DEFAULT_AUDIENCE, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { verifyPkce } from './pkce';
+import { type AssuranceLevel, isReleasableAt } from './scope-release.util';
 import { WorkloadIdentityService } from './workload-identity.service';
 
 export interface AuthorizeParams {
@@ -88,6 +89,7 @@ interface ResolvedGrant {
   audience: string;
   scopes: string[];
   rejected: string[];
+  withheld: string[];
 }
 
 @Injectable()
@@ -295,7 +297,14 @@ export class OAuthService {
     return this.failAuthorize(params, 'access_denied');
   }
 
-  private async resolveGrant(client: OAuthClient, requestedResource: string | undefined, requestedScope: string, principal: 'user' | 'service'): Promise<ResolvedGrant> {
+  /** `issuedAt` names the assurance level of the token being minted; without it (authorize, consent) a consented sensitive scope stays on the grant. */
+  private async resolveGrant(
+    client: OAuthClient,
+    requestedResource: string | undefined,
+    requestedScope: string,
+    principal: 'user' | 'service',
+    issuedAt?: AssuranceLevel,
+  ): Promise<ResolvedGrant> {
     const audience = requestedResource ?? DEFAULT_AUDIENCE;
     const availableHere = await this.clientService.getAvailableScopes(client, audience);
     if (requestedResource !== undefined && availableHere.size === 0 && !(await this.clientService.isOwnAudience(client, requestedResource))) {
@@ -310,7 +319,12 @@ export class OAuthService {
     const requested = requestedScope.split(' ').filter(Boolean);
     const principalScoped = await this.clientService.filterScopesForPrincipal(requested, principal);
     const isAllowed = (name: string): boolean => availableHere.has(name) || (principal === 'user' && OIDC_PROTOCOL_SCOPES.has(name));
-    return { audience, scopes: principalScoped.filter(isAllowed), rejected: principalScoped.filter(name => !isAllowed(name)) };
+    const isWithheld = (name: string): boolean => {
+      const scope = availableHere.get(name);
+      return issuedAt !== undefined && scope !== undefined && !isReleasableAt(scope, issuedAt);
+    };
+    const allowed = principalScoped.filter(isAllowed);
+    return { audience, scopes: allowed.filter(name => !isWithheld(name)), rejected: principalScoped.filter(name => !isAllowed(name)), withheld: allowed.filter(isWithheld) };
   }
 
   async token(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
@@ -518,7 +532,7 @@ export class OAuthService {
       throw AppErrorCode.OAU_003.create();
     }
 
-    const grant = await this.resolveGrant(client, payload.resource, payload.scope, 'user');
+    const grant = await this.resolveGrant(client, payload.resource, payload.scope, 'user', 'AAL1');
     const scope = grant.scopes.join(' ');
     const organisationId = await this.applicationAccessService.resolveActiveOrganisationId(userId, client.applicationId);
     if (!organisationId) {
@@ -629,7 +643,7 @@ export class OAuthService {
     }
 
     const requestedResource = rotated.context.audience === DEFAULT_AUDIENCE ? undefined : (rotated.context.audience ?? undefined);
-    const grant = await this.resolveGrant(client, requestedResource, rotated.context.scope ?? '', 'user');
+    const grant = await this.resolveGrant(client, requestedResource, rotated.context.scope ?? '', 'user', 'AAL1');
     if (grant.rejected.length > 0) {
       this.logger.warn('dropped scopes revoked since the refresh-token family was opened', { clientId: client.id, familyId: rotated.familyId, dropped: grant.rejected });
     }
