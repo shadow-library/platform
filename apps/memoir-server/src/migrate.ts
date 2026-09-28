@@ -1,7 +1,7 @@
-import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
+import { createMigrationClient } from '@shadow-library/modules/bootstrap';
 
 import { APP_NAME } from '@server/constants';
 
@@ -16,7 +16,7 @@ if (!url) {
   process.exit(1);
 }
 
-const client = new SQL(url, { max: 1 });
+const client = createMigrationClient(url);
 
 /**
  * Memoir has no data worth preserving yet, so a failed migration wipes the database back to empty

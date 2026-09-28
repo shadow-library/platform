@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 
 import { and, eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/bun-sql';
 import { Config, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -224,13 +223,7 @@ export async function resetSequences(db: PrimaryDatabase): Promise<void> {
  * a fresh *production* deployment gets none of it, so a misrouted OTP or security alert fails loudly instead of being silently swallowed by
  * the `DEV` provider. It seeds no demo messages.
  */
-export async function seedBaseline(db?: PrimaryDatabase): Promise<void> {
-  if (!db) {
-    const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
-    db = drizzle(url, { schema });
-    logger.debug(`Connected to database '${url.split('/').pop()}' for baseline seeding`);
-  }
-
+export async function seedBaseline(db: PrimaryDatabase): Promise<void> {
   const gate = new BaselineRenderGate(new TemplateEngineService(), () => loadPublishedDesignSystem(db));
   await bootstrapPartials(db, gate);
   await bootstrapLayouts(db, gate);

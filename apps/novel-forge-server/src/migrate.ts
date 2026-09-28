@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
+import { createMigrationClient, toMigrationConnectionString } from '@shadow-library/modules/bootstrap';
 
 import { APP_NAME } from '@server/constants';
 
@@ -20,12 +21,12 @@ const logger = Logger.getLogger(APP_NAME, 'migrate');
 Logger.attachTransport(Config.isProd() ? 'console:json' : 'console:pretty');
 
 try {
-  const db = drizzle(url);
+  const db = drizzle({ client: createMigrationClient(url) });
   // Drizzle never generates CREATE EXTENSION, and the schema's vector columns need it before the first migration.
   await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   await migrate(db, { migrationsFolder });
   logger.info('Drizzle migrations applied');
-  const checkPointer = PostgresSaver.fromConnString(url);
+  const checkPointer = PostgresSaver.fromConnString(toMigrationConnectionString(url));
   await checkPointer.setup();
   logger.info('LangGraph checkpointer tables created');
   logger.info('Database migration completed successfully');
