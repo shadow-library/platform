@@ -32,6 +32,8 @@ export interface TeamOrganisationOptions {
   label?: string;
   /** Default `ALL_APPS`, identity's own default. */
   appAccessMode?: AppAccessMode;
+  /** Default `E2E <label>-<suffix>`; written as given, so a name the API reserves can still be arranged. */
+  name?: string;
 }
 
 export interface TeamOrganisation {
@@ -118,15 +120,15 @@ export async function invalidateAllGrants(): Promise<void> {
 
 /** The bootstrap-created platform organisation, whose members alone reach INTERNAL applications. */
 export async function findPlatformOrganisationId(): Promise<string> {
-  const [row] = await identityDb()<{ id: string }[]>`SELECT id::text FROM organisations WHERE type = 'TEAM' AND name = ${PLATFORM_ORGANISATION_NAME} ORDER BY id LIMIT 1`;
-  if (!row) throw new IdentityOrgError(`no ${PLATFORM_ORGANISATION_NAME} organisation; run identity's bootstrap first`);
+  const [row] = await identityDb()<{ id: string }[]>`SELECT id::text FROM organisations WHERE is_platform`;
+  if (!row) throw new IdentityOrgError(`no organisation is marked is_platform; run identity's bootstrap first`);
   return row.id;
 }
 
 export async function createTeamOrganisation(options: TeamOrganisationOptions = {}): Promise<TeamOrganisation> {
   const suffix = `${options.label ?? 'team'}-${randomBytes(4).toString('hex')}`;
   const slug = `e2e-${suffix}`;
-  const name = `E2E ${suffix}`;
+  const name = options.name ?? `E2E ${suffix}`;
   const [row] = await identityDb()<{ id: string }[]>`
     INSERT INTO organisations (slug, name, type, status, app_access_mode)
     VALUES (${slug}, ${name}, 'TEAM', 'ACTIVE', ${options.appAccessMode ?? 'ALL_APPS'}::organisation_app_access_mode)

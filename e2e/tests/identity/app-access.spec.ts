@@ -34,6 +34,7 @@ import {
   updateOrganisationMember,
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
+import { expectRefused } from './helpers';
 
 /**
  * Defining types
@@ -202,15 +203,39 @@ test.describe('identity app access — authorize enforcement', () => {
     await expectGranted(insider.ctx, app.client, 'a platform-organisation member is granted INTERNAL apps');
   });
 
-  test.fixme('should not treat a user-created team that borrows the platform organisation’s name as the platform organisation', async ({ identity }) => {
-    // ApplicationAccessService.computePlatformGrants matches the platform org by name, and team names are neither unique nor reserved.
-    const app = await firstPartyApp(identity, 'namesake', 'INTERNAL');
+  test('should refuse the platform organisation’s name, however it is spelled, to a new team and to a rename', async ({ identity }) => {
     const { user, ctx } = await member(identity, 'namesake');
-    const created = await identityMutate(ctx, 'post', '/api/v1/organisations', { name: PLATFORM_ORGANISATION_NAME, slug: `e2e-namesake-${randomBytes(4).toString('hex')}` });
-    expect(created.status()).toBe(201);
-    identity.trackOrganisation(((await created.json()) as { id: string }).id, user.userId);
+    const team = await identity.createTeam({ label: 'namesake-rename' });
+    const spellings = [PLATFORM_ORGANISATION_NAME, 'shadow-platform', ' SHADOW  PLATFORM ', 'Shadow\u200BPlatform', 'Ｓｈａｄｏｗ Ｐｌａｔｆｏｒｍ', 'Shadów Platform'];
 
-    await expectHidden(ctx, app.client, 'a namesake team must not unlock INTERNAL apps');
+    for (const name of spellings) {
+      const created = await identityMutate(ctx, 'post', '/api/v1/organisations', { name, slug: `e2e-namesake-${randomBytes(4).toString('hex')}` });
+      await expectRefused(created, 400, 'ORG_012', `creating a team named ${JSON.stringify(name)}`);
+      const renamed = await identityMutate(team.ownerCtx, 'patch', `/api/v1/organisations/${team.organisationId}`, { name });
+      await expectRefused(renamed, 400, 'ORG_012', `renaming a team to ${JSON.stringify(name)}`);
+    }
+    const teams = await identityDb()<{ name: string }[]>`
+      SELECT o.name FROM organisations o JOIN organisation_members m ON m.organisation_id = o.id
+      WHERE o.type = 'TEAM' AND (m.user_id = ${user.userId} OR o.id = ${team.organisationId})
+    `;
+    expect(teams, 'no refused name was written').toEqual([{ name: team.name }]);
+
+    const created = await identityMutate(ctx, 'post', '/api/v1/organisations', { name: 'Shadow Platformers', slug: `e2e-namesake-${randomBytes(4).toString('hex')}` });
+    expect(created.status(), await created.text()).toBe(201);
+    identity.trackOrganisation(((await created.json()) as { id: string }).id, user.userId);
+    const renamed = await identityMutate(team.ownerCtx, 'patch', `/api/v1/organisations/${team.organisationId}`, { name: 'E2E Shadow Platform Fans' });
+    expect(renamed.status(), await renamed.text()).toBe(200);
+  });
+
+  test('should not treat a team that bears the platform organisation’s name but not its mark as the platform organisation', async ({ identity }) => {
+    const app = await firstPartyApp(identity, 'namesake', 'INTERNAL');
+    const namesake = await identity.createTeam({ label: 'namesake', name: PLATFORM_ORGANISATION_NAME });
+    const { user, ctx } = await member(identity, 'namesake', namesake.organisationId);
+
+    await expectHidden(ctx, app.client, 'an unmarked namesake team must not unlock INTERNAL apps');
+
+    await addOrganisationMember(await findPlatformOrganisationId(), user.userId);
+    await expectGranted(ctx, app.client, 'the same user is granted INTERNAL apps once a member of the marked platform organisation');
   });
 });
 
