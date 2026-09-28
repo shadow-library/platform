@@ -375,8 +375,7 @@ test.describe('novel-forge AI settings and project models', () => {
     expect(pinned.status(), `a registered model on its own provider is accepted — body ${await pinned.text()}`).toBe(200);
   });
 
-  // project.service.ts:223 binds JSON.stringify(config) as a jsonb string, so `|| kept` stores ["{…}", {}] and the pin is lost.
-  test.fixme('should keep a project model pin it accepted', async ({ forge }) => {
+  test('should keep a project model pin it accepted', async ({ forge }) => {
     const author = await forge.actor({ label: 'models-kept' });
     const project = await createProject(author);
     const model = await pricedModel(author.ctx);
@@ -388,7 +387,7 @@ test.describe('novel-forge AI settings and project models', () => {
     expect((await readProjectRow(project.id))?.config?.models?.generation, 'the router reads the pin from the stored config').toEqual(ref);
   });
 
-  // defaults.ts:114 isRegisteredModel checks only the provider, so project.service.ts:80 accepts an image model on a text role.
+  // defaults.ts:114 isRegisteredModel checks only that the id is registered under that provider, not its kind, so project.service.ts:80 accepts an image model on a text role.
   test.fixme('should refuse an image model pinned on a text role', async ({ forge }) => {
     const author = await forge.actor({ label: 'models-image' });
     const project = await createProject(author);

@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 
-import { type APIRequestContext, type APIResponse, expect as playwrightExpect } from '@playwright/test';
+import { type APIRequestContext } from '@playwright/test';
 
 /**
  * Importing user defined packages
@@ -111,31 +111,6 @@ export class ForgeArrangeError extends Error {
  * running a whole hand-write-approve-finalize flow. A pending proposal is likewise seeded bare and then `PATCH`ed through the real API
  * so the server computes its baseline and stamps idea ids.
  */
-
-/** The default handler's generic body for an uncaught server error (`packages/fastify/src/server.error.ts`), what a 500 from the serializer bug below always carries. */
-const UNEXPECTED_SERVER_ERROR_CODE = 'S001';
-
-/**
- * `POST /proposals/:id/apply` and `/revert` (`proposal.controller.ts:61,84`) each declare two `@RespondFor` codes with no `@HttpStatus`;
- * `getStatusCode` (`packages/fastify/src/module/fastify-router.ts:322-327`) then defaults the POST to 201 because more than one status is
- * registered, and the 201 has no matching response transformer, so a raw bigint in the body (`ProposalResponse.id`) fails JSON
- * serialization after the write already committed — `500 {"code":"S001"}` (`ac5a7309`).
- *
- * The same shape recurs wherever a *response field* is a nullable bigint that just went non-null: `LedgerEntryResponse.supersedesId`
- * (`ledger.dto.ts:177`) and `BibleAuditReportResponse.proposalId` (`bible-audit.dto.ts:191`) both hit `class-schema`'s nullable/`anyOf`
- * handling (`packages/class-schema/src/class-schema.ts:194-200`) once non-null, 500ing on an otherwise-successful write.
- *
- * Both are pre-existing app bugs, not something a spec should mask by weakening its assertion: this helper accepts only the expected
- * status, or a 500 whose body is exactly the default handler's `S001` — never an unrelated 500 — so a real regression elsewhere still
- * fails the test. Callers always read the committed state back from the database afterward rather than trusting the response body.
- */
-export async function expectCommittedDespiteSerializerBug(response: APIResponse, expectedStatus: number, what: string): Promise<void> {
-  if (response.status() === expectedStatus) return;
-  const body = await response.text();
-  playwrightExpect(response.status(), `${what} — neither ${expectedStatus} nor the serializer bug's 500 — body ${body}`).toBe(500);
-  const parsed = JSON.parse(body) as { code?: string };
-  playwrightExpect(parsed.code, `${what} — a 500 not carrying the serializer bug's own code — body ${body}`).toBe(UNEXPECTED_SERVER_ERROR_CODE);
-}
 
 export async function insertChapterRow(seed: ChapterRowSeed): Promise<string> {
   const sql = novelForgeDb();

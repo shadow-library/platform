@@ -50,10 +50,20 @@ export interface ForgeAccess {
 export interface PublishJob {
   readonly status: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
   readonly lastError: string | null;
+  readonly updatedAt: Date;
 }
 
 export interface ForgePublicationRow {
   readonly novelSlug: string;
+  readonly title: string;
+  readonly originalAuthor: string | null;
+  readonly blurb: string | null;
+  readonly genres: string[] | null;
+  readonly tags: string[] | null;
+  readonly sexualContent: string | null;
+  readonly violence: string | null;
+  readonly darkContent: string | null;
+  readonly status: string;
   readonly revision: number;
   readonly publishToken: string | null;
 }
@@ -61,10 +71,16 @@ export interface ForgePublicationRow {
 export interface ForgeChapterLedgerRow {
   readonly chapter: number;
   readonly publishedOrdinal: number;
+  readonly title: string;
+  readonly authorNote: string | null;
+  readonly contentRating: Record<string, string> | null;
   readonly status: 'scheduled' | 'published' | 'failed' | 'unpublished';
   readonly revision: number;
   readonly contentHash: string;
+  readonly scheduledAt: Date | null;
+  readonly publishedAt: Date | null;
   readonly error: string | null;
+  readonly updatedAt: Date;
 }
 
 export interface ForgeWikiLedgerRow {
@@ -73,11 +89,17 @@ export interface ForgeWikiLedgerRow {
   readonly revision: number;
   readonly contentHash: string;
   readonly error: string | null;
+  readonly updatedAt: Date;
 }
 
+/** Canonical chapter columns no route edits on a locked chapter without a model; only the fields given are written. */
 export interface ForgeChapterRevision {
   content?: string;
   contentRating?: Record<string, string>;
+  title?: string | null;
+  note?: string | null;
+  wordCount?: number;
+  locked?: boolean;
 }
 
 export interface ForgeSession {
@@ -114,12 +136,20 @@ async function expectStatus(response: APIResponse, status: number, action: strin
  */
 export async function settlePublishJob(projectId: string): Promise<PublishJob | undefined> {
   const job = await pollUntil(
-    async () => (await novelForgeDb()<PublishJob[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE project_id = ${projectId} AND kind = 'publish'`)[0],
+    () => readPublishJob(projectId),
     current => !isActive(current),
     { timeoutMs: PUBLISH_SETTLE_TIMEOUT_MS, intervalMs: 250 },
   );
   if (isActive(job)) throw new ForgePublicationError(`publish job for project ${projectId} still ${job?.status} after ${PUBLISH_SETTLE_TIMEOUT_MS}ms`);
   return job;
+}
+
+/** The project's one `publish` job as it stands, without waiting on it. */
+export async function readPublishJob(projectId: string): Promise<PublishJob | undefined> {
+  const [row] = await novelForgeDb()<PublishJob[]>`
+    SELECT status, last_error AS "lastError", updated_at AS "updatedAt" FROM jobs WHERE project_id = ${projectId} AND kind = 'publish'
+  `;
+  return row;
 }
 
 export async function createForgeProject(ctx: APIRequestContext, slug: string): Promise<string> {
@@ -170,6 +200,12 @@ export function reconcileForge(publication: ForgePublication): Promise<APIRespon
   return mutate(publication.ctx, 'post', `/api/v1/projects/${publication.projectId}/publications/reconcile`);
 }
 
+/** Removes every reader novel published under the project's ref, wherever a slug conflict moved it, with its audit trail. */
+export async function removeServedNovelsOf(projectId: string): Promise<void> {
+  const removed = await webNovelDb()<{ slug: string }[]>`DELETE FROM novels WHERE source_client_id = ${FORGE_CLIENT_ID} AND source_ref = ${projectId} RETURNING slug`;
+  await deleteNovels(removed.map(row => row.slug));
+}
+
 /**
  * Settles any push still in flight first, or it could recreate the reader's row after it is deleted; every step still runs if an earlier
  * one fails. The reader's row is found by the forge's own `sourceRef` as well as the slug, since a converge that met a slug conflict would
@@ -183,10 +219,7 @@ export async function removeForgePublication(ctx: APIRequestContext, projectId: 
           const deleted = await mutate(ctx, 'delete', `/api/v1/projects/${projectId}`);
           if (deleted.status() !== 204 && deleted.status() !== 404) throw new ForgePublicationError(`project ${projectId} delete answered ${deleted.status()}`);
         },
-        async () => {
-          const moved = await webNovelDb()<{ slug: string }[]>`DELETE FROM novels WHERE source_client_id = ${FORGE_CLIENT_ID} AND source_ref = ${projectId} RETURNING slug`;
-          await deleteNovels(moved.map(row => row.slug));
-        },
+        () => removeServedNovelsOf(projectId),
       ]
     : [];
   await runAll([...forgeSteps, () => deleteNovels([slug])]);
@@ -219,21 +252,25 @@ export async function reconcileSettled(publication: ForgePublication): Promise<R
 
 export async function readForgePublication(projectId: string): Promise<ForgePublicationRow | undefined> {
   const [row] = await novelForgeDb()<ForgePublicationRow[]>`
-    SELECT novel_slug AS "novelSlug", revision, publish_token AS "publishToken" FROM publications WHERE project_id = ${projectId}
+    SELECT novel_slug AS "novelSlug", title, original_author AS "originalAuthor", blurb, genres, tags, sexual_content AS "sexualContent", violence,
+      dark_content AS "darkContent", status, revision, publish_token AS "publishToken"
+    FROM publications WHERE project_id = ${projectId}
   `;
   return row;
 }
 
 export async function readForgeLedger(projectId: string): Promise<ForgeChapterLedgerRow[]> {
   return novelForgeDb()<ForgeChapterLedgerRow[]>`
-    SELECT chapter, published_ordinal AS "publishedOrdinal", status, revision, content_hash AS "contentHash", error
+    SELECT chapter, published_ordinal AS "publishedOrdinal", title, author_note AS "authorNote", content_rating AS "contentRating", status, revision,
+      content_hash AS "contentHash", scheduled_at AS "scheduledAt", published_at AS "publishedAt", error, updated_at AS "updatedAt"
     FROM chapter_publications WHERE project_id = ${projectId} ORDER BY published_ordinal
   `;
 }
 
 export async function readForgeWikiLedger(projectId: string): Promise<ForgeWikiLedgerRow[]> {
   return novelForgeDb()<ForgeWikiLedgerRow[]>`
-    SELECT entry_key AS "entryKey", state, revision, content_hash AS "contentHash", error FROM wiki_publications WHERE project_id = ${projectId} ORDER BY entry_key
+    SELECT entry_key AS "entryKey", state, revision, content_hash AS "contentHash", error, updated_at AS "updatedAt"
+    FROM wiki_publications WHERE project_id = ${projectId} ORDER BY entry_key
   `;
 }
 
@@ -253,10 +290,16 @@ export async function repeatForgeWikiPush(projectId: string, entryKey: string): 
   if (updated.count !== 1) throw new ForgePublicationError(`no pushed wiki ledger row ${entryKey} to repeat for project ${projectId}`);
 }
 
-/** Rewrites a finalized chapter's canonical prose or rating; no API edits a locked chapter without a model, so the edit is arranged. */
 export async function reviseForgeChapter(projectId: string, chapter: number, revision: ForgeChapterRevision): Promise<void> {
   const sql = novelForgeDb();
-  const columns = { content: revision.content, content_rating: revision.contentRating === undefined ? undefined : sql.json(revision.contentRating) };
+  const columns = {
+    content: revision.content,
+    content_rating: revision.contentRating === undefined ? undefined : sql.json(revision.contentRating),
+    title: revision.title,
+    note: revision.note,
+    word_count: revision.wordCount,
+    locked: revision.locked,
+  };
   const updated = await sql`
     UPDATE chapters SET ${sql(Object.fromEntries(Object.entries(columns).filter(([, value]) => value !== undefined)))}, updated_at = now()
     WHERE project_id = ${projectId} AND number = ${chapter}

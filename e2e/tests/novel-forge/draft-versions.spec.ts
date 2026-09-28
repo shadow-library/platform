@@ -3,24 +3,15 @@
  */
 import { createHash } from 'node:crypto';
 
-import { type APIRequestContext, type APIResponse } from '@playwright/test';
-
 /**
  * Importing user defined packages
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
-import { type Draft, errorCode, readDraft, saveChapter, startNextChapter, writeChapterByHand } from './forge-helpers';
-import {
-  applySuggestionAsRead,
-  approveAsRead,
-  createGuardedProject,
-  expectCommittedDespiteSerializerBug,
-  finalizeChapterNoReview,
-  readStaleDraft,
-  restoreVersionAsRead,
-} from './forge-story';
+import { type Draft, importDraft, readDraft, saveChapter, startNextChapter, writeChapterByHand } from './forge-helpers';
+import { applySuggestionAsRead, approveAsRead, createGuardedProject, finalizeChapterNoReview, readStaleDraft, restoreVersionAsRead } from './forge-story';
 
 /**
  * Defining types
@@ -58,19 +49,6 @@ const ANCHOR_CONTEXT_CHARS = 32;
  * `open`, since making one for real spends a model call under the fail-pin.
  */
 
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
-
-async function importOnto(ctx: APIRequestContext, projectId: string, draft: Draft, prose: string, title: string): Promise<Draft> {
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${draft.chapter}/import`, {
-    data: { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, prose, title },
-  });
-  await expectCommittedDespiteSerializerBug(response, 200, `importing chapter ${draft.chapter}`);
-  return readDraft(ctx, projectId, draft.chapter);
-}
-
 function versionsPath(projectId: string, chapter: number, suffix = ''): string {
   return `/api/v1/projects/${projectId}/drafts/${chapter}/versions${suffix}`;
 }
@@ -106,9 +84,9 @@ test.describe('novel-forge draft versions', () => {
     const projectId = await createGuardedProject(forge, owner, 'versions');
 
     const empty = await startNextChapter(owner.ctx, projectId);
-    const v1 = await importOnto(owner.ctx, projectId, empty, 'The lamplighter watched her from the corner every dawn.', 'First cut');
+    const v1 = await importDraft(owner.ctx, projectId, empty, { body: 'The lamplighter watched her from the corner every dawn.', title: 'First cut' });
     expect(v1.revision).toBe(1);
-    const v2 = await importOnto(owner.ctx, projectId, v1, 'The lamplighter watched her from the corner every dawn, then vanished.', 'Second cut');
+    const v2 = await importDraft(owner.ctx, projectId, v1, { body: 'The lamplighter watched her from the corner every dawn, then vanished.', title: 'Second cut' });
     expect(v2.revision).toBe(2);
 
     const listed = (await (await owner.ctx.get(versionsPath(projectId, 1))).json()) as { items: DraftVersion[] };
@@ -120,13 +98,13 @@ test.describe('novel-forge draft versions', () => {
     expect(compared).toMatchObject({ from: 0, to: 2 });
     expect(compared.wordsAdded).toBeGreaterThan(0);
 
-    await expectRefused(await owner.ctx.get(versionsPath(projectId, 1, '/compare?from=0&to=99')), 404, 'VER_001', 'comparing against an unknown revision');
-    await expectRefused(await mutate(owner.ctx, 'post', versionsPath(projectId, 1, '/99/restore'), { data: {} }), 404, 'VER_001', 'restoring an unknown revision');
+    await expectCode(await owner.ctx.get(versionsPath(projectId, 1, '/compare?from=0&to=99')), 404, 'VER_001', 'comparing against an unknown revision');
+    await expectCode(await mutate(owner.ctx, 'post', versionsPath(projectId, 1, '/99/restore'), { data: {} }), 404, 'VER_001', 'restoring an unknown revision');
 
     const staleBase = await mutate(owner.ctx, 'post', versionsPath(projectId, 1, '/1/restore'), {
       data: { baseDraftId: v2.id, baseRevision: 0, baseSaveSeq: v2.saveSeq },
     });
-    await expectRefused(staleBase, 409, 'DRF_013', 'restoring against a base that has moved on');
+    await expectCode(staleBase, 409, 'DRF_013', 'restoring against a base that has moved on');
 
     const restored = await restoreVersionAsRead(owner.ctx, projectId, 1, 1, v2);
     expect(restored.body).toBe(v1.body);
@@ -147,8 +125,8 @@ test.describe('novel-forge draft versions', () => {
 
     const chapterOne = await writeChapterByHand(owner.ctx, projectId, { title: 'One', body: 'Chapter one, first telling.' });
     const olderBody = 'Chapter one, an even older telling.';
-    const v1 = await importOnto(owner.ctx, projectId, chapterOne, olderBody, 'One (older)');
-    const v2 = await importOnto(owner.ctx, projectId, v1, 'Chapter one, the current telling.', 'One (current)');
+    const v1 = await importDraft(owner.ctx, projectId, chapterOne, { body: olderBody, title: 'One (older)' });
+    const v2 = await importDraft(owner.ctx, projectId, v1, { body: 'Chapter one, the current telling.', title: 'One (current)' });
 
     const chapterTwo = await writeChapterByHand(owner.ctx, projectId, { title: 'Two', body: 'Chapter two follows on.' });
     const approvedTwo = await approveAsRead(owner.ctx, projectId, chapterTwo);
@@ -169,7 +147,7 @@ test.describe('novel-forge draft versions', () => {
     const final = await finalizeChapterNoReview(owner.ctx, finalProjectId, finalDraft);
     expect(final.status).toBe('final');
 
-    await expectRefused(await mutate(owner.ctx, 'post', versionsPath(finalProjectId, 1, '/0/restore'), { data: {} }), 400, 'VER_002', 'restoring a final chapter');
+    await expectCode(await mutate(owner.ctx, 'post', versionsPath(finalProjectId, 1, '/0/restore'), { data: {} }), 400, 'VER_002', 'restoring a final chapter');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
     expect(await listDispatchedModelCalls(finalProjectId), 'no real model call was made').toEqual([]);
   });
@@ -188,12 +166,12 @@ test.describe('novel-forge passage suggestions', () => {
     const outOfBounds = await mutate(owner.ctx, 'post', passagesPath(projectId, 1), {
       data: { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, start: 0, end: 9999, passageHash: 'a'.repeat(64), request: 'punch it up' },
     });
-    await expectRefused(outOfBounds, 400, 'PSG_002', 'a selection past the end of the chapter');
+    await expectCode(outOfBounds, 400, 'PSG_002', 'a selection past the end of the chapter');
 
     const wrongHash = await mutate(owner.ctx, 'post', passagesPath(projectId, 1), {
       data: { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, start: 6, end: 10, passageHash: 'a'.repeat(64), request: 'punch it up' },
     });
-    await expectRefused(wrongHash, 409, 'PSG_003', 'a passage hash that no longer matches the text at those offsets');
+    await expectCode(wrongHash, 409, 'PSG_003', 'a passage hash that no longer matches the text at those offsets');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
@@ -211,7 +189,7 @@ test.describe('novel-forge passage suggestions', () => {
     const refused = await mutate(owner.ctx, 'post', passagesPath(projectId, 1), {
       data: { baseDraftId: final.id, baseRevision: final.revision, baseSaveSeq: final.saveSeq, start: 0, end: 4, passageHash: '0'.repeat(64), request: 'x' },
     });
-    await expectRefused(refused, 400, 'PSG_006', 'requesting a passage rewrite on a final chapter');
+    await expectCode(refused, 400, 'PSG_006', 'requesting a passage rewrite on a final chapter');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
@@ -240,7 +218,7 @@ test.describe('novel-forge passage suggestions', () => {
     expect(listAfter.items.find(item => item.id === suggestionId)).toBeUndefined();
 
     const reappliedResponse = await mutate(owner.ctx, 'post', passagesPath(projectId, 1, `/${suggestionId}/apply`), { data: {} });
-    await expectRefused(reappliedResponse, 409, 'PSG_005', 'applying an already-applied suggestion');
+    await expectCode(reappliedResponse, 409, 'PSG_005', 'applying an already-applied suggestion');
 
     const secondDraft = await readDraft(owner.ctx, projectId, 1);
     const secondStart = secondDraft.body!.indexOf('delta');
@@ -248,9 +226,9 @@ test.describe('novel-forge passage suggestions', () => {
     await saveChapter(owner.ctx, projectId, secondDraft, { title: 'One', body: 'A completely different sentence with no trace of the old words.' });
 
     const stale = await mutate(owner.ctx, 'post', passagesPath(projectId, 1, `/${secondSuggestionId}/apply`), { data: {} });
-    await expectRefused(stale, 409, 'PSG_004', 'applying a suggestion whose passage moved or changed');
+    await expectCode(stale, 409, 'PSG_004', 'applying a suggestion whose passage moved or changed');
 
-    await expectRefused(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, '/999999999/apply'), { data: {} }), 404, 'PSG_001', 'applying an unknown suggestion');
+    await expectCode(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, '/999999999/apply'), { data: {} }), 404, 'PSG_001', 'applying an unknown suggestion');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
@@ -268,8 +246,8 @@ test.describe('novel-forge passage suggestions', () => {
     expect(dismissed.status(), await dismissed.text()).toBe(200);
     expect((await dismissed.json()) as PassageSuggestion).toMatchObject({ status: 'dismissed' });
 
-    await expectRefused(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, `/${suggestionId}/dismiss`)), 409, 'PSG_005', 'dismissing an already-closed suggestion');
-    await expectRefused(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, '/999999999/dismiss')), 404, 'PSG_001', 'dismissing an unknown suggestion');
+    await expectCode(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, `/${suggestionId}/dismiss`)), 409, 'PSG_005', 'dismissing an already-closed suggestion');
+    await expectCode(await mutate(owner.ctx, 'post', passagesPath(projectId, 1, '/999999999/dismiss')), 404, 'PSG_001', 'dismissing an unknown suggestion');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 });
@@ -280,8 +258,8 @@ test.describe('novel-forge chapter-workspace response bodies', () => {
     const owner = await forge.actor({ label: 'versions-response' });
     const projectId = await createGuardedProject(forge, owner, 'versions-response');
     const empty = await startNextChapter(owner.ctx, projectId);
-    const v1 = await importOnto(owner.ctx, projectId, empty, 'First telling.', 'One');
-    const v2 = await importOnto(owner.ctx, projectId, v1, 'Second telling.', 'One');
+    const v1 = await importDraft(owner.ctx, projectId, empty, { body: 'First telling.', title: 'One' });
+    const v2 = await importDraft(owner.ctx, projectId, v1, { body: 'Second telling.', title: 'One' });
 
     const restore = await mutate(owner.ctx, 'post', versionsPath(projectId, 1, '/1/restore'), {
       data: { baseDraftId: v2.id, baseRevision: v2.revision, baseSaveSeq: v2.saveSeq },
@@ -290,7 +268,7 @@ test.describe('novel-forge chapter-workspace response bodies', () => {
     expect(await restore.json()).toMatchObject({ body: 'First telling.', revision: 3 });
   });
 
-  // cc90e2fc — chapter-workspace.controller.ts:65-70: same shape as the restore fixme above, so apply commits but answers 500 S001.
+  // cc90e2fc — chapter-workspace.controller.ts:69-74: same shape as the restore fixme above, so apply commits but answers 500 S001.
   test.fixme('should answer applying a suggestion with the updated draft and suggestion', async ({ forge }) => {
     const owner = await forge.actor({ label: 'passage-response' });
     const projectId = await createGuardedProject(forge, owner, 'passage-response');

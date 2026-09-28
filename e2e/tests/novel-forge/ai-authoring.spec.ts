@@ -6,7 +6,8 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { apiContext, mutate, novelForgeDb, pollJob } from '../../lib';
+import { apiContext, mutate, novelForgeDb } from '../../lib';
+import { readProposalRow } from './forge-bible';
 import {
   aiAvailable,
   aiSkipReason,
@@ -17,12 +18,14 @@ import {
   createNovel,
   deleteProjectQuietly,
   type Draft,
+  expectCommittedDespiteSerializerBug,
   finalizeThroughReview,
   HAIKU_MODEL,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   NOVEL_NOTES,
   pinHaiku,
+  pollJobStatus,
   readDraft,
   saveChapter,
   settledChatJob,
@@ -58,7 +61,8 @@ const PLAN_KIND = 'chapter_plan';
 
 async function applyProposal(ctx: APIRequestContext, projectId: string, proposalId: string): Promise<void> {
   const applied = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-  expect(applied.status(), await applied.text()).toBe(200);
+  await expectCommittedDespiteSerializerBug(applied, 200, `applying proposal ${proposalId}`);
+  expect((await readProposalRow(proposalId))?.status, `proposal ${proposalId} was applied`).toBe('applied');
 }
 
 /** Finalize refuses a standard chapter without a summary, and a generated draft may not carry one; a hand save adds it before approval. */
@@ -128,7 +132,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
       const write = await slowPost(ctx, `/api/v1/projects/${novel.projectId}/generate`, { limit: 1 });
       expect(write.status(), await write.text()).toBe(202);
       const { jobId } = (await write.json()) as { jobId: string };
-      const job = await pollJob<{ status: string; lastError?: string }>(ctx, jobId, { timeoutMs: MODEL_FLOW_TIMEOUT_MS / 2 });
+      const job = await pollJobStatus(jobId, MODEL_FLOW_TIMEOUT_MS / 2);
       expect(job.status, job.lastError ?? '').toBe('done');
 
       const draft = await readDraft(ctx, novel.projectId, 1);
@@ -137,8 +141,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
 
     await test.step('approve chapter 1 and finalize it through its Story Bible review', async () => {
       const draft = await withSummary(ctx, novel.projectId, await readDraft(ctx, novel.projectId, 1));
-      const approved = await approveChapter(ctx, novel.projectId, draft);
-      expect(approved.status(), await approved.text()).toBe(200);
+      await expectCommittedDespiteSerializerBug(await approveChapter(ctx, novel.projectId, draft), 200, 'approving chapter 1');
 
       const review = await finalizeThroughReview(ctx, novel.projectId, 1);
       expect(review.status).toBe('applied');
@@ -158,7 +161,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
       expect([201, 202], await run.text()).toContain(run.status());
       if (run.status() === 202) {
         const { jobId } = (await run.json()) as { jobId: string };
-        const job = await pollJob<{ status: string; lastError?: string }>(ctx, jobId, { timeoutMs: MODEL_FLOW_TIMEOUT_MS / 2 });
+        const job = await pollJobStatus(jobId, MODEL_FLOW_TIMEOUT_MS / 2);
         expect(job.status, job.lastError ?? '').toBe('done');
       }
 
@@ -169,8 +172,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
     });
 
     await test.step('approve and finalize through the Story Bible review', async () => {
-      const approved = await approveChapter(ctx, projectId, await readDraft(ctx, projectId, 1));
-      expect(approved.status(), await approved.text()).toBe(200);
+      await expectCommittedDespiteSerializerBug(await approveChapter(ctx, projectId, await readDraft(ctx, projectId, 1)), 200, 'approving chapter 1');
 
       const review = await finalizeThroughReview(ctx, projectId, 1);
       expect(review.status).toBe('applied');

@@ -240,6 +240,11 @@ const MODEL_CAPABLE_JOB_KINDS: readonly JobKind[] = ['generate', 'finalize', 'im
 
 const LIVE_JOB_STATUSES: readonly JobStatus[] = ['pending', 'in_progress'];
 
+const TEARDOWN_LOCK_TIMEOUT = '10s';
+
+/** Postgres's SQLSTATE for a lock wait that ran past `lock_timeout`. */
+const LOCK_NOT_AVAILABLE = '55P03';
+
 export class ForgeDbError extends Error {
   override readonly name = 'ForgeDbError';
 }
@@ -320,13 +325,23 @@ export async function updateProjectOwnership(projectId: string, patch: ProjectOw
   await sql`UPDATE projects SET ${sql(Object.fromEntries(columns))} WHERE id = ${projectId}`;
 }
 
-/** Removes the projects and everything that cascades with them, plus the tool calls, which hang off a run id with no foreign key. */
+/**
+ * Removes the projects and everything that cascades with them, plus the tool calls, which hang off a run id with no foreign key. A server
+ * transaction left open on one of their rows would otherwise block the delete forever, so it gives up after `TEARDOWN_LOCK_TIMEOUT` instead.
+ */
 export async function deleteForgeProjects(projectIds: readonly string[]): Promise<void> {
   if (projectIds.length === 0) return;
-  const sql = novelForgeDb();
-  await sql`DELETE FROM tool_calls WHERE run_id IN (SELECT id::text FROM workflow_runs WHERE project_id = ANY(${projectIds}::bigint[]))`;
-  await sql`DELETE FROM authoring_claims WHERE project_id = ANY(${projectIds}::bigint[])`;
-  await sql`DELETE FROM projects WHERE id = ANY(${projectIds}::bigint[])`;
+  await novelForgeDb()
+    .begin(async tx => {
+      await tx`SELECT set_config('lock_timeout', ${TEARDOWN_LOCK_TIMEOUT}, true)`;
+      await tx`DELETE FROM tool_calls WHERE run_id IN (SELECT id::text FROM workflow_runs WHERE project_id = ANY(${projectIds}::bigint[]))`;
+      await tx`DELETE FROM authoring_claims WHERE project_id = ANY(${projectIds}::bigint[])`;
+      await tx`DELETE FROM projects WHERE id = ANY(${projectIds}::bigint[])`;
+    })
+    .catch((error: unknown) => {
+      if ((error as { code?: string }).code !== LOCK_NOT_AVAILABLE) throw error;
+      throw new ForgeDbError(`teardown of projects ${projectIds.join(', ')} waited ${TEARDOWN_LOCK_TIMEOUT} on a row lock another transaction holds`, { cause: error });
+    });
 }
 
 export async function listProjectIdsOwnedBy(owner: ForgeOwner): Promise<string[]> {

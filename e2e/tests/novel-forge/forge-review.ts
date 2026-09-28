@@ -11,7 +11,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 import { mutate, novelForgeDb } from '../../lib';
 import { expect } from './forge-actors';
 import { assertSpendGuarded, ForgeDbError } from './forge-db';
-import { type Draft, errorCode } from './forge-helpers';
+import { type Draft } from './forge-helpers';
 import { readyFinalizeReview } from './forge-story';
 
 /**
@@ -100,11 +100,6 @@ export function reviewPath(projectId: string, chapter: number, suffix = ''): str
 
 function hashBody(body: string): string {
   return createHash('sha256').update(body).digest('hex');
-}
-
-export async function expectRefusal(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
 }
 
 export async function readinessCodes(ctx: APIRequestContext, projectId: string, chapter: number): Promise<string[]> {

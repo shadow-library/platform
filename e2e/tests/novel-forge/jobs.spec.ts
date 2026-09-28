@@ -11,7 +11,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode, guardedProject, newProject } from './forge-arrange';
-import { assertSpendGuarded, holdAuthoringClaim, insertJob, insertReservedJob, type JobStatus } from './forge-db';
+import { assertSpendGuarded, holdAuthoringClaim, insertJob, insertReservedJob, type JobStatus, listDispatchedModelCalls } from './forge-db';
 import { CHAPTER_ONE, type Draft, writeChapterByHand } from './forge-helpers';
 import { ageAuthoringClaim, readAuthoringClaim, readJobRow, updateJobRow } from './forge-rows';
 
@@ -150,14 +150,19 @@ test.describe('novel-forge background jobs', () => {
     await expectCancel(owner.ctx, projectId, jobId, 'cancelled', 'cancelled', 'the owner through its own project');
   });
 
-  // job.service.ts:410 usageForJobs joins workflow_runs.id (uuid) to model_calls.run_id (varchar), so reading any job by id answers 500 (also fixme'd in org-sharing.spec.ts).
-  test.fixme('should read a job of its own project by id', async ({ forge }) => {
+  // job.service.ts:410 usageForJobs joins uuid workflow_runs.id to varchar model_calls.run_id, which Postgres refuses at plan time: both reads 500 whenever there is a job to report.
+  test.fixme("should read a job of its own project by id and in the project's job list", async ({ forge }) => {
     const owner = await forge.actor({ label: 'jobs-read' });
-    const jobId = await reindexJob(await newProject(owner, 'jobs-read'), 'e2e-read', 'pending');
+    const projectId = await newProject(owner, 'jobs-read');
+    const jobId = await reindexJob(projectId, 'e2e-read', 'pending');
 
     const read = await owner.ctx.get(`/api/v1/jobs/${jobId}`);
     expect(read.status(), await read.text()).toBe(200);
     expect(await read.json()).toMatchObject({ id: jobId, kind: 'backfill', status: 'pending' });
+
+    const listed = await owner.ctx.get(`/api/v1/projects/${projectId}/jobs`);
+    expect(listed.status(), await listed.text()).toBe(200);
+    expect(((await listed.json()) as { items: { id: string }[] }).items.map(job => job.id)).toEqual([jobId]);
   });
 });
 
@@ -217,13 +222,15 @@ test.describe("novel-forge a novel's authoring claim", () => {
 });
 
 test.describe('novel-forge chapter insert', () => {
-  // fastify-router.ts:322-327 defaults this POST to 201 (200+400, no @HttpStatus; ac5a7309), no transformer runs, bigint ids fail JSON: 500 after commit.
+  // chapter-insert.controller.ts:17 declares 200 and 400 with no @HttpStatus, so fastify-router.ts:322-327 answers 201 untransformed: 500 after commit.
   test.fixme('should answer a hand chapter insert with the brief it created', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chapter-insert' });
     const projectId = await guardedProject(forge, owner, 'chapter-insert');
 
+    await assertSpendGuarded(projectId, { requireQuota: true });
     const inserted = await insertHandChapter(owner, projectId, 0);
     expect(inserted.status(), `a hand insert into an empty plan — body ${await inserted.text()}`).toBe(200);
     expect(await inserted.json()).toMatchObject({ newChapter: 1, shiftedChapters: 0, brief: { chapter: 1, body: HAND_BRIEF } });
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 });

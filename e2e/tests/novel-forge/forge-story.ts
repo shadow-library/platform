@@ -11,13 +11,11 @@ import { type APIRequestContext, type APIResponse, expect } from '@playwright/te
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { type ForgeActor, type ForgeHarness } from './forge-actors';
 import { assertSpendGuarded, failPin } from './forge-db';
-import { approveChapter, type Draft, errorCode, readDraft, uniqueSuffix } from './forge-helpers';
+import { approveChapter, type Draft, type EntitySeed, expectCommittedDespiteSerializerBug, readDraft, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
  */
-
-export type EntityType = 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
 
 export type VolumeState = 'not_started' | 'active' | 'goal_met';
 
@@ -81,14 +79,6 @@ export interface ContextPreview {
   readonly renderedStable: string;
   readonly renderedVolatile: string;
   readonly rendered: string;
-}
-
-export interface EntitySeed {
-  entityKey: string;
-  name: string;
-  type?: EntityType;
-  significance?: 'major' | 'minor' | null;
-  body?: string | null;
 }
 
 export interface ChapterSeed {
@@ -190,13 +180,6 @@ export async function writeFact(ctx: APIRequestContext, projectId: string, factK
   expect(response.status(), `writing fact ${factKey} — body ${await response.text()}`).toBe(200);
 }
 
-export async function createEntity(ctx: APIRequestContext, projectId: string, seed: EntitySeed): Promise<void> {
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, {
-    data: { entityKey: seed.entityKey, name: seed.name, type: seed.type ?? 'character', body: seed.body ?? undefined, significance: seed.significance ?? undefined },
-  });
-  expect(response.status(), `creating entity ${seed.entityKey} — body ${await response.text()}`).toBe(201);
-}
-
 export function putBrief(ctx: APIRequestContext, projectId: string, chapter: number, body: BriefBody): Promise<APIResponse> {
   return mutate(ctx, 'put', `/api/v1/projects/${projectId}/briefs/${chapter}`, { data: body });
 }
@@ -260,15 +243,10 @@ export async function writerPrompt(ctx: APIRequestContext, projectId: string, ch
   return ((await response.json()) as { markdown: string }).markdown;
 }
 
-/**
- * Approves the revision read and confirms it from the draft. The approve route answers 500 S001 after it commits (the fixme in
- * facts.spec.ts holds the correct 200), so that one answer is tolerated; any refusal fails.
- */
+/** Approves the revision read and confirms it from the draft; the approve route answers 500 S001 after it commits (fixme'd in facts.spec.ts). */
 export async function approveAsRead(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
   await assertSpendGuarded(projectId);
-  const response = await approveChapter(ctx, projectId, draft);
-  const committedButUnserialized = response.status() === 500 && (await errorCode(response)) === 'S001';
-  if (!committedButUnserialized) expect(response.status(), `approving chapter ${draft.chapter} — body ${await response.text()}`).toBe(200);
+  await expectCommittedDespiteSerializerBug(await approveChapter(ctx, projectId, draft), 200, `approving chapter ${draft.chapter}`);
   const approved = await readDraft(ctx, projectId, draft.chapter);
   expect(approved, `the approval of chapter ${draft.chapter} committed`).toMatchObject({ reviewStatus: 'approved', approvedRevision: draft.revision });
   return approved;
@@ -294,13 +272,8 @@ export async function finalizeChapterNoReview(ctx: APIRequestContext, projectId:
  * a state the finalize pipeline would leave, it does not assert that the pipeline produces it.
  */
 export async function insertFinalDraft(projectId: string, chapter: number, body = `Chapter ${chapter}, finalized by arrangement.`): Promise<void> {
-  const sql = novelForgeDb();
-  const wordCount = body.split(/\s+/).filter(Boolean).length;
-  await sql`
-    INSERT INTO chapters (project_id, number, content, summary, word_count, status, generator, isolated, locked, continuity_applied)
-    VALUES (${projectId}, ${chapter}, ${body}, 'Finalized by arrangement.', ${wordCount}, 'done', 'human', false, true, true)
-  `;
-  await sql`
+  await insertFinalChapters(projectId, [{ number: chapter, content: body, summary: 'Finalized by arrangement.' }]);
+  await novelForgeDb()`
     INSERT INTO drafts (project_id, chapter, status, revision, save_seq, approved_revision, summary, body, generator, isolated, review_status)
     VALUES (${projectId}, ${chapter}, 'final', 1, 1, 1, 'Finalized by arrangement.', ${body}, 'human', false, 'final')
   `;
@@ -345,7 +318,7 @@ export async function insertFinalChapters(projectId: string, seeds: readonly Cha
       title: seed.title ?? null,
       content,
       summary: seed.summary ?? null,
-      word_count: content.split(/\s+/).length,
+      word_count: content.split(/\s+/).filter(Boolean).length,
       status: 'done',
       generator: 'human',
       isolated: seed.isolated ?? false,
@@ -473,42 +446,12 @@ export async function readyFinalizeReview(projectId: string, draft: Pick<Draft, 
   `;
 }
 
-/**
- * Waits for a job to reach a terminal status, read from the database rather than `GET /api/v1/jobs/:jobId` — that route (and the per-project
- * job list) joins `workflow_runs.id` (uuid) to `model_calls.run_id` (varchar) and 500s for every job (`job.service.ts:410`, parked as fixmes in
- * `org-sharing.spec.ts`), so a job's settled status is only observable this way until that join is fixed.
- */
-export async function pollJobStatus(jobId: string, timeoutMs = 30_000): Promise<{ status: string; lastError: string | null }> {
-  const terminal = new Set(['done', 'failed', 'cancelled']);
-  const last = await pollUntil(
-    async () => {
-      const [row] = await novelForgeDb()<{ status: string; lastError: string | null }[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`;
-      return row ?? { status: 'missing', lastError: null };
-    },
-    row => terminal.has(row.status),
-    { timeoutMs, intervalMs: 500 },
-  );
-  if (!terminal.has(last.status)) throw new Error(`job ${jobId} did not reach a terminal status within ${timeoutMs}ms; last status was "${last.status}"`);
-  return last;
-}
-
 /** How many `approved` `user_feedback` rows a chapter's draft has recorded — the row an approval writes exactly one of per call. */
 export async function countApprovals(projectId: string, chapter: number): Promise<number> {
   const [row] = await novelForgeDb()<{ count: number }[]>`
     SELECT count(*)::int AS count FROM user_feedback WHERE project_id = ${projectId} AND artifact_type = 'draft' AND artifact_ref = ${String(chapter)} AND disposition = 'approved'
   `;
   return row?.count ?? 0;
-}
-
-/**
- * Confirms a write that shares the fastify-router POST-defaults-to-201 bug (`packages/fastify/src/module/fastify-router.ts:322-327`):
- * a POST with two or more `@RespondFor` entries and no `@HttpStatus` defaults to 201, which has no bigint-safe response transformer, so
- * the write commits but answers 500 `S001` instead of `expectedStatus`. Callers read the row back afterward rather than trust this
- * response's body either way.
- */
-export async function expectCommittedDespiteSerializerBug(response: APIResponse, expectedStatus: number, what: string): Promise<void> {
-  if (response.status() === 500 && (await errorCode(response)) === 'S001') return;
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(expectedStatus);
 }
 
 /** Restores a version through the route that shares {@link expectCommittedDespiteSerializerBug}'s bug, then reads the draft back. */

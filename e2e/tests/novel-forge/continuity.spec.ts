@@ -8,8 +8,9 @@ import { type APIResponse } from '@playwright/test';
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { insertChapterRow } from './forge-bible';
-import { expectRefusal, readChapterRow } from './forge-review';
+import { readChapterRow } from './forge-review';
 import { countKnowledge, createGuardedProject, insertEntities } from './forge-story';
 
 /**
@@ -164,17 +165,17 @@ test.describe('novel-forge continuity proposals', () => {
     const owner = await forge.actor({ label: 'cnt-none' });
     const projectId = await createGuardedProject(forge, owner, 'cnt-none');
 
-    await expectRefusal(await owner.ctx.get(proposalPath(projectId, 1)), 404, 'CNT_001', 'reading a proposal that does not exist');
-    await expectRefusal(await mutate(owner.ctx, 'patch', proposalPath(projectId, 1), { data: { proposal: EMPTY_DELTA } }), 404, 'CNT_001', 'editing it');
-    await expectRefusal(await apply(owner, projectId, 1), 404, 'CNT_001', 'applying it');
-    await expectRefusal(await mutate(owner.ctx, 'post', proposalPath(projectId, 1, '/discard')), 404, 'CNT_001', 'discarding it');
+    await expectCode(await owner.ctx.get(proposalPath(projectId, 1)), 404, 'CNT_001', 'reading a proposal that does not exist');
+    await expectCode(await mutate(owner.ctx, 'patch', proposalPath(projectId, 1), { data: { proposal: EMPTY_DELTA } }), 404, 'CNT_001', 'editing it');
+    await expectCode(await apply(owner, projectId, 1), 404, 'CNT_001', 'applying it');
+    await expectCode(await mutate(owner.ctx, 'post', proposalPath(projectId, 1, '/discard')), 404, 'CNT_001', 'discarding it');
 
     await insertDelta(projectId, 1, { threads: [{ threadKey: 'e2e-discarded', status: 'open', summary: 'Never canon.' }] });
     expect((await expectProposal(await owner.ctx.get(proposalPath(projectId, 1)), 'reading the pending proposal')).status).toBe('pending');
     const discarded = await expectProposal(await mutate(owner.ctx, 'post', proposalPath(projectId, 1, '/discard')), 'discarding the pending proposal');
     expect(discarded.status).toBe('discarded');
-    await expectRefusal(await owner.ctx.get(proposalPath(projectId, 1)), 404, 'CNT_001', 'reading a discarded proposal');
-    await expectRefusal(await apply(owner, projectId, 1), 404, 'CNT_001', 'applying a discarded proposal');
+    await expectCode(await owner.ctx.get(proposalPath(projectId, 1)), 404, 'CNT_001', 'reading a discarded proposal');
+    await expectCode(await apply(owner, projectId, 1), 404, 'CNT_001', 'applying a discarded proposal');
     expect(await readThread(projectId, 'e2e-discarded'), 'a discarded proposal writes nothing').toBeUndefined();
   });
 
@@ -229,7 +230,7 @@ test.describe('novel-forge continuity proposals', () => {
     expect(await readMystery(projectId, 'e2e-wall')).toMatchObject({ truthFactKey: 'wall_is_alive', openedChapter: 1, lastAdvancedChapter: 1 });
     expect(await countKnowledge(projectId), 'knowledge changes stay on the proposal, never in the ledger').toBe(0);
     expect((await readChapterRow(projectId, 1))?.continuityApplied).toBe(true);
-    await expectRefusal(await apply(owner, projectId, 1), 404, 'CNT_001', 're-applying a fully applied proposal');
+    await expectCode(await apply(owner, projectId, 1), 404, 'CNT_001', 're-applying a fully applied proposal');
 
     await insertDelta(projectId, 2, {
       appeared: ['mira'],
@@ -301,7 +302,7 @@ test.describe('novel-forge continuity proposals', () => {
     expect(await readThread(projectId, 'e2e-held')).toMatchObject({ openedChapter: 2, lastAdvancedChapter: 2 });
     expect((await readRelationships(projectId)).map(row => row.kind).sort()).toEqual(['ally', 'rival']);
     expect((await readState(projectId, 'mira'))?.statusNote, 'the siblings applied earlier were not replayed over the author’s edit').toBe('The author corrected this.');
-    await expectRefusal(await apply(owner, projectId, 2), 404, 'CNT_001', 're-applying the fully applied proposal');
+    await expectCode(await apply(owner, projectId, 2), 404, 'CNT_001', 're-applying the fully applied proposal');
 
     await insertDelta(projectId, 1, {
       threads: [{ threadKey: 'e2e-sure', status: 'closed', summary: 'Closed in an earlier chapter.' }],

@@ -18,10 +18,12 @@ import {
 } from '../web-novel/forge-publication';
 import { uniqueNovelSlug } from '../web-novel/helpers';
 import { expect, type ForgeActor, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { insertChapterRow } from './forge-bible';
+import { expectImportLanded, startFinalImport } from './forge-bundles';
 import { failPin, listDispatchedModelCalls } from './forge-db';
-import { CHAPTER_ONE, expectImportLanded, readDraft, startFinalImport, writeChapterByHand } from './forge-helpers';
-import { expectRefusal, readChapterRow } from './forge-review';
+import { CHAPTER_ONE, readDraft, writeChapterByHand } from './forge-helpers';
+import { readChapterRow } from './forge-review';
 import { createGuardedProject, finalizeChapterNoReview, insertFinalChapters } from './forge-story';
 
 /**
@@ -77,9 +79,9 @@ test.describe('novel-forge chapter amend', () => {
   test('should rewrite finalized prose past the lock, keep what the Story Bible derived, and carry it into the final draft as an amended revision', async ({ forge }) => {
     const owner = await forge.actor({ label: 'amend' });
     const projectId = await createGuardedProject(forge, owner, 'amend');
-    await expectRefusal(await amend(owner, projectId, 99, { content: AMENDED }), 404, 'CHP_001', 'amending a chapter that does not exist');
+    await expectCode(await amend(owner, projectId, 99, { content: AMENDED }), 404, 'CHP_001', 'amending a chapter that does not exist');
     await insertChapterRow({ projectId, number: 9, status: 'failed', locked: false });
-    await expectRefusal(await amend(owner, projectId, 9, { content: AMENDED }), 400, 'CHP_006', 'amending a chapter that is not finalized canon');
+    await expectCode(await amend(owner, projectId, 9, { content: AMENDED }), 400, 'CHP_006', 'amending a chapter that is not finalized canon');
 
     const final = await finalizeChapterNoReview(owner.ctx, projectId, await writeChapterByHand(owner.ctx, projectId, CHAPTER_ONE));
     await novelForgeDb()`UPDATE drafts SET judge = 'consistent', judge_note = 'Read against the old prose.' WHERE project_id = ${projectId} AND chapter = 1`;
@@ -122,7 +124,7 @@ test.describe('novel-forge chapter amend', () => {
     expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  // embedding.service.ts:19-26 turns a failed embed into a null vector and chapter-amend.service.ts:150-153 then reports indexed:true, which
+  // embedding.service.ts:19-26 turns a failed embed into a null vector and chapter-amend.service.ts:151-154 then reports indexed:true, which
   // AmendChapterResponse.indexed (generation.dto.ts:370-374) promises is false when the re-embed failed; backfill also skips such a chapter.
   test.fixme('should report an amend unindexed when no chunk of it could be embedded', async ({ forge }) => {
     const owner = await forge.actor({ label: 'amend-indexed' });

@@ -73,9 +73,12 @@ test.describe('novel-forge usage and charges', () => {
     await expect(page.getByText('No model calls yet.').first()).toBeVisible();
 
     const period = page.getByRole('radiogroup', { name: 'Period' });
-    const unchecked = period.getByRole('radio', { checked: false }).first();
-    await unchecked.click();
-    await expect(unchecked).toBeChecked();
+    const radios = period.getByRole('radio');
+    const states = await Promise.all((await radios.all()).map(radio => radio.isChecked()));
+    expect(states, 'the period switch offers a period not already chosen').toContain(false);
+    const chosen = radios.nth(states.indexOf(false));
+    await chosen.click();
+    await expect(chosen).toBeChecked();
   });
 
   test('should show the account usage screen with a per-novel breakdown', async ({ page }) => {

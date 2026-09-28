@@ -8,16 +8,15 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, holdAuthoringClaim, listDispatchedModelCalls, releaseAuthoringClaim } from './forge-db';
-import { CHAPTER_ONE, type Draft, errorCode, readDraft, saveChapter, startNextChapter, uniqueSuffix, writeChapterByHand } from './forge-helpers';
+import { CHAPTER_ONE, expectCommittedDespiteSerializerBug, importDraft, pollJobStatus, saveChapter, startNextChapter, uniqueSuffix, writeChapterByHand } from './forge-helpers';
 import {
   approveAsRead,
   countApprovals,
   createGuardedProject,
-  expectCommittedDespiteSerializerBug,
   insertContinuityProposal,
   insertFinalDraft,
-  pollJobStatus,
   readFinalizeReviewStatus,
   readStaleDraft,
   writeBrief,
@@ -47,27 +46,8 @@ interface JobEnqueueResponse {
  * before any model is reached. Every project fail-pins and quota-pins every role, since approving always stages a model job.
  */
 
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
-
 function draftsPath(projectId: string, chapter: number, suffix = ''): string {
   return `/api/v1/projects/${projectId}/drafts/${chapter}${suffix}`;
-}
-
-async function importTolerant(
-  ctx: APIRequestContext,
-  projectId: string,
-  chapter: number,
-  base: Draft,
-  data: { prose: string; title?: string; summary?: string; isolated?: boolean },
-): Promise<Draft> {
-  const response = await mutate(ctx, 'post', draftsPath(projectId, chapter, '/import'), {
-    data: { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq, ...data },
-  });
-  await expectCommittedDespiteSerializerBug(response, 200, `importing chapter ${chapter}`);
-  return readDraft(ctx, projectId, chapter);
 }
 
 async function setReviewStatus(projectId: string, chapter: number, reviewStatus: string): Promise<void> {
@@ -87,13 +67,13 @@ test.describe('novel-forge hand saves, imports and the stale cascade', () => {
     const owner = await forge.actor({ label: 'draft-guards' });
     const projectId = await createGuardedProject(forge, owner, 'draft-guards');
 
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'put', draftsPath(projectId, 1), { data: { baseDraftId: '1', body: 'partial base' } }),
       400,
       'DRF_020',
       'a save with only baseDraftId set',
     );
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'put', draftsPath(projectId, 1), { data: { baseDraftId: '999999999999', baseRevision: 1, baseSaveSeq: 1, body: 'no draft yet' } }),
       404,
       'DRF_001',
@@ -106,9 +86,9 @@ test.describe('novel-forge hand saves, imports and the stale cascade', () => {
     expect(unchanged, 'a save identical to the current text is a no-op').toMatchObject({ revision: written.revision, saveSeq: written.saveSeq });
 
     await insertFinalDraft(projectId, 99);
-    await expectRefused(await mutate(owner.ctx, 'put', draftsPath(projectId, 99), { data: { body: 'past the lock' } }), 400, 'DRF_002', 'saving a final draft');
-    await expectRefused(await mutate(owner.ctx, 'delete', draftsPath(projectId, 99)), 400, 'DRF_002', 'deleting a final draft');
-    await expectRefused(await mutate(owner.ctx, 'delete', draftsPath(projectId, 50)), 404, 'DRF_001', 'deleting a chapter with no draft');
+    await expectCode(await mutate(owner.ctx, 'put', draftsPath(projectId, 99), { data: { body: 'past the lock' } }), 400, 'DRF_002', 'saving a final draft');
+    await expectCode(await mutate(owner.ctx, 'delete', draftsPath(projectId, 99)), 400, 'DRF_002', 'deleting a final draft');
+    await expectCode(await mutate(owner.ctx, 'delete', draftsPath(projectId, 50)), 404, 'DRF_001', 'deleting a chapter with no draft');
   });
 
   test('should fold consecutive unreviewed hand saves and break the fold on a review, an approval or an import', async ({ forge }) => {
@@ -128,7 +108,7 @@ test.describe('novel-forge hand saves, imports and the stale cascade', () => {
     const d = await saveChapter(owner.ctx, projectId, approved, { ...CHAPTER_ONE, body: `${approved.body}\n\nA fourth line, after approval.` });
     expect(d.revision, 'a save after approval does not fold').toBeGreaterThan(approved.revision);
 
-    const imported = await importTolerant(owner.ctx, projectId, 1, d, { prose: `${d.body}\n\nPasted prose replaces the hand-written text.`, title: 'Imported' });
+    const imported = await importDraft(owner.ctx, projectId, d, { body: `${d.body}\n\nPasted prose replaces the hand-written text.`, title: 'Imported' });
     expect(imported.revision, 'an import always bumps the revision, even where a hand edit would have folded').toBeGreaterThan(d.revision);
     expect(imported.generator).toBe('human');
     expect(imported.isolated, 'isolated is kept (false) when the import omits it').toBe(false);
@@ -216,8 +196,8 @@ test.describe('novel-forge hand saves, imports and the stale cascade', () => {
     const deleted = await mutate(owner.ctx, 'delete', draftsPath(projectId, 1));
     expect(deleted.status(), await deleted.text()).toBe(204);
 
-    await expectRefused(await owner.ctx.get(draftsPath(projectId, 1)), 404, 'DRF_001', 'reading the deleted draft');
-    await expectRefused(await mutate(owner.ctx, 'delete', draftsPath(projectId, 1)), 404, 'DRF_001', 'deleting it twice');
+    await expectCode(await owner.ctx.get(draftsPath(projectId, 1)), 404, 'DRF_001', 'reading the deleted draft');
+    await expectCode(await mutate(owner.ctx, 'delete', draftsPath(projectId, 1)), 404, 'DRF_001', 'deleting it twice');
 
     const [proposalRow] = await novelForgeDb()<{ count: number }[]>`SELECT count(*)::int AS count FROM continuity_proposals WHERE project_id = ${projectId} AND chapter = 1`;
     expect(proposalRow?.count, 'the deleted chapter’s continuity proposal went with it').toBe(0);
@@ -261,7 +241,7 @@ test.describe('novel-forge approval binding', () => {
     await approveTolerant(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: `e2e-idem-2-${uniqueSuffix()}` });
     expect(await countApprovals(projectId, 1), 'a distinct key records a distinct approval').toBe(2);
 
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', draftsPath(projectId, 1, '/approve'), { data: { revision: ch1.revision + 5, saveSeq: ch1.saveSeq, draftId: ch1.id } }),
       409,
       'DRF_013',
@@ -270,13 +250,13 @@ test.describe('novel-forge approval binding', () => {
 
     await novelForgeDb()`UPDATE drafts SET stale_reason = 'e2e forced stale' WHERE project_id = ${projectId} AND chapter = 1`;
     const stale = await readStaleDraft(owner.ctx, projectId, 1);
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', draftsPath(projectId, 1, '/approve'), { data: { revision: stale.revision, saveSeq: stale.saveSeq, draftId: stale.id } }),
       400,
       'DRF_007',
       'approving a stale draft without keepStale',
     );
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', draftsPath(projectId, 1, '/approve'), {
         data: { revision: stale.revision, saveSeq: stale.saveSeq, draftId: stale.id, keepStale: true, staleReason: 'not what is actually stored' },
       }),
@@ -321,17 +301,17 @@ test.describe('novel-forge generation gates without a model', () => {
     const projectId = await createGuardedProject(forge, owner, 'gen-guards');
 
     await assertSpendGuarded(projectId);
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'BRF_001', 'generating with no briefs at all');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'BRF_001', 'generating with no briefs at all');
 
     await writeChapterByHand(owner.ctx, projectId, CHAPTER_ONE);
     await setReviewStatus(projectId, 1, 'contradiction');
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'DRF_003', 'generating while a draft sits in contradiction');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'DRF_003', 'generating while a draft sits in contradiction');
     await setReviewStatus(projectId, 1, 'needs_review');
 
     const staleProjectId = await createGuardedProject(forge, owner, 'gen-stale-brief');
     await writeBrief(owner.ctx, staleProjectId, 1, { body: 'A plain chapter with nothing hand-approved yet.' });
     await novelForgeDb()`UPDATE briefs SET stale_reason = 'e2e stale brief' WHERE project_id = ${staleProjectId} AND chapter = 1`;
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${staleProjectId}/generate`, { data: {} }), 400, 'BRF_002', 'generating a batch whose brief is stale');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${staleProjectId}/generate`, { data: {} }), 400, 'BRF_002', 'generating a batch whose brief is stale');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
     expect(await listDispatchedModelCalls(staleProjectId), 'no real model call was made').toEqual([]);
   });
@@ -342,12 +322,7 @@ test.describe('novel-forge generation gates without a model', () => {
     await writeBrief(owner.ctx, projectId, 3, { body: 'A brief far ahead of anything written.' });
 
     await assertSpendGuarded(projectId);
-    await expectRefused(
-      await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }),
-      400,
-      'DRF_011',
-      'generating with an earlier chapter still undrafted',
-    );
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'DRF_011', 'generating with an earlier chapter still undrafted');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
@@ -362,7 +337,7 @@ test.describe('novel-forge generation gates without a model', () => {
     await writeBrief(owner.ctx, projectId, 2, { body: 'A plain follow-on chapter.' });
 
     await assertSpendGuarded(projectId);
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'DRF_016', 'generating while an earlier lesson is unsettled');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 400, 'DRF_016', 'generating while an earlier lesson is unsettled');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
@@ -397,7 +372,7 @@ test.describe('novel-forge generation gates without a model', () => {
     await insertFinalDraft(projectId, 1);
 
     await assertSpendGuarded(projectId);
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/generate-unrestricted`, { data: {} }),
       400,
       'DRF_002',
@@ -411,16 +386,16 @@ test.describe('novel-forge generation gates without a model', () => {
     const projectId = await createGuardedProject(forge, owner, 'regen-brief-lock');
 
     await assertSpendGuarded(projectId);
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 400, 'BRF_001', 'regenerating a chapter with no brief');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 400, 'BRF_001', 'regenerating a chapter with no brief');
 
     await writeBrief(owner.ctx, projectId, 1, { body: 'A plain chapter.' });
     await novelForgeDb()`UPDATE briefs SET stale_reason = 'e2e stale' WHERE project_id = ${projectId} AND chapter = 1`;
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 400, 'BRF_002', 'regenerating a chapter whose brief is stale');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 400, 'BRF_002', 'regenerating a chapter whose brief is stale');
 
     const lockedProjectId = await createGuardedProject(forge, owner, 'regen-locked');
     await writeBrief(owner.ctx, lockedProjectId, 1, { body: 'A plain chapter.' });
     await insertFinalDraft(lockedProjectId, 1);
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${lockedProjectId}/chapters/1/regenerate`), 409, 'CHP_008', 'regenerating a locked, finalized chapter');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${lockedProjectId}/chapters/1/regenerate`), 409, 'CHP_008', 'regenerating a locked, finalized chapter');
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
     expect(await listDispatchedModelCalls(lockedProjectId), 'no real model call was made').toEqual([]);
   });
@@ -436,7 +411,7 @@ test.describe('novel-forge generation gates without a model', () => {
     const queued = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} });
     expect(queued.status(), await queued.text()).toBe(202);
     const job = (await queued.json()) as JobEnqueueResponse;
-    await expectRefused(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 409, 'DRF_010', 'regenerating while another generation job runs');
+    await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`), 409, 'DRF_010', 'regenerating while another generation job runs');
     await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/jobs/${job.jobId}/cancel`);
     const settledFirst = await pollJobStatus(job.jobId);
     expect(['cancelled', 'failed', 'done'], 'the active job reached a terminal state').toContain(settledFirst.status);
@@ -452,7 +427,7 @@ test.describe('novel-forge generation gates without a model', () => {
 
     await writeChapterByHand(owner.ctx, projectId, { title: 'Two', body: 'Chapter two prose.' });
     await setReviewStatus(projectId, 2, 'contradiction');
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`),
       400,
       'DRF_003',
@@ -469,7 +444,7 @@ test.describe('novel-forge generation gates without a model', () => {
     await novelForgeDb()`UPDATE briefs SET write_mode = 'external' WHERE project_id = ${externalProjectId} AND chapter = 1`;
     await writeBrief(external.ctx, externalProjectId, 3, { body: 'The target chapter.' });
     await assertSpendGuarded(externalProjectId);
-    await expectRefused(
+    await expectCode(
       await mutate(external.ctx, 'post', `/api/v1/projects/${externalProjectId}/chapters/3/regenerate`),
       400,
       'DRF_012',
@@ -480,7 +455,7 @@ test.describe('novel-forge generation gates without a model', () => {
     const gapProjectId = await createGuardedProject(forge, gap, 'regen-gap');
     await writeBrief(gap.ctx, gapProjectId, 1, { body: 'Chapter one, unwritten.' });
     await writeBrief(gap.ctx, gapProjectId, 3, { body: 'The target chapter.' });
-    await expectRefused(
+    await expectCode(
       await mutate(gap.ctx, 'post', `/api/v1/projects/${gapProjectId}/chapters/3/regenerate`),
       400,
       'DRF_011',
@@ -496,7 +471,7 @@ test.describe('novel-forge generation gates without a model', () => {
     await writeChapterByHand(teacher.ctx, teacherProjectId, CHAPTER_ONE);
     await writeChapterByHand(teacher.ctx, teacherProjectId, { title: 'Two', body: 'Chapter two prose.' });
     await writeBrief(teacher.ctx, teacherProjectId, 3, { body: 'The target chapter.' });
-    await expectRefused(await mutate(teacher.ctx, 'post', `/api/v1/projects/${teacherProjectId}/chapters/3/regenerate`), 400, 'DRF_016', 'regenerating over an unsettled lesson');
+    await expectCode(await mutate(teacher.ctx, 'post', `/api/v1/projects/${teacherProjectId}/chapters/3/regenerate`), 400, 'DRF_016', 'regenerating over an unsettled lesson');
 
     expect(await listDispatchedModelCalls(externalProjectId), 'no real model call was made').toEqual([]);
     expect(await listDispatchedModelCalls(gapProjectId), 'no real model call was made').toEqual([]);
@@ -512,7 +487,7 @@ test.describe('novel-forge generation gates without a model', () => {
 
     await assertSpendGuarded(projectId);
     await holdAuthoringClaim(projectId, { kind: 'generate' });
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chapters/1/regenerate`),
       409,
       'JOB_002',
@@ -582,7 +557,7 @@ test.describe('novel-forge chapter and entity images', () => {
     const afterDelete = (await (await owner.ctx.get(`/api/v1/projects/${projectId}/chapters/1/images`)).json()) as { items: ChapterImageItem[] };
     expect(afterDelete.items.map(item => item.id)).toEqual([secondBody.id]);
 
-    await expectRefused(await mutate(owner.ctx, 'delete', `/api/v1/projects/${projectId}/chapters/1/images/999999999`), 404, 'DRF_006', 'deleting an unknown chapter image');
+    await expectCode(await mutate(owner.ctx, 'delete', `/api/v1/projects/${projectId}/chapters/1/images/999999999`), 404, 'DRF_006', 'deleting an unknown chapter image');
   });
 
   test('should carry an entity portrait and gallery, refuse an unknown gallery image, and 404 a missing entity', async ({ forge }) => {
@@ -628,14 +603,14 @@ test.describe('novel-forge chapter and entity images', () => {
       'delete by id',
     ).toEqual(['second']);
 
-    await expectRefused(await mutate(owner.ctx, 'delete', `/api/v1/projects/${projectId}/entities/mira/images/999999999`), 404, 'ENT_002', 'deleting an unknown gallery image');
-    await expectRefused(
+    await expectCode(await mutate(owner.ctx, 'delete', `/api/v1/projects/${projectId}/entities/mira/images/999999999`), 404, 'ENT_002', 'deleting an unknown gallery image');
+    await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/entities/no_such_entity/image`, { data: { mime: 'image/png', image: TINY_PNG } }),
       404,
       'ENT_001',
       'uploading a portrait to a missing entity',
     );
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/entities/no_such_entity/images`, { data: { mime: 'image/png', image: TINY_PNG } }),
       404,
       'ENT_001',

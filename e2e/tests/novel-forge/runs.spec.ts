@@ -10,8 +10,9 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { insertContextPack, insertModelCalls, insertToolCall, insertWorkflowRun, readWorkflowRun } from './forge-db';
-import { errorCode, uniqueSuffix } from './forge-helpers';
+import { uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -87,11 +88,6 @@ async function seedRuns(owner: ForgeActor): Promise<SeededProject> {
   const orphan = await insertWorkflowRun({ projectId, graph: 'chapter-generation', target: 'chapter:2', status: 'running', startedAgoMs: 5_000 });
   const background = await insertWorkflowRun({ projectId, graph: 'chat-title', status: 'running', startedAgoMs: 1_000 });
   return { projectId, packed, callIds, bare, orphan, background };
-}
-
-async function expectCode(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
 }
 
 async function expectMissing(response: APIResponse, what: string): Promise<void> {

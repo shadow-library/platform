@@ -36,7 +36,8 @@ import {
   updateServedChapter,
   updateServedNovel,
 } from '../web-novel/helpers';
-import { type BibleEntity, createEntity, expectImportLanded, jsonOrUndefined, pollWebNovel, reconcileUntilConverged, startFinalImport, uniqueSuffix } from './forge-helpers';
+import { expectImportLanded, startFinalImport } from './forge-bundles';
+import { createEntity, type EntitySeed, jsonOrUndefined, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -66,7 +67,7 @@ interface NovelDetail {
 
 const RATED = { violence: 'mild' };
 
-const KEEPER: BibleEntity = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
+const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
 
 function readerUrl(slug: string): string {
   return `/api/novels/${slug}`;

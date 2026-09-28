@@ -8,9 +8,10 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { csrfHeaders, mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
-import { errorCode } from './forge-helpers';
-import { createEntity, createGuardedProject, insertMystery, insertThread, insertVolumes, putBrief, writeBrief, writeFact } from './forge-story';
+import { createEntity } from './forge-helpers';
+import { createGuardedProject, insertMystery, insertThread, insertVolumes, putBrief, writeBrief, writeFact } from './forge-story';
 
 /**
  * Defining types
@@ -45,11 +46,6 @@ interface Volume {
  * route, so they are arranged in the database.
  */
 
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
-
 function milestonePath(projectId: string, suffix = ''): string {
   return `/api/v1/projects/${projectId}/milestones${suffix}`;
 }
@@ -82,44 +78,44 @@ test.describe('novel-forge milestones', () => {
     expect(created.status(), await created.text()).toBe(201);
     expect(await created.json()).toMatchObject({ milestoneKey: 'oath_sworn', label: 'Mira swears the oath', subjectEntityKey: 'mira', kind: 'custom', state: 'open' });
 
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', milestonePath(projectId), { data: { milestoneKey: 'ghost_rank', label: 'A ghost rises', subjectEntityKey: 'ghost' } }),
       400,
       'MIL_004',
       'a subject that is not an entity of this novel',
     );
-    await expectRefused(await mutate(owner.ctx, 'post', milestonePath(projectId), { data: { milestoneKey: 'oath_sworn', label: 'Again' } }), 409, 'MIL_002', 'a duplicate key');
-    await expectRefused(
+    await expectCode(await mutate(owner.ctx, 'post', milestonePath(projectId), { data: { milestoneKey: 'oath_sworn', label: 'Again' } }), 409, 'MIL_002', 'a duplicate key');
+    await expectCode(
       await mutate(owner.ctx, 'patch', milestonePath(projectId, '/no_such_milestone'), { data: { subjectEntityKey: 'ghost' } }),
       400,
       'MIL_004',
       'an unknown subject is refused before the unknown milestone',
     );
-    await expectRefused(await mutate(owner.ctx, 'patch', milestonePath(projectId, '/no_such_milestone'), { data: { label: 'Nothing' } }), 404, 'MIL_001', 'an unknown milestone');
+    await expectCode(await mutate(owner.ctx, 'patch', milestonePath(projectId, '/no_such_milestone'), { data: { label: 'Nothing' } }), 404, 'MIL_001', 'an unknown milestone');
     const patched = await mutate(owner.ctx, 'patch', milestonePath(projectId, '/oath_sworn'), { data: { label: 'Mira swears on the river', kind: 'event' } });
     expect(patched.status(), await patched.text()).toBe(200);
     expect(await patched.json()).toMatchObject({ label: 'Mira swears on the river', kind: 'event', subjectEntityKey: 'mira', state: 'open' });
 
     await writeFact(owner.ctx, projectId, 'oracle_truth', { text: 'The oracle is the regent in disguise.', unlock: { all: [{ milestone: 'oath_sworn' }] } });
-    await expectRefused(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 409, 'MIL_003', 'removing a milestone an unlock names');
+    await expectCode(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 409, 'MIL_003', 'removing a milestone an unlock names');
     await writeFact(owner.ctx, projectId, 'oracle_truth', { text: 'The oracle is the regent in disguise.', unlock: null, revealChapter: 5 });
 
     await writeBrief(owner.ctx, projectId, 2, { body: 'Mira swears.', claimedMilestones: ['oath_sworn'] });
     expect(await readMilestone(owner.ctx, projectId, 'oath_sworn'), 'a claiming plan makes it planned').toMatchObject({ state: 'planned', plannedChapter: 2 });
-    await expectRefused(
+    await expectCode(
       await putBrief(owner.ctx, projectId, 3, { body: 'Mira swears again.', claimedMilestones: ['oath_sworn'] }),
       400,
       'PLN_003',
       'a second plan claiming the same milestone',
     );
-    await expectRefused(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 409, 'MIL_003', 'removing a milestone a plan claims');
+    await expectCode(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 409, 'MIL_003', 'removing a milestone a plan claims');
 
     await writeBrief(owner.ctx, projectId, 2, { body: 'Mira hesitates.', claimedMilestones: null });
     expect(await readMilestone(owner.ctx, projectId, 'oath_sworn'), 'dropping the claim opens it again').toMatchObject({ state: 'open', plannedChapter: null });
     const deleted = await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn'));
     expect(deleted.status(), await deleted.text()).toBe(204);
     expect(await readMilestones(owner.ctx, projectId)).toEqual([]);
-    await expectRefused(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 404, 'MIL_001', 'deleting it twice');
+    await expectCode(await mutate(owner.ctx, 'delete', milestonePath(projectId, '/oath_sworn')), 404, 'MIL_001', 'deleting it twice');
   });
 });
 
@@ -206,9 +202,9 @@ test.describe('novel-forge volumes', () => {
     const one = await owner.ctx.get(`/api/v1/projects/${projectId}/volumes/v2`);
     expect(one.status(), await one.text()).toBe(200);
     expect(await one.json()).toMatchObject({ volumeKey: 'v2', title: 'The Capital', objective: 'Mira wins the council vote.', state: 'not_started' });
-    await expectRefused(await owner.ctx.get(`/api/v1/projects/${projectId}/volumes/nope`), 404, 'VOL_001', 'reading an unknown volume');
-    await expectRefused(await goalMet('nope'), 404, 'VOL_001', 'meeting an unknown volume’s goal');
-    await expectRefused(await goalMet('v2'), 409, 'VOL_003', 'meeting the goal of a volume that is not active');
+    await expectCode(await owner.ctx.get(`/api/v1/projects/${projectId}/volumes/nope`), 404, 'VOL_001', 'reading an unknown volume');
+    await expectCode(await goalMet('nope'), 404, 'VOL_001', 'meeting an unknown volume’s goal');
+    await expectCode(await goalMet('v2'), 409, 'VOL_003', 'meeting the goal of a volume that is not active');
     expect(await readVolumes(owner.ctx, projectId), 'a refused click changes nothing').toEqual({ v1: 'active', v2: 'not_started', v3: 'not_started' });
 
     const headers = await csrfHeaders(owner.ctx);

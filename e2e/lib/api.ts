@@ -40,22 +40,14 @@ export interface PollWindow {
   intervalMs?: number;
 }
 
-export interface PollOptions extends PollWindow {
-  /** Statuses (case-insensitive) that end the poll. Defaults cover both the job and run vocabularies. */
-  terminalStatuses?: string[];
-}
-
 /**
  * Declaring the constants
  *
  * Helpers for driving the platform's JSON APIs directly from a spec, without a browser page. `apiContext` hands
  * back a Playwright `APIRequestContext` already pointed at a product and (optionally) carrying a persona's saved
  * session; `mutate` performs the double-submit CSRF dance every mutating request needs once a session cookie is
- * present; the pollers wait out novel-forge's job/run-based async work.
+ * present; `pollUntil` waits out async work.
  */
-
-/** The default terminal statuses a poll stops on — the union of the job vocabulary (`done`/`failed`) and the run one. */
-const DEFAULT_TERMINAL_STATUSES = ['done', 'failed', 'succeeded', 'completed', 'error', 'cancelled', 'canceled'];
 
 /**
  * An `APIRequestContext` for `product`, optionally authenticated as `persona`. The self-signed local CA is
@@ -115,24 +107,4 @@ export async function pollUntil<T>(probe: () => Promise<T>, done: (value: T) => 
     if (done(value) || Date.now() >= deadline) return value;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
-}
-
-/** Polls `poll` until its returned status is terminal, returning the final parsed body and throwing on a timeout. */
-async function pollStatus<T>(poll: () => Promise<{ status: string; body: T }>, options: PollOptions): Promise<T> {
-  const timeoutMs = options.timeoutMs ?? 300_000;
-  const terminal = (options.terminalStatuses ?? DEFAULT_TERMINAL_STATUSES).map(s => s.toLowerCase());
-  const isTerminal = (status: string): boolean => terminal.includes(status.toLowerCase());
-
-  const last = await pollUntil(poll, ({ status }) => isTerminal(status), { timeoutMs, intervalMs: options.intervalMs });
-  if (!isTerminal(last.status)) throw new Error(`Poll timed out after ${timeoutMs}ms; last status was "${last.status}"`);
-  return last.body;
-}
-
-/** Polls `GET /api/v1/jobs/:jobId` until the job reaches a terminal status, returning its final body. */
-export async function pollJob<T = Record<string, unknown>>(ctx: APIRequestContext, jobId: string, options: PollOptions = {}): Promise<T> {
-  return pollStatus<T>(async () => {
-    const response = await ctx.get(`/api/v1/jobs/${jobId}`);
-    const body = (await response.json()) as T & { status: string };
-    return { status: body.status, body };
-  }, options);
 }

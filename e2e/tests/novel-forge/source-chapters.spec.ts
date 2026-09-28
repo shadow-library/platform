@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { type APIResponse } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
-import { errorCode, writeChapterByHand } from './forge-helpers';
+import { expectCode } from './forge-arrange';
+import { writeChapterByHand } from './forge-helpers';
 import { createGuardedProject, insertThread, writeBrief } from './forge-story';
 
 /**
@@ -41,11 +41,6 @@ interface ChapterRow {
  * routes see them: sanitized on write, immutable once locked, and listable by status, volume and point of view. Rows an import produces
  * are seeded straight into the database, since there is no hand-authoring route for them at this stage.
  */
-
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
 
 function sourcePath(projectId: string, suffix = ''): string {
   return `/api/v1/projects/${projectId}/source/chapters${suffix}`;
@@ -95,8 +90,8 @@ test.describe('novel-forge source chapters', () => {
     const projectId = await createGuardedProject(forge, owner, 'source-locked');
     await insertSourceChapter(projectId, { number: 1, locked: true, content: 'The original locked prose.' });
 
-    await expectRefused(await mutate(owner.ctx, 'patch', sourcePath(projectId, '/1'), { data: { content: 'An attempted rewrite.' } }), 409, 'CHP_008', 'patching a locked chapter');
-    await expectRefused(await mutate(owner.ctx, 'delete', sourcePath(projectId, '/1')), 409, 'CHP_008', 'deleting a locked chapter');
+    await expectCode(await mutate(owner.ctx, 'patch', sourcePath(projectId, '/1'), { data: { content: 'An attempted rewrite.' } }), 409, 'CHP_008', 'patching a locked chapter');
+    await expectCode(await mutate(owner.ctx, 'delete', sourcePath(projectId, '/1')), 409, 'CHP_008', 'deleting a locked chapter');
 
     const untouched = await owner.ctx.get(sourcePath(projectId, '/1'));
     expect(((await untouched.json()) as SourceChapter).content).toBe('The original locked prose.');
@@ -106,9 +101,9 @@ test.describe('novel-forge source chapters', () => {
     const owner = await forge.actor({ label: 'source-missing' });
     const projectId = await createGuardedProject(forge, owner, 'source-missing');
 
-    await expectRefused(await owner.ctx.get(sourcePath(projectId, '/9')), 404, 'CHP_001', 'reading a missing chapter');
-    await expectRefused(await mutate(owner.ctx, 'patch', sourcePath(projectId, '/9'), { data: { content: 'text' } }), 404, 'CHP_001', 'patching a missing chapter');
-    await expectRefused(await mutate(owner.ctx, 'delete', sourcePath(projectId, '/9')), 404, 'CHP_001', 'deleting a missing chapter');
+    await expectCode(await owner.ctx.get(sourcePath(projectId, '/9')), 404, 'CHP_001', 'reading a missing chapter');
+    await expectCode(await mutate(owner.ctx, 'patch', sourcePath(projectId, '/9'), { data: { content: 'text' } }), 404, 'CHP_001', 'patching a missing chapter');
+    await expectCode(await mutate(owner.ctx, 'delete', sourcePath(projectId, '/9')), 404, 'CHP_001', 'deleting a missing chapter');
   });
 
   test('should filter the chapter list by status, volume and point of view, and jump to a chapter with goto', async ({ forge }) => {
@@ -140,7 +135,7 @@ test.describe('novel-forge source chapters', () => {
     expect(byOtherPov.items).toEqual([]);
 
     const gone = await owner.ctx.get(sourcePath(projectId, '?goto=99'));
-    await expectRefused(gone, 404, 'CHP_001', 'jumping to a chapter that does not exist');
+    await expectCode(gone, 404, 'CHP_001', 'jumping to a chapter that does not exist');
     const found = await owner.ctx.get(sourcePath(projectId, '?goto=2&limit=1'));
     expect(found.status(), await found.text()).toBe(200);
     expect(((await found.json()) as SourceChapterPage).items.map(item => item.number)).toContain(2);

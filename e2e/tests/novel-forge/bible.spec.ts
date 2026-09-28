@@ -9,17 +9,9 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newProject } from './forge-arrange';
-import {
-  computeBibleDocHash,
-  expectCommittedDespiteSerializerBug,
-  ForgeArrangeError,
-  insertChapterRow,
-  insertRawBibleDoc,
-  readBibleDocRow,
-  readChapterFlags,
-  readProposalRow,
-} from './forge-bible';
+import { computeBibleDocHash, ForgeArrangeError, insertChapterRow, insertRawBibleDoc, readBibleDocRow, readChapterFlags, readProposalRow } from './forge-bible';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
+import { expectCommittedDespiteSerializerBug } from './forge-helpers';
 
 /**
  * Defining types

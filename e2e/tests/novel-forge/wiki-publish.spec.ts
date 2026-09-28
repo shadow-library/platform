@@ -19,7 +19,8 @@ import {
   setForgeWikiVisibility,
 } from '../web-novel/forge-publication';
 import { auditWatermark, publishAuditSince, readServedWikiEntry, setServedWikiRevision } from '../web-novel/helpers';
-import { type BibleEntity, createEntity, expectImportLanded, pollWebNovel, reconcileUntilConverged, startFinalImport, uniqueSuffix } from './forge-helpers';
+import { expectImportLanded, startFinalImport } from './forge-bundles';
+import { createEntity, type EntitySeed, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -71,8 +72,8 @@ interface WikiEntry {
 const RED_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4oaEBAALUARkFUI+kAAAAAElFTkSuQmCC';
 const BLUE_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQ0DgBAAGUARn8OyyYAAAAAElFTkSuQmCC';
 
-const KEEPER: BibleEntity = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
-const RIVAL: BibleEntity = { entityKey: 'e2e-rival', type: 'character', name: 'Odo the Assessor', body: 'A guild assessor who wants the coast light dark.' };
+const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
+const RIVAL: EntitySeed = { entityKey: 'e2e-rival', type: 'character', name: 'Odo the Assessor', body: 'A guild assessor who wants the coast light dark.' };
 
 async function revealFact(publication: ForgePublication, factKey: string, text: string): Promise<void> {
   const { ctx, projectId } = publication;

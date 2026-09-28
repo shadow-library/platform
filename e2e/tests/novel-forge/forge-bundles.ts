@@ -10,11 +10,11 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  * Importing user defined packages
  */
 import { csrfHeaders, mutate, novelForgeDb, runAll, webNovelDb } from '../../lib';
-import { FORGE_CLIENT_ID, settlePublishJob } from '../web-novel/forge-publication';
+import { removeServedNovelsOf, settlePublishJob } from '../web-novel/forge-publication';
 import { arrangeNovel, deleteNovels, uniqueNovelSlug } from '../web-novel/helpers';
 import { expect, type ForgeActor, test as forgeTest } from './forge-actors';
 import { AI_ROLES, deleteForgeProjects, failPin, insertProject, listDispatchedModelCalls, listProjectIdsOwnedBy } from './forge-db';
-import { settleForgeJob, uniqueSuffix } from './forge-helpers';
+import { pollJobStatus, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -87,79 +87,6 @@ export interface IllustrationRow {
   promptKey: string;
 }
 
-export interface PublicationRow {
-  novelSlug: string;
-  title: string;
-  originalAuthor: string | null;
-  blurb: string | null;
-  genres: string[] | null;
-  tags: string[] | null;
-  sexualContent: string | null;
-  violence: string | null;
-  darkContent: string | null;
-  status: string;
-  revision: number;
-}
-
-export interface LedgerRow {
-  chapter: number;
-  publishedOrdinal: number;
-  title: string;
-  authorNote: string | null;
-  contentRating: Record<string, string> | null;
-  contentHash: string;
-  revision: number;
-  status: 'scheduled' | 'published' | 'failed' | 'unpublished';
-  scheduledAt: Date | null;
-  publishedAt: Date | null;
-  error: string | null;
-  updatedAt: Date;
-}
-
-export interface WikiLedgerRow {
-  entryKey: string;
-  state: 'pending' | 'pushed' | 'failed' | 'deleted';
-  revision: number;
-  contentHash: string;
-  updatedAt: Date;
-}
-
-export interface ServedCatalogRow {
-  slug: string;
-  sourceClientId: string;
-  sourceRef: string;
-  genres: string[];
-  tags: string[];
-  sexualContent: string | null;
-  violence: string | null;
-  darkContent: string | null;
-  revision: number;
-}
-
-export interface ServedChapterRow {
-  ordinal: number;
-  title: string;
-  content: string;
-  authorNote: string | null;
-  contentHash: string;
-  revision: number;
-  wordCount: number | null;
-  contentRating: Record<string, string> | null;
-}
-
-export interface ServedWikiRow {
-  entryKey: string;
-  revision: number;
-  contentHash: string;
-  firstVisibleOrdinal: number;
-  facets: { facetKey: string; content: string; visibleFromOrdinal: number }[];
-}
-
-export interface PublishJobRow {
-  status: string;
-  updatedAt: Date;
-}
-
 export interface PublishingLane {
   /** Quota-pins the project's owner and fail-pins every text role; the image role stays unpinned, since a pinned image model fails reference validation. */
   guard(projectId: string): Promise<void>;
@@ -199,6 +126,35 @@ const ZIP_END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 const ZIP_CENTRAL_FILE_HEADER = 0x02014b50;
 
 const DEFAULT_SYNOPSIS = 'A retired lighthouse keeper discovers the tide itself is listening, and it wants the flame she has guarded for eleven winters.';
+
+/** An import writes rows only, but queues behind whatever else the executor is running. */
+const IMPORT_SETTLE_MS = 60_000;
+
+const FINAL_CHAPTERS: readonly { title: string; content: string }[] = [
+  {
+    title: 'The Last Watch',
+    content:
+      'Mira climbed the spiral stair for what she told herself was the last time, though she had said that every winter for eleven years. The lamp room smelled of brass polish and salt. Below, the sea moved the way it always moved at dusk, patient and unhurried, listening. She set the wick, struck the flame, and watched the beam swing out across water the colour of old iron. Somewhere past the third reef a bell buoy answered, faint and out of time.',
+  },
+  {
+    title: 'A Voice in the Foam',
+    content:
+      'The voice came again with the seventh wave, the way it always did. Mira had stopped telling herself it was the wind three years ago. "I know you are there," she said to the dark water, and for the first time in all those winters, something answered — not in words she could keep, but in the long slow pull of the tide against the rocks, a rhythm that spelled her grandmother\'s name.',
+  },
+  {
+    title: 'What the Tide Keeps',
+    content:
+      "It wanted the lamp. Not the light it cast, but the fire itself, the one her grandmother had carried up these same stairs eighty years before. Mira understood, then, why the keeper's post had never once gone empty in three hundred years, and why it never would, until someone finally stood at the rail and said no. She wrapped both hands around the warm brass and, for the first time, considered what the sea would do if she did.",
+  },
+];
+
+/** A publish-ready novel: one volume of three hand-written chapters, titled and tagged, landed final — three, so a publish can skip one (PUB_003). */
+export const FINAL_BUNDLE = {
+  genre: 'fantasy',
+  tags: ['fantasy', 'slow-burn'],
+  chapterTitle: (chapter: number): string => FINAL_CHAPTERS[chapter - 1]?.title ?? `Chapter ${chapter}`,
+  chapterText: (chapter: number): string => FINAL_CHAPTERS[chapter - 1]?.content ?? chapterProse(chapter),
+} satisfies Omit<BundleOptions, 'title'>;
 
 export class ForgeBundleError extends Error {
   override readonly name = 'ForgeBundleError';
@@ -272,6 +228,18 @@ export function buildBundle(options: BundleOptions): ImportBundle {
 /** `POST /api/v1/import` with any body, valid or not; `timeoutMs` covers a bundle of many megabytes. */
 export async function postImport(ctx: APIRequestContext, body: unknown, timeoutMs = 30_000): Promise<APIResponse> {
   return ctx.post('/api/v1/import', { headers: await csrfHeaders(ctx), data: body, timeout: timeoutMs });
+}
+
+/** Starts importing {@link FINAL_BUNDLE} as a new project; the import job writes rows only and calls no model. */
+export async function startFinalImport(ctx: APIRequestContext, title: string): Promise<ImportAccepted> {
+  const response = await postImport(ctx, { bundle: buildBundle({ ...FINAL_BUNDLE, title }) });
+  expect(response.status(), await response.text()).toBe(202);
+  return (await response.json()) as ImportAccepted;
+}
+
+export async function expectImportLanded(jobId: string): Promise<void> {
+  const job = await pollJobStatus(jobId, IMPORT_SETTLE_MS);
+  expect(job.status, `import job failed: ${job.lastError ?? ''}`).toBe('done');
 }
 
 /**
@@ -358,15 +326,6 @@ export async function setIllustrationStatus(illustrationId: string, status: 'act
   if (updated.count !== 1) throw new ForgeBundleError(`no illustration ${illustrationId}`);
 }
 
-export async function readPublicationRow(projectId: string): Promise<PublicationRow | undefined> {
-  const [row] = await novelForgeDb()<PublicationRow[]>`
-    SELECT novel_slug AS "novelSlug", title, original_author AS "originalAuthor", blurb, genres, tags, sexual_content AS "sexualContent", violence,
-      dark_content AS "darkContent", status, revision
-    FROM publications WHERE project_id = ${projectId}
-  `;
-  return row;
-}
-
 /** A bare publication row holding `slug`, on a bare project of `owner` — how a rung of the slug ladder is occupied without a reader push. */
 export async function holdForgeSlug(owner: ForgeActor, slug: string): Promise<void> {
   const projectId = await insertProject({ owner: owner.owner, name: `e2e-forge-slug-holder-${uniqueSuffix()}` });
@@ -387,65 +346,6 @@ export async function setPublicationAuthor(projectId: string, originalAuthor: st
   if (updated.count !== 1) throw new ForgeBundleError(`no publication for project ${projectId}`);
 }
 
-export async function readLedgerRows(projectId: string): Promise<LedgerRow[]> {
-  return novelForgeDb()<LedgerRow[]>`
-    SELECT chapter, published_ordinal AS "publishedOrdinal", title, author_note AS "authorNote", content_rating AS "contentRating", content_hash AS "contentHash",
-      revision, status, scheduled_at AS "scheduledAt", published_at AS "publishedAt", error, updated_at AS "updatedAt"
-    FROM chapter_publications WHERE project_id = ${projectId} ORDER BY published_ordinal
-  `;
-}
-
-export async function readWikiLedgerRows(projectId: string): Promise<WikiLedgerRow[]> {
-  return novelForgeDb()<WikiLedgerRow[]>`
-    SELECT entry_key AS "entryKey", state, revision, content_hash AS "contentHash", updated_at AS "updatedAt"
-    FROM wiki_publications WHERE project_id = ${projectId} ORDER BY entry_key
-  `;
-}
-
-/** Edits canonical chapter columns no route touches on a locked chapter. */
-export async function updateChapterColumns(
-  projectId: string,
-  chapter: number,
-  columns: { title?: string | null; note?: string | null; wordCount?: number; locked?: boolean },
-): Promise<void> {
-  const sql = novelForgeDb();
-  const set = Object.fromEntries(
-    Object.entries({ title: columns.title, note: columns.note, word_count: columns.wordCount, locked: columns.locked }).filter(([, value]) => value !== undefined),
-  );
-  const updated = await sql`UPDATE chapters SET ${sql(set)}, updated_at = now() WHERE project_id = ${projectId} AND number = ${chapter}`;
-  if (updated.count !== 1) throw new ForgeBundleError(`no chapter ${chapter} for project ${projectId}`);
-}
-
-export async function readPublishJob(projectId: string): Promise<PublishJobRow | undefined> {
-  const [row] = await novelForgeDb()<PublishJobRow[]>`SELECT status, updated_at AS "updatedAt" FROM jobs WHERE project_id = ${projectId} AND kind = 'publish'`;
-  return row;
-}
-
-export async function readServedCatalog(slug: string): Promise<ServedCatalogRow | undefined> {
-  const [row] = await webNovelDb()<ServedCatalogRow[]>`
-    SELECT slug, source_client_id AS "sourceClientId", source_ref AS "sourceRef", genres, tags, sexual_content AS "sexualContent", violence, dark_content AS "darkContent", revision
-    FROM novels WHERE slug = ${slug}
-  `;
-  return row;
-}
-
-export async function readServedChapterRows(slug: string): Promise<ServedChapterRow[]> {
-  return webNovelDb()<ServedChapterRow[]>`
-    SELECT c.ordinal, c.title, c.content, c.author_note AS "authorNote", c.content_hash AS "contentHash", c.revision, c.word_count AS "wordCount",
-      c.content_rating AS "contentRating"
-    FROM published_chapters c JOIN novels n ON n.id = c.novel_id WHERE n.slug = ${slug} ORDER BY c.ordinal
-  `;
-}
-
-export async function readServedWikiRows(slug: string): Promise<ServedWikiRow[]> {
-  return webNovelDb()<ServedWikiRow[]>`
-    SELECT e.entry_key AS "entryKey", e.revision, e.content_hash AS "contentHash", e.first_visible_ordinal AS "firstVisibleOrdinal",
-      coalesce((SELECT json_agg(json_build_object('facetKey', f.facet_key, 'content', f.content, 'visibleFromOrdinal', f.visible_from_ordinal) ORDER BY f.sort_order)
-        FROM wiki_entry_facets f WHERE f.entry_id = e.id), '[]') AS facets
-    FROM wiki_entries e JOIN novels n ON n.id = e.novel_id WHERE n.slug = ${slug} ORDER BY e.entry_key
-  `;
-}
-
 /** Wipes the reader's copy of a novel — chapters, wiki and grants cascade with it — as a reader restored from empty would stand. */
 export async function wipeServedNovel(slug: string): Promise<void> {
   const deleted = await webNovelDb()`DELETE FROM novels WHERE slug = ${slug}`;
@@ -460,11 +360,6 @@ export async function reassignServedPublisher(slug: string, sourceClientId: stri
 
 export function ladderSlugs(base: string): string[] {
   return [base, ...Array.from({ length: SLUG_LADDER - 1 }, (_, index) => `${base}-${index + 2}`)];
-}
-
-async function removeServedNovelsOf(projectId: string): Promise<void> {
-  const removed = await webNovelDb()<{ slug: string }[]>`DELETE FROM novels WHERE source_client_id = ${FORGE_CLIENT_ID} AND source_ref = ${projectId} RETURNING slug`;
-  await deleteNovels(removed.map(row => row.slug));
 }
 
 /** Every text role; the image role stays on its tier default so reference validation can read the image model's capacity. */
@@ -501,8 +396,7 @@ export const test = forgeTest.extend<{ lane: PublishingLane }>({
         expect(response.status(), await response.text()).toBe(202);
         const accepted = (await response.json()) as ImportAccepted;
         projects.push(accepted.projectId);
-        const job = await settleForgeJob(accepted.jobId);
-        expect(job.status, `import job failed: ${job.lastError ?? ''}`).toBe('done');
+        await expectImportLanded(accepted.jobId);
         await guard(accepted.projectId);
         return accepted;
       },

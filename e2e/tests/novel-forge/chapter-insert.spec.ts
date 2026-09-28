@@ -8,10 +8,10 @@ import { type APIResponse } from '@playwright/test';
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { holdAuthoringClaim, insertContextPack, insertModelCalls, releaseAuthoringClaim } from './forge-db';
-import { CHAPTER_TWO, writeChapterByHand } from './forge-helpers';
-import { expectRefusal } from './forge-review';
-import { createGuardedProject, expectCommittedDespiteSerializerBug, insertEntities, insertFinalDraft, insertVolumes, insertWorldFacts, readStaleDraft } from './forge-story';
+import { CHAPTER_TWO, expectCommittedDespiteSerializerBug, writeChapterByHand } from './forge-helpers';
+import { createGuardedProject, insertEntities, insertFinalDraft, insertVolumes, insertWorldFacts, readStaleDraft } from './forge-story';
 
 /**
  * Defining types
@@ -192,14 +192,14 @@ test.describe('novel-forge chapter insert by hand', () => {
     const briefs = await readBriefs(projectId);
     const shifted = await readShiftedValues(projectId);
 
-    await expectRefusal(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand' }), 422, 'S003', 'a hand insert without a brief');
-    await expectRefusal(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand', briefBody: '   ' }), 422, 'S003', 'a hand insert with a blank brief');
-    await expectRefusal(await insertChapter(owner, projectId, 2, { briefOrigin: 'planner' }), 422, 'S003', 'a planner insert without an intent');
-    await expectRefusal(await insertChapter(owner, projectId, 0, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 400, 'CHP_003', 'inserting behind the finalized chapter 1');
-    await expectRefusal(await insertChapter(owner, projectId, 1, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 409, 'CHP_009', 'inserting below the written chapter 2');
-    await expectRefusal(await insertChapter(owner, projectId, 5, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 404, 'CHP_001', 'inserting past every plan and chapter');
+    await expectCode(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand' }), 422, 'S003', 'a hand insert without a brief');
+    await expectCode(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand', briefBody: '   ' }), 422, 'S003', 'a hand insert with a blank brief');
+    await expectCode(await insertChapter(owner, projectId, 2, { briefOrigin: 'planner' }), 422, 'S003', 'a planner insert without an intent');
+    await expectCode(await insertChapter(owner, projectId, 0, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 400, 'CHP_003', 'inserting behind the finalized chapter 1');
+    await expectCode(await insertChapter(owner, projectId, 1, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 409, 'CHP_009', 'inserting below the written chapter 2');
+    await expectCode(await insertChapter(owner, projectId, 5, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 404, 'CHP_001', 'inserting past every plan and chapter');
     await holdAuthoringClaim(projectId);
-    await expectRefusal(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 409, 'CHP_004', 'inserting while another holder has the novel');
+    await expectCode(await insertChapter(owner, projectId, 2, { briefOrigin: 'hand', briefBody: HAND_BRIEF }), 409, 'CHP_004', 'inserting while another holder has the novel');
     await releaseAuthoringClaim(projectId);
 
     expect(await readBriefs(projectId), 'no refusal touched a plan').toEqual(briefs);

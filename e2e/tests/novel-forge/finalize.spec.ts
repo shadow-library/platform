@@ -8,14 +8,14 @@ import { type APIRequestContext } from '@playwright/test';
  */
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, FAIL_PIN_MODEL, listDispatchedModelCalls, readProjectRow } from './forge-db';
-import { CHAPTER_ONE, CHAPTER_TWO, type Draft, readDraft, readFinalizeReview, saveChapter, writeChapterByHand } from './forge-helpers';
+import { CHAPTER_ONE, CHAPTER_TWO, createEntity, type Draft, readDraft, readFinalizeReview, saveChapter, writeChapterByHand } from './forge-helpers';
 import {
   BLOCKING_FINDING,
   countDraftRevisions,
   deleteFinalizeReviews,
   expectFinalizeRun,
-  expectRefusal,
   type FinalizeAnswer,
   finalizeRoute,
   finalizeThroughReviewRoute,
@@ -40,7 +40,6 @@ import {
 import { markDraftIsolated } from './forge-rows';
 import {
   approveAsRead,
-  createEntity,
   createGuardedProject,
   finalizeChapterNoReview,
   insertFinalDraft,
@@ -107,7 +106,7 @@ async function expectRefusedInOrder(owner: ForgeActor, projectId: string, chapte
   expect(await readinessCodes(owner.ctx, projectId, chapter), `readiness of chapter ${chapter}`).toEqual(blockers);
   const [first] = blockers;
   if (!first) return;
-  await expectRefusal(
+  await expectCode(
     await finalizeThroughReviewRoute(owner.ctx, projectId, chapter),
     REFUSAL_STATUS[first] ?? 0,
     first,
@@ -238,11 +237,11 @@ test.describe('novel-forge finalize refusals', () => {
     const owner = await forge.actor({ label: 'fin-review-gates' });
     const projectId = await createGuardedProject(forge, owner, 'fin-review-gates');
     const draft = await writeChapterByHand(owner.ctx, projectId, CHAPTER_ONE);
-    await expectRefusal(await readFinalizeReview(owner.ctx, projectId, 1), 404, 'FRV_001', 'reading the review of a chapter never approved');
+    await expectCode(await readFinalizeReview(owner.ctx, projectId, 1), 404, 'FRV_001', 'reading the review of a chapter never approved');
 
     const approved = await approvedWithFailedReview(owner, projectId, draft);
     await expectRefusedInOrder(owner, projectId, 1, ['FRV_003']);
-    await expectRefusal(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/keep-routine')), 409, 'FRV_003', 'answering a review whose reading failed');
+    await expectCode(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/keep-routine')), 409, 'FRV_003', 'answering a review whose reading failed');
 
     await assertSpendGuarded(projectId);
     const prepared = await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/prepare'));
@@ -327,9 +326,9 @@ test.describe('novel-forge finalize through a ready review', () => {
     ]);
     await expectRefusedInOrder(owner, projectId, 1, ['FRV_005']);
 
-    await expectRefusal(await decide(owner.ctx, projectId, 1, ids['mystery-skipped'] ?? '', { decision: 'skipped' }), 400, 'FRV_010', 'skipping without a reason');
-    await expectRefusal(await decide(owner.ctx, projectId, 1, '999999999', { decision: 'kept' }), 404, 'FRV_008', 'deciding an update that is not in the review');
-    await expectRefusal(
+    await expectCode(await decide(owner.ctx, projectId, 1, ids['mystery-skipped'] ?? '', { decision: 'skipped' }), 400, 'FRV_010', 'skipping without a reason');
+    await expectCode(await decide(owner.ctx, projectId, 1, '999999999', { decision: 'kept' }), 404, 'FRV_008', 'deciding an update that is not in the review');
+    await expectCode(
       await decide(owner.ctx, projectId, 1, ids['thread-edited'] ?? '', { decision: 'edited', edited: { threadKey: 'e2e-other-thread' } }),
       400,
       'FRV_009',
@@ -367,8 +366,8 @@ test.describe('novel-forge finalize through a ready review', () => {
     ]);
     expect(await listDispatchedModelCalls(projectId), 'the review path finalizes without a model call').toEqual([]);
 
-    await expectRefusal(await decide(owner.ctx, projectId, 1, ids['mystery-skipped'] ?? '', { decision: 'kept' }), 409, 'FRV_011', 'deciding on an applied review');
-    await expectRefusal(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/keep-routine')), 409, 'FRV_011', 'keeping routine updates on an applied review');
+    await expectCode(await decide(owner.ctx, projectId, 1, ids['mystery-skipped'] ?? '', { decision: 'kept' }), 409, 'FRV_011', 'deciding on an applied review');
+    await expectCode(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/keep-routine')), 409, 'FRV_011', 'keeping routine updates on an applied review');
 
     const revisions = await countDraftRevisions(projectId, 1);
     await expectRefusedInOrder(owner, projectId, 1, ['DRF_002']);
@@ -386,15 +385,13 @@ test.describe('novel-forge finalize through a ready review', () => {
     expect(saved.status(), await saved.text()).toBe(200);
     expect(await saved.json(), 'a category named twice is kept once').toEqual({ autoKeep: ['promise', 'appearance'] });
     const refused = await mutate(owner.ctx, 'put', path, { data: { autoKeep: ['everything'] } });
-    await expectRefusal(refused, 422, 'VALIDATION_ERROR', 'an unknown category');
+    await expectCode(refused, 422, 'VALIDATION_ERROR', 'an unknown category');
 
     expect((await readProjectRow(projectId))?.config?.models?.['continuity'], 'the model pins survive the merge').toEqual(FAIL_PIN_MODEL);
     await assertSpendGuarded(projectId);
   });
 
-  // finalize-review.service.ts:322 binds an already-stringified array to `::jsonb`, which the driver encodes again: the stored value is a JSON string,
-  // so the prepare job's `new Set(autoKeep)` (finalize-review.service.ts:419) sees characters, never categories.
-  test.fixme('should store the auto-keep categories as the array it answered with', async ({ forge }) => {
+  test('should store the auto-keep categories as the array it answered with', async ({ forge }) => {
     const owner = await forge.actor({ label: 'fin-autokeep-stored' });
     const projectId = await createGuardedProject(forge, owner, 'fin-autokeep-stored');
     const saved = await mutate(owner.ctx, 'put', `/api/v1/projects/${projectId}/finalize-review/settings`, { data: { autoKeep: ['promise', 'appearance'] } });
@@ -458,8 +455,10 @@ test.describe('novel-forge finalize on the direct continuity path', () => {
     await approvedWithFailedReview(owner, projectId, await writeChapterByHand(owner.ctx, projectId, CHAPTER_ONE));
     await deleteFinalizeReviews(projectId, 1);
 
+    await assertSpendGuarded(projectId);
     const response = await finalizeRoute(owner.ctx, projectId, 1);
     expect(response.status(), await response.text()).toBe(200);
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 });
 
@@ -476,13 +475,13 @@ test.describe('novel-forge finalize review revert', () => {
     expect(applied, 'finalize applied the kept thread').toBeDefined();
     const revert = (chapter: number): ReturnType<typeof mutate> => mutate(owner.ctx, 'post', reviewPath(projectId, chapter, '/revert'));
 
-    await expectRefusal(await revert(2), 409, 'FRV_012', 'reverting a chapter with nothing applied');
+    await expectCode(await revert(2), 409, 'FRV_012', 'reverting a chapter with nothing applied');
     await novelForgeDb()`INSERT INTO chapters (project_id, number, content, status, locked) VALUES (${projectId}, 2, 'A later final chapter.', 'done', true)`;
-    await expectRefusal(await revert(1), 409, 'FRV_012', 'reverting a chapter that is no longer the latest final one');
+    await expectCode(await revert(1), 409, 'FRV_012', 'reverting a chapter that is no longer the latest final one');
     await novelForgeDb()`DELETE FROM chapters WHERE project_id = ${projectId} AND number = 2`;
 
     await novelForgeDb()`UPDATE plot_threads SET summary = 'The author rewrote this since.' WHERE project_id = ${projectId} AND thread_key = 'e2e-revert-thread'`;
-    await expectRefusal(await revert(1), 409, 'FRV_007', 'reverting over a row changed since it was applied');
+    await expectCode(await revert(1), 409, 'FRV_007', 'reverting over a row changed since it was applied');
     expect((await readReviewRow(projectId, 1))?.status, 'the refused revert left the review applied').toBe('applied');
     await novelForgeDb()`UPDATE plot_threads SET summary = ${applied?.summary ?? null} WHERE project_id = ${projectId} AND thread_key = 'e2e-revert-thread'`;
 
@@ -494,7 +493,7 @@ test.describe('novel-forge finalize review revert', () => {
       'the Story Bible updates of chapter 1 were undone',
     );
     expect((await readDraft(owner.ctx, projectId, 1)).status, 'the prose stays final').toBe('final');
-    await expectRefusal(await revert(1), 409, 'FRV_012', 'reverting the same review twice');
+    await expectCode(await revert(1), 409, 'FRV_012', 'reverting the same review twice');
   });
 
   test('should refuse a revert that would un-reach a milestone one of the chapter’s reveals depends on', async ({ forge }) => {
@@ -529,7 +528,7 @@ test.describe('novel-forge finalize review revert', () => {
     const finalized = await finalizeThroughReviewRoute(owner.ctx, projectId, 1);
     expect(finalized.status(), await finalized.text()).toBe(200);
 
-    await expectRefusal(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/revert')), 409, 'FRV_013', 'un-reaching the milestone the chapter’s reveal needs');
+    await expectCode(await mutate(owner.ctx, 'post', reviewPath(projectId, 1, '/revert')), 409, 'FRV_013', 'un-reaching the milestone the chapter’s reveal needs');
     const [row] = await novelForgeDb()<{ state: string; reachedChapter: number | null }[]>`
       SELECT state, reached_chapter AS "reachedChapter" FROM milestones WHERE project_id = ${projectId} AND milestone_key = 'oath_sworn'
     `;

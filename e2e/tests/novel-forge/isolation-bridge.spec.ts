@@ -7,6 +7,8 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
+import { type ForgeActor, type ForgeHarness, test as forgeTest } from './forge-actors';
+import { assertSpendGuarded, failPin, listDispatchedModelCalls } from './forge-db';
 import {
   aiAvailable,
   aiSkipReason,
@@ -48,59 +50,74 @@ interface Bridge {
 
 const ISOLATED_CHAPTER = { ...CHAPTER_ONE, title: 'Behind the Locked Door' };
 
-test.describe('novel-forge isolated chapter bridge', () => {
-  test.use({ storageState: storageStateFor('user1') });
-  test.describe.configure({ mode: 'serial' });
+/** A standard novel of `owner` whose owner stands at the call ceiling, which holds on the unrestricted route an isolated chapter takes. */
+async function bridgedNovel(forge: ForgeHarness, owner: ForgeActor): Promise<string> {
+  const { projectId } = await createNovel(owner.ctx, { title: `E2E Bridge ${uniqueSuffix()}` });
+  await forge.quotaPin(projectId);
+  await failPin(projectId);
+  return projectId;
+}
 
-  let ctx: APIRequestContext;
-  let projectId = '';
-
-  test.beforeAll(async () => {
-    ctx = await apiContext('novelForge', 'user1');
-    projectId = (await createNovel(ctx, { title: `E2E Bridge ${uniqueSuffix()}` })).projectId;
-    await pinHaiku(ctx, projectId);
-  });
-
-  test.afterAll(async () => {
-    await deleteProjectQuietly(ctx, projectId);
-    await ctx.dispose();
-  });
-
-  test('should keep a pasted isolated chapter walled off until a bridge is approved', async () => {
-    const isolated = await pasteChapter(ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
+forgeTest.describe('novel-forge isolated chapter bridge', () => {
+  forgeTest('should keep a pasted isolated chapter walled off until a bridge is approved', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'bridge-walled' });
+    const projectId = await bridgedNovel(forge, owner);
+    const isolated = await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
     expect(isolated).toMatchObject({ chapter: 1, isolated: true, generator: 'human' });
 
-    const bridge = await ctx.get(`/api/v1/projects/${projectId}/drafts/1/bridge`);
+    const bridge = await owner.ctx.get(`/api/v1/projects/${projectId}/drafts/1/bridge`);
     expect(bridge.status(), await bridge.text()).toBe(200);
     expect((await bridge.json()) as Bridge).toMatchObject({ chapter: 1, revision: isolated.revision, approved: false, positions: [] });
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  test('should refuse to read a bridge before the chapter is final (BRG_002)', async () => {
-    const prepare = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/1/bridge/prepare`);
+  forgeTest('should refuse to read a bridge before the chapter is final (BRG_002)', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'bridge-unfinished' });
+    const projectId = await bridgedNovel(forge, owner);
+    await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
+
+    await assertSpendGuarded(projectId, { requireQuota: true });
+    const prepare = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/drafts/1/bridge/prepare`);
     expect(prepare.status(), await prepare.text()).toBe(400);
     expect(await errorCode(prepare)).toBe('BRG_002');
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  test('should answer that a standard chapter has no bridge (BRG_001)', async () => {
-    const standard = await writeChapterByHand(ctx, projectId, CHAPTER_TWO);
+  forgeTest('should answer that a standard chapter has no bridge (BRG_001)', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'bridge-standard' });
+    const projectId = await bridgedNovel(forge, owner);
+    await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
+    const standard = await writeChapterByHand(owner.ctx, projectId, CHAPTER_TWO);
     expect(standard).toMatchObject({ chapter: 2, isolated: false });
 
-    const bridge = await ctx.get(`/api/v1/projects/${projectId}/drafts/2/bridge`);
+    const bridge = await owner.ctx.get(`/api/v1/projects/${projectId}/drafts/2/bridge`);
     expect(bridge.status()).toBe(400);
     expect(await errorCode(bridge)).toBe('BRG_001');
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  test('should mark the isolated chapter as unrestricted in the chapter list and its workspace', async ({ page }) => {
-    const chapters = `${requireProductUrl('novelForge')}/novels/${projectId}/chapters`;
-    await page.goto(chapters);
-    const row = page.getByRole('button', { name: `Open chapter 1: ${ISOLATED_CHAPTER.title}` });
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(row.getByText('unrestricted', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: `Open chapter 2: ${CHAPTER_TWO.title}` }).getByText('unrestricted', { exact: true })).toHaveCount(0);
+  forgeTest('should mark the isolated chapter as unrestricted in the chapter list and its workspace', async ({ forge, browser }) => {
+    const owner = await forge.actor({ label: 'bridge-ui' });
+    const projectId = await bridgedNovel(forge, owner);
+    await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
+    await writeChapterByHand(owner.ctx, projectId, CHAPTER_TWO);
 
-    await row.click();
-    await expect(page).toHaveURL(/chapter=1\b/);
-    await expect(page.getByText('unrestricted', { exact: true }).first()).toBeVisible();
+    const context = await browser.newContext({ storageState: await owner.ctx.storageState(), ignoreHTTPSErrors: true });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${requireProductUrl('novelForge')}/novels/${projectId}/chapters`);
+      const row = page.getByRole('button', { name: `Open chapter 1: ${ISOLATED_CHAPTER.title}` });
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await expect(row.getByText('unrestricted', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: `Open chapter 2: ${CHAPTER_TWO.title}` }).getByText('unrestricted', { exact: true })).toHaveCount(0);
+
+      await row.click();
+      await expect(page).toHaveURL(/chapter=1\b/);
+      await expect(page.getByText('unrestricted', { exact: true }).first()).toBeVisible();
+    } finally {
+      await context.close();
+    }
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 });
 

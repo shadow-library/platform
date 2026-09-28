@@ -8,7 +8,7 @@ import { type APIResponse } from '@playwright/test';
  */
 import { addOrganisationMember, assignApplicationRole, findApplicationRoleId, findSetCookie, identityMutate, mutate, pollUntil, requireProductUrl } from '../../lib';
 import { expect, test, untilIdentityAdmits } from './forge-actors';
-import { errorCode } from './forge-helpers';
+import { expectCode } from './forge-arrange';
 
 /**
  * Defining types
@@ -34,11 +34,6 @@ const LOGIN_STATE_COOKIE = `${SESSION_COOKIE}-login`;
 
 /** A token shaped like a signed JWT that no issuer signed. */
 const FORGED_JWT = `${Buffer.from('{"alg":"RS256","typ":"JWT"}').toString('base64url')}.${Buffer.from('{"sub":"1","aud":"api://novel-forge"}').toString('base64url')}.c2lnbmF0dXJl`;
-
-async function expectRefusal(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
 
 function location(response: APIResponse): URL {
   const header = response.headers()['location'];
@@ -93,8 +88,8 @@ test.describe('novel-forge access probe', () => {
     const team = await forge.team('access');
     const bot = await forge.bot(team, ['projects:write', 'generation', 'illustrations'], 'access');
 
-    await expectRefusal(await bot.ctx.get('/api/v1/access'), 403, 'IAM_002', 'a bot is refused the admin probe whatever it holds');
-    await expectRefusal(await (await forge.anonymous()).get('/api/v1/access'), 401, 'IAM_001', 'an anonymous caller must authenticate first');
+    await expectCode(await bot.ctx.get('/api/v1/access'), 403, 'IAM_002', 'a bot is refused the admin probe whatever it holds');
+    await expectCode(await (await forge.anonymous()).get('/api/v1/access'), 401, 'IAM_001', 'an anonymous caller must authenticate first');
 
     const own = await bot.ctx.get('/api/v1/projects');
     expect(own.status(), `the same key still reaches a route open to bots — body ${await own.text()}`).toBe(200);
@@ -106,10 +101,10 @@ test.describe('novel-forge credentials', () => {
     const author = await forge.actor({ label: 'bearer' });
     const anonymous = await forge.anonymous();
 
-    await expectRefusal(await anonymous.get('/api/v1/projects'), 401, 'IAM_001', 'no credential at all');
-    await expectRefusal(await anonymous.get('/api/v1/projects', { headers: { authorization: 'Bearer not-a-token' } }), 401, 'IAM_001', 'a garbage bearer');
-    await expectRefusal(await anonymous.get('/api/v1/projects', { headers: { authorization: `Bearer ${FORGED_JWT}` } }), 401, 'IAM_001', 'an unsigned JWT-shaped bearer');
-    await expectRefusal(
+    await expectCode(await anonymous.get('/api/v1/projects'), 401, 'IAM_001', 'no credential at all');
+    await expectCode(await anonymous.get('/api/v1/projects', { headers: { authorization: 'Bearer not-a-token' } }), 401, 'IAM_001', 'a garbage bearer');
+    await expectCode(await anonymous.get('/api/v1/projects', { headers: { authorization: `Bearer ${FORGED_JWT}` } }), 401, 'IAM_001', 'an unsigned JWT-shaped bearer');
+    await expectCode(
       await author.ctx.get('/api/v1/projects', { headers: { authorization: `Bearer ${FORGED_JWT}` } }),
       401,
       'IAM_001',
@@ -132,7 +127,7 @@ test.describe('novel-forge credentials', () => {
   test('should answer the session probe 401 when signed out and with the verified principal when signed in', async ({ forge }) => {
     const author = await forge.actor({ label: 'session-shape' });
 
-    await expectRefusal(await (await forge.anonymous()).get('/api/auth/session'), 401, 'IAM_001', 'no session is a 401, never a 200 with nothing in it');
+    await expectCode(await (await forge.anonymous()).get('/api/auth/session'), 401, 'IAM_001', 'no session is a 401, never a 200 with nothing in it');
 
     const signedIn = await author.ctx.get('/api/auth/session');
     expect(signedIn.status(), await signedIn.text()).toBe(200);
@@ -171,7 +166,7 @@ test.describe('novel-forge login and callback', () => {
     const anonymous = await forge.anonymous();
     for (const returnTo of ['https://evil.test/landing', '//evil.test/landing', '/\\evil.test/landing']) {
       const response = await anonymous.get(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`, { maxRedirects: 0 });
-      await expectRefusal(response, 400, 'REDIRECT_NOT_ALLOWED', `return_to=${returnTo}`);
+      await expectCode(response, 400, 'REDIRECT_NOT_ALLOWED', `return_to=${returnTo}`);
     }
 
     const local = await anonymous.get(`/api/auth/login?return_to=${encodeURIComponent('/novels')}`, { maxRedirects: 0 });
@@ -180,13 +175,13 @@ test.describe('novel-forge login and callback', () => {
 
   test('should refuse a callback with no login state or a state that does not match', async ({ forge }) => {
     const stranger = await forge.anonymous();
-    await expectRefusal(await stranger.get('/api/auth/callback?code=e2e-code&state=e2e-state', { maxRedirects: 0 }), 400, 'LOGIN_STATE_INVALID', 'no login-state cookie');
+    await expectCode(await stranger.get('/api/auth/callback?code=e2e-code&state=e2e-state', { maxRedirects: 0 }), 400, 'LOGIN_STATE_INVALID', 'no login-state cookie');
 
     const started = await forge.anonymous();
     const login = await started.get('/api/auth/login?return_to=/novels', { maxRedirects: 0 });
     expect(login.status()).toBe(302);
     const mismatched = await started.get('/api/auth/callback?code=e2e-code&state=not-the-state-that-was-issued', { maxRedirects: 0 });
-    await expectRefusal(mismatched, 400, 'LOGIN_STATE_INVALID', 'a state that is not the one this browser was issued');
+    await expectCode(mismatched, 400, 'LOGIN_STATE_INVALID', 'a state that is not the one this browser was issued');
   });
 
   test('should complete a real hop onto the requested return_to with a fresh session cookie', async ({ forge }) => {
@@ -219,7 +214,7 @@ test.describe('novel-forge logout', () => {
     const author = await forge.actor({ label: 'logout' });
 
     const refused = await author.ctx.post('/api/auth/logout');
-    await expectRefusal(refused, 403, 'S010', 'a cookie-bearing logout with no double-submit token');
+    await expectCode(refused, 403, 'S010', 'a cookie-bearing logout with no double-submit token');
     expect((await author.ctx.get('/api/auth/session')).status(), 'the refused logout ended nothing').toBe(200);
 
     const loggedOut = await untilIdentityAdmits(() => mutate(author.ctx, 'post', '/api/auth/logout'));
@@ -229,7 +224,7 @@ test.describe('novel-forge logout', () => {
     expect(cleared, 'the session cookie is cleared').toBeDefined();
     expect(cleared?.value ?? 'x').toBe('');
 
-    await expectRefusal(await author.ctx.get('/api/auth/session'), 401, 'IAM_001', 'the logged-out session is gone');
+    await expectCode(await author.ctx.get('/api/auth/session'), 401, 'IAM_001', 'the logged-out session is gone');
   });
 });
 
@@ -248,6 +243,6 @@ test.describe('novel-forge session after an identity signout', () => {
       { timeoutMs: 75_000, intervalMs: 2_000 },
     );
     expect(status, 'the next token mint after the signout must fail the app session').toBe(401);
-    await expectRefusal(await author.ctx.get('/api/auth/session'), 401, 'IAM_001', 'the session probe agrees');
+    await expectCode(await author.ctx.get('/api/auth/session'), 401, 'IAM_001', 'the session probe agrees');
   });
 });

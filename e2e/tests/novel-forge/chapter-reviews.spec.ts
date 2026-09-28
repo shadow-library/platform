@@ -3,16 +3,15 @@
  */
 import { createHash } from 'node:crypto';
 
-import { type APIResponse } from '@playwright/test';
-
 /**
  * Importing user defined packages
  */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
-import { errorCode, saveChapter, startNextChapter, writeChapterByHand } from './forge-helpers';
-import { createGuardedProject, pollJobStatus } from './forge-story';
+import { pollJobStatus, saveChapter, startNextChapter, writeChapterByHand } from './forge-helpers';
+import { createGuardedProject } from './forge-story';
 
 /**
  * Defining types
@@ -42,11 +41,6 @@ interface ChapterReview {
  * free, the judge kind is a model job that fails under the fail-pin, and an open blocking judge finding holds the chapter as a
  * `contradiction` — which the author answers by dismissing, overriding or promising to fix it by hand — never by spending a model call.
  */
-
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
 
 function reviewsPath(projectId: string, chapter: number, suffix = ''): string {
   return `/api/v1/projects/${projectId}/chapters/${chapter}/reviews${suffix}`;
@@ -85,11 +79,11 @@ test.describe('novel-forge deterministic reviews', () => {
 
     const empty = await startNextChapter(owner.ctx, projectId);
     expect(empty.body ?? '').toBe('');
-    await expectRefused(await mutate(owner.ctx, 'post', reviewsPath(projectId, 1), { data: { kind: 'mechanics' } }), 400, 'REV_006', 'reviewing an empty draft');
+    await expectCode(await mutate(owner.ctx, 'post', reviewsPath(projectId, 1), { data: { kind: 'mechanics' } }), 400, 'REV_006', 'reviewing an empty draft');
 
     const written = await saveChapter(owner.ctx, projectId, empty, { title: 'Draft', body: 'The lamplighter counted the links twice before dawn broke over the quiet street.' });
     await novelForgeDb()`UPDATE drafts SET review_status = 'generating' WHERE id = ${written.id}`;
-    await expectRefused(await mutate(owner.ctx, 'post', reviewsPath(projectId, 1), { data: { kind: 'mechanics' } }), 409, 'REV_007', 'reviewing a chapter still generating');
+    await expectCode(await mutate(owner.ctx, 'post', reviewsPath(projectId, 1), { data: { kind: 'mechanics' } }), 409, 'REV_007', 'reviewing a chapter still generating');
 
     await novelForgeDb()`UPDATE drafts SET review_status = 'needs_review' WHERE id = ${written.id}`;
     const run = await mutate(owner.ctx, 'post', reviewsPath(projectId, 1), { data: { kind: 'mechanics' } });
@@ -149,25 +143,20 @@ test.describe('novel-forge judge gate and remedies', () => {
     const readiness = (await (await owner.ctx.get(`/api/v1/projects/${projectId}/drafts/1/finalize-readiness`)).json()) as { blockers: { code: string }[] };
     expect(readiness.blockers.map(blocker => blocker.code)).toContain('FIN_004');
 
-    await expectRefused(
-      await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'f1'), { data: { action: 'dismissed' } }),
-      400,
-      'REV_004',
-      'dismissing without a reason',
-    );
-    await expectRefused(
+    await expectCode(await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'f1'), { data: { action: 'dismissed' } }), 400, 'REV_004', 'dismissing without a reason');
+    await expectCode(
       await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'f2'), { data: { action: 'overridden' } }),
       400,
       'REV_005',
       'overriding a non-blocking finding',
     );
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', remedyPath(projectId, 1, '999999999', 'f1'), { data: { action: 'dismissed', reason: 'checked by hand' } }),
       404,
       'REV_001',
       'remedying an unknown review',
     );
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'ghost'), { data: { action: 'dismissed', reason: 'checked by hand' } }),
       404,
       'REV_002',
@@ -201,7 +190,7 @@ test.describe('novel-forge judge gate and remedies', () => {
     expect(moved.revision).toBeGreaterThan(draft.revision);
     const staleRead = await owner.ctx.get(`/api/v1/projects/${projectId}/chapters/1/reviews/${reviewId}`);
     expect((await staleRead.json()) as ChapterReview, 'staleness is computed on read, from the text as it stands now').toMatchObject({ stale: true });
-    await expectRefused(
+    await expectCode(
       await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'f2'), { data: { action: 'dismissed', reason: 'the text moved' } }),
       409,
       'REV_003',

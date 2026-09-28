@@ -12,8 +12,9 @@ import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { guardedProject } from './forge-arrange';
 import { assertSpendGuarded } from './forge-db';
-import { type ChapterText, errorCode, readDraft, startNextChapter, writeChapterByHand } from './forge-helpers';
+import { type ChapterText, errorCode, readDraft, writeChapterByHand } from './forge-helpers';
 import { insertWriterSnapshot, markDraftIsolated } from './forge-rows';
+import { writerPrompt } from './forge-story';
 
 /**
  * Defining types
@@ -66,12 +67,6 @@ function markedChapter(label: string): MarkedChapter {
 async function writeIsolatedChapter(owner: ForgeActor, projectId: string, text: ChapterText): Promise<void> {
   const draft = await writeChapterByHand(owner.ctx, projectId, text);
   await markDraftIsolated(projectId, draft.chapter);
-}
-
-async function writerPrompt(ctx: APIRequestContext, projectId: string, chapter: number): Promise<string> {
-  const response = await ctx.get(`/api/v1/projects/${projectId}/drafts/${chapter}/prompt`);
-  expect(response.status(), await response.text()).toBe(200);
-  return ((await response.json()) as { markdown: string }).markdown;
 }
 
 async function searchHits(ctx: APIRequestContext, projectId: string, q: string): Promise<number[]> {
@@ -160,19 +155,5 @@ test.describe('novel-forge isolated chapters', () => {
 
     expect(await mechanicsReview(owner.ctx, projectId, 1), 'a review of the isolated chapter is marked isolated').toMatchObject({ kind: 'mechanics', isolated: true });
     expect(await mechanicsReview(owner.ctx, projectId, 2), 'its standard neighbour is not').toMatchObject({ kind: 'mechanics', isolated: false });
-  });
-
-  // fastify-router.ts:322-327 defaults this POST to 201 (200+409, no @HttpStatus; b3425e3b), no transformer runs, bigint ids fail JSON: 500 after commit.
-  test.fixme('should paste an isolated chapter and answer with its draft', async ({ forge }) => {
-    const owner = await forge.actor({ label: 'isolation-paste' });
-    const projectId = await guardedProject(forge, owner, 'isolation-paste');
-    const walled = markedChapter('walled');
-    const draft = await startNextChapter(owner.ctx, projectId);
-
-    const pasted = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/drafts/${draft.chapter}/import`, {
-      data: { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, prose: walled.text.body, title: walled.text.title, isolated: true },
-    });
-    expect(pasted.status(), `pasting an isolated chapter — body ${await pasted.text()}`).toBe(200);
-    expect(await pasted.json()).toMatchObject({ chapter: 1, isolated: true, body: walled.text.body });
   });
 });

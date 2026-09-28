@@ -7,21 +7,10 @@ import { type APIResponse } from '@playwright/test';
  * Importing user defined packages
  */
 import { mutate } from '../../lib';
-import { reviseForgeChapter, settlePublishJob } from '../web-novel/forge-publication';
+import { readForgeLedger, readForgePublication, readPublishJob, reviseForgeChapter, settlePublishJob } from '../web-novel/forge-publication';
 import { type ForgeActor } from './forge-actors';
 import { expectCode } from './forge-arrange';
-import {
-  buildBundle,
-  expect,
-  holdForgeSlug,
-  ladderSlugs,
-  readLedgerRows,
-  readPublicationRow,
-  readPublishJob,
-  setPublicationAuthor,
-  test,
-  updateChapterColumns,
-} from './forge-bundles';
+import { buildBundle, expect, holdForgeSlug, ladderSlugs, setPublicationAuthor, test } from './forge-bundles';
 import { uniqueSuffix } from './forge-helpers';
 
 /**
@@ -112,17 +101,17 @@ test.describe('novel-forge publication record', () => {
     expect((await published(owner, projectId, { tags: ['Female Protagonist', 'Weak to Strong'] })).revision, 'a tag-only change').toBe(2);
     expect((await published(owner, projectId, { violence: 'graphic' })).revision, 'a rating-only change').toBe(3);
     expect((await published(owner, projectId, { blurb: 'A keeper and a listening tide.' })).revision, 'a metadata-only save').toBe(4);
-    expect(await readPublicationRow(projectId)).toEqual(
+    expect(await readForgePublication(projectId)).toEqual(
       expect.objectContaining({ genres: ['Fantasy', 'Mystery'], tags: ['Female Protagonist', 'Weak to Strong'], violence: 'graphic', darkContent: 'mild', revision: 4 }),
     );
     expect((await published(owner, projectId, { blurb: 'A keeper and a listening tide.', genres: ['Fantasy', 'Mystery'] })).revision, 'an unchanged resend').toBe(4);
 
     expect((await published(owner, projectId, { violence: null })).revision).toBe(5);
-    expect(await readPublicationRow(projectId), 'a null clears only its own dimension').toEqual(expect.objectContaining({ violence: null, darkContent: 'mild' }));
+    expect(await readForgePublication(projectId), 'a null clears only its own dimension').toEqual(expect.objectContaining({ violence: null, darkContent: 'mild' }));
     expect((await published(owner, projectId, { genres: null })).revision).toBe(6);
-    expect(await readPublicationRow(projectId)).toEqual(expect.objectContaining({ genres: null, tags: ['Female Protagonist', 'Weak to Strong'] }));
+    expect(await readForgePublication(projectId)).toEqual(expect.objectContaining({ genres: null, tags: ['Female Protagonist', 'Weak to Strong'] }));
 
-    const before = await readPublicationRow(projectId);
+    const before = await readForgePublication(projectId);
     const refused: [string, Record<string, unknown>][] = [
       ['an unknown genre', { genres: ['Space Western'] }],
       ['a duplicate tag', { tags: ['Weak to Strong', 'Weak to Strong'] }],
@@ -131,7 +120,7 @@ test.describe('novel-forge publication record', () => {
       ['an unknown status', { status: 'draft' }],
     ];
     for (const [what, body] of refused) await expectCode(await publish(owner, projectId, { ...body, blurb: 'Never stored.' }), 422, 'VALIDATION_ERROR', what);
-    expect(await readPublicationRow(projectId), 'a refused save writes nothing, not even its valid fields').toEqual(before);
+    expect(await readForgePublication(projectId), 'a refused save writes nothing, not even its valid fields').toEqual(before);
 
     expect((await published(owner, projectId, { status: 'retired' })).status).toBe('retired');
     const relisted = await published(owner, projectId, { blurb: 'Back on the shelf.' });
@@ -151,11 +140,11 @@ test.describe('novel-forge publication record', () => {
     expect(await published(owner, holder, { novelSlug: moved })).toEqual(expect.objectContaining({ novelSlug: moved, revision: 2 }));
 
     await expectCode(await publish(owner, claimant, { novelSlug: moved, title: 'The Salt Road' }), 409, 'PUB_007', 'creating on a held slug');
-    expect(await readPublicationRow(claimant), 'no publication row is left behind').toBeUndefined();
+    expect(await readForgePublication(claimant), 'no publication row is left behind').toBeUndefined();
     expect((await published(owner, claimant, { novelSlug: own, title: 'The Salt Road' })).novelSlug).toBe(own);
     await expectCode(await publish(owner, claimant, { novelSlug: moved }), 409, 'PUB_007', 'moving onto a held slug');
-    expect(await readPublicationRow(claimant)).toEqual(expect.objectContaining({ novelSlug: own, revision: 1 }));
-    expect(await readPublicationRow(holder)).toEqual(expect.objectContaining({ novelSlug: moved, revision: 2 }));
+    expect(await readForgePublication(claimant)).toEqual(expect.objectContaining({ novelSlug: own, revision: 1 }));
+    expect(await readForgePublication(holder)).toEqual(expect.objectContaining({ novelSlug: moved, revision: 2 }));
   });
 
   test('should derive a slug from the title, ladder past held rungs, fall back to novel and fit a long title', async ({ forge, lane }) => {
@@ -172,7 +161,7 @@ test.describe('novel-forge publication record', () => {
     await holdForgeSlug(owner, fifth as string);
     const exhausted = await lane.project(owner, 'derive-exhausted');
     await expectCode(await publish(owner, exhausted, { title }), 409, 'PUB_008', 'every rung of the ladder held');
-    expect(await readPublicationRow(exhausted)).toBeUndefined();
+    expect(await readForgePublication(exhausted)).toBeUndefined();
     expect((await published(owner, exhausted, { title, novelSlug: lane.slug('led-explicit') })).revision, 'an explicit slug is the way out').toBe(1);
 
     const punctuated = await lane.project(owner, 'derive-punctuation');
@@ -197,13 +186,13 @@ test.describe('novel-forge publication record', () => {
     await published(owner, projectId, { novelSlug: lane.slug('led-rating'), title: 'The Quiet Coast', violence: 'mild' });
 
     await expectCode(await publishChapter(owner, projectId, 1), 400, 'PUB_009', 'a chapter rated above the novel');
-    expect(await readLedgerRows(projectId)).toEqual([]);
+    expect(await readForgeLedger(projectId)).toEqual([]);
 
     expect((await published(owner, projectId, { violence: 'graphic' })).revision).toBe(2);
     await chapterPublished(owner, projectId, 1);
     await expectCode(await publish(owner, projectId, { violence: 'mild' }), 400, 'PUB_009', 'lowering the novel below a published chapter');
     await expectCode(await publish(owner, projectId, { violence: null }), 400, 'PUB_009', 'unrating the novel under a rated chapter');
-    expect(await readPublicationRow(projectId)).toEqual(expect.objectContaining({ violence: 'graphic', revision: 2 }));
+    expect(await readForgePublication(projectId)).toEqual(expect.objectContaining({ violence: 'graphic', revision: 2 }));
     expect((await published(owner, projectId, { violence: 'extreme' })).revision, 'raising the novel is always allowed').toBe(3);
   });
 });
@@ -221,15 +210,15 @@ test.describe('novel-forge chapter ledger', () => {
     await published(owner, projectId, { novelSlug: slug, title: 'The Quiet Coast' });
 
     await expectCode(await publishChapter(owner, projectId, 99), 404, 'CHP_001', 'an unknown chapter');
-    await updateChapterColumns(projectId, 2, { locked: false });
+    await reviseForgeChapter(projectId, 2, { locked: false });
     await expectCode(await publishChapter(owner, projectId, 2), 400, 'PUB_002', 'an unlocked chapter');
-    await updateChapterColumns(projectId, 2, { locked: true });
+    await reviseForgeChapter(projectId, 2, { locked: true });
     const prose = 'Chapter three, restored.';
     await reviseForgeChapter(projectId, 3, { content: '   ' });
     await expectCode(await publishChapter(owner, projectId, 3), 400, 'PUB_002', 'a chapter with no prose');
     await reviseForgeChapter(projectId, 3, { content: prose });
     await expectCode(await publishChapter(owner, projectId, 2), 400, 'PUB_003', 'a chapter ahead of an unpublished earlier one');
-    expect(await readLedgerRows(projectId), 'no refused publish leaves a row').toEqual([]);
+    expect(await readForgeLedger(projectId), 'no refused publish leaves a row').toEqual([]);
 
     const one = await chapterPublished(owner, projectId, 1);
     expect(one).toEqual(expect.objectContaining({ chapter: 1, publishedOrdinal: 1, revision: 1, status: 'scheduled' }));
@@ -272,7 +261,7 @@ test.describe('novel-forge chapter ledger', () => {
     await published(owner, projectId, { novelSlug: lane.slug('led-hash'), title: 'The Quiet Coast', violence: 'graphic' });
     const first = await chapterPublished(owner, projectId, 1);
 
-    await updateChapterColumns(projectId, 1, { wordCount: 9_999 });
+    await reviseForgeChapter(projectId, 1, { wordCount: 9_999 });
     expect(await chapterPublished(owner, projectId, 1), 'a word count is not reader content').toEqual(expect.objectContaining({ contentHash: first.contentHash, revision: 1 }));
 
     await reviseForgeChapter(projectId, 1, { content: 'Mira climbed the stair one final time and put out the flame.' });
@@ -298,7 +287,7 @@ test.describe('novel-forge publication attribution', () => {
     expect(attributed).toEqual(expect.objectContaining({ originalAuthor: 'Ada Lovelace', revision: 1 }));
     expect((await published(curator, projectId, { originalAuthor: 'Ada Lovelace' })).revision, 'the same name again').toBe(1);
     expect(await published(curator, projectId, { originalAuthor: null })).toEqual(expect.objectContaining({ revision: 2 }));
-    expect((await readPublicationRow(projectId))?.originalAuthor).toBeNull();
+    expect((await readForgePublication(projectId))?.originalAuthor).toBeNull();
   });
 
   test('should refuse an attribution from a non-curator with no row written, and let them publish around an existing one', async ({ forge, lane }) => {
@@ -312,7 +301,7 @@ test.describe('novel-forge publication attribution', () => {
       'PUB_010',
       'a first publish naming an author',
     );
-    expect(await readPublicationRow(projectId), 'the refused create leaves no publication').toBeUndefined();
+    expect(await readForgePublication(projectId), 'the refused create leaves no publication').toBeUndefined();
     expect((await published(owner, projectId, { novelSlug: slug, title: 'The Salt Road' })).revision).toBe(1);
 
     await setPublicationAuthor(projectId, 'Grace Hopper');
@@ -322,7 +311,7 @@ test.describe('novel-forge publication attribution', () => {
     expect(await published(owner, projectId, { blurb: 'Salt, and a road across it.' })).toEqual(expect.objectContaining({ originalAuthor: 'Grace Hopper', revision: 3 }));
 
     await expectCode(await publish(owner, projectId, { originalAuthor: 'Someone Else', blurb: 'Never stored.' }), 403, 'PUB_010', 'moving the attribution');
-    expect(await readPublicationRow(projectId)).toEqual(expect.objectContaining({ originalAuthor: 'Grace Hopper', blurb: 'Salt, and a road across it.', revision: 3 }));
+    expect(await readForgePublication(projectId)).toEqual(expect.objectContaining({ originalAuthor: 'Grace Hopper', blurb: 'Salt, and a road across it.', revision: 3 }));
     expect(await published(owner, projectId, { originalAuthor: null }), 'clearing needs no curate permission').toEqual(
       expect.objectContaining({ originalAuthor: null, revision: 4 }),
     );
@@ -334,17 +323,17 @@ test.describe('novel-forge publication attribution', () => {
 
     const { projectId: adopted } = await lane.imported(owner, bundle('Adopted'));
     await published(owner, adopted, { novelSlug: lane.slug('led-adopted') });
-    expect((await readPublicationRow(adopted))?.genres).toEqual(['Mystery']);
+    expect((await readForgePublication(adopted))?.genres).toEqual(['Mystery']);
     await published(owner, adopted, { genres: null });
     await published(owner, adopted, { blurb: 'Saved after the clear.' });
-    expect((await readPublicationRow(adopted))?.genres, 'the import is never consulted again').toBeNull();
+    expect((await readForgePublication(adopted))?.genres, 'the import is never consulted again').toBeNull();
 
     const { projectId: chosen } = await lane.imported(owner, bundle('Chosen'));
     await published(owner, chosen, { novelSlug: lane.slug('led-chosen'), genres: ['Horror'] });
-    expect((await readPublicationRow(chosen))?.genres, 'the body outranks the import').toEqual(['Horror']);
+    expect((await readForgePublication(chosen))?.genres, 'the body outranks the import').toEqual(['Horror']);
 
     const { projectId: declined } = await lane.imported(owner, bundle('Declined'));
     await published(owner, declined, { novelSlug: lane.slug('led-declined'), genres: null });
-    expect((await readPublicationRow(declined))?.genres, 'an explicit null on the first publish outranks the import').toBeNull();
+    expect((await readForgePublication(declined))?.genres, 'an explicit null on the first publish outranks the import').toBeNull();
   });
 });

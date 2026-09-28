@@ -122,7 +122,7 @@ test.describe('novel-forge organisation sharing', () => {
     });
   });
 
-  // job.service.ts:410 (5d38bd83) joins workflow_runs.id (uuid) to model_calls.run_id (varchar), so listing any project's jobs answers 500.
+  // The job list 500s whenever it holds a job (job.service.ts:410, fixme'd for the owner in jobs.spec.ts); this one holds the curator's reach once that is fixed.
   test.fixme("should list an org-shared project's jobs to its curator", async ({ forge }) => {
     const team = await forge.team('share-jobs');
     const curator = await forge.actor({ label: 'jobs-curator', organisation: team, roles: ['NovelForgeCurator'] });
@@ -146,33 +146,6 @@ test.describe('novel-forge organisation sharing', () => {
     const job = await curator.ctx.get(`/api/v1/jobs/${jobId}`);
     expect(job.status(), `the curator reaches the project, so its job too — body ${await job.text()}`).toBe(200);
     expect(((await job.json()) as { id: string }).id).toBe(jobId);
-  });
-});
-
-test.describe('novel-forge jobs read by their owner', () => {
-  // job.service.ts:410 (5d38bd83) joins workflow_runs.id (uuid) to model_calls.run_id (varchar), so reading any job answers 500.
-  test.fixme('should read a job of its own project by id', async ({ forge }) => {
-    const author = await forge.actor({ label: 'jobs-owner-id' });
-    const created = await createProject(author.ctx, {});
-    expect(created.status(), await created.text()).toBe(201);
-    const jobId = await insertJob({ projectId: ((await created.json()) as ProjectItem).id, kind: 'backfill', target: 'all', status: 'done' });
-
-    const job = await author.ctx.get(`/api/v1/jobs/${jobId}`);
-    expect(job.status(), await job.text()).toBe(200);
-    expect(await job.json()).toMatchObject({ id: jobId, kind: 'backfill', status: 'done' });
-  });
-
-  // Same join at job.service.ts:410: the project's job list answers 500 once it holds any job.
-  test.fixme("should list its own project's jobs", async ({ forge }) => {
-    const author = await forge.actor({ label: 'jobs-owner-list' });
-    const created = await createProject(author.ctx, {});
-    expect(created.status(), await created.text()).toBe(201);
-    const projectId = ((await created.json()) as ProjectItem).id;
-    const jobId = await insertJob({ projectId, kind: 'backfill', target: 'all', status: 'done' });
-
-    const jobs = await author.ctx.get(`/api/v1/projects/${projectId}/jobs`);
-    expect(jobs.status(), await jobs.text()).toBe(200);
-    expect(((await jobs.json()) as { items: { id: string }[] }).items.map(job => job.id)).toEqual([jobId]);
   });
 });
 

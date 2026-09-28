@@ -1,9 +1,4 @@
 /**
- * Importing npm packages
- */
-import { type APIRequestContext } from '@playwright/test';
-
-/**
  * Importing user defined packages
  */
 import { mutate, novelForgeDb } from '../../lib';
@@ -12,7 +7,6 @@ import { expectCode, guardedProject, newProject } from './forge-arrange';
 import { assertSpendGuarded } from './forge-db';
 import {
   countUserFeedback,
-  expectCommittedDespiteSerializerBug,
   insertLedgeredFact,
   insertPendingProposal,
   insertVolumeRow,
@@ -22,7 +16,7 @@ import {
   readVolumeRow,
   rebaselineProposal,
 } from './forge-bible';
-import { uniqueSuffix, writeChapterByHand } from './forge-helpers';
+import { createEntity, expectCommittedDespiteSerializerBug, uniqueSuffix, writeChapterByHand } from './forge-helpers';
 import { markDraftIsolated } from './forge-rows';
 
 /**
@@ -59,11 +53,6 @@ interface UndoImpactResponse {
 async function readProjectPremise(projectId: string): Promise<string | null> {
   const [row] = await novelForgeDb()<{ premise: string | null }[]>`SELECT premise FROM projects WHERE id = ${projectId}`;
   return row?.premise ?? null;
-}
-
-async function createEntity(ctx: APIRequestContext, projectId: string, entityKey: string, name: string): Promise<void> {
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, { data: { entityKey, type: 'character', name } });
-  expect(response.status(), await response.text()).toBe(201);
 }
 
 async function proposalStatus(proposalId: string): Promise<string | undefined> {
@@ -119,7 +108,7 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
     const owner = await forge.actor({ label: 'prop-conflict' });
     const projectId = await newProject(owner, 'prop-conflict');
     const entityKey = `e2e-prop-conflict-${uniqueSuffix()}`;
-    await createEntity(owner.ctx, projectId, entityKey, 'Original name');
+    await createEntity(owner.ctx, projectId, { entityKey, name: 'Original name' });
 
     const changeSetA = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Renamed by A' }];
     const changeSetB = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Renamed by B' }];
@@ -520,7 +509,7 @@ test.fixme('should answer 200 with the applied proposal on a successful apply â€
   forge,
 }) => {
   const owner = await forge.actor({ label: 'prop-apply-status-fixme' });
-  const projectId = await newProject(owner, 'prop-apply-status-fixme');
+  const projectId = await guardedProject(forge, owner, 'prop-apply-status-fixme');
   const entityKey = `e2e-prop-fixme-${uniqueSuffix()}`;
   const changeSet = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Fixme Entity' }];
   const proposalId = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet, baseline: {} });

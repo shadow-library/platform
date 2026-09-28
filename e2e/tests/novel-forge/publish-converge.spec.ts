@@ -8,37 +8,24 @@
 import { mutate, pollUntil } from '../../lib';
 import {
   FORGE_CLIENT_ID,
+  type ForgeChapterLedgerRow,
   type ForgePublication,
   publishForge,
   publishForgeChapter,
+  readForgeLedger,
   readForgePublication,
+  readPublishJob,
   reconcileForge,
   reconcileSettled,
   rescheduleForgeChapter,
   reviseForgeChapter,
   settlePublishJob,
 } from '../web-novel/forge-publication';
-import { readServedNovel, readServedNovelsByRef } from '../web-novel/helpers';
+import { readServedChapters, readServedNovel, readServedNovelsByRef, readServedWikiEntries } from '../web-novel/helpers';
 import { type ForgeActor } from './forge-actors';
 import { expectCode } from './forge-arrange';
-import {
-  buildBundle,
-  expect,
-  ladderSlugs,
-  type LedgerRow,
-  type PublishingLane,
-  readLedgerRows,
-  readPublishJob,
-  readServedCatalog,
-  readServedChapterRows,
-  readServedWikiRows,
-  reassignServedPublisher,
-  test,
-  updateChapterColumns,
-  wipeServedNovel,
-  writePublicationVocabulary,
-} from './forge-bundles';
-import { type BibleEntity, createEntity, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
+import { buildBundle, expect, ladderSlugs, type PublishingLane, reassignServedPublisher, test, wipeServedNovel, writePublicationVocabulary } from './forge-bundles';
+import { createEntity, type EntitySeed, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -53,7 +40,7 @@ import { type BibleEntity, createEntity, reconcileUntilConverged, uniqueSuffix }
  * a sweep is proven to have run by a chapter it released, never by waiting out the clock.
  */
 
-const KEEPER: BibleEntity = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
+const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
 
 const SWEEP_TIMEOUT_MS = 150_000;
 
@@ -64,12 +51,12 @@ async function importedPublication(lane: PublishingLane, owner: ForgeActor, labe
   return { ctx: owner.ctx, projectId, slug: lane.slug(label) };
 }
 
-async function ledgerRow(projectId: string, chapter: number): Promise<LedgerRow | undefined> {
-  return (await readLedgerRows(projectId)).find(row => row.chapter === chapter);
+async function ledgerRow(projectId: string, chapter: number): Promise<ForgeChapterLedgerRow | undefined> {
+  return (await readForgeLedger(projectId)).find(row => row.chapter === chapter);
 }
 
 /** Waits for the janitor to release `chapter`, which only a sweep does for a row scheduled into the future. */
-async function awaitSweptRelease(projectId: string, chapter: number): Promise<LedgerRow | undefined> {
+async function awaitSweptRelease(projectId: string, chapter: number): Promise<ForgeChapterLedgerRow | undefined> {
   return pollUntil(
     () => ledgerRow(projectId, chapter),
     row => row?.status === 'published',
@@ -92,43 +79,43 @@ test.describe('novel-forge publish converge', () => {
     const saved = (body: Record<string, unknown>): Promise<unknown> => publishForge(owner.ctx, projectId, body).then(job => expect(job?.status).toBe('done'));
 
     await saved({ novelSlug: slug, title: 'The Quiet Coast', genres: ['Fantasy'], tags: ['Female Protagonist'], violence: 'mild', darkContent: 'heavy' });
-    expect(await readServedCatalog(slug)).toEqual(
+    expect(await readServedNovel(slug)).toEqual(
       expect.objectContaining({ genres: ['Fantasy'], tags: ['Female Protagonist'], sexualContent: null, violence: 'mild', darkContent: 'heavy', revision: 1 }),
     );
 
     await saved({ tags: ['Female Protagonist', 'Weak to Strong'] });
-    expect(await readServedCatalog(slug)).toEqual(expect.objectContaining({ tags: ['Female Protagonist', 'Weak to Strong'], revision: 2 }));
+    expect(await readServedNovel(slug)).toEqual(expect.objectContaining({ tags: ['Female Protagonist', 'Weak to Strong'], revision: 2 }));
     await saved({ violence: 'graphic' });
-    expect(await readServedCatalog(slug)).toEqual(expect.objectContaining({ violence: 'graphic', revision: 3 }));
+    expect(await readServedNovel(slug)).toEqual(expect.objectContaining({ violence: 'graphic', revision: 3 }));
     await saved({ violence: null });
-    expect(await readServedCatalog(slug), 'a nulled rating goes out unrated; an omitted one stands').toEqual(
+    expect(await readServedNovel(slug), 'a nulled rating goes out unrated; an omitted one stands').toEqual(
       expect.objectContaining({ violence: null, darkContent: 'heavy', revision: 4 }),
     );
 
     await writePublicationVocabulary(projectId, ['Fantasy', 'Fantasy', 'Space Western'], ['Weak to Strong', 'Not A Tag']);
     const repushed = await reconcileSettled({ ctx: owner.ctx, projectId, slug });
     expect(repushed.novel, 'the push goes out rather than failing on the stored vocabulary').toBe('applied');
-    expect(await readServedCatalog(slug)).toEqual(expect.objectContaining({ genres: ['Fantasy'], tags: ['Weak to Strong'], revision: 5 }));
+    expect(await readServedNovel(slug)).toEqual(expect.objectContaining({ genres: ['Fantasy'], tags: ['Weak to Strong'], revision: 5 }));
   });
 
   test('should push reader-clean chapters and ledger each one published with its hash and time', async ({ forge, lane }) => {
     const owner = await forge.actor({ label: 'conv-payload' });
     const publication = await importedPublication(lane, owner, 'conv-payload');
     const { projectId, slug } = publication;
-    await updateChapterColumns(projectId, 2, { title: null, note: '   ' });
-    await updateChapterColumns(projectId, 3, { note: '  A word from the keeper.  ' });
+    await reviseForgeChapter(projectId, 2, { title: null, note: '   ' });
+    await reviseForgeChapter(projectId, 3, { note: '  A word from the keeper.  ' });
 
     expect((await publishForge(owner.ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
     for (const chapter of [1, 2, 3]) await publishForgeChapter(owner.ctx, projectId, chapter);
     await reconcileUntilConverged(owner.ctx, projectId, [1, 2, 3], []);
 
-    const ledger = await readLedgerRows(projectId);
+    const ledger = await readForgeLedger(projectId);
     expect(ledger.map(row => [row.status, row.error, row.publishedAt instanceof Date])).toEqual([
       ['published', null, true],
       ['published', null, true],
       ['published', null, true],
     ]);
-    const served = await readServedChapterRows(slug);
+    const served = await readServedChapters(slug);
     expect(served.map(({ ordinal, title, authorNote, contentRating, revision }) => ({ ordinal, title, authorNote, contentRating, revision }))).toEqual([
       { ordinal: 1, title: 'Chapter 1: The Watch', authorNote: null, contentRating: null, revision: 1 },
       { ordinal: 2, title: 'Chapter 2', authorNote: null, contentRating: null, revision: 1 },
@@ -147,9 +134,9 @@ test.describe('novel-forge publish converge', () => {
     for (const chapter of [1, 2]) await publishForgeChapter(owner.ctx, projectId, chapter);
     await reconcileUntilConverged(owner.ctx, projectId, [1, 2], [KEEPER.entityKey]);
 
-    const catalog = await readServedCatalog(slug);
-    const chapters = await readServedChapterRows(slug);
-    const wiki = await readServedWikiRows(slug);
+    const catalog = await readServedNovel(slug);
+    const chapters = await readServedChapters(slug);
+    const wiki = await readServedWikiEntries(slug);
     expect(chapters.map(row => row.ordinal)).toEqual([1, 2]);
     expect(wiki.map(row => row.entryKey)).toEqual([KEEPER.entityKey]);
 
@@ -157,9 +144,11 @@ test.describe('novel-forge publish converge', () => {
     const rebuilt = await reconcileSettled(publication);
     expect(rebuilt).toEqual(expect.objectContaining({ novel: 'applied', pushed: [1, 2], failed: [] }));
     expect(rebuilt.wiki).toEqual(expect.objectContaining({ pushed: [KEEPER.entityKey], failed: [] }));
-    expect(await readServedCatalog(slug)).toEqual(catalog);
-    expect(await readServedChapterRows(slug), 'every chapter comes back byte for byte').toEqual(chapters);
-    expect(await readServedWikiRows(slug)).toEqual(wiki);
+    const rebuiltCatalog = await readServedNovel(slug);
+    expect(rebuiltCatalog?.id, 'the catalog comes back as a new row').not.toBe(catalog?.id);
+    expect(rebuiltCatalog).toEqual({ ...catalog, id: expect.any(String), updatedAt: expect.any(Date) });
+    expect(await readServedChapters(slug), 'every chapter comes back byte for byte').toEqual(chapters.map(row => ({ ...row, id: expect.any(String) })));
+    expect(await readServedWikiEntries(slug)).toEqual(wiki.map(row => ({ ...row, id: expect.any(String) })));
   });
 
   test('should refuse to push prose that drifted after the publish decision until the chapter is republished', async ({ forge, lane }) => {
@@ -169,7 +158,7 @@ test.describe('novel-forge publish converge', () => {
     expect((await publishForge(owner.ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
     await publishForgeChapter(owner.ctx, projectId, 1);
     await reconcileUntilConverged(owner.ctx, projectId, [1], []);
-    const [held] = await readServedChapterRows(slug);
+    const [held] = await readServedChapters(slug);
 
     const revised = 'Mira climbed the stair one final time and put out the flame.';
     await reviseForgeChapter(projectId, 1, { content: revised });
@@ -178,12 +167,12 @@ test.describe('novel-forge publish converge', () => {
     const drift = 'canonical prose changed since this publish was decided — republish chapter 1';
     expect(refused.failed).toEqual([{ ordinal: 1, error: drift }]);
     expect(await ledgerRow(projectId, 1)).toEqual(expect.objectContaining({ status: 'failed', error: drift, revision: 1 }));
-    expect(await readServedChapterRows(slug), 'the reader keeps the prose the author published').toEqual([held]);
+    expect(await readServedChapters(slug), 'the reader keeps the prose the author published').toEqual([held]);
 
     await publishForgeChapter(owner.ctx, projectId, 1);
     await reconcileUntilConverged(owner.ctx, projectId, [1], []);
     expect(await ledgerRow(projectId, 1)).toEqual(expect.objectContaining({ status: 'published', error: null, revision: 2 }));
-    expect((await readServedChapterRows(slug))[0]).toEqual(expect.objectContaining({ content: revised, revision: 2 }));
+    expect((await readServedChapters(slug))[0]).toEqual(expect.objectContaining({ content: revised, revision: 2 }));
   });
 });
 
@@ -194,12 +183,12 @@ test.describe('novel-forge publish converge onto foreign slugs', () => {
     const slug = lane.slug('conv-foreign');
     const [, second] = ladderSlugs(slug);
     await lane.foreignNovel(slug);
-    const foreign = await readServedCatalog(slug);
+    const foreign = await readServedNovel(slug);
 
     expect((await publishForge(owner.ctx, projectId, { novelSlug: slug, title: 'The Salt Road' }))?.status).toBe('done');
     expect((await readForgePublication(projectId))?.novelSlug).toBe(second);
     expect(await readServedNovelsByRef(FORGE_CLIENT_ID, projectId)).toEqual([expect.objectContaining({ slug: second, sourceRef: projectId, revision: 1 })]);
-    expect(await readServedCatalog(slug), "the other publisher's novel is untouched").toEqual(foreign);
+    expect(await readServedNovel(slug), "the other publisher's novel is untouched").toEqual(foreign);
   });
 
   test('should give up after five foreign rungs, roll the slug back and ledger a failure the janitor never retries', async ({ forge, lane }) => {
@@ -242,7 +231,7 @@ test.describe('novel-forge publish converge onto foreign slugs', () => {
     await publishForgeChapter(owner.ctx, projectId, 1);
     await reconcileUntilConverged(owner.ctx, projectId, [1], []);
     const original = await readServedNovel(slug);
-    const originalChapters = await readServedChapterRows(slug);
+    const originalChapters = await readServedChapters(slug);
 
     await reassignServedPublisher(slug, 'e2e-seed');
     const moved = await reconcileSettled(publication);
@@ -251,11 +240,11 @@ test.describe('novel-forge publish converge onto foreign slugs', () => {
     const [laddered] = await readServedNovelsByRef(FORGE_CLIENT_ID, projectId);
     expect(laddered).toEqual(expect.objectContaining({ slug: second, sourceRef: projectId }));
     expect(laddered?.id, 'a second novel, not the original recovered').not.toBe(original?.id);
-    expect((await readServedChapterRows(second as string)).map(row => row.contentHash)).toEqual(originalChapters.map(row => row.contentHash));
+    expect((await readServedChapters(second as string)).map(row => row.contentHash)).toEqual(originalChapters.map(row => row.contentHash));
     expect(await readServedNovel(slug), 'the original is left where it was, no longer addressable by the forge').toEqual(
       expect.objectContaining({ id: original?.id, sourceClientId: 'e2e-seed' }),
     );
-    expect(await readServedChapterRows(slug)).toEqual(originalChapters);
+    expect(await readServedChapters(slug)).toEqual(originalChapters);
   });
 });
 
@@ -283,7 +272,7 @@ test.describe('novel-forge publication janitor', () => {
     expect(job?.status, 'the release ran through the publish job').toBe('done');
     expect(job?.updatedAt.getTime()).toBeGreaterThan(before?.updatedAt.getTime() ?? 0);
     expect((await ledgerRow(due.projectId, 2))?.status).toBe('scheduled');
-    expect((await readServedChapterRows(due.slug)).map(row => row.ordinal)).toEqual([1]);
+    expect((await readServedChapters(due.slug)).map(row => row.ordinal)).toEqual([1]);
 
     expect(await readPublishJob(idle.projectId), 'a sweep with nothing due for a project enqueues nothing for it').toEqual(idleJob);
     expect((await ledgerRow(idle.projectId, 1))?.status).toBe('scheduled');

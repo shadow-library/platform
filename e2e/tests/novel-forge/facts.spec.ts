@@ -8,18 +8,19 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
+import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
-import { approveChapter, type Draft, errorCode, readDraft, saveChapter, startNextChapter } from './forge-helpers';
+import { approveChapter, createEntity, type Draft, readDraft, saveChapter, startNextChapter } from './forge-helpers';
 import {
   approveAsRead,
   countKnowledge,
-  createEntity,
   createGuardedProject,
   type FactBody,
   putFact,
   readBriefStale,
   readFactRow,
   readKnowledge,
+  readStaleDraft,
   readyFinalizeReview,
   writeBrief,
   writeFact,
@@ -44,10 +45,6 @@ interface Fact extends Omit<FactBody, 'writerNote' | 'constraintNote'> {
   readonly plannedChapter?: number | null;
   readonly disclosedInChapter?: number | null;
   readonly knowledge: KnowledgeEntry[];
-}
-
-interface StaleDraft extends Draft {
-  readonly staleReason: string | null;
 }
 
 interface Milestone {
@@ -91,17 +88,8 @@ async function readFact(ctx: APIRequestContext, projectId: string, factKey: stri
   return (await response.json()) as Fact;
 }
 
-async function expectRefused(response: APIResponse, status: number, code: string, what: string): Promise<void> {
-  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
-  expect(await errorCode(response), what).toBe(code);
-}
-
 function reveal(ctx: APIRequestContext, projectId: string, factKey: string, data: { entityKey: string; chapter: number; note?: string }): Promise<APIResponse> {
   return mutate(ctx, 'post', factPath(projectId, `/${factKey}/reveal`), { data });
-}
-
-async function readStaleDraft(ctx: APIRequestContext, projectId: string, chapter: number): Promise<StaleDraft> {
-  return (await readDraft(ctx, projectId, chapter)) as StaleDraft;
 }
 
 async function readMilestone(ctx: APIRequestContext, projectId: string, milestoneKey: string): Promise<Milestone | undefined> {
@@ -138,7 +126,7 @@ test.describe('novel-forge canon facts', () => {
     expect(cleared, 'the rest stays').toMatchObject({ constraintNote: FULL_FACT.constraintNote, terms: FULL_FACT.terms, subjects: FULL_FACT.subjects });
 
     const malformed = await putFact(owner.ctx, projectId, ORACLE, { text: retold, unlock: { all: [{ ending: false } as never] } });
-    await expectRefused(malformed, 400, 'FCT_005', 'an ending term that is not true');
+    await expectCode(malformed, 400, 'FCT_005', 'an ending term that is not true');
     expect((await readFact(owner.ctx, projectId, ORACLE)).unlock, 'the refused condition was not stored').toBeUndefined();
 
     const listed = await owner.ctx.get(factPath(projectId));
@@ -169,9 +157,9 @@ test.describe('novel-forge canon facts', () => {
     expect(retracted.status(), await retracted.text()).toBe(200);
     expect(((await retracted.json()) as Fact).knowledge.map(entry => entry.entityKey)).toEqual(['mira']);
 
-    await expectRefused(await reveal(owner.ctx, projectId, 'no_such_fact', { entityKey: 'mira', chapter: 1 }), 404, 'FCT_001', 'revealing an unknown fact');
-    await expectRefused(await reveal(owner.ctx, projectId, ORACLE, { entityKey: 'ghost', chapter: 1 }), 400, 'FCT_002', 'revealing to an unknown entity');
-    await expectRefused(await mutate(owner.ctx, 'delete', factPath(projectId, '/no_such_fact/knowledge/mira')), 404, 'FCT_001', 'retracting from an unknown fact');
+    await expectCode(await reveal(owner.ctx, projectId, 'no_such_fact', { entityKey: 'mira', chapter: 1 }), 404, 'FCT_001', 'revealing an unknown fact');
+    await expectCode(await reveal(owner.ctx, projectId, ORACLE, { entityKey: 'ghost', chapter: 1 }), 400, 'FCT_002', 'revealing to an unknown entity');
+    await expectCode(await mutate(owner.ctx, 'delete', factPath(projectId, '/no_such_fact/knowledge/mira')), 404, 'FCT_001', 'retracting from an unknown fact');
     expect((await readFact(owner.ctx, projectId, ORACLE)).knowledge, 'refusals leave the ledger alone').toHaveLength(1);
 
     // apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:732 warns this removes "everything recorded about who learns it"; FCT_003
@@ -179,8 +167,8 @@ test.describe('novel-forge canon facts', () => {
     const deleted = await mutate(owner.ctx, 'delete', factPath(projectId, `/${ORACLE}`));
     expect(deleted.status(), await deleted.text()).toBe(204);
     expect(await countKnowledge(projectId), 'the ledger went with the fact').toBe(0);
-    await expectRefused(await owner.ctx.get(factPath(projectId, `/${ORACLE}`)), 404, 'FCT_001', 'reading a deleted fact');
-    await expectRefused(await mutate(owner.ctx, 'delete', factPath(projectId, `/${ORACLE}`)), 404, 'FCT_001', 'deleting it twice');
+    await expectCode(await owner.ctx.get(factPath(projectId, `/${ORACLE}`)), 404, 'FCT_001', 'reading a deleted fact');
+    await expectCode(await mutate(owner.ctx, 'delete', factPath(projectId, `/${ORACLE}`)), 404, 'FCT_001', 'deleting it twice');
 
     await writeFact(owner.ctx, projectId, ORACLE, { text: ORACLE_TEXT });
     expect((await readFact(owner.ctx, projectId, ORACLE)).knowledge, 'the key is free to write again, with no ledger').toEqual([]);
@@ -208,11 +196,11 @@ test.describe('novel-forge canon facts', () => {
     expect(await readKnowledge(projectId, ORACLE), 'with the reveal it ledgered').toEqual([]);
 
     await assertSpendGuarded(projectId);
-    await expectRefused(await approveChapter(owner.ctx, projectId, stale), 400, 'DRF_007', 'approving a stale draft');
+    await expectCode(await approveChapter(owner.ctx, projectId, stale), 400, 'DRF_007', 'approving a stale draft');
     const asWritten = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/drafts/1/approve`, {
       data: { revision: stale.revision, saveSeq: stale.saveSeq, draftId: stale.id, keepStale: true, staleReason: stale.staleReason },
     });
-    await expectRefused(asWritten, 400, 'DRF_017', 'approving as written over a reveal that no longer holds');
+    await expectCode(asWritten, 400, 'DRF_017', 'approving as written over a reveal that no longer holds');
 
     await writeFact(owner.ctx, projectId, ORACLE, { text: ORACLE_TEXT, revealChapter: 1 });
     expect(await readBriefStale(projectId, 1), 'the reconcile lifts its own mark').toBeNull();
@@ -302,7 +290,7 @@ test.describe('novel-forge story API responses', () => {
   });
 
   // generation.dto.ts:597 — BriefResponse has no knowledgeContract field, so a plan's contract is write-only through the API, though
-  // docs/novel-forge/ai-testing.md:966-967 expects `GET /briefs/:n` to echo it back.
+  // docs/novel-forge/ai-testing.md:993 expects `GET /briefs/:n` to echo it back.
   test.fixme("should read a plan's knowledge contract back from the plan", async ({ forge }) => {
     const owner = await forge.actor({ label: 'facts-brief' });
     const projectId = await createGuardedProject(forge, owner, 'facts-brief');

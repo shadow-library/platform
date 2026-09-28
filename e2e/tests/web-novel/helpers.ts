@@ -89,6 +89,11 @@ export interface ServedNovel {
   readonly title: string;
   readonly originalAuthor: string | null;
   readonly blurb: string | null;
+  readonly genres: string[];
+  readonly tags: string[];
+  readonly sexualContent: string | null;
+  readonly violence: string | null;
+  readonly darkContent: string | null;
   readonly revision: number;
   readonly updatedAt: Date;
 }
@@ -104,8 +109,10 @@ export interface ServedChapter {
   readonly ordinal: number;
   readonly title: string;
   readonly content: string;
+  readonly authorNote: string | null;
   readonly contentHash: string;
   readonly revision: number;
+  readonly wordCount: number | null;
   readonly contentRating: Record<string, string> | null;
 }
 
@@ -117,6 +124,8 @@ export interface ServedChapterPatch {
 
 export interface ServedWikiEntry {
   readonly id: string;
+  readonly entryKey: string;
+  readonly firstVisibleOrdinal: number;
   readonly revision: number;
   readonly contentHash: string;
   readonly facets: { facetKey: string; content: string; visibleFromOrdinal: number }[];
@@ -335,7 +344,8 @@ export function accessAuditSince(slug: string, watermark: string): Promise<Publi
 export async function readServedNovelsByRef(sourceClientId: string, sourceRef: string): Promise<ServedNovel[]> {
   return webNovelDb()<ServedNovel[]>`
     SELECT id::text AS id, slug, source_client_id AS "sourceClientId", source_ref AS "sourceRef", publish_token AS "publishToken", title,
-      original_author AS "originalAuthor", blurb, revision, updated_at AS "updatedAt"
+      original_author AS "originalAuthor", blurb, genres, tags, sexual_content AS "sexualContent", violence, dark_content AS "darkContent", revision,
+      updated_at AS "updatedAt"
     FROM novels WHERE source_client_id = ${sourceClientId} AND source_ref = ${sourceRef}
   `;
 }
@@ -343,7 +353,8 @@ export async function readServedNovelsByRef(sourceClientId: string, sourceRef: s
 export async function readServedNovel(slug: string): Promise<ServedNovel | undefined> {
   const [novel] = await webNovelDb()<ServedNovel[]>`
     SELECT id::text AS id, slug, source_client_id AS "sourceClientId", source_ref AS "sourceRef", publish_token AS "publishToken", title,
-      original_author AS "originalAuthor", blurb, revision, updated_at AS "updatedAt"
+      original_author AS "originalAuthor", blurb, genres, tags, sexual_content AS "sexualContent", violence, dark_content AS "darkContent", revision,
+      updated_at AS "updatedAt"
     FROM novels WHERE slug = ${slug}
   `;
   return novel;
@@ -358,7 +369,8 @@ export async function updateServedNovel(slug: string, patch: ServedNovelPatch): 
 
 export async function readServedChapters(slug: string): Promise<ServedChapter[]> {
   return webNovelDb()<ServedChapter[]>`
-    SELECT c.id::text AS id, c.ordinal, c.title, c.content, c.content_hash AS "contentHash", c.revision, c.content_rating AS "contentRating"
+    SELECT c.id::text AS id, c.ordinal, c.title, c.content, c.author_note AS "authorNote", c.content_hash AS "contentHash", c.revision, c.word_count AS "wordCount",
+      c.content_rating AS "contentRating"
     FROM published_chapters c JOIN novels n ON n.id = c.novel_id WHERE n.slug = ${slug} ORDER BY c.ordinal
   `;
 }
@@ -382,15 +394,23 @@ export async function insertServedChapter(slug: string, ordinal: number): Promis
   `;
 }
 
-export async function readServedWikiEntry(slug: string, entryKey: string): Promise<ServedWikiEntry | undefined> {
-  const [entry] = await webNovelDb()<ServedWikiEntry[]>`
-    SELECT e.id::text AS id, e.revision, e.content_hash AS "contentHash",
+/** Every wiki entry the reader serves for the novel, or only `entryKey`'s, with its facets and images in display order. */
+export async function readServedWikiEntries(slug: string, entryKey?: string): Promise<ServedWikiEntry[]> {
+  const sql = webNovelDb();
+  return sql<ServedWikiEntry[]>`
+    SELECT e.id::text AS id, e.entry_key AS "entryKey", e.first_visible_ordinal AS "firstVisibleOrdinal", e.revision, e.content_hash AS "contentHash",
       coalesce((SELECT json_agg(json_build_object('facetKey', f.facet_key, 'content', f.content, 'visibleFromOrdinal', f.visible_from_ordinal) ORDER BY f.sort_order)
         FROM wiki_entry_facets f WHERE f.entry_id = e.id), '[]') AS facets,
       coalesce((SELECT json_agg(json_build_object('imageRef', i.image_ref, 'caption', i.caption) ORDER BY i.sort_order)
         FROM wiki_entry_images i WHERE i.entry_id = e.id), '[]') AS images
-    FROM wiki_entries e JOIN novels n ON n.id = e.novel_id WHERE n.slug = ${slug} AND e.entry_key = ${entryKey}
+    FROM wiki_entries e JOIN novels n ON n.id = e.novel_id
+    WHERE n.slug = ${slug} ${entryKey === undefined ? sql`` : sql`AND e.entry_key = ${entryKey}`}
+    ORDER BY e.entry_key
   `;
+}
+
+export async function readServedWikiEntry(slug: string, entryKey: string): Promise<ServedWikiEntry | undefined> {
+  const [entry] = await readServedWikiEntries(slug, entryKey);
   return entry;
 }
 

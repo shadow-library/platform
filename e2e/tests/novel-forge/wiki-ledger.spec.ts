@@ -6,10 +6,11 @@
  * Importing user defined packages
  */
 import { mutate } from '../../lib';
-import { publishForge, publishForgeChapter } from '../web-novel/forge-publication';
+import { publishForge, publishForgeChapter, readForgeWikiLedger } from '../web-novel/forge-publication';
+import { readServedWikiEntries } from '../web-novel/helpers';
 import { type ForgeActor } from './forge-actors';
-import { buildBundle, countEntities, expect, readServedWikiRows, readWikiLedgerRows, test } from './forge-bundles';
-import { type BibleEntity, createEntity, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
+import { buildBundle, countEntities, expect, test } from './forge-bundles';
+import { createEntity, type EntitySeed, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -24,9 +25,9 @@ import { type BibleEntity, createEntity, reconcileUntilConverged, uniqueSuffix }
  * is `pending` only inside the converge that writes it, so the ledger is read once each converge settles.
  */
 
-const KEEPER: BibleEntity = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
-const ORDER: BibleEntity = { entityKey: 'e2e-order', type: 'faction', name: 'The Tidewatch Order' };
-const RIVAL: BibleEntity = { entityKey: 'e2e-rival', type: 'character', name: 'Odo the Assessor', body: 'A guild assessor who wants the coast light dark.' };
+const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
+const ORDER: EntitySeed = { entityKey: 'e2e-order', type: 'faction', name: 'The Tidewatch Order' };
+const RIVAL: EntitySeed = { entityKey: 'e2e-rival', type: 'character', name: 'Odo the Assessor', body: 'A guild assessor who wants the coast light dark.' };
 
 async function revealFact(owner: ForgeActor, projectId: string, factKey: string, subject: string, chapter: number): Promise<void> {
   const fact = await mutate(owner.ctx, 'put', `/api/v1/projects/${projectId}/facts/${factKey}`, { data: { text: `The ${factKey} holds.`, subjects: [subject] } });
@@ -46,9 +47,9 @@ test.describe('novel-forge wiki publishing ledger', () => {
     expect((await publishForge(owner.ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
     await publishForgeChapter(owner.ctx, projectId, 1);
     await reconcileUntilConverged(owner.ctx, projectId, [1], [KEEPER.entityKey]);
-    const [first] = await readWikiLedgerRows(projectId);
+    const [first] = await readForgeWikiLedger(projectId);
     expect(first).toEqual(expect.objectContaining({ entryKey: KEEPER.entityKey, state: 'pushed', revision: 1 }));
-    const [served] = await readServedWikiRows(slug);
+    const [served] = await readServedWikiEntries(slug);
     expect(served).toEqual(expect.objectContaining({ revision: 1, contentHash: first?.contentHash }));
     expect(
       served?.facets.map(facet => facet.facetKey),
@@ -57,10 +58,10 @@ test.describe('novel-forge wiki publishing ledger', () => {
 
     await publishForgeChapter(owner.ctx, projectId, 2);
     await reconcileUntilConverged(owner.ctx, projectId, [1, 2], [KEEPER.entityKey]);
-    const [second] = await readWikiLedgerRows(projectId);
+    const [second] = await readForgeWikiLedger(projectId);
     expect(second).toEqual(expect.objectContaining({ state: 'pushed', revision: 2 }));
     expect(second?.contentHash).not.toBe(first?.contentHash);
-    const [reserved] = await readServedWikiRows(slug);
+    const [reserved] = await readServedWikiEntries(slug);
     expect(reserved).toEqual(expect.objectContaining({ revision: 2, contentHash: second?.contentHash }));
     expect(reserved?.facets.map(facet => [facet.facetKey, facet.visibleFromOrdinal])).toEqual([
       ['profile', 0],
@@ -79,7 +80,7 @@ test.describe('novel-forge wiki publishing ledger', () => {
     expect((await publishForge(owner.ctx, projectId, { novelSlug: slug, title: 'The Quiet Coast' }))?.status).toBe('done');
     await publishForgeChapter(owner.ctx, projectId, 1);
     await reconcileUntilConverged(owner.ctx, projectId, [1], [KEEPER.entityKey, ORDER.entityKey]);
-    const converged = await readWikiLedgerRows(projectId);
+    const converged = await readForgeWikiLedger(projectId);
     expect(converged.map(row => [row.entryKey, row.state, row.revision])).toEqual([
       [KEEPER.entityKey, 'pushed', 1],
       [ORDER.entityKey, 'pushed', 1],
@@ -88,7 +89,7 @@ test.describe('novel-forge wiki publishing ledger', () => {
 
     await createEntity(owner.ctx, projectId, RIVAL);
     await reconcileUntilConverged(owner.ctx, projectId, [1], [RIVAL.entityKey]);
-    const grown = await readWikiLedgerRows(projectId);
+    const grown = await readForgeWikiLedger(projectId);
     expect(grown.find(row => row.entryKey === RIVAL.entityKey)).toEqual(expect.objectContaining({ state: 'pushed', revision: 1 }));
     expect(
       grown.find(row => row.entryKey === KEEPER.entityKey),
@@ -98,13 +99,13 @@ test.describe('novel-forge wiki publishing ledger', () => {
     const retracted = await mutate(owner.ctx, 'delete', `/api/v1/projects/${projectId}/facts/e2e-order-flame`);
     expect(retracted.ok(), await retracted.text()).toBe(true);
     await reconcileUntilConverged(owner.ctx, projectId, [1], [KEEPER.entityKey, RIVAL.entityKey]);
-    expect((await readWikiLedgerRows(projectId)).map(row => [row.entryKey, row.state])).toEqual([
+    expect((await readForgeWikiLedger(projectId)).map(row => [row.entryKey, row.state])).toEqual([
       [KEEPER.entityKey, 'pushed'],
       [ORDER.entityKey, 'deleted'],
       [RIVAL.entityKey, 'pushed'],
     ]);
     expect(
-      (await readServedWikiRows(slug)).map(row => row.entryKey),
+      (await readServedWikiEntries(slug)).map(row => row.entryKey),
       'the facet-less entry is gone from the reader',
     ).toEqual([KEEPER.entityKey, RIVAL.entityKey]);
     expect(await countEntities(projectId), 'the entity itself stays in the bible').toBe(3);

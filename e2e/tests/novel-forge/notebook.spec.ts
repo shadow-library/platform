@@ -10,7 +10,6 @@ import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode, newProject } from './forge-arrange';
 import {
-  expectCommittedDespiteSerializerBug,
   ForgeArrangeError,
   insertAuditFindingDecision,
   insertPendingProposal,
@@ -20,7 +19,7 @@ import {
   readProposalRow,
   rebaselineProposal,
 } from './forge-bible';
-import { uniqueSuffix } from './forge-helpers';
+import { expectCommittedDespiteSerializerBug, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types

@@ -9,11 +9,10 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { assertSpendGuarded, insertJob, listDispatchedModelCalls } from './forge-db';
-import { type Draft, errorCode, saveChapter, startNextChapter } from './forge-helpers';
+import { createEntity, type Draft, errorCode, saveChapter, startNextChapter } from './forge-helpers';
 import {
   approveAsRead,
   type ContextPreview,
-  createEntity,
   createGuardedProject,
   type EndingContract,
   insertEntities,

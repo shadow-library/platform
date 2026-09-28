@@ -7,7 +7,7 @@ import { type APIRequestContext, test as base } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, clearIpState, freshClientIp, runAll } from '../../lib';
-import { expectImportLanded, startFinalImport } from '../novel-forge/forge-helpers';
+import { expectImportLanded, startFinalImport } from '../novel-forge/forge-bundles';
 import { createForgeProject, type ForgePublication, type ForgeSession, openCuratorSession, removeForgePublication } from './forge-publication';
 import { deleteNovels, uniqueNovelSlug } from './helpers';
 
@@ -16,7 +16,7 @@ import { deleteNovels, uniqueNovelSlug } from './helpers';
  */
 
 export interface ForgeProjectOptions {
-  /** Lands the three finalized chapters of `buildFinalBundle` through a novel import, so chapters can be published without a model. */
+  /** Lands the three finalized chapters of `FINAL_BUNDLE` through a novel import, so chapters can be published without a model. */
   chapters?: boolean;
   /** The author's forge context; user1's when omitted. */
   ctx?: APIRequestContext;

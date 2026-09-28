@@ -20,24 +20,20 @@ export interface ModelRef {
   readonly model: string;
 }
 
-/** The subset of `POST /api/v1/import` a bundle needs — enough to author a valid one by hand. */
-export interface NovelBundle {
-  format: 'novel-import';
-  schemaVersion: 1;
-  mode: 'final';
-  novel: { title: string; synopsis: string; tags?: string[]; genre?: string; cover?: string };
-  volumes: { ordinal: number; title?: string; chapters: { title: string; content: string }[] }[];
-  assets?: { name: string; mimeType: string; dataBase64: string }[];
-}
+export type EntityType = 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
 
-export interface BibleEntity {
+export interface EntitySeed {
   entityKey: string;
-  type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
   name: string;
-  body?: string;
+  type?: EntityType;
+  significance?: 'major' | 'minor' | null;
+  body?: string | null;
 }
 
 export type ContentMode = 'standard' | 'unrestricted';
+
+/** What an API answer and a page's network answer share, so either can be judged by the same helpers. */
+export type HttpAnswer = Pick<APIResponse, 'status' | 'text'>;
 
 export type CostTier = 'economy' | 'balanced' | 'performant';
 
@@ -133,6 +129,11 @@ export interface FinalizeReview {
 
 export const MODEL_TAG = '@model';
 
+/** The default handler's body for an uncaught server error (`packages/fastify/src/server.error.ts`), which a 500 from the serializer bug carries. */
+const UNEXPECTED_SERVER_ERROR_CODE = 'S001';
+
+const JOB_SETTLE_TIMEOUT_MS = 30_000;
+
 export class ForgeJobTimeoutError extends Error {
   override readonly name = 'ForgeJobTimeoutError';
 }
@@ -205,13 +206,26 @@ export function uniqueSuffix(): string {
 }
 
 /** Parses a response body as JSON, tolerating an empty body (204) by returning `undefined`. */
-export async function jsonOrUndefined<T = Record<string, unknown>>(response: APIResponse): Promise<T | undefined> {
+export async function jsonOrUndefined<T = Record<string, unknown>>(response: HttpAnswer): Promise<T | undefined> {
   const text = await response.text();
   return text ? (JSON.parse(text) as T) : undefined;
 }
 
-export async function errorCode(response: APIResponse): Promise<string | undefined> {
+export async function errorCode(response: HttpAnswer): Promise<string | undefined> {
   return (await jsonOrUndefined<{ code?: string }>(response))?.code;
+}
+
+/**
+ * A POST declaring two `@RespondFor` codes and no `@HttpStatus` defaults to 201 (`packages/fastify/src/module/fastify-router.ts:322-327`), which
+ * has no bigint-safe response transformer, and a nullable bigint response field that just went non-null fails the same way
+ * (`packages/class-schema/src/class-schema.ts:194-200`): the write commits, then answers `500 S001`. Only `expectedStatus` or that exact 500
+ * passes — never an unrelated one — and the caller reads the committed state back rather than trusting the body.
+ */
+export async function expectCommittedDespiteSerializerBug(response: HttpAnswer, expectedStatus: number, what: string): Promise<void> {
+  if (response.status() === expectedStatus) return;
+  const body = await response.text();
+  expect(response.status(), `${what} — neither ${expectedStatus} nor the serializer bug's 500 — body ${body}`).toBe(500);
+  expect(await errorCode(response), `${what} — a 500 not carrying the serializer bug's code — body ${body}`).toBe(UNEXPECTED_SERVER_ERROR_CODE);
 }
 
 export async function createProject(
@@ -266,22 +280,26 @@ export async function writeChapterByHand(ctx: APIRequestContext, projectId: stri
   return saveChapter(ctx, projectId, await startNextChapter(ctx, projectId), text);
 }
 
-/** Pastes prose into the next chapter, as "Import chapters" does; `isolated` firewalls it as an unrestricted chapter. */
-export async function pasteChapter(ctx: APIRequestContext, projectId: string, text: ChapterText, options: { isolated?: boolean } = {}): Promise<Draft> {
-  const draft = await startNextChapter(ctx, projectId);
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${draft.chapter}/import`, {
+/** Imports prose onto `base`, as "Import chapters" does; `isolated` firewalls it as an unrestricted chapter and is left to the server when omitted. */
+export async function importDraft(ctx: APIRequestContext, projectId: string, base: Draft, text: ChapterText, options: { isolated?: boolean } = {}): Promise<Draft> {
+  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${base.chapter}/import`, {
     data: {
-      baseDraftId: draft.id,
-      baseRevision: draft.revision,
-      baseSaveSeq: draft.saveSeq,
+      baseDraftId: base.id,
+      baseRevision: base.revision,
+      baseSaveSeq: base.saveSeq,
       prose: text.body,
       title: text.title,
       summary: text.summary,
-      isolated: options.isolated ?? false,
+      ...(options.isolated === undefined ? {} : { isolated: options.isolated }),
     },
   });
-  expect(response.status(), await response.text()).toBe(200);
-  return (await response.json()) as Draft;
+  await expectCommittedDespiteSerializerBug(response, 200, `importing chapter ${base.chapter}`);
+  return readDraft(ctx, projectId, base.chapter);
+}
+
+/** Pastes prose into the next chapter the server allows. */
+export async function pasteChapter(ctx: APIRequestContext, projectId: string, text: ChapterText, options: { isolated?: boolean } = {}): Promise<Draft> {
+  return importDraft(ctx, projectId, await startNextChapter(ctx, projectId), text, { isolated: options.isolated ?? false });
 }
 
 export async function approveChapter(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<APIResponse> {
@@ -291,48 +309,10 @@ export async function approveChapter(ctx: APIRequestContext, projectId: string, 
 }
 
 /**
- * A minimal, valid novel-import bundle: one volume, three finalized chapters, landed locked, human-authored and publish-ready. Three
- * chapters let the publish spec exercise the non-contiguous gate — publish 1, then attempt 3 → PUB_003.
+ * Waits for a job to settle, read from the forge's own table: `GET /api/v1/jobs/:id` and the project job list answer 500 for any job, because
+ * `usageForJobs` joins uuid `workflow_runs.id` to varchar `model_calls.run_id` (`job.service.ts:410`), which Postgres refuses at plan time.
  */
-export function buildFinalBundle(title: string): NovelBundle {
-  return {
-    format: 'novel-import',
-    schemaVersion: 1,
-    mode: 'final',
-    novel: {
-      title,
-      synopsis: 'A retired lighthouse keeper discovers the tide itself is listening, and it wants the flame she has guarded for eleven winters.',
-      tags: ['fantasy', 'slow-burn'],
-      genre: 'fantasy',
-    },
-    volumes: [
-      {
-        ordinal: 1,
-        title: 'The Quiet Coast',
-        chapters: [
-          {
-            title: 'The Last Watch',
-            content:
-              'Mira climbed the spiral stair for what she told herself was the last time, though she had said that every winter for eleven years. The lamp room smelled of brass polish and salt. Below, the sea moved the way it always moved at dusk, patient and unhurried, listening. She set the wick, struck the flame, and watched the beam swing out across water the colour of old iron. Somewhere past the third reef a bell buoy answered, faint and out of time.',
-          },
-          {
-            title: 'A Voice in the Foam',
-            content:
-              'The voice came again with the seventh wave, the way it always did. Mira had stopped telling herself it was the wind three years ago. "I know you are there," she said to the dark water, and for the first time in all those winters, something answered — not in words she could keep, but in the long slow pull of the tide against the rocks, a rhythm that spelled her grandmother\'s name.',
-          },
-          {
-            title: 'What the Tide Keeps',
-            content:
-              "It wanted the lamp. Not the light it cast, but the fire itself, the one her grandmother had carried up these same stairs eighty years before. Mira understood, then, why the keeper's post had never once gone empty in three hundred years, and why it never would, until someone finally stood at the rail and said no. She wrapped both hands around the warm brass and, for the first time, considered what the sea would do if she did.",
-          },
-        ],
-      },
-    ],
-  };
-}
-
-/** Waits for a job to leave pending/in-progress, read from the forge's own table: `GET /api/v1/jobs/:id` answers 500 for every job — job.service.ts:409 joins uuid workflow_runs.id to varchar model_calls.run_id. */
-export async function settleForgeJob(jobId: string, timeoutMs = 60_000): Promise<ForgeJob> {
+export async function pollJobStatus(jobId: string, timeoutMs = JOB_SETTLE_TIMEOUT_MS): Promise<ForgeJob> {
   const job = await pollUntil(
     async () => (await novelForgeDb()<ForgeJob[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`)[0],
     current => current !== undefined && current.status !== 'pending' && current.status !== 'in_progress',
@@ -342,22 +322,12 @@ export async function settleForgeJob(jobId: string, timeoutMs = 60_000): Promise
   return job;
 }
 
-/** Starts importing {@link buildFinalBundle} as a new project; the import job writes rows only and calls no model. */
-export async function startFinalImport(ctx: APIRequestContext, title: string): Promise<{ projectId: string; jobId: string }> {
-  const response = await mutate(ctx, 'post', '/api/v1/import', { data: { bundle: buildFinalBundle(title) } });
-  expect(response.status(), await response.text()).toBe(202);
-  return (await response.json()) as { projectId: string; jobId: string };
-}
-
-export async function expectImportLanded(jobId: string): Promise<void> {
-  const job = await settleForgeJob(jobId);
-  expect(job.status, `import job failed: ${job.lastError ?? ''}`).toBe('done');
-}
-
 /** Adds a Story Bible entity; one with a `body` projects a reader wiki entry visible before the first chapter. */
-export async function createEntity(ctx: APIRequestContext, projectId: string, entity: BibleEntity): Promise<void> {
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, { data: entity });
-  expect(response.status(), await response.text()).toBe(201);
+export async function createEntity(ctx: APIRequestContext, projectId: string, seed: EntitySeed): Promise<void> {
+  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, {
+    data: { entityKey: seed.entityKey, name: seed.name, type: seed.type ?? 'character', body: seed.body ?? undefined, significance: seed.significance ?? undefined },
+  });
+  expect(response.status(), `creating entity ${seed.entityKey} — body ${await response.text()}`).toBe(201);
 }
 
 /** Polls a web-novel GET until it returns `wantStatus`, so an in-flight reader push has time to arrive. */

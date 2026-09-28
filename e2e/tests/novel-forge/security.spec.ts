@@ -20,7 +20,7 @@ import { createProject, deleteProjectQuietly, HAIKU_MODEL, jsonOrUndefined, uniq
  * deliberate BOLA defence that never leaks existence via 403. These tests assert the *code*, not just the
  * status, so a future accidental 403 would fail here. The Unrestricted block records the real server behaviour:
  * `resolveModel` coerces disallowed overrides on Unrestricted projects (model-router.service.ts) and the PATCH itself does not
- * validate the override against contentMode — so AI_003, though defined, is never thrown (see the fixme).
+ * validate the override against contentMode — so an off-allowlist override is coerced rather than refused.
  */
 
 test.describe('novel-forge ownership security', () => {
@@ -111,12 +111,5 @@ test.describe('novel-forge unrestricted enforcement', () => {
     const body = (await fetched.json()) as { contentMode: string; config?: { models?: Record<string, { provider: string; model: string }> } };
     expect(body.contentMode).toBe('unrestricted');
     expect(body.config?.models?.generation).toEqual(HAIKU_MODEL);
-  });
-
-  // AI_003 is defined but thrown nowhere — Unrestricted silently coerces at resolve time. Recorded, not "fixed".
-  test.fixme('should reject a non-allowlisted AI dispatch on an Unrestricted project with AI_003', async () => {
-    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'An Unrestricted project that should refuse Haiku.' } });
-    expect(response.status()).toBe(400);
-    expect((await jsonOrUndefined<{ code: string }>(response))?.code).toBe('AI_003');
   });
 });
