@@ -4,7 +4,7 @@ import { ApiError } from '@shadow-library/web';
 import { type Command } from '@/lib/data';
 import { SyncClient, SyncTransportError } from '@/lib/sync';
 
-import { createTestEngine, waitFor, waitForState } from './sync-harness';
+import { applied, createTestEngine, failed, waitFor, waitForState } from './sync-harness';
 
 const TODAY = '2026-08-24';
 const RETRY_DELAYS_MS = [1, 1, 1];
@@ -38,6 +38,20 @@ describe('SyncEngine retry', () => {
     await engine.enqueue(complete(`walk:${TODAY}`), TODAY);
 
     await waitForState(engine, snapshot => snapshot.state === 'online' && snapshot.queuedCount === 0);
+  });
+
+  it('should resend a queue held by a retryable command failure without the owner asking again', async () => {
+    const { engine, server } = createTestEngine({
+      today: TODAY,
+      retryDelaysMs: RETRY_DELAYS_MS,
+      outcomes: (batch, attempt) => batch.commandIds.map(commandId => (attempt === 0 ? failed(commandId) : applied(commandId))),
+    });
+    engines.push(engine);
+
+    await engine.enqueue(complete(`walk:${TODAY}`), TODAY);
+
+    await waitForState(engine, snapshot => snapshot.state === 'online' && snapshot.queuedCount === 0);
+    expect(server.batches).toHaveLength(2);
   });
 
   it.each([500, 503, 429])('should retry a pass that failed with a %d', async (status: number) => {
