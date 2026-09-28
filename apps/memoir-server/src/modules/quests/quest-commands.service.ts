@@ -360,7 +360,7 @@ export class QuestCommandsService implements OnModuleInit {
     const reasonNote = parseReasonNote('note', payload['note']);
 
     const windowStart = formatLocalDate(addDays(occurrence.occurrenceDate, -(RESCHEDULE_WINDOW_DAYS - 1)));
-    const usedInWindow = await this.questLogRepository.rescheduleCountInWindow(ctx.tx, occurrence.quest.id, windowStart);
+    const usedInWindow = await this.questLogRepository.rescheduleCountInWindow(ctx.tx, occurrence.quest.id, windowStart, formatLocalDate(occurrence.occurrenceDate));
 
     if (usedInWindow >= RESCHEDULE_CAP_PER_WINDOW && !acceptBeyondCap) {
       return {

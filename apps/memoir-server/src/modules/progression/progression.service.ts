@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, eq, gte, isNotNull, or } from 'drizzle-orm';
+import { and, between, eq, isNotNull, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
@@ -217,7 +217,7 @@ export class ProgressionService {
       .where(
         and(
           eq(schema.rescheduleEvents.accountId, accountId),
-          gte(schema.rescheduleEvents.date, since),
+          between(schema.rescheduleEvents.date, since, date),
           or(isNotNull(schema.rescheduleEvents.reasonTag), isNotNull(schema.rescheduleEvents.reasonNote)),
         ),
       );

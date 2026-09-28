@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, asc, eq, getTableColumns, gt, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, between, eq, getTableColumns, gt, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
 /**
@@ -185,13 +185,13 @@ export class QuestLogRepository extends OwnerScopedRepository {
       .then(rows => rows[0] ?? null);
   }
 
-  /** Count of reschedules for this quest in the rolling 7-day window ending on `date` (inclusive), the PRD §2.2 cap's input. */
-  async rescheduleCountInWindow(tx: DatabaseTransaction, questId: bigint, sinceDate: string): Promise<number> {
+  /** Count of reschedules for this quest in the window `[fromDate, toDate]` (inclusive), the PRD §2.2 cap's input. */
+  async rescheduleCountInWindow(tx: DatabaseTransaction, questId: bigint, fromDate: string, toDate: string): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx
       .select({ count: sql<string>`count(*)` })
       .from(schema.rescheduleEvents)
-      .where(and(eq(schema.rescheduleEvents.accountId, accountId), eq(schema.rescheduleEvents.questId, questId), gte(schema.rescheduleEvents.date, sinceDate)));
+      .where(and(eq(schema.rescheduleEvents.accountId, accountId), eq(schema.rescheduleEvents.questId, questId), between(schema.rescheduleEvents.date, fromDate, toDate)));
     return Number(row?.count ?? 0);
   }
 
