@@ -181,6 +181,7 @@ export class AdminApplicationController {
     for (const client of clients) await this.clientService.deleteClient(client.id);
 
     await this.applicationService.deleteApplication(application.name);
+    await this.accessService.invalidateGlobal();
     await this.record(actor, 'admin.application.deleted', String(application.id), { name: application.name });
     return { success: true };
   }

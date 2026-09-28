@@ -8,9 +8,10 @@ const APPLICATION = { id: 5, name: 'pulse', ownerOrganisationId: null, isActive:
 
 function controller() {
   const invalidateGlobal = mock(() => Promise.resolve());
-  const applicationService = { getApplicationByIdOrThrow: () => APPLICATION, updateApplication: () => Promise.resolve() };
+  const applicationService = { getApplicationByIdOrThrow: () => APPLICATION, updateApplication: () => Promise.resolve(), deleteApplication: () => Promise.resolve() };
+  const clientService = { listClients: () => Promise.resolve([{ id: APPLICATION.name, applicationId: APPLICATION.id }]), deleteClient: () => Promise.resolve() };
   const audit = { record: () => Promise.resolve() };
-  const instance = new AdminApplicationController(applicationService as never, {} as never, { invalidateGlobal } as never, {} as never, {} as never, audit as never);
+  const instance = new AdminApplicationController(applicationService as never, {} as never, { invalidateGlobal } as never, {} as never, clientService as never, audit as never);
   return { instance, invalidateGlobal };
 }
 
@@ -44,6 +45,16 @@ describe('AdminApplicationController', () => {
       const { instance, invalidateGlobal } = controller();
 
       await instance.updateApplication({ applicationId: APPLICATION.id }, { isActive: true, visibility: 'RESTRICTED' } as UpdateApplicationBody);
+
+      expect(invalidateGlobal).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('deleteApplication', () => {
+    it('should drop every cached grant set once the application is gone', async () => {
+      const { instance, invalidateGlobal } = controller();
+
+      await instance.deleteApplication({ applicationId: APPLICATION.id });
 
       expect(invalidateGlobal).toHaveBeenCalledTimes(1);
     });
