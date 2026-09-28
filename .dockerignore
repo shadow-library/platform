@@ -49,7 +49,7 @@
 **/*.md
 **/docs
 
-# OS / logs
+# OS / logs — runtime log output only; a blanket **/logs would also drop source directories named logs
 **/.DS_Store
 **/*.log
-**/logs
+apps/*-server/logs
