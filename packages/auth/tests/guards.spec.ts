@@ -9,8 +9,20 @@ import 'reflect-metadata';
  * Importing user defined packages
  */
 import { type HandlerMetadata } from '@shadow-library/app';
-import { AuthClient } from '@shadow-library/auth';
-import { Authenticated, AuthGuard, AuthModule, extendContextWithAuth, GuardedRequest, RequirePermission, RequireScope } from '@shadow-library/auth/module';
+import { AuthClient, type FetchLike } from '@shadow-library/auth';
+import {
+  AppSessionService,
+  Authenticated,
+  AuthGuard,
+  AuthModule,
+  extendContextWithAuth,
+  GuardedRequest,
+  GuardedResponse,
+  RequirePermission,
+  RequireScope,
+  resolveAuthRoutes,
+  resolveBrowserAuthConfig,
+} from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
@@ -191,6 +203,49 @@ describe('AuthGuard', () => {
       expect(context.getAuthPrincipal().sub).toBe('named');
     });
     idp.setEndpointFailure('/api/v1/authz/check', false);
+  });
+
+  describe('under an identity throttle', () => {
+    const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
+
+    /** Answers every call to `pathname` the way identity's rate limiter does */
+    const throttling =
+      (pathname: string): FetchLike =>
+      (url, init) =>
+        new URL(url).pathname === pathname
+          ? Promise.resolve(Response.json({ code: 'SEC_001', message: 'Too many requests' }, { status: 429, headers: { 'retry-after': '30' } }))
+          : fetch(url, init);
+
+    const capture = (): { response: GuardedResponse; headers: Record<string, string | string[]> } => {
+      const headers: Record<string, string | string[]> = {};
+      return { headers, response: { header: (name, value) => (headers[name] = value), redirect: () => undefined } };
+    };
+
+    it('should answer a throttled permission check with a retryable 503, not a 403', async () => {
+      const throttled = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: throttling('/api/v1/authz/check') });
+      const handler = new AuthGuard(throttled, context).generate({ shadowAuth: { authenticated: true, permission: 'posts:write' } });
+      idp.grantPermission({ kind: 'user', sub: 'entitled' }, ORG, 'posts:write');
+      const { response, headers } = capture();
+
+      const failure = await handler?.(request(await idp.issueToken({ sub: 'entitled', audience: AUDIENCE, org: ORG })), response).catch((error: unknown) => error);
+      expect(failure).toMatchObject({ code: 'PDP_UNAVAILABLE', status: 503 });
+      expect(headers['retry-after']).toBe('30');
+      throttled.stop();
+    });
+
+    it('should answer a throttled session mint with a retryable 503, not a 401', async () => {
+      const throttled = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: throttling('/api/v1/app-sessions/token') });
+      const config = resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true, redirectUri: 'https://pulse.test/auth/callback' });
+      const sessions = new AppSessionService(throttled, config);
+      const handler = new AuthGuard(throttled, context, sessions).generate({ shadowAuth: { authenticated: true } });
+      const { response, headers } = capture();
+
+      const failure = await handler?.({ headers: { cookie: `${config.cookieName}=some-handle` } }, response).catch((error: unknown) => error);
+      expect(failure).toMatchObject({ code: 'APP_SESSION_FAILED', status: 503 });
+      expect(headers['retry-after']).toBe('30');
+      expect(headers['set-cookie']).toBeUndefined();
+      throttled.stop();
+    });
   });
 
   it('should throw 401 from getAuthPrincipal when the guard never ran', async () => {

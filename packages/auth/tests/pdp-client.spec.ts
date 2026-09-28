@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:te
 /**
  * Importing user defined packages
  */
-import { AuthClient, CheckPrincipal } from '@shadow-library/auth';
+import { AuthClient, CheckPrincipal, type FetchLike } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -109,5 +109,61 @@ describe('AuthClient.check (pdp client)', () => {
     expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal })).toBe(false);
     expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal }, { failOpen: true })).toBe(true);
     idp.setEndpointFailure('/api/v1/authz/check', false);
+  });
+});
+
+describe('AuthClient.check under an identity throttle', () => {
+  let idp: TestIdP;
+  let counter = 0;
+
+  beforeAll(async () => {
+    idp = await createTestIdP();
+  });
+  afterAll(() => idp.stop());
+
+  const freshPrincipal = (): CheckPrincipal => ({ kind: 'user', sub: `throttled-${++counter}` });
+
+  /** Answers the first `times` pdp calls the way identity's rate limiter does, then lets the rest through */
+  const throttledClient = (retryAfter: string, times = Number.POSITIVE_INFINITY): { auth: AuthClient; throttled: () => number } => {
+    let throttled = 0;
+    const fetchFn: FetchLike = (url, init) => {
+      if (new URL(url).pathname !== '/api/v1/authz/check' || throttled >= times) return fetch(url, init);
+      throttled += 1;
+      return Promise.resolve(Response.json({ code: 'SEC_001', message: 'Too many requests' }, { status: 429, headers: { 'retry-after': retryAfter } }));
+    };
+    return { auth: new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, fetch: fetchFn }), throttled: () => throttled };
+  };
+
+  it('should retry a throttled check once identity says it may and return the real decision', async () => {
+    const principal = freshPrincipal();
+    idp.grantPermission(principal, ORG, 'posts:write');
+    const { auth, throttled } = throttledClient('0', 1);
+
+    expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal })).toBe(true);
+    expect(throttled()).toBe(1);
+  });
+
+  it('should surface a throttle that outlasts its retries as unavailable, never as a deny', async () => {
+    const principal = freshPrincipal();
+    idp.grantPermission(principal, ORG, 'posts:write');
+    const { auth, throttled } = throttledClient('0');
+
+    const failure = await auth.check({ action: 'posts:write', organisationId: ORG, principal }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'PDP_UNAVAILABLE', status: 503, data: { retryAfterSeconds: 0 } });
+    expect(throttled()).toBe(3);
+  });
+
+  it('should not hold the request for a retry-after longer than its budget, and carry the hint instead', async () => {
+    const principal = freshPrincipal();
+    const { auth, throttled } = throttledClient('30');
+
+    const failure = await auth.check({ action: 'posts:write', organisationId: ORG, principal }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'PDP_UNAVAILABLE', status: 503, data: { retryAfterSeconds: 30 } });
+    expect(throttled()).toBe(1);
+  });
+
+  it('should still honour fail-open on a throttled check', async () => {
+    const { auth } = throttledClient('30');
+    expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal: freshPrincipal() }, { failOpen: true })).toBe(true);
   });
 });

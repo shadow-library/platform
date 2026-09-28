@@ -18,6 +18,7 @@ import {
   FetchLike,
   SwitchedOrganisation,
 } from '../interfaces';
+import { retryAfterSecondsOf } from './transport';
 
 /**
  * Defining types
@@ -64,6 +65,8 @@ const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'
 
 /** Identity's application-access denials; on the organisation routes they mean "not reachable through that one" */
 const ACCESS_DENIED_CODES = ['APP_006', 'APP_007'];
+
+const TOO_MANY_REQUESTS = 429;
 
 /** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
 const INVALID_GRANT_CODES = ['OAU_003', 'invalid_grant'];
@@ -174,8 +177,13 @@ export class AppSessionClient {
       .catch((error: Error) => throwError(this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${method} ${SESSIONS_PATH}${path} failed: ${error.message}` }))));
   }
 
+  /** A throttle is marked as one, with identity's hint, so the guard can answer a retryable 503 instead of restarting the login */
   private async parse<T>(response: Response, path: string): Promise<T> {
     if (response.ok) return (await response.json()) as T;
+    if (response.status === TOO_MANY_REQUESTS) {
+      const retryAfterSeconds = retryAfterSecondsOf(response);
+      throw this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${SESSIONS_PATH}${path} was throttled`, throttled: true, retryAfterSeconds }));
+    }
     throw this.toError(response.status, await this.readError(response), path);
   }
 

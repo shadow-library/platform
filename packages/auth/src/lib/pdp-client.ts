@@ -9,6 +9,7 @@ import { Logger } from '@shadow-library/common';
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
+import { isThrottled, retryAfterHint, retryAfterSecondsOf } from './transport';
 
 /**
  * Defining types
@@ -44,10 +45,22 @@ interface PdpResponse {
  * failures and malformed responses are a DENY unless the caller explicitly opted into fail-open.
  * A bot's decision is always high-risk: its grants are revocable by an organisation admin at any time,
  * and a long-TTL entry written by a routine check would otherwise answer the guard's later ones.
+ *
+ * A throttle is the exception to "failure is a DENY". Identity said "not now", not "no", so reading it
+ * as a denial would refuse an entitled caller with a 403 that no retry could ever be expected to fix.
+ * It is retried a bounded number of times, never sooner than identity's `Retry-After` and never when
+ * that wait would hold the request past `THROTTLE_MAX_WAIT_MS`; after that it is rethrown as the 503 it
+ * is, carrying the hint, unless the caller opted into fail-open.
  */
 const DEFAULT_TTL_SECONDS = 900;
 const HIGH_RISK_TTL_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 1000;
+const THROTTLE_RETRIES = 2;
+const THROTTLE_DEFAULT_WAIT_MS = 250;
+const THROTTLE_MAX_WAIT_MS = 1_000;
+const TOO_MANY_REQUESTS = 429;
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 export class PdpClient {
   private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
@@ -74,8 +87,12 @@ export class PdpClient {
     }
 
     try {
-      return await this.dedupe(key, options, () => this.request(principalKey, key, organisationId, input, options));
+      return await this.dedupe(key, options, () => this.requestWithinThrottle(principalKey, key, organisationId, input, options));
     } catch (error) {
+      if (isThrottled(error) && !options.failOpen) {
+        this.logger.warn('pdp check throttled past its retries; answering unavailable rather than denied', { action: input.action, retryAfterSeconds: retryAfterHint(error) });
+        throw error;
+      }
       this.logger.warn('pdp check failed; applying fallback decision', { action: input.action, failOpen: options.failOpen ?? false, reason: (error as Error).message });
       return options.failOpen ?? false;
     }
@@ -104,6 +121,25 @@ export class PdpClient {
     return flight;
   }
 
+  private async requestWithinThrottle(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.request(principalKey, key, organisationId, input, options);
+      } catch (error) {
+        const waitMs = this.throttleWait(error, attempt);
+        if (waitMs === undefined) throw error;
+        await sleep(waitMs);
+      }
+    }
+  }
+
+  private throttleWait(error: unknown, attempt: number): number | undefined {
+    if (!isThrottled(error) || attempt >= THROTTLE_RETRIES) return undefined;
+    const hint = retryAfterHint(error);
+    const waitMs = hint === undefined ? THROTTLE_DEFAULT_WAIT_MS : hint * 1000;
+    return waitMs <= THROTTLE_MAX_WAIT_MS ? waitMs : undefined;
+  }
+
   private async request(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     const token = await this.options.getToken?.().catch((error: Error) => {
@@ -119,6 +155,9 @@ export class PdpClient {
       action: input.action,
     });
     const response = await this.options.fetchFn(`${this.options.baseUrl}/api/v1/authz/check`, { method: 'POST', headers, body });
+    if (response.status === TOO_MANY_REQUESTS) {
+      throw AuthErrorCode.PDP_UNAVAILABLE.create({ reason: 'identity throttled the check', throttled: true, retryAfterSeconds: retryAfterSecondsOf(response) });
+    }
     if (!response.ok) throw AuthErrorCode.PDP_UNAVAILABLE.create({ reason: `pdp returned http ${response.status}` });
 
     const result = (await response.json()) as PdpResponse;

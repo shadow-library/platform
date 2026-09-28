@@ -14,7 +14,7 @@ import { AuthPrincipal, BotPrincipal } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
 import { BOT_KEY_PREFIX, parseBotKey } from '../lib/bot-key';
 import { BotRateLimiter } from '../lib/bot-rate-limiter';
-import { retryAfterHint } from '../lib/transport';
+import { isThrottled, retryAfterHint } from '../lib/transport';
 import { AppSessionService } from './app-session.service';
 import { AUTH_ROUTE_METADATA } from './constants';
 import { AUTH_PRINCIPAL } from './context';
@@ -222,8 +222,12 @@ export class AuthGuard {
       return this.bounce(response, sessions.stepUpUrl(returnTo));
     }
 
-    /** Identity throttled the exchange and said when to come back; the 503 carries that forward rather than leaving the bot to guess */
-    if (AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED)) {
+    /**
+     * Identity throttled the exchange, the permission check or the session mint and said when to come
+     * back; the 503 carries that forward. A throttle collapsed into the generic pair would tell an
+     * entitled caller it is forbidden, or bounce a signed-in browser into a login identity is also throttling.
+     */
+    if (AppError.is(error, AuthErrorCode.TOKEN_EXCHANGE_FAILED) || isThrottled(error)) {
       const retryAfterSeconds = retryAfterHint(error);
       if (retryAfterSeconds !== undefined) response?.header('retry-after', String(retryAfterSeconds));
       throw error;
