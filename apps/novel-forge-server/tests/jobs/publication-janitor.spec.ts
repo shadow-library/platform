@@ -122,14 +122,22 @@ describe('PublicationJanitor.reconcileCrlfContentHashes', () => {
 describe('PublicationJanitor.dueProjects', () => {
   function janitorOver(tables: Map<unknown, Row[]>): PublicationJanitor {
     const read = () => ({
-      from: (table: unknown) => ({ where: async (where: SQL) => (tables.get(table) ?? []).filter(row => matchesWhere(row, where)).map(row => ({ projectId: row['projectId'] })) }),
+      from: (table: unknown) => ({
+        where: (where: SQL) => {
+          const rows = (tables.get(table) ?? []).filter(row => matchesWhere(row, where));
+          const projects = (list: Row[]) => list.map(row => ({ projectId: row['projectId'] }));
+          return Object.assign(Promise.resolve(projects(rows)), {
+            orderBy: () => ({ limit: async (count: number) => projects([...rows].sort((a, b) => Number(a['id']) - Number(b['id'])).slice(0, count)) }),
+          });
+        },
+      }),
     });
     const db = { select: read, selectDistinct: read };
     return new PublicationJanitor({ getPostgresClient: () => db } as never, {} as never, {} as never);
   }
 
   function publication(projectId: bigint, overrides: Row = {}): Row {
-    return { projectId, accessRevision: 3, accessPushedRevision: 3, accessError: null, ...overrides };
+    return { id: projectId, projectId, accessRevision: 3, accessPushedRevision: 3, accessError: null, ...overrides };
   }
 
   it('should sweep a publication whose share list changed after the reader last accepted one', async () => {
@@ -157,5 +165,14 @@ describe('PublicationJanitor.dueProjects', () => {
     const janitor = janitorOver(new Map([[schema.publications, publications]]));
 
     expect(await janitor.dueProjects()).toEqual([]);
+  });
+
+  it('should drain a backlog of trailing publications a batch per sweep, lowest id first', async () => {
+    const publications = Array.from({ length: 45 }, (_, index) => publication(BigInt(45 - index), { accessPushedRevision: null }));
+    const janitor = janitorOver(new Map([[schema.publications, publications]]));
+
+    const due = await janitor.dueProjects();
+
+    expect(due).toEqual(Array.from({ length: 20 }, (_, index) => BigInt(index + 1)));
   });
 });

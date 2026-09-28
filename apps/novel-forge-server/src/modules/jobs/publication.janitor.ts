@@ -20,6 +20,8 @@ function retryableFailure(error: PgColumn): SQL | undefined {
 /** Sweep cadence — also the precision of `scheduledAt` releases and the base retry interval for failed pushes */
 const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
 
+const ACCESS_SWEEP_BATCH = 20;
+
 /**
  * The ledger-as-outbox sweeper (checkpoint-janitor pattern): on boot and
  * every minute it finds projects whose ledger has due work — scheduled rows past their gate, failed
@@ -114,11 +116,14 @@ export class PublicationJanitor {
       .where(or(eq(schema.wikiPublications.state, 'pending'), and(eq(schema.wikiPublications.state, 'failed'), retryableFailure(schema.wikiPublications.error))));
 
     // Access rides the same converge. A share-list change deduped onto a publish job that had already read the list is still owed, and
-    // a narrowing must reach the reader, so a publication whose recorded access revision trails is due until one lands.
+    // a narrowing must reach the reader, so a publication whose recorded access revision trails is due until one lands. Batched, because
+    // after the column was added every publication trails at once, on every replica's boot sweep.
     const accessDue = await this.db
       .select({ projectId: schema.publications.projectId })
       .from(schema.publications)
-      .where(and(accessBehind(), retryableFailure(schema.publications.accessError)));
+      .where(and(accessBehind(), retryableFailure(schema.publications.accessError)))
+      .orderBy(schema.publications.id)
+      .limit(ACCESS_SWEEP_BATCH);
 
     return [...new Set([...chapterDue, ...wikiDue, ...accessDue].map(row => row.projectId))];
   }
