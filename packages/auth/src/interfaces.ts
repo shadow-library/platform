@@ -449,8 +449,9 @@ export interface CheckInput {
 
 export interface CheckOptions {
   /**
-   * Permits the action when the PDP is unreachable instead of failing closed. Explicit opt-in for
-   * availability-critical read paths only; a reachable PDP answering DENY is always a DENY.
+   * Permits the action when the PDP is unreachable or throttled, instead of answering a deny (outage) or
+   * throwing a 503 `PDP_UNAVAILABLE` (throttle). Explicit opt-in for availability-critical read paths
+   * only; a reachable PDP answering DENY is always a DENY.
    */
   failOpen?: boolean;
 

@@ -318,7 +318,11 @@ export class AuthClient {
     return payload.access_token;
   }
 
-  /** Asks the PDP whether the principal may perform the action; deny-by-default on any failure */
+  /**
+   * Asks the PDP whether the principal may perform the action. An unreachable or malformed PDP reads as
+   * a deny; a throttle that outlasts its retries throws a 503 `PDP_UNAVAILABLE` instead, because the
+   * caller may well be entitled. `failOpen` turns either into a permit.
+   */
   check(input: CheckInput, options?: CheckOptions): Promise<boolean> {
     return this.pdp.check(input, options);
   }
