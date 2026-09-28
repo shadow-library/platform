@@ -216,8 +216,8 @@ export interface QuotaLimits {
  * Keeping a model-capable request from spending — later batches use both guards, the quota pin as the belt and the fail-pin as braces:
  *  - `quotaPin` stands the project's owner at the AI_008 call ceiling. Every paid dispatch (`chatFor`, `structured` and its streaming and
  *    image-input variants, `images`) runs `AiQuotaService.enforce` before `routeModel` decides standard or unrestricted, so it holds on
- *    both paths. It pins every project of that owner, lasts one window (an hour in dev), and fails open if the server cannot read usage;
- *    that owner's usage and cost figures then include the pin's zero-cost rows (prompt key `e2e-quota-pin`).
+ *    both paths. It pins every project of that owner and lasts one window (an hour in dev); a server that cannot read usage refuses the
+ *    call with AI_018 instead. That owner's usage and cost figures then include the pin's zero-cost rows (prompt key `e2e-quota-pin`).
  *  - `failPin` refuses a standard route with AI_002. It does nothing on an unrestricted route — `generate-unrestricted`, an isolated
  *    chapter or one whose plan is written unrestricted, a plugin raised to the permissive writer — which dispatches the tier default, and a
  *    later `PATCH /projects/:id` carrying `config` replaces the pins.
