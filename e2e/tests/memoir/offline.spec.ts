@@ -22,9 +22,6 @@ import { createDailyQuest, hasQuestLogFor, memoirCsrfHeaders, pullDelta } from '
  * `navigator.onLine`-driven `NetStrip` reacts to.
  */
 test.describe('memoir offline outbox', () => {
-  // Pinned because memoir-web takes Today from the browser's zone rather than the account's (app bug, fixme in core-loop.spec.ts); UTC matches the harness account.
-  test.use({ timezoneId: 'UTC' });
-
   test('should queue a quest completion while offline and flush it once back online', async ({ page, context, memoir }) => {
     const url = requireProductUrl('memoir');
     const persona = await memoir.persona({ label: 'offline', onboard: true });
@@ -62,8 +59,6 @@ test.describe('memoir offline outbox', () => {
 });
 
 test.describe('memoir outbox — CSRF refusals', () => {
-  test.use({ timezoneId: 'UTC' });
-
   test.fixme('should keep the CSRF cookie across a GET that carries a fresh cookie and no header (app bug: csrf-protection.middleware.ts:48 re-issues it)', async ({ memoir }) => {
     const { ctx } = await memoir.persona({ label: 'csrf-rotate', onboard: true });
     await memoirCsrfHeaders(ctx);

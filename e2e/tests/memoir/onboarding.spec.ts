@@ -21,9 +21,6 @@ import { getAccount } from './helpers';
  * sub → account id for `account.context-ttl` (60 s) and answers a vanished row with ACC_002 ("being deleted") until it expires.
  */
 test.describe('memoir onboarding', () => {
-  // The zone the wizard picks: memoir-web dates Today by the browser, not the account (app bug, fixme in core-loop.spec.ts).
-  test.use({ timezoneId: 'Europe/London' });
-
   let user: IdentityUser | undefined;
 
   test.afterEach(async () => {

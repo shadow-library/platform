@@ -22,9 +22,6 @@ import { createDailyQuest, hasQuestLogFor, memoirMutate, pullDelta, submitComman
  * offline outbox exists to make invisible to the user.
  */
 test.describe('memoir core loop', () => {
-  // Pinned because memoir-web takes Today from the browser's zone rather than the account's (app bug, fixme below); UTC matches the harness account.
-  test.use({ timezoneId: 'UTC' });
-
   test('should complete a quest from Today, update Hero state, and persist across reload', async ({ page, context, memoir }) => {
     const url = requireProductUrl('memoir');
     const persona = await memoir.persona({ label: 'core-loop', onboard: true });
@@ -60,11 +57,7 @@ test.describe('memoir core loop — account day', () => {
   const ACCOUNT_ZONE = 'Pacific/Pago_Pago';
   test.use({ timezoneId: 'Pacific/Kiritimati' });
 
-  test.fixme('should complete from Today on the account day (app bug: memoir-web sync-context.tsx:104 stamps the browser date; docs/memoir.md:22)', async ({
-    page,
-    context,
-    memoir,
-  }) => {
+  test('should complete from Today on the account day, not the browser’s', async ({ page, context, memoir }) => {
     const persona = await memoir.persona({ label: 'account-day' });
     const onboarded = await memoirMutate(persona.ctx, 'post', '/api/v1/account/onboarding', {
       data: { defaultCurrency: 'USD', timezone: ACCOUNT_ZONE, scheduleStartMin: 0, scheduleEndMin: 1439 },
