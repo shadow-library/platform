@@ -69,7 +69,8 @@ export class ProjectModelRef {
   model: string;
 }
 
-// Enumerated fields avoid an unnormalised additionalProperties ref that breaks client code generation; keep these synchronized with AiRole.
+// Enumerated fields avoid an unnormalised additionalProperties ref that breaks client code generation; keep these synchronized with AiRole,
+// less `embedding`, which is deployment-wide (`ai.embedding.model`) and so never a project pin.
 @Schema({ description: 'Optional provider and model overrides keyed by AI role.' })
 export class ProjectModelOverrides {
   @Field(() => ProjectModelRef, { optional: true })
@@ -119,9 +120,6 @@ export class ProjectModelOverrides {
 
   @Field(() => ProjectModelRef, { optional: true })
   compact?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  embedding?: ProjectModelRef;
 
   @Field(() => ProjectModelRef, { optional: true })
   image?: ProjectModelRef;

@@ -31,7 +31,6 @@ interface ProjectModelOverridesData {
   audit?: ProjectModelRefData;
   chat?: ProjectModelRefData;
   compact?: ProjectModelRefData;
-  embedding?: ProjectModelRefData;
   image?: ProjectModelRefData;
 }
 

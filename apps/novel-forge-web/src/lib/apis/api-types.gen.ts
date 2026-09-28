@@ -6147,7 +6147,6 @@ export interface components {
       audit?: components['schemas']['ProjectModelRef'];
       chat?: components['schemas']['ProjectModelRef'];
       compact?: components['schemas']['ProjectModelRef'];
-      embedding?: components['schemas']['ProjectModelRef'];
       image?: components['schemas']['ProjectModelRef'];
     };
     /** @description Provider and model reference used for a project-level AI role override. */

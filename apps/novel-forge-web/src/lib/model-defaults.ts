@@ -42,13 +42,12 @@ export interface ModelSaveInput {
   /** Absent while the registry is loading or failed: the allowlist is unknown, so the stored per-job picks must not be rewritten. */
   unrestrictedAllowlist?: readonly string[];
   picks: readonly ModelSavePick[];
-  embedding?: ProjectModelRef;
 }
 
-export function modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks, embedding }: ModelSaveInput): UpdateProjectBody {
+export function modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks }: ModelSaveInput): UpdateProjectBody {
   if (!unrestrictedAllowlist) return { contentMode, costTier };
   const allowed = contentMode === 'unrestricted' ? new Set(unrestrictedAllowlist) : undefined;
-  const models: ProjectModelOverrides = embedding ? { embedding } : {};
+  const models: ProjectModelOverrides = {};
   for (const { roles, ref } of picks) {
     if (!ref || (allowed && !allowed.has(ref.model))) continue;
     for (const role of roles) models[role] = ref;

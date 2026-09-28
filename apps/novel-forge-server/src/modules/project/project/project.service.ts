@@ -37,6 +37,12 @@ import {
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
 
+/** The embedding model is deployment-wide (`ai.embedding.model`), so a pin stored before that is dropped unvalidated: a retired id must never block a save. */
+function withoutEmbeddingPin(config: ProjectConfig): ProjectConfig {
+  if (!config.models) return config;
+  return { ...config, models: Object.fromEntries(Object.entries(config.models).filter(([role]) => role !== 'embedding')) };
+}
+
 @Injectable()
 export class ProjectService {
   private readonly logger = Logger.getLogger(APP_NAME, ProjectService.name);
@@ -210,7 +216,8 @@ export class ProjectService {
     return this.present(result);
   }
 
-  async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
+  async update(id: bigint, body: UpdateProjectBody): Promise<Project.Presented> {
+    const update = body.config ? { ...body, config: withoutEmbeddingPin(body.config) } : body;
     this.assertConfigModelsAllowed(update.config);
     this.assertWordTargetValid(update.wordTarget);
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
@@ -245,7 +252,8 @@ export class ProjectService {
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
-    this.assertConfigModelsAllowed(body.config);
+    const config = body.config && withoutEmbeddingPin(body.config);
+    this.assertConfigModelsAllowed(config);
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
@@ -267,7 +275,7 @@ export class ProjectService {
           instructions: writingInstructionAdditions(source.instructions),
           contentMode: body.contentMode ?? source.contentMode,
           costTier: source.costTier,
-          config: body.config ? { ...body.config, ...(source.config?.finalizeReview ? { finalizeReview: source.config.finalizeReview } : {}) } : (source.config ?? null),
+          config: config ? { ...config, ...(source.config?.finalizeReview ? { finalizeReview: source.config.finalizeReview } : {}) } : (source.config ?? null),
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
           wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
         })

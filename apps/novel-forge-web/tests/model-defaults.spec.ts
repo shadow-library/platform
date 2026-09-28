@@ -33,7 +33,6 @@ describe('inheritedModel', () => {
 describe('modelSaveBody', () => {
   const opus = { provider: 'anthropic', model: 'claude-opus' };
   const glm = { provider: 'openrouter', model: 'glm' };
-  const embedding = { provider: 'openai', model: 'embed' };
   const picks = [
     { roles: ['generation', 'revision'] as const, ref: opus },
     { roles: ['chat'] as const, ref: glm },
@@ -41,14 +40,14 @@ describe('modelSaveBody', () => {
   ];
 
   it('should send only the mode and tier while the registry is missing, leaving every stored pick alone', () => {
-    expect(modelSaveBody({ contentMode: 'unrestricted', costTier: 'economy', picks, embedding })).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
+    expect(modelSaveBody({ contentMode: 'unrestricted', costTier: 'economy', picks })).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
   });
 
-  it('should fan each pick out over its roles and keep the locked embedding once the registry is loaded', () => {
-    expect(modelSaveBody({ contentMode: 'standard', costTier: 'balanced', unrestrictedAllowlist: ['glm'], picks, embedding })).toEqual({
+  it('should fan each pick out over its roles once the registry is loaded', () => {
+    expect(modelSaveBody({ contentMode: 'standard', costTier: 'balanced', unrestrictedAllowlist: ['glm'], picks })).toEqual({
       contentMode: 'standard',
       costTier: 'balanced',
-      config: { models: { embedding, generation: opus, revision: opus, chat: glm } },
+      config: { models: { generation: opus, revision: opus, chat: glm } },
     });
   });
 

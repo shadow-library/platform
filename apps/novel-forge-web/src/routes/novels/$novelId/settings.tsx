@@ -46,7 +46,7 @@ type AiRole = keyof ProjectModelOverrides;
 
 // The author picks a model per *group*, not per fine-grained role. Selecting a group's model fans that
 // choice out across every role it owns (GROUP_ROLES) so the backend — which still resolves per role —
-// routes them identically. `embedding` is intentionally absent: it's locked to the pgvector schema.
+// routes them identically.
 const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
   writing: ['generation', 'revision', 'fix'],
   planning: ['premise', 'plan', 'outline', 'bible', 'extraction'],
@@ -276,7 +276,7 @@ function SettingsScreen(): React.JSX.Element {
       const value = models[group.key];
       return { roles: GROUP_ROLES[group.key], ref: value && value !== INHERIT_MODEL ? decodeModelRef(value) : null };
     });
-    const body = modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks, embedding: project?.config?.models?.embedding });
+    const body = modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks });
     updateProject.mutate(body, { onSuccess: () => toast.success('Model & cost settings saved'), onError: err => toast.danger(err.message) });
   };
 

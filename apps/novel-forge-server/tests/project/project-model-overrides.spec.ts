@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'bun:test';
+import { type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { ProjectService } from '@modules/project/project/project.service';
+import { type UpdateProjectBody } from '@modules/project/project/project.dto';
 
 const TEXT_MODEL = { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' };
 const IMAGE_MODEL = { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' };
+const RETIRED_EMBEDDING_MODEL = { provider: 'ollama', model: 'qwen3-embedding:8b' };
+
+function storedConfig(write: unknown): unknown {
+  const [json] = new PgDialect().sqlToQuery((write as { config: SQL }).config).params;
+  return JSON.parse(json as string);
+}
 
 function makeService(): { service: ProjectService; writes: unknown[] } {
   const writes: unknown[] = [];
@@ -42,5 +51,14 @@ describe('ProjectService.update — model overrides', () => {
     await service.update(5n, { config: { models: { generation: TEXT_MODEL, image: IMAGE_MODEL } } });
 
     expect(writes).toHaveLength(1);
+  });
+
+  it('should save over a retired embedding pin echoed back from the stored config and drop it', async () => {
+    const { service, writes } = makeService();
+    const body = { config: { models: { generation: TEXT_MODEL, embedding: RETIRED_EMBEDDING_MODEL } } } as UpdateProjectBody;
+
+    await service.update(5n, body);
+
+    expect(writes.map(storedConfig)).toEqual([{ models: { generation: TEXT_MODEL } }]);
   });
 });
