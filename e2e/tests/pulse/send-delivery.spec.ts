@@ -1,33 +1,45 @@
 /**
  * Importing npm packages
  */
-import { expect, request, test } from '@playwright/test';
+import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, fetchLatestOtp, mutate, pulseDb, requireProductUrl } from '../../lib';
+import {
+  clusterTokensAvailable,
+  deletePulseNotificationsTo,
+  deleteRegistrationAttempt,
+  fetchLatestOtp,
+  mutate,
+  pulseDb,
+  registerInit,
+  requireProductUrl,
+  storageStateFor,
+  uniqueEmail,
+} from '../../lib';
+import { expect, test } from './fixtures';
+import { createPublishedTemplate, createTemplate, memoirSendToken, uniqueKey } from './helpers';
 
 /**
  * Defining types
  */
 
+interface SendBody {
+  status?: string;
+  code?: string;
+  fields?: { field: string; msg: string }[];
+  channelResults?: { channel: string; status: string; jobId?: string; error?: { code: string } }[];
+}
+
 /**
  * Declaring the constants
  *
- * `POST /api/v1/notifications` is `@RequireScope('notifications:send')` — a scope declared `principalType:
- * 'SERVICE'` and granted, ecosystem-wide, to exactly one client: `identity-server`
- * (`apps/identity-server/.../ecosystem-seed.constants.ts:157-161,180,219`). `AuthGuard.authorize()`'s scope
- * check is a plain membership test against `principal.scopes` regardless of whether the principal resolved
- * from a bearer token or a session cookie (`packages/auth/src/module/auth-guard.ts:96-113`) — so there is no
- * session, including the bootstrap admin's, that can ever hold this scope. Confirmed live: `admin` POSTing a
- * well-formed body gets a flat `403 IAM_002` before the request ever reaches `NotificationService.send()`.
- *
- * That reshapes this file's "real interconnect proof" away from a direct forged call (impossible from e2e —
- * there's no identity-server service credential available to a host-side Playwright process either) and
- * toward the actual producer path: trigger a real identity action that makes identity itself call pulse with
- * its own service credential, then observe delivery from both sides' databases. This is a *stronger* proof
- * than a direct call would have been — it exercises the real M2M auth, not just template rendering.
+ * `POST /api/v1/notifications` is `@RequireScope('notifications:send')`, a scope declared `principalType: 'SERVICE'`
+ * (`apps/identity-server/src/modules/bootstrap/ecosystem-seed.constants.ts:109-111`), so no session — the bootstrap admin's
+ * included — can hold it. Two service clients do: identity's own outbound client, whose self-signed token e2e cannot
+ * forge, and memoir's, which authenticates by its bound `memoir/memoir-server` workload identity. The producer path is
+ * proven by a real identity action; the contract of the endpoint itself is driven as memoir.
  */
 
 /** True when `templateKey` has a published version with at least one enabled channel — the send precondition. */
@@ -42,110 +54,153 @@ async function hasPublishedTemplate(templateKey: string): Promise<boolean> {
   return (rows[0]?.count ?? 0) > 0;
 }
 
+async function countJobsTo(recipient: string): Promise<number> {
+  const [row] = await pulseDb()<{ count: number }[]>`SELECT count(*)::int AS count FROM notification_jobs WHERE recipient = ${recipient}`;
+  return row?.count ?? 0;
+}
+
+async function sendAs(guest: APIRequestContext, token: string, data: Record<string, unknown>): Promise<{ response: APIResponse; body: SendBody }> {
+  const response = await guest.post('/api/v1/notifications', { headers: { authorization: `Bearer ${token}` }, data });
+  return { response, body: (await response.json()) as SendBody };
+}
+
 test.describe('send + delivery', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
 
   /**
-   * The end-to-end interconnect proof: register a never-before-used email at identity, capture the OTP
-   * identity enqueues (`notification_outbox`, `fetchLatestOtp`), and then confirm pulse actually delivered it
-   * — a `notification_jobs` row reaching `SENT` (the `DEV` provider is the only one that really delivers) and
-   * a `notification_messages` row whose rendered body contains the same code. This proves routing (the
-   * catch-all `e2e-dev` rule), rendering (the code appears in the rendered text, not the raw `{{ code }}`),
-   * and cross-service M2M auth (identity's own service token got through `RequireScope`) all at once.
-   *
-   * `hasPublishedTemplate` is asserted as a hard precondition, not a skip: `pulse-server`'s migration Job runs
-   * `apps/pulse-server/src/migrate.ts`, which calls the idempotent `seedBaseline()`
-   * (`apps/pulse-server/src/database/seed/baseline.seed.ts`) unconditionally right after Drizzle migrations,
-   * seeding `auth.register.otp` and the rest of the 23-key catalogue on every rollout — this is part of the
-   * deployed contract, not an incidental gap, so a deployment missing it must show red, not a silent skip.
+   * The end-to-end interconnect proof: registering a never-before-used email makes identity enqueue an OTP and post it to
+   * pulse with its own service credential; pulse must route it (the catch-all `e2e-dev` rule), render it (the code, not the
+   * raw `{{ code }}`) and deliver it through the `DEV` provider. The baseline seed runs after every pulse migration, so a
+   * missing `auth.register.otp` is a broken deployment, not a reason to skip.
    */
-  test('should deliver a real registration OTP end-to-end through identity -> pulse -> DEV provider', async () => {
+  test('should deliver a real registration OTP end-to-end through identity -> pulse -> DEV provider', async ({ pulse }) => {
     expect(await hasPublishedTemplate('auth.register.otp'), 'auth.register.otp has no published version — the baseline seed did not run on this deployment').toBe(true);
+    const email = uniqueEmail('send-delivery');
 
-    const identityCtx = await request.newContext({ baseURL: 'https://identity.shadow-apps.test', ignoreHTTPSErrors: true });
-    const email = `e2e.send-delivery.${Date.now()}@shadow-apps.test`;
+    try {
+      const initResponse = await registerInit(await pulse.identityAnonymous(), email);
+      expect(initResponse.status(), await initResponse.text()).toBe(200);
 
-    const initResponse = await identityCtx.post('/api/v1/auth/register/init', { data: { email } });
-    // register/init is rate-limited 5/hour per IP; repeated suite runs on one host exhaust it. The full
-    // identity->pulse->DEV chain is also proven (rate-limit-free) by cross-app/notification-pipeline, so skip
-    // rather than fail when the limit is hot.
-    test.skip(initResponse.status() === 429, 'identity register/init rate-limited (5/hour per IP) — residue from repeated runs');
-    expect(initResponse.status(), await initResponse.text()).toBe(200);
+      const code = await pollForOtp(email, 'auth.register.otp');
+      expect(code, `expected identity to enqueue an OTP for ${email}`).toBeTruthy();
 
-    const code = await pollForOtp(email, 'auth.register.otp');
-    expect(code, `expected identity to enqueue an OTP for ${email}`).toBeTruthy();
-
-    const message = await pollForDeliveredMessage(email, code as string);
-    expect(message.renderedBody).toContain(code);
-
-    await identityCtx.dispose();
+      const message = await pollForDeliveredMessage(email, code as string);
+      expect(message.renderedBody).toContain(code);
+    } finally {
+      await deleteRegistrationAttempt(email);
+    }
   });
 
-  test.fixme(
-    'an anonymous caller reaching `@Schema({minProperties:1})` validation on `recipients: {}` before the ' +
-      '`@RequireScope` auth guard is no longer reachable from e2e: the platform now authenticates before ' +
-      'validating (packages/auth AuthGuard moved ahead of the Fastify preValidation hook), so a credential-less ' +
-      'caller 401s IAM_001 first regardless of body shape — see the passing test right below. The 422 ' +
-      '`VALIDATION_ERROR` shape asserted here is still real, just only reachable by the identity-server service ' +
-      'credential (see the file-level doc comment and the `test.fixme` below it), which e2e cannot forge.',
-    async () => {
-      const ctx = await apiContext('pulse');
-      const response = await ctx.post('/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: {} } });
-      expect(response.status()).toBe(422);
-      const body = (await response.json()) as { code?: string; fields?: { field: string; msg: string }[] };
-      expect(body.code).toBe('VALIDATION_ERROR');
-      expect(body.fields?.some(f => f.field.includes('recipients'))).toBe(true);
-    },
-  );
-
-  test('should 401 IAM_001 for a well-formed send with no credential at all', async () => {
-    const ctx = await apiContext('pulse');
-    const response = await ctx.post('/api/v1/notifications', { data: { templateKey: 'auth.register.otp', recipients: { email: 'e2e.pulse.probe@shadow-apps.test' } } });
+  test('should 401 IAM_001 for a well-formed send with no credential at all', async ({ pulse }) => {
+    const response = await (
+      await pulse.guest()
+    ).post('/api/v1/notifications', {
+      data: { templateKey: 'auth.register.otp', recipients: { email: 'e2e.pulse.probe@shadow-apps.test' } },
+    });
     expect(response.status()).toBe(401);
     const body = (await response.json()) as { code?: string };
     expect(body.code).toBe('IAM_001');
   });
+});
 
-  test.fixme(
-    'per-channel business-logic error codes (NTF_001-004, TPL_VER_003, TPL_CNT_003) are unreachable from e2e — ' +
-      'not an app bug, an access-control fact: POST /api/v1/notifications only ever accepts the identity-server ' +
-      'service client (see file-level doc comment), and no such credential is available to a host-side Playwright ' +
-      'process (service auth uses a projected in-cluster ServiceAccount token, per the infra report). Every ' +
-      'well-formed body from any session-backed caller, including admin, 403s IAM_002 before reaching NotificationService.send().',
-    async () => {
-      const ctx = await apiContext('pulse', 'admin');
-      const response = await mutate(ctx, 'post', '/api/v1/notifications', { data: { templateKey: 'does-not-exist', recipients: { email: 'a@b.com' } } });
-      expect(response.status()).toBe(201);
-    },
-  );
+test.describe('send + delivery — service caller', () => {
+  test.beforeAll(async () => {
+    test.skip(!(await clusterTokensAvailable()), 'kubectl cannot mint service-account tokens against k3d-shadow-apps-dev');
+  });
 
-  /**
-   * Drives the manual-send console form as a human operator would. Because `admin` cannot hold
-   * `notifications:send` (see above), the actual, observed outcome is `SendForm.tsx`'s error branch — an
-   * Alert titled "Cannot send" carrying the 403's message — never the "Overall status: Accepted" success path
-   * the task brief expected. This is a real app-level gap worth flagging on its own: `/send` is presented as
-   * PulseAdmin/Operator tooling ("Manually trigger a send to test templates and routing end-to-end"), but no
-   * user role can ever complete a send through it — the feature is unusable by any human operator today.
-   */
-  test.fixme(
-    'the /send console form should complete a manual send as admin (app gap: no user role, including PulseAdmin, ' +
-      'ever holds the service-only notifications:send scope required by POST /api/v1/notifications — see ' +
-      'apps/pulse-server/src/modules/notification/notification.controller.ts:30 and ' +
-      "apps/identity-server/.../ecosystem-seed.constants.ts:157-161,219; observed actual result is SendForm.tsx's " +
-      '"Cannot send" error Alert with the 403 IAM_002 message, not "Overall status: Accepted")',
-    async ({ page }) => {
-      const url = requireProductUrl('pulse');
-      await page.goto(`${url}/send`);
+  test('should refuse a malformed or unroutable send without queuing a job, then accept and deliver the well-formed one', async ({ pulse }) => {
+    const guest = await pulse.guest();
+    const token = await memoirSendToken(await pulse.identityAnonymous());
+    const email = uniqueEmail('send-contract');
+    const device = uniqueKey('send-device');
 
+    try {
+      const emptyRecipients = await sendAs(guest, token, { templateKey: 'auth.password.changed', recipients: {} });
+      expect(emptyRecipients.response.status()).toBe(422);
+      expect(emptyRecipients.body.code).toBe('VALIDATION_ERROR');
+      expect(emptyRecipients.body.fields?.some(field => field.field.includes('recipients'))).toBe(true);
+
+      const unknownTemplate = await sendAs(guest, token, { templateKey: `e2e-missing-${Date.now()}`, recipients: { email } });
+      expect(unknownTemplate.response.status()).toBe(404);
+      expect(unknownTemplate.body.code).toBe('TPL_001');
+
+      const missingVariable = await sendAs(guest, token, { templateKey: 'auth.password.changed', recipients: { email } });
+      expect(missingVariable.response.status()).toBe(400);
+      expect(missingVariable.body.code).toBe('NTF_004');
+
+      const noUsableRecipient = await sendAs(guest, token, { templateKey: 'auth.register.otp', recipients: { push: device }, payload: { code: '482913' } });
+      expect(noUsableRecipient.response.status()).toBe(201);
+      expect(noUsableRecipient.body.status).toBe('FAILED');
+      expect(noUsableRecipient.body.channelResults?.map(result => [result.channel, result.status, result.error?.code]).sort()).toEqual([
+        ['EMAIL', 'FAILED', 'NTF_002'],
+        ['SMS', 'FAILED', 'NTF_001'],
+      ]);
+      expect(await countJobsTo(email), 'no refused send may queue a job').toBe(0);
+      expect(await countJobsTo(device), 'no refused send may queue a job').toBe(0);
+
+      const accepted = await sendAs(guest, token, { templateKey: 'auth.password.changed', recipients: { email }, payload: { ipAddress: '203.0.113.7' } });
+      expect(accepted.response.status()).toBe(201);
+      expect(accepted.body.status).toBe('ACCEPTED');
+      expect(accepted.body.channelResults).toEqual([expect.objectContaining({ channel: 'EMAIL', status: 'QUEUED', jobId: expect.any(String) })]);
+
+      const message = await pollForDeliveredMessage(email, '203.0.113.7');
+      expect(message.renderedBody).toContain('203.0.113.7');
+    } finally {
+      await deletePulseNotificationsTo([email, device]);
+    }
+  });
+
+  test('should fail a channel whose template has no published version or no content for it, and still send the channel that has both', async ({ pulse }) => {
+    const admin = await pulse.admin();
+    const guest = await pulse.guest();
+    const token = await memoirSendToken(await pulse.identityAnonymous());
+    const email = uniqueEmail('send-channels');
+    const phone = `+1555${String(Date.now()).slice(-7)}`;
+
+    const unpublished = await createTemplate(admin, { templateKey: uniqueKey('send-unpublished') });
+    pulse.trackTemplate(unpublished.id);
+    await mutate(admin, 'put', `/api/v1/templates/${unpublished.id}/channels/EMAIL`, { data: { isEnabled: true } });
+    const emailOnly = await createPublishedTemplate(admin, 'send-email-only');
+    pulse.trackTemplate(emailOnly.id);
+    await mutate(admin, 'put', `/api/v1/templates/${emailOnly.id}/channels/SMS`, { data: { isEnabled: true } });
+
+    const noVersion = await sendAs(guest, token, { templateKey: unpublished.templateKey, recipients: { email } });
+    expect(noVersion.response.status()).toBe(201);
+    expect(noVersion.body).toMatchObject({ status: 'FAILED', channelResults: [{ channel: 'EMAIL', status: 'FAILED', error: { code: 'TPL_VER_003' } }] });
+    expect(await countJobsTo(email), 'an unpublished template queues nothing').toBe(0);
+
+    const partly = await sendAs(guest, token, { templateKey: emailOnly.templateKey, recipients: { email, phone } });
+    expect(partly.response.status()).toBe(201);
+    expect(partly.body.status).toBe('PARTIAL_ACCEPTED');
+    expect(partly.body.channelResults?.map(result => [result.channel, result.status, result.error?.code]).sort()).toEqual([
+      ['EMAIL', 'QUEUED', undefined],
+      ['SMS', 'FAILED', 'TPL_CNT_003'],
+    ]);
+    expect(await countJobsTo(phone), 'the content-less channel queues nothing').toBe(0);
+    expect(await countJobsTo(email)).toBe(1);
+  });
+});
+
+test.describe('send + delivery — console', () => {
+  test.use({ storageState: storageStateFor('admin') });
+
+  test.fixme('should complete a manual send from /send as admin (app gap: a service-only scope guards the route, notification.controller.ts:16)', async ({ page }) => {
+    const url = requireProductUrl('pulse');
+    const email = uniqueEmail('console-send');
+    await page.goto(`${url}/send`);
+
+    try {
       await page.getByLabel('Template key').click();
-      await page.getByRole('option', { name: 'auth.register.otp' }).click();
-      await page.getByLabel('Email').fill('e2e.pulse.probe@shadow-apps.test');
-      await page.getByLabel('Payload').fill('{ "code": "123456" }');
-      await page.getByRole('button', { name: 'Send notification' }).click();
+      await page.getByRole('option', { name: 'auth.password.changed' }).click();
+      await page.getByLabel('Email').fill(email);
+      await page.getByLabel('Payload').fill('{ "ipAddress": "203.0.113.7" }');
+      await page.getByRole('main').getByRole('button', { name: 'Send notification' }).click();
 
       await expect(page.getByText(/Overall status: Accepted/i)).toBeVisible({ timeout: 15_000 });
-    },
-  );
+    } finally {
+      await deletePulseNotificationsTo([email]);
+    }
+  });
 });
 
 /** Polls identity's outbox for the OTP `fetchLatestOtp` returns, giving the worker a few seconds to catch up. */
@@ -160,7 +215,7 @@ async function pollForOtp(email: string, templateKey: string, timeoutMs = 20_000
 }
 
 /** Polls pulse for the delivered `notification_messages` row for `email`, once its job reaches `SENT`. */
-async function pollForDeliveredMessage(email: string, code: string, timeoutMs = 60_000): Promise<{ renderedSubject: string | null; renderedBody: string }> {
+async function pollForDeliveredMessage(email: string, expected: string, timeoutMs = 60_000): Promise<{ renderedSubject: string | null; renderedBody: string }> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const rows = await pulseDb()<{ renderedSubject: string | null; renderedBody: string; status: string }[]>`
@@ -173,7 +228,7 @@ async function pollForDeliveredMessage(email: string, code: string, timeoutMs = 
     `;
     const row = rows[0];
     if (row) return row;
-    if (Date.now() >= deadline) throw new Error(`No SENT notification_messages row for ${email} (code ${code}) after ${timeoutMs}ms`);
+    if (Date.now() >= deadline) throw new Error(`No SENT notification_messages row for ${email} (expecting ${expected}) after ${timeoutMs}ms`);
     await new Promise(resolve => setTimeout(resolve, 2_000));
   }
 }

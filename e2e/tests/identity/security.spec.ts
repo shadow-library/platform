@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
+import { apiContext, requireProductUrl, storageStateFor, useClientIp } from '../../lib';
+import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
 
 /**
@@ -28,6 +28,10 @@ const GATED_PATHS = ['/account', '/account/security', '/console'];
 /** A seeded email that would appear if the admin user directory ever rendered — its absence proves no data leaked to a non-admin. */
 const SEEDED_ADMIN_EMAIL = 'admin@shadow-apps.com';
 
+test.beforeEach(async ({ context, identity }) => {
+  await useClientIp(context, identity.clientIp);
+});
+
 test.describe('identity security — unauthenticated gates', () => {
   for (const path of GATED_PATHS) {
     test(`should redirect an unauthenticated visitor from ${path} to /login`, async ({ page }) => {
@@ -39,8 +43,8 @@ test.describe('identity security — unauthenticated gates', () => {
 });
 
 test.describe('identity security — admin authorization', () => {
-  test('should forbid a non-admin the admin users API with 403 ADM_001', async () => {
-    const ctx = await apiContext('identity', 'user2');
+  test('should forbid a non-admin the admin users API with 403 ADM_001', async ({ identity }) => {
+    const ctx = await apiContext('identity', 'user2', { clientIp: identity.clientIp });
     try {
       const response = await ctx.get('/api/v1/admin/users');
       expect(response.status()).toBe(403);
@@ -50,8 +54,8 @@ test.describe('identity security — admin authorization', () => {
     }
   });
 
-  test('should allow an admin to search the admin users API (positive control)', async () => {
-    const ctx = await apiContext('identity', 'admin');
+  test('should allow an admin to search the admin users API (positive control)', async ({ identity }) => {
+    const ctx = await apiContext('identity', 'admin', { clientIp: identity.clientIp });
     try {
       // A read-only search needs the usersRead permission but not step-up elevation, so it succeeds without any
       // MFA dance — the positive control proving the 403 above is authorization, not a broken endpoint.

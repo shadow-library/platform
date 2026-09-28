@@ -43,13 +43,6 @@ interface QuestLogRow {
  *
  * Metrics (ARCHITECTURE §18): the lazy 4-built-in seed, `metric.delete`'s quest-consequence guard, per-source
  * entry uniqueness, and the health-threshold completion offer a `metric.register` surfaces.
- *
- * `metric.register`'s non-`quest_log` path (manual/food sources) is currently broken in this environment —
- * `metric-entry.repository.ts:66` sends its `onConflictDoUpdate`'s `targetWhere` as a bind parameter, so once a
- * pooled connection has planned that statement a few times Postgres plans it generically and
- * `infer_arbiter_indexes` can no longer match the partial index, 500ing with `42P10` on every such call —
- * confirmed against a psql repro and dev logs, not environment staleness. Those scenarios are `test.fixme`d below,
- * citing the line; the live tests here only exercise the unaffected `quest_log` path (`isNotNull`, no bind param).
  */
 
 const BUILTIN_METRIC_NAMES = ['Steps', 'Calories burned', 'Sleep duration', 'Water'].sort();
@@ -183,9 +176,7 @@ test.describe('memoir metrics', () => {
     expect(entriesFor(delta, metricId)).toHaveLength(2);
   });
 
-  test.fixme('metric.register overwrites the same manual-source entry and lets different sources coexist (app bug: apps/memoir-server/src/modules/metrics/metric-entry.repository.ts:66 — targetWhere is sent as a bind parameter, so once a pooled connection has planned this statement generically infer_arbiter_indexes cannot match the partial index and every non-quest_log metric.register 500s with 42P10)', async ({
-    memoir,
-  }) => {
+  test('should overwrite the same manual-source entry on metric.register and let different sources coexist', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'met-uniqueness-manual', onboard: true });
     const today = todayLocal();
 
@@ -274,9 +265,7 @@ test.describe('memoir metrics', () => {
     expect(afterCompletion.result['offers'], 'a terminal log for the occurrence suppresses the offer').toEqual([]);
   });
 
-  test.fixme('metric.register offers a quest completion from a manual-source entry too, not only quest_log (app bug: apps/memoir-server/src/modules/metrics/metric-entry.repository.ts:66 — same bind-param targetWhere, 42P10 on every non-quest_log register)', async ({
-    memoir,
-  }) => {
+  test('should offer a quest completion from a manual-source metric.register too, not only quest_log', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'met-offers-manual', onboard: true });
     const today = todayLocal();
 

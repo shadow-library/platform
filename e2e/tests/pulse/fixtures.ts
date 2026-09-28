@@ -9,6 +9,7 @@ import { type APIRequestContext, test as base, request } from '@playwright/test'
 import {
   type AdminApi,
   apiContext,
+  clearIpState,
   clientIpHeaders,
   createAdminApi,
   createOAuthApplication,
@@ -25,7 +26,7 @@ import {
   requireProductUrl,
   runAll,
 } from '../../lib';
-import { deactivateTemplate, deleteNotificationJobs } from './helpers';
+import { deleteNotificationJobs, deleteTemplates } from './helpers';
 
 /**
  * Defining types
@@ -50,7 +51,7 @@ export interface PulseHarness {
   identityAdmin(): Promise<AdminApi>;
   /** A throwaway PUBLIC application with its own `api://` audience and a redirecting first-party client. */
   createOAuthApp(label?: string): Promise<OAuthApplication>;
-  /** Deactivates `templateId` after the test — templates have no DELETE route. */
+  /** Removes `templateId`, with its versions and any jobs sent on it, after the test. */
   trackTemplate(templateId: string): void;
   /** Removes these `notification_jobs` rows, and the `notification_messages` rows hanging off them, after the test. */
   trackJobs(...jobIds: string[]): void;
@@ -123,11 +124,12 @@ export const test = base.extend<{ pulse: PulseHarness }>({
     const pendingAdmin = adminApi;
     await runAll([
       () => deleteNotificationJobs(jobIds),
-      ...templateIds.map(templateId => async () => deactivateTemplate(await admin(), templateId)),
+      () => deleteTemplates(templateIds),
       ...applications.map(application => async () => deleteOAuthApplication((await identityAdmin()).ctx, application)),
       ...(pendingAdmin ? [async () => (await pendingAdmin).dispose()] : []),
       ...contexts.map(ctx => () => ctx.dispose()),
       ...staffAccounts.map(staff => () => deletePulseStaff(staff)),
+      () => clearIpState(clientIp),
     ]);
   },
 });

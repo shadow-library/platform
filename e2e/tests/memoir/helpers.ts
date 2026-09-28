@@ -71,7 +71,7 @@ export async function memoirCsrfHeaders(ctx: APIRequestContext, seedPath = '/api
   return token ? { 'x-csrf-token': token } : {};
 }
 
-/** Today's date in `YYYY-MM-DD`, in the runner's local timezone — good enough for a command's `localDate`/`recurrence.startDate` in dev, where the seeded accounts run UTC-adjacent timezones. */
+/** Today's UTC date in `YYYY-MM-DD` — the account day of every harness persona, which `ensureOnboarded` puts on UTC. */
 export function todayLocal(): string {
   return new Date().toISOString().slice(0, 10);
 }

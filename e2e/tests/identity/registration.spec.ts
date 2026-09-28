@@ -84,7 +84,7 @@ test.describe('identity registration', () => {
     await expect(page.getByText(email)).toBeVisible();
   });
 
-  test('should keep registration enumeration-safe for an email that already has an account', async ({ page }) => {
+  test('should keep registration enumeration-safe for an email that already has an account', async ({ page, identity }) => {
     const identityUrl = requireProductUrl('identity');
     // A seeded, definitely-existing account. Identity must not reveal that it exists: `register/init` answers
     // with the same 200 → OTP step as a brand-new email, and issues no code. A submitted code therefore fails
@@ -96,6 +96,7 @@ test.describe('identity registration', () => {
     const initResponsePromise = page.waitForResponse(response => response.url().includes('/api/v1/auth/register/init'));
     await page.getByRole('button', { name: 'Continue' }).click();
     const initResponse = await initResponsePromise;
+    identity.trackFlow(String(((await initResponse.json()) as { flowId?: string }).flowId));
 
     // Enumeration-safety, part one: the response is a normal 200 that advances to the OTP step, identical to a
     // new email — no 409/"already exists" leak at init.

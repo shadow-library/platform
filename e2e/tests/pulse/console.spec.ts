@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
-import { deactivateTemplate, uniqueKey } from './helpers';
+import { deleteTemplateByKey, uniqueKey } from './helpers';
 
 /**
  * Defining types
@@ -24,7 +24,14 @@ import { deactivateTemplate, uniqueKey } from './helpers';
 test.use({ storageState: storageStateFor('admin') });
 
 test.describe('console UI', () => {
+  let createdTemplateKeys: string[] = [];
+
   test.beforeEach(() => requireProductUrl('pulse'));
+
+  test.afterEach(async () => {
+    for (const templateKey of createdTemplateKeys) await deleteTemplateByKey(templateKey);
+    createdTemplateKeys = [];
+  });
 
   test('should load the delivery-health dashboard with the shape-only KPI cards', async ({ page }) => {
     const url = requireProductUrl('pulse');
@@ -52,27 +59,24 @@ test.describe('console UI', () => {
     await expect(page.getByRole('table', { name: 'Templates' }).getByText('auth.register.otp')).toBeVisible();
   });
 
-  test('the /templates search box should filter the table', async ({ page }) => {
-    const templateKey = uniqueKey('console-search-probe');
-    const ctx = await apiContext('pulse', 'admin');
-    await ctx.post('/api/v1/templates', { data: { templateKey, name: 'Search probe', messageType: 'TRANSACTIONAL' } });
-
-    const requests: string[] = [];
-    page.on('request', request => {
-      if (request.method() === 'GET' && request.url().includes('/api/v1/templates')) requests.push(request.url());
-    });
-
+  test('should send the typed key as the /templates list filter and narrow the table to it', async ({ page }) => {
     const url = requireProductUrl('pulse');
     await page.goto(`${url}/templates`);
-    await page.getByPlaceholder('Search by template key').fill(templateKey);
-    await page.waitForTimeout(500);
+    const table = page.getByRole('table', { name: 'Templates' });
+    await page.getByPlaceholder('Search by template key').fill('auth.password.changed');
+    await expect(table.getByText('auth.password.changed')).toBeVisible();
 
-    const filtered = requests.find(u => u.includes('key='));
-    expect(filtered, `expected a GET /api/v1/templates request carrying the typed key filter; saw: ${requests.join(', ')}`).toBeTruthy();
+    const filtered = page.waitForRequest(request => request.method() === 'GET' && request.url().includes('/api/v1/templates') && request.url().includes('key=auth.register.otp'));
+    await page.getByPlaceholder('Search by template key').fill('auth.register.otp');
+    await filtered;
+
+    await expect(table.getByText('auth.register.otp')).toBeVisible();
+    await expect(table.getByText('auth.password.changed')).toBeHidden();
   });
 
   test('should create a template via the drawer, edit it from its detail page, and see the change reflected there', async ({ page }) => {
     const templateKey = uniqueKey('console-tpl');
+    createdTemplateKeys.push(templateKey);
     const url = requireProductUrl('pulse');
     await page.goto(`${url}/templates`);
 
@@ -101,6 +105,7 @@ test.describe('console UI', () => {
     const ctx = await apiContext('pulse', 'admin');
     const listResponse = await ctx.get(`/api/v1/templates?key=${templateKey}`);
     const listBody = (await listResponse.json()) as { items: { id: string }[] };
+    await ctx.dispose();
     const created = listBody.items[0];
     expect(created, `expected ${templateKey} to have been created by the drawer submit`).toBeTruthy();
 
@@ -114,10 +119,6 @@ test.describe('console UI', () => {
     await editDialog.getByRole('button', { name: 'Save changes' }).click();
     // `.first()`: the new name renders both in the page subtitle and in the metadata description list.
     await expect(page.getByText('E2E console template (edited)').first()).toBeVisible();
-
-    // Cleanup: no DELETE route for templates — deactivate via the API instead of a second UI round trip. It goes
-    // through `deactivateTemplate` because a bare `ctx.patch` on a session-carrying context is refused by CSRF.
-    if (created) await deactivateTemplate(ctx, created.id);
   });
 
   test('should show the seeded e2e-dev sender profile in /senders', async ({ page }) => {

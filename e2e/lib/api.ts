@@ -8,6 +8,7 @@ import { type APIRequestContext, type APIResponse, request } from '@playwright/t
 /**
  * Importing user defined packages
  */
+import { clientIpHeaders } from './client-ip';
 import { type ProductKey, requireProductUrl } from './env';
 import { type LoginPersona, storageStateFor } from './personas';
 
@@ -17,6 +18,11 @@ import { type LoginPersona, storageStateFor } from './personas';
 
 /** A mutating HTTP method — the ones the CSRF double-submit guard applies to. */
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
+
+export interface ApiContextOptions {
+  /** Sent as `X-Forwarded-For` on every request, so identity charges this address's rate limits. */
+  clientIp?: string;
+}
 
 export interface MutateOptions {
   /** JSON body sent with the request. */
@@ -57,11 +63,12 @@ const DEFAULT_TERMINAL_STATUSES = ['done', 'failed', 'succeeded', 'completed', '
  * been produced yet (setup skipped), the context is created without it rather than throwing — the caller's own
  * auth assertion then fails meaningfully instead of a file-not-found surfacing here.
  */
-export async function apiContext(product: ProductKey, persona?: LoginPersona): Promise<APIRequestContext> {
+export async function apiContext(product: ProductKey, persona?: LoginPersona, options: ApiContextOptions = {}): Promise<APIRequestContext> {
   const baseURL = requireProductUrl(product);
   const statePath = persona ? storageStateFor(persona) : undefined;
   const storageState = statePath && existsSync(statePath) ? statePath : undefined;
-  return request.newContext({ baseURL, ignoreHTTPSErrors: true, storageState });
+  const extraHTTPHeaders = options.clientIp ? clientIpHeaders(options.clientIp) : undefined;
+  return request.newContext({ baseURL, ignoreHTTPSErrors: true, storageState, extraHTTPHeaders });
 }
 
 /**

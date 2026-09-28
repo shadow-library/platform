@@ -181,6 +181,19 @@ export async function readAuthFlow<T = Record<string, unknown>>(flowId: string):
   return raw ? (JSON.parse(raw) as T) : null;
 }
 
+/** Every live auth flow (login, registration, recovery) started for one of `identifiers`, which identity would otherwise keep until its TTL. */
+export async function deleteAuthFlowsFor(identifiers: readonly string[]): Promise<void> {
+  if (identifiers.length === 0) return;
+  const wanted = new Set(identifiers.map(identifier => identifier.toLowerCase()));
+  const doomed: string[] = [];
+  for (const key of await redisScan('auth_flow:*')) {
+    const raw = await redisGet(key);
+    const identifier = raw ? (JSON.parse(raw) as { identifier?: unknown }).identifier : undefined;
+    if (typeof identifier === 'string' && wanted.has(identifier.toLowerCase())) doomed.push(key);
+  }
+  await redisDel(...doomed);
+}
+
 /** Merges `patch` into a live auth flow's JSON, keeping its remaining TTL. */
 export async function patchAuthFlow(flowId: string, patch: Record<string, unknown>): Promise<void> {
   const key = `auth_flow:${flowId}`;

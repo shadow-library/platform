@@ -109,6 +109,15 @@ export async function fetchLatestOtp(email: string, templateKey: string): Promis
   return rows[0]?.code ?? undefined;
 }
 
+/** Every pulse `notification_jobs` row addressed to one of `recipients`, with the messages hanging off them — what identity delivered to a test's addresses. */
+export async function deletePulseNotificationsTo(recipients: readonly string[]): Promise<void> {
+  if (recipients.length === 0) return;
+  const sql = pulseDb();
+  const jobs = sql`SELECT id FROM notification_jobs WHERE recipient IN ${sql(recipients as string[])}`;
+  await sql`DELETE FROM notification_messages WHERE notification_job_id IN (${jobs})`;
+  await sql`DELETE FROM notification_jobs WHERE recipient IN ${sql(recipients as string[])}`;
+}
+
 /** Closes every open database client. Call from Playwright's global teardown so the node process can exit. */
 export async function closeDbs(): Promise<void> {
   const open = [...clients.values()];

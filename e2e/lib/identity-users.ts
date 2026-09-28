@@ -6,9 +6,9 @@ import { randomBytes } from 'node:crypto';
 /**
  * Importing user defined packages
  */
-import { identityDb } from './db';
+import { deletePulseNotificationsTo, identityDb } from './db';
 import { PERSONAS } from './personas';
-import { redisDel } from './redis';
+import { deleteAuthFlowsFor, redisDel } from './redis';
 
 /**
  * Defining types
@@ -159,18 +159,46 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
 
 /**
  * Removes a factory or API-registered user: the user row (its sessions, credentials, emails, memberships and the rest cascade), the
- * sign-in events and verification challenges that outlive it, its personal organisation, identity's Redis set of its session
- * hashes and its per-identifier OTP counters. Idempotent, so it is safe in a teardown that may run after a failed create or a spec
- * that already deleted the user through the API.
+ * sign-in events and verification challenges that outlive it, the notifications identity queued and pulse delivered to any address it
+ * held, its unfinished auth flows, its personal organisation, identity's Redis set of its session hashes and its per-identifier OTP
+ * counters. Idempotent, so it is safe in a teardown that may run after a failed create or a spec that already deleted the user
+ * through the API.
  */
 export async function deleteIdentityUser(user: IdentityUserRef): Promise<void> {
   const sql = identityDb();
-  const targets = [user.email.toLowerCase(), ...(user.phone ? [user.phone] : [])];
+  const held = await sql<{ target: string }[]>`
+    SELECT lower(email_id) AS target FROM user_emails WHERE user_id = ${user.userId}
+    UNION SELECT phone_number FROM user_phones WHERE user_id = ${user.userId}
+  `;
+  const targets = [...new Set([user.email.toLowerCase(), ...(user.phone ? [user.phone] : []), ...held.map(row => row.target)])];
   await sql`DELETE FROM user_sign_in_events WHERE user_id = ${user.userId}`;
   await sql`DELETE FROM verification_challenges WHERE user_id = ${user.userId} OR lower(target) IN ${sql(targets)}`;
+  await deleteOutboxTo(targets);
+  await deletePulseNotificationsTo(targets);
   await sql`DELETE FROM users WHERE id = ${user.userId}`;
+  await deleteAuthFlowsFor(targets);
   if (user.personalOrgId) await sql`DELETE FROM organisations WHERE id = ${user.personalOrgId} AND type = 'PERSONAL'`;
   await redisDel(`user_sessions:${user.userId}`, ...targets.map(target => `rl:otp-ident:${target}`));
+}
+
+/** `recipients` is read through `#>> '{}'` because rows written under prepared statements hold it as a JSON string, not an object. */
+async function deleteOutboxTo(targets: readonly string[]): Promise<void> {
+  const sql = identityDb();
+  await sql`
+    DELETE FROM notification_outbox
+    WHERE lower((recipients #>> '{}')::jsonb ->> 'email') IN ${sql(targets as string[])} OR (recipients #>> '{}')::jsonb ->> 'phone' IN ${sql(targets as string[])}
+  `;
+}
+
+/** What a registration for `email` leaves behind besides a user: its challenges, its Redis flows, its outbox rows, what pulse delivered from them and its OTP throttle key. */
+export async function deleteRegistrationAttempt(email: string): Promise<void> {
+  const sql = identityDb();
+  const target = email.toLowerCase();
+  await sql`DELETE FROM verification_challenges WHERE lower(target) = ${target} AND user_id IS NULL`;
+  await deleteOutboxTo([target]);
+  await deletePulseNotificationsTo([target]);
+  await deleteAuthFlowsFor([target]);
+  await redisDel(`rl:otp-ident:${target}`);
 }
 
 /** The user whose primary email is `email`, e.g. one a spec registered through the API. */

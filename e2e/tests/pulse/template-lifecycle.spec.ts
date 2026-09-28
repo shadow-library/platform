@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, mutate, requireProductUrl } from '../../lib';
-import { createTemplate, deactivateTemplate, openDraft, publishDraft, putDraftContent, uniqueKey } from './helpers';
+import { createTemplate, deleteTemplates, openDraft, publishDraft, putDraftContent, uniqueKey } from './helpers';
 
 /**
  * Defining types
@@ -19,8 +19,8 @@ import { createTemplate, deactivateTemplate, openDraft, publishDraft, putDraftCo
  * Request-level coverage of the template CMS's draft → publish lifecycle
  * (`apps/pulse-server/src/modules/template/template-version.service.ts`), driven as `admin` (PulseAdmin holds
  * `pulse:templates:write` + the elevated `pulse:templates:publish`). Every template this file creates carries a
- * `uniqueKey('tpl')` key and is deactivated (not deleted — `TemplateController` has no `DELETE` route) in an
- * `afterEach`, so nothing here touches the baseline `auth.*` catalog.
+ * `uniqueKey('tpl')` key and is removed in the database in an `afterEach` (`TemplateController` has no `DELETE`
+ * route), so nothing here touches the baseline `auth.*` catalog.
  */
 test.describe('template lifecycle', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
@@ -28,8 +28,7 @@ test.describe('template lifecycle', () => {
   let createdTemplateIds: string[] = [];
 
   test.afterEach(async () => {
-    const ctx = await apiContext('pulse', 'admin');
-    await Promise.all(createdTemplateIds.map(id => deactivateTemplate(ctx, id)));
+    await deleteTemplates(createdTemplateIds);
     createdTemplateIds = [];
   });
 

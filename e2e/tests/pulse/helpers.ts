@@ -8,7 +8,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { mutate, pulseDb } from '../../lib';
+import { mintServiceAccountToken, mutate, pulseDb, requireProductUrl, type TokenResponseBody, workloadGrant } from '../../lib';
 
 /**
  * Defining types
@@ -87,12 +87,17 @@ export interface NotificationJobRow {
  */
 
 /**
- * A wall-clock literal for pulse's naive `timestamp` columns. A `Date` would be sent with this host's offset and
- * stored with it dropped, landing the row in the wrong day whenever the host is not on UTC — which is exactly the
- * bucket `DashboardService` reads.
+ * A `notifications:send` bearer for pulse, minted as memoir's service client. Memoir is the one first-party client holding the
+ * scope whose credential a host-side process can present: identity binds it to the `memoir/memoir-server` workload, and
+ * `kubectl create token` issues that service account's projected token without touching the cluster.
  */
-function utcTimestamp(date: Date): string {
-  return date.toISOString().replace('T', ' ').replace('Z', '');
+export async function memoirSendToken(identity: APIRequestContext): Promise<string> {
+  const assertion = await mintServiceAccountToken('memoir', 'memoir-server', { audiences: [new URL(requireProductUrl('identity')).origin] });
+  const response = await workloadGrant(identity, assertion, { clientId: 'memoir', resource: 'api://pulse', scope: 'notifications:send' });
+  if (response.status() !== 200) throw new Error(`memoir workload grant failed: ${response.status()} ${await response.text()}`);
+  const { access_token: token } = (await response.json()) as TokenResponseBody;
+  if (!token) throw new Error('memoir workload grant returned no access token');
+  return token;
 }
 
 /** A collision-safe resource key: `e2e-<concern>-<epoch-ms><random>` — two copies of one test can start in the same millisecond. */
@@ -109,9 +114,23 @@ export async function createTemplate(ctx: APIRequestContext, overrides: Template
   return response.json();
 }
 
-/** Best-effort cleanup: templates have no DELETE route, so the isolation contract is satisfied by deactivating instead. */
-export async function deactivateTemplate(ctx: APIRequestContext, templateId: string): Promise<void> {
-  await mutate(ctx, 'patch', `/api/v1/templates/${templateId}`, { data: { isActive: false } });
+/**
+ * Templates have no DELETE route, and a deactivated one stays in the catalogue for good, so a test's templates are removed in
+ * the database: their jobs and messages first (`notification_jobs` restricts the delete), then the template, whose versions,
+ * contents and channel settings cascade.
+ */
+export async function deleteTemplates(templateIds: readonly string[]): Promise<void> {
+  if (templateIds.length === 0) return;
+  const sql = pulseDb();
+  const ids = sql(templateIds as string[]);
+  const jobs = await sql<{ id: string }[]>`SELECT id::text FROM notification_jobs WHERE template_id IN ${ids}`;
+  await deleteNotificationJobs(jobs.map(job => job.id));
+  await sql`DELETE FROM templates WHERE id IN ${ids}`;
+}
+
+export async function deleteTemplateByKey(templateKey: string): Promise<void> {
+  const rows = await pulseDb()<{ id: string }[]>`SELECT id::text FROM templates WHERE template_key = ${templateKey}`;
+  await deleteTemplates(rows.map(row => row.id));
 }
 
 /** Opens (or re-fetches, idempotently) the draft version for `templateId`. */
@@ -265,12 +284,14 @@ export async function findPublishedVersionId(templateId: string): Promise<string
  * hold (see `security.spec.ts`), so a delivery state is arranged by writing the row the queue would have written.
  */
 export async function insertNotificationJob(row: NotificationJobRow): Promise<string> {
-  const createdAt = utcTimestamp(row.createdAt ?? new Date());
+  // `created_at` is a naive UTC `timestamp`: the client would parse a zone-less literal bound to it as host-local time, so the instant
+  // goes over as `timestamptz` and Postgres takes its UTC wall clock.
+  const createdAt = (row.createdAt ?? new Date()).toISOString();
   const rows = await pulseDb()<{ id: string }[]>`
     INSERT INTO notification_jobs (template_id, template_version_id, channel, locale, recipient, status, created_at, updated_at)
     VALUES (
       ${row.templateId}, ${row.templateVersionId}, ${row.channel}::notification_channel, ${row.locale ?? 'en-ZZ'}, ${row.recipient},
-      ${row.status}::notification_status, ${createdAt}, ${createdAt}
+      ${row.status}::notification_status, ${createdAt}::timestamptz AT TIME ZONE 'UTC', ${createdAt}::timestamptz AT TIME ZONE 'UTC'
     )
     RETURNING id::text
   `;

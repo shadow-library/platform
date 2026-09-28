@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { PERSONAS, readSeedManifest, requireProductUrl, storageStateFor } from '../../lib';
-import { capturePasswordCredential, maxOutboxId, pollOutboxRowAfter, restorePasswordCredential } from './helpers';
+import { PERSONAS, readSeedManifest, requireProductUrl, storageStateFor, useClientIp } from '../../lib';
+import { expect, test } from './fixtures';
+import { capturePasswordCredential, deleteNotificationsAfter, maxOutboxId, pollOutboxRowAfter, restorePasswordCredential } from './helpers';
 
 /**
  * Defining types
@@ -26,6 +26,10 @@ import { capturePasswordCredential, maxOutboxId, pollOutboxRowAfter, restorePass
 
 /** The password-changed notification identity enqueues on a successful self-service change. */
 const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
+
+test.beforeEach(async ({ context, identity }) => {
+  await useClientIp(context, identity.clientIp);
+});
 
 test.describe('identity account portal (user2)', () => {
   test.use({ storageState: storageStateFor('user2') });
@@ -132,6 +136,7 @@ test.describe('identity account security (user1)', () => {
     } finally {
       // Always restore, even if an assertion above failed mid-flight, so the seeded password keeps working.
       await restorePasswordCredential(userId, snapshot);
+      await deleteNotificationsAfter(persona.email, PASSWORD_CHANGED_TEMPLATE, outboxBaseline);
     }
   });
 });

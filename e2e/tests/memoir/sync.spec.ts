@@ -446,7 +446,7 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     const sideQuestId = randomUUID();
     await applied('sidequest.log', { id: sideQuestId, draft: { date: today, name: 'E2E sync-12 side quest', statAffinity: 'discipline' } });
 
-    // health.save (wire type metric.register) is NOT exercised here — see the dedicated `test.fixme` below for why.
+    // health.save (wire type metric.register) has its own test below.
 
     // title.display — titles are only ever chosen among already-earned ones, so one is seeded directly.
     await memoirDb()`INSERT INTO titles_earned (account_id, title_id) VALUES (${accountId}, 'steady_builder') ON CONFLICT DO NOTHING`;
@@ -608,8 +608,7 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     expectRow('progress_counters', () => true, ['activeDays']);
   });
 
-  // App bug: apps/memoir-server/src/modules/metrics/metric-entry.repository.ts:66 binds targetWhere ne(source, 'quest_log') as a parameter; once a pooled connection switches to a generic plan (~6th execution) Postgres can no longer infer the partial index, so every non-quest_log metric.register fails 42P10.
-  test.fixme('should apply health.save (wire type metric.register) and carry metricId/date/value/createdAt on the metrics and metric_entries domains', async ({ memoir }) => {
+  test('should apply health.save (wire type metric.register) and carry metricId/date/value/createdAt on the metrics and metric_entries domains', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'sync-12-health-save', onboard: true });
     const accountId = persona.account!.id;
     const today = todayLocal();

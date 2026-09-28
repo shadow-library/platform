@@ -1,24 +1,21 @@
 /**
  * Importing npm packages
  */
-import { expect, test } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
-import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
-import { ensureOnboarded } from './helpers';
+import { requireProductUrl } from '../../lib';
+import { expect, test } from './fixtures';
 
 /**
  * Defining types
  */
 
 test.describe('memoir quick capture', () => {
-  test.use({ storageState: storageStateFor('user1') });
-
-  test('should log an expense through the command palette and show it on the Finance screen', async ({ page }) => {
+  test('should log an expense through the command palette and show it on the Finance screen', async ({ page, context, memoir }) => {
     const url = requireProductUrl('memoir');
-    await ensureOnboarded(await apiContext('memoir', 'user1'));
+    await memoir.signInBrowser(context, await memoir.persona({ label: 'quick-expense', onboard: true }));
 
     await page.goto(url);
     // The ⌘K listener is registered by a shell effect after hydration, and `page.goto` only waits for `load`, so an early
@@ -39,9 +36,9 @@ test.describe('memoir quick capture', () => {
     await expect(page.getByText(note)).toBeVisible();
   });
 
-  test('should save a journal entry from /log and show it in the entry list', async ({ page }) => {
+  test('should save a journal entry from /log and show it in the entry list', async ({ page, context, memoir }) => {
     const url = requireProductUrl('memoir');
-    await ensureOnboarded(await apiContext('memoir', 'user1'));
+    await memoir.signInBrowser(context, await memoir.persona({ label: 'quick-journal', onboard: true }));
 
     await page.goto(`${url}/log`);
     await expect(page.getByRole('heading', { name: 'Journal', level: 2 })).toBeVisible();

@@ -29,10 +29,9 @@ interface MemoirTemplateCase {
  * Declaring the constants
  *
  * The three memoir EMAIL templates in the baseline catalog (`apps/pulse-server/src/database/seed/baseline.data.ts`'s
- * `BASELINE_TEMPLATES`), rendered through the studio preview API (`POST /versions/preview`) rather than a real send:
- * every send route is `@RequireScope('notifications:send')`, a service-only scope no host-side caller can hold (see
- * `send-delivery.spec.ts`). Preview needs no draft, no publish and no cleanup — it reads the already-PUBLISHED
- * baseline version and renders it against caller-supplied data, so this is read-only against seeded state.
+ * `BASELINE_TEMPLATES`), rendered through the studio preview API (`POST /versions/preview`) rather than a real send.
+ * Preview needs no draft, no publish and no cleanup — it reads the already-PUBLISHED baseline version and renders it
+ * against caller-supplied data, so this is read-only against seeded state; `send-delivery.spec.ts` covers the send itself.
  */
 const CASES: MemoirTemplateCase[] = [
   {

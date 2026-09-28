@@ -28,6 +28,7 @@ import {
   deleteOrganisation,
   deleteOrganisationBotRecord,
   deleteOrgOAuthApp,
+  deleteRegistrationAttempt,
   deleteSamlSpRecord,
   deleteWebhookRecord,
   findIdentityUserByEmail,
@@ -45,6 +46,7 @@ import {
   type OrganisationBot,
   type OrganisationRole,
   type OrgOAuthApp,
+  redisDel,
   registerOAuthClient,
   type RegisterOAuthClientOptions,
   registerOrgOAuthApp,
@@ -109,8 +111,10 @@ export interface IdentityHarness {
   createTeam(options?: TeamOrganisationOptions): Promise<IdentityTeam>;
   /** Removes an organisation the test created some other way (e.g. through the API) after the test, like `createTeam`'s. */
   trackOrganisation(organisationId: string, ownerUserId: string): void;
-  /** Removes the user holding `email` after the test, if one exists by then — for accounts a spec registers through the API or UI. */
+  /** Removes the user holding `email` after the test, if one exists by then, and whatever its registration left behind — for accounts a spec registers through the API or UI. */
   trackUserByEmail(email: string): void;
+  /** Drops an auth flow the test left unfinished, for an account the harness does not own (a seeded persona). */
+  trackFlow(flowId: string): void;
 }
 
 export interface IdentityTeam extends TeamOrganisation {
@@ -151,6 +155,7 @@ export const test = base.extend<{ identity: IdentityHarness }>({
     const samlSps: string[] = [];
     const webhooks: string[] = [];
     const registeredEmails: string[] = [];
+    const flowIds: string[] = [];
     const extraAdmins: AdminApi[] = [];
     let adminApi: Promise<AdminApi> | undefined;
 
@@ -255,6 +260,9 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       trackUserByEmail: email => {
         registeredEmails.push(email);
       },
+      trackFlow: flowId => {
+        flowIds.push(flowId);
+      },
     });
 
     const pendingAdmin = adminApi;
@@ -271,9 +279,11 @@ export const test = base.extend<{ identity: IdentityHarness }>({
       ...contexts.map(ctx => () => ctx.dispose()),
       ...users.map(user => () => deleteIdentityUser(user)),
       ...registeredEmails.map(email => async () => {
+        await deleteRegistrationAttempt(email);
         const user = await findIdentityUserByEmail(email);
         if (user) await deleteIdentityUser(user);
       }),
+      () => redisDel(...flowIds.map(flowId => `auth_flow:${flowId}`)),
       () => clearIpState(clientIp),
     ]);
   },

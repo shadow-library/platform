@@ -6,7 +6,7 @@ import { type APIResponse, expect, type Page } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { findSetCookie, type FlowStepBody, identityDb } from '../../lib';
+import { findSetCookie, type FlowStepBody, identityDb, pulseDb } from '../../lib';
 
 /**
  * Defining types
@@ -133,6 +133,29 @@ export async function pollOutboxRowAfter(email: string, templateKey: string, aft
     if (Date.now() >= deadline) throw new Error(`No new ${templateKey} outbox row for ${email} within ${timeoutMs}ms (baseline ${afterId})`);
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
+}
+
+/**
+ * Removes the `email`+`templateKey` notifications a test caused on an account that outlives it (a seeded persona): the outbox rows
+ * newer than `afterId`, and whatever pulse delivered from them. Pulse jobs are matched from the first such row's creation on, read
+ * off the one Postgres clock both databases share; a row still pending is simply never sent.
+ */
+export async function deleteNotificationsAfter(email: string, templateKey: string, afterId: bigint): Promise<void> {
+  const outbox = identityDb();
+  const rows = outbox`
+    SELECT id FROM notification_outbox
+    WHERE ((recipients #>> '{}')::jsonb) ->> 'email' = ${email} AND template_key = ${templateKey} AND id > ${afterId.toString()}
+  `;
+  const [first] = await outbox<{ since: string | null }[]>`SELECT (min(created_at) AT TIME ZONE 'UTC')::text AS since FROM notification_outbox WHERE id IN (${rows})`;
+  await outbox`DELETE FROM notification_outbox WHERE id IN (${rows})`;
+  if (!first?.since) return;
+  const sql = pulseDb();
+  const jobs = sql`
+    SELECT j.id FROM notification_jobs j JOIN templates t ON t.id = j.template_id
+    WHERE j.recipient = ${email} AND t.template_key = ${templateKey} AND j.created_at >= ${first.since}::text::timestamp
+  `;
+  await sql`DELETE FROM notification_messages WHERE notification_job_id IN (${jobs})`;
+  await sql`DELETE FROM notification_jobs WHERE id IN (${jobs})`;
 }
 
 /** Asserts a JSON error envelope carries the expected machine `code`, surfacing the actual body in the failure message. */

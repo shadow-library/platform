@@ -3,7 +3,7 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import { type APIRequestContext, test as base, request } from '@playwright/test';
+import { type APIRequestContext, test as base, type BrowserContext, request } from '@playwright/test';
 
 /**
  * Importing user defined packages
@@ -30,6 +30,7 @@ import {
   redisScan,
   requireProductUrl,
   runAll,
+  useClientIp,
 } from '../../lib';
 import { type AccountView, ensureOnboarded } from './helpers';
 
@@ -78,6 +79,8 @@ export interface MemoirHarness {
   disposableAccount(label?: string): Promise<DisposableAccount>;
   /** A cookie-less memoir context — an unauthenticated caller, or one presenting only a bearer token. */
   guest(): Promise<APIRequestContext>;
+  /** Signs a browser context in as `persona` with its identity and memoir cookies, charged to this test's client address. */
+  signInBrowser(context: BrowserContext, persona: MemoirPersona): Promise<void>;
   /** An identity context signed in as `persona`, for the OAuth calls that ride a session. */
   identityCaller(persona: MemoirPersona): Promise<APIRequestContext>;
   /** A cookie-less identity context — the token endpoint refuses a cookie-carrying caller with `S010` (CSRF). */
@@ -230,6 +233,10 @@ export const test = base.extend<{ memoir: MemoirHarness }>({
         return account;
       },
       guest: async () => track(await request.newContext({ baseURL: memoirUrl, ignoreHTTPSErrors: true, extraHTTPHeaders: clientIpHeaders(clientIp) })),
+      signInBrowser: async (context, persona) => {
+        await context.addCookies((await persona.ctx.storageState()).cookies);
+        await useClientIp(context, clientIp);
+      },
       identityCaller: async persona => track(await identitySessionContext(persona.session, { clientIp })),
       identityAnonymous: async () => track(await identityApi(clientIp)),
       identityAdmin,
