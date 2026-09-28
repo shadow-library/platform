@@ -59,9 +59,8 @@ interface DstDay {
  * are arranged by rewinding `accounts.last_hp_date` (see `rollover-helpers.ts`) and asserted through the delta and the
  * rows the walk writes. The engine's HP/Crown/Comeback/Returner numbers come from ruleset v1 (`rules/ruleset.ts`).
  *
- * The walk resumes at `last_hp_date + 1`, and preparing today stamps `last_hp_date = today`, so the day an account was
- * last prepared on is never closed (apps/memoir-server/src/modules/rollover/rollover.service.ts:192 and :428); the
- * `test.fixme`s pin the correct behaviour. Every live test starts its elapsed days after a day the rig leaves closed.
+ * Preparing today stamps `last_hp_date = today` with the day still open, so the walk resumes at that day itself while its
+ * row is open and at the day after once it is closed; the prepared-day tests below backdate an open prepared day to prove it.
  */
 
 const CATCHUP_MAX_DAYS = 90;
@@ -166,9 +165,7 @@ test.describe('memoir rollover', () => {
       expect(await syncSeqOf('quest_logs', subject.accountId, yesterday, 'missed')).toBeLessThan(completedSeq);
     });
 
-    test.fixme('should close the day an account was last prepared on once the next day begins (app bug: apps/memoir-server/src/modules/rollover/rollover.service.ts:428 stamps last_hp_date on the prepared day and :192 resumes after it, so that day is never closed)', async ({
-      memoir,
-    }) => {
+    test('should close the day an account was last prepared on once the next day begins', async ({ memoir }) => {
       const subject = await rolloverSubject(memoir, 'roll-prepared-day');
       const today = localToday();
       const anchorQuestId = await createQuest(subject.ctx, { strictness: 'anchor', startDate: addDays(today, -1) });
@@ -552,9 +549,7 @@ test.describe('memoir rollover', () => {
       expect(await accountSnapshot(subject.ctx)).toMatchObject({ persona: 'active', comeback: null });
     });
 
-    test.fixme('should expire the Recovery an account was prepared with once the next day begins (app bug: apps/memoir-server/src/modules/rollover/rollover.service.ts:428 stamps last_hp_date on the prepared day and :192 resumes after it, so the Recovery’s own day never closes)', async ({
-      memoir,
-    }) => {
+    test('should expire the Recovery an account was prepared with once the next day begins', async ({ memoir }) => {
       const subject = await rolloverSubject(memoir, 'roll-recovery-next-day');
       const today = localToday();
       const anchorQuestId = await createQuest(subject.ctx, { strictness: 'anchor', startDate: addDays(today, -1) });
@@ -571,9 +566,7 @@ test.describe('memoir rollover', () => {
   });
 
   test.describe('returner ritual', () => {
-    test.fixme('should date the last activity to the prepared day it happened on, firing the Returner from there (app bug: apps/memoir-server/src/modules/rollover/rollover.service.ts:428 and :192 leave the prepared day unclosed, so last_active_date never records it and :475 skips the Returner)', async ({
-      memoir,
-    }) => {
+    test('should date the last activity to the prepared day it happened on, firing the Returner from there', async ({ memoir }) => {
       const subject = await rolloverSubject(memoir, 'roll-returner-prepared-day');
       const today = localToday();
       const questId = await createQuest(subject.ctx, { strictness: 'anchor', startDate: addDays(today, -9) });
