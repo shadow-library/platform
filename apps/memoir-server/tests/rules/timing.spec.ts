@@ -17,6 +17,11 @@ const at = (overrides: Partial<TimingBandInput>): TimingBandInput => ({
 });
 
 describe('resolveTimingBand', () => {
+  it('should score an occurrence completed in the last minutes before its own day began as on time', () => {
+    expect(resolveTimingBand(ruleset, at({ strictness: 'anchor', daysElapsed: -1, minuteOfDay: 1437 }))).toBe('on_time');
+    expect(resolveTimingBand(ruleset, at({ daysElapsed: -1, minuteOfDay: 1437 }))).toBe('on_time');
+  });
+
   describe('anchor within-day boundaries', () => {
     const cases: readonly [label: string, minuteOfDay: number, band: TimingBand][] = [
       ['before the start minute', ANCHOR_START - 1, 'on_time'],

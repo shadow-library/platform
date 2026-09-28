@@ -89,4 +89,27 @@ describe('command day stamps', () => {
     await expect(run(type, payload, '2026-03-11')).rejects.toMatchObject({ code: 'CMD_002' });
     await expect(run(type, payload, TODAY)).rejects.toBeInstanceOf(PastTheDayCheck);
   });
+
+  it('should accept tomorrow’s occurrence from a clock a little ahead in the last five minutes of the day', async () => {
+    setSystemTime(new Date(`${TODAY}T23:55:00Z`));
+
+    await expect(run('quest.complete', { occurrenceId: '7:2026-03-11' })).rejects.toBeInstanceOf(PastTheDayCheck);
+  });
+
+  it('should still refuse tomorrow’s occurrence just outside the five minutes, and any later day inside them', async () => {
+    setSystemTime(new Date(`${TODAY}T23:54:59Z`));
+    await expect(run('quest.complete', { occurrenceId: '7:2026-03-11' })).rejects.toMatchObject({ code: 'QST_009' });
+
+    setSystemTime(new Date(`${TODAY}T23:59:59Z`));
+    await expect(run('quest.complete', { occurrenceId: '7:2026-03-12' })).rejects.toMatchObject({ code: 'QST_009' });
+  });
+
+  it.each([
+    ['plan.setLock', { locked: false }],
+    ['recovery.complete', {}],
+  ])('should keep refusing %s stamped for tomorrow in the last minutes of today, since that day is not prepared yet', async (type, payload) => {
+    setSystemTime(new Date(`${TODAY}T23:59:00Z`));
+
+    await expect(run(type, payload, '2026-03-11')).rejects.toMatchObject({ code: 'CMD_002' });
+  });
 });

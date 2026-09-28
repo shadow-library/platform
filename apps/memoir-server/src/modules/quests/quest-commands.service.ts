@@ -79,6 +79,7 @@ interface ResolvedTiming {
 const RESCHEDULE_CAP_PER_WINDOW = 2;
 const RESCHEDULE_WINDOW_DAYS = 7;
 const EDIT_WINDOW_DAYS = 7;
+const MIDNIGHT_SKEW_MS = 5 * 60_000;
 const MS_PER_DAY = 86_400_000;
 
 function requiredMinute(field: string, value: unknown): number {
@@ -550,9 +551,12 @@ export class QuestCommandsService implements OnModuleInit {
     return account as AccountSnapshot;
   }
 
-  /** An outcome for a day that has not begun would score as on time today; a past day's is how an offline completion arrives, and stays allowed. */
+  /**
+   * An outcome for a day that has not begun is refused; a past day's is how an offline completion arrives, and stays allowed. A device clock a
+   * little ahead of the server stamps tomorrow in the last minutes of today, so the day is read that far ahead.
+   */
   private assertStarted(occurrence: OccurrenceContext, account: AccountSnapshot): void {
-    const today = accountToday(Date.now(), account.timezone, account.lastHpDate);
+    const today = accountToday(Date.now() + MIDNIGHT_SKEW_MS, account.timezone, account.lastHpDate);
     if (compareLocalDates(occurrence.occurrenceDate, today) > 0) throw AppErrorCode.QST_009.create({ date: occurrence.ref.date });
   }
 

@@ -5,7 +5,7 @@ export interface TimingBandInput {
   /** Null for an untimed quest, which has no within-day decay regardless of strictness. */
   readonly startMinute: number | null;
   readonly durationMinutes: number;
-  /** Local calendar days between the occurrence's day and the day the completion resolved on. */
+  /** Local calendar days between the occurrence's day and the day the completion resolved on; negative when it resolved before its day began. */
   readonly daysElapsed: number;
   /** Minute-of-day the completion resolved at, in the account's timezone. */
   readonly minuteOfDay: number;
@@ -28,6 +28,7 @@ const dayBandFor = (daysElapsed: number): TimingBand => {
 };
 
 export const resolveTimingBand = (ruleset: Ruleset, input: TimingBandInput): TimingBand => {
+  if (input.daysElapsed < 0) return 'on_time';
   const daysElapsed = Math.max(0, Math.trunc(input.daysElapsed));
   if (daysElapsed > 0) return dayBandFor(daysElapsed);
 
