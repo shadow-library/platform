@@ -376,6 +376,7 @@ export class FastifyRouter extends Dispatcher {
     const statusCode = this.getStatusCode(metadata);
     const argsOrder = (Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, route.instance, route.handlerName) as (keyof RequestContext | undefined)[]) ?? [];
     const headerEntries = Object.entries(metadata.headers ?? {});
+    const injectsResponse = argsOrder.includes('response');
 
     return async (request, response) => {
       const params = request.params as Record<string, string>;
@@ -390,9 +391,23 @@ export class FastifyRouter extends Dispatcher {
         response.header(key, typeof value === 'function' ? value() : value);
       }
 
-      /** Handling the actual route and serializing the output */
+      /**
+       * A handler that sends through `@Res()` and returns nothing leaves Fastify a resolved `undefined`; while an async
+       * `onSend` hook such as compression is still streaming, Fastify reads that as "nothing sent" and sends again, empty.
+       * Handing the reply back makes Fastify wait for the first send to finish instead.
+       */
+      let isSentByHandler = false;
+      if (injectsResponse) {
+        const send = response.send;
+        response.send = payload => {
+          isSentByHandler = true;
+          return send.call(response, payload);
+        };
+      }
+
       const args = argsOrder.map(arg => arg && context[arg]);
       const data = await route.handler(...args);
+      if (isSentByHandler) return response;
 
       if (metadata.redirect) return response.status(metadata.status ?? 301).redirect(metadata.redirect);
 

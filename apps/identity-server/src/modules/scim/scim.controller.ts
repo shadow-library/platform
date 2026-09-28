@@ -29,14 +29,14 @@ export class ScimController {
     private readonly scimGroupService: ScimGroupService,
   ) {}
 
-  private async run(reply: FastifyReply, status: number, fn: () => Promise<unknown>): Promise<void> {
+  private async run(reply: FastifyReply, status: number, fn: () => Promise<unknown>): Promise<FastifyReply> {
     try {
       const body = await fn();
-      if (body === undefined) reply.status(status).send();
-      else reply.status(status).type(SCIM_CONTENT_TYPE).send(JSON.stringify(body));
+      if (body === undefined) return reply.status(status).send();
+      return reply.status(status).type(SCIM_CONTENT_TYPE).send(JSON.stringify(body));
     } catch (error) {
       if (!(error instanceof ScimError)) throw error;
-      reply.status(error.status).type(SCIM_CONTENT_TYPE).send(JSON.stringify(error.toEnvelope()));
+      return reply.status(error.status).type(SCIM_CONTENT_TYPE).send(JSON.stringify(error.toEnvelope()));
     }
   }
 
@@ -45,8 +45,8 @@ export class ScimController {
   }
 
   @Get('/Users')
-  async listUsers(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async listUsers(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       const page = parsePage(query.startIndex, query.count);
       const { total, resources } = await this.scimUserService.list(tenant, parseFilter(query.filter, ['userName', 'externalId']), page);
@@ -55,40 +55,40 @@ export class ScimController {
   }
 
   @Post('/Users')
-  async createUser(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 201, async () => {
+  async createUser(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 201, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimUserService.create(tenant, parseUserInput(request.body));
     });
   }
 
   @Get('/Users/:id')
-  async getUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async getUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimUserService.get(tenant, params.id);
     });
   }
 
   @Put('/Users/:id')
-  async replaceUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async replaceUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimUserService.replace(tenant, params.id, parseUserInput(request.body));
     });
   }
 
   @Patch('/Users/:id')
-  async patchUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async patchUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimUserService.patch(tenant, params.id, parsePatchOperations(request.body));
     });
   }
 
   @Delete('/Users/:id')
-  async deleteUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 204, async () => {
+  async deleteUser(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 204, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       await this.scimUserService.remove(tenant, params.id);
       return undefined;
@@ -96,8 +96,8 @@ export class ScimController {
   }
 
   @Get('/Groups')
-  async listGroups(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async listGroups(@Query() query: ScimListQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       const page = parsePage(query.startIndex, query.count);
       const { total, resources } = await this.scimGroupService.list(tenant, parseFilter(query.filter, ['displayName', 'externalId']), page);
@@ -106,40 +106,40 @@ export class ScimController {
   }
 
   @Post('/Groups')
-  async createGroup(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 201, async () => {
+  async createGroup(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 201, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimGroupService.create(tenant, parseGroupInput(request.body));
     });
   }
 
   @Get('/Groups/:id')
-  async getGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async getGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimGroupService.get(tenant, params.id);
     });
   }
 
   @Put('/Groups/:id')
-  async replaceGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async replaceGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimGroupService.replace(tenant, params.id, parseGroupInput(request.body));
     });
   }
 
   @Patch('/Groups/:id')
-  async patchGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async patchGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       return this.scimGroupService.patch(tenant, params.id, parsePatchOperations(request.body));
     });
   }
 
   @Delete('/Groups/:id')
-  async deleteGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 204, async () => {
+  async deleteGroup(@Params() params: ScimIdParams, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 204, async () => {
       const tenant = await this.scimAuthService.authenticate(request);
       await this.scimGroupService.remove(tenant, params.id);
       return undefined;
@@ -147,8 +147,8 @@ export class ScimController {
   }
 
   @Get('/ServiceProviderConfig')
-  async serviceProviderConfig(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async serviceProviderConfig(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       await this.scimAuthService.authenticate(request);
       return {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
@@ -166,8 +166,8 @@ export class ScimController {
   }
 
   @Get('/ResourceTypes')
-  async resourceTypes(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async resourceTypes(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       await this.scimAuthService.authenticate(request);
       const resources = [
         { schemas: ['urn:ietf:params:scim:schemas:core:2.0:ResourceType'], id: 'User', name: 'User', endpoint: '/Users', schema: 'urn:ietf:params:scim:schemas:core:2.0:User' },
@@ -178,8 +178,8 @@ export class ScimController {
   }
 
   @Get('/Schemas')
-  async schemas(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
-    await this.run(reply, 200, async () => {
+  async schemas(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
+    return this.run(reply, 200, async () => {
       await this.scimAuthService.authenticate(request);
       const resources = [
         { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', description: 'User account provisioned into an organisation' },

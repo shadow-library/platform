@@ -165,7 +165,7 @@ return the result. All business logic lives in the service.
    answering a status it never declared refuses to boot. A data-dependent status comes from the
    service throwing a typed domain error that carries the HTTP status (`ErrorCode` status factories take
    a trailing status override), never from branching on the reply. `@Res` is allowed ONLY where the
-   response is genuinely hand-produced: `Set-Cookie`, redirects, XML/HTML, spec media types (e.g. SCIM).
+   response is genuinely hand-produced: `Set-Cookie`, redirects, XML/HTML, spec media types (e.g. SCIM); a handler that sends through it returns the reply (`return reply.send(...)`), as Fastify requires of async handlers.
 
 6. **All business logic in the service.** Audit recording, notifications, validation, data-dependent
    authorization (member rank, last-owner protection, step-up) live in service methods taking a

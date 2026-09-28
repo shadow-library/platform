@@ -1,13 +1,15 @@
 /**
  * Importing npm packages
  */
+import { gunzipSync } from 'node:zlib';
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { Response } from 'light-my-request';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Field, Schema, SchemaComposer } from '@shadow-library/class-schema';
 import { Config } from '@shadow-library/common';
-import { FastifyModule, FastifyRouter, Get, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
+import { FastifyModule, FastifyRouter, Get, HttpController, type HttpResponse, HttpStatus, Post, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -689,6 +691,17 @@ describe('HttpCore Module', () => {
       doGet() {
         return { status: 'ok' };
       }
+
+      @Get('/document')
+      document(@Res() reply: HttpResponse): void {
+        reply.type('application/xml; charset=utf-8').send('<metadata/>');
+      }
+
+      @Get('/async-document')
+      async asyncDocument(@Res() reply: HttpResponse): Promise<void> {
+        await Promise.resolve();
+        reply.type('text/html; charset=utf-8').send('<p>signing you in</p>');
+      }
     }
 
     async function setupCompression(enabled: boolean) {
@@ -709,6 +722,21 @@ describe('HttpCore Module', () => {
       const response = await compressRouter.mockRequest().get('/api/test').headers({ 'accept-encoding': 'gzip' });
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should keep the body a handler sends itself and returns nothing for', async () => {
+      await setupCompression(true);
+      const response = await compressRouter.mockRequest().get('/api/document').headers({ 'accept-encoding': 'gzip' });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-encoding']).toBe('gzip');
+      expect(gunzipSync(response.rawPayload).toString()).toBe('<metadata/>');
+    });
+
+    it('should keep the body an async handler sends itself after awaiting', async () => {
+      await setupCompression(true);
+      const response = await compressRouter.mockRequest().get('/api/async-document').headers({ 'accept-encoding': 'gzip' });
+      expect(response.statusCode).toBe(200);
+      expect(gunzipSync(response.rawPayload).toString()).toBe('<p>signing you in</p>');
     });
 
     it('should not compress response when disabled', async () => {

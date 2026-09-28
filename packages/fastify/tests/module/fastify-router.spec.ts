@@ -295,6 +295,29 @@ describe('FastifyRouter', () => {
       expect(handler).toBeCalledWith(request.params, request, undefined, request.query, undefined, response, request.body);
     });
 
+    it('should hand the reply back to fastify when the handler sent it itself', async () => {
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue(['response']);
+      const send = jest.fn().mockReturnThis();
+      const reply = { ...response, send };
+      handler.mockImplementationOnce(res => void res.send('<metadata/>'));
+      const routeHandler = generateRouteHandler({ method: HttpMethod.GET });
+
+      expect(await routeHandler(request, reply)).toBe(reply);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledWith('<metadata/>');
+    });
+
+    it('should leave a handler that injects the reply but sends nothing to the router', async () => {
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue(['response']);
+      const send = jest.fn().mockReturnThis();
+      const reply = { ...response, send };
+      handler.mockReturnValue(undefined);
+      const routeHandler = generateRouteHandler({ method: HttpMethod.GET });
+
+      expect(await routeHandler(request, reply)).toBeUndefined();
+      expect(send).not.toHaveBeenCalled();
+    });
+
     it('should redirect if redirect is provided', async () => {
       const routeHandler = generateRouteHandler({ redirect: '/redirect' });
       await routeHandler(request, response);

@@ -24,37 +24,35 @@ export class SamlController {
   @Get('/saml2/metadata')
   @Auth({ public: true })
   @Header('cache-control', 'public, max-age=300')
-  getSamlMetadata(@Res() reply: FastifyReply): void {
-    reply.type('application/xml; charset=utf-8').send(this.samlService.getMetadata());
+  getSamlMetadata(@Res() reply: FastifyReply): FastifyReply {
+    return reply.type('application/xml; charset=utf-8').send(this.samlService.getMetadata());
   }
 
   @Get('/saml2/sso')
   @Auth({ public: true })
-  async handleSamlSso(@Query() query: SamlSsoQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+  async handleSamlSso(@Query() query: SamlSsoQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
     const result = await this.samlService.handleSsoRequest(query.SAMLRequest, query.RelayState, request.cookies[SESSION_COOKIE_NAME]);
-    this.dispatch(result, reply);
+    return this.dispatch(result, reply);
   }
 
   @Get('/saml2/sso/resume')
   @Auth({ public: true })
-  async resumeSamlSso(@Query() query: SamlResumeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+  async resumeSamlSso(@Query() query: SamlResumeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<FastifyReply> {
     const result = await this.samlService.resume(query.rid, request.cookies[SESSION_COOKIE_NAME]);
-    this.dispatch(result, reply);
+    return this.dispatch(result, reply);
   }
 
-  private dispatch(result: SsoResult, reply: FastifyReply): void {
+  private dispatch(result: SsoResult, reply: FastifyReply): FastifyReply {
     if (result.kind === 'login') {
       const returnTo = encodeURIComponent(`${this.issuer}/saml2/sso/resume?rid=${result.resumeId}`);
-      reply.status(302).redirect(`${this.loginUrl}?return_to=${returnTo}`);
-      return;
+      return reply.status(302).redirect(`${this.loginUrl}?return_to=${returnTo}`);
     }
 
     if (result.kind === 'denied') {
       const url = new URL('/error', this.loginUrl);
       url.searchParams.set('error', 'access_denied');
       url.searchParams.set('application', result.applicationName);
-      reply.status(302).redirect(url.toString());
-      return;
+      return reply.status(302).redirect(url.toString());
     }
 
     const relayState = result.relayState ? `<input type="hidden" name="RelayState" value="${escapeXml(result.relayState)}"/>` : '';
@@ -65,6 +63,6 @@ export class SamlController {
       `<input type="hidden" name="SAMLResponse" value="${result.samlResponse}"/>${relayState}` +
       `<noscript><button type="submit">Continue</button></noscript>` +
       `</form><script>${SUBMIT_SCRIPT}</script></body></html>`;
-    reply.header('content-security-policy', SUBMIT_SCRIPT_CSP).header('cache-control', 'no-store').type('text/html; charset=utf-8').send(page);
+    return reply.header('content-security-policy', SUBMIT_SCRIPT_CSP).header('cache-control', 'no-store').type('text/html; charset=utf-8').send(page);
   }
 }
