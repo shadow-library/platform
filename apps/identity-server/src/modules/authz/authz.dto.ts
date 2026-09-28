@@ -1,5 +1,7 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
+import { PATTERN } from '@server/constants';
+
 @Schema()
 export class CheckRequestBody {
   @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT'] })
@@ -8,7 +10,7 @@ export class CheckRequestBody {
   @Field()
   principalId: string;
 
-  @Field()
+  @Field({ ...PATTERN.ID })
   organisationId: string;
 
   @Field()
