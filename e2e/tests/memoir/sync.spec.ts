@@ -371,7 +371,7 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     const questCompleted = await createQuest(`E2E sync-12 complete ${randomUUID()}`);
     await applied('quest.complete', { occurrenceId: `${questCompleted}:${today}` });
     await applied('quest.update', { questId: questCompleted, patch: { name: `E2E sync-12 renamed ${randomUUID()}` } });
-    // plan.setLock is NOT exercised here — see the dedicated `test.fixme` below for why.
+    // plan.setLock has a test of its own below.
 
     const questPartial = await createQuest(`E2E sync-12 partial ${randomUUID()}`);
     await applied('quest.partial', { occurrenceId: `${questPartial}:${today}`, progress: 50, reasonTag: 'forgot', note: null });
@@ -631,8 +631,7 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     expect(Object.keys(entry as Record<string, unknown>)).toEqual(expect.arrayContaining(['metricId', 'date', 'value', 'createdAt']));
   });
 
-  // App bug: apps/memoir-server/src/modules/sync/delta.repository.ts:29 (serializeDeltaRow) converts only a column's own top-level bigint, not bigint[] elements, so a locked day's daily_states.locked_quest_ids crashes every later GET /sync/delta with "JSON.stringify cannot serialize BigInt"; unlocking the same still-open day clears it and recovers, but once the day rolls over, setLock's own LCK_002 guard (compassion-commands.service.ts:93) refuses the unlock too, so sync stalls for good.
-  test.fixme("should lock a day's quests via plan.setLock and still let the very next delta pull read daily_states.lockedQuestIds back as strings", async ({ memoir }) => {
+  test("should lock a day's quests via plan.setLock and still let the very next delta pull read daily_states.lockedQuestIds back as strings", async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'sync-12-plan-lock', onboard: true });
     const today = todayLocal();
     const questId = String((await submitCommand(persona.ctx, 'quest.create', dailyQuestDraft(`E2E sync-12 plan-lock ${randomUUID()}`))).result['id']);
