@@ -67,6 +67,15 @@ const STEP_UP_ACR = 'AAL2';
 /** Only http(s) origins can be compared meaningfully; every other scheme reports its origin as `"null"` */
 const WEB_PROTOCOLS = new Set(['http:', 'https:']);
 
+/**
+ * Stands in for this application's origin when a relative `return_to` is resolved. Which origin the
+ * browser is on does not matter, only whether following the reference would leave it.
+ */
+const SAME_ORIGIN_BASE = 'https://return-to.invalid';
+
+/** A browser silently drops tabs and newlines from a URL, so `/\t/evil.test` reaches it as `//evil.test` */
+const CONTROL_CHARACTERS = /\p{Cc}/u;
+
 /** Used when identity answers with an expiry this SDK cannot read, so a session is never immortal by accident */
 const FALLBACK_SESSION_TTL_MS = 60 * 60 * 1000;
 
@@ -386,24 +395,32 @@ export class AppSessionService {
   }
 
   /**
-   * Validates a `return_to` against the allow-list. Same-origin absolute paths are always fine;
-   * anything else must be named in configuration. The check runs on a slash-normalised copy because
-   * a browser folds backslashes into slashes for http(s): `//evil.test` and `/\evil.test` both read
-   * as a path to a careless comparison and as an origin to the thing that actually follows them.
+   * Validates a `return_to` against the allow-list. A relative reference is fine when a browser would
+   * resolve it without leaving this origin; anything absolute must be named in configuration. The
+   * decision is the URL parser's rather than a prefix check, because a browser folds backslashes into
+   * slashes and strips control characters before it resolves: `//evil.test`, `/\evil.test` and
+   * `/\t/evil.test` all read as a path to a string comparison and as an origin to the browser. What
+   * comes back is the parser's own normalised path, so it cannot be reinterpreted as an authority.
    */
   resolveReturnTo(candidate: string | undefined): string {
     if (!candidate) return this.config.postLoginRedirect;
+    if (CONTROL_CHARACTERS.test(candidate)) throw this.redirectRefused(candidate);
+    if (URL.canParse(candidate)) return this.assertAllowedRedirect(candidate);
 
-    const normalised = candidate.replace(/\\/g, '/');
-    if (normalised.startsWith('/') && !normalised.startsWith('//')) return normalised;
-    return this.assertAllowedRedirect(candidate);
+    const target = URL.parse(candidate, SAME_ORIGIN_BASE);
+    if (target?.origin !== SAME_ORIGIN_BASE || target.pathname.startsWith('//')) throw this.redirectRefused(candidate);
+    return `${target.pathname}${target.search}${target.hash}`;
   }
 
   private assertAllowedRedirect(candidate: string): string {
     const target = URL.parse(candidate);
     const allowed = target && this.config.allowedRedirects.some(entry => this.covers(entry, target));
-    if (!allowed) throw this.logged(AuthErrorCode.REDIRECT_NOT_ALLOWED.create({ reason: `'${candidate}' is not in the redirect allow-list` }));
+    if (!allowed) throw this.redirectRefused(candidate);
     return target.toString();
+  }
+
+  private redirectRefused(candidate: string): AppError {
+    return this.logged(AuthErrorCode.REDIRECT_NOT_ALLOWED.create({ reason: `'${candidate}' is not in the redirect allow-list` }));
   }
 
   /**

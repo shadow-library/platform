@@ -288,6 +288,27 @@ describe('redirect allow-list', () => {
     }
   });
 
+  it('should reject a return_to that only reads as off-origin once a browser strips its control characters', () => {
+    const sessions = service(['https://reports.test']);
+    const attacks = ['/\t/evil.test', '/\n/evil.test', '/\r/evil.test', '\t//evil.test', '/\t\\evil.test', '\\\t\\evil.test', '/\u0000/evil.test', '/\u007f/evil.test'];
+    for (const target of attacks) expect(() => sessions.resolveReturnTo(target)).toThrow(/not allowed/);
+  });
+
+  it('should reject a path a browser would collapse into a protocol-relative reference', () => {
+    const sessions = service(['https://reports.test']);
+    for (const target of ['/.//evil.test', '/./\\evil.test', '/..//evil.test', '\\\\evil.test', '\\/evil.test', '//reports.test/anything']) {
+      expect(() => sessions.resolveReturnTo(target)).toThrow(/not allowed/);
+    }
+  });
+
+  it('should keep a same-origin path with its query and fragment', () => {
+    const sessions = service([]);
+    expect(sessions.resolveReturnTo('/reports/42?tab=history&page=2#row-7')).toBe('/reports/42?tab=history&page=2#row-7');
+    expect(sessions.resolveReturnTo('/search?q=%2F%2Fevil.test')).toBe('/search?q=%2F%2Fevil.test');
+    expect(sessions.resolveReturnTo('/%09/still-a-path')).toBe('/%09/still-a-path');
+    expect(sessions.resolveReturnTo('/')).toBe('/');
+  });
+
   it('should not let one custom-scheme entry whitelist every custom-scheme target', () => {
     /** Every non-special scheme reports its origin as the string "null", which would compare equal */
     const sessions = service(['app-reports://callback']);
