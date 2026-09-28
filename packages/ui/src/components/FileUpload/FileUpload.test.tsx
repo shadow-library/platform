@@ -4,12 +4,14 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { useRef, useState } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Importing user defined packages
  */
 import { FileUpload } from './FileUpload';
+import { type FileItem } from './FileUpload.types';
 
 /**
  * Declaring the constants
@@ -18,6 +20,21 @@ function fileInput(container: HTMLElement): HTMLInputElement {
   const input = container.querySelector('input[type="file"]');
   if (!input) throw new Error('no file input');
   return input as HTMLInputElement;
+}
+
+/** Hands FileUpload a fresh inline callback on every render that also updates the parent, as a route screen does; capped so a loop fails fast. */
+function StatefulParent({ onFiles }: { onFiles: (files: FileItem[]) => void }) {
+  const [, setSelection] = useState<{ files: FileItem[] }>();
+  const renders = useRef(0);
+  return (
+    <FileUpload
+      aria-label="Choose files"
+      onValueChange={files => {
+        onFiles(files);
+        if (++renders.current <= 10) setSelection({ files });
+      }}
+    />
+  );
 }
 
 describe('FileUpload', () => {
@@ -54,6 +71,15 @@ describe('FileUpload', () => {
     await user.upload(fileInput(container), new File(['x'], 'notes.txt'));
     await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }));
     expect(screen.queryByText('notes.txt')).not.toBeInTheDocument();
+  });
+
+  it('should report a selection once when the parent re-renders with a new callback', async () => {
+    const user = userEvent.setup();
+    const onFiles = vi.fn();
+    const { container } = render(<StatefulParent onFiles={onFiles} />);
+    await user.upload(fileInput(container), new File(['{}'], 'bundle.json', { type: 'application/json' }));
+
+    expect(onFiles.mock.calls.map(([files]) => files.map((file: FileItem) => file.name))).toEqual([[], ['bundle.json']]);
   });
 
   it('renders the compact button variant', () => {

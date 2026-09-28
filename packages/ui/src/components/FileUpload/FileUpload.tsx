@@ -74,11 +74,16 @@ export function FileUpload({
   const controllers = useRef(new Map<string, AbortController>());
   const active = useRef(0);
   const queue = useRef<string[]>([]);
+  const onValueChangeRef = useRef(onValueChange);
+
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange;
+  });
 
   useEffect(() => {
     itemsRef.current = items;
-    onValueChange?.(items);
-  }, [items, onValueChange]);
+    onValueChangeRef.current?.(items);
+  }, [items]);
 
   function patch(id: string, next: Partial<FileItem>): void {
     setItems(list => list.map(item => (item.id === id ? { ...item, ...next } : item)));

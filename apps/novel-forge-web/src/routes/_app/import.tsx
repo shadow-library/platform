@@ -65,6 +65,12 @@ function ImportNovelScreen(): React.JSX.Element {
     }
   };
 
+  const clearBundle = (): void => {
+    setBundle(null);
+    setFileName('');
+    setParseError(null);
+  };
+
   const submit = (): void => {
     if (!bundle) return;
     importNovel.mutate(bundle, {
@@ -93,8 +99,9 @@ function ImportNovelScreen(): React.JSX.Element {
             accept={['.json']}
             maxFiles={1}
             onValueChange={files => {
-              const file = files[files.length - 1]?.file;
+              const file = files.at(-1)?.file;
               if (file) void readBundle(file);
+              else clearBundle();
             }}
           />
           {parseError && (
