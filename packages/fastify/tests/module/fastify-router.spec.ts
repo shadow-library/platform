@@ -243,13 +243,41 @@ describe('FastifyRouter', () => {
     });
 
     it('should set the default status code', async () => {
-      const getHandler = generateRouteHandler({ method: HttpMethod.GET, schemas: { response: { 201: {}, 202: {} } } });
+      const getHandler = generateRouteHandler({ method: HttpMethod.GET, schemas: { response: { 200: {}, 202: {} } } });
       await getHandler(request, response);
       expect(response.status).toBeCalledWith(200);
 
       const postHandler = generateRouteHandler({ method: HttpMethod.POST });
       await postHandler(request, response);
       expect(response.status).toBeCalledWith(201);
+    });
+
+    it('should set the single declared success status even when error responses are declared too', async () => {
+      const routeHandler = generateRouteHandler({ method: HttpMethod.POST, schemas: { response: { 200: {}, 409: {} } } });
+      await routeHandler(request, response);
+      expect(response.status).toBeCalledWith(200);
+    });
+
+    it('should accept a status covered by a wildcard response', async () => {
+      const routeHandler = generateRouteHandler({ method: HttpMethod.POST, schemas: { response: { '2xx': {} } } });
+      await routeHandler(request, response);
+      expect(response.status).toBeCalledWith(201);
+    });
+
+    it('should refuse a route whose default status has no declared response', () => {
+      const metadata = { method: HttpMethod.POST, path: '/drafts', schemas: { response: { 200: {}, 202: {} } } };
+      expect(() => generateRouteHandler(metadata)).toThrow('POST /drafts answers 201 but declares no response for it');
+    });
+
+    it('should refuse a route whose explicit status has no declared response', () => {
+      const metadata = { method: HttpMethod.GET, path: '/drafts', status: 204, schemas: { response: { 200: {} } } };
+      expect(() => generateRouteHandler(metadata)).toThrow('GET /drafts answers 204 but declares no response for it');
+    });
+
+    it('should not require a declared response when the route declares no success response', async () => {
+      const routeHandler = generateRouteHandler({ method: HttpMethod.DELETE, status: 204, schemas: { response: { 404: {} } } });
+      await routeHandler(request, response);
+      expect(response.status).toBeCalledWith(204);
     });
 
     it('should set the provided headers', async () => {

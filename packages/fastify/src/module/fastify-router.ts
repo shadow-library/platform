@@ -122,6 +122,7 @@ interface RouteArtifacts {
 const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) as Exclude<HttpMethod, HttpMethod.ALL>[];
 const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
+const isSuccessCode = (code: string): boolean => code === '2xx' || (Number(code) >= 200 && Number(code) < 300);
 
 // No first-party DTO uses `@Sensitive`, so the compiled masks never fire; this default pass is the only thing keeping
 // credentials out of request logs. Long unambiguous stems match anywhere in the normalized key so compound names like
@@ -354,11 +355,20 @@ export class FastifyRouter extends Dispatcher {
   }
 
   private getStatusCode(metadata: ServerMetadata): number {
-    if (metadata.status) return metadata.status;
-    const responseStatusCodes = Object.keys(metadata.schemas?.response ?? {}).map(n => parseInt(n));
-    const statusCodes = responseStatusCodes.filter(code => code >= 200 && code < 600);
-    if (statusCodes.length === 1) return statusCodes[0] as number;
-    return metadata.method === HttpMethod.POST ? 201 : 200;
+    const declaredCodes = Object.keys(metadata.schemas?.response ?? {}).map(code => code.toLowerCase());
+    const statusCode = metadata.status ?? this.getDefaultStatusCode(metadata.method, declaredCodes);
+    if (metadata.redirect || !declaredCodes.some(isSuccessCode)) return statusCode;
+
+    const status = String(statusCode);
+    const isDeclared = declaredCodes.includes(status) || declaredCodes.includes(`${status.charAt(0)}xx`) || declaredCodes.includes('default');
+    if (!isDeclared) throw AppError.internal(`${metadata.method} ${metadata.path} answers ${statusCode} but declares no response for it; add @HttpStatus or @RespondFor`);
+    return statusCode;
+  }
+
+  private getDefaultStatusCode(method: MaybeUndefined<HttpMethod>, declaredCodes: string[]): number {
+    const successCodes = declaredCodes.map(Number).filter(code => code >= 200 && code < 300);
+    if (successCodes.length === 1) return successCodes[0] as number;
+    return method === HttpMethod.POST ? 201 : 200;
   }
 
   private generateRouteHandler(route: ParsedController<ServerMetadata>): AsyncRouteHandler {

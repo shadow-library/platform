@@ -160,7 +160,9 @@ return the result. All business logic lives in the service.
    `RouteGuardSentinel` + `@Public()`, or `novel-forge-server`'s `ProjectOwnershipGuard`/BOLA middleware).
 
 5. **Status codes: `@HttpStatus(n)` (or `@RespondFor(status, Dto)`), never `reply.status(n)`.**
-   204 delete included — the router auto-sends the empty body. A data-dependent status comes from the
+   204 delete included — the router auto-sends the empty body. Without `@HttpStatus` a route answers its
+   single declared 2xx, else 201 for POST and 200 otherwise; a route declaring a 2xx response but
+   answering a status it never declared refuses to boot. A data-dependent status comes from the
    service throwing a typed domain error that carries the HTTP status (`ErrorCode` status factories take
    a trailing status override), never from branching on the reply. `@Res` is allowed ONLY where the
    response is genuinely hand-produced: `Set-Cookie`, redirects, XML/HTML, spec media types (e.g. SCIM).
