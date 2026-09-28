@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, Mock, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, Mock, mock, spyOn } from 'bun:test';
 import { request } from 'undici';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
+import { APIRequest, AppError, ErrorCode, Logger } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -271,6 +271,25 @@ describe('APIRequest', () => {
 
     it('should reject an invalid service name', async () => {
       await expect(APIRequest.get('svc://Bad_Name/x').execute()).rejects.toBeInstanceOf(AppError);
+    });
+  });
+
+  describe('logging', () => {
+    it('should never log credential headers, not even at debug', async () => {
+      const isDebugEnabled = spyOn(Logger, 'isDebugEnabled').mockReturnValue(true);
+      const logger = (APIRequest as unknown as { logger: Record<'debug' | 'info' | 'error', (...args: unknown[]) => void> }).logger;
+      const logged = (['debug', 'info', 'error'] as const).map(level => spyOn(logger, level));
+      mockRequest.mockResolvedValue({ statusCode: 500, headers: { 'set-cookie': 'sid=response-session' }, body: { text: () => Promise.resolve('') } });
+
+      await APIRequest.get('/svc')
+        .header('authorization', 'Bearer live-service-token')
+        .header('cookie', 'sid=request-session')
+        .catch(() => undefined);
+
+      const lines = JSON.stringify(logged.flatMap(spy => spy.mock.calls));
+      for (const secret of ['live-service-token', 'request-session', 'response-session']) expect(lines).not.toContain(secret);
+      expect(mockRequest).toHaveBeenCalledWith('/svc', expect.objectContaining({ headers: { authorization: 'Bearer live-service-token', cookie: 'sid=request-session' } }));
+      for (const spy of [isDebugEnabled, ...logged]) spy.mockRestore();
     });
   });
 });
