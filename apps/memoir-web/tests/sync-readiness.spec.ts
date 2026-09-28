@@ -52,7 +52,13 @@ function slowBacking(): KeyValueBacking {
 }
 
 function engineOver(fetchImpl: FetchLike, options: { backing?: KeyValueBacking; maxPages?: number } = {}): SyncEngine {
-  return new SyncEngine({ store: new MemoirStore(options.backing ?? sharedBacking()), client: new SyncClient({ fetchImpl }), today: TODAY, maxPages: options.maxPages });
+  return new SyncEngine({
+    store: new MemoirStore(options.backing ?? sharedBacking()),
+    client: new SyncClient({ fetchImpl }),
+    today: TODAY,
+    maxPages: options.maxPages,
+    retryDelaysMs: [],
+  });
 }
 
 function setOnline(online: boolean): void {
