@@ -8,15 +8,18 @@ import { APP_NAME } from '@server/constants';
 import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RateLimiterService } from './rate-limiter.service';
 import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
+import { ServiceCallerService } from './service-caller.service';
 
 const UNAUTHENTICATED_STATUSES = new Set([401, 403]);
 
 /**
- * The second half of the per-client M2M budget (T-804). `RateLimitMiddleware` only *reads* the IP
- * counter on a route marked `@M2MBudget()`, so something has to count the requests that never reach
- * a client budget — otherwise the IP tier would be free on exactly the endpoints an attacker floods
- * without credentials. Running at `onResponse` is what makes the outcome knowable: authentication
- * happens in a guard or a service, long after `onRequest`.
+ * The second half of the per-client M2M budget (T-804). On a route marked `@M2MBudget()`,
+ * `RateLimitMiddleware` charges a verified first-party service to its client and only *reads* the IP
+ * counter for anyone else, so something has to count the requests that never reach a client budget —
+ * otherwise the IP tier would be free on exactly the endpoints an attacker floods without credentials.
+ * Running at `onResponse` is what makes the outcome knowable: authentication happens in a guard or a
+ * service, long after `onRequest`. A refusal a verified service earned (scope, service access) is not
+ * a failed authentication and stays off its pod's address.
  *
  * Failures here are swallowed. The response has already been sent, and losing one accounting hit is
  * a better outcome than an error on a completed request; the request that *starts* a flood is
@@ -26,7 +29,10 @@ const UNAUTHENTICATED_STATUSES = new Set([401, 403]);
 export class M2MRateLimitMiddleware implements MiddlewareGenerator {
   private readonly logger = Logger.getLogger(APP_NAME, M2MRateLimitMiddleware.name);
 
-  constructor(private readonly rateLimiter: RateLimiterService) {}
+  constructor(
+    private readonly rateLimiter: RateLimiterService,
+    private readonly serviceCaller: ServiceCallerService,
+  ) {}
 
   cacheKey(metadata: HandlerMetadata): string {
     return `m2m-rate-limit:${String(metadata.method)}:${String(metadata.path)}`;
@@ -40,6 +46,7 @@ export class M2MRateLimitMiddleware implements MiddlewareGenerator {
       if (!UNAUTHENTICATED_STATUSES.has(reply.statusCode)) return;
       const ip = request.ip || 'unknown';
       if (this.rateLimiter.isAllowlisted(ip)) return;
+      if (this.serviceCaller.clientIdOf(request)) return;
 
       await this.rateLimiter
         .consume(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS)

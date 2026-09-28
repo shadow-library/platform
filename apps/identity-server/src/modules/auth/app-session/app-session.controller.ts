@@ -4,7 +4,7 @@ import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
-import { M2MBudget, RateLimiterService } from '@server/modules/infrastructure/security';
+import { M2MBudget } from '@server/modules/infrastructure/security';
 
 import { APP_SESSION_SCOPE } from './app-session.constants';
 import {
@@ -29,7 +29,6 @@ export class AppSessionController {
   constructor(
     private readonly appSessionService: AppSessionService,
     private readonly clientService: OAuthClientService,
-    private readonly rateLimiterService: RateLimiterService,
   ) {}
 
   @Post()
@@ -112,9 +111,6 @@ export class AppSessionController {
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : '';
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_002.create();
-    const budget = await this.rateLimiterService.consumeClientBudget(client.id);
-    if (budget.allowed) return client;
-    Context.getResponse()?.header('retry-after', String(budget.retryAfterSeconds));
-    throw AppErrorCode.SEC_001.create();
+    return client;
   }
 }

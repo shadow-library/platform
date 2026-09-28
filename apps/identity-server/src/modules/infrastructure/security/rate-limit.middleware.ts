@@ -10,12 +10,16 @@ import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RATE_LIMIT_METADATA, RateLimitPolicy } from './rate-limit.decorator';
 import { RateDecision, RateLimiterService } from './rate-limiter.service';
 import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
+import { ServiceCallerService } from './service-caller.service';
 
 @Middleware({ type: 'onRequest', weight: 95 })
 export class RateLimitMiddleware implements MiddlewareGenerator {
   private readonly logger = Logger.getLogger(APP_NAME, RateLimitMiddleware.name);
 
-  constructor(private readonly rateLimiter: RateLimiterService) {}
+  constructor(
+    private readonly rateLimiter: RateLimiterService,
+    private readonly serviceCaller: ServiceCallerService,
+  ) {}
 
   /**
    * The router caches generated handlers by metadata alone, so two generating middlewares on the
@@ -38,6 +42,13 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
       const failClosed = Boolean(policy) || isM2M;
       const blockTtl = await this.guarded(() => this.rateLimiter.getIpBlockTtl(ip), failClosed);
       if (blockTtl) return this.reject(reply, blockTtl);
+
+      const serviceClientId = isM2M ? this.serviceCaller.clientIdOf(request) : null;
+      if (serviceClientId) {
+        const budget = await this.guarded(() => this.rateLimiter.consumeClientBudget(serviceClientId), true);
+        if (budget && !budget.allowed) return this.reject(reply, budget.retryAfterSeconds);
+        return;
+      }
 
       const chargeIp = isM2M ? this.rateLimiter.peek.bind(this.rateLimiter) : this.rateLimiter.consume.bind(this.rateLimiter);
       const general = await this.guarded(() => chargeIp(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS), failClosed);

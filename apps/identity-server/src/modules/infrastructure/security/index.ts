@@ -7,3 +7,4 @@ export * from './rate-limit.middleware';
 export * from './rate-limiter.service';
 export * from './security.constants';
 export * from './security.module';
+export * from './service-caller.service';

@@ -6,6 +6,9 @@ import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 import {
+  GENERAL_LIMIT,
+  GENERAL_WINDOW_SECONDS,
+  IP_GENERAL_BUCKET,
   M2M_CLIENT_BUCKET,
   M2M_CLIENT_LIMIT,
   M2M_CLIENT_WINDOW_SECONDS,
@@ -81,6 +84,11 @@ export class RateLimiterService {
     const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
     if (!decision.allowed) this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
     return decision;
+  }
+
+  async consumeAddressBudget(ip: string): Promise<RateDecision> {
+    if (this.isAllowlisted(ip)) return { allowed: true, remaining: GENERAL_LIMIT, retryAfterSeconds: 0 };
+    return this.consume(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS);
   }
 
   async consumePublicClientBudget(clientId: string, ip: string): Promise<RateDecision> {

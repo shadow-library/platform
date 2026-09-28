@@ -1,4 +1,21 @@
 export interface paths {
+  '/.well-known/jwks.json': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Jwks */
+    get: operations['get_well_known_jwks_json'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -25,23 +42,6 @@ export interface paths {
     };
     /** Get Readiness */
     get: operations['get_health_ready'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/.well-known/jwks.json': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Jwks */
-    get: operations['get_well_known_jwks_json'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2760,9 +2760,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    HealthResponse: {
-      /** @enum {string} */
-      status: 'ok' | 'degraded';
+    JwksResponse: {
+      keys: components['schemas']['JwkDto'][];
+    };
+    JwkDto: {
+      kty: string;
+      crv: string;
+      x: string;
+      kid: string;
+      use: string;
+      alg: string;
     };
     DevErrorResponseDto: {
       code: string;
@@ -2774,6 +2781,10 @@ export interface components {
       field: string;
       msg: string;
     };
+    HealthResponse: {
+      /** @enum {string} */
+      status: 'ok' | 'degraded';
+    };
     ReadinessResponse: {
       /** @enum {string} */
       status: 'ok' | 'degraded';
@@ -2784,17 +2795,6 @@ export interface components {
       postgres: 'up' | 'down';
       /** @enum {string} */
       redis: 'up' | 'down';
-    };
-    JwksResponse: {
-      keys: components['schemas']['JwkDto'][];
-    };
-    JwkDto: {
-      kty: string;
-      crv: string;
-      x: string;
-      kid: string;
-      use: string;
-      alg: string;
     };
     PolicyListResponse: {
       policies: components['schemas']['PolicyItem'][];
@@ -4559,6 +4559,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  get_well_known_jwks_json: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JwksResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_health: {
     parameters: {
       query?: never;
@@ -4622,44 +4660,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ReadinessResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_well_known_jwks_json: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JwksResponse'];
         };
       };
       /** @description Default Response */
@@ -13157,13 +13157,13 @@ export interface operations {
     };
   };
 }
-export type HealthResponse = components['schemas']['HealthResponse'];
-export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
-export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
-export type ReadinessResponse = components['schemas']['ReadinessResponse'];
-export type ReadinessDependencies = components['schemas']['ReadinessDependencies'];
 export type JwksResponse = components['schemas']['JwksResponse'];
 export type JwkDto = components['schemas']['JwkDto'];
+export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
+export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
+export type HealthResponse = components['schemas']['HealthResponse'];
+export type ReadinessResponse = components['schemas']['ReadinessResponse'];
+export type ReadinessDependencies = components['schemas']['ReadinessDependencies'];
 export type PolicyListResponse = components['schemas']['PolicyListResponse'];
 export type PolicyItem = components['schemas']['PolicyItem'];
 export type SetPolicyBody = components['schemas']['SetPolicyBody'];

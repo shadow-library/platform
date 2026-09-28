@@ -131,6 +131,7 @@ export class OAuthController {
 
   @Get('/oauth2/userinfo')
   @Auth({ public: true })
+  @M2MBudget()
   @RespondFor(200, UserInfoResponse)
   async getUserInfo(@Req() request: FastifyRequest): Promise<UserInfoResponse> {
     const header = request.headers.authorization;
@@ -138,6 +139,7 @@ export class OAuthController {
     const claims = token ? this.keyService.verify(token) : null;
     if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw AppErrorCode.OAU_002.create();
     if (claims.token_type === 'service' || claims.token_type === 'bot') throw AppErrorCode.OAU_002.create();
+    await this.oauthService.consumeUserInfoBudget(claims.client_id);
 
     const userId = BigInt(claims.sub);
     const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);

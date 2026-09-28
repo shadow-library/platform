@@ -1,6 +1,7 @@
 import { Body, Get, HttpController, Post, Put, RespondFor } from '@shadow-library/fastify';
 
 import { Auth, Context, serviceClientId } from '@server/modules/access';
+import { M2MBudget } from '@server/modules/infrastructure/security';
 
 import { CatalogSyncBody, CatalogSyncResponse, CheckRequestBody, CheckResponse, ServiceAccessResponse } from './authz.dto';
 import { CatalogSyncService } from './catalog-sync.service';
@@ -9,6 +10,7 @@ import { ServiceAccessService } from './service-access.service';
 
 @HttpController('/api/v1/authz')
 @Auth({ service: 'authz:check' })
+@M2MBudget()
 export class AuthzController {
   constructor(
     private readonly pdp: PolicyDecisionService,
