@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { is, SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { type Publishing } from '@server/database';
 
@@ -9,6 +11,18 @@ import { type AccessPushBody, type ReaderPushClient, ReaderPushError, SlugConfli
 import { type WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
 
 type Row = Record<string, unknown>;
+
+const dialect = new PgDialect();
+const renderedValue = (value: unknown): unknown => {
+  if (!is(value, SQL)) return value;
+  const { sql, params } = dialect.sqlToQuery(value);
+  return { sql, params };
+};
+const rendered = (patch: Row): Row => Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, renderedValue(value)]));
+const accessPushed = (revision: number): Row => ({
+  accessPushedRevision: { sql: 'greatest(coalesce("publications"."access_pushed_revision", 0), $1)', params: [revision] },
+  accessError: null,
+});
 
 function publicationRow(overrides: Partial<Publishing.Publication> = {}): Publishing.Publication {
   return {
@@ -49,7 +63,7 @@ function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
   const shareLists = [...(reader.shareLists ?? [['reader-1']])];
   const db = {
     query: { publications: { findFirst: async () => reader.latest ?? publication } },
-    update: () => ({ set: (patch: Row) => ({ where: async () => void updates.push(patch) }) }),
+    update: () => ({ set: (patch: Row) => ({ where: async () => void updates.push(rendered(patch)) }) }),
   };
   const pushed: AccessPushBody[] = [];
   const pushClient = {
@@ -106,12 +120,12 @@ describe('PublishRunner.converge', () => {
     await expect(publish.converge(1n, { reconcile: true })).rejects.toMatchObject({ code: 'PUB_004', status: 500 });
   });
 
-  it('should record the access revision the reader accepted', async () => {
+  it('should record the access revision the reader accepted, never below the one already recorded', async () => {
     const { runner: publish, updates } = runner(publicationRow({ accessRevision: 2 }));
 
     await publish.converge(1n);
 
-    expect(updates).toContainEqual({ accessPushedRevision: 2, accessError: null });
+    expect(updates).toContainEqual(accessPushed(2));
   });
 
   it('should push a share-list narrowing that committed after the pass read the list', async () => {
@@ -131,7 +145,7 @@ describe('PublishRunner.converge', () => {
       [3, ['reader-1']],
     ]);
     expect(result.access).toBe('applied');
-    expect(updates).toContainEqual({ accessPushedRevision: 3, accessError: null });
+    expect(updates).toContainEqual(accessPushed(3));
   });
 
   it('should record a late access push that failed, leaving it for the janitor, without failing the pass', async () => {
@@ -148,7 +162,7 @@ describe('PublishRunner.converge', () => {
     await publish.converge(1n);
 
     expect(updates).toContainEqual({ accessError: 'reader service unreachable: connect ECONNREFUSED' });
-    expect(updates).not.toContainEqual({ accessPushedRevision: 3, accessError: null });
+    expect(updates).not.toContainEqual(accessPushed(3));
   });
 
   it('should record an access push that failed the header on the publication', async () => {

@@ -493,7 +493,8 @@ export class PublishRunner {
   }
 
   private async recordAccessPushed(publication: Publishing.Publication, revision: number): Promise<void> {
-    await this.db.update(schema.publications).set({ accessPushedRevision: revision, accessError: null }).where(eq(schema.publications.id, publication.id));
+    const accessPushedRevision = sql<number>`greatest(coalesce(${schema.publications.accessPushedRevision}, 0), ${revision})`;
+    await this.db.update(schema.publications).set({ accessPushedRevision, accessError: null }).where(eq(schema.publications.id, publication.id));
   }
 
   /** Only while the reader lacks the current revision: a pass that landed access and failed later leaves nothing to report here. */
