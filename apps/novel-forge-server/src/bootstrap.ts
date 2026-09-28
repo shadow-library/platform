@@ -1,5 +1,6 @@
 import { Config } from '@shadow-library/common';
 
+import { PRODUCTION_GROUP_DEFAULTS } from './modules/ai/defaults';
 import { assertModelOverrideTarget } from './modules/ai/model-override';
 
 declare module '@shadow-library/common' {
@@ -59,7 +60,7 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 Config.load('ai.openrouter.api.key');
 Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
-Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });
+Config.load('ai.embedding.model', { defaultValue: PRODUCTION_GROUP_DEFAULTS.embedding.model });
 Config.load('ai.model-override');
 Config.load('ai.structured-output', { allowedValues: ['prompt', 'json-schema'], defaultValue: 'prompt' });
 assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));

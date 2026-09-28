@@ -79,7 +79,7 @@ export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   // Cheapest registered model OpenRouter lists with image input.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
-  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  embedding: { provider: 'ollama', model: 'qwen3-embedding:0.6b' },
 };
 
 // Unrestricted is an alternate model map, not a vendor pin. Writing goes to Grok 4.6; planning/chat stay on
@@ -93,7 +93,7 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   helper: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   vision: { provider: 'openrouter', model: 'x-ai/grok-4.6' },
-  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  embedding: { provider: 'ollama', model: 'qwen3-embedding:0.6b' },
 };
 
 export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);

@@ -32,6 +32,8 @@ interface SelectableModelEntry extends ModelEntryBase {
 /** Pinned to the pgvector column width and never offered in a picker, so it carries no display name. */
 interface EmbeddingModelEntry extends ModelEntryBase {
   kind: 'embedding';
+  /** Width of the vectors the model emits; it must equal the pgvector columns' `vector(n)`. */
+  dimensions: number;
 }
 
 export type ModelEntry = SelectableModelEntry | EmbeddingModelEntry;
@@ -256,8 +258,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     reasoning: { mode: 'mandatory', efforts: ['high', 'medium', 'low'] },
   },
   // The only local model left: `EmbeddingService` calls Ollama directly, and the pgvector columns are
-  // sized to this model's 1024 dimensions. No chat call ever routes to `ollama`.
-  { id: 'qwen3-embedding:8b', provider: 'ollama', kind: 'embedding' },
+  // sized to this model's 1024 dimensions. No chat call ever routes to `ollama`. The 8b sibling emits 4096 and can never fit.
+  { id: 'qwen3-embedding:0.6b', provider: 'ollama', kind: 'embedding', dimensions: 1024 },
 ];
 
 export const MODEL_MAP: Record<string, ModelEntry> = Object.fromEntries(MODEL_REGISTRY.map(m => [m.id, m]));

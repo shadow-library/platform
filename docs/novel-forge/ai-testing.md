@@ -258,7 +258,7 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 | `AI_OPENROUTER_API_KEY`       | —                                                | `bootstrap.ts:43`                           | **every** chat and image model; absent → `AI_006`                                                                                                  |
 | `AI_OPENROUTER_API_URL`       | `https://openrouter.ai/api/v1`                   | `bootstrap.ts:44`                           | point at any OpenAI-compatible gateway                                                                                                             |
 | `AI_OLLAMA_HOST`              | `http://localhost:11434`                         | `bootstrap.ts:45`                           | embeddings only                                                                                                                                    |
-| `AI_EMBEDDING_MODEL`          | `qwen3-embedding:8b`                             | `bootstrap.ts:46`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap                                                                                |
+| `AI_EMBEDDING_MODEL`          | `qwen3-embedding:0.6b`                           | `bootstrap.ts:46`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap (`qwen3-embedding:8b` emits 4096 and fails every insert)                       |
 | `AI_MODEL_OVERRIDE`           | —                                                | `bootstrap.ts`                              | local-model test environments only — see below; unset is inert                                                                                     |
 | `AI_STRUCTURED_OUTPUT`        | `prompt`                                         | `bootstrap.ts`                              | `prompt` \| `json-schema` — see below; `prompt` is inert                                                                                           |
 | `AI_LLM_TIMEOUT_MS`           | `300000`                                         | `bootstrap.ts:47`                           | per-call budget (`model-router.service.ts:186`)                                                                                                    |
@@ -310,7 +310,7 @@ Model selection is **code + database**, not environment.
 - Production group defaults (`defaults.ts:85-95`):
   `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
   `chat` → `anthropic/claude-opus-5.5`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
-  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:8b`.
+  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:0.6b`.
 - Unrestricted map (`defaults.ts:101-111`) applies when `project.contentMode === 'unrestricted'`; overrides are
   clamped to `UNRESTRICTED_LLM_ALLOWLIST` (`defaults.ts:117`).
 - Reasoning effort per group: `REASONING_POLICY` (`defaults.ts:142-152`) — every authoring group asks for `low`.
@@ -397,7 +397,7 @@ exist but do not want to pay for generation.
 Nothing in the UI tells you. If you are testing anything retrieval-shaped, **start Ollama first**:
 
 ```bash
-ollama pull qwen3-embedding:8b && ollama serve   # must stay on :11434
+ollama pull qwen3-embedding:0.6b && ollama serve   # must stay on :11434
 ```
 
 and re-run the bible builder afterwards (indexing only happens during a run), or the previously written docs stay
@@ -530,7 +530,7 @@ PUBLISHING_AUTO_PUSH=false             # no reader service on the host
 bun run db apps/novel-forge-server migrate
 
 # 4. optional but recommended — without it retrieval degrades silently (§6)
-ollama pull qwen3-embedding:8b   # then keep ollama running on :11434
+ollama pull qwen3-embedding:0.6b   # then keep ollama running on :11434
 
 # 5. run — two terminals, each starting from the repo root (the cds are not chainable)
 (cd apps/novel-forge-server && bun run dev)    # terminal 1 — :8080

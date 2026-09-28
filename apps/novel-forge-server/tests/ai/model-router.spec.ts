@@ -221,7 +221,7 @@ describe('resolveReasoningEffort', () => {
   });
 
   it('should send nothing for a model with no reasoning metadata', () => {
-    expect(resolveReasoningEffort('qwen3-embedding:8b', 'writing')).toBeUndefined();
+    expect(resolveReasoningEffort('qwen3-embedding:0.6b', 'writing')).toBeUndefined();
     expect(resolveReasoningEffort('not-a-real-model', 'writing')).toBeUndefined();
   });
 });
@@ -258,7 +258,7 @@ describe('supportsPromptCaching', () => {
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'x-ai/grok-4.6' })).toBe(false);
     expect(supportsPromptCaching({ provider: 'openrouter', model: 'openai/gpt-5.4' })).toBe(false);
-    expect(supportsPromptCaching({ provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(false);
+    expect(supportsPromptCaching({ provider: 'ollama', model: 'qwen3-embedding:0.6b' })).toBe(false);
   });
 
   it('resolves the provider from the registry when the resolution names none', () => {
@@ -283,7 +283,7 @@ describe('MODEL_REGISTRY', () => {
     for (const m of MODEL_REGISTRY.filter(m => m.supportsImageInput)) expect(m.kind).toBe('llm');
     expect(MODEL_MAP['z-ai/glm-5.2']?.supportsImageInput).toBeUndefined();
     expect(MODEL_MAP['deepseek/deepseek-v4-pro']?.supportsImageInput).toBeUndefined();
-    expect(MODEL_MAP['qwen3-embedding:8b']?.supportsImageInput).toBeUndefined();
+    expect(MODEL_MAP['qwen3-embedding:0.6b']?.supportsImageInput).toBeUndefined();
   });
 
   it('every llm entry is an openrouter vendor/model slug', () => {
