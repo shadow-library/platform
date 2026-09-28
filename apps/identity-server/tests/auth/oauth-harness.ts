@@ -107,7 +107,7 @@ export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
   } as unknown as ApplicationAccessService;
 
   const rateLimiterService = new RateLimiterService(databaseService);
-  const codeService = new AuthorizationCodeService(databaseService);
+  const codeService = new AuthorizationCodeService(databaseService, refreshTokenService, { record: () => Promise.resolve() } as never);
   const userService = { getUser: () => Promise.resolve({ id: BigInt(USER_ID), status: 'ACTIVE' }) };
   const userEmailService = { getPrimaryEmail: () => Promise.resolve(null) };
   const policyService = { resolve: () => Promise.resolve(600) };

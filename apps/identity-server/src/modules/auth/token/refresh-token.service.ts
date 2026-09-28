@@ -296,6 +296,22 @@ export class RefreshTokenService {
     );
   }
 
+  async revokeForSessionClient(sessionId: bigint, clientId: string): Promise<void> {
+    const families = await this.db
+      .update(schema.refreshTokenFamilies)
+      .set({ status: 'REVOKED', revokeReason: 'ROTATION_REUSE', revokedAt: new Date() })
+      .where(and(eq(schema.refreshTokenFamilies.sessionId, sessionId), eq(schema.refreshTokenFamilies.clientId, clientId), eq(schema.refreshTokenFamilies.status, 'ACTIVE')))
+      .returning({ id: schema.refreshTokenFamilies.id });
+    await Promise.all(
+      families.map(family =>
+        this.db
+          .update(schema.refreshTokens)
+          .set({ status: 'REVOKED' })
+          .where(and(eq(schema.refreshTokens.familyId, family.id), ne(schema.refreshTokens.status, 'REVOKED'))),
+      ),
+    );
+  }
+
   async revokeForSession(sessionId: bigint): Promise<void> {
     const families = await this.db
       .update(schema.refreshTokenFamilies)
