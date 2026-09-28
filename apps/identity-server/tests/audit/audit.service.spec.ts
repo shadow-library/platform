@@ -171,6 +171,26 @@ describe('AuditService', () => {
       expect(await service.verifyChain('42')).toEqual({ valid: true });
     });
 
+    it('should accept a chain a new writer started and an old writer extended during a rollout', async () => {
+      const table = new AuditTable();
+      const service = auditServiceOver(table);
+      const first = await service.record(EVENT);
+      table.rows.push(legacyRow(service, 'ffffffff-ffff-7fff-bfff-ffffffffffff', first.hash));
+      await service.record(EVENT);
+
+      expect(await service.verifyChain('42')).toEqual({ valid: true });
+    });
+
+    it('should reject an ordered root beside a legacy root', async () => {
+      const table = new AuditTable();
+      const service = auditServiceOver(table);
+      const legacyRoot = legacyRow(service, '00000000-0000-7000-8000-000000000001', null);
+      const orderedRoot = { ...legacyRow(service, '00000000-0000-7000-8000-000000000002', null), chainPosition: 1n };
+      table.rows.push(legacyRoot, orderedRoot);
+
+      expect(await service.verifyChain('42')).toEqual({ valid: false, brokenAt: orderedRoot.id });
+    });
+
     it('should reject a legacy event whose content no longer matches its hash', async () => {
       const table = new AuditTable();
       const service = auditServiceOver(table);

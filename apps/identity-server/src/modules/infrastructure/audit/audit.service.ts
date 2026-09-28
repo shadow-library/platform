@@ -132,8 +132,8 @@ export class AuditService {
   /**
    * Positioned rows must form one unbroken run from position 1, each linked to the one before it. Rows written before positions existed
    * were chained onto whichever predecessor held the largest UUIDv7 id, which forked under concurrent writes; they are never rewritten, so
-   * each is held only to its own hash and to linking to a row of the same chain, with a single root, and the first positioned row must
-   * continue from one of them.
+   * each is held only to its own hash and to linking to a row of the same chain, with a single root. The first positioned row continues
+   * from one of them, or is itself the root when a new writer began the chain and an old one extended it during a rollout.
    */
   async verifyChain(organisationId: string | null = null): Promise<ChainVerification> {
     const rows = await this.db
@@ -145,6 +145,7 @@ export class AuditService {
     const legacy = rows.filter(row => row.chainPosition === null);
     const chainHashes = new Set(rows.map(row => row.hash));
     const legacyHashes = new Set(legacy.map(row => row.hash));
+    const legacyRooted = legacy.some(row => row.prevHash === null);
     let roots = 0;
     for (const row of legacy) {
       if (row.prevHash === null) roots++;
@@ -155,7 +156,7 @@ export class AuditService {
     let previous: AuditEvent | null = null;
     for (const row of rows.slice(legacy.length)) {
       const position = (previous?.chainPosition ?? 0n) + 1n;
-      const anchored = legacy.length === 0 ? row.prevHash === null : legacyHashes.has(row.prevHash ?? '');
+      const anchored = row.prevHash === null ? !legacyRooted : legacyHashes.has(row.prevHash);
       const linked = previous ? row.prevHash === previous.hash : anchored;
       if (row.chainPosition !== position || !linked || row.hash !== this.rehash(row)) return { valid: false, brokenAt: row.id };
       previous = row;
