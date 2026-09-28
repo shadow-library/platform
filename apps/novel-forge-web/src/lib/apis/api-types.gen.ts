@@ -3413,7 +3413,7 @@ export interface components {
         [key: string]: unknown;
       };
       /** @description Who bounds what the chapter may state and which facts they learn on-page; null when the chapter is unfiltered. */
-      knowledgeContract?: components['schemas']['KnowledgeContractSchema'] | null;
+      knowledgeContract?: components['schemas']['KnowledgeContractResponse'] | null;
       /** @description The author's standing guidance for this chapter's writer. */
       guidance?: null | string;
       /** @description The agreed direction for the chapter. */
@@ -3439,16 +3439,16 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    KnowledgeContractSchema: {
-      /** @description entity keys whose ledgered knowledge bounds what the chapter may state */
+    /** @description A brief's knowledge contract as the pipeline reads it. */
+    KnowledgeContractResponse: {
+      /** @description Entity keys whose ledgered knowledge bounds what the chapter may state. */
       pov: string[];
-      /** @description facts discovered on-page during this chapter; ledgered when the draft is approved */
-      learns?: components['schemas']['KnowledgeRevealSchema'][];
+      /** @description Facts discovered on-page during this chapter; ledgered when the draft is approved. */
+      learns: components['schemas']['KnowledgeRevealResponse'][];
     };
-    KnowledgeRevealSchema: {
-      /** @description entity key of the character who learns the fact on-page this chapter */
+    /** @description A learned fact as stored: plan and proposal writes only require non-blank keys, so the response imposes no key pattern. */
+    KnowledgeRevealResponse: {
       entityKey: string;
-      /** @description key of the canon fact being revealed */
       factKey: string;
     };
     /** @description One scene of a chapter plan. */
@@ -3505,6 +3505,18 @@ export interface components {
     };
     /** @enum {string} */
     HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn' | 'closure_with_momentum' | 'earned_rest';
+    KnowledgeContractSchema: {
+      /** @description entity keys whose ledgered knowledge bounds what the chapter may state */
+      pov: string[];
+      /** @description facts discovered on-page during this chapter; ledgered when the draft is approved */
+      learns?: components['schemas']['KnowledgeRevealSchema'][];
+    };
+    KnowledgeRevealSchema: {
+      /** @description entity key of the character who learns the fact on-page this chapter */
+      entityKey: string;
+      /** @description key of the canon fact being revealed */
+      factKey: string;
+    };
     /** @description A reveal-rule refusal (PLN_001): the plan being written reveals a secret still locked at its chapter. */
     RevealRuleErrorResponse: {
       code: string;
@@ -15922,12 +15934,14 @@ export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryRe
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type BriefWriteMode = components['schemas']['BriefWriteMode'];
 export type BriefResponse = components['schemas']['BriefResponse'];
-export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
-export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
+export type KnowledgeContractResponse = components['schemas']['KnowledgeContractResponse'];
+export type KnowledgeRevealResponse = components['schemas']['KnowledgeRevealResponse'];
 export type BriefSceneSchema = components['schemas']['BriefSceneSchema'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
 export type EndingContractSchema = components['schemas']['EndingContractSchema'];
 export type HookType = components['schemas']['HookType'];
+export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
+export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
 export type RevealRuleErrorResponse = components['schemas']['RevealRuleErrorResponse'];
 export type RevealRuleDetails = components['schemas']['RevealRuleDetails'];
 export type RevealRuleViolationItem = components['schemas']['RevealRuleViolationItem'];

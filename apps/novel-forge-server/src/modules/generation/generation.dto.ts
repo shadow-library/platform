@@ -593,6 +593,24 @@ export class FinalizeReadinessResponse {
   blockers: FinalizeBlockerResponse[];
 }
 
+@Schema({ description: 'A learned fact as stored: plan and proposal writes only require non-blank keys, so the response imposes no key pattern.' })
+export class KnowledgeRevealResponse {
+  @Field()
+  entityKey: string;
+
+  @Field()
+  factKey: string;
+}
+
+@Schema({ description: "A brief's knowledge contract as the pipeline reads it." })
+export class KnowledgeContractResponse {
+  @Field(() => [String], { description: 'Entity keys whose ledgered knowledge bounds what the chapter may state.' })
+  pov: string[];
+
+  @Field(() => [KnowledgeRevealResponse], { description: 'Facts discovered on-page during this chapter; ledgered when the draft is approved.' })
+  learns: KnowledgeRevealResponse[];
+}
+
 @Schema()
 export class BriefResponse {
   @Field(() => String)
@@ -643,12 +661,12 @@ export class BriefResponse {
   })
   endingContract?: unknown;
 
-  @Field(() => KnowledgeContractSchema, {
+  @Field(() => KnowledgeContractResponse, {
     optional: true,
     nullable: true,
     description: 'Who bounds what the chapter may state and which facts they learn on-page; null when the chapter is unfiltered.',
   })
-  knowledgeContract?: KnowledgeContractSchema | null;
+  knowledgeContract?: KnowledgeContractResponse | null;
 
   @Field({ optional: true, nullable: true, description: "The author's standing guidance for this chapter's writer." })
   guidance?: string | null;
