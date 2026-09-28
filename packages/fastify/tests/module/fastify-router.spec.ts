@@ -314,6 +314,7 @@ describe('FastifyRouter', () => {
         config: { metadata: route.metadata, artifacts: { transformers: {}, masks: {} } },
         attachValidation: false,
         handler: expect.any(Function),
+        preSerialization: [expect.any(Function)],
         method: ['GET'],
         url: '/',
         schema: { response: {} },
@@ -349,6 +350,7 @@ describe('FastifyRouter', () => {
         },
         attachValidation: false,
         handler: expect.any(Function),
+        preSerialization: [expect.any(Function)],
         method: ['GET'],
         url: '/',
         schema: { response: {}, body: schema, params: schema, querystring: schema },
@@ -379,6 +381,7 @@ describe('FastifyRouter', () => {
         },
         attachValidation: false,
         handler: expect.any(Function),
+        preSerialization: [expect.any(Function)],
         preHandler: [expect.any(Function), middleware],
         method: ['GET'],
         url: '/',
@@ -411,6 +414,7 @@ describe('FastifyRouter', () => {
         },
         attachValidation: false,
         handler: expect.any(Function),
+        preSerialization: [expect.any(Function)],
         preHandler: [expect.any(Function), middleware],
         method: ['GET'],
         url: '/',
@@ -443,6 +447,7 @@ describe('FastifyRouter', () => {
         },
         attachValidation: false,
         handler: expect.any(Function),
+        preSerialization: [expect.any(Function)],
         preHandler: [expect.any(Function), middleware],
         method: ['GET'],
         url: '/',
@@ -475,7 +480,7 @@ describe('FastifyRouter', () => {
         },
         attachValidation: false,
         handler: expect.any(Function),
-        preSerialization: [middleware, expect.any(Function)],
+        preSerialization: [middleware, expect.any(Function), expect.any(Function)],
         method: ['GET'],
         url: '/',
         schema: { response: { 200: responseSchema } },
@@ -484,6 +489,26 @@ describe('FastifyRouter', () => {
       expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.transformers?.response?.[200]?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
         value: BigInt('12345678901234567890'),
       });
+    });
+
+    it('should convert bigints to strings as the last step before serialization, without mutating the payload', async () => {
+      route.metadata.preSerialization = [async () => {}];
+      await router.register([]);
+      const hooks = (instance.route as any).mock.calls[0]?.[0].preSerialization as Fn[];
+      const stringifyBigInts = hooks.at(-1) as Fn;
+      const payload = { id: 1n, volume: { id: 2n, name: 'one' }, ids: [3n, 'four'], at: new Date(0), empty: null };
+
+      const result = await stringifyBigInts({}, {}, payload);
+      expect(result).toStrictEqual({ id: '1', volume: { id: '2', name: 'one' }, ids: ['3', 'four'], at: new Date(0), empty: null });
+      expect(payload.volume.id).toBe(2n);
+    });
+
+    it('should hand the payload through untouched when it holds no bigint', async () => {
+      await router.register([]);
+      const stringifyBigInts = (instance.route as any).mock.calls[0]?.[0].preSerialization.at(-1) as Fn;
+      const payload = { volume: { id: '2' }, ids: ['3'] };
+
+      expect(await stringifyBigInts({}, {}, payload)).toBe(payload);
     });
 
     it('should apply the middleware if generator returns a function', async () => {

@@ -159,6 +159,40 @@ function redactSensitiveLogData(value: unknown, depth = 0, seen = new WeakSet<ob
   return value;
 }
 
+const isPlainObject = (value: object): value is Record<string, unknown> => {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+/**
+ * Bigints go on the wire as strings. Neither `JSON.stringify` nor the Ajv checks fast-json-stringify runs for `anyOf`
+ * and multi-type schemas (every nullable field) accept a raw bigint, so they are converted before serialization.
+ */
+function stringifyBigInts(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (Array.isArray(value)) {
+    let copy: unknown[] | undefined;
+    for (let index = 0; index < value.length; index++) {
+      const item = value[index];
+      const converted = stringifyBigInts(item);
+      if (converted === item) continue;
+      copy ??= [...value];
+      copy[index] = converted;
+    }
+    return copy ?? value;
+  }
+  if (value === null || typeof value !== 'object' || !isPlainObject(value)) return value;
+  let copy: Record<string, unknown> | undefined;
+  for (const key of Object.keys(value)) {
+    const item = value[key];
+    const converted = stringifyBigInts(item);
+    if (converted === item) continue;
+    copy ??= { ...value };
+    copy[key] = converted;
+  }
+  return copy ?? value;
+}
+
 @Injectable()
 export class FastifyRouter extends Dispatcher {
   static override readonly name = 'FastifyRouter';
@@ -550,6 +584,8 @@ export class FastifyRouter extends Dispatcher {
           this.addRouteHandler(routeOptions, 'preSerialization', handler);
         }
       }
+
+      this.addRouteHandler(routeOptions, 'preSerialization', async (_request, _reply, payload) => stringifyBigInts(payload));
 
       if ('body' in artifacts.transformers || 'query' in artifacts.transformers || 'params' in artifacts.transformers) {
         const handler = this.transformRequestHandler();
