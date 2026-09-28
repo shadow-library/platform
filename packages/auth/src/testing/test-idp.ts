@@ -7,7 +7,6 @@
  */
 import { AppRegistration, AssuranceLevel, FetchLike, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { formatBotKey } from '../lib/bot-key';
-import { decodeJwt } from '../lib/jwt';
 import { createTestSigner, TestSigner } from './signer';
 
 /**
@@ -298,6 +297,12 @@ const readClaims = (token: string): JwtPayload | undefined => {
 /** Identity's catalog keys for the two app-session failures an SDK is expected to branch on */
 const sessionInvalid = (): Response => json({ code: 'AUTH_005', message: 'Application session is no longer valid' }, 401);
 const elevationRequired = (): Response => json({ code: 'AUTH_006', message: 'Step-up authentication is required' }, 403);
+/** Identity's userinfo refusal (RFC 6750 §3.1): a bare challenge when no bearer came, `invalid_token` when one did and failed */
+const invalidToken = (challenge = 'Bearer error="invalid_token"'): Response =>
+  new Response(JSON.stringify({ code: 'invalid_token', message: 'The access token is invalid or expired' }), {
+    status: 401,
+    headers: { 'content-type': 'application/json', 'www-authenticate': challenge },
+  });
 const intentMismatch = (): Response => json({ code: 'AUTH_007', message: 'the step-up was not granted for this application and resource' }, 403);
 
 /**
@@ -610,8 +615,10 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const handleUserInfo = (request: Request): Response => {
     const header = request.headers.get('authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
-    const claims = token ? decodeJwt(token).payload : null;
-    if (!claims?.sub) return json({ code: 'OAU_002', message: 'Token is not valid here' }, 401);
+    if (!token) return invalidToken('Bearer');
+    const claims = readClaims(token);
+    const expired = typeof claims?.exp === 'number' && claims.exp * 1000 <= Date.now();
+    if (!claims?.sub || expired || claims.token_type === 'service' || claims.token_type === 'bot') return invalidToken();
 
     const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);
     const profile = scopes.has('profile') ? (profiles.get(claims.sub) ?? {}) : {};

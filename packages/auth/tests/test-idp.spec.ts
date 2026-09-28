@@ -108,4 +108,21 @@ describe('createTestIdP parity', () => {
     await expect(handleOnly.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
     handleOnly.stop();
   });
+
+  it('should refuse a bad userinfo bearer the way identity does, with invalid_token and a Bearer challenge', async () => {
+    const userinfo = (authorization?: string): Promise<Response> => idp.transport(`${idp.issuer}/oauth2/userinfo`, { headers: authorization ? { authorization } : {} });
+    const service = await idp.issueToken({ sub: APP_ID, kind: 'service' });
+    const expired = await idp.issueToken({ sub: 'user-1', ttlSeconds: -60 });
+
+    const missing = await userinfo();
+    expect(missing.status).toBe(401);
+    expect(missing.headers.get('www-authenticate')).toBe('Bearer');
+    for (const bearer of ['not-a-token', service, expired]) {
+      const refused = await userinfo(`Bearer ${bearer}`);
+      expect(refused.status).toBe(401);
+      expect(refused.headers.get('www-authenticate')).toBe('Bearer error="invalid_token"');
+      expect(await refused.json()).toMatchObject({ code: 'invalid_token' });
+    }
+    expect((await userinfo(`Bearer ${await idp.issueToken({ sub: 'user-1' })}`)).status).toBe(200);
+  });
 });
