@@ -314,8 +314,9 @@ describe('ActionJobService', () => {
   it('should run an organise or plan job left pending at boot through the handlers it registers', async () => {
     const pending = [job({ status: 'pending' }), job({ id: 'job-2', projectId: 2n, kind: 'plan', status: 'pending', payload: { chapter: 1 } })];
     const jobs = {
-      findPending: async () => pending,
+      findPendingIds: async () => pending.map(row => row.id),
       get: async (id: string) => pending.find(row => row.id === id),
+      cancellation: async (id: string) => pending.find(row => row.id === id),
       start: async () => true,
       progress: async () => undefined,
       succeed: async () => undefined,

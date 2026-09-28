@@ -16,6 +16,7 @@ import { landFinalChapters } from '../novel-import/land-chapters';
 import { PublishRunner } from '../publishing/publish-runner';
 import { AuthoringClaimService } from './authoring-claim.service';
 import { JobHandlerRegistry } from './job-handler.registry';
+import { redactJobForResponse } from './job-response';
 import { JobService, payloadCostTier, type TransitionedJob } from './job.service';
 
 interface GeneratePayload {
@@ -94,10 +95,10 @@ export class JobExecutor {
   // Without this a crashed job would sit pending forever with no one to pick it up. It waits for application ready, after every
   // module's init, so the job kinds other modules register have their handlers by then.
   async onApplicationReady(): Promise<void> {
-    const pending = await this.jobService.findPending();
+    const pending = await this.jobService.findPendingIds();
     if (pending.length === 0) return;
     this.logger.info(`Dispatching ${pending.length} pending job(s) on boot`);
-    for (const job of pending) this.dispatch(job.id).catch(err => this.logger.error('Boot dispatch failed', { err, jobId: job.id }));
+    for (const jobId of pending) this.dispatch(jobId).catch(err => this.logger.error('Boot dispatch failed', { err, jobId }));
   }
 
   onModuleDestroy(): void {
@@ -171,7 +172,7 @@ export class JobExecutor {
     const startedAt = Date.now();
     // Payload can carry chapter lists, guidance, limits — sensitive/verbose, so it rides on debug.
     this.logger.info('Job started', { jobId, kind: job.kind, projectId, target: job.target });
-    this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
+    this.logger.debug('Job payload', { jobId, kind: job.kind, payload: redactJobForResponse(job).payload });
     const outcome = await this.runWatched(job, token);
     await this.settle(job, token, outcome);
     if (outcome.status === 'done') this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
@@ -271,7 +272,7 @@ export class JobExecutor {
   private async cancelRequested(jobId: string): Promise<boolean> {
     const watch = this.cancelWatches.get(jobId);
     if (watch?.observed) return true;
-    const job = await this.jobService.get(jobId);
+    const job = await this.jobService.cancellation(jobId);
     if (job && !job.cancelRequestedAt) return false;
     if (watch) watch.observed = true;
     if (!job) {

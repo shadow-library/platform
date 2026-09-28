@@ -1412,7 +1412,7 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
 ### 2. Recipe: novel import [det]
 
 - **Entry:** UI screen **Import novel** at `/import` (`.json` file upload + "Import novel" button), reached from the Projects home header button "Import novel". API
-  `POST /api/v1/import` (202 `{projectId, jobId, warnings}`, route body limit 64 MB against the app-wide 12 MB). Creates the project; not nested under `/projects/:id`.
+  `POST /api/v1/import` (202 `{projectId, jobId, warnings}`, route body limit 16 MiB against the app-wide 12 MB). Creates the project; not nested under `/projects/:id`.
 - **Preconditions:** none. Project cap (`PRJ_004`, 409) applies.
 - **Input:** S4. `mode` accepts only `final`.
 - **Run:** 1. POST S4 as `{"bundle": <s4.json>}`. 2. Poll the job (`phase` inserting). 3. `GET /api/v1/projects/:P/source/chapters`. 4. Negative bodies: two volumes with
@@ -1425,7 +1425,7 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
   Negatives return 400 with field paths `volumes` / `novel.cover` / `volumes[0].chapters[0].content` (the whitespace-only body clears the DTO's `minLength: 1` and is
   caught by `validateNovelBundle`, not AJV); a `mode` other than `final` is an AJV enum error.
 - **Fails when:** 400 `ValidationError` field errors; `PRJ_004`; job `failed` mid-batch leaves the project with partial chapters (`jobs.last_error`); a `413` past the
-  route's 64 MB, or a 400 on field `bundle` past the validator's own 48 MB content ceiling.
+  route's 16 MiB, or a 400 on field `bundle` when the content alone passes the same ceiling.
 
 ---
 

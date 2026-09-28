@@ -55,6 +55,7 @@ describe('JobExecutor.dispatch', () => {
     const job = { id: 'job-1', projectId: 1n, kind: 'generate', target: 'batch', status: 'pending', payload, cancelRequestedAt: null };
     const jobService = {
       get: async () => job,
+      cancellation: async () => job,
       start: async () => true,
       progress: async () => undefined,
       succeed: mock(async () => undefined),

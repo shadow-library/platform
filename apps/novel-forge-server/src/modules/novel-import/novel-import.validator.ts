@@ -25,10 +25,12 @@ export interface BundleValidation {
   volumes: FlattenedVolume[];
 }
 
-// Sanity ceiling on chapter text + (estimated) decoded asset bytes, independent of the HTTP transport
-// body limit (see `dynamic.modules.ts`) — catches a pathological bundle with a clear field error
-// instead of a bare transport-level rejection.
-const MAX_BUNDLE_CONTENT_BYTES = 48 * 1024 * 1024;
+/**
+ * The import route's body limit, and the ceiling on a bundle's chapter text plus decoded asset bytes. An import peaks near nine times
+ * its body — the request text, the parsed bundle, the jsonb it is staged as, then the job's read-back of that row, each twice the
+ * bytes once the prose holds a character past Latin-1 — so 16 MiB keeps two concurrent imports inside a 1 GiB pod.
+ */
+export const NOVEL_IMPORT_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
 
 function findDuplicates<T>(items: T[]): T[] {
   const seen = new Set<T>();
@@ -81,10 +83,10 @@ export function validateNovelBundle(bundle: NovelBundle): BundleValidation {
   const textBytes = chapters.reduce((sum, c) => sum + Buffer.byteLength(c.content, 'utf8'), 0);
   const assetBytes = assets.reduce((sum, a) => sum + estimateDecodedBytes(a.dataBase64), 0);
   const totalBytes = textBytes + assetBytes;
-  if (totalBytes > MAX_BUNDLE_CONTENT_BYTES) {
+  if (totalBytes > NOVEL_IMPORT_BODY_LIMIT_BYTES) {
     issues.push({
       field: 'bundle',
-      msg: `bundle content (~${Math.round(totalBytes / (1024 * 1024))}MB) exceeds the ${MAX_BUNDLE_CONTENT_BYTES / (1024 * 1024)}MB import limit`,
+      msg: `bundle content (~${Math.round(totalBytes / (1024 * 1024))}MB) exceeds the ${NOVEL_IMPORT_BODY_LIMIT_BYTES / (1024 * 1024)}MB import limit`,
     });
   }
 

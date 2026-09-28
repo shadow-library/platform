@@ -28,8 +28,9 @@ function reviewJob(overrides: Record<string, unknown> = {}) {
 
 function executorOver(job: ReturnType<typeof reviewJob>) {
   const jobService = {
-    findPending: async () => [job],
+    findPendingIds: async () => [job.id],
     get: async () => job,
+    cancellation: async () => job,
     start: mock(async () => true),
     progress: async () => undefined,
     succeed: mock(async () => undefined),

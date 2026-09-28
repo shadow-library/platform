@@ -108,9 +108,8 @@ describe('validateNovelBundle', () => {
 
   it('should reject a bundle whose total content exceeds the size sanity limit', () => {
     const bundle = buildBundle();
-    // 49MB of chapter text — over the 48MB validator ceiling, comfortably under a slow-test threshold.
-    bundle.volumes[0]!.chapters[0]!.content = 'a'.repeat(49 * 1024 * 1024);
+    bundle.volumes[0]!.chapters[0]!.content = 'a'.repeat(17 * 1024 * 1024);
     const issues = validateNovelBundle(bundle).issues;
-    expect(issues.some(i => i.field === 'bundle' && i.msg.includes('exceeds the 48MB import limit'))).toBe(true);
+    expect(issues.some(i => i.field === 'bundle' && i.msg.includes('exceeds the 16MB import limit'))).toBe(true);
   });
 });

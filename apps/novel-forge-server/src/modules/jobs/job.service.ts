@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, not, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, inArray, isNull, not, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -77,6 +77,17 @@ function originSessionId(): SQL<string | null> {
 }
 
 const TRANSITIONED = { projectId: schema.jobs.projectId, kind: schema.jobs.kind, status: schema.jobs.status, sessionId: originSessionId() };
+
+/**
+ * An import's payload is the whole bundle until the job compacts it, so a read that answers a request summarises it in Postgres and the
+ * prose never reaches this process; the summary is the shape `redactJobForResponse` gives an import either way.
+ */
+const RESPONSE_PAYLOAD = sql`case when ${schema.jobs.kind} = 'import' then jsonb_build_object(
+  'chapters', case when jsonb_typeof(${schema.jobs.payload} -> 'chapters') = 'array' then to_jsonb(jsonb_array_length(${schema.jobs.payload} -> 'chapters')) else coalesce(${schema.jobs.payload} -> 'chapters', '0'::jsonb) end,
+  'hasCover', coalesce(${schema.jobs.payload} -> 'hasCover', to_jsonb(coalesce(${schema.jobs.payload} -> 'cover', 'null'::jsonb) <> 'null'::jsonb))
+) else ${schema.jobs.payload} end`.mapWith(schema.jobs.payload);
+
+const RESPONSE_COLUMNS = { ...getTableColumns(schema.jobs), payload: RESPONSE_PAYLOAD };
 
 export function payloadOrigin(payload: unknown): JobOrigin | undefined {
   const origin = (payload as { origin?: Partial<JobOrigin> } | null)?.origin;
@@ -159,8 +170,9 @@ export class JobService {
     return { id: existing.id, outcome: 'reset' };
   }
 
-  async findPending(): Promise<Job.Row[]> {
-    return this.db.query.jobs.findMany({ where: eq(schema.jobs.status, 'pending'), orderBy: desc(schema.jobs.createdAt) });
+  async findPendingIds(): Promise<string[]> {
+    const rows = await this.db.select({ id: schema.jobs.id }).from(schema.jobs).where(eq(schema.jobs.status, 'pending')).orderBy(desc(schema.jobs.createdAt));
+    return rows.map(row => row.id);
   }
 
   // Atomically claim a pending job. Returns false if another worker already claimed it, which keeps the
@@ -307,11 +319,16 @@ export class JobService {
     return this.db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
   }
 
+  /** Polled every second while a job runs, so it reads the flag alone and never an import's bundle; undefined once the row is gone. */
+  async cancellation(jobId: string): Promise<Pick<Job.Row, 'cancelRequestedAt'> | undefined> {
+    return this.db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId), columns: { cancelRequestedAt: true } });
+  }
+
   /** The job with its project's ownership, for `GET /api/v1/jobs/:jobId` to scope by the project's access rules (NF-BOLA-02). */
   async getWithProject(jobId: string): Promise<{ job: Job.Row; project: ProjectOwnership } | undefined> {
     const [row] = await this.db
       .select({
-        job: schema.jobs,
+        job: RESPONSE_COLUMNS,
         project: {
           ownerKind: schema.projects.ownerKind,
           ownerId: schema.projects.ownerId,
@@ -327,7 +344,7 @@ export class JobService {
   }
 
   async listByProject(projectId: bigint): Promise<Job.Row[]> {
-    return this.db.query.jobs.findMany({ where: eq(schema.jobs.projectId, projectId), orderBy: desc(schema.jobs.createdAt) });
+    return this.db.select(RESPONSE_COLUMNS).from(schema.jobs).where(eq(schema.jobs.projectId, projectId)).orderBy(desc(schema.jobs.createdAt));
   }
 
   publish(jobId: string, job: Pick<TransitionedJob, 'projectId' | 'kind' | 'status'>): void {

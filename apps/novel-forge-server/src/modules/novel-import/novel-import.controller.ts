@@ -6,6 +6,7 @@ import { GENERATION_RUN_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/co
 import { JobExecutor } from '../jobs/job.executor';
 import { ImportNovelBody, ImportNovelResponse } from './novel-import.dto';
 import { NovelImportService } from './novel-import.service';
+import { NOVEL_IMPORT_BODY_LIMIT_BYTES } from './novel-import.validator';
 
 // `RouteOptions` only declares `method`/`path`, but `@shadow-library/fastify` forwards every extra key
 // on the object straight through to Fastify's native `instance.route(...)` (verified in
@@ -16,10 +17,9 @@ interface RouteOptionsWithBodyLimit extends RouteOptions {
   bodyLimit?: number;
 }
 
-// A whole novel plus an optional base64 cover in one JSON body — realistically a few MB, but given
-// headroom for large multi-hundred-chapter bundles. Scoped to this one route only: every other write
+// A whole novel plus an optional base64 cover in one JSON body. Scoped to this one route only: every other write
 // route in the app stays under the app-wide 12MB `bodyLimit` (`dynamic.modules.ts`).
-const IMPORT_ROUTE_OPTIONS: RouteOptionsWithBodyLimit = { method: HttpMethod.POST, bodyLimit: 64 * 1024 * 1024 };
+const IMPORT_ROUTE_OPTIONS: RouteOptionsWithBodyLimit = { method: HttpMethod.POST, bodyLimit: NOVEL_IMPORT_BODY_LIMIT_BYTES };
 
 // Not nested under `/projects/:projectId` — this endpoint CREATES the project,
 // so there is nothing for `ProjectOwnershipGuard` to check yet; ownership is stamped on write from

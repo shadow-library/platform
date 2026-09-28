@@ -28,6 +28,10 @@ class FakeJobs {
     return row && { ...row };
   }
 
+  async cancellation(id: string): Promise<Pick<Job.Row, 'cancelRequestedAt'> | undefined> {
+    return this.get(id);
+  }
+
   async start(id: string): Promise<boolean> {
     const row = this.rows.get(id);
     if (row?.status !== 'pending') return false;
