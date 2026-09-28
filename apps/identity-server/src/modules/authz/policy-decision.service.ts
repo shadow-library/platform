@@ -65,13 +65,16 @@ export class PolicyDecisionService {
   }
 
   async getAuthzVersion(principal: Principal): Promise<number> {
-    const value = await this.redis.get(this.versionKey(principal));
-    return value ? Number(value) : 0;
+    return this.readVersion(this.versionKey(principal));
   }
 
-  private async getOrgVersion(organisationId: string): Promise<number> {
-    const value = await this.redis.get(this.orgVersionKey(organisationId));
-    return value ? Number(value) : 0;
+  private getOrgVersion(organisationId: string): Promise<number> {
+    return this.readVersion(this.orgVersionKey(organisationId));
+  }
+
+  private async readVersion(key: string): Promise<number> {
+    const results = await this.redis.multi().call('GET', key).call('EXPIRE', key, CACHE_VERSION_TTL_SECONDS).exec();
+    return Number(results?.[0]?.[1] ?? 0);
   }
 
   private async resolveAuthzVersion(principal: Principal, organisationId: string): Promise<number> {

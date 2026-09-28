@@ -67,6 +67,30 @@ describe('ApplicationAccessService', () => {
       expect(await redis.ttl('app_access_version:org:7')).toBe(THIRTY_DAYS);
     });
 
+    it('should not serve a grant set cached before the version key lapsed', async () => {
+      let now = 0;
+      const redis = new InMemoryRedis({ now: () => now });
+      const team = organisationRow({ appAccessMode: 'ASSIGNED_ONLY' });
+      let assigned = [{ applicationId: PUBLIC_APP.id }];
+      const postgres = {
+        query: {
+          organisations: { findFirst: () => Promise.resolve(team) },
+          applications: { findMany: () => Promise.resolve([PUBLIC_APP]) },
+          organisationApplications: { findMany: () => Promise.resolve(assigned) },
+        },
+      };
+      const service = new ApplicationAccessService(new FakeDatabaseService({ postgres, redis }));
+
+      await service.invalidateOrganisation(team.id.toString());
+      now = (THIRTY_DAYS - 60) * 1000;
+      expect([...(await service.listOrganisationApplicationIds(team.id))]).toEqual([PUBLIC_APP.id]);
+      now += 120_000;
+      assigned = [];
+      await service.invalidateOrganisation(team.id.toString());
+
+      expect([...(await service.listOrganisationApplicationIds(team.id))]).toEqual([]);
+    });
+
     it('should keep the single global version without expiry', async () => {
       const redis = new InMemoryRedis();
 

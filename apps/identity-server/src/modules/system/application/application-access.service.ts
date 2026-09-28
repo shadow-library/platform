@@ -120,9 +120,10 @@ export class ApplicationAccessService {
 
   private async resolveOrganisationGrants(organisation: Organisation): Promise<Set<number>> {
     const organisationId = organisation.id.toString();
-    const [globalRaw, orgRaw] = await this.redis.mget(GLOBAL_VERSION_KEY, this.orgVersionKey(organisationId));
-    const globalVersion = globalRaw ? Number(globalRaw) : 0;
-    const orgVersion = orgRaw ? Number(orgRaw) : 0;
+    const orgKey = this.orgVersionKey(organisationId);
+    const results = await this.redis.multi().call('GET', GLOBAL_VERSION_KEY).call('GET', orgKey).call('EXPIRE', orgKey, CACHE_VERSION_TTL_SECONDS).exec();
+    const globalVersion = Number(results?.[0]?.[1] ?? 0);
+    const orgVersion = Number(results?.[1]?.[1] ?? 0);
     const cacheKey = this.grantCacheKey(organisationId, globalVersion, orgVersion);
 
     const cached = await this.redis.get(cacheKey);

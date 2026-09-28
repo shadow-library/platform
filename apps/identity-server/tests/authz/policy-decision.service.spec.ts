@@ -25,4 +25,21 @@ describe('PolicyDecisionService', () => {
       });
     }
   });
+
+  describe('getAuthzVersion', () => {
+    it('should keep a version key alive while decisions are still being read under it', async () => {
+      let now = 0;
+      const redis = new InMemoryRedis({ now: () => now });
+      const service = new PolicyDecisionService(new FakeDatabaseService({ redis }));
+      const principal = { type: 'USER' as const, id: '11' };
+
+      await service.invalidatePrincipal(principal);
+      now = (THIRTY_DAYS - 60) * 1000;
+      expect(await service.getAuthzVersion(principal)).toBe(1);
+      now += 120_000;
+
+      expect(await service.getAuthzVersion(principal)).toBe(1);
+      expect(await redis.ttl('authz_version:USER:11')).toBeGreaterThan(THIRTY_DAYS - 120);
+    });
+  });
 });

@@ -7,8 +7,8 @@ export const OIDC_PROTOCOL_SCOPES = new Set(['openid', 'profile', 'email', 'offl
 export const OIDC_PROFILE_SCOPE = 'profile';
 
 /**
- * Lifetime of a per-entity cache version key, refreshed on every bump. It must outlive anything cached under an older version (grant
- * sets for five minutes, SDK decisions for fifteen by default), so a key that lapses and restarts at zero can never revive a stale entry;
- * the SDK keeps the highest version it saw and simply stops caching that principal's older-numbered answers until it restarts.
+ * Idle lifetime of a per-entity cache version key, refreshed by every bump and every read. Grant sets and PDP decisions are re-cached under
+ * the current version only when that version is read, so a key lapses only after nothing has consulted it for this long, when no cache
+ * entry (grant sets live five minutes, SDK decisions fifteen by default) can still be keyed on it.
  */
 export const CACHE_VERSION_TTL_SECONDS = 30 * 24 * 60 * 60;
