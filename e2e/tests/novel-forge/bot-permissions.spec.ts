@@ -129,8 +129,7 @@ test.describe('novel-forge bot permission matrix', () => {
     expect(await listDispatchedModelCalls(projectId), 'no model call was dispatched').toEqual([]);
   });
 
-  // generation.controller.ts:246 declares only generation:run on summarize, yet generation.service.ts:910 saves the summary it produces.
-  test.fixme('should refuse summarize to a bot that holds generation but not projects:write', async ({ forge }) => {
+  test('should refuse summarize to a bot that holds generation but not projects:write', async ({ forge }) => {
     const team = await forge.team('bot-summary-gap');
     const author = await forge.bot(team, ['projects:write', 'generation'], 'summary-writer');
     const generator = await forge.bot(team, ['projects:read', 'generation'], 'summary-reader');
