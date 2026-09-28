@@ -284,7 +284,9 @@ test.describe('identity bot key exchange — refusals', () => {
       'invalid_grant',
       'a bot token delegated onwards',
     );
-    await expectRefused(await ctx.get('/oauth2/userinfo', { headers: { authorization: `Bearer ${botToken}` } }), 401, 'invalid_client', 'a bot token at userinfo');
+    const userinfo = await ctx.get('/oauth2/userinfo', { headers: { authorization: `Bearer ${botToken}` } });
+    await expectRefused(userinfo, 401, 'invalid_token', 'a bot token at userinfo');
+    expect(userinfo.headers()['www-authenticate'], 'a refused bearer is challenged').toMatch(/^Bearer\b.*error="invalid_token"/);
 
     expect((await exchangeBotKey(ctx, client, { subjectToken: key.key })).status(), 'the key it came from still buys a fresh one').toBe(200);
   });

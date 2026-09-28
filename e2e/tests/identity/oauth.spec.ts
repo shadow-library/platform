@@ -236,8 +236,7 @@ test.describe('identity OIDC — discovery and signing keys', () => {
     expect(await introspect(anonymous, client, unsigned)).toEqual({ active: false });
   });
 
-  test.fixme('should answer a bad bearer on userinfo with invalid_token and a WWW-Authenticate challenge', async ({ identity }) => {
-    // identity returns OAU_002 invalid_client and no WWW-Authenticate for a bad bearer on userinfo (RFC 6750 §3.1, OIDC Core §5.3.3).
+  test('should answer a bad bearer on userinfo with invalid_token and a WWW-Authenticate challenge', async ({ identity }) => {
     const response = await userinfo(await identity.anonymous(), 'not-a-token');
     expect(response.status()).toBe(401);
     expect(response.headers()['www-authenticate']).toMatch(/^Bearer\b.*error="invalid_token"/);
@@ -469,6 +468,18 @@ test.describe('identity OAuth — client credentials', () => {
   async function grantOn(admin: APIRequestContext, target: OAuthApplication, client: OAuthClientCredentials, name: string, principalType?: ScopePrincipalType): Promise<void> {
     await grantClientScope(admin, client.clientId, await createResourceScope(admin, target.audience, name, { principalType }));
   }
+
+  test('should answer a grant type identity does not support with unsupported_grant_type and still mint a supported one', async ({ identity }) => {
+    const caller = await identity.createOAuthApp('cc-grant-type');
+    const client = caller.serviceClient;
+    const tokenCtx = await identity.anonymous();
+
+    for (const grantType of ['password', 'implicit', 'urn:ietf:params:oauth:grant-type:device_code']) {
+      const refused = await tokenCtx.post('/oauth2/token', { form: { grant_type: grantType, client_id: client.clientId, client_secret: client.secret ?? '' } });
+      await expectTokenError(refused, 400, 'unsupported_grant_type');
+    }
+    expect(await serviceClaims(tokenCtx, client, undefined, caller.audience), 'the same client is served a supported grant').toMatchObject({ aud: caller.audience });
+  });
 
   test('should bind a client-credentials token to the requested audience and the service scopes granted on it', async ({ identity }) => {
     const admin = (await identity.admin()).ctx;
