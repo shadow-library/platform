@@ -7,7 +7,7 @@ import { type AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { AccessTokenCache, type AppSessionToken, AuthClient, hashSessionHandle } from '@shadow-library/auth';
+import { AccessTokenCache, AppSessionClient, type AppSessionToken, AuthClient, hashSessionHandle } from '@shadow-library/auth';
 import { AppSessionService, decodeLoginState, encodeLoginState, type LoginState, matchesState, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
@@ -133,6 +133,16 @@ describe('AppSessionClient', () => {
 
     const replayed = await auth.appSessions.createSession(input).catch((error: unknown) => error);
     expect(replayed).toMatchObject({ code: 'AUTHORIZATION_CODE_INVALID', status: 400 });
+  });
+
+  it('should read invalid_grant as a bad code only on the session-create route', async () => {
+    const invalidGrant = () => Promise.resolve(Response.json({ code: 'invalid_grant', message: 'invalid_grant' }, { status: 400 }));
+    const sessions = new AppSessionClient({ baseUrl: 'https://identity.test', fetchFn: invalidGrant, getToken: async () => 'service-token', invalidateToken: () => undefined });
+
+    await expect(sessions.createSession({ code: 'c', codeVerifier: 'v', redirectUri: 'https://app.test/auth/callback' })).rejects.toMatchObject({
+      code: 'AUTHORIZATION_CODE_INVALID',
+    });
+    await expect(sessions.revokeSession('handle')).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
   });
 
   it('should keep identity paths and upstream wording out of an unclassified failure response', async () => {

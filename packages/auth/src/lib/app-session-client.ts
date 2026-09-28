@@ -160,14 +160,14 @@ export class AppSessionClient {
    */
   private async request<T>(method: string, path: string, body: unknown): Promise<T> {
     const response = await this.dispatch(method, path, body, await this.options.getToken());
-    if (response.status !== 401) return this.parse<T>(response, path);
+    if (response.status !== 401) return this.parse<T>(response, method, path);
 
     const failure = await this.readError(response);
     if (failure.code === SESSION_INVALID_CODE) throw this.logged(AuthErrorCode.SESSION_INVALID.create({ reason: failure.reason }));
 
     this.logger.warn('app session call rejected with 401; retrying with a fresh service token', { path });
     this.options.invalidateToken();
-    return this.parse<T>(await this.dispatch(method, path, body, await this.options.getToken()), path);
+    return this.parse<T>(await this.dispatch(method, path, body, await this.options.getToken()), method, path);
   }
 
   private dispatch(method: string, path: string, body: unknown, token: string): Promise<Response> {
@@ -178,13 +178,13 @@ export class AppSessionClient {
   }
 
   /** A throttle is marked as one, with identity's hint, so the guard can answer a retryable 503 instead of restarting the login */
-  private async parse<T>(response: Response, path: string): Promise<T> {
+  private async parse<T>(response: Response, method: string, path: string): Promise<T> {
     if (response.ok) return (await response.json()) as T;
     if (response.status === TOO_MANY_REQUESTS) {
       const retryAfterSeconds = retryAfterSecondsOf(response);
       throw this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${SESSIONS_PATH}${path} was throttled`, throttled: true, retryAfterSeconds }));
     }
-    throw this.toError(response.status, await this.readError(response), path);
+    throw this.toError(response.status, await this.readError(response), method, path);
   }
 
   private async readError(response: Response): Promise<{ code?: string; reason: string }> {
@@ -193,10 +193,10 @@ export class AppSessionClient {
     return { code, reason: body.message ?? code ?? `http ${response.status}` };
   }
 
-  private toError(status: number, failure: { code?: string; reason: string }, path: string): AppError {
+  private toError(status: number, failure: { code?: string; reason: string }, method: string, path: string): AppError {
     const code = failure.code ?? '';
     if (status === 401 && code === SESSION_INVALID_CODE) return this.logged(AuthErrorCode.SESSION_INVALID.create({ reason: failure.reason }));
-    if (path === '' && INVALID_GRANT_CODES.includes(code)) return this.logged(AuthErrorCode.AUTHORIZATION_CODE_INVALID.create({ reason: failure.reason }));
+    if (method === 'POST' && path === '' && INVALID_GRANT_CODES.includes(code)) return this.logged(AuthErrorCode.AUTHORIZATION_CODE_INVALID.create({ reason: failure.reason }));
     if (ELEVATION_INTENT_MISMATCH_CODES.includes(code)) return this.logged(AuthErrorCode.ELEVATION_INTENT_MISMATCH.create({ reason: failure.reason }));
     if (status === 403 && code === ELEVATION_REQUIRED_CODE) return this.logged(AuthErrorCode.ELEVATION_REQUIRED.create({ reason: failure.reason }));
     if (status === 403 && ACCESS_DENIED_CODES.includes(code)) return this.logged(AuthErrorCode.ORGANISATION_NOT_PERMITTED.create({ reason: failure.reason }));
