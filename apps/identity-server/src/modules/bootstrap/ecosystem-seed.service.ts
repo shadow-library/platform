@@ -43,7 +43,7 @@ export class EcosystemSeedService {
     for (const client of newServiceClients) await this.createServiceClient(client);
 
     for (const application of newApplications) await this.bindApplication(application, scopes);
-    for (const application of existingApplications) await this.reconcileApplication(application, scopes);
+    for (const application of existingApplications) await this.reconcileApplication(application, operator, scopes);
 
     /**
      * Every service client, not only the ones just created: a grant added to the seed after a deployment
@@ -96,7 +96,7 @@ export class EcosystemSeedService {
     });
 
     await this.ensureResourceScopes(application.id, seed, scopes);
-    await this.createRoles(application.id, seed, operator);
+    await this.reconcileCatalogue(application.id, seed, operator);
     await this.createClient(application.id, seed.name, origins);
     this.logger.info(`Seeded ecosystem application '${seed.name}'`, { applicationId: application.id });
   }
@@ -111,21 +111,26 @@ export class EcosystemSeedService {
     }
   }
 
-  private async createRoles(applicationId: number, seed: SeedApplication, operator: EcosystemOperator): Promise<void> {
+  /**
+   * Runs at creation and again on every boot, so a permission or role declared after its application exists still arrives. It only adds:
+   * nothing the seed stops declaring is removed, and a declared grant an operator revoked comes back, as seeded scope grants do.
+   */
+  private async reconcileCatalogue(applicationId: number, seed: SeedApplication, operator: EcosystemOperator): Promise<void> {
     const permissions = new Map<string, string>();
     for (const permission of seed.permissions ?? []) {
       permissions.set(permission.name, await this.policyDecisionService.ensurePermission(applicationId, permission.name, permission.description));
     }
 
     for (const role of seed.roles ?? []) {
-      const created = await this.applicationRoleService.addRole(seed.name, { roleName: role.name, description: role.description });
+      const existing = this.applicationService.getApplicationOrThrow(seed.name).roles.find(candidate => candidate.roleName === role.name);
+      const target = existing ?? (await this.applicationRoleService.addRole(seed.name, { roleName: role.name, description: role.description }));
       for (const name of role.permissions) {
         const permissionId =
           permissions.get(name) ?? throwError(AppError.internal(`Role '${role.name}' requires permission '${name}', which application '${seed.name}' does not declare`));
-        await this.policyDecisionService.grantPermissionToRole(created.id, permissionId);
+        await this.policyDecisionService.grantPermissionToRole(target.id, permissionId);
       }
-      if (role.grantToBootstrapAdmin) {
-        await this.policyDecisionService.assignRole({ type: 'USER', id: operator.adminUserId.toString() }, created.id, operator.platformOrganisationId.toString());
+      if (!existing && role.grantToBootstrapAdmin) {
+        await this.policyDecisionService.assignRole({ type: 'USER', id: operator.adminUserId.toString() }, target.id, operator.platformOrganisationId.toString());
       }
     }
   }
@@ -191,9 +196,10 @@ export class EcosystemSeedService {
     }
   }
 
-  private async reconcileApplication(seed: SeedApplication, scopes: Map<string, string>): Promise<void> {
+  private async reconcileApplication(seed: SeedApplication, operator: EcosystemOperator, scopes: Map<string, string>): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(seed.name);
     await this.ensureResourceScopes(application.id, seed, scopes);
+    await this.reconcileCatalogue(application.id, seed, operator);
     await this.bindApplication(seed, scopes);
     await this.reconcileClient(seed);
   }
