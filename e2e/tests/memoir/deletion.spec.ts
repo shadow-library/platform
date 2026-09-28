@@ -118,9 +118,7 @@ test.describe('memoir account deletion — step-up gate', () => {
     await expectDeletionState(await guest.get(DELETION_PATH, bearer(await issuer.elevated(persona))), 200, 'none');
   });
 
-  // App bug: the code grant filters scopes by client and principal alone (identity-server oauth.service.ts:298-313, reached from :511), never by the
-  // session's assurance level, unlike the app-session mint (app-session.service.ts:161) and token exchange (oauth.service.ts:468).
-  test.fixme('should withhold memoir:destructive from a code grant until the session steps up', async ({ memoir }) => {
+  test('should withhold memoir:destructive from a code grant until the session steps up', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'del-aal1-scope' });
     const issuer = await createMemoirTokenIssuer(memoir);
 
