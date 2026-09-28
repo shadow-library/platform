@@ -14,6 +14,8 @@ Notification service and operations console. Other apps send a message by templa
 ## Architecture
 
 - Producers call Pulse server-to-server: `identity` (auth/security/user/org/bot templates) and `memoir-server` (memoir-*). Each needs a service-access rule in Identity.
+- Producers send on `POST /api/v1/notifications` (service-only `notifications:send` scope). An admin's manual send from the console goes to
+  `POST /api/v1/notifications/console` (`pulse:notifications:send`, PulseAdmin only, high-risk decision TTL). Neither route admits the other's caller.
 - Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
@@ -32,11 +34,16 @@ Notification service and operations console. Other apps send a message by templa
 - Template and layout publish MUST be render-gated on sample data; partial publish is NOT. The baseline seed is gated too: a layout or template it writes must render
   against the live design system, and a partial only while the whole fixture catalogue renders; a failure withholds the write with a warning. Rollback creates a NEW published copy (history never deleted), templates only.
 - A job MUST pin `templateVersionId`; NEVER resolve "latest" at delivery. Layout/partial publishes still hit every template at once, including retries of pinned jobs.
-- Missing required payload variables abort the whole send (a producer bug); extra keys pass through and can override globals.
+- Missing required payload variables abort the whole send (a producer bug); extra keys pass through and, on the producer route, can override globals.
 - Locale falls back to `en-ZZ`: keep `en-ZZ` content on every template or an unmatched locale fails that channel.
 - A null layout sends the email fragment unwrapped; layouts never apply to SMS/PUSH.
 - Auto-escaping is a security boundary on EMAIL bodies (SMS/PUSH and all subjects are plain text): only the framework's `content` slot is unescaped (`| raw` and
   `{% echo %}` are overridden). NEVER weaken it.
+- The console send is a test tool, not a second producer. It MUST refuse identity's account-security templates with NTF_005: `auth.*`, `security.*`, `user.*`,
+  `password-reset`, any OTP message type and the `auth`/`security` categories. It strips payload keys that name a render global or `content` unless the template
+  declares them. It logs one info line per send (actor, organisation, template, channels, masked recipients, job ids, stripped keys), never the raw recipient or
+  payload; pulse has no audit table, so that line is the trail. Each actor gets 20 sends per sliding 10 minutes (429 NTF_006 with `Retry-After`), counted in
+  process: per replica and reset on restart.
 - Recipients are masked in info logs and the message-log API, which exists only when `app.stage` is `dev`. The job and message tables still hold raw recipient, payload and
   rendered body (OTP codes, reset links) and `debug` logs the whole job row: NEVER widen that exposure.
 - The global routing rule cannot be deleted and rules cannot be created or edited to point at an inactive profile (deactivating a profile later is not checked). No matching rule/endpoint makes the job PERMANENTLY_FAILED.
@@ -47,7 +54,7 @@ Notification service and operations console. Other apps send a message by templa
 
 ## Non-goals
 
-- No visual email builder, campaigns, audiences, A/B or scheduling; transactional only. No audit trail, four-eyes approval or test-send. No WhatsApp.
+- No visual email builder, campaigns, audiences, A/B or scheduling; transactional only. No audit table or four-eyes approval. No WhatsApp.
 
 ## Open work
 
