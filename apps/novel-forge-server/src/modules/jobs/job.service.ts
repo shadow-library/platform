@@ -4,7 +4,7 @@ import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { AUTHORING_JOB_KINDS, isAuthoringJob, jobHoldsLiveClaim, ownedBy, type OwnerRef } from '@server/common';
+import { AUTHORING_JOB_KINDS, isAuthoringJob, jobHoldsLiveClaim } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Job, type PrimaryDatabase, type Project, schema } from '@server/database';
 
@@ -13,6 +13,7 @@ import { isCostTier } from '../ai/defaults';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { ProjectEventService } from '../events/project-event.service';
 import { type OrganiseReceipt } from '../notes/organise-card';
+import { type ProjectOwnership } from '../project/project-access.service';
 import { AuthoringClaimService } from './authoring-claim.service';
 
 export interface JobProgress {
@@ -306,17 +307,23 @@ export class JobService {
     return this.db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
   }
 
-  // The owner-scoped read behind `GET /api/v1/jobs/:jobId` (NF-BOLA-02): a job is only visible to the
-  // owner of its project. Resolving projectId → owner via an inner join returns nothing when the job is
-  // missing or owned by someone else, and a null owner_id never matches — so it fails closed.
-  async getForOwner(jobId: string, owner: OwnerRef): Promise<Job.Row | undefined> {
+  /** The job with its project's ownership, for `GET /api/v1/jobs/:jobId` to scope by the project's access rules (NF-BOLA-02). */
+  async getWithProject(jobId: string): Promise<{ job: Job.Row; project: ProjectOwnership } | undefined> {
     const [row] = await this.db
-      .select({ job: schema.jobs })
+      .select({
+        job: schema.jobs,
+        project: {
+          ownerKind: schema.projects.ownerKind,
+          ownerId: schema.projects.ownerId,
+          organisationId: schema.projects.organisationId,
+          sharedWithOrg: schema.projects.sharedWithOrg,
+        },
+      })
       .from(schema.jobs)
       .innerJoin(schema.projects, eq(schema.jobs.projectId, schema.projects.id))
-      .where(and(eq(schema.jobs.id, jobId), ownedBy(schema.projects, owner)))
+      .where(eq(schema.jobs.id, jobId))
       .limit(1);
-    return row?.job;
+    return row;
   }
 
   async listByProject(projectId: bigint): Promise<Job.Row[]> {

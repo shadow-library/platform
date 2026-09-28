@@ -1,24 +1,17 @@
 import { eq, sql } from 'drizzle-orm';
 import { type PgPreparedQuery, type PreparedQueryConfig } from 'drizzle-orm/pg-core';
 import { type HandlerMetadata } from '@shadow-library/app';
-import { AuthClient } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
-import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
+import { type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
-import { isOwnedBy } from '@server/common';
-import { APP_NAME, CURATE_PERMISSION } from '@server/constants';
-import { type Owner, type PrimaryDatabase, schema } from '@server/database';
+import { APP_NAME } from '@server/constants';
+import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type Actor, ActorService } from '@modules/actor';
+import { ActorService } from '@modules/actor';
 
-interface ProjectOwnership {
-  ownerKind: Owner.Kind;
-  ownerId: bigint | null;
-  organisationId: bigint | null;
-  sharedWithOrg: boolean;
-}
+import { ProjectAccessService, type ProjectOwnership } from './project-access.service';
 
 /**
  * Object-level authorization for every project-scoped route (audit finding NF-BOLA-01). The class-level
@@ -40,9 +33,8 @@ export class ProjectOwnershipGuard {
   private readonly projectOwnerQuery: PgPreparedQuery<PreparedQueryConfig & { execute: ProjectOwnership | undefined }>;
 
   constructor(
-    private readonly context: ContextService,
     private readonly actorService: ActorService,
-    private readonly authClient: AuthClient,
+    private readonly access: ProjectAccessService,
     databaseService: DatabaseService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
@@ -85,31 +77,10 @@ export class ProjectOwnershipGuard {
     const actor = this.actorService.current();
     const project = await this.projectOwnerQuery.execute({ projectId });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    if (isOwnedBy(project, actor)) return;
-    if (await this.isOrganisationCurator(project, actor)) return;
+    if (await this.access.canReach(project, actor)) return;
 
     this.logger.warn('rejected cross-owner project access', { projectId: projectId.toString(), callerKind: actor.kind, caller: actor.id.toString() });
     throw AppErrorCode.PRJ_001.create();
-  }
-
-  /**
-   * The sharing branch: a project its owner opened to the organisation is reachable by a member of that same
-   * organisation who holds `novel-forge:curate` there. Only a user qualifies — a bot is granted permissions
-   * for its own work, never for reading another principal's records — and a null organisation on either side
-   * never matches. A user-owned project carries an organisation only when `/internal/bots/:botId/transfer`
-   * handed it over from a bot, which deliberately preserves both columns so the organisation keeps the access
-   * it had while the bot still existed.
-   *
-   * `highRisk` because this guard is the only authorization on the destructive project routes, which scope by id
-   * alone: at the default TTL a revoked curator would keep delete rights on someone else's project for 15 minutes.
-   */
-  private async isOrganisationCurator(project: ProjectOwnership, actor: Actor): Promise<boolean> {
-    if (actor.kind !== 'user' || !project.sharedWithOrg) return false;
-    if (project.organisationId === null || project.organisationId !== actor.organisationId) return false;
-
-    const principal = this.context.getAuthPrincipal();
-    const organisationId = project.organisationId.toString();
-    return this.authClient.check({ action: CURATE_PERMISSION, organisationId, principal }, { highRisk: true });
   }
 
   // The param may already be a bigint (routes whose DTO transforms it) or a raw string (e.g. the image

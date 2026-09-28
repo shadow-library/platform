@@ -6,6 +6,7 @@ import { ActorModule } from '@modules/actor';
 
 import { AiModule } from '../ai/ai.module';
 import { EventsModule } from '../events/events.module';
+import { ProjectAccessModule } from '../project/project-access.module';
 import { PublishingModule } from '../publishing/publishing.module';
 import { AuthoringClaimModule } from './authoring-claim.module';
 import { AuthoringJobJanitor } from './authoring-job.janitor';
@@ -17,7 +18,18 @@ import { JobsController } from './jobs.controller';
 import { PublicationJanitor } from './publication.janitor';
 
 @Module({
-  imports: [ActorModule, DatabaseModule, AiModule, AuthoringClaimModule, EventsModule, JobHandlerRegistryModule, PublishingModule, StorageModule, FastifyModule],
+  imports: [
+    ActorModule,
+    DatabaseModule,
+    AiModule,
+    AuthoringClaimModule,
+    EventsModule,
+    JobHandlerRegistryModule,
+    ProjectAccessModule,
+    PublishingModule,
+    StorageModule,
+    FastifyModule,
+  ],
   controllers: [JobsController],
   providers: [JobService, JobExecutor, AuthoringJobJanitor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, JobExecutor],

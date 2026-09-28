@@ -57,7 +57,7 @@ export class ProjectService {
   }
 
   /**
-   * Mirrors `ProjectOwnershipGuard`'s sharing branch, one PDP check per request, skipped for bots and org-less users.
+   * Mirrors `ProjectAccessService`'s sharing branch, one PDP check per request, skipped for bots and org-less users.
    * A PDP that is unavailable (identity throttling the check) narrows the list to the caller's own projects: a strict
    * subset, so still fail-closed, where failing the whole list would take the home screen down with it.
    */

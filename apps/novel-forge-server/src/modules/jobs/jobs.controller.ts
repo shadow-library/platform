@@ -6,6 +6,7 @@ import { AppErrorCode } from '@server/classes';
 import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { emptyCallUsageTotals } from '../ai/usage/call-usage';
+import { ProjectAccessService } from '../project/project-access.service';
 import { redactJobForResponse, toJobUsageResponse } from './job-response';
 import { JobService } from './job.service';
 import { JobIdParams, JobResponse } from './jobs.dto';
@@ -17,15 +18,17 @@ export class JobsController {
   constructor(
     private readonly jobService: JobService,
     private readonly actorService: ActorService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   @Get('/:jobId')
   @RespondFor(200, JobResponse)
   async getJob(@Params() params: JobIdParams): Promise<JobResponse> {
-    // Jobs are not nested under a project route, so the ownership guard cannot cover them; scope the
-    // read by the caller here. A job the caller does not own is reported as not found (NF-BOLA-02).
-    const job = await this.jobService.getForOwner(params.jobId, this.actorService.current());
-    if (!job) throw AppErrorCode.JOB_001.create();
+    // Jobs are not nested under a project route, so the ownership guard cannot cover them; scope the read by the
+    // same access rule here. A job of a project the caller cannot reach is reported as not found (NF-BOLA-02).
+    const found = await this.jobService.getWithProject(params.jobId);
+    if (!found || !(await this.projectAccess.canReach(found.project, this.actorService.current()))) throw AppErrorCode.JOB_001.create();
+    const { job } = found;
     const usage = await this.jobService.usageForJobs([job.id]);
     return { ...redactJobForResponse(job), usage: toJobUsageResponse(usage.get(job.id) ?? emptyCallUsageTotals()) };
   }
