@@ -33,6 +33,7 @@ const FAILURE_COPY: Record<string, FailureCopy> = {
   AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond after a few tries.' },
   AI_008: { title: 'Too many model calls right now', reason: 'Wait a moment, then try again.' },
   AI_009: { title: 'AI spending limit reached', reason: 'Model calls are paused for this account until the limit resets.' },
+  AI_018: { title: 'Couldn’t check your AI usage', reason: 'The usage limit couldn’t be checked, so the model wasn’t called. Try again shortly.' },
 };
 
 const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reason: 'Something went wrong on the server.' };
