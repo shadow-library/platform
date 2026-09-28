@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, asc, between, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, between, eq, isNull, lte, min, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -40,6 +40,11 @@ export interface RecoveryQuestDraft {
   triggerLogIds: bigint[];
   isReturnerDay: boolean;
   expiresAt: Date;
+}
+
+export interface ActivityStart {
+  firstLogDate: string | null;
+  firstQuestAt: Date | null;
 }
 
 export interface ComebackEventDraft {
@@ -166,6 +171,18 @@ export class RolloverRepository {
       .from(schema.questLogs)
       .where(and(eq(schema.questLogs.accountId, accountId), between(schema.questLogs.date, from, to)))
       .orderBy(asc(schema.questLogs.date));
+  }
+
+  async findActivityStart(tx: DatabaseTransaction, accountId: bigint): Promise<ActivityStart> {
+    const [log] = await tx
+      .select({ date: min(schema.questLogs.date) })
+      .from(schema.questLogs)
+      .where(eq(schema.questLogs.accountId, accountId));
+    const [quest] = await tx
+      .select({ createdAt: min(schema.quests.createdAt) })
+      .from(schema.quests)
+      .where(eq(schema.quests.accountId, accountId));
+    return { firstLogDate: log?.date ?? null, firstQuestAt: quest?.createdAt ?? null };
   }
 
   /** A system miss never displaces a user's own outcome: the occurrence unique constraint absorbs the collision (§13.3, PRD §4.10 step 3). */

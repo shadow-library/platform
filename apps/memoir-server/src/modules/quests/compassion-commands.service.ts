@@ -14,13 +14,16 @@ import {
   accountToday,
   addDays,
   capacityWarningFor,
+  compareLocalDates,
   computeCapacity,
   computeReward,
   currentRuleset,
   formatLocalDate,
   type LocalDate,
+  localDateAt,
   parseLocalDate,
   type QuestLogState,
+  type TimeZone,
 } from '@modules/rules';
 import { RolloverRepository } from '@modules/rollover';
 import { AppErrorCode } from '@server/classes';
@@ -54,7 +57,7 @@ export class CompassionCommandsService implements OnModuleInit {
   /** Pending-only (PRD §3.6): reward via the ledger, then a P6 second Comeback arming — this time via recovery, lifting the day's fire allowance to 2. */
   private async completeRecovery(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
-    const date = await this.requireToday(ctx);
+    const { date } = await this.requireToday(ctx);
     const reflectionText = this.parseReflection(ctx.envelope.payload['reflectionText']);
 
     const updated = await this.rolloverRepository.completeRecoveryQuest(ctx.tx, ctx.accountId, date, reflectionText);
@@ -100,7 +103,7 @@ export class CompassionCommandsService implements OnModuleInit {
   /** Open day only (`rollover_at IS NULL`); capacity thresholds are advisory in the result and never refuse the lock (PRD §4.11 — "never blocks"). */
   private async setLock(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
-    const date = await this.requireToday(ctx);
+    const { date, timezone } = await this.requireToday(ctx);
     const locked = ctx.envelope.payload['locked'] === true;
 
     const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, date);
@@ -121,7 +124,7 @@ export class CompassionCommandsService implements OnModuleInit {
     const day = parseLocalDate(date);
     if (!day) throw AppError.internal(`plan.setLock addressed a malformed local date '${date}'`);
     const capacity = computeCapacity(ruleset, {
-      trailingCompletions: await this.trailingCompletions(ctx, day, ruleset.capacity.medianWindowDays),
+      trailingCompletions: await this.trailingCompletions(ctx, day, ruleset.capacity.medianWindowDays, timezone),
       momentum: dailyState.momentumBucket,
       priorDayHeavyMiss: false,
     });
@@ -135,24 +138,42 @@ export class CompassionCommandsService implements OnModuleInit {
   }
 
   /** Both commands act on the open day alone; one queued offline before a rollover must not reach a day that is already closed, or one not yet begun. */
-  private async requireToday(ctx: CommandContext): Promise<string> {
+  private async requireToday(ctx: CommandContext): Promise<{ date: string; timezone: TimeZone }> {
     const date = ctx.envelope.localDate;
     const account = await this.rolloverRepository.lockAccount(ctx.tx, ctx.accountId);
     if (!account) throw AppError.internal(`compassion command addressed account '${ctx.accountId}' which does not exist`);
     if (date !== formatLocalDate(accountToday(Date.now(), account.timezone, account.lastHpDate))) throw AppErrorCode.CMD_002.create({ date });
-    return date;
+    return { date, timezone: account.timezone };
   }
 
-  private async trailingCompletions(ctx: CommandContext, day: LocalDate, windowDays: number): Promise<number[]> {
-    const from = formatLocalDate(addDays(day, -windowDays));
-    const to = formatLocalDate(addDays(day, -1));
-    const history = await this.rolloverRepository.listQuestLogs(ctx.tx, ctx.accountId, from, to);
+  /**
+   * `CapacityInput`'s daily counts, most recent first, with a day without a completion counted as zero, as the momentum median counts it.
+   * Only days since the account's first quest or log count, and an account with none before today is a new user at the baseline cap.
+   */
+  private async trailingCompletions(ctx: CommandContext, day: LocalDate, windowDays: number, timezone: TimeZone): Promise<number[]> {
+    const began = await this.activityBegan(ctx, timezone);
+    if (began === null) return [];
+
+    const days = Array.from({ length: windowDays }, (_, index) => addDays(day, -(index + 1))).filter(date => compareLocalDates(date, began) >= 0);
+    const [latest] = days;
+    const earliest = days.at(-1);
+    if (!latest || !earliest) return [];
+
+    const history = await this.rolloverRepository.listQuestLogs(ctx.tx, ctx.accountId, formatLocalDate(earliest), formatLocalDate(latest));
     const counts = new Map<string, number>();
     for (const log of history) {
       if (!HOLD_STATES.includes(log.state)) continue;
       counts.set(log.date, (counts.get(log.date) ?? 0) + 1);
     }
-    return [...counts.values()];
+    return days.map(date => counts.get(formatLocalDate(date)) ?? 0);
+  }
+
+  private async activityBegan(ctx: CommandContext, timezone: TimeZone): Promise<LocalDate | null> {
+    const { firstLogDate, firstQuestAt } = await this.rolloverRepository.findActivityStart(ctx.tx, ctx.accountId);
+    const firstLog = firstLogDate === null ? null : parseLocalDate(firstLogDate);
+    const firstQuest = firstQuestAt === null ? null : localDateAt(firstQuestAt.getTime(), timezone);
+    if (!firstLog || !firstQuest) return firstLog ?? firstQuest;
+    return compareLocalDates(firstLog, firstQuest) < 0 ? firstLog : firstQuest;
   }
 
   private parseReflection(value: unknown): string | null {
