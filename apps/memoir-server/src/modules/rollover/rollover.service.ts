@@ -90,10 +90,11 @@ const isHold = (state: QuestLog.State): boolean => HOLD_STATES.includes(state);
 const isBreak = (state: QuestLog.State): boolean => BREAK_STATES.includes(state);
 
 /**
- * The day-closing engine of ARCHITECTURE §13. One transaction per elapsed day — bounded work, and a
- * crash after day N leaves days ≤ N closed with `accounts.last_hp_date` at N, so the next invocation
- * resumes at N+1 rather than replaying. Idempotence rests on `daily_states.rollover_at` plus the natural
- * key behind every write the day performs, so re-running a closed day is a no-op twice over.
+ * The day-closing engine of ARCHITECTURE §13. One transaction per elapsed day — bounded work.
+ * `accounts.last_hp_date` names the last day the walk touched, closed or merely prepared as today, so
+ * the walk resumes at that day while its `daily_states.rollover_at` is unset and at the day after once
+ * it is. Idempotence rests on that marker plus the natural key behind every write the day performs, so
+ * re-running a closed day is a no-op twice over.
  */
 @Injectable()
 export class RolloverService implements OnModuleInit {
@@ -169,7 +170,7 @@ export class RolloverService implements OnModuleInit {
     const lastHpDate = account.lastHpDate === null ? null : parseLocalDate(account.lastHpDate);
     if (lastHpDate !== null && compareLocalDates(lastHpDate, today) >= 0) return 'current';
 
-    const day = this.nextDay(lastHpDate, today);
+    const day = await this.nextDay(tx, account.id, lastHpDate, today);
     const context: DayContext = { ruleset, account, timeZone, intensityMode: account.intensityMode, day, date: formatLocalDate(day) };
 
     if (compareLocalDates(day, today) >= 0) {
@@ -186,11 +187,12 @@ export class RolloverService implements OnModuleInit {
    * absence of any length costs a fixed amount of work. The walk skips straight to the bound's first day,
    * which then opens at full HP because the day before it was never closed and carries no `hp_end`.
    */
-  private nextDay(lastHpDate: LocalDate | null, today: LocalDate): LocalDate {
-    const bound = addDays(today, -Config.get('rollover.catchup-max-days'));
+  private async nextDay(tx: DatabaseTransaction, accountId: bigint, lastHpDate: LocalDate | null, today: LocalDate): Promise<LocalDate> {
     if (lastHpDate === null) return today;
-    const next = addDays(lastHpDate, 1);
-    return compareLocalDates(next, bound) < 0 ? bound : next;
+    const bound = addDays(today, -Config.get('rollover.catchup-max-days'));
+    if (compareLocalDates(lastHpDate, bound) < 0) return bound;
+    const last = await this.repository.findDailyState(tx, accountId, formatLocalDate(lastHpDate));
+    return last?.rolloverAt ? addDays(lastHpDate, 1) : lastHpDate;
   }
 
   /*!

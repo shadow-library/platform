@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, asc, between, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, between, eq, isNull, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -238,12 +238,15 @@ export class RolloverRepository {
     return new Set(rows.map(row => row.questId));
   }
 
-  /** PRD §4.10 step 4: expiry is silent to the user — no penalty, no cascade, no reopening — but still lands its own `hero_events` audit row (I-7). */
+  /**
+   * PRD §4.10 step 4: expiry is silent to the user — no penalty, no cascade, no reopening — but still lands its own `hero_events` audit row (I-7).
+   * Bounded above only, so a Recovery whose own day the walk skipped (the catch-up bound) still expires at the next close.
+   */
   async expirePendingRecovery(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<RecoveryQuest.Row[]> {
     return tx
       .update(schema.recoveryQuests)
       .set({ state: 'expired' })
-      .where(and(eq(schema.recoveryQuests.accountId, accountId), eq(schema.recoveryQuests.date, date), eq(schema.recoveryQuests.state, 'pending')))
+      .where(and(eq(schema.recoveryQuests.accountId, accountId), lte(schema.recoveryQuests.date, date), eq(schema.recoveryQuests.state, 'pending')))
       .returning();
   }
 
