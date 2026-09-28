@@ -121,6 +121,7 @@ function normalise(body: Partial<AppRegistration>): AppRegistration {
     audience: body.audience ?? '',
     redirectUris: body.redirectUris ?? [],
     scopes: body.scopes ?? [],
+    sensitiveScopes: body.sensitiveScopes ?? [],
     postLogoutRedirectUris: body.postLogoutRedirectUris,
   };
 }

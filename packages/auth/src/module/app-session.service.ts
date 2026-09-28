@@ -49,6 +49,8 @@ export interface BrowserAuthRuntime {
   audience: string;
   redirectUri: string;
   scopes: string[];
+  /** Asked for at authorize and minted only into an elevated token; see {@link AppRegistration.sensitiveScopes} */
+  sensitiveScopes: string[];
   stepUpUrl: string;
 }
 
@@ -91,6 +93,10 @@ const PROFILE_TTL_MS = 5 * 60 * 1000;
  * `profile` is what releases the person's name back to the application that signed them in.
  */
 const PROTOCOL_SCOPES = ['openid', 'profile'];
+
+/** Identity releases a sensitive scope only into an elevated token, so asking for one on a plain mint would only read as a narrowed grant */
+const mintScope = (runtime: BrowserAuthRuntime, elevated: boolean): string | undefined =>
+  (elevated ? [...runtime.scopes, ...runtime.sensitiveScopes] : runtime.scopes).join(' ') || undefined;
 
 /** An unreadable timestamp must fail towards "expires sooner", never towards "never expires" */
 const parseExpiry = (value: string, fallback: number): number => {
@@ -139,13 +145,14 @@ export class AppSessionService {
    */
   async warmUp(): Promise<BrowserAuthRuntime> {
     const runtime = await this.runtime(undefined);
-    if (this.config.validateScopes) await this.client.assertScopesSupported(runtime.scopes);
+    if (this.config.validateScopes) await this.client.assertScopesSupported([...runtime.scopes, ...runtime.sensitiveScopes]);
     this.warnOnRedirectUriMismatch(runtime.redirectUri);
     this.logger.info('browser auth resolved from the app registration', {
       clientId: runtime.clientId,
       audience: runtime.audience,
       redirectUri: runtime.redirectUri,
       scopes: runtime.scopes,
+      sensitiveScopes: runtime.sensitiveScopes,
     });
     return runtime;
   }
@@ -160,7 +167,7 @@ export class AppSessionService {
       authorizationEndpoint: document.authorization_endpoint,
       clientId: runtime.clientId,
       redirectUri: runtime.redirectUri,
-      scopes: runtime.scopes,
+      scopes: [...runtime.scopes, ...runtime.sensitiveScopes],
       state: state.state,
       nonce: state.nonce,
       codeChallenge: pkce.challenge,
@@ -236,7 +243,7 @@ export class AppSessionService {
 
     const runtime = await this.runtime(undefined);
     const elevated = request.elevated ?? false;
-    const key = { handleHash, audience: runtime.audience, elevated, scope: runtime.scopes.join(' ') || undefined };
+    const key = { handleHash, audience: runtime.audience, elevated, scope: mintScope(runtime, elevated) };
     const cached = this.tokens.get(key);
     if (cached) return cached;
 
@@ -250,7 +257,7 @@ export class AppSessionService {
     const inflight = this.mints.get(flightKey);
     if (inflight) return inflight;
 
-    const flight = this.mint(runtime, handle, handleHash, elevated)
+    const flight = this.mint(runtime.audience, key.scope, handle, handleHash, elevated)
       .then(minted => {
         /**
          * An elevated token is only cached for as long as the grant it came from is known to last. When
@@ -436,9 +443,8 @@ export class AppSessionService {
     return target.pathname === allowed.pathname || target.pathname.startsWith(`${allowed.pathname.replace(/\/+$/, '')}/`);
   }
 
-  private async mint(runtime: BrowserAuthRuntime, handle: string, handleHash: string, elevated: boolean): Promise<AppSessionToken> {
-    const scope = runtime.scopes.join(' ') || undefined;
-    const input = { sessionHandle: handle, resource: runtime.audience, scope, elevated };
+  private async mint(resource: string, scope: string | undefined, handle: string, handleHash: string, elevated: boolean): Promise<AppSessionToken> {
+    const input = { sessionHandle: handle, resource, scope, elevated };
     return this.client.appSessions.mintToken(input).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
   }
 
@@ -457,18 +463,20 @@ export class AppSessionService {
     if (cached?.registration === registration && cached.requestOrigin === requestOrigin && cached.runtime.audience === audience && cached.runtime.stepUpUrl === stepUpEndpoint)
       return cached.runtime;
 
+    /**
+     * The protocol scopes lead, always. An application's registration lists the API capabilities it
+     * owns and never the OIDC ones — those belong to the protocol, not to a resource server — so
+     * without this an app requests `scope=` empty, the session consents to nothing, and identity
+     * has no basis on which to release the signed-in person's own name back to it. Identity honours
+     * them for any client without a grant, so adding them costs no registration change anywhere.
+     */
+    const scopes = [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])];
     const runtime: BrowserAuthRuntime = {
       clientId: registration.appId,
       audience,
       redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris, requestOrigin),
-      /**
-       * The protocol scopes lead, always. An application's registration lists the API capabilities it
-       * owns and never the OIDC ones — those belong to the protocol, not to a resource server — so
-       * without this an app requests `scope=` empty, the session consents to nothing, and identity
-       * has no basis on which to release the signed-in person's own name back to it. Identity honours
-       * them for any client without a grant, so adding them costs no registration change anywhere.
-       */
-      scopes: [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])],
+      scopes,
+      sensitiveScopes: registration.sensitiveScopes.filter(scope => !scopes.includes(scope)),
       stepUpUrl: stepUpEndpoint,
     };
     this.derived = { registration, requestOrigin, runtime };

@@ -293,8 +293,15 @@ export interface AppRegistration {
   /** Redirect URIs an admin registered for the browser flow */
   redirectUris: string[];
 
-  /** Scopes an admin has granted this application; the browser flow requests exactly these */
+  /** Scopes an admin has granted this application; every browser-flow token asks for these */
   scopes: string[];
+
+  /**
+   * The application's `is_sensitive` scopes. Consent for them is asked at login, because identity
+   * freezes an app session's grant from its authorization code, but identity releases them only into
+   * an elevated mint, so only an elevated mint asks for them.
+   */
+  sensitiveScopes: string[];
 
   postLogoutRedirectUris?: string[];
 }

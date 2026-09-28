@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
  * Importing user defined packages
  */
 import { AuthClient } from '@shadow-library/auth';
-import { AppSessionService, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
+import { AppSessionService, parseCookies, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -187,5 +187,64 @@ describe('derived configuration', () => {
     await Promise.all([auth.getAudience(), auth.getAudience(), auth.getAppRegistration()]);
     expect(idp.getRequestCount('/api/v1/apps/me')).toBe(before + 1);
     auth.stop();
+  });
+});
+
+describe('sensitive scopes', () => {
+  const SENSITIVE = 'reports:destroy';
+  const USER = 'user-7';
+  let idp: TestIdP;
+  let auth: AuthClient;
+  let service: AppSessionService;
+
+  beforeAll(async () => {
+    idp = await createTestIdP({
+      clientId: APP_ID,
+      clientSecret: CLIENT.secret,
+      app: { audience: AUDIENCE, redirectUris: [REDIRECT_URI], scopes: ['reports:read'], sensitiveScopes: [SENSITIVE] },
+    });
+    auth = new AuthClient({ issuer: idp.issuer, appId: APP_ID, client: CLIENT });
+    service = new AppSessionService(auth, resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes()));
+  });
+  afterAll(() => {
+    auth.stop();
+    idp.stop();
+  });
+
+  /** Walks the browser leg: identity consents to exactly what the authorization request asked for */
+  const signIn = async (): Promise<string> => {
+    const started = await service.beginLogin('/reports');
+    const authorize = new URL(started.url);
+    const scopes = (authorize.searchParams.get('scope') ?? '').split(' ');
+    const code = idp.createAuthorizationCode({ sub: USER, scopes });
+    const stateCookie = (started.cookies[0] as string).split(';')[0] as string;
+    const cookies = parseCookies(stateCookie);
+    const result = await service.completeLogin({ code, state: authorize.searchParams.get('state') ?? '' }, cookies);
+    const handle = (result.cookies[0] as string).split(';')[0]?.split('=')[1];
+    return handle as string;
+  };
+
+  it('should carry the sensitive scopes identity publishes through the registration', async () => {
+    await expect(auth.getAppRegistration()).resolves.toMatchObject({ scopes: ['reports:read'], sensitiveScopes: [SENSITIVE] });
+  });
+
+  it('should ask consent for a sensitive scope at authorize, since identity freezes the session grant from the code', async () => {
+    const started = await service.beginLogin('/reports');
+    expect(new URL(started.url).searchParams.get('scope')).toBe(`openid profile reports:read ${SENSITIVE}`);
+  });
+
+  it('should request a sensitive scope only on an elevated mint, never on a plain one', async () => {
+    const handle = await signIn();
+
+    const plain = await service.getAccessToken(handle);
+    expect(idp.getLastMintRequest()).toMatchObject({ elevated: false, scope: 'openid profile reports:read' });
+    expect(plain.grantedScopes).not.toContain(SENSITIVE);
+
+    idp.setSteppedUp(USER, { clientId: APP_ID, resource: AUDIENCE });
+    await service.claimElevation(handle);
+    const elevated = await service.getAccessToken(handle, { elevated: true });
+    expect(idp.getLastMintRequest()).toMatchObject({ elevated: true, scope: `openid profile reports:read ${SENSITIVE}` });
+    expect(elevated.grantedScopes).toContain(SENSITIVE);
+    await expect(auth.verify(elevated.accessToken)).resolves.toMatchObject({ aal: 'AAL2', scopes: expect.arrayContaining([SENSITIVE]) });
   });
 });
