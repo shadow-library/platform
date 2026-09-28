@@ -1,0 +1,2 @@
+ALTER TABLE "audit_events" ADD COLUMN "chain_position" bigint;--> statement-breakpoint
+CREATE UNIQUE INDEX "audit_events_chain_position_unique" ON "audit_events" USING btree (coalesce("organisation_id", ''),"chain_position") WHERE "audit_events"."chain_position" IS NOT NULL;

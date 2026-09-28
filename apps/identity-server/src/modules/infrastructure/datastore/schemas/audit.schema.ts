@@ -1,5 +1,5 @@
-import { InferEnum, InferSelectModel } from 'drizzle-orm';
-import { index, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
+import { bigint, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
 
@@ -15,8 +15,9 @@ export const auditOutcome = pgEnum('audit_outcome', ['SUCCESS', 'DENIED', 'FAILU
 
 /**
  * Append-only, hash-chained audit log. It carries no foreign keys: audit records must outlive the
- * rows they describe and must never be mutated. `id` is UUIDv7 so rows sort chronologically, and
- * each row's hash chains to its predecessor within the same organisation (or the global chain).
+ * rows they describe and must never be mutated. Each row's hash chains to its predecessor within the
+ * same organisation (or the global chain), in `chain_position` order: UUIDv7 ids are not monotonic
+ * within a millisecond or across replicas, so they order rows only roughly in time.
  */
 export const auditEvents = pgTable(
   'audit_events',
@@ -36,6 +37,14 @@ export const auditEvents = pgTable(
     detail: jsonb('detail').$type<Record<string, unknown>>(),
     prevHash: text('prev_hash'),
     hash: text('hash').notNull(),
+    /** Assigned under the chain's advisory lock; null on the rows written before chains were ordered by it, which were never renumbered. */
+    chainPosition: bigint('chain_position', { mode: 'bigint' }),
   },
-  t => [index('audit_events_organisation_id_id_idx').on(t.organisationId, t.id), index('audit_events_action_id_idx').on(t.action, t.id)],
+  t => [
+    index('audit_events_organisation_id_id_idx').on(t.organisationId, t.id),
+    index('audit_events_action_id_idx').on(t.action, t.id),
+    uniqueIndex('audit_events_chain_position_unique')
+      .on(sql`coalesce(${t.organisationId}, '')`, t.chainPosition)
+      .where(sql`${t.chainPosition} IS NOT NULL`),
+  ],
 );

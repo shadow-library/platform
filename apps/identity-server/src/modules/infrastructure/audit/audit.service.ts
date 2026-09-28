@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 
-import { asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -72,24 +72,23 @@ export class AuditService {
   }
 
   private async writeRecord(tx: PrimaryTransaction, input: AuditInput): Promise<AuditEvent> {
-    const chainKey = input.organisationId ?? GLOBAL_CHAIN;
-    const id = Bun.randomUUIDv7();
-    const occurredAt = new Date();
+    const organisationId = input.organisationId ?? null;
     const detail = this.redact(input.detail ?? undefined);
 
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${chainKey}))`);
-    const [previous] = await tx
-      .select({ hash: schema.auditEvents.hash })
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${organisationId ?? GLOBAL_CHAIN}))`);
+    const [tip] = await tx
+      .select({ hash: schema.auditEvents.hash, chainPosition: schema.auditEvents.chainPosition })
       .from(schema.auditEvents)
-      .where(this.chainCondition(input.organisationId ?? null))
-      .orderBy(sql`${schema.auditEvents.id} DESC`)
+      .where(and(sql`coalesce(${schema.auditEvents.organisationId}, '') = ${organisationId ?? ''}`, isNotNull(schema.auditEvents.chainPosition)))
+      .orderBy(desc(schema.auditEvents.chainPosition))
       .limit(1);
-    const prevHash = previous?.hash ?? null;
+    const prevHash = tip ? tip.hash : await this.legacyTipHash(tx, organisationId);
+    const chainPosition = (tip?.chainPosition ?? 0n) + 1n;
 
     const record = {
-      id,
-      occurredAt,
-      organisationId: input.organisationId ?? null,
+      id: Bun.randomUUIDv7(),
+      occurredAt: new Date(),
+      organisationId,
       actorType: input.actorType,
       actorId: input.actorId ?? null,
       action: input.action,
@@ -103,11 +102,22 @@ export class AuditService {
     const hash = this.computeHash(prevHash, record);
     const [inserted] = await tx
       .insert(schema.auditEvents)
-      .values({ ...record, prevHash, hash })
+      .values({ ...record, prevHash, hash, chainPosition })
       .returning();
     assert(inserted, 'Audit event insertion failed');
     await this.webhookService.fanOut(inserted, tx);
     return inserted;
+  }
+
+  /** Rows written before chain positions existed chained onto the largest id, so the first positioned row continues from the same tip. */
+  private async legacyTipHash(tx: PrimaryTransaction, organisationId: string | null): Promise<string | null> {
+    const [legacy] = await tx
+      .select({ hash: schema.auditEvents.hash })
+      .from(schema.auditEvents)
+      .where(this.chainCondition(organisationId))
+      .orderBy(desc(schema.auditEvents.id))
+      .limit(1);
+    return legacy?.hash ?? null;
   }
 
   async listForSubject(subjectId: string, limit = 50): Promise<AuditEvent[]> {
@@ -119,28 +129,55 @@ export class AuditService {
       .limit(limit);
   }
 
+  /**
+   * Positioned rows must form one unbroken run from position 1, each linked to the one before it. Rows written before positions existed
+   * were chained onto whichever predecessor held the largest UUIDv7 id, which forked under concurrent writes; they are never rewritten, so
+   * each is held only to its own hash and to linking to a row of the same chain, with a single root, and the first positioned row must
+   * continue from one of them.
+   */
   async verifyChain(organisationId: string | null = null): Promise<ChainVerification> {
-    const rows = await this.db.select().from(schema.auditEvents).where(this.chainCondition(organisationId)).orderBy(asc(schema.auditEvents.id));
-    let prevHash: string | null = null;
-    for (const row of rows) {
-      const expected = this.computeHash(prevHash, {
-        id: row.id,
-        occurredAt: row.occurredAt,
-        organisationId: row.organisationId,
-        actorType: row.actorType,
-        actorId: row.actorId,
-        action: row.action,
-        targetType: row.targetType,
-        targetId: row.targetId,
-        outcome: row.outcome,
-        ipAddress: row.ipAddress,
-        correlationId: row.correlationId,
-        detail: row.detail ?? null,
-      });
-      if (row.prevHash !== prevHash || row.hash !== expected) return { valid: false, brokenAt: row.id };
-      prevHash = row.hash;
+    const rows = await this.db
+      .select()
+      .from(schema.auditEvents)
+      .where(this.chainCondition(organisationId))
+      .orderBy(sql`${schema.auditEvents.chainPosition} ASC NULLS FIRST`, asc(schema.auditEvents.id));
+
+    const legacy = rows.filter(row => row.chainPosition === null);
+    const chainHashes = new Set(rows.map(row => row.hash));
+    const legacyHashes = new Set(legacy.map(row => row.hash));
+    let roots = 0;
+    for (const row of legacy) {
+      if (row.prevHash === null) roots++;
+      const linked = row.prevHash === null ? roots === 1 : chainHashes.has(row.prevHash);
+      if (!linked || row.hash !== this.rehash(row)) return { valid: false, brokenAt: row.id };
+    }
+
+    let previous: AuditEvent | null = null;
+    for (const row of rows.slice(legacy.length)) {
+      const position = (previous?.chainPosition ?? 0n) + 1n;
+      const anchored = legacy.length === 0 ? row.prevHash === null : legacyHashes.has(row.prevHash ?? '');
+      const linked = previous ? row.prevHash === previous.hash : anchored;
+      if (row.chainPosition !== position || !linked || row.hash !== this.rehash(row)) return { valid: false, brokenAt: row.id };
+      previous = row;
     }
     return { valid: true };
+  }
+
+  private rehash(row: AuditEvent): string {
+    return this.computeHash(row.prevHash, {
+      id: row.id,
+      occurredAt: row.occurredAt,
+      organisationId: row.organisationId,
+      actorType: row.actorType,
+      actorId: row.actorId,
+      action: row.action,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      outcome: row.outcome,
+      ipAddress: row.ipAddress,
+      correlationId: row.correlationId,
+      detail: row.detail ?? null,
+    });
   }
 
   private chainCondition(organisationId: string | null) {
