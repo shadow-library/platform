@@ -22,15 +22,23 @@ export type SyncableTable = OwnedTable & SyncSeqTable;
  * Declaring the constants
  */
 
-/** Values Postgres hands back that JSON cannot carry; every delta row passes through here before it reaches the wire. */
+function toWireValue(value: unknown): unknown {
+  if (typeof value === 'bigint') return String(value);
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(toWireValue);
+  if (isPlainObject(value)) return serializeDeltaRow(value);
+  return value;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/** Values Postgres hands back that JSON cannot carry, at any depth (a `bigint[]` column included); every delta row passes through here before it reaches the wire. */
 export function serializeDeltaRow(row: Record<string, unknown>): DeltaRow {
-  const serialized: DeltaRow = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (typeof value === 'bigint') serialized[key] = String(value);
-    else if (value instanceof Date) serialized[key] = value.toISOString();
-    else serialized[key] = value;
-  }
-  return serialized;
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, toWireValue(value)]));
 }
 
 /**
