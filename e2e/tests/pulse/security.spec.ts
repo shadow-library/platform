@@ -91,21 +91,11 @@ test.describe('security', () => {
     test.use({ storageState: storageStateFor('admin') });
 
     /**
-     * `MessageLog.tsx:42` gates on `import.meta.env.DEV` — a **build-time** Vite flag baked into the bundle, not
-     * the server's runtime `APP_STAGE`. The deployed pulse-web image is a production build (`vite build`), so the
-     * plan was to assert `import.meta.env.DEV` is `false` there and observe the EmptyState. In practice the route
-     * itself is unreachable on this deployment, which is the app bug worth flagging instead: the file route is
-     * registered at `/_app/logs/` (trailing slash), so `/logs` (no slash) 404s — confirmed live,
-     * `curl -I https://pulse.shadow-apps.test/logs` → `404`. But `/logs/` *itself* 307s back to `/logs` (`curl -I
-     * .../logs/` → `location: /logs`), which then 404s — a redirect loop that dead-ends either way, with or
-     * without the admin session (confirmed both authenticated and as guest). `/logs` is reachable from the nav
-     * rail (`Layout/index.tsx`'s `NAV` config links to `/logs`, no trailing slash) — so a real operator clicking
-     * "Message Log" in the sidebar hits this same 404. Not something a test workaround (e.g. a different path)
-     * can route around, since no path reaches the page at all.
+     * `MessageLog.tsx` gates on `import.meta.env.DEV` — a **build-time** Vite flag baked into the bundle, not the server's
+     * runtime `APP_STAGE` — so the page is either the unavailable notice (a production build) or the live table (a dev build).
+     * Either way `/logs`, which the nav rail links to, has to reach the page.
      */
-    test.fixme('/logs is unreachable in this deployment (app bug: TanStack Start route registered at /_app/logs/ but /logs redirects to /logs, which 404s — a redirect loop; the nav rail itself links to /logs with no trailing slash, so this is not an e2e-only path)', async ({
-      page,
-    }, testInfo) => {
+    test('should reach the Message Log page at /logs, the path the nav rail links to', async ({ page }, testInfo) => {
       const url = requireProductUrl('pulse');
       await page.goto(`${url}/logs`);
       await expect(page.getByText('Message Log is unavailable').or(page.getByRole('table'))).toBeVisible({ timeout: 20_000 });
