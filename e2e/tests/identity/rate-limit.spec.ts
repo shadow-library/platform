@@ -367,15 +367,17 @@ test.describe('identity token endpoint budgets', () => {
     expect(await readRateLimit(PUBLIC_CLIENT.bucket, `${confidential.clientId}:${source.ip}`), 'and is never bucketed per source').toBe(0);
   });
 
-  // App bug: the per-client budgets hold `retryAfterSeconds` and throw without it (rate-limiter.service.ts:80-92), where the
-  // middleware sets the header before throwing the same code (rate-limit.middleware.ts:62-63).
-  test.fixme('should tell a client refused by its own budget when to retry', async ({ identity, limits }) => {
+  test('should tell a client refused by its own budget when to retry', async ({ identity, limits }) => {
     const application = await identity.createOAuthApp('rl-m2m-retry');
+    const other = await identity.createOAuthApp('rl-m2m-retry-other');
     const caller = await limits.caller();
-    limits.track(rateLimitKey(M2M_CLIENT.bucket, application.serviceClient.clientId));
+    limits.track(rateLimitKey(M2M_CLIENT.bucket, application.serviceClient.clientId), rateLimitKey(M2M_CLIENT.bucket, other.serviceClient.clientId));
 
     await spendRateLimit(M2M_CLIENT.bucket, application.serviceClient.clientId, M2M_CLIENT.limit, M2M_CLIENT.windowSeconds);
-    expectRetryAfterWithin(await clientCredentialsGrant(caller.ctx, application.serviceClient), M2M_CLIENT.windowSeconds);
+    const refused = await clientCredentialsGrant(caller.ctx, application.serviceClient);
+    await expectRefused(refused, 429, 'RATE_LIMITED', 'a client over its own budget');
+    expectRetryAfterWithin(refused, M2M_CLIENT.windowSeconds);
+    expect((await clientCredentialsGrant(caller.ctx, other.serviceClient)).status(), 'another client from the same address is still served').toBe(200);
   });
 });
 
