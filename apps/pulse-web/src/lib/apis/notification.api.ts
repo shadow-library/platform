@@ -16,10 +16,10 @@ export function useListNotificationMessagesQuery(params: ListMessagesQueryParams
   });
 }
 
-export function useCreateNotificationMutation(): UseMutationResult<CreateNotificationResponse, ApiError, CreateNotificationBody> {
+export function useConsoleSendMutation(): UseMutationResult<CreateNotificationResponse, ApiError, CreateNotificationBody> {
   const queryClient = useQueryClient();
   return useMutation<CreateNotificationResponse, ApiError, CreateNotificationBody>({
-    mutationFn: data => APIRequest.post('/notifications').body(data).execute(),
+    mutationFn: data => APIRequest.post('/notifications/console').body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: notificationKeys.messageLists() }),
   });
 }

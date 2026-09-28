@@ -2,8 +2,9 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from '@shadow-library/ui';
 
 import { Mono, type Option, OutlineBadge, PageHeader, trimToUndefined } from '@/features/shared';
-import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useCreateNotificationMutation, useListTemplatesQuery } from '@/lib';
+import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useConsoleSendMutation, useListTemplatesQuery } from '@/lib';
 
+import { describeSendError } from './send-error';
 import styles from './Send.module.css';
 
 const EMPTY = { templateKey: '', email: '', phone: '', push: '', payload: '', locale: '', service: '' };
@@ -12,7 +13,7 @@ export default function SendForm(): ReactElement {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [result, setResult] = useState<CreateNotificationResponse | null>(null);
-  const mutation = useCreateNotificationMutation();
+  const mutation = useConsoleSendMutation();
 
   const { data: templatesData } = useListTemplatesQuery({ limit: 100 });
   const templateOptions: Option[] = (templatesData?.items ?? []).map(template => ({ value: template.templateKey, label: template.templateKey }));
@@ -49,7 +50,7 @@ export default function SendForm(): ReactElement {
       onSuccess: data => setResult(data),
       onError: apiError => {
         setResult(null);
-        setError(apiError.message);
+        setError(describeSendError(apiError));
       },
     });
   };
@@ -65,7 +66,7 @@ export default function SendForm(): ReactElement {
       <PageHeader title="Send Notification" subtitle="Manually trigger a send to test templates and routing end-to-end." />
       <Card padding="lg">
         <Card.Body className={styles.formCol}>
-          <FormField label="Template key" required helper="References an existing template.">
+          <FormField label="Template key" required helper="References an existing template. Authentication, security and one-time-code templates are refused.">
             <Combobox
               options={templateOptions}
               value={form.templateKey || null}
