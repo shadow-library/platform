@@ -182,6 +182,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_011 = AppErrorCode.validation('ORG_011', 'The application cannot be assigned to this organisation', 400);
   /** Revoke-path companion to ORG_011: same machine code and status so no new failure oracle appears, wording that fits removal rather than assignment */
   static readonly ORG_011_REVOKE = AppErrorCode.validation('ORG_011', 'The application is not entitled in this organisation', 400);
+  /** The name is reserved for the platform organisation, which no team may borrow */
+  static readonly ORG_012 = AppErrorCode.validation('ORG_012', 'Organisation name is reserved', 400);
 
   /*!
    * Bot Error Codes

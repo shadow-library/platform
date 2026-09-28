@@ -5,7 +5,6 @@ import { Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { Application, DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 interface QualifyingMembership {
@@ -151,7 +150,7 @@ export class ApplicationAccessService {
     if (organisation.type === 'PERSONAL') return new Set(publicIds);
 
     const base = new Set(publicIds);
-    if (organisation.type === 'TEAM' && organisation.name === PLATFORM_ORG_NAME) {
+    if (organisation.isPlatform) {
       for (const application of applications) if (application.visibility === 'INTERNAL') base.add(application.id);
     }
 

@@ -6,7 +6,7 @@ import { Config, Logger, ValidationError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
-import { ADMIN_PERMISSIONS, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
+import { ADMIN_PERMISSIONS } from '@server/modules/admin/admin.constants';
 import { FederatedIdentityService, IdentityProviderService, UpstreamIdentity, UpstreamOidcService } from '@server/modules/auth/federation';
 import { MfaService, RecoveryCodeService, WebauthnAssertion, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
@@ -152,7 +152,7 @@ export class LoginService {
 
   private async isPlatformAdmin(userId: bigint): Promise<boolean> {
     if (!this.platformOrganisationId) {
-      const organisation = await this.organisationService.findTeamByName(PLATFORM_ORG_NAME);
+      const organisation = await this.organisationService.findPlatformOrganisation();
       if (!organisation) return false;
       this.platformOrganisationId = organisation.id.toString();
     }

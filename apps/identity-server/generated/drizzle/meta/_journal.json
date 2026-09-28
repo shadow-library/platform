@@ -64,6 +64,13 @@
       "when": 1790616316997,
       "tag": "0008_recovery_code_lookup_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790618475266,
+      "tag": "0009_mark_platform_organisation",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
+import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE } from '@server/modules/admin/admin.constants';
 import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -76,7 +76,7 @@ export class BootstrapService implements OnModuleInit {
   }
 
   private async ensurePlatformOrganisation(): Promise<bigint> {
-    const organisation = await this.organisationService.ensureTeamOrganisation(PLATFORM_ORG_NAME);
+    const organisation = await this.organisationService.ensurePlatformOrganisation();
     return organisation.id;
   }
 

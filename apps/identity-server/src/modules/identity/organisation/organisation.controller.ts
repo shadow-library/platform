@@ -67,6 +67,7 @@ export class OrganisationController {
   @RespondFor(200, OrganisationResponse)
   async updateOrganisation(@Params() params: OrganisationIdParams, @Body() body: UpdateOrganisationBody): Promise<Organisation> {
     let organisation = Context.getOrganisation();
+    if (body.name !== undefined) this.organisationService.assertNameAvailable(body.name, organisation);
     if (body.appAccessMode !== undefined) {
       const caller = { role: Context.getMembership().role, elevated: Context.getAuth().elevated ?? false };
       organisation = await this.organisationApplicationService.changeAppAccessMode(this.auditActor(), params.organisationId, caller, body.appAccessMode);

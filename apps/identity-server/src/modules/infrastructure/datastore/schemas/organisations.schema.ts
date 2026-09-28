@@ -26,17 +26,27 @@ export const organisationDomainStatus = pgEnum('organisation_domain_status', ['P
 
 export const organisationAppAccessMode = pgEnum('organisation_app_access_mode', ['ALL_APPS', 'ASSIGNED_ONLY']);
 
-export const organisations = pgTable('organisations', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  slug: varchar('slug', { length: 64 }).notNull().unique(),
-  name: varchar('name', { length: 255 }).notNull(),
-  type: organisationType('type').notNull().default('TEAM'),
-  status: organisationStatus('status').notNull().default('ACTIVE'),
-  appAccessMode: organisationAppAccessMode('app_access_mode').notNull().default('ALL_APPS'),
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const organisations = pgTable(
+  'organisations',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    slug: varchar('slug', { length: 64 }).notNull().unique(),
+    name: varchar('name', { length: 255 }).notNull(),
+    type: organisationType('type').notNull().default('TEAM'),
+    status: organisationStatus('status').notNull().default('ACTIVE'),
+    appAccessMode: organisationAppAccessMode('app_access_mode').notNull().default('ALL_APPS'),
+    /** Set only by bootstrap; the platform organisation is identified by this marker, never by its name. */
+    isPlatform: boolean('is_platform').notNull().default(false),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    uniqueIndex('organisations_platform_unique')
+      .on(t.isPlatform)
+      .where(sql`${t.isPlatform}`),
+  ],
+);
 
 export const organisationMembers = pgTable(
   'organisation_members',

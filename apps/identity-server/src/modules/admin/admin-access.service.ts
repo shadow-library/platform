@@ -7,7 +7,7 @@ import { ValidatedSession } from '@server/modules/auth/session';
 import { PolicyDecisionService, Principal } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 
-import { ADMIN_PERMISSIONS, AdminPermission, PLATFORM_ORG_NAME } from './admin.constants';
+import { ADMIN_PERMISSIONS, AdminPermission } from './admin.constants';
 
 export type AdminScope = 'platform' | 'application';
 
@@ -29,9 +29,9 @@ export class AdminAccessService {
 
   private async getPlatformOrganisationId(): Promise<string> {
     if (this.platformOrganisationId) return this.platformOrganisationId;
-    const organisation = await this.organisationService.findTeamByName(PLATFORM_ORG_NAME);
+    const organisation = await this.organisationService.findPlatformOrganisation();
     if (!organisation) {
-      this.logger.error('platform organisation missing — admin authorization cannot proceed', { platformOrgName: PLATFORM_ORG_NAME });
+      this.logger.error('platform organisation missing — admin authorization cannot proceed');
       throw AppErrorCode.ADM_002.create();
     }
     this.platformOrganisationId = organisation.id.toString();

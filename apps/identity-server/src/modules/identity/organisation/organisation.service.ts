@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, isNumericId } from '@server/constants';
 import { type BotCaller, type Caller, type UserCaller } from '@server/modules/access';
+import { PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -70,6 +71,15 @@ const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1
 const BOT_INVITABLE_ROLES: readonly Organisation.MemberRole[] = ['MEMBER'];
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
+const comparableName = (name: string): string =>
+  name
+    .normalize('NFKC')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+const RESERVED_NAME = comparableName(PLATFORM_ORG_NAME);
+
 const ROLE_CHANGED_TEMPLATE = 'organisation-role-changed';
 const MEMBER_REMOVED_TEMPLATE = 'organisation-member-removed';
 const MEMBER_STATUS_TEMPLATE = 'organisation-member-status-changed';
@@ -117,7 +127,14 @@ export class OrganisationService {
     return organisation;
   }
 
+  assertNameAvailable(name: string, organisation?: Organisation): void {
+    if (organisation?.isPlatform || comparableName(name) !== RESERVED_NAME) return;
+    this.logger.warn('refused a team name reserved for the platform organisation', { securityEvent: 'org.reserved_name', organisationId: organisation?.id });
+    throw AppErrorCode.ORG_012.create();
+  }
+
   async createTeam(userId: bigint, input: CreateTeamInput): Promise<Organisation> {
+    this.assertNameAvailable(input.name);
     if (input.slug && !SLUG_PATTERN.test(input.slug)) throw AppErrorCode.ORG_006.create();
     const slug = input.slug ?? this.generateSlug(input.name);
     return this.db.transaction(async tx => {
@@ -133,26 +150,45 @@ export class OrganisationService {
     });
   }
 
-  /**
-   * Idempotently provisions a named team organisation. Organisation names carry no unique
-   * constraint, so this must only be called from single-flight contexts (bootstrap) where a
-   * concurrent duplicate insert cannot occur.
-   */
-  async ensureTeamOrganisation(name: string): Promise<Organisation> {
-    const existing = await this.findTeamByName(name);
-    if (existing) return existing;
-    const [organisation] = await this.db
-      .insert(schema.organisations)
-      .values({ name, slug: this.generateSlug(name), type: 'TEAM', status: 'ACTIVE' })
-      .returning();
-    if (!organisation) throw AppError.internal(`Failed to create organisation '${name}'`);
-    this.logger.info('created team organisation', { organisationId: organisation.id, name });
-    return organisation;
+  async findPlatformOrganisation(): Promise<Organisation | null> {
+    const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.isPlatform, true) });
+    return organisation ?? null;
   }
 
-  async findTeamByName(name: string): Promise<Organisation | null> {
-    const organisation = await this.db.query.organisations.findFirst({ where: and(eq(schema.organisations.name, name), eq(schema.organisations.type, 'TEAM')) });
-    return organisation ?? null;
+  /**
+   * Replicas boot concurrently, so creation races on the partial unique index over `is_platform` and the loser adopts the winner's row. An
+   * unmarked organisation already bearing the name means a migration refused to guess which one bootstrap created: creating another would
+   * split platform administration across two organisations, so this refuses until an operator marks the right one.
+   */
+  async ensurePlatformOrganisation(): Promise<Organisation> {
+    const existing = await this.findPlatformOrganisation();
+    if (existing) return existing;
+
+    const namesake = await this.db.query.organisations.findFirst({
+      where: and(eq(schema.organisations.name, PLATFORM_ORG_NAME), eq(schema.organisations.type, 'TEAM')),
+      columns: { id: true },
+    });
+    if (namesake) {
+      this.logger.error('no organisation is marked as the platform organisation but one bears its name; mark it by hand (organisations.is_platform)', {
+        organisationId: namesake.id,
+        platformOrgName: PLATFORM_ORG_NAME,
+      });
+      throw AppErrorCode.ADM_002.create();
+    }
+
+    const [created] = await this.db
+      .insert(schema.organisations)
+      .values({ name: PLATFORM_ORG_NAME, slug: this.generateSlug(PLATFORM_ORG_NAME), type: 'TEAM', status: 'ACTIVE', isPlatform: true })
+      .onConflictDoNothing({ target: schema.organisations.isPlatform, where: sql`${schema.organisations.isPlatform}` })
+      .returning();
+    if (created) {
+      this.logger.info('created the platform organisation', { organisationId: created.id });
+      return created;
+    }
+
+    const winner = await this.findPlatformOrganisation();
+    if (!winner) throw AppErrorCode.ADM_002.create();
+    return winner;
   }
 
   async assertActiveTeam(organisationId: string): Promise<Organisation> {
@@ -234,6 +270,7 @@ export class OrganisationService {
   }
 
   async renameOrganisation(caller: CallerContext, organisation: Organisation, name: string): Promise<Organisation> {
+    this.assertNameAvailable(name, organisation);
     await this.rename(organisation.id, name);
     await this.audit(caller, organisation.id, 'org.renamed');
     return { ...organisation, name };
