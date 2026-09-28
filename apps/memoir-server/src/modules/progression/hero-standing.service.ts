@@ -7,6 +7,7 @@ import { Injectable } from '@shadow-library/app';
  * Importing user defined packages
  */
 import {
+  accountToday,
   type CrownCadence,
   crownCadenceFor,
   type CrownPeriod,
@@ -15,7 +16,6 @@ import {
   daysBetween,
   formatLocalDate,
   type LocalDate,
-  localDateAt,
   type Ruleset,
   streakApplies,
   xpThresholdForLevel,
@@ -106,7 +106,7 @@ export class HeroStandingService {
 
   async forAccount(account: Account.Row): Promise<HeroStanding> {
     const ruleset = currentRuleset();
-    const today = localDateAt(Date.now(), account.timezone);
+    const today = accountToday(Date.now(), account.timezone, account.lastHpDate);
     const date = formatLocalDate(today);
     const period = crownPeriodOf(ruleset, crownCadenceFor(ruleset, account.intensityMode), today);
 
