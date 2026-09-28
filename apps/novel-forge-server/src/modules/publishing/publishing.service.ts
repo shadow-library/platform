@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { AppError, Logger } from '@shadow-library/common';
@@ -153,7 +153,7 @@ export class PublishingService {
     const [updated] = await this.databaseService.run(() =>
       this.db
         .update(schema.publications)
-        .set({ ...next, revision: stored.revision + 1, updatedAt: new Date() })
+        .set({ ...next, revision: sql`${schema.publications.revision} + 1`, updatedAt: new Date() })
         .where(eq(schema.publications.id, stored.id))
         .returning(),
     );

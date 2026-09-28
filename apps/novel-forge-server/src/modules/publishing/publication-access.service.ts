@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger, throwError } from '@shadow-library/common';
@@ -6,7 +6,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
+import { type DbExecutor, type PrimaryDatabase, type Publishing, schema } from '@server/database';
 import { type PublicationAccessBody, type PublicationAccessResponse } from './publishing.dto';
 import { PublishingService } from './publishing.service';
 
@@ -41,7 +41,9 @@ export class PublicationAccessService {
   /**
    * Replaces the whole access record. `accessRevision` is bumped only when something actually
    * changed, so a UI that saves an unedited panel does not make the reader re-apply an identical
-   * record — the same "no-op if nothing moved" rule the metadata publish follows.
+   * record — the same "no-op if nothing moved" rule the metadata publish follows. The comparison runs
+   * under the publication's row lock and the bump is an increment, so two concurrent saves never share
+   * a revision: a narrowing written second always outranks the widening before it on the reader.
    *
    * A re-resolution runs on every save, which is also how a `pending` grant becomes `resolved` once
    * its owner finally signs up: the author does not have to remember to come back and re-add them.
@@ -56,10 +58,11 @@ export class PublicationAccessService {
     const resolved = await this.resolveEmails(wanted);
     const nextOrganisationId = body.visibility === 'ORGANISATION' ? (organisationId as string) : null;
 
-    const existing = await this.loadGrants(publication.id);
-    const changed = this.hasChanged(publication, existing, body.visibility, nextOrganisationId, wanted, resolved);
-
-    const grants = await this.db.transaction(async tx => {
+    const { grants, changed } = await this.db.transaction(async tx => {
+      const [locked] = await tx.select().from(schema.publications).where(eq(schema.publications.id, publication.id)).for('update');
+      if (!locked) throw AppErrorCode.PUB_001.create();
+      const existing = await this.loadGrants(publication.id, tx);
+      const changed = this.hasChanged(locked, existing, body.visibility, nextOrganisationId, wanted, resolved);
       await tx.delete(schema.publicationGrants).where(eq(schema.publicationGrants.publicationId, publication.id));
       if (wanted.length > 0) {
         await tx.insert(schema.publicationGrants).values(
@@ -76,11 +79,11 @@ export class PublicationAccessService {
         .set({
           visibility: body.visibility as Publishing.Visibility,
           organisationId: nextOrganisationId,
-          accessRevision: changed ? publication.accessRevision + 1 : publication.accessRevision,
+          ...(changed ? { accessRevision: sql`${schema.publications.accessRevision} + 1` } : {}),
           updatedAt: new Date(),
         })
         .where(eq(schema.publications.id, publication.id));
-      return tx.select().from(schema.publicationGrants).where(eq(schema.publicationGrants.publicationId, publication.id));
+      return { grants: await this.loadGrants(publication.id, tx), changed };
     });
 
     const pending = grants.filter(grant => grant.state === 'pending').length;
@@ -107,8 +110,8 @@ export class PublicationAccessService {
     return new Map(resolved.map(user => [user.email.toLowerCase(), user.userId]));
   }
 
-  private loadGrants(publicationId: bigint): Promise<Publishing.Grant[]> {
-    return this.db.select().from(schema.publicationGrants).where(eq(schema.publicationGrants.publicationId, publicationId)).orderBy(schema.publicationGrants.email);
+  private loadGrants(publicationId: bigint, db: DbExecutor = this.db): Promise<Publishing.Grant[]> {
+    return db.select().from(schema.publicationGrants).where(eq(schema.publicationGrants.publicationId, publicationId)).orderBy(schema.publicationGrants.email);
   }
 
   /**
