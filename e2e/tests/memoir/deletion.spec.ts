@@ -146,8 +146,7 @@ test.describe('memoir account deletion — step-up gate', () => {
     await expectDeletionState(await guest.get(DELETION_PATH, bearer(await issuer.elevated(persona))), 200, 'none');
   });
 
-  // App bug: memoir logs in without sensitive scopes (packages/auth/src/module/app-session.service.ts:454), so a stepped-up start answers 403 IAM_002.
-  test.fixme("should start deletion for a memoir session once it has stepped up through memoir's own step-up route", async ({ memoir }) => {
+  test("should start deletion for a memoir session once it has stepped up through memoir's own step-up route", async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'del-web', onboard: true });
     const accountId = (await getAccount(persona.ctx)).id;
 
