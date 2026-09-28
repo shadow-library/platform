@@ -76,11 +76,8 @@ test.describe('security', () => {
   /**
    * `GET /api/v1/notifications/messages` is gated by `@EnableIf(() => Config.get('app.stage') === 'dev')` in
    * addition to `pulse:messages:read`, which only `PulseAdmin` (admin's role) carries.
-   *
-   * App bug: identity's `EcosystemSeedService.reconcileApplication` never adds a permission declared after its application
-   * exists, so `pulse:messages:read` (added in da30f903) is missing from the dev identity DB and admin gets 403 IAM_002.
    */
-  test.fixme('should allow admin GET /api/v1/notifications/messages in this (dev-stage) deployment', async () => {
+  test('should allow admin GET /api/v1/notifications/messages in this (dev-stage) deployment', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const response = await ctx.get('/api/v1/notifications/messages?limit=3');
     expect(response.status()).toBe(200);
