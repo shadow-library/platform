@@ -234,8 +234,7 @@ test.describe('web-novel session: callback', () => {
     expect((await legitimate.ctx.get('/api/auth/session')).status(), 'a fresh login still works').toBe(200);
   });
 
-  // An `invalid_grant` from identity falls through to APP_SESSION_FAILED (503) in packages/auth/src/lib/app-session-client.ts:195.
-  test.fixme('should answer a replayed authorization code with a client error, not a 503', async ({ webNovel }) => {
+  test('should answer a replayed authorization code with 400 AUTHORIZATION_CODE_INVALID and mint nothing', async ({ webNovel }) => {
     const reader = await webNovel.reader('callback-replay-status');
     const ctx = await webNovel.preLogin(reader);
     const authorize = await ctx.get(loginPath('/library'), { maxRedirects: 0 });
@@ -244,15 +243,31 @@ test.describe('web-novel session: callback', () => {
     expect((await ctx.get(callback.href, { maxRedirects: 0 })).status()).toBe(302);
 
     const replayed = await (await webNovel.guest()).get(callback.href, { maxRedirects: 0, headers: { cookie: `${WEB_NOVEL_LOGIN_STATE_COOKIE}=${loginState}` } });
-    expect(replayed.status()).toBeGreaterThanOrEqual(400);
-    expect(replayed.status()).toBeLessThan(500);
+    expect(replayed.status(), await replayed.text()).toBe(400);
+    expect(await errorCode(replayed)).toBe('AUTHORIZATION_CODE_INVALID');
+    expect(await replayed.text(), 'identity’s internal path never reaches the browser').not.toContain('/api/v1/');
+    expect(findSetCookie(replayed, WEB_NOVEL_SESSION_COOKIE)?.value || undefined).toBeUndefined();
+    expect(await countAppSessions(reader.user.userId)).toBe(1);
   });
 
-  // A user refusing the authorization is thrown as EXCHANGE_FAILED (503): packages/auth/src/module/auth.controller.ts:103.
-  test.fixme('should answer a callback identity refused with a client error, not a 503', async ({ webNovel }) => {
-    const refused = await (await webNovel.guest()).get(`/api/auth/callback?${new URLSearchParams({ error: 'access_denied' })}`, { maxRedirects: 0 });
-    expect(refused.status()).toBeGreaterThanOrEqual(400);
-    expect(refused.status()).toBeLessThan(500);
+  test('should answer a callback identity refused with a client error that echoes none of its text', async ({ webNovel }) => {
+    const guest = await webNovel.guest();
+    const planted = 'e2e-planted-description';
+    const callback = (error: string): Promise<APIResponse> =>
+      guest.get(`/api/auth/callback?${new URLSearchParams({ error, error_description: planted, state: 'e2e' })}`, { maxRedirects: 0 });
+
+    const declined = await callback('access_denied');
+    expect(declined.status(), await declined.text()).toBe(403);
+    expect(await errorCode(declined)).toBe('AUTHORIZATION_DENIED');
+    expect(await declined.text()).not.toContain(planted);
+
+    const refused = await callback('invalid_scope');
+    expect(refused.status(), await refused.text()).toBe(400);
+    expect(await errorCode(refused)).toBe('AUTHORIZATION_REFUSED');
+    expect(await refused.text()).not.toContain(planted);
+
+    const reader = await webNovel.reader('callback-refused');
+    expect((await (await webNovel.signIn(reader)).ctx.get('/api/auth/session')).status(), 'a real login still completes').toBe(200);
   });
 });
 
