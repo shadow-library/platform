@@ -180,13 +180,14 @@ test.describe('web-novel access push (forge-fronted)', () => {
     expect(await detailStatus(pendingCtx, slug)).toBe(200);
   });
 
-  // publish-runner.ts:153 rethrows the reader's WBN_003 conflict as PUB_004, the 500 reserved for a reader outage.
-  test.fixme('should answer a reconcile the reader refuses as stale with a 409 conflict', async ({ publication, webNovel }) => {
+  test('should answer a reconcile the reader refuses as stale with a 409 conflict', async ({ publication, webNovel }) => {
     const reader = await webNovel.reader('stale-status');
     const { accessRevision } = await setForgeAccess(publication, 'RESTRICTED', [reader.user.email]);
     await setServedAccessRevision(publication.slug, accessRevision + 10);
 
-    expect((await reconcileForge(publication)).status()).toBe(409);
+    const refused = await reconcileForge(publication);
+    expect(refused.status(), await refused.text()).toBe(409);
+    expect(((await refused.json()) as { code?: string }).code).toBe('PUB_011');
   });
 
   // job.service.ts:148-151 folds a share-list change made during a running converge into that converge, which already read the old list,

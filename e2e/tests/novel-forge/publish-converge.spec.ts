@@ -207,7 +207,7 @@ test.describe('novel-forge publish converge onto foreign slugs', () => {
     expect(exhausted).toEqual(expect.objectContaining({ status: 'failed', error: expect.stringMatching(/^slug unassignable: /) }));
     expect((await readForgePublication(projectId))?.novelSlug, 'the spent ladder rolls the slug back').toBe(slug);
     expect(await readServedNovelsByRef(FORGE_CLIENT_ID, projectId), 'nothing was pushed under any rung').toEqual([]);
-    await expectCode(await reconcileForge(publication), 500, 'PUB_004', 'a reconcile against the spent ladder');
+    await expectCode(await reconcileForge(publication), 409, 'PUB_008', 'a reconcile against the spent ladder');
     const settled = { row: await ledgerRow(projectId, 1), job: await readPublishJob(projectId) };
 
     const sentinel = await importedPublication(lane, owner, 'conv-sentinel', 1);
