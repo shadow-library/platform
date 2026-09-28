@@ -63,7 +63,8 @@ describe('COST_TIER_DEFAULTS', () => {
   it('should name a registered model with its registry provider for every tier, mode and group', () => {
     for (const tier of COST_TIERS) {
       for (const mode of CONTENT_MODES) {
-        for (const group of GROUPS) expect({ tier, mode, group, registered: isRegisteredModel(COST_TIER_DEFAULTS[tier][mode][group]) }).toMatchObject({ registered: true });
+        for (const group of GROUPS)
+          expect({ tier, mode, group, registered: isRegisteredModel(GROUP_ROLE[group], COST_TIER_DEFAULTS[tier][mode][group]) }).toMatchObject({ registered: true });
       }
     }
   });

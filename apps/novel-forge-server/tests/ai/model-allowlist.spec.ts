@@ -18,18 +18,25 @@ function setConfig(key: string, value: unknown): void {
 
 describe('isRegisteredModel', () => {
   it('should accept a registry model paired with its registry provider', () => {
-    expect(isRegisteredModel({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
-    expect(isRegisteredModel({ provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(true);
+    expect(isRegisteredModel('generation', { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(true);
+    expect(isRegisteredModel('embedding', { provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(true);
+    expect(isRegisteredModel('image', { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' })).toBe(true);
   });
 
   it('should reject a model id that is not in the registry', () => {
-    expect(isRegisteredModel({ provider: 'openrouter', model: 'anthropic/claude-omega-max' })).toBe(false);
-    expect(isRegisteredModel({ provider: 'openrouter', model: '../../etc/passwd' })).toBe(false);
+    expect(isRegisteredModel('generation', { provider: 'openrouter', model: 'anthropic/claude-omega-max' })).toBe(false);
+    expect(isRegisteredModel('generation', { provider: 'openrouter', model: '../../etc/passwd' })).toBe(false);
   });
 
   it('should reject a registry model id paired with the wrong provider', () => {
-    expect(isRegisteredModel({ provider: 'ollama', model: 'anthropic/claude-sonnet-5' })).toBe(false);
-    expect(isRegisteredModel({ provider: 'openrouter', model: 'qwen3-embedding:8b' })).toBe(false);
+    expect(isRegisteredModel('generation', { provider: 'ollama', model: 'anthropic/claude-sonnet-5' })).toBe(false);
+    expect(isRegisteredModel('embedding', { provider: 'openrouter', model: 'qwen3-embedding:8b' })).toBe(false);
+  });
+
+  it('should reject a registry model whose kind is not the one its role dispatches to', () => {
+    expect(isRegisteredModel('chat', { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' })).toBe(false);
+    expect(isRegisteredModel('image', { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' })).toBe(false);
+    expect(isRegisteredModel('generation', { provider: 'ollama', model: 'qwen3-embedding:8b' })).toBe(false);
   });
 });
 

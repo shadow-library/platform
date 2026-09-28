@@ -353,7 +353,7 @@ export class ChatService {
       // Clearing (both null) restores the project/profile default; a pin must name a registry model with
       // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
       if (provider !== null || model !== null) {
-        if (!provider || !model || !isRegisteredModel({ provider, model })) throw AppErrorCode.AI_002.create();
+        if (!provider || !model || !isRegisteredModel('chat', { provider, model })) throw AppErrorCode.AI_002.create();
       }
       set.modelProvider = provider;
       set.modelId = model;

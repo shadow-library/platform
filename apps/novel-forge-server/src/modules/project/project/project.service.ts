@@ -12,7 +12,7 @@ import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Prima
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
-import { isRegisteredModel } from '../../ai/defaults';
+import { type AiRole, isRegisteredModel } from '../../ai/defaults';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
@@ -84,8 +84,8 @@ export class ProjectService {
   private assertConfigModelsAllowed(config?: ProjectConfig): void {
     const models = config?.models;
     if (!models) return;
-    for (const ref of Object.values(models)) {
-      if (ref && !isRegisteredModel(ref)) throw AppErrorCode.AI_002.create();
+    for (const [role, ref] of Object.entries(models)) {
+      if (ref && !isRegisteredModel(role as AiRole, ref)) throw AppErrorCode.AI_002.create();
     }
   }
 

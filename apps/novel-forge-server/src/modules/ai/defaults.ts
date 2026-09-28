@@ -1,6 +1,6 @@
 import { type Project } from '@server/database';
 
-import { MODEL_MAP, type ReasoningEffort } from './models';
+import { MODEL_MAP, type ModelEntry, type ReasoningEffort } from './models';
 
 export type AiRole =
   | 'extraction'
@@ -109,10 +109,17 @@ export function isUnrestrictedAllowed(role: AiRole, resolved: ResolvedModel): bo
   return (UNRESTRICTED_LLM_ALLOWLIST as readonly string[]).includes(resolved.model);
 }
 
-// Write-time allowlist gate: a pick is accepted only when the model id is in the registry AND the
-// stated provider matches the registry's — a real model id paired with the wrong provider is rejected.
-export function isRegisteredModel(resolved: ResolvedModel): boolean {
-  return MODEL_MAP[resolved.model]?.provider === resolved.provider;
+function modelKindFor(role: AiRole): ModelEntry['kind'] {
+  if (role === 'image') return 'image';
+  if (role === 'embedding') return 'embedding';
+  return 'llm';
+}
+
+// Write-time allowlist gate: a pick is accepted only when the model id is in the registry, the stated
+// provider matches the registry's, and the model's kind is the one the role dispatches to.
+export function isRegisteredModel(role: AiRole, resolved: ResolvedModel): boolean {
+  const entry = MODEL_MAP[resolved.model];
+  return entry?.provider === resolved.provider && entry.kind === modelKindFor(role);
 }
 
 function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<AiRole, ResolvedModel> {
