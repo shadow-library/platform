@@ -124,6 +124,7 @@ export class AppSessionService {
       })
       .returning()
       .then(([row]) => row ?? throwError(AppError.internal('App session creation failed')));
+    await this.codeService.assertNotReplayed(input.code);
 
     this.logger.info('app session created', {
       securityEvent: 'app_session.created',

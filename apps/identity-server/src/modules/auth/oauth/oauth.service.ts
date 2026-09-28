@@ -576,6 +576,7 @@ export class OAuthService {
       });
       refreshToken = issued.secret;
     }
+    await this.codeService.assertNotReplayed(params.code);
 
     this.logger.info('access token issued', {
       securityEvent: 'oauth.token_issued',
