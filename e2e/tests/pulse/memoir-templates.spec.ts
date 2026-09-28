@@ -15,7 +15,7 @@ import { apiContext, mutate, requireProductUrl } from '../../lib';
 interface MemoirTemplateCase {
   templateKey: string;
   data: Record<string, unknown>;
-  expectedSubject: string | RegExp;
+  expectedSubject: string;
   /**
    * Substrings anchored on the substituted value's own boundary (its text plus the tag that immediately follows
    * or precedes it), never on a fixed opening tag — publishing composes the content into the baseline layout and
@@ -57,10 +57,7 @@ const CASES: MemoirTemplateCase[] = [
   {
     templateKey: 'memoir-billing-reminder',
     data: { state: 'active', expiresAtDate: '2026-02-01', amount: 9.99, currencyCode: 'USD' },
-    // `seedBaseline` (`baseline.seed.ts:89-92`) inserts a template's content only when it has no PUBLISHED version
-    // yet, so it never updates an already-seeded row — an environment seeded before `baseline.data.ts:626`'s
-    // wording changed keeps the earlier "About your Memoir subscription", so this tolerates either.
-    expectedSubject: /^About your (Shadow )?Memoir subscription$/,
+    expectedSubject: 'About your Memoir subscription',
     expectedBodySubstrings: ['status is ', 'active</span>', '2026-02-01</span>', 'Renewal amount: 9.99 USD'],
   },
 ];
@@ -84,7 +81,7 @@ test.describe('memoir template preview', () => {
       expect(preview.status(), await preview.text()).toBe(200);
       const body = (await preview.json()) as { subject?: string | null; body: string };
 
-      expect(body.subject).toMatch(testCase.expectedSubject);
+      expect(body.subject).toBe(testCase.expectedSubject);
       for (const substring of testCase.expectedBodySubstrings) expect(body.body, `expected the rendered body to contain "${substring}"`).toContain(substring);
     });
   }
