@@ -4,6 +4,7 @@ import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { DatabaseService, OidcLogoutDelivery, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -117,9 +118,10 @@ export class BackChannelLogoutService {
     if (!response.ok) throw AppError.internal(`logout endpoint answered ${response.status}`);
   }
 
+  /** A target the SSRF guard refuses will not become deliverable by waiting, so it is dead-lettered on the first refusal. */
   private async markFailed(delivery: OidcLogoutDelivery, error: unknown): Promise<void> {
     const attemptCount = delivery.attemptCount + 1;
-    const dead = attemptCount >= MAX_ATTEMPTS;
+    const dead = attemptCount >= MAX_ATTEMPTS || AppError.is(error, AppErrorCode.WHK_002);
     const backoffMinutes = Math.min(2 ** attemptCount, 60);
     const message = error instanceof Error ? error.message : String(error);
     await this.db

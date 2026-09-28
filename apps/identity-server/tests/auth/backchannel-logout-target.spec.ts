@@ -60,7 +60,7 @@ describe('back-channel logout targets', () => {
     for (const uri of ['https://169.254.169.254/latest', 'http://rp.example.com/logout', 'https://localhost/logout', 'https://rebound.example.com/logout']) {
       const { service, statuses } = logoutServiceDelivering(uri);
       expect(await service.dispatchPending()).toBe(0);
-      expect(statuses).toEqual(['FAILED']);
+      expect(statuses, 'a refused target is dead-lettered at once rather than retried').toEqual(['DEAD']);
     }
     expect(fetchSpy).not.toHaveBeenCalled();
   });
