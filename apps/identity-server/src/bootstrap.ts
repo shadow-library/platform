@@ -13,6 +13,8 @@ declare module '@shadow-library/common' {
     'auth.password.breach-check-enabled': boolean;
     'auth.webauthn.rp-id': string;
     'auth.webauthn.origin': string;
+    /** How long after a rotation the same client's duplicate of the rotated token is refused without being treated as reuse. */
+    'auth.refresh-token.reuse-grace-ms': number;
 
     /** Key-encryption key used to wrap signing and encryption keys at rest; no default is permitted in production. */
     'security.master-encryption-key': string;
@@ -55,6 +57,7 @@ Config.load('auth.bootstrap.admin-password', { defaultValue: '' });
 Config.load('auth.password.breach-check-enabled', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('auth.webauthn.rp-id', { defaultValue: 'localhost' });
 Config.load('auth.webauthn.origin', { defaultValue: 'http://localhost:8080' });
+Config.load('auth.refresh-token.reuse-grace-ms', { defaultValue: '2000', validateType: 'number' });
 
 Config.load('notification.audience', { defaultValue: 'api://pulse' });
 

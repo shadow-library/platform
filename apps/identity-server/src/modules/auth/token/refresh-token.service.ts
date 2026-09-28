@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { and, eq, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
@@ -71,10 +71,19 @@ export class RefreshTokenClientMismatchError extends Error {
   }
 }
 
+/** The same client presented a token its own concurrent request had just rotated: refused, but not treated as theft. */
+export class RefreshTokenRaceError extends Error {
+  constructor() {
+    super('Refresh token was already rotated by a concurrent request');
+    this.name = 'RefreshTokenRaceError';
+  }
+}
+
 @Injectable()
 export class RefreshTokenService {
   private readonly logger = Logger.getLogger(APP_NAME, RefreshTokenService.name);
   private readonly db: PrimaryDatabase;
+  private readonly reuseGraceMs = Config.get('auth.refresh-token.reuse-grace-ms');
 
   constructor(
     databaseService: DatabaseService,
@@ -83,6 +92,17 @@ export class RefreshTokenService {
     private readonly policyService: PolicyService,
   ) {
     this.db = databaseService.getPostgresClient();
+  }
+
+  private async isConcurrentDuplicate(presented: typeof schema.refreshTokens.$inferSelect, expectedClientId?: string): Promise<boolean> {
+    if (presented.status !== 'ROTATED' || !presented.rotatedAt || Date.now() - presented.rotatedAt.getTime() > this.reuseGraceMs) return false;
+    const family = await this.db.query.refreshTokenFamilies.findFirst({ where: eq(schema.refreshTokenFamilies.id, presented.familyId) });
+    return family?.status === 'ACTIVE' && expectedClientId !== undefined && family.clientId === expectedClientId;
+  }
+
+  private concurrentDuplicate(familyId: string): RefreshTokenRaceError {
+    this.logger.info('refresh token rotation refused: a concurrent request from the same client rotated it first', { familyId });
+    return new RefreshTokenRaceError();
   }
 
   private hash(secret: string): string {
@@ -143,6 +163,7 @@ export class RefreshTokenService {
       throw new RefreshTokenReuseError();
     }
 
+    if (await this.isConcurrentDuplicate(presented, context.expectedClientId)) throw this.concurrentDuplicate(presented.familyId);
     if (presented.status !== 'ACTIVE' || presented.expiresAt.getTime() <= Date.now()) {
       this.logger.warn('refresh token rotation rejected: superseded or expired token replayed', {
         securityEvent: 'security.token_reuse',
@@ -189,6 +210,7 @@ export class RefreshTokenService {
       return token.id;
     });
     if (tokenId === null) {
+      if (context.expectedClientId === family.clientId) throw this.concurrentDuplicate(family.id);
       this.logger.warn('refresh token rotation rejected: a concurrent use of the same token rotated it first', { securityEvent: 'security.token_reuse', familyId: family.id });
       await this.revokeFamily(family.id, 'ROTATION_REUSE');
       throw new RefreshTokenReuseError();

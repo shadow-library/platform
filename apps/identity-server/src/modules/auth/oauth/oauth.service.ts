@@ -6,7 +6,7 @@ import { APP_NAME, OIDC_PROTOCOL_SCOPES } from '@server/constants';
 import { Context } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
-import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
+import { RefreshTokenClientMismatchError, RefreshTokenRaceError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
 import { BOT_ACCESS_TOKEN_TTL_SECONDS, BotKeyExchangeService, normaliseClientIp } from '@server/modules/identity/bot';
 import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -603,6 +603,7 @@ export class OAuthService {
         this.logger.warn('refresh token rejected: client mismatch', { clientId: client.id });
         throw AppErrorCode.OAU_003.create();
       }
+      if (error instanceof RefreshTokenRaceError) throw AppErrorCode.OAU_003.create();
       throw error;
     });
 
