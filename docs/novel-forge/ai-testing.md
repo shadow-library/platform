@@ -405,10 +405,10 @@ unindexed. The repair rules differ by kind:
 
 - **Lore** self-heals. `addLore` upserts on `(projectId, kind, refKey)` and writes `embedding` in the `set` clause
   (`indexing.service.ts:58-68`), so re-running the bible builder overwrites a null embedding in place.
-- **Prose does not.** `backfill` skips every chapter that already has any `chapter_chunks` row, null embeddings
-  included (`indexing.service.ts:87,93`). The only repair is `addProse`, which deletes the chapter's chunks first
-  (`:33`) and runs when the chapter is re-indexed by a finalize — so re-finalize the chapter, or delete its
-  `chapter_chunks` rows by hand before calling backfill.
+- **Prose** heals on `POST /backfill`: it re-indexes every finalized, non-isolated chapter with no `chapter_chunks`
+  row or with any chunk whose `embedding` is null (`addProse` deletes the chapter's chunks first). A chapter the
+  embedder still cannot reach counts as `skipped`, and an amend or backfill reports a chapter indexed only when
+  every chunk was embedded.
 
 ---
 
@@ -1301,7 +1301,8 @@ true}`. `chapters.content` replaced, `word_count` recomputed, **`locked` stays `
   draft's current revision (unless one is already there); the `final` draft then takes the same `body`, `words` and
   (when sent) `title` and rating, with `judge`/`judge_note` cleared, at `revision = max(draft.revision, latest.revision)+1`,
   and a matching row `source='amended'`; a chapter with no final draft amends the chapter alone. Re-embedding happens **after** the
-  transaction; on failure the chunks are dropped and `indexed:false` (fix with `POST /backfill`).
+  transaction; on failure the chunks are dropped and `indexed:false`, and a chunk the embedder could not reach also
+  answers `indexed:false` (fix either with `POST /backfill`).
   Republish only when the reader payload hash moved. The UI then shows the "Canon was not re-derived" alert —
   **the bible, continuity and downstream chapters are untouched by design**; the follow-up is "Add to bible".
 - **Fails when:** `CHP_006` (chapter not finalized), `CHP_001`, `DRF_013` (the final draft moved mid-amend; nothing is written); log

@@ -146,12 +146,11 @@ export class ChapterAmendService {
    * committed amendment with a stale index, so it is resolved in the safe direction — drop the chunks
    * and leave the chapter unindexed for `backfill` to pick up. Retrieval that returns nothing is
    * recoverable; retrieval that returns the sentence the author just deleted is the bug amend exists
-   * to fix. `addProse` skips isolated chapters itself, so the flag reports that rather than gating it.
+   * to fix. `addProse` reports an isolated chapter, or one the embedder could not fully reach, as unindexed.
    */
   private async reindex(projectId: bigint, chapterNumber: number, chapter: Chapter.Row): Promise<boolean> {
     try {
-      await this.indexingService.addProse(projectId, chapterNumber, chapter.content ?? '', chapter.isolated);
-      return !chapter.isolated;
+      return await this.indexingService.addProse(projectId, chapterNumber, chapter.content ?? '', chapter.isolated);
     } catch (err) {
       this.logger.error('amend: re-embed failed, leaving the chapter unindexed for the next backfill', { projectId, chapter: chapterNumber, err });
       await this.indexingService.deleteProse(projectId, chapterNumber).catch(cleanupErr => {

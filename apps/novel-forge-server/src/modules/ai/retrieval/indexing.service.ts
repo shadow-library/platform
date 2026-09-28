@@ -22,12 +22,13 @@ export class IndexingService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent).
+  // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent). Resolves true only when every chunk
+  // carries an embedding; a chunk stored without one is invisible to retrieval, and `backfill` retries the chapter.
   // Containment keys on `isolated`, never on provenance: hand-pasted firewalled prose is `generator: 'human'`.
-  async addProse(projectId: bigint, chapter: number, content: string, isolated: boolean): Promise<void> {
+  async addProse(projectId: bigint, chapter: number, content: string, isolated: boolean): Promise<boolean> {
     if (isolated) {
       this.logger.debug('addProse: skipping isolated chapter (not indexed)', { projectId, chapter });
-      return;
+      return false;
     }
 
     await this.deleteProse(projectId, chapter);
@@ -47,6 +48,8 @@ export class IndexingService {
         embedding: embeddings[i] ?? null,
       })),
     );
+    if (embedded < chunks.length) this.logger.warn('addProse: chapter left partly unembedded for the next backfill', { projectId, chapter, chunks: chunks.length, embedded });
+    return embedded === chunks.length;
   }
 
   async deleteProse(projectId: bigint, chapter: number): Promise<void> {
@@ -68,7 +71,7 @@ export class IndexingService {
   }
 
   // Backfill: find all non-isolated chapters for projectId with status='done'
-  // that have zero chapter_chunks rows, then addProse for each.
+  // that have no chapter_chunks rows or a chunk without an embedding, then addProse for each.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content)),
@@ -77,14 +80,14 @@ export class IndexingService {
     const indexableChapters = doneChapters.filter(c => !c.isolated);
     this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, indexableChapters: indexableChapters.length });
 
-    const indexedCounts = await this.db.execute<{ chapter: number; cnt: number }>(sql`
-      SELECT chapter, COUNT(*)::int AS cnt
+    const indexedCounts = await this.db.execute<{ chapter: number; cnt: number; unembedded: number }>(sql`
+      SELECT chapter, COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE embedding IS NULL)::int AS unembedded
       FROM chapter_chunks
       WHERE project_id = ${projectId}
       GROUP BY chapter
     `);
 
-    const indexedChapters = new Set<number>(indexedCounts.filter(r => r.cnt > 0).map(r => r.chapter));
+    const indexedChapters = new Set<number>(indexedCounts.filter(r => r.cnt > 0 && r.unembedded === 0).map(r => r.chapter));
 
     let indexed = 0;
     let skipped = 0;
@@ -94,8 +97,8 @@ export class IndexingService {
       // Narrowing only — the query already excludes null content.
       if (!chapter.content) continue;
       try {
-        await this.addProse(projectId, chapter.number, chapter.content, chapter.isolated);
-        indexed++;
+        if (await this.addProse(projectId, chapter.number, chapter.content, chapter.isolated)) indexed++;
+        else skipped++;
       } catch (err) {
         this.logger.warn('Backfill failed for chapter', { projectId, chapter: chapter.number, err });
         skipped++;

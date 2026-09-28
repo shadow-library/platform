@@ -56,6 +56,7 @@ interface AmendFakeOptions {
   draft?: Partial<StoredDraft> | null;
   revisions?: StoredRevision[];
   refuseDraftWrite?: boolean;
+  embedded?: boolean;
 }
 
 const FINAL_PROSE = 'The lighthouse keeper logs a ship that never arrives.';
@@ -164,7 +165,10 @@ function amendFake(options: AmendFakeOptions = {}) {
     },
   };
 
-  const indexing = { addProse: async () => undefined, deleteProse: async () => undefined };
+  const indexing = {
+    addProse: async (_projectId: bigint, _chapter: number, _content: string, isolated: boolean) => !isolated && (options.embedded ?? true),
+    deleteProse: async () => undefined,
+  };
   const service = new ChapterAmendService({ getPostgresClient: () => db } as never, indexing as never);
   const writesTo = (table: unknown) => writes.filter(write => write.table === table);
   return { db, service, chapter, draft, revisions, writesTo, draftLookups };
@@ -249,6 +253,15 @@ describe('ChapterAmendService', () => {
 
     expect(fake.draft?.revision).toBe(7);
     expect(fake.revisions.at(-1)).toMatchObject({ revision: 7, body: AMENDED_PROSE });
+  });
+
+  it('should report an amend unindexed when no chunk of it could be embedded', async () => {
+    const fake = amendFake({ embedded: false });
+
+    const result = await fake.service.amend(1n, 4, { content: AMENDED_PROSE });
+
+    expect(result.indexed).toBe(false);
+    expect(fake.chapter.content).toBe(AMENDED_PROSE);
   });
 
   it('should keep an isolated chapter and its draft contained', async () => {
