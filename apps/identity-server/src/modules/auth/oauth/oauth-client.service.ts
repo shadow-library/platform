@@ -458,14 +458,21 @@ export class OAuthClientService {
     });
   }
 
-  /** Only a secret-authenticated client is moved; the secrets it holds stop authenticating it, since a workload client must present an assertion. */
+  /** Only a secret-authenticated client is moved, and its secrets are revoked with it: a workload client must present an assertion. */
   async requireWorkloadIdentity(clientId: string): Promise<boolean> {
-    const moved = await this.db
-      .update(schema.oauthClients)
-      .set({ tokenEndpointAuthMethod: 'private_key_jwt', updatedAt: new Date() })
-      .where(and(eq(schema.oauthClients.id, clientId), eq(schema.oauthClients.tokenEndpointAuthMethod, 'client_secret_basic')))
-      .returning({ id: schema.oauthClients.id });
-    return moved.length > 0;
+    return this.db.transaction(async tx => {
+      const moved = await tx
+        .update(schema.oauthClients)
+        .set({ tokenEndpointAuthMethod: 'private_key_jwt', updatedAt: new Date() })
+        .where(and(eq(schema.oauthClients.id, clientId), eq(schema.oauthClients.tokenEndpointAuthMethod, 'client_secret_basic')))
+        .returning({ id: schema.oauthClients.id });
+      if (moved.length === 0) return false;
+      await tx
+        .update(schema.oauthClientSecrets)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(schema.oauthClientSecrets.clientId, clientId), isNull(schema.oauthClientSecrets.revokedAt)));
+      return true;
+    });
   }
 
   async deleteClient(clientId: string): Promise<void> {
