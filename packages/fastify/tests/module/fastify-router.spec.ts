@@ -554,6 +554,20 @@ describe('FastifyRouter', () => {
       expect(payload.volume.id).toBe(2n);
     });
 
+    it('should convert bigints in a cyclic payload without recursing forever', async () => {
+      await router.register([]);
+      const stringifyBigInts = (instance.route as any).mock.calls[0]?.[0].preSerialization.at(-1) as Fn;
+      const parent: Record<string, unknown> = { id: 1n };
+      const children: unknown[] = [{ id: 2n, parent }];
+      parent.children = children;
+      children.push(children);
+
+      const result = await stringifyBigInts({}, {}, parent);
+      expect(result.id).toBe('1');
+      expect(result.children[0]).toStrictEqual({ id: '2', parent });
+      expect(result.children[1]).toBe(children);
+    });
+
     it('should hand the payload through untouched when it holds no bigint', async () => {
       await router.register([]);
       const stringifyBigInts = (instance.route as any).mock.calls[0]?.[0].preSerialization.at(-1) as Fn;

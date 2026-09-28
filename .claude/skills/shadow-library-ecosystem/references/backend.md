@@ -172,6 +172,8 @@ return the result. All business logic lives in the service.
    caller-context object (`{ session, ip }`, membership, …) pulled from `Context`.
 
 7. **DTOs live in `<feature>.dto.ts`, never inline in the controller.**
+   A handler returns its response as plain objects and arrays, never class instances: the router converts
+   bigints to strings only inside plain objects, so a bigint held by a class instance can still fail serialization (500).
 
 8. **User-facing validation wording belongs on the field, via `errorMessage`.** A `@Field()` without it
    surfaces AJV's phrasing (`must NOT have fewer than 8 characters`). MUST NOT re-validate in the handler

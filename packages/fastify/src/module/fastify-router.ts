@@ -167,30 +167,36 @@ const isPlainObject = (value: object): value is Record<string, unknown> => {
 
 /**
  * Bigints go on the wire as strings. Neither `JSON.stringify` nor the Ajv checks fast-json-stringify runs for `anyOf`
- * and multi-type schemas (every nullable field) accept a raw bigint, so they are converted before serialization.
+ * and multi-type schemas (every nullable field) accept a raw bigint, so they are converted before serialization. Only
+ * plain objects and arrays are walked, and a cycle is left pointing at the original object.
  */
-function stringifyBigInts(value: unknown): unknown {
+function stringifyBigInts(value: unknown, ancestors = new WeakSet<object>()): unknown {
   if (typeof value === 'bigint') return value.toString();
+  if (value === null || typeof value !== 'object' || ancestors.has(value)) return value;
   if (Array.isArray(value)) {
+    ancestors.add(value);
     let copy: unknown[] | undefined;
     for (let index = 0; index < value.length; index++) {
       const item = value[index];
-      const converted = stringifyBigInts(item);
+      const converted = stringifyBigInts(item, ancestors);
       if (converted === item) continue;
       copy ??= [...value];
       copy[index] = converted;
     }
+    ancestors.delete(value);
     return copy ?? value;
   }
-  if (value === null || typeof value !== 'object' || !isPlainObject(value)) return value;
+  if (!isPlainObject(value)) return value;
+  ancestors.add(value);
   let copy: Record<string, unknown> | undefined;
   for (const key of Object.keys(value)) {
     const item = value[key];
-    const converted = stringifyBigInts(item);
+    const converted = stringifyBigInts(item, ancestors);
     if (converted === item) continue;
     copy ??= { ...value };
     copy[key] = converted;
   }
+  ancestors.delete(value);
   return copy ?? value;
 }
 
