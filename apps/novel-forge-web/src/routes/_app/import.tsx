@@ -4,6 +4,7 @@ import { Alert, Button, FileUpload, toast } from '@shadow-library/ui';
 
 import { PageContainer, PageHeader, SectionCard } from '@/components/nf';
 import { type NovelBundle, useImportNovelMutation } from '@/lib/apis';
+import { bundleFileOf, latestOnly } from '@/lib/novel-import';
 
 import styles from './import.module.css';
 
@@ -31,11 +32,15 @@ function ImportNovelScreen(): React.JSX.Element {
   const [bundle, setBundle] = useState<NovelBundle | null>(null);
   const [fileName, setFileName] = useState('');
   const [parseError, setParseError] = useState<string | null>(null);
+  const [reads] = useState(latestOnly);
 
   const readBundle = async (file: File): Promise<void> => {
     importNovel.reset();
+    const isCurrent = reads.begin();
     try {
-      const parsed = JSON.parse(await file.text()) as NovelBundle;
+      const text = await file.text();
+      if (!isCurrent()) return;
+      const parsed = JSON.parse(text) as NovelBundle;
       if (parsed.format !== BUNDLE_FORMAT || parsed.schemaVersion !== BUNDLE_SCHEMA_VERSION) {
         setBundle(null);
         setParseError(`Not a supported novel-import bundle — expected format "${BUNDLE_FORMAT}" schema version ${BUNDLE_SCHEMA_VERSION}.`);
@@ -60,12 +65,14 @@ function ImportNovelScreen(): React.JSX.Element {
       setFileName(file.name);
       setParseError(null);
     } catch {
+      if (!isCurrent()) return;
       setBundle(null);
       setParseError('The selected file is not valid JSON.');
     }
   };
 
   const clearBundle = (): void => {
+    reads.cancel();
     setBundle(null);
     setFileName('');
     setParseError(null);
@@ -99,7 +106,7 @@ function ImportNovelScreen(): React.JSX.Element {
             accept={['.json']}
             maxFiles={1}
             onValueChange={files => {
-              const file = files.at(-1)?.file;
+              const file = bundleFileOf(files);
               if (file) void readBundle(file);
               else clearBundle();
             }}
