@@ -289,9 +289,7 @@ test.describe('identity bot permissions — catalog and grant validation', () =>
     expect(race.assignments, 'they converge on one assignment').toEqual([{ roleId: race.roleId, grantedBy: `bot:${race.granterUserId}` }]);
   });
 
-  // App bug: `added` is computed from a read taken before the insert (bot-permission.service.ts:243) and the insert
-  // itself discards the loser (`onConflictDoNothing`, :251), so both writers audit the grant one of them never made.
-  test.fixme('should audit two concurrent identical replacements once', async ({ identity }) => {
+  test('should audit two concurrent identical replacements once', async ({ identity }) => {
     const race = await racingReplacements(identity, 'botperm-race-audit');
     expect(race.audits, 'a converged write is one change, so it is one audit row').toBe(1);
   });
