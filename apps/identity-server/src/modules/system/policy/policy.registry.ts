@@ -84,14 +84,6 @@ export const POLICY_REGISTRY = {
     max: 180 * DAY,
     resolution: 'MIN',
   },
-  'mfa.email_otp_fallback.enabled': {
-    label: 'Allow emailed one-time codes',
-    description:
-      'Whether a code sent to a member’s inbox counts as their second factor. Turning it off obliges them to use a stronger factor such as an authenticator app or a passkey.',
-    type: 'boolean',
-    default: true,
-    resolution: 'AND',
-  },
 } as const satisfies Record<string, PolicyDefinition>;
 
 export const POLICY_KEYS = Object.keys(POLICY_REGISTRY) as PolicyKey[];
