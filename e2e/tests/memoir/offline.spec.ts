@@ -59,7 +59,7 @@ test.describe('memoir offline outbox', () => {
 });
 
 test.describe('memoir outbox — CSRF refusals', () => {
-  test.fixme('should keep the CSRF cookie across a GET that carries a fresh cookie and no header (app bug: csrf-protection.middleware.ts:48 re-issues it)', async ({ memoir }) => {
+  test('should keep the CSRF cookie across a GET that carries a fresh cookie and no header', async ({ memoir }) => {
     const { ctx } = await memoir.persona({ label: 'csrf-rotate', onboard: true });
     await memoirCsrfHeaders(ctx);
 
