@@ -201,7 +201,9 @@ export class EcosystemSeedService {
   /**
    * The corrected redirect URI is added unconditionally. The superseded one is removed only when it is
    * exactly what the old name-derived rule would have seeded — never an operator-added URI, which this
-   * seed never wrote and therefore never recognises as stale.
+   * seed never wrote and therefore never recognises as stale. A client seeded before the deployment was
+   * production-flagged still authenticates with its fallback secret until it is moved to workload identity,
+   * which is how `createClient` would have registered it in production.
    */
   private async reconcileClient(seed: SeedApplication): Promise<void> {
     const client = await this.oauthClientService.getClient(seed.name);
@@ -213,7 +215,9 @@ export class EcosystemSeedService {
 
     const required = workloadSubject(seed.name);
     const current = client.workloadSubjects ?? [];
-    if (current.includes(required)) return;
-    await this.oauthClientService.updateClient(client.id, { workloadSubjects: [...current, required] });
+    if (!current.includes(required)) await this.oauthClientService.updateClient(client.id, { workloadSubjects: [...current, required] });
+
+    if (!Config.isProductionDeployment() || !(await this.oauthClientService.requireWorkloadIdentity(client.id))) return;
+    this.logger.warn(`Moved ${seed.name} client '${client.id}' to workload identity; its fallback secret no longer authenticates it`, { clientId: client.id });
   }
 }

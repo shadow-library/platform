@@ -458,6 +458,16 @@ export class OAuthClientService {
     });
   }
 
+  /** Only a secret-authenticated client is moved; the secrets it holds stop authenticating it, since a workload client must present an assertion. */
+  async requireWorkloadIdentity(clientId: string): Promise<boolean> {
+    const moved = await this.db
+      .update(schema.oauthClients)
+      .set({ tokenEndpointAuthMethod: 'private_key_jwt', updatedAt: new Date() })
+      .where(and(eq(schema.oauthClients.id, clientId), eq(schema.oauthClients.tokenEndpointAuthMethod, 'client_secret_basic')))
+      .returning({ id: schema.oauthClients.id });
+    return moved.length > 0;
+  }
+
   async deleteClient(clientId: string): Promise<void> {
     await this.db.transaction(async tx => {
       await tx.delete(schema.consents).where(eq(schema.consents.clientId, clientId));
