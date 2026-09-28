@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { type AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -123,6 +124,25 @@ describe('AppSessionClient', () => {
     await expect(strict.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, scope: 'reports:read' })).resolves.toMatchObject({
       grantedScopes: ['reports:read'],
     });
+  });
+
+  it('should answer a replayed authorization code as a client error', async () => {
+    const code = idp.createAuthorizationCode({ sub: 'replayed', scopes: ['openid'] });
+    const input = { code, codeVerifier: 'verifier', redirectUri: 'https://app.test/auth/callback' };
+    await auth.appSessions.createSession(input);
+
+    const replayed = await auth.appSessions.createSession(input).catch((error: unknown) => error);
+    expect(replayed).toMatchObject({ code: 'AUTHORIZATION_CODE_INVALID', status: 400 });
+  });
+
+  it('should keep identity paths and upstream wording out of an unclassified failure response', async () => {
+    const handleOnly = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: idp.handleOnlyTransport() });
+    const session = await createSession('opaque-failure');
+
+    const failure = await handleOnly.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'APP_SESSION_FAILED', status: 503 });
+    expect((failure as AppError).toResponse().message).toBe('Application session request failed');
+    handleOnly.stop();
   });
 
   it('should grant nothing to a handle presented without the application credential', async () => {

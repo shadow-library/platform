@@ -66,6 +66,9 @@ const isEnabled = (route: RouteName): boolean => Boolean(routes?.[route]);
 /** 302 keeps the browser's method on a redirect the user follows interactively */
 const FOUND = 302;
 
+/** RFC 6749 §4.1.2.1: the two callback errors that report identity's own trouble rather than a refusal of this request */
+const TRANSIENT_AUTHORIZATION_ERRORS = new Set(['server_error', 'temporarily_unavailable']);
+
 /** Applies the resolved paths to the controller; must run before the module registry scans the class */
 export function configureAuthRoutes(resolved: AuthRoutePaths): void {
   routes = resolved;
@@ -100,7 +103,7 @@ export class AuthController {
   @Get('/callback')
   @EnableIf(() => isEnabled('callback'))
   async callback(@Query() query: AuthCallbackQuery): Promise<void> {
-    if (query.error) throw AuthErrorCode.EXCHANGE_FAILED.create({ reason: `identity refused the authorization: ${query.error_description ?? query.error}` });
+    if (query.error) throw this.authorizationRefused(query.error);
 
     const result = await this.sessions.completeLogin(query, this.cookies(), this.requestOrigin());
     this.send(this.context.getResponse(), result.cookies, result.returnTo);
@@ -237,6 +240,14 @@ export class AuthController {
   private promptUrl(returnTo: string, outcome: 'absent' | 'mismatch', query: AuthStepUpQuery): Promise<string> {
     const markers = [outcome === 'absent' || query.claimed ? 'claimed=1' : '', outcome === 'mismatch' || query.retried ? 'retried=1' : ''].filter(Boolean);
     return this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&${markers.join('&')}`);
+  }
+
+  /** Anyone can hand the browser a callback URL, so `error_description` is never echoed and the status follows the RFC error alone */
+  private authorizationRefused(error: string): AppError {
+    this.logger.warn('identity answered the callback with an error', { error });
+    if (error === 'access_denied') return AuthErrorCode.AUTHORIZATION_DENIED.create();
+    if (TRANSIENT_AUTHORIZATION_ERRORS.has(error)) return AuthErrorCode.EXCHANGE_FAILED.create({ reason: 'identity could not complete the authorization' });
+    return AuthErrorCode.AUTHORIZATION_REFUSED.create();
   }
 
   private cookies(): Record<string, string> {

@@ -76,8 +76,10 @@ export class AuthErrorCode extends ErrorCode {
    * First-Party App Session Errors
    */
 
-  /** An app-session endpoint was unreachable or answered in a way the SDK cannot interpret */
-  static readonly APP_SESSION_FAILED = AuthErrorCode.unavailable('APP_SESSION_FAILED', 'Application session request failed: {reason}');
+  /** An app-session endpoint was unreachable or answered in a way the SDK cannot interpret; the `reason` names identity's path and wording, so it stays out of the message */
+  static readonly APP_SESSION_FAILED = AuthErrorCode.unavailable('APP_SESSION_FAILED', 'Application session request failed');
+  /** Identity refused to redeem the callback's code: replayed, expired, or issued for another redirect or verifier */
+  static readonly AUTHORIZATION_CODE_INVALID = AuthErrorCode.badRequest('AUTHORIZATION_CODE_INVALID', 'The authorization code is invalid, expired or already used');
   /** The route needs an AAL2 token and no live elevation grant covers this app session and audience */
   static readonly ELEVATION_REQUIRED = AuthErrorCode.forbidden('ELEVATION_REQUIRED', 'Step-up authentication is required');
   /**
@@ -109,6 +111,10 @@ export class AuthErrorCode extends ErrorCode {
   static readonly LOGIN_STATE_INVALID = AuthErrorCode.badRequest('LOGIN_STATE_INVALID', 'Login state is missing or does not match');
   /** The back-channel logout token failed validation */
   static readonly LOGOUT_TOKEN_INVALID = AuthErrorCode.badRequest('LOGOUT_TOKEN_INVALID', 'Back-channel logout token is invalid: {reason}');
+  /** The user declined the authorization, or identity denied it; the callback's `error_description` is attacker-controlled and never echoed */
+  static readonly AUTHORIZATION_DENIED = AuthErrorCode.forbidden('AUTHORIZATION_DENIED', 'The sign-in was declined');
+  /** Identity refused the authorization request for a reason other than a denial or its own outage */
+  static readonly AUTHORIZATION_REFUSED = AuthErrorCode.badRequest('AUTHORIZATION_REFUSED', 'The sign-in request was refused');
   /** A `return_to` or post-logout target failed the redirect allow-list */
   static readonly REDIRECT_NOT_ALLOWED = AuthErrorCode.badRequest('REDIRECT_NOT_ALLOWED', 'Redirect target is not allowed');
 

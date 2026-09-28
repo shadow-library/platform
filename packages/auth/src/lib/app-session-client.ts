@@ -66,6 +66,7 @@ const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'
 const ACCESS_DENIED_CODES = ['APP_006', 'APP_007'];
 
 /** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
+const INVALID_GRANT_CODES = ['OAU_003', 'invalid_grant'];
 const INVALID_TARGET_CODES = ['OAU_005', 'invalid_target'];
 const INVALID_SCOPE_CODES = ['OAU_004', 'invalid_scope'];
 
@@ -187,6 +188,7 @@ export class AppSessionClient {
   private toError(status: number, failure: { code?: string; reason: string }, path: string): AppError {
     const code = failure.code ?? '';
     if (status === 401 && code === SESSION_INVALID_CODE) return this.logged(AuthErrorCode.SESSION_INVALID.create({ reason: failure.reason }));
+    if (path === '' && INVALID_GRANT_CODES.includes(code)) return this.logged(AuthErrorCode.AUTHORIZATION_CODE_INVALID.create({ reason: failure.reason }));
     if (ELEVATION_INTENT_MISMATCH_CODES.includes(code)) return this.logged(AuthErrorCode.ELEVATION_INTENT_MISMATCH.create({ reason: failure.reason }));
     if (status === 403 && code === ELEVATION_REQUIRED_CODE) return this.logged(AuthErrorCode.ELEVATION_REQUIRED.create({ reason: failure.reason }));
     if (status === 403 && ACCESS_DENIED_CODES.includes(code)) return this.logged(AuthErrorCode.ORGANISATION_NOT_PERMITTED.create({ reason: failure.reason }));
@@ -197,7 +199,7 @@ export class AppSessionClient {
 
   /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
-    this.logger.error(error.message);
+    this.logger.error(error.message, { code: error.code, reason: error.data?.reason });
     return error;
   }
 }
