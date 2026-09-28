@@ -1,5 +1,5 @@
 import { Field, Schema } from '@shadow-library/class-schema';
-import { Transform } from '@shadow-library/fastify';
+import { Sensitive, Transform } from '@shadow-library/fastify';
 
 import { NotificationChannel, VersionStatus } from '@server/common';
 import { type Notification, type Template } from '@server/database';
@@ -106,6 +106,7 @@ export class PreviewBody {
   locale?: string;
 
   @Field(() => Object, { optional: true, additionalProperties: true })
+  @Sensitive()
   data?: Record<string, unknown>;
 }
 

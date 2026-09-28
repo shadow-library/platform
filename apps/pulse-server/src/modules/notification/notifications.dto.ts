@@ -1,6 +1,6 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 import { type AppErrorObject } from '@shadow-library/common';
-import { ErrorResponseDto } from '@shadow-library/fastify';
+import { ErrorResponseDto, Sensitive } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
 import { MessageType, NotificationChannel, SortByCreatedAt } from '@server/common';
@@ -11,12 +11,15 @@ import { ChannelNotificationStatus, NotificationStatus } from './notification.se
 @Schema({ minProperties: 1 })
 export class NotificationRecipients {
   @Field({ optional: true })
+  @Sensitive('email')
   email?: string;
 
   @Field({ optional: true })
+  @Sensitive('number')
   phone?: string;
 
   @Field({ optional: true })
+  @Sensitive()
   push?: string;
 }
 
@@ -29,6 +32,7 @@ export class CreateNotificationBody {
   recipients: NotificationRecipients;
 
   @Field({ optional: true })
+  @Sensitive()
   payload?: Record<string, any>;
 
   @Field({ optional: true })
@@ -71,6 +75,7 @@ export class ListNotificationMessagesQuery extends PaginationQuery(SortByCreated
   channel?: Notification.Channel;
 
   @Field({ optional: true })
+  @Sensitive()
   recipient?: string;
 }
 

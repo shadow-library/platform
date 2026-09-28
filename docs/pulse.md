@@ -44,8 +44,10 @@ Notification service and operations console. Other apps send a message by templa
   declares them. It logs one info line per send (actor, organisation, template, channels, masked recipients, job ids, stripped keys), never the raw recipient or
   payload; pulse has no audit table, so that line is the trail. Each actor gets 20 sends per sliding 10 minutes (429 NTF_006 with `Retry-After`), counted in
   process: per replica and reset on restart.
-- Recipients are masked in info logs and the message-log API, which exists only when `app.stage` is `dev`. The job and message tables still hold raw recipient, payload and
-  rendered body (OTP codes, reset links) and `debug` logs the whole job row: NEVER widen that exposure.
+- Recipients are masked in info logs and the message-log API, which exists only when `app.stage` is `dev`. The request log masks request DTO fields marked
+  `@Sensitive` (send recipients and payload, the message-log recipient filter, preview data): a new recipient or payload field MUST carry it, since the framework's
+  default redaction only knows credential-shaped keys. The job and message tables still hold raw recipient, payload and rendered body (OTP codes, reset links),
+  and the `debug` line "Notification job details" logs the whole job row, raw recipient and payload included: NEVER widen that exposure.
 - The global routing rule cannot be deleted and rules cannot be created or edited to point at an inactive profile (deactivating a profile later is not checked). No matching rule/endpoint makes the job PERMANENTLY_FAILED.
 - The baseline DEV profile and global rule are seeded only outside production; a fresh prod needs an operator-made real profile.
 - The RBAC permission catalog MUST match the seed in `identity`; role sync is off, so edit both together. Every route needs an auth decorator or `@Public()` (the SDK's own `/api/auth/*` is exempt); bots are refused everywhere.
