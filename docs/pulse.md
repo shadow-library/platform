@@ -23,8 +23,6 @@ Notification service and operations console. Other apps send a message by templa
   contract withholds the update with a warning. Template metadata, variables and channel settings are only ever created, never updated.
 - Published content is cached in-process; change it only through publish, never by editing rows.
 - `pulse-web` calls same-origin `/api/*` in the browser and `pulse-server` directly during SSR, and authenticates via Identity; its `api-types.gen.ts` is generated from `pulse-server`.
-- Producers send on `POST /api/v1/notifications` (service-only `notifications:send` scope); the console's manual send is `POST /api/v1/notifications/console`
-  (admin-only `pulse:senders:write`, high-risk). A session never holds the scope and a service token has no organisation to check a permission in, so neither route admits the other caller.
 
 ## Hard rules
 

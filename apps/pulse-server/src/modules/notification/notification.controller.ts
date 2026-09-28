@@ -19,17 +19,6 @@ export class NotificationController {
     return this.notificationService.send(body);
   }
 
-  /**
-   * The console's manual send. It cannot share the producer route: a session never carries the service-only
-   * scope, and a service token names no organisation to evaluate a permission in, so each caller has its own guard.
-   */
-  @Post('/console')
-  @RequirePermission(PULSE_PERMISSIONS.sendersWrite, { highRisk: true })
-  @RespondFor(201, CreateNotificationResponse)
-  sendFromConsole(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
-    return this.notificationService.send(body);
-  }
-
   @Get('/messages')
   @EnableIf(() => Config.get('app.stage') === 'dev')
   @RequirePermission(PULSE_PERMISSIONS.messagesRead)
