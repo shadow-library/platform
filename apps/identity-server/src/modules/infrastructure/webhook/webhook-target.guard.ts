@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
 import { Injectable } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
+import { Config, type ErrorCode } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 
@@ -47,33 +47,33 @@ export class WebhookTargetGuard {
 
   lookupAddresses: LookupFn = async hostname => lookup(hostname, { all: true, verbatim: true });
 
-  assertAcceptableUrl(rawUrl: string): URL {
+  assertAcceptableUrl(rawUrl: string, refusal: ErrorCode = AppErrorCode.WHK_002): URL {
     let url: URL;
     try {
       url = new URL(rawUrl);
     } catch {
-      throw AppErrorCode.WHK_002.create();
+      throw refusal.create();
     }
 
-    if (url.protocol !== 'https:' && !(this.allowInsecureTargets && url.protocol === 'http:')) throw AppErrorCode.WHK_002.create();
-    if (url.username || url.password) throw AppErrorCode.WHK_002.create();
+    if (url.protocol !== 'https:' && !(this.allowInsecureTargets && url.protocol === 'http:')) throw refusal.create();
+    if (url.username || url.password) throw refusal.create();
     if (this.allowInsecureTargets) return url;
 
     const hostname = url.hostname.toLowerCase();
-    if (BLOCKED_HOSTNAMES.has(hostname) || BLOCKED_SUFFIXES.some(suffix => hostname.endsWith(suffix))) throw AppErrorCode.WHK_002.create();
-    if (isIP(hostname.replace(/^\[|\]$/g, '')) !== 0 && isPrivateAddress(hostname.replace(/^\[|\]$/g, ''))) throw AppErrorCode.WHK_002.create();
+    if (BLOCKED_HOSTNAMES.has(hostname) || BLOCKED_SUFFIXES.some(suffix => hostname.endsWith(suffix))) throw refusal.create();
+    if (isIP(hostname.replace(/^\[|\]$/g, '')) !== 0 && isPrivateAddress(hostname.replace(/^\[|\]$/g, ''))) throw refusal.create();
     return url;
   }
 
-  async assertDeliverable(rawUrl: string): Promise<void> {
-    const url = this.assertAcceptableUrl(rawUrl);
+  async assertDeliverable(rawUrl: string, refusal: ErrorCode = AppErrorCode.WHK_002): Promise<void> {
+    const url = this.assertAcceptableUrl(rawUrl, refusal);
     if (this.allowInsecureTargets) return;
 
     const bare = url.hostname.replace(/^\[|\]$/g, '');
     if (isIP(bare) !== 0) return;
 
     const addresses = await this.lookupAddresses(bare);
-    if (addresses.length === 0) throw AppErrorCode.WHK_002.create();
-    if (addresses.some(entry => isPrivateAddress(entry.address))) throw AppErrorCode.WHK_002.create();
+    if (addresses.length === 0) throw refusal.create();
+    if (addresses.some(entry => isPrivateAddress(entry.address))) throw refusal.create();
   }
 }

@@ -26,4 +26,6 @@ export const ERROR_MESSAGES = {
   EXPIRY_NOT_APPLICABLE: 'may only accompany a suspension, which is the sole status that lapses on its own',
   EXPIRY_MUST_BE_FUTURE: 'must be a point in the future',
   INVALID_CURSOR: 'must be a cursor returned by an earlier page of this endpoint',
+  INVALID_HTTP_URL: 'must be an absolute http or https url',
+  INVALID_CLEARABLE_HTTP_URL: 'must be an absolute http or https url, or empty to clear it',
 } as const satisfies Record<string, string>;

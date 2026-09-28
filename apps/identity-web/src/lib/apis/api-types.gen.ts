@@ -4300,7 +4300,7 @@ export interface components {
       redirectUris?: string[];
       grantTypes: string[];
       accessTokenTtl?: number;
-      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination. */
+      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination; must be a public https url. */
       backchannelLogoutUri?: string;
       /** @description Kubernetes service-account subjects or namespace-scoped patterns allowed to authenticate this client. */
       workloadSubjects?: string[];
@@ -4342,7 +4342,7 @@ export interface components {
       name?: string;
       isActive?: boolean;
       redirectUris?: string[];
-      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination. */
+      /** @description OIDC back-channel logout endpoint to which logout tokens are posted on session termination; must be a public https url, or empty to remove it. */
       backchannelLogoutUri?: string;
       /** @description Replaces the full set of Kubernetes service-account subjects or patterns; pass an empty array to remove all bindings. */
       workloadSubjects?: string[];

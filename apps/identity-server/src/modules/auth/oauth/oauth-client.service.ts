@@ -8,6 +8,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME, OIDC_PROTOCOL_SCOPES, REGEX } from '@server/constants';
 import { type ElevationIntent } from '@server/modules/auth/session';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
+import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
 import { applicationAudience, DEFAULT_AUDIENCE, OAUTH_CALLBACK_PATH, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from './workload-subject.util';
@@ -92,12 +93,16 @@ export class OAuthClientService {
   private activeScopeNamesAt = 0;
   private activeScopeNamesInflight: Promise<string[]> | null = null;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly targetGuard: WebhookTargetGuard,
+  ) {
     this.db = databaseService.getPostgresClient();
   }
 
   async register(input: RegisterClient): Promise<RegisteredClient> {
     if (input.redirectUris) this.assertValidRedirectUris(input.redirectUris);
+    if (input.backchannelLogoutUri) this.targetGuard.assertAcceptableUrl(input.backchannelLogoutUri, AppErrorCode.ADM_003);
     if (input.id !== undefined) this.assertValidClientId(input.id);
     const isPublic = PUBLIC_KINDS.includes(input.kind);
     const workloadSubjects = input.workloadSubjects ?? [];
@@ -429,6 +434,7 @@ export class OAuthClientService {
 
   async updateClient(clientId: string, update: UpdateClient): Promise<void> {
     if (update.redirectUris) this.assertValidRedirectUris(update.redirectUris);
+    if (update.backchannelLogoutUri) this.targetGuard.assertAcceptableUrl(update.backchannelLogoutUri, AppErrorCode.ADM_003);
     const workloadSubjects = update.workloadSubjects === undefined ? undefined : (update.workloadSubjects ?? []);
     if (workloadSubjects) for (const subject of workloadSubjects) assertValidWorkloadBinding(subject);
     await this.db.transaction(async tx => {

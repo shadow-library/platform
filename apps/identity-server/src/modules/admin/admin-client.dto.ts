@@ -48,7 +48,12 @@ export class RegisterClientBody {
   @Field(() => Number, { optional: true, minimum: 60, maximum: 86400 })
   accessTokenTtl?: number;
 
-  @Field({ optional: true, description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination.' })
+  @Field({
+    optional: true,
+    maxLength: 2048,
+    ...PATTERN.HTTP_URL,
+    description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination; must be a public https url.',
+  })
   backchannelLogoutUri?: string;
 
   @Field(() => [String], {
@@ -149,7 +154,12 @@ export class UpdateClientBody {
   @Field(() => [String], { optional: true })
   redirectUris?: string[];
 
-  @Field({ optional: true, description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination.' })
+  @Field({
+    optional: true,
+    maxLength: 2048,
+    ...PATTERN.CLEARABLE_HTTP_URL,
+    description: 'OIDC back-channel logout endpoint to which logout tokens are posted on session termination; must be a public https url, or empty to remove it.',
+  })
   backchannelLogoutUri?: string;
 
   @Field(() => [String], {

@@ -8,6 +8,7 @@ import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { SecurityModule } from '@server/modules/infrastructure/security';
+import { WebhookModule } from '@server/modules/infrastructure/webhook';
 import { ApplicationModule } from '@server/modules/system/application';
 import { PolicyModule } from '@server/modules/system/policy';
 
@@ -23,7 +24,7 @@ import { OAuthService } from './oauth.service';
 import { WorkloadIdentityService } from './workload-identity.service';
 
 @Module({
-  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule, SecurityModule, BotModule],
+  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule, SecurityModule, BotModule, WebhookModule],
   controllers: [OAuthController, ConsentController, MeConsentController, AppsController],
   providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService, WorkloadIdentityService],
   exports: [OAuthClientService, AccessTokenService, ConsentService, AuthorizationCodeService],

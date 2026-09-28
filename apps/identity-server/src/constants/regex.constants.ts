@@ -19,6 +19,7 @@ export const REGEX = {
   BOT_HANDLE: /^[a-z0-9](-?[a-z0-9])*$/,
   BOT_CLIENT_ID: /^bot_[0-9A-Za-z]{22}$/,
   ISO_DATE_TIME: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/,
+  HTTP_URL: /^https?:\/\/\S+$/,
 } as const satisfies Record<string, RegExp>;
 
 export const isNumericId = (value: string): boolean => REGEX.ID.test(value);
@@ -47,4 +48,6 @@ export const PATTERN = {
   BOT_HANDLE: shapedAs(REGEX.BOT_HANDLE, ERROR_MESSAGES.INVALID_BOT_HANDLE),
   ISO_DATE_TIME: shapedAs(REGEX.ISO_DATE_TIME, ERROR_MESSAGES.INVALID_DATE_TIME),
   IDENTIFIER: shapedAs(identifier, ERROR_MESSAGES.INVALID_IDENTIFIER),
+  HTTP_URL: shapedAs(REGEX.HTTP_URL, ERROR_MESSAGES.INVALID_HTTP_URL),
+  CLEARABLE_HTTP_URL: shapedAs(new RegExp(`^(${unanchored(REGEX.HTTP_URL)})?$`), ERROR_MESSAGES.INVALID_CLEARABLE_HTTP_URL),
 } as const satisfies Record<string, FieldPattern>;

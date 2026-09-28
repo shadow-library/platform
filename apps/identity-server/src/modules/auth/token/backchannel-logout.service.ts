@@ -7,6 +7,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { DatabaseService, OidcLogoutDelivery, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
 const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 const LOGOUT_TOKEN_TTL_SECONDS = 120;
@@ -22,6 +23,7 @@ export class BackChannelLogoutService {
   constructor(
     databaseService: DatabaseService,
     private readonly keyService: KeyService,
+    private readonly targetGuard: WebhookTargetGuard,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -100,14 +102,18 @@ export class BackChannelLogoutService {
   }
 
   private async send(delivery: OidcLogoutDelivery): Promise<void> {
+    await this.targetGuard.assertDeliverable(delivery.logoutUri);
     /** Mint at delivery time because retry windows can outlive the logout token. */
     const token = this.mintLogoutToken(delivery);
     const response = await fetch(delivery.logoutUri, {
       method: 'POST',
+      redirect: 'manual',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: `logout_token=${encodeURIComponent(token)}`,
       signal: AbortSignal.timeout(10_000),
     });
+    if (response.status >= 300 && response.status < 400)
+      throw AppError.internal(`logout endpoint returned a redirect (${response.status}); refusing to follow it into an unvalidated target`);
     if (!response.ok) throw AppError.internal(`logout endpoint answered ${response.status}`);
   }
 
