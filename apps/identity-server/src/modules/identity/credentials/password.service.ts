@@ -124,11 +124,6 @@ export class PasswordService {
     return false;
   }
 
-  async recordHistory(userId: bigint, hash: string): Promise<void> {
-    await this.db.insert(schema.passwordHistory).values({ userId, hash });
-    await this.pruneHistory(userId);
-  }
-
   private async pruneHistory(userId: bigint): Promise<void> {
     const kept = await this.db
       .select({ id: schema.passwordHistory.id })
