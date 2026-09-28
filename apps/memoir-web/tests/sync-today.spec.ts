@@ -9,9 +9,9 @@ const NOW = new Date('2026-08-24T12:00:00Z');
 const BROWSER_DAY = '2026-08-24';
 const ACCOUNT_DAY = '2026-08-25';
 
-function accountPage(timezone: string): DeltaPage {
+function accountPage(timezone: string, lastHpDate: string | null = null): DeltaPage {
   const quest = { id: 'q1', name: 'Walk', durationMin: 20, startTimeMin: 420, strictness: 'routine', recurrence: { frequency: 'daily' }, active: true };
-  return { cursor: '1', hasMore: false, domains: { account: [{ id: 'account', timezone }], quests: [quest] }, tombstones: [] };
+  return { cursor: '1', hasMore: false, domains: { account: [{ id: 'account', timezone, lastHpDate }], quests: [quest] }, tombstones: [] };
 }
 
 describe('SyncEngine today', () => {
@@ -59,5 +59,15 @@ describe('SyncEngine today', () => {
       const { engine } = createTestEngine({ today: null });
 
       expect(engine.today).toBe(BROWSER_DAY);
+    }));
+
+  it('should keep to the server’s open day while a backward timezone change leaves the zone’s date behind it', () =>
+    withTimeZone('UTC', async () => {
+      setSystemTime(NOW);
+      const { engine } = createTestEngine({ today: null, pages: [accountPage('UTC', ACCOUNT_DAY)] });
+
+      await engine.start();
+
+      expect(engine.today).toBe(ACCOUNT_DAY);
     }));
 });

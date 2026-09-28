@@ -228,11 +228,17 @@ export class SyncEngine {
     return this.rows;
   }
 
-  /** The server closes days in the account's timezone (docs/memoir.md), so a browser a zone ahead would otherwise stamp tomorrow's occurrence and be refused. */
+  /**
+   * The server closes days in the account's timezone (docs/memoir.md), so a browser a zone ahead would otherwise stamp tomorrow's occurrence and be refused.
+   * After a backward timezone change the server's open day (`lastHpDate`) stays ahead of the zone's date until the zone catches up, and that day is today.
+   */
   get today(): string {
     if (this.options.today) return this.options.today;
-    const timeZone = this.rows.account?.[0]?.['timezone'];
-    return accountDay(typeof timeZone === 'string' ? timeZone : null);
+    const account = this.rows.account?.[0];
+    const timeZone = account?.['timezone'];
+    const zoneDay = accountDay(typeof timeZone === 'string' ? timeZone : null);
+    const openDay = account?.['lastHpDate'];
+    return typeof openDay === 'string' && openDay > zoneDay ? openDay : zoneDay;
   }
 
   /**
