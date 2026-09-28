@@ -8,6 +8,7 @@ import { ConsoleSendLimiter } from '@modules/notification/console-send-limiter.s
 import { ConsoleSendService } from '@modules/notification/console-send.service';
 import { ChannelNotificationStatus, type NotificationService, NotificationStatus } from '@modules/notification/notification.service';
 import { type ResolvedTemplate, type TemplateResolverService } from '@modules/template';
+import { AppErrorCode } from '@server/classes';
 import { type Notification, type Template } from '@server/database';
 import { BASELINE_TEMPLATES } from '@server/database/seed/baseline.data';
 
@@ -164,11 +165,17 @@ describe('ConsoleSendService', () => {
   });
 
   describe('audit', () => {
-    it('should log one info line naming the actor, template, channels, masked recipients and job ids', async () => {
+    it('should log one info line naming the actor, template, routing service, locale, channels, masked recipients and job ids', async () => {
       const { service } = setup();
       const info = spyOn(service['logger'], 'info');
 
-      await service.send({ templateKey: 'sign-up', recipients: { email: EMAIL, phone: PHONE }, payload: { name: 'Ada Lovelace', brand: 'Evil' } });
+      await service.send({
+        templateKey: 'sign-up',
+        recipients: { email: EMAIL, phone: PHONE },
+        payload: { name: 'Ada Lovelace', brand: 'Evil' },
+        service: 'identity',
+        locale: 'en-GB',
+      });
 
       expect(info).toHaveBeenCalledTimes(1);
       const [message, metadata] = info.mock.calls[0] ?? [];
@@ -177,6 +184,8 @@ describe('ConsoleSendService', () => {
         actor: ADMIN.sub,
         organisation: '7',
         templateKey: 'sign-up',
+        service: 'identity',
+        locale: 'en-GB',
         channels: ['EMAIL', 'SMS'],
         recipients: { email: 'j***@e***.com', phone: '***23' },
         jobIds: ['11', '12'],
@@ -188,6 +197,18 @@ describe('ConsoleSendService', () => {
       expect(line).not.toContain('jane');
       expect(line).not.toContain('5550123');
       expect(line).not.toContain('Ada Lovelace');
+    });
+
+    it('should still audit a send that fails after resolving, with the error code and no job ids', async () => {
+      const { service, sendResolved } = setup();
+      sendResolved.mockImplementationOnce(() => Promise.reject(AppErrorCode.UNKNOWN.create()));
+      const info = spyOn(service['logger'], 'info');
+
+      await refusal(service.send({ templateKey: 'sign-up', recipients: { email: EMAIL } }));
+
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(info.mock.calls[0]?.[0]).toBe('Console notification send failed');
+      expect(info.mock.calls[0]?.[1]).toMatchObject({ templateKey: 'sign-up', channels: ['EMAIL', 'SMS'], status: 'ERROR', errorCode: 'UNKNOWN', jobIds: [] });
     });
 
     it('should mask a push token down to its last two characters', async () => {

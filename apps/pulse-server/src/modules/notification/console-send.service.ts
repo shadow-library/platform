@@ -1,5 +1,5 @@
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
 import { TemplateResolverService } from '@modules/template';
@@ -24,7 +24,7 @@ export class ConsoleSendService {
 
   async send(config: SendNotificationConfig): Promise<SendNotificationResult> {
     const actor = this.context.getAuthPrincipal();
-    const attempt = { actor: actor.sub, organisation: actor.org, templateKey: config.templateKey };
+    const attempt = { actor: actor.sub, organisation: actor.org, templateKey: config.templateKey, service: config.service, locale: config.locale };
 
     const admission = this.limiter.admit(actor.sub);
     if (!admission.admitted) {
@@ -35,20 +35,27 @@ export class ConsoleSendService {
 
     const resolved = await this.templateResolver.resolveForSend(config.templateKey);
     if (!isConsoleSendable(resolved.template)) {
-      this.logger.warn('Refused a console send of an authentication or security template', attempt);
+      this.logger.warn('Refused a console send of an identity, authentication or security template', attempt);
       throw AppErrorCode.NTF_005.create();
     }
 
     const { payload, strippedKeys } = withoutRenderGlobals(resolved.template.variableSchema, config.payload);
-    const result = await this.notificationService.sendResolved(resolved, { ...config, payload });
-    this.logger.info('Console notification sent', {
+    const audit = {
       ...attempt,
-      channels: result.channelResults.map(channelResult => channelResult.channel),
+      channels: resolved.enabledChannels,
       recipients: maskRecipients(config.recipients),
-      jobIds: result.channelResults.flatMap(channelResult => (channelResult.jobId ? [channelResult.jobId] : [])),
-      status: result.status,
       strippedPayloadKeys: strippedKeys,
-    });
-    return result;
+    };
+    try {
+      const result = await this.notificationService.sendResolved(resolved, { ...config, payload });
+      const jobIds = result.channelResults.flatMap(channelResult => (channelResult.jobId ? [channelResult.jobId] : []));
+      this.logger.info('Console notification sent', { ...audit, jobIds, status: result.status });
+      return result;
+    } catch (error) {
+      /** A channel's job may already have fired when a sibling channel throws, so the attempt is audited even without its job ids. */
+      const errorCode = error instanceof AppError ? error.code : 'UNKNOWN_ERROR';
+      this.logger.info('Console notification send failed', { ...audit, jobIds: [], status: 'ERROR', errorCode });
+      throw error;
+    }
   }
 }
