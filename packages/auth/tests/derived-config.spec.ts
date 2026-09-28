@@ -233,6 +233,14 @@ describe('sensitive scopes', () => {
     expect(new URL(started.url).searchParams.get('scope')).toBe(`openid profile reports:read ${SENSITIVE}`);
   });
 
+  it('should let a scopes override pin the sensitive scopes too, keeping a named one off plain mints', async () => {
+    const pinned = (scopes: string[]): AppSessionService =>
+      new AppSessionService(auth, resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true, scopes }));
+
+    await expect(pinned(['reports:read']).warmUp()).resolves.toMatchObject({ scopes: ['openid', 'profile', 'reports:read'], sensitiveScopes: [] });
+    await expect(pinned(['reports:read', SENSITIVE]).warmUp()).resolves.toMatchObject({ scopes: ['openid', 'profile', 'reports:read'], sensitiveScopes: [SENSITIVE] });
+  });
+
   it('should request a sensitive scope only on an elevated mint, never on a plain one', async () => {
     const handle = await signIn();
 

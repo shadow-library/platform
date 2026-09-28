@@ -491,14 +491,17 @@ export class AppSessionService {
      * without this an app requests `scope=` empty, the session consents to nothing, and identity
      * has no basis on which to release the signed-in person's own name back to it. Identity honours
      * them for any client without a grant, so adding them costs no registration change anywhere.
+     * An override pins the whole set, so it decides which sensitive scopes are asked for as well; a
+     * sensitive scope it names still belongs to the elevated set, never to a plain mint.
      */
-    const scopes = [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])];
+    const sensitiveScopes = registration.sensitiveScopes.filter(scope => !this.config.scopes || this.config.scopes.includes(scope));
+    const scopes = [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])].filter(scope => !sensitiveScopes.includes(scope));
     const runtime: BrowserAuthRuntime = {
       clientId: registration.appId,
       audience,
       redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris, requestOrigin),
       scopes,
-      sensitiveScopes: registration.sensitiveScopes.filter(scope => !scopes.includes(scope)),
+      sensitiveScopes,
       stepUpUrl: stepUpEndpoint,
     };
     this.derived = { registration, requestOrigin, runtime };
