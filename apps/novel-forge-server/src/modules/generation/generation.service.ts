@@ -597,7 +597,7 @@ export class GenerationService {
 
     // The approval, its audit row and the brief's provisional reveals commit together, and only for the revision the author read. Approving
     // as written clears only the stale reason the author saw; the prose is unchanged, so nothing built on it goes stale.
-    // `idempotencyKey` (unique) makes a retried approve a no-op instead of a duplicate approval row.
+    // `idempotencyKey` (unique per project) makes a retried approve a no-op instead of a duplicate approval row.
     const updated = await this.db.transaction(async tx => {
       await lockProjectPlan(tx, projectId);
       await assertPlanRevealsHold(tx, projectId, chapter);
@@ -628,7 +628,7 @@ export class GenerationService {
           idempotencyKey: body.idempotencyKey ?? null,
           note: keptStale ? `${APPROVED_AS_WRITTEN_PREFIX}${keptStale}` : null,
         })
-        .onConflictDoNothing({ target: schema.userFeedback.idempotencyKey });
+        .onConflictDoNothing({ target: [schema.userFeedback.projectId, schema.userFeedback.idempotencyKey] });
 
       const reveals = await ledgerBriefReveals(tx, projectId, chapter, row.revision);
       if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, revision: row.revision, applied: reveals.applied });

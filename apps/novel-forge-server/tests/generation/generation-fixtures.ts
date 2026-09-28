@@ -30,6 +30,7 @@ export interface RecordedWrite {
   values?: Record<string, unknown>;
   where?: SQL;
   setWhere?: SQL;
+  conflictTarget?: unknown;
 }
 
 export interface KnowledgeFixture {
@@ -154,7 +155,10 @@ export function fakeGenerationDb(options: FakeGenerationDbOptions = {}): FakeGen
         writes.push(write);
         return {
           returning: () => resultFor(table),
-          onConflictDoNothing: () => Object.assign(Promise.resolve(undefined), { returning: () => resultFor(table) }),
+          onConflictDoNothing: (config?: { target?: unknown }) => {
+            write.conflictTarget = config?.target;
+            return Object.assign(Promise.resolve(undefined), { returning: () => resultFor(table) });
+          },
           onConflictDoUpdate: (config: { setWhere?: SQL }) => {
             write.kind = 'upsert';
             write.setWhere = config.setWhere;

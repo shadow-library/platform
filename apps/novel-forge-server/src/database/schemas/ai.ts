@@ -285,7 +285,7 @@ export const userFeedback = pgTable(
   },
   t => [
     index('user_feedback_project_id_artifact_type_artifact_ref_idx').on(t.projectId, t.artifactType, t.artifactRef),
-    unique('user_feedback_idempotency_key_unique').on(t.idempotencyKey),
+    unique('user_feedback_project_id_idempotency_key_unique').on(t.projectId, t.idempotencyKey),
   ],
 );
 

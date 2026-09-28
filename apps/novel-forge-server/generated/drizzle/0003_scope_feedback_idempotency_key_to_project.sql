@@ -1,0 +1,2 @@
+ALTER TABLE "user_feedback" DROP CONSTRAINT "user_feedback_idempotency_key_unique";--> statement-breakpoint
+ALTER TABLE "user_feedback" ADD CONSTRAINT "user_feedback_project_id_idempotency_key_unique" UNIQUE("project_id","idempotency_key");
