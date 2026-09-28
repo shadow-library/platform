@@ -5,6 +5,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { ActorModule } from '@modules/actor';
 
 import { JobsModule } from '../jobs/jobs.module';
+import { ImportAdmissionGuard } from './import-admission.middleware';
 import { NovelImportController } from './novel-import.controller';
 import { NovelImportService } from './novel-import.service';
 
@@ -14,7 +15,7 @@ import { NovelImportService } from './novel-import.service';
 // avoid, unlike the Publishing split (see PublishingHttpModule).
 @Module({
   imports: [ActorModule, DatabaseModule, JobsModule, FastifyModule],
-  controllers: [NovelImportController],
+  controllers: [NovelImportController, ImportAdmissionGuard],
   providers: [NovelImportService],
   exports: [NovelImportService],
 })

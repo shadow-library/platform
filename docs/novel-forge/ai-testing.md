@@ -1425,7 +1425,8 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
   Negatives return 400 with field paths `volumes` / `novel.cover` / `volumes[0].chapters[0].content` (the whitespace-only body clears the DTO's `minLength: 1` and is
   caught by `validateNovelBundle`, not AJV); a `mode` other than `final` is an AJV enum error.
 - **Fails when:** 400 `ValidationError` field errors; `PRJ_004`; job `failed` mid-batch leaves the project with partial chapters (`jobs.last_error`); a `413` past the
-  route's 16 MiB, or a 400 on field `bundle` when the content alone passes the same ceiling.
+  route's 16 MiB (the validator's content ceiling is the same figure, so its field-`bundle` 400 cannot fire through this route); a `429 IMP_001` with
+  `Retry-After` while two imports are already in flight on the replica.
 
 ---
 

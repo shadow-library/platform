@@ -427,4 +427,9 @@ export class AppErrorCode extends ServerErrorCode {
    */
   static readonly BRG_001 = AppErrorCode.badRequest('BRG_001', 'Chapter {chapter} is not an unrestricted chapter, so it has no bridge — standard chapters read its prose directly');
   static readonly BRG_002 = AppErrorCode.badRequest('BRG_002', 'Chapter {chapter} is not final — its bridge is read when you approve it');
+
+  /*!
+   * Novel import errors
+   */
+  static readonly IMP_001 = AppErrorCode.badRequest('IMP_001', 'Too many novel imports are running right now — try again shortly', 429);
 }
