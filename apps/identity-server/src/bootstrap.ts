@@ -1,5 +1,7 @@
 import { Config } from '@shadow-library/common';
 
+import { M2M_CLIENT_DEFAULT_LIMITS, USERINFO_SUBJECT_DEFAULT_LIMIT } from '@server/modules/infrastructure/security/security.constants';
+
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
     'server.port': number;
@@ -17,6 +19,12 @@ declare module '@shadow-library/common' {
     'rate-limit.enabled': boolean;
     /** Comma-separated client IPs exempt from rate limiting. */
     'rate-limit.ip-allowlist': string;
+    /** Per-client requests a minute, across every replica, for the token endpoint and app-session opens and mints. */
+    'rate-limit.m2m.session-limit': number;
+    /** Per-client requests a minute, across every replica, for PDP checks, the user directory and userinfo. */
+    'rate-limit.m2m.authz-limit': number;
+    /** Userinfo requests a minute for one user's tokens from one client. */
+    'rate-limit.userinfo.subject-limit': number;
     /** Relaxes the HTTPS/public-address webhook target guard for local development and tests. */
     'webhooks.allow-insecure-targets': boolean;
 
@@ -62,6 +70,9 @@ Config.load('auth.workload.sa-token-path', { defaultValue: '/var/run/secrets/kub
 
 Config.load('rate-limit.enabled', { defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { defaultValue: '' });
+Config.load('rate-limit.m2m.session-limit', { defaultValue: String(M2M_CLIENT_DEFAULT_LIMITS.session), validateType: 'number' });
+Config.load('rate-limit.m2m.authz-limit', { defaultValue: String(M2M_CLIENT_DEFAULT_LIMITS.authz), validateType: 'number' });
+Config.load('rate-limit.userinfo.subject-limit', { defaultValue: String(USERINFO_SUBJECT_DEFAULT_LIMIT), validateType: 'number' });
 
 Config.load('webhooks.allow-insecure-targets', { defaultValue: 'false', validateType: 'boolean' });
 

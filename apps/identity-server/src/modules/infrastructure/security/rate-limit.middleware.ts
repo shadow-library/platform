@@ -9,7 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RATE_LIMIT_METADATA, RateLimitPolicy } from './rate-limit.decorator';
 import { RateDecision, RateLimiterService } from './rate-limiter.service';
-import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
+import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET, type M2MBudgetClass } from './security.constants';
 import { ServiceCallerService } from './service-caller.service';
 
 @Middleware({ type: 'onRequest', weight: 95 })
@@ -32,7 +32,8 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler {
     const policy = metadata[RATE_LIMIT_METADATA] as RateLimitPolicy | undefined;
-    const isM2M = metadata[M2M_BUDGET_METADATA] === true;
+    const m2mBudget = metadata[M2M_BUDGET_METADATA] as M2MBudgetClass | undefined;
+    const isM2M = m2mBudget !== undefined;
 
     return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       if (!this.rateLimiter.enabled) return;
@@ -44,8 +45,8 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
       if (blockTtl) return this.reject(reply, blockTtl);
 
       const serviceClientId = isM2M ? this.serviceCaller.clientIdOf(request) : null;
-      if (serviceClientId) {
-        const budget = await this.guarded(() => this.rateLimiter.consumeClientBudget(serviceClientId), true);
+      if (serviceClientId && m2mBudget) {
+        const budget = await this.guarded(() => this.rateLimiter.consumeClientBudget(serviceClientId, m2mBudget), true);
         if (budget && !budget.allowed) return this.reject(reply, budget.retryAfterSeconds);
         return;
       }

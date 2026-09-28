@@ -6,15 +6,14 @@ import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 import {
-  GENERAL_LIMIT,
-  GENERAL_WINDOW_SECONDS,
-  IP_GENERAL_BUCKET,
-  M2M_CLIENT_BUCKET,
-  M2M_CLIENT_LIMIT,
+  M2M_CLIENT_BUCKETS,
   M2M_CLIENT_WINDOW_SECONDS,
+  type M2MBudgetClass,
   OAUTH_PUBLIC_CLIENT_BUCKET,
   OAUTH_PUBLIC_CLIENT_LIMIT,
   OAUTH_PUBLIC_CLIENT_WINDOW_SECONDS,
+  USERINFO_SUBJECT_BUCKET,
+  USERINFO_SUBJECT_WINDOW_SECONDS,
 } from './security.constants';
 
 export interface RateDecision {
@@ -34,6 +33,8 @@ export class RateLimiterService {
   private readonly logger = Logger.getLogger(APP_NAME, RateLimiterService.name);
   private readonly redis: Redis;
   private readonly allowlist: Set<string>;
+  private readonly clientLimits: Record<M2MBudgetClass, number>;
+  private readonly userInfoLimit: number;
 
   enabled: boolean;
 
@@ -46,6 +47,8 @@ export class RateLimiterService {
         .map(ip => ip.trim())
         .filter(Boolean),
     );
+    this.clientLimits = { session: Config.get('rate-limit.m2m.session-limit'), authz: Config.get('rate-limit.m2m.authz-limit') };
+    this.userInfoLimit = Config.get('rate-limit.userinfo.subject-limit');
   }
 
   isAllowlisted(ip: string): boolean {
@@ -80,15 +83,16 @@ export class RateLimiterService {
   }
 
   /** The caller refuses a disallowed decision itself, because only it can reach the reply that must carry `Retry-After`. */
-  async consumeClientBudget(clientId: string): Promise<RateDecision> {
-    const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
-    if (!decision.allowed) this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
+  async consumeClientBudget(clientId: string, budget: M2MBudgetClass): Promise<RateDecision> {
+    const decision = await this.consume(M2M_CLIENT_BUCKETS[budget], clientId, this.clientLimits[budget], M2M_CLIENT_WINDOW_SECONDS);
+    if (!decision.allowed) this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId, budget });
     return decision;
   }
 
-  async consumeAddressBudget(ip: string): Promise<RateDecision> {
-    if (this.isAllowlisted(ip)) return { allowed: true, remaining: GENERAL_LIMIT, retryAfterSeconds: 0 };
-    return this.consume(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS);
+  async consumeUserInfoBudget(clientId: string, subject: string): Promise<RateDecision> {
+    const decision = await this.consume(USERINFO_SUBJECT_BUCKET, `${clientId}:${subject}`, this.userInfoLimit, USERINFO_SUBJECT_WINDOW_SECONDS);
+    if (!decision.allowed) this.logger.warn('userinfo budget exceeded for a user token', { securityEvent: 'security.userinfo_rate_limited', clientId, subject });
+    return decision;
   }
 
   async consumePublicClientBudget(clientId: string, ip: string): Promise<RateDecision> {

@@ -13,7 +13,7 @@ import { ServiceCallerService } from './service-caller.service';
 const UNAUTHENTICATED_STATUSES = new Set([401, 403]);
 
 /**
- * The second half of the per-client M2M budget (T-804). On a route marked `@M2MBudget()`,
+ * The second half of the per-client M2M budget (T-804). On a route marked `@M2MBudget(...)`,
  * `RateLimitMiddleware` charges a verified first-party service to its client and only *reads* the IP
  * counter for anyone else, so something has to count the requests that never reach a client budget —
  * otherwise the IP tier would be free on exactly the endpoints an attacker floods without credentials.
@@ -39,7 +39,7 @@ export class M2MRateLimitMiddleware implements MiddlewareGenerator {
   }
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
-    if (metadata[M2M_BUDGET_METADATA] !== true) return undefined;
+    if (metadata[M2M_BUDGET_METADATA] === undefined) return undefined;
 
     return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       if (!this.rateLimiter.enabled) return;

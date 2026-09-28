@@ -465,13 +465,8 @@ export class OAuthService {
     return { accessToken, tokenType: 'Bearer', expiresIn, scope: '', issuedTokenType: ACCESS_TOKEN_TYPE };
   }
 
-  /** Userinfo is presented with a user's token, so the caller is whoever holds it: a confidential client's own backend, or a public client's user at their address. */
-  async consumeUserInfoBudget(clientId: unknown): Promise<void> {
-    const client = typeof clientId === 'string' ? await this.clientService.getClient(clientId) : null;
-    const budget =
-      client && client.tokenEndpointAuthMethod !== 'none'
-        ? await this.rateLimiterService.consumeClientBudget(client.id)
-        : await this.rateLimiterService.consumeAddressBudget(Context.getClientInfo().ip);
+  async consumeUserInfoBudget(clientId: unknown, subject: string): Promise<void> {
+    const budget = await this.rateLimiterService.consumeUserInfoBudget(typeof clientId === 'string' ? clientId : '', subject);
     if (!budget.allowed) throw this.tooManyRequests(budget.retryAfterSeconds);
   }
 
@@ -726,7 +721,7 @@ export class OAuthService {
     const budget =
       client.tokenEndpointAuthMethod === 'none'
         ? await this.rateLimiterService.consumePublicClientBudget(client.id, Context.getClientInfo().ip)
-        : await this.rateLimiterService.consumeClientBudget(client.id);
+        : await this.rateLimiterService.consumeClientBudget(client.id, 'session');
     if (!budget.allowed) throw this.tooManyRequests(budget.retryAfterSeconds);
     return client;
   }

@@ -59,7 +59,14 @@ export function oauthClient(overrides: Partial<OAuthClient> = {}): OAuthClient {
 }
 
 export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
-  setConfig({ 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '', 'oauth.login-url': 'https://identity.example.com/login' });
+  setConfig({
+    'rate-limit.enabled': true,
+    'rate-limit.ip-allowlist': '',
+    'rate-limit.m2m.session-limit': 600,
+    'rate-limit.m2m.authz-limit': 1200,
+    'rate-limit.userinfo.subject-limit': 60,
+    'oauth.login-url': 'https://identity.example.com/login',
+  });
   const client = oauthClient(options.client);
   const scopes = options.scopes ?? [];
   const redis = new InMemoryRedis();

@@ -96,7 +96,7 @@ export class OAuthController {
 
   @Post('/oauth2/token')
   @Auth({ public: true })
-  @M2MBudget()
+  @M2MBudget('session')
   @RespondFor(200, TokenResponse)
   async exchangeToken(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
     this.assertFormEncoded(request);
@@ -131,7 +131,7 @@ export class OAuthController {
 
   @Get('/oauth2/userinfo')
   @Auth({ public: true })
-  @M2MBudget()
+  @M2MBudget('authz')
   @RespondFor(200, UserInfoResponse)
   async getUserInfo(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<UserInfoResponse> {
     const header = request.headers.authorization;
@@ -140,7 +140,7 @@ export class OAuthController {
     const claims = this.keyService.verify(token);
     if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw this.invalidToken(reply);
     if (claims.token_type === 'service' || claims.token_type === 'bot') throw this.invalidToken(reply);
-    await this.oauthService.consumeUserInfoBudget(claims.client_id);
+    await this.oauthService.consumeUserInfoBudget(claims.client_id, claims.sub);
 
     const userId = BigInt(claims.sub);
     const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);

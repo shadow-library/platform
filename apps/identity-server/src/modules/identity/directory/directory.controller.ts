@@ -8,7 +8,7 @@ import { DirectoryService } from './directory.service';
 
 @HttpController('/api/v1/internal')
 @Auth({ service: 'users:resolve' })
-@M2MBudget()
+@M2MBudget('authz')
 export class DirectoryController {
   constructor(private readonly directoryService: DirectoryService) {}
 

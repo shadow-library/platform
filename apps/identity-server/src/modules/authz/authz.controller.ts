@@ -10,7 +10,7 @@ import { ServiceAccessService } from './service-access.service';
 
 @HttpController('/api/v1/authz')
 @Auth({ service: 'authz:check' })
-@M2MBudget()
+@M2MBudget('authz')
 export class AuthzController {
   constructor(
     private readonly pdp: PolicyDecisionService,

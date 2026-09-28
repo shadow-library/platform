@@ -24,7 +24,7 @@ import { AppSessionService } from './app-session.service';
 
 @HttpController('/api/v1/app-sessions')
 @Auth({ service: APP_SESSION_SCOPE })
-@M2MBudget()
+@M2MBudget('session')
 export class AppSessionController {
   constructor(
     private readonly appSessionService: AppSessionService,

@@ -12,7 +12,7 @@ import { M2M_BUDGET_METADATA } from '@server/modules/infrastructure/security/m2m
 import { M2MRateLimitMiddleware } from '@server/modules/infrastructure/security/m2m-rate-limit.middleware';
 import { RateLimitMiddleware } from '@server/modules/infrastructure/security/rate-limit.middleware';
 import { RateLimiterService } from '@server/modules/infrastructure/security/rate-limiter.service';
-import { GENERAL_LIMIT, IP_GENERAL_BUCKET, M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT } from '@server/modules/infrastructure/security/security.constants';
+import { GENERAL_LIMIT, IP_GENERAL_BUCKET, M2M_CLIENT_BUCKETS, M2M_CLIENT_DEFAULT_LIMITS } from '@server/modules/infrastructure/security/security.constants';
 import { ServiceCallerService } from '@server/modules/infrastructure/security/service-caller.service';
 
 const ISSUER = 'https://identity.example.com';
@@ -27,7 +27,10 @@ const TOKENS: Record<string, JwtClaims> = {
   foreignAudience: { iss: ISSUER, aud: 'api://novel-forge', token_type: 'service', client_id: FORGE, sub: FORGE, exp: inAnHour() },
 };
 
-const M2M_ROUTE = { method: 'POST', path: '/api/v1/authz/check', [M2M_BUDGET_METADATA]: true } as unknown as HandlerMetadata;
+const M2M_ROUTE = { method: 'POST', path: '/api/v1/authz/check', [M2M_BUDGET_METADATA]: 'authz' } as unknown as HandlerMetadata;
+const SESSION_ROUTE = { method: 'POST', path: '/api/v1/app-sessions', [M2M_BUDGET_METADATA]: 'session' } as unknown as HandlerMetadata;
+const M2M_CLIENT_BUCKET = M2M_CLIENT_BUCKETS.authz;
+const M2M_CLIENT_LIMIT = M2M_CLIENT_DEFAULT_LIMITS.authz;
 const HUMAN_ROUTE = { method: 'GET', path: '/api/v1/me' } as unknown as HandlerMetadata;
 
 interface RecordingReply {
@@ -64,7 +67,13 @@ describe('RateLimitMiddleware budget selection', () => {
     outcome(onRequest.generate(metadata)(requestFrom(bearer), reply as unknown as FastifyReply) as Promise<void>);
 
   beforeEach(() => {
-    setConfig({ 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '', 'oauth.issuer': ISSUER });
+    setConfig({
+      'rate-limit.enabled': true,
+      'rate-limit.ip-allowlist': '',
+      'rate-limit.m2m.session-limit': M2M_CLIENT_DEFAULT_LIMITS.session,
+      'rate-limit.m2m.authz-limit': M2M_CLIENT_DEFAULT_LIMITS.authz,
+      'oauth.issuer': ISSUER,
+    });
     redis = new InMemoryRedis();
     const rateLimiter = new RateLimiterService(new FakeDatabaseService({ redis }));
     verifications = 0;
@@ -132,5 +141,13 @@ describe('RateLimitMiddleware budget selection', () => {
     await onResponse.generate(M2M_ROUTE)?.(serviceRequest, reply as unknown as FastifyReply);
 
     expect(verifications).toBe(1);
+  });
+
+  it("should keep a burst of permission checks from spending the budget the same client's sign-ins need", async () => {
+    await spend(M2M_CLIENT_BUCKETS.authz, FORGE, M2M_CLIENT_DEFAULT_LIMITS.authz);
+
+    expect(AppError.is(await request(M2M_ROUTE, 'service'), AppErrorCode.SEC_001)).toBe(true);
+    expect(await request(SESSION_ROUTE, 'service')).toBe('served');
+    expect(await counter(M2M_CLIENT_BUCKETS.session, FORGE)).toBe(1);
   });
 });
