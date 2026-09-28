@@ -376,9 +376,7 @@ test.describe('memoir quests', () => {
       expect(await rescheduleEvents(subject.accountId)).toHaveLength(3);
     });
 
-    test.fixme('should count only reschedules inside an occurrence’s own 7-day window, never later ones (app bug: apps/memoir-server/src/modules/quests/quest-log.repository.ts:194 bounds the window below only, so later reschedules count against an earlier occurrence)', async ({
-      memoir,
-    }) => {
+    test('should count only reschedules inside an occurrence’s own 7-day window, never later ones', async ({ memoir }) => {
       const subject = await rolloverSubject(memoir, 'quest-reschedule-window');
       const today = localToday();
       const questId = await createQuest(subject.ctx, { strictness: 'routine', startDate: addDays(today, -20) });
