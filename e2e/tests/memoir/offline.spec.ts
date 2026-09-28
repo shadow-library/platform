@@ -68,11 +68,7 @@ test.describe('memoir outbox — CSRF refusals', () => {
     expect(findSetCookie(read, 'csrf-token'), 'a valid, unexpired token must not be replaced').toBeUndefined();
   });
 
-  test.fixme('should flush a command the server refused with S010 without the user asking again (app bug: sync-engine.ts:410-418 never schedules a retry)', async ({
-    page,
-    context,
-    memoir,
-  }) => {
+  test('should flush a command the server refused with S010 without the user asking again', async ({ page, context, memoir }) => {
     const persona = await memoir.persona({ label: 'csrf-retry', onboard: true });
     await memoir.signInBrowser(context, persona);
     const questName = `E2E csrf retry ${Date.now()}`;
