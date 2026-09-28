@@ -77,7 +77,7 @@ export class MfaService {
 
   async getFactors(userId: bigint): Promise<MfaFactors> {
     const enrollment = await this.db.query.mfaEnrollments.findFirst({
-      where: and(eq(schema.mfaEnrollments.userId, userId), isNotNull(schema.mfaEnrollments.verifiedAt)),
+      where: and(eq(schema.mfaEnrollments.userId, userId), eq(schema.mfaEnrollments.type, 'TOTP'), isNotNull(schema.mfaEnrollments.verifiedAt)),
       columns: { id: true },
     });
     const credential = await this.db.query.webauthnCredentials.findFirst({ where: eq(schema.webauthnCredentials.userId, userId), columns: { id: true } });
