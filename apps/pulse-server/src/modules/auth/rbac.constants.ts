@@ -18,6 +18,8 @@ export const PULSE_PERMISSIONS = {
   logsRead: 'pulse:logs:read',
   /** High-trust: the dev message log exposes recipient PII and rendered bodies (OTP codes, reset links), so it is admin-only, unlike the viewer-held logsRead */
   messagesRead: 'pulse:messages:read',
+  /** The console's manual send, which the service-only producer route never admits; admin-only */
+  notificationsSend: 'pulse:notifications:send',
 } as const;
 
 export const PULSE_SCOPES = {

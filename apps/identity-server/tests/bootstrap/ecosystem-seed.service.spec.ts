@@ -33,7 +33,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
     return Promise.resolve(created);
   });
   const ensurePermission = mock((applicationId: number, name: string) => Promise.resolve(permissionId(applicationId, name)));
-  const grantPermissionToRole = mock(() => Promise.resolve());
+  const grantPermissionToRole = mock<(roleId: number, permissionId: string) => Promise<void>>(() => Promise.resolve());
   const assignRole = mock(() => Promise.resolve());
 
   const applicationService = { getApplication: (name: string) => applications.get(name), getApplicationOrThrow: (name: string) => applications.get(name) };
@@ -74,6 +74,21 @@ describe('EcosystemSeedService', () => {
       expect(seed.grantPermissionToRole).toHaveBeenCalledWith(pulseAdmin.id, permissionId(pulseId, 'pulse:messages:read'));
       expect(seed.grantPermissionToRole).not.toHaveBeenCalledWith(1, permissionId(pulseId, 'pulse:messages:read'));
       expect(seed.addRole).not.toHaveBeenCalled();
+    });
+
+    it('should grant the console send permission to an existing PulseAdmin role and to no other pulse role', async () => {
+      const roles = [
+        { id: 1, roleName: 'PulseViewer' },
+        { id: 2, roleName: 'PulseOperator' },
+        { id: 3, roleName: 'PulseAdmin' },
+      ];
+      const seed = seedOver({ pulse: roles });
+      const consoleSend = permissionId(seed.applications.get('pulse')?.id ?? 0, 'pulse:notifications:send');
+
+      await seed.service.seed(OPERATOR);
+
+      const grantedTo = seed.grantPermissionToRole.mock.calls.filter(([, permission]) => permission === consoleSend).map(([roleId]) => roleId);
+      expect(grantedTo).toEqual([3]);
     });
 
     it('should leave the catalogue of an application that pushes its own to that application once it exists', async () => {
