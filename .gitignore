@@ -7,8 +7,9 @@ dist/
 coverage/
 CHANGELOG.md
 
-# Logs
-logs/
+# Logs — runtime output only; a bare logs/ would also hide source directories named logs
+/logs/
+apps/*-server/logs/
 *.log
 npm-debug.log*
 
