@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BottomNavigation, IconButton, Kbd, matchPath, Tooltip, useMediaQuery, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 
 import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HistoryIcon, HomeIcon, MoonIcon, SearchIcon, SettingsSlidersIcon, SunIcon, TagIcon } from '@/components/icons';
 import { SearchOverlay } from '@/features/search';
 import { loginUrl, meQuery, purgeOnLogout, sessionQueryOptions, signOut, useNotifications } from '@/lib/apis';
-import { NOVEL_FORGE_URL } from '@/lib/constants';
+import { useNovelForgeUrl } from '@/lib/runtime-config';
 
 import styles from './app-shell.module.css';
 
@@ -58,12 +58,14 @@ const SECONDARY_NAV: NavLeaf[] = [
   { to: '/notifications', label: 'Notifications', icon: <BellIcon size={16} /> },
   { to: '/settings', label: 'Settings', icon: <SettingsSlidersIcon size={16} /> },
   { to: '/help', label: 'Help', icon: <HelpIcon size={16} /> },
-  // Novel Forge is a separate service, so this is a real external link, not SPA nav. It sits among the
-  // destinations rather than in a footer slot, because to a reader it is simply somewhere else to go.
-  { to: NOVEL_FORGE_URL, label: 'Write a novel', icon: <PencilIcon size={16} />, external: true },
 ];
 
-const NAV: NavConfig = { variant: 'sections', sections: [{ items: MAIN_NAV }, { items: SECONDARY_NAV }] };
+// Novel Forge is a separate service, so this is a real external link, not SPA nav. It sits among the
+// destinations rather than in a footer slot, because to a reader it is simply somewhere else to go.
+function navConfig(novelForgeUrl: string | null): NavConfig {
+  const secondary = novelForgeUrl ? [...SECONDARY_NAV, { to: novelForgeUrl, label: 'Write a novel', icon: <PencilIcon size={16} />, external: true }] : SECONDARY_NAV;
+  return { variant: 'sections', sections: [{ items: MAIN_NAV }, { items: secondary }] };
+}
 
 export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const location = useLocation();
@@ -73,6 +75,8 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const isPhone = useMediaQuery('(max-width: 767px)');
   const [searchOpen, setSearchOpen] = useState(false);
+  const novelForgeUrl = useNovelForgeUrl();
+  const nav = useMemo(() => navConfig(novelForgeUrl), [novelForgeUrl]);
 
   const user = session.data ?? undefined;
   // The name lives on its own query, not the session: the session gates routes, and a profile that
@@ -106,7 +110,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   return (
     <Chrome
       brand={{ icon: <BookIcon size={18} />, name: 'Shadow', tagline: 'Webnovel', to: '/' }}
-      nav={NAV}
+      nav={nav}
       account={
         user
           ? { name: me.data?.name ?? 'Reader', email: me.data?.email, onSignOut: () => void onSignOut() }

@@ -8,7 +8,7 @@ import { Cover, formatCount, NovelCard } from '@/components/novel';
 import styles from '@/features/home/home-screen.module.css';
 import { catalogQueryOptions, progressQueryOptions, sessionQueryOptions } from '@/lib/apis';
 import { type NovelSummary, type ReadingProgress } from '@/lib/apis/types';
-import { NOVEL_FORGE_URL } from '@/lib/constants';
+import { useNovelForgeUrl } from '@/lib/runtime-config';
 
 interface ContinueItem {
   novel: NovelSummary;
@@ -249,30 +249,34 @@ function RankedCard({ novel, rank }: { novel: NovelSummary; rank: number }): Rea
   );
 }
 
-function PromoSection(): React.JSX.Element {
+function PromoSection(): React.JSX.Element | null {
   const install = usePwaInstall();
+  const novelForgeUrl = useNovelForgeUrl();
 
   const onInstall = async (): Promise<void> => {
     const outcome = await install.promptInstall();
     if (outcome === 'unavailable') toast.info('On iOS Safari, tap Share → Add to Home Screen to install.');
   };
 
+  if (!novelForgeUrl && install.isInstalled) return null;
   return (
     <section className={styles.promos}>
-      <div className={styles.promoForge}>
-        <div className={styles.promoKicker}>
-          <ExternalIcon size={13} /> Separate service
+      {novelForgeUrl && (
+        <div className={styles.promoForge}>
+          <div className={styles.promoKicker}>
+            <ExternalIcon size={13} /> Separate service
+          </div>
+          <h3 className={styles.promoTitle}>Have a story to tell?</h3>
+          <p className={styles.promoText}>
+            Publish and manage your own webnovels in <strong>Novel Forge</strong>, our dedicated writing studio.
+          </p>
+          <Button variant="secondary" asChild>
+            <a href={novelForgeUrl} target="_blank" rel="noreferrer">
+              Open Novel Forge
+            </a>
+          </Button>
         </div>
-        <h3 className={styles.promoTitle}>Have a story to tell?</h3>
-        <p className={styles.promoText}>
-          Publish and manage your own webnovels in <strong>Novel Forge</strong>, our dedicated writing studio.
-        </p>
-        <Button variant="secondary" asChild>
-          <a href={NOVEL_FORGE_URL} target="_blank" rel="noreferrer">
-            Open Novel Forge
-          </a>
-        </Button>
-      </div>
+      )}
       {!install.isInstalled && (
         <div className={styles.promoInstall}>
           <div className={styles.promoKicker}>

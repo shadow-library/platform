@@ -11,6 +11,7 @@ import { pwaHeadLinks, pwaHeadMeta } from '@shadow-library/web/pwa';
 import AppProvider from '@/components/AppProvider';
 import { DefaultCatchBoundary } from '@/components/DefaultCatchBoundary';
 import { NotFound } from '@/components/NotFound';
+import { getPublicRuntimeConfig, type PublicRuntimeConfig } from '@/lib/runtime-config';
 import '@/styles.css';
 
 interface RouterContext {
@@ -30,6 +31,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [{ rel: 'icon', href: '/favicon.svg' }, ...pwaHeadLinks(PWA_HEAD)],
   }),
+  // Loaded once with the SSR document the service worker precaches as the offline shell; a client-side reload would need the network.
+  loader: (): Promise<PublicRuntimeConfig> => getPublicRuntimeConfig().catch(() => ({ novelForgeUrl: null })),
+  staleTime: Infinity,
+  shouldReload: false,
   errorComponent: props => (
     <RootDocument>
       <DefaultCatchBoundary {...props} />
