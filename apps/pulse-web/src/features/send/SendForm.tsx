@@ -1,19 +1,28 @@
-import { type ReactElement, useState } from 'react';
-import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from '@shadow-library/ui';
+import { type ReactElement, useEffect, useState } from 'react';
+import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea, useHydrated } from '@shadow-library/ui';
 
 import { Mono, type Option, OutlineBadge, PageHeader, trimToUndefined } from '@/features/shared';
 import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useConsoleSendMutation, useListTemplatesQuery } from '@/lib';
 
+import { clearSendDraft, consoleSendStepUpUrl, EMPTY_SEND_DRAFT, readSendDraft, stashSendDraft } from './send-draft';
 import { describeSendError } from './send-error';
 import styles from './Send.module.css';
 
-const EMPTY = { templateKey: '', email: '', phone: '', push: '', payload: '', locale: '', service: '' };
-
+/** A form stashed before the step-up round trip lives in browser storage, so it is restored only once hydrated, by remounting the form. */
 export default function SendForm(): ReactElement {
-  const [form, setForm] = useState(EMPTY);
+  const hydrated = useHydrated();
+  return <SendFormBody key={hydrated ? 'restored' : 'server'} restoreDraft={hydrated} />;
+}
+
+function SendFormBody({ restoreDraft }: { restoreDraft: boolean }): ReactElement {
+  const [form, setForm] = useState(() => (restoreDraft ? (readSendDraft() ?? EMPTY_SEND_DRAFT) : EMPTY_SEND_DRAFT));
   const [error, setError] = useState('');
   const [result, setResult] = useState<CreateNotificationResponse | null>(null);
   const mutation = useConsoleSendMutation();
+
+  useEffect(() => {
+    if (restoreDraft) clearSendDraft();
+  }, [restoreDraft]);
 
   const { data: templatesData } = useListTemplatesQuery({ limit: 100 });
   const templateOptions: Option[] = (templatesData?.items ?? []).map(template => ({ value: template.templateKey, label: template.templateKey }));
@@ -49,6 +58,11 @@ export default function SendForm(): ReactElement {
     mutation.mutate(body, {
       onSuccess: data => setResult(data),
       onError: apiError => {
+        if (apiError.code === 'IAM_003') {
+          stashSendDraft(form);
+          window.location.assign(consoleSendStepUpUrl());
+          return;
+        }
         setResult(null);
         setError(describeSendError(apiError));
       },
@@ -56,7 +70,7 @@ export default function SendForm(): ReactElement {
   };
 
   const reset = (): void => {
-    setForm(EMPTY);
+    setForm(EMPTY_SEND_DRAFT);
     setError('');
     setResult(null);
   };
@@ -66,7 +80,11 @@ export default function SendForm(): ReactElement {
       <PageHeader title="Send Notification" subtitle="Manually trigger a send to test templates and routing end-to-end." />
       <Card padding="lg">
         <Card.Body className={styles.formCol}>
-          <FormField label="Template key" required helper="References an existing template. Authentication, security and one-time-code templates are refused.">
+          <FormField
+            label="Template key"
+            required
+            helper="References an existing template. Templates identity sends, and other authentication, security or one-time-code templates, are refused. Sending asks you to confirm it is you."
+          >
             <Combobox
               options={templateOptions}
               value={form.templateKey || null}

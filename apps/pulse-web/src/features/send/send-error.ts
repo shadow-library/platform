@@ -1,7 +1,7 @@
 import { type ApiError } from '@/lib';
 
 const SECURITY_TEMPLATE_REFUSED =
-  'Authentication and security templates (auth.*, security.*, user.*, one-time codes and password resets) cannot be sent from the console. Only the flows that own them send them.';
+  'Templates identity sends (sign-in, account, organisation and bot notices) and other authentication, security, one-time-code or password-reset templates cannot be sent from the console. Only the flows that own them send them.';
 
 function retryHint(retryAfterSeconds?: number): string {
   if (!retryAfterSeconds) return 'Try again later.';

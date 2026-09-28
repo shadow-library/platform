@@ -4,9 +4,9 @@ import { ApiError } from '@shadow-library/web';
 import { describeSendError } from '../src/features/send/send-error';
 
 describe('describeSendError', () => {
-  it('should explain that authentication and security templates are never sent from the console', () => {
-    const error = new ApiError(403, { code: 'NTF_005', type: 'CLIENT_ERROR', message: 'Authentication and security templates cannot be sent from the console' });
-    expect(describeSendError(error)).toMatch(/one-time codes/);
+  it("should explain that identity's and other authentication or security templates are never sent from the console", () => {
+    const error = new ApiError(403, { code: 'NTF_005', type: 'CLIENT_ERROR', message: 'Identity, authentication and security templates cannot be sent from the console' });
+    expect(describeSendError(error)).toMatch(/Templates identity sends .* one-time-code/);
   });
 
   it('should tell the admin how long to wait once the console send limit is reached', () => {
