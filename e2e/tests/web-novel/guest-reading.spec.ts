@@ -93,27 +93,19 @@ test.describe('guest reading', () => {
   });
 
   /**
-   * APP BUG (suspected) — `/novels/$slug`'s loader (`apps/web-novel-web/src/routes/_shell/novels.$slug.tsx:20`)
-   * calls `context.queryClient.ensureQueryData(novelQueryOptions(params.slug))` and never calls TanStack
-   * Router's `notFound()`. When the API 404s (WBN_001, confirmed correct at the API level — see
-   * `visibility.spec.ts`), `novelQueryOptions` throws a plain `ApiError`, which the router routes to
-   * `DefaultCatchBoundary` (`apps/web-novel-web/src/components/DefaultCatchBoundary.tsx`) rather than the
-   * `NotFound` component (`apps/web-novel-web/src/components/NotFound.tsx`) — and, confirmed live via `curl`,
-   * the outer HTTP response is `500`, not `404`. Expected per this suite's brief: a 404 boundary, not a
-   * generic error page. Actual: a `500` "Something went wrong" catch-boundary page with the raw API message
-   * ("Novel not found") as body text — which, for the restricted-novel case, also happens to leak that the
-   * slug corresponds to *something* (an error distinguishable from a route that never matched), undermining
-   * the enumeration-safety property `visibility.spec.ts` confirms holds at the API layer.
+   * A novel the reader may not see is answered exactly like one that does not exist: the route's own 404 boundary with a
+   * 404 status, never an error page that would tell the two apart.
    */
-  test.fixme('should render the 404 boundary (not a forbidden page) for the restricted novel as a guest', async ({ page }) => {
-    const url = requireProductUrl('webNovel');
-    const response = await page.goto(`${url}/novels/${webNovel.restrictedSlug}`, { waitUntil: 'domcontentloaded' });
-    expect(response?.status()).toBe(404);
-  });
-
-  test.fixme('should render the 404 boundary for an unknown slug', async ({ page }) => {
-    const url = requireProductUrl('webNovel');
-    const response = await page.goto(`${url}/novels/e2e-does-not-exist`, { waitUntil: 'domcontentloaded' });
-    expect(response?.status()).toBe(404);
-  });
+  for (const [label, slug] of [
+    ['the restricted novel', webNovel.restrictedSlug],
+    ['an unknown slug', 'e2e-does-not-exist'],
+  ] as const) {
+    test(`should render the 404 boundary for ${label} as a guest`, async ({ page }) => {
+      const url = requireProductUrl('webNovel');
+      const response = await page.goto(`${url}/novels/${slug}`, { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBe(404);
+      await expect(page.getByRole('heading', { name: 'Lost in the shadows' })).toBeVisible();
+      await expect(page.getByText('Novel not found'), 'the API message never reaches the page').toHaveCount(0);
+    });
+  }
 });
