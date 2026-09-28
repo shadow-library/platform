@@ -9,6 +9,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
+import { ProgressionService } from '@modules/progression';
 import { addDays, capacityWarningFor, computeCapacity, computeReward, currentRuleset, formatLocalDate, type LocalDate, parseLocalDate, type QuestLogState } from '@modules/rules';
 import { RolloverRepository } from '@modules/rollover';
 import { AppErrorCode } from '@server/classes';
@@ -31,6 +32,7 @@ export class CompassionCommandsService implements OnModuleInit {
     private readonly commandBus: CommandBus,
     private readonly heroLedger: HeroLedger,
     private readonly rolloverRepository: RolloverRepository,
+    private readonly progressionService: ProgressionService,
   ) {}
 
   onModuleInit(): void {
@@ -63,6 +65,7 @@ export class CompassionCommandsService implements OnModuleInit {
       },
     ]);
     if (!grant) throw AppError.internal(`HeroLedger.grant returned no outcome for recovery quest '${updated.id}'`);
+    await this.progressionService.onRecoveryQuestCompleted(ctx.tx, ctx.accountId, date);
 
     const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, date);
     let comebackReArmed = false;

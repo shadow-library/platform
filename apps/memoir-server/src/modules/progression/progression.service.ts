@@ -132,11 +132,6 @@ export class ProgressionService {
     await this.evaluate(tx, accountId, date);
   }
 
-  /**
-   * Not yet called by any command — Recovery Quest completion is T-20 scope and does not exist in this
-   * worktree. Wired ahead of that command landing so `first_recovery_completed`/`restorer` need only a
-   * one-line call from wherever T-20's `RecoverQuest`-equivalent handler commits its completion.
-   */
   async onRecoveryQuestCompleted(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.mutate(tx, accountId, date, envelope => ({
       ...envelope,
