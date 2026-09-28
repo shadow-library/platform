@@ -190,9 +190,7 @@ test.describe('web-novel access push (forge-fronted)', () => {
     expect(((await refused.json()) as { code?: string }).code).toBe('PUB_011');
   });
 
-  // job.service.ts:148-151 folds a share-list change made during a running converge into that converge, which already read the old list,
-  // and no later sweep pushes access, so the dropped reader keeps reading.
-  test.fixme('should push a share-list narrowing made while a publish converge is running', async ({ publication, webNovel }) => {
+  test('should push a share-list narrowing made while a publish converge is running', async ({ publication, webNovel }) => {
     const { slug, projectId } = publication;
     const kept = await webNovel.reader('race-kept');
     const dropped = await webNovel.reader('race-dropped');
