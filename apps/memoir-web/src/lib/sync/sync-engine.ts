@@ -1,4 +1,5 @@
 import { type DispatchOptions, type OutcomeTicket, type ServerSettlement, type UnconfirmedReason } from '@/lib/data/command.types';
+import { accountDay } from '@/lib/format';
 
 import { isServerBacked, isUnaddressed } from './command-wire';
 import { AccountBoundaryError, ignoreAccountBoundary, type MemoirStore, type StoreBoundary } from './memoir-store';
@@ -29,7 +30,8 @@ import {
 export interface SyncEngineOptions {
   store: MemoirStore;
   client?: SyncClient;
-  today: string;
+  /** Pins the day; otherwise it is the account's own day, read from the mirrored account row on every call, so it follows the clock past midnight. */
+  today?: string;
   deviceId?: string;
   /** Bounds a `hasMore` drain so a pathological server can never spin the client forever. */
   maxPages?: number;
@@ -218,7 +220,7 @@ export class SyncEngine {
   }
 
   world(): ReturnType<typeof projectWorldState> {
-    return projectWorldState(this.rows, this.options.today);
+    return projectWorldState(this.rows, this.today);
   }
 
   /** The mirrored rows themselves, for the domain providers that project their own shapes rather than the quest world. */
@@ -226,8 +228,11 @@ export class SyncEngine {
     return this.rows;
   }
 
+  /** The server closes days in the account's timezone (docs/memoir.md), so a browser a zone ahead would otherwise stamp tomorrow's occurrence and be refused. */
   get today(): string {
-    return this.options.today;
+    if (this.options.today) return this.options.today;
+    const timeZone = this.rows.account?.[0]?.['timezone'];
+    return accountDay(typeof timeZone === 'string' ? timeZone : null);
   }
 
   /**

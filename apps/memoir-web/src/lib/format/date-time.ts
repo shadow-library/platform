@@ -1,10 +1,9 @@
 import { addDays, DEFAULT_LOCALE, parseISODate, toISODate } from '@shadow-library/ui';
 
 /**
- * "Local" means the browser's own time zone, resolved by the runtime `Intl` default — the same zone
- * `sync-context.tsx#today` already assumes (`toISODate(new Date())`) and the one P1-09 used for the App
- * & sync queue. Tests pin it with `process.env.TZ`. The account's configured `timezone` only steers the
- * server's daily rollover boundary; nothing here reads it.
+ * "Local" here means the browser's own time zone, for rendering a date or an instant; tests pin it with
+ * `process.env.TZ`. Which calendar day is *today* is a different question, answered in the account's
+ * zone by {@link accountDay}, because the server closes days there (docs/memoir.md).
  */
 function toLocalDate(value: string): Date | null {
   const dateOnly = parseISODate(value);

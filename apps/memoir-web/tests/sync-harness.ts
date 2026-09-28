@@ -203,7 +203,8 @@ export interface TestEngine {
 
 export interface TestEngineOptions extends FakeServerOptions {
   backing?: KeyValueBacking;
-  today?: string;
+  /** `null` leaves the day unpinned, so the engine reads it from the mirrored account's timezone. */
+  today?: string | null;
   /** Binds the store to an account, as the app does; omitted, the store is unbound and skips every ownership check. */
   accountId?: string;
   principal?: () => Promise<string>;
@@ -240,7 +241,7 @@ export function createTestEngine(options: TestEngineOptions = {}): TestEngine {
   const engine = new SyncEngine({
     store,
     client: new SyncClient({ fetchImpl }),
-    today: options.today ?? '2026-08-24',
+    today: options.today === null ? undefined : (options.today ?? '2026-08-24'),
     principal: options.principal,
     onAccountChanged: options.onAccountChanged,
     outcomeTimeoutMs: options.outcomeTimeoutMs,
@@ -305,7 +306,9 @@ export function createSyncedTestData(engine: SyncEngine, principal?: () => Promi
     finance,
     quickLogs,
     queryClient: memoirQueryClient(),
-    today: engine.today,
+    get today() {
+      return engine.today;
+    },
     persona: 'active',
   };
 }

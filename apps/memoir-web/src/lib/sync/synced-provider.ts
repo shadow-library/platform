@@ -111,7 +111,7 @@ export class SyncedDataProvider implements DataProvider {
     if (needsConfirmation(result) || result.status === 'rejected') return result;
     const occurrenceId = occurrenceOf(resolved);
     if (occurrenceId && isServerBacked(resolved)) this.queued.add(occurrenceId);
-    const delivery = await this.sync.enqueue(resolved, this.world.today, options);
+    const delivery = await this.sync.enqueue(resolved, this.sync.today, options);
     if (delivery.status === 'refused') await this.reproject().catch(ignoreAccountBoundary);
     return { ...result, delivery };
   }

@@ -1,5 +1,5 @@
 import { createContext, type ReactElement, type ReactNode, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Button, toISODate } from '@shadow-library/ui';
+import { Button } from '@shadow-library/ui';
 
 import { StatusPage } from '@/components/StatusPage';
 import { accountKeys, type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider } from '@/lib/data';
@@ -101,9 +101,8 @@ export interface SyncedMemoirOptions {
  * and the weekly review — the server exposes no read model for any of the three.
  */
 export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemoirData {
-  const today = options.today ?? toISODate(new Date());
   const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER, unload: LOCAL_UNLOAD_BACKING });
-  const engine = new SyncEngine({ store, today, principal: options.principal, onAccountChanged: options.onAccountChanged });
+  const engine = new SyncEngine({ store, today: options.today, principal: options.principal, onAccountChanged: options.onAccountChanged });
   const account = new SyncedAccountProvider(engine, options.principal);
   const finance = new SyncedFinanceProvider(engine);
   const quickLogs = new SyncedQuickLogProvider(engine);
@@ -119,7 +118,9 @@ export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemo
     finance,
     quickLogs,
     queryClient: memoirQueryClient(),
-    today,
+    get today() {
+      return engine.today;
+    },
     persona: 'active',
   };
 }
