@@ -18,6 +18,8 @@ import {
   type ManifestItem,
   ReaderPushClient,
   SlugConflictError,
+  StaleRevisionError,
+  UnknownConflictError,
   type WikiManifest,
   type WikiManifestItem,
 } from './reader-push.client';
@@ -149,7 +151,16 @@ export class PublishRunner {
       await this.recordFailure(this.dueRows(ledger, options), message);
       // The header may have laddered before it failed, so the slug the row now holds is not the one it entered with.
       const held = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId), columns: { novelSlug: true } });
-      this.logger.error('publish converge aborted before chapter pushes', { projectId, slug: publication.novelSlug, heldSlug: held?.novelSlug, message });
+      const context = { projectId, slug: publication.novelSlug, heldSlug: held?.novelSlug, message };
+      if (err instanceof SlugExhaustedError) {
+        this.logger.warn('publish converge found no slug the reader accepts', context);
+        throw AppErrorCode.PUB_008.create({ base: err.slug });
+      }
+      if (err instanceof StaleRevisionError || err instanceof UnknownConflictError) {
+        this.logger.warn('publish converge refused by the reader as a conflict', context);
+        throw AppErrorCode.PUB_011.create({ reason: message });
+      }
+      this.logger.error('publish converge aborted before chapter pushes', context);
       throw AppErrorCode.PUB_004.create({ reason: message });
     }
 
