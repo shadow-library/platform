@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, or, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AuthClient } from '@shadow-library/auth';
-import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { AuthClient, AuthErrorCode } from '@shadow-library/auth';
+import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService, StorageService } from '@shadow-library/modules';
 
@@ -56,14 +56,22 @@ export class ProjectService {
     return this.actorService.current();
   }
 
-  /** Mirrors `ProjectOwnershipGuard`'s sharing branch, one PDP check per request, skipped for bots and org-less users. */
+  /**
+   * Mirrors `ProjectOwnershipGuard`'s sharing branch, one PDP check per request, skipped for bots and org-less users.
+   * A PDP that is unavailable (identity throttling the check) narrows the list to the caller's own projects: a strict
+   * subset, so still fail-closed, where failing the whole list would take the home screen down with it.
+   */
   private async listVisibilityFilter(actor: Actor): Promise<SQL> {
     const own = ownedBy(schema.projects, actor);
     if (actor.kind !== 'user' || actor.organisationId === null) return own;
 
     const principal = this.context.getAuthPrincipal();
     const organisationId = actor.organisationId.toString();
-    const isCurator = await this.authClient.check({ action: CURATE_PERMISSION, organisationId, principal }, { highRisk: true });
+    const isCurator = await this.authClient.check({ action: CURATE_PERMISSION, organisationId, principal }, { highRisk: true }).catch((error: unknown) => {
+      if (!AppError.is(error, AuthErrorCode.PDP_UNAVAILABLE)) throw error;
+      this.logger.warn('curator check unavailable; listing only the caller’s own projects', { organisationId, reason: error.message });
+      return false;
+    });
     if (!isCurator) return own;
 
     // A constant, not `eq(sharedWithOrg, true)`: a bound parameter defeats a generic plan's ability to prove
