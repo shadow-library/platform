@@ -63,6 +63,10 @@ export class APIRequest {
 
   private static readonly REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
   private static readonly CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie', 'set-cookie']);
+  private static readonly CREDENTIAL_HEADER_PATTERN = /api-?key|token|secret/i;
+  /** Token-endpoint and credential fields as they appear in OAuth forms and JSON bodies: `access_token`, `refresh_token`, `id_token`, `client_secret`, `client_assertion`, `accessToken`, … */
+  private static readonly CREDENTIAL_FIELD_PATTERN = /token$|secret$|assertion$|password$|^code_verifier$/i;
+  private static readonly REDACTED = '[redacted]';
 
   private constructor(private readonly options: APIRequestOptions = {}) {
     if (typeof options.throwErrorOnFailure === 'undefined') options.throwErrorOnFailure = true;
@@ -186,7 +190,30 @@ export class APIRequest {
 
   private static redactHeaders(headers: unknown): unknown {
     if (!APIRequest.isHeaderRecord(headers)) return headers;
-    return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, APIRequest.CREDENTIAL_HEADERS.has(name.toLowerCase()) ? '[redacted]' : value]));
+    const isCredential = (name: string): boolean => APIRequest.CREDENTIAL_HEADERS.has(name.toLowerCase()) || APIRequest.CREDENTIAL_HEADER_PATTERN.test(name);
+    return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, isCredential(name) ? APIRequest.REDACTED : value]));
+  }
+
+  private static redactFields(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(item => APIRequest.redactFields(item));
+    if (typeof value !== 'object' || value === null) return value;
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, APIRequest.CREDENTIAL_FIELD_PATTERN.test(key) ? APIRequest.REDACTED : APIRequest.redactFields(item)]),
+    );
+  }
+
+  private static redactBody(body: unknown, isForm: boolean): unknown {
+    if (typeof body !== 'string') return APIRequest.redactFields(body);
+    if (isForm) {
+      const params = new URLSearchParams(body);
+      for (const key of [...params.keys()]) if (APIRequest.CREDENTIAL_FIELD_PATTERN.test(key)) params.set(key, APIRequest.REDACTED);
+      return params.toString();
+    }
+    try {
+      return APIRequest.redactFields(JSON.parse(body));
+    } catch {
+      return body;
+    }
   }
 
   private static isHeaderRecord(headers: unknown): headers is IncomingHttpHeaders {
@@ -240,8 +267,14 @@ export class APIRequest {
     /** Log the request. Read the level per request so a runtime level change is honoured. */
     const isDebug = Logger.isDebugEnabled();
     const reqLog = `${this.options.method} ${uri}`;
-    if (isDebug) APIRequest.logger.debug(reqLog, { ...requestOptions, headers: APIRequest.redactHeaders(requestOptions.headers) });
-    else APIRequest.logger.info(reqLog);
+    if (isDebug) {
+      const loggedBody = APIRequest.redactBody(requestOptions.body, bodyFormat === 'form');
+      APIRequest.logger.debug(reqLog, {
+        ...requestOptions,
+        headers: APIRequest.redactHeaders(requestOptions.headers),
+        ...(requestOptions.body === undefined ? {} : { body: loggedBody }),
+      });
+    } else APIRequest.logger.info(reqLog);
 
     /** Execute the request. One signal bounds dispatch and body read together, so the timeout is a total budget rather than undici's per-phase ones. */
     const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
@@ -282,12 +315,15 @@ export class APIRequest {
 
     /** Log the response */
     const resLog = `${this.options.method} ${uri} - ${response.statusCode} - ${timeTaken}ms`;
-    if (isDebug) APIRequest.logger.debug(resLog, { statusCode: response.statusCode, data: resData, headers: APIRequest.redactHeaders(response.headers) });
+    if (isDebug) APIRequest.logger.debug(resLog, { statusCode: response.statusCode, data: APIRequest.redactFields(resData), headers: APIRequest.redactHeaders(response.headers) });
     else APIRequest.logger.info(resLog, { contentLength: response.headers['content-length'] ?? 0, statusCode: response.statusCode });
 
     /** Handle errors */
     if (throwErrorOnFailure && response.statusCode >= 400) {
-      APIRequest.logger.error(`Request failed with status code ${response.statusCode}`, { data: resData, headers: APIRequest.redactHeaders(response.headers) });
+      APIRequest.logger.error(`Request failed with status code ${response.statusCode}`, {
+        data: APIRequest.redactFields(resData),
+        headers: APIRequest.redactHeaders(response.headers),
+      });
       ErrorCode.API_REQUEST_FAILED.throw({ status: response.statusCode, response: resData });
     }
 

@@ -291,5 +291,24 @@ describe('APIRequest', () => {
       expect(mockRequest).toHaveBeenCalledWith('/svc', expect.objectContaining({ headers: { authorization: 'Bearer live-service-token', cookie: 'sid=request-session' } }));
       for (const spy of [isDebugEnabled, ...logged]) spy.mockRestore();
     });
+
+    it('should never log token-like fields of a request or response body, nor api-key headers', async () => {
+      const isDebugEnabled = spyOn(Logger, 'isDebugEnabled').mockReturnValue(true);
+      const logger = (APIRequest as unknown as { logger: Record<'debug' | 'info' | 'error', (...args: unknown[]) => void> }).logger;
+      const logged = (['debug', 'info', 'error'] as const).map(level => spyOn(logger, level));
+      const tokens = { access_token: 'live-access', refresh_token: 'live-refresh', id_token: 'live-id', token_type: 'Bearer', nested: { accessToken: 'live-nested' } };
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: { 'content-type': 'application/json' }, body: { json: () => Promise.resolve(tokens) } });
+
+      await APIRequest.post('/token')
+        .header('x-api-key', 'live-api-key')
+        .form({ grant_type: 'client_credentials', client_secret: 'live-secret', client_assertion: 'live-assertion' });
+      await APIRequest.post('/login').body({ username: 'ada', password: 'live-password' });
+
+      const lines = JSON.stringify(logged.flatMap(spy => spy.mock.calls));
+      for (const secret of ['live-access', 'live-refresh', 'live-id', 'live-nested', 'live-api-key', 'live-secret', 'live-assertion', 'live-password'])
+        expect(lines).not.toContain(secret);
+      for (const kept of ['Bearer', 'client_credentials', 'ada']) expect(lines).toContain(kept);
+      for (const spy of [isDebugEnabled, ...logged]) spy.mockRestore();
+    });
   });
 });
