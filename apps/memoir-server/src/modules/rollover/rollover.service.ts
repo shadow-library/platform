@@ -151,12 +151,16 @@ export class RolloverService implements OnModuleInit {
     throw AppError.internal(`rollover walk for account '${accountId}' did not converge within its catch-up bound`);
   }
 
-  /** Deliberately lock-free: the overwhelmingly common answer is "already current", and paying for a lock to learn that would put every request behind every other request's rollover. */
+  /**
+   * Deliberately lock-free: the overwhelmingly common answer is "already current", and paying for a lock to learn that would put every request behind every other request's rollover.
+   * A backward timezone change leaves the open day ahead of the zone's own date until the zone catches up, which is still current.
+   */
   private async isCurrent(accountId: bigint): Promise<boolean> {
     const account = await this.repository.readCurrency(accountId);
     if (!account) return true;
     if (account.deletionState !== 'none') return true;
-    return account.lastHpDate === formatLocalDate(localDateAt(Date.now(), account.timezone));
+    const lastHpDate = account.lastHpDate === null ? null : parseLocalDate(account.lastHpDate);
+    return lastHpDate !== null && compareLocalDates(lastHpDate, localDateAt(Date.now(), account.timezone)) >= 0;
   }
 
   private async advanceOne(tx: DatabaseTransaction, accountId: bigint): Promise<WalkStep> {
@@ -382,7 +386,7 @@ export class RolloverService implements OnModuleInit {
    */
 
   private async prepareToday(tx: DatabaseTransaction, context: DayContext): Promise<void> {
-    const promoted = await this.promotePending(tx, context);
+    const promoted = this.inNewZone(await this.promotePending(tx, context));
     const { ruleset, account, day, date } = promoted;
 
     const quests = await this.repository.listActiveQuests(tx, account.id);
@@ -450,6 +454,17 @@ export class RolloverService implements OnModuleInit {
     await this.repository.updateAccount(tx, account.id, { timezone, intensityMode, pendingTimezone: null, pendingIntensityMode: null });
 
     return { ...context, account: { ...account, timezone, intensityMode, pendingTimezone: null, pendingIntensityMode: null }, timeZone: timezone, intensityMode };
+  }
+
+  /**
+   * Today is re-read in a promoted zone. A forward change starts on the new zone's date, and the dates it jumps over are never
+   * lived, so never closed with every quest missed. A backward change cannot reopen the day it just closed, so the day being
+   * prepared stays open, longer than 24 hours, until the new zone's own date passes it.
+   */
+  private inNewZone(context: DayContext): DayContext {
+    const today = localDateAt(Date.now(), context.timeZone);
+    if (compareLocalDates(today, context.day) <= 0) return context;
+    return { ...context, day: today, date: formatLocalDate(today) };
   }
 
   private recentCompletions(history: QuestLog.Row[], day: LocalDate): [number, number, number] {

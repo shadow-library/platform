@@ -20,6 +20,7 @@ class FakeRolloverStore {
   readonly recoveries: RecoveryQuest.Row[] = [];
   readonly streaks = new Map<bigint, StreakState>();
   readonly quests: Quest.Row[] = [];
+  serializedRuns = 0;
   private nextId = 100n;
 
   constructor(account: Partial<Account.Row>) {
@@ -62,9 +63,16 @@ class FakeRolloverStore {
     this.dailyStates.set(date, this.dailyStateRow({ date, rolloverAt: null }));
   }
 
+  closedDay(date: string): void {
+    this.dailyStates.set(date, this.dailyStateRow({ date, rolloverAt: new Date(`${date}T23:59:59Z`) }));
+  }
+
   repository(): RolloverRepository {
     const repository = {
-      runSerialized: async (_accountId: bigint, operation: (tx: unknown) => Promise<unknown>) => operation({}),
+      runSerialized: async (_accountId: bigint, operation: (tx: unknown) => Promise<unknown>) => {
+        this.serializedRuns += 1;
+        return operation({});
+      },
       readCurrency: async () => ({ timezone: this.account.timezone, lastHpDate: this.account.lastHpDate, deletionState: this.account.deletionState }),
       lockAccount: async () => ({ ...this.account }),
       updateAccount: async (_tx: unknown, _accountId: bigint, values: Partial<Account.Row>) => {
@@ -258,5 +266,48 @@ describe('RolloverService day walk', () => {
     expect(closedDays).not.toContain('2025-11-01');
     expect(closedDays[0]).toBe('2025-12-10');
     expect(store.dailyStates.get('2025-11-01')?.rolloverAt).toBeNull();
+  });
+
+  it('should prepare the new zone’s day after a forward timezone change, never closing the day it skipped with every quest missed', async () => {
+    const store = new FakeRolloverStore({ lastHpDate: '2026-03-09', pendingTimezone: 'Pacific/Kiritimati' });
+    store.addDailyQuest();
+    store.closedDay('2026-03-09');
+    const { service, closedDays } = harness(store);
+
+    setSystemTime(new Date('2026-03-10T11:00:00Z'));
+    await service.catchUp(ACCOUNT_ID);
+    await service.catchUp(ACCOUNT_ID);
+
+    expect(store.account.timezone).toBe('Pacific/Kiritimati');
+    expect(store.account.lastHpDate).toBe('2026-03-11');
+    expect(store.dailyStates.get('2026-03-11')?.rolloverAt).toBeNull();
+    expect(store.dailyStates.has('2026-03-10')).toBe(false);
+    expect(closedDays).toEqual([]);
+    expect(store.questLogs).toHaveLength(0);
+  });
+
+  it('should hold the open day after a backward timezone change until it ends in the new zone, without locking on every request meanwhile', async () => {
+    const store = new FakeRolloverStore({ timezone: 'Pacific/Kiritimati', pendingTimezone: 'UTC', lastHpDate: '2026-03-10' });
+    store.addDailyQuest();
+    store.openDay('2026-03-10');
+    const { service, closedDays } = harness(store);
+
+    setSystemTime(new Date('2026-03-10T11:00:00Z'));
+    await service.catchUp(ACCOUNT_ID);
+    expect(store.account.timezone).toBe('UTC');
+    expect(store.account.lastHpDate).toBe('2026-03-11');
+    expect(closedDays).toEqual(['2026-03-10']);
+
+    const runs = store.serializedRuns;
+    setSystemTime(new Date('2026-03-10T20:00:00Z'));
+    await service.catchUp(ACCOUNT_ID);
+    setSystemTime(new Date('2026-03-11T20:00:00Z'));
+    await service.catchUp(ACCOUNT_ID);
+    expect(store.serializedRuns).toBe(runs);
+    expect(closedDays).toEqual(['2026-03-10']);
+
+    setSystemTime(new Date('2026-03-12T01:00:00Z'));
+    await service.catchUp(ACCOUNT_ID);
+    expect(closedDays).toEqual(['2026-03-10', '2026-03-11']);
   });
 });
