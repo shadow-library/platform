@@ -238,29 +238,42 @@ export class BotPermissionService {
       const assigned = await this.assignedRoles(tx, bot);
 
       const keep = new Set(roles.map(role => role.roleId));
-      const removed = assigned.filter(row => isManagedGrant(row.grantedBy) && !keep.has(row.roleId));
       const present = new Set(assigned.map(row => row.roleId));
-      const added = roles.filter(role => !present.has(role.roleId));
+      const toAdd = roles.filter(role => !present.has(role.roleId));
+      const toRemove = assigned.filter(row => isManagedGrant(row.grantedBy) && !keep.has(row.roleId));
 
-      if (added.length > 0)
-        await tx
+      const inserted = new Set<number>();
+      if (toAdd.length > 0) {
+        const rows = await tx
           .insert(schema.roleAssignments)
           .values(
-            added.map(role => ({ principalType: 'SERVICE_ACCOUNT' as const, principalId: bot.clientId, roleId: role.roleId, organisationId, grantedBy: markerFor(actor.userId) })),
+            toAdd.map(role => ({ principalType: 'SERVICE_ACCOUNT' as const, principalId: bot.clientId, roleId: role.roleId, organisationId, grantedBy: markerFor(actor.userId) })),
           )
-          .onConflictDoNothing();
-      if (removed.length > 0)
-        await tx.delete(schema.roleAssignments).where(
-          and(
-            this.principalScope(bot),
-            inArray(
-              schema.roleAssignments.roleId,
-              removed.map(row => row.roleId),
-            ),
-          ),
-        );
+          .onConflictDoNothing()
+          .returning({ roleId: schema.roleAssignments.roleId });
+        for (const row of rows) inserted.add(row.roleId);
+      }
 
-      return { bot, diff: { added: added.map(role => this.refOf(role)), removed: removed.map(row => this.refOf(row)) } };
+      const deleted = new Set<number>();
+      if (toRemove.length > 0) {
+        const rows = await tx
+          .delete(schema.roleAssignments)
+          .where(
+            and(
+              this.principalScope(bot),
+              inArray(
+                schema.roleAssignments.roleId,
+                toRemove.map(row => row.roleId),
+              ),
+            ),
+          )
+          .returning({ roleId: schema.roleAssignments.roleId });
+        for (const row of rows) deleted.add(row.roleId);
+      }
+
+      const added = toAdd.filter(role => inserted.has(role.roleId)).map(role => this.refOf(role));
+      const removed = toRemove.filter(row => deleted.has(row.roleId)).map(row => this.refOf(row));
+      return { bot, diff: { added, removed } };
     });
 
     await this.announceChange(actor, bot, diff);
