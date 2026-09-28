@@ -21,7 +21,7 @@ function makeService(check: () => Promise<boolean>): { service: ProjectService; 
   };
   const actors = { current: () => ACTOR } as never;
   const context = { getAuthPrincipal: () => ({ kind: 'user', sub: '3', org: '7' }) } as never;
-  const service = new ProjectService({ getPostgresClient: () => db } as never, actors, {} as never, { check } as never, context, {} as never);
+  const service = new ProjectService({ getPostgresClient: () => db } as never, actors, {} as never, { check } as never, context, {} as never, {} as never);
   return { service, filters };
 }
 

@@ -33,7 +33,7 @@ function makeService(): { service: ProjectService; sets: Row[] } {
   };
   const noop = {} as never;
   const storage = { getPublicUrl: () => undefined } as never;
-  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, storage, noop, noop, noop), sets };
+  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, storage, noop, noop, noop, noop), sets };
 }
 
 describe('ProjectService.update — story fields and cost tier', () => {

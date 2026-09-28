@@ -13,6 +13,7 @@ import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Prima
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { type AiRole, isRegisteredModel } from '../../ai/defaults';
+import { WorkflowRunService } from '../../ai/graphs/workflow-run.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
@@ -48,6 +49,7 @@ export class ProjectService {
     private readonly authClient: AuthClient,
     private readonly context: ContextService,
     private readonly claims: AuthoringClaimService,
+    private readonly workflowRuns: WorkflowRunService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -310,15 +312,25 @@ export class ProjectService {
     });
   }
 
+  /**
+   * The claim goes first because its job reference is ON DELETE RESTRICT. The row lock keeps a concurrent acquire from recreating it
+   * and blocks a new run, whose insert locks the project row for its foreign key, so the running runs read under it are complete. The
+   * abort waits for the commit and is process-local: a run on another replica finishes its current call.
+   */
   async delete(id: bigint): Promise<void> {
     this.logger.info('deleting project (cascades to all child tables)', { projectId: id });
-    // The claim goes first because its job reference is ON DELETE RESTRICT; the row lock keeps a concurrent acquire from recreating it.
-    const result = await this.db.transaction(async tx => {
+    const { deleted, running } = await this.db.transaction(async tx => {
       await tx.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.id, id)).for('update');
+      const running = await tx
+        .select({ id: schema.workflowRuns.id })
+        .from(schema.workflowRuns)
+        .where(and(eq(schema.workflowRuns.projectId, id), eq(schema.workflowRuns.status, 'running')));
       await tx.delete(schema.authoringClaims).where(eq(schema.authoringClaims.projectId, id));
-      return tx.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
+      const deleted = await tx.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
+      return { deleted, running };
     });
-    if (result.length === 0) throw AppErrorCode.PRJ_001.create();
+    if (deleted.length === 0) throw AppErrorCode.PRJ_001.create();
+    for (const run of running) this.workflowRuns.cancel(run.id);
   }
 
   async reset(id: bigint, stage: string): Promise<ResetResponse> {

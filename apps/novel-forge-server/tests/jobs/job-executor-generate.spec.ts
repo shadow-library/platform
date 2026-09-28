@@ -9,12 +9,12 @@ import type { WorkflowRunResult } from '@modules/ai/graphs/workflow-run.service'
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
 
-function makeExecutor(runChapterGeneration: (input: unknown) => Promise<WorkflowRunResult>) {
+function makeExecutor(runChapterGeneration: (input: unknown) => Promise<WorkflowRunResult>, readJob: () => Promise<unknown> = async () => ({ cancelRequestedAt: null })) {
   const progressCalls: [string, JobProgress][] = [];
   const progress = mock(async (jobId: string, snapshot: JobProgress) => {
     progressCalls.push([jobId, snapshot]);
   });
-  const jobService = { progress, get: async () => ({ cancelRequestedAt: null }) } as never;
+  const jobService = { progress, get: readJob } as never;
   const claims = new FakeAuthoringClaims().asService();
   const runChapterGenerationMock = mock(runChapterGeneration);
   const workflowRunService = { runChapterGeneration: runChapterGenerationMock } as never;
@@ -86,5 +86,22 @@ describe('JobExecutor.runGenerate — batch adjacency halt', () => {
     const job = makeJob([5, 6]);
 
     await expect((executor as unknown as { runGenerate(job: Job.Row): Promise<void> }).runGenerate(job)).rejects.toThrow();
+  });
+});
+
+describe('JobExecutor.runGenerate — project deleted mid-batch', () => {
+  it('should stop at the next chapter boundary once its job row is gone', async () => {
+    let jobRow: unknown = { cancelRequestedAt: null };
+    const { executor, runChapterGeneration } = makeExecutor(
+      async () => {
+        jobRow = undefined;
+        return { runId: 'r', outcome: 'accepted', status: 'completed' };
+      },
+      async () => jobRow,
+    );
+
+    await (executor as unknown as { runGenerate(job: Job.Row): Promise<void> }).runGenerate(makeJob([5, 6, 7]));
+
+    expect(runChapterGeneration).toHaveBeenCalledTimes(1);
   });
 });

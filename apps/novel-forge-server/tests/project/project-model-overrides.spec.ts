@@ -18,7 +18,7 @@ function makeService(): { service: ProjectService; writes: unknown[] } {
   };
   const noop = {} as never;
   const storage = { getPublicUrl: () => undefined } as never;
-  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, storage, noop, noop, noop), writes };
+  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, storage, noop, noop, noop, noop), writes };
 }
 
 describe('ProjectService.update — model overrides', () => {

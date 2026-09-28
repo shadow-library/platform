@@ -48,7 +48,7 @@ function fakeProject(briefs: Row[], volumes: Row[]) {
   };
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => (transactions.push(run), run(tx)) };
   const noop = {} as never;
-  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop), rows, transactions };
+  return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop), rows, transactions };
 }
 
 describe('ProjectService.reset', () => {
@@ -89,7 +89,7 @@ describe('ProjectService.reset — authoring claims', () => {
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
     const noop = {} as never;
-    return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, claims.asService()), deleted };
+    return { service: new ProjectService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, claims.asService(), noop), deleted };
   }
 
   it('should refuse a generate reset while the claim is held by a pending or running job, deleting nothing', async () => {

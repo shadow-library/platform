@@ -30,7 +30,7 @@ function makeService(accountSettings: Row[], actor: { kind: 'user' | 'bot'; id: 
   const actors = { current: () => ({ ...actor, organisationId: null }) } as never;
   const storage = { getPublicUrl: () => undefined } as never;
   const noop = {} as never;
-  return { service: new ProjectService({ getPostgresClient: () => db } as never, actors, storage, noop, noop, noop), projects };
+  return { service: new ProjectService({ getPostgresClient: () => db } as never, actors, storage, noop, noop, noop, noop), projects };
 }
 
 describe('ProjectService.create — cost tier', () => {

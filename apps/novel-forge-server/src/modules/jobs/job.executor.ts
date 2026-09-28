@@ -272,8 +272,12 @@ export class JobExecutor {
     const watch = this.cancelWatches.get(jobId);
     if (watch?.observed) return true;
     const job = await this.jobService.get(jobId);
-    if (!job?.cancelRequestedAt) return false;
+    if (job && !job.cancelRequestedAt) return false;
     if (watch) watch.observed = true;
+    if (!job) {
+      this.logger.info('Job row gone with its project; stopping', { jobId });
+      return true;
+    }
     this.logger.info('Job cancellation observed', { jobId });
     await this.cancelLiveRuns(jobId);
     return true;
