@@ -124,16 +124,18 @@ test.describe('novel-forge chapter amend', () => {
     expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  // embedding.service.ts:19-26 turns a failed embed into a null vector and chapter-amend.service.ts:151-154 then reports indexed:true, which
-  // AmendChapterResponse.indexed (generation.dto.ts:370-374) promises is false when the re-embed failed; backfill also skips such a chapter.
-  test.fixme('should report an amend unindexed when no chunk of it could be embedded', async ({ forge }) => {
+  test('should report an amend indexed only when every chunk of it was embedded', async ({ forge }) => {
     const owner = await forge.actor({ label: 'amend-indexed' });
     const projectId = await createGuardedProject(forge, owner, 'amend-indexed');
     await insertFinalChapters(projectId, [{ number: 1, content: CHAPTER_ONE.body }]);
 
-    const answer = await expectAmended(await amend(owner, projectId, 1, { content: AMENDED }), 'amending with the embedding service unreachable');
-    const [chunks] = await novelForgeDb()<{ embedded: number }[]>`SELECT count(embedding)::int AS embedded FROM chapter_chunks WHERE project_id = ${projectId} AND chapter = 1`;
-    expect(answer.indexed).toBe((chunks?.embedded ?? 0) > 0);
+    const answer = await expectAmended(await amend(owner, projectId, 1, { content: AMENDED }), 'amending a final chapter');
+    const [chunks] = await novelForgeDb()<{ stored: number; embedded: number }[]>`
+      SELECT count(*)::int AS stored, count(embedding)::int AS embedded FROM chapter_chunks WHERE project_id = ${projectId} AND chapter = 1
+    `;
+    expect(chunks?.stored, 'the amend stored the prose as chunks').toBeGreaterThan(0);
+    expect(answer.indexed, `${chunks?.embedded ?? 0} of ${chunks?.stored ?? 0} chunks embedded`).toBe(chunks?.embedded === chunks?.stored);
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
   test('should reschedule a published chapter only when the payload readers see moves, and never a withdrawn one', async ({ forge }) => {
