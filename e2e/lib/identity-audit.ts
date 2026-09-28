@@ -29,6 +29,7 @@ export interface AuditRow {
 export interface AuditChainTip {
   id: string;
   hash: string;
+  chainPosition: string | null;
 }
 
 /**
@@ -37,25 +38,30 @@ export interface AuditChainTip {
  * Identity writes `audit_events` inside the transaction that performs the audited action, so a row is readable the
  * moment its API call answers. Every row belongs to exactly one hash chain — the organisation named on it, or the
  * global chain of rows carrying no organisation — and `prev_hash` points at the previous row of that chain alone.
- * Ids are UUIDv7, so ordering by id is write order. `detail` is stored as a JSON string inside jsonb (as the
+ * `chain_position` is write order within a chain; ids are UUIDv7, which is not monotonic inside one millisecond, so only
+ * the rows written before positions existed (position null, chained in id order) are ordered by id. `detail` is stored as a JSON string inside jsonb (as the
  * notification outbox is), so it is unwrapped with `#>> '{}'` and re-parsed rather than read with `->`.
  */
 
-/** Rows of one chain in write order — `organisationId` null is the global chain — optionally only those written after `afterId`. */
+/** Rows of one chain in write order — `organisationId` null is the global chain — optionally only those written after the row `afterId`. */
 export async function auditChain(organisationId: string | null, afterId?: string): Promise<AuditRow[]> {
+  const after = afterId ?? null;
   return identityDb()<AuditRow[]>`
     SELECT id::text, action, outcome::text, actor_type::text AS "actorType", actor_id AS "actorId", organisation_id AS "organisationId",
            target_type AS "targetType", target_id AS "targetId", ((detail #>> '{}')::jsonb) AS detail, prev_hash AS "prevHash", hash
     FROM audit_events
-    WHERE organisation_id IS NOT DISTINCT FROM ${organisationId} AND (${afterId ?? null}::uuid IS NULL OR id > ${afterId ?? null}::uuid)
-    ORDER BY id
+    WHERE organisation_id IS NOT DISTINCT FROM ${organisationId}
+      AND (${after}::uuid IS NULL OR chain_position > coalesce((SELECT chain_position FROM audit_events WHERE id = ${after}::uuid), 0))
+    ORDER BY chain_position NULLS FIRST, id
   `;
 }
 
 /** The newest row of a chain, or `undefined` when nothing has been written to it yet. */
 export async function auditChainTip(organisationId: string | null): Promise<AuditChainTip | undefined> {
   const [row] = await identityDb()<AuditChainTip[]>`
-    SELECT id::text, hash FROM audit_events WHERE organisation_id IS NOT DISTINCT FROM ${organisationId} ORDER BY id DESC LIMIT 1
+    SELECT id::text, hash, chain_position::text AS "chainPosition" FROM audit_events
+    WHERE organisation_id IS NOT DISTINCT FROM ${organisationId}
+    ORDER BY chain_position DESC NULLS LAST, id DESC LIMIT 1
   `;
   return row;
 }

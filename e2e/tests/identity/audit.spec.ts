@@ -37,14 +37,6 @@ import { expect, type IdentityHarness, type IdentityTeam, test } from './fixture
  * `AuditService.verifyChain` has no HTTP surface, and re-deriving a row's hash here would only re-implement the
  * verifier under test. Each test drives its own organisation, so its chain starts empty and every row in it is one the
  * test caused; the global chain is shared with every other spec, so it is asserted over whole contiguous segments.
- *
- * The three linkage tests below are `fixme` against a live defect, not a flake: `AuditService.writeRecord` mints the row's
- * UUIDv7 id (audit.service.ts:76) before taking the chain's `pg_advisory_xact_lock` (:79) and then picks the predecessor
- * with `ORDER BY id DESC` (:83). UUIDv7 is not monotonic inside one millisecond, so two writes landing in the same
- * millisecond can read the same tip and the chain forks — and `verifyChain` re-derives in id order, so it reports a forked
- * chain invalid. This is already in the data: on 2026-09-23 the dev identity database held 81 forked links across roughly
- * 150 of its 37,096 rows, none of them written by this suite. The bodies assert the intended behaviour — one contiguous
- * chain, no forks — so they pass once identity chooses the tip by insertion order.
  */
 
 function domainPath(organisationId: string): string {
@@ -80,7 +72,7 @@ async function globalAction(identity: IdentityHarness, application: OAuthApplica
 }
 
 test.describe('identity audit — chain integrity', () => {
-  test.fixme('should chain consecutive global events, each one to the hash of the event before it', async ({ identity }) => {
+  test('should chain consecutive global events, each one to the hash of the event before it', async ({ identity }) => {
     const application = await identity.createOAuthApp('audit-global');
     const tip = await auditChainTip(null);
     expect(tip, 'the deployment has a global audit history to extend').toBeDefined();
@@ -97,7 +89,7 @@ test.describe('identity audit — chain integrity', () => {
     expect(await countAuditChainRoots(null), 'the global chain starts exactly once').toBe(1);
   });
 
-  test.fixme('should start an organisation chain at its own first event and keep it independent of the global one', async ({ identity }) => {
+  test('should start an organisation chain at its own first event and keep it independent of the global one', async ({ identity }) => {
     const team = await auditedTeam(identity, 'audit-org');
     const application = await identity.createOAuthApp('audit-org');
     const globalTip = await auditChainTip(null);
@@ -121,7 +113,7 @@ test.describe('identity audit — chain integrity', () => {
     ).toBe(false);
   });
 
-  test.fixme('should keep an organisation chain unbroken across ten concurrent audited actions', async ({ identity }) => {
+  test('should keep an organisation chain unbroken across ten concurrent audited actions', async ({ identity }) => {
     const team = await auditedTeam(identity, 'audit-concurrent');
 
     const headers = await csrfHeaders(team.ownerCtx, IDENTITY_CSRF_SEED_PATH);
@@ -145,7 +137,6 @@ test.describe('identity audit — chain integrity', () => {
     await updateApplication((await identity.admin()).ctx, application.applicationId, { visibility: 'RESTRICTED' });
     expect((await registerDomain(team.ownerCtx, team.organisationId)).status()).toBe(201);
 
-    // Read by target rather than as the segment after a captured tip: the tip is chosen by id (audit.service.ts:83), which is not write order.
     const platform = await findAuditEvents('application.visibility.changed', String(application.applicationId));
     expect(platform.length, "the application's visibility changes are audited").toBeGreaterThan(0);
     expect([...new Set(platform.map(row => row.organisationId))], 'a platform application change is a global event').toEqual([null]);
