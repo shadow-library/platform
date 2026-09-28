@@ -692,8 +692,11 @@ export class OAuthService {
 
   private async authenticateGrantClient(credential: ClientCredential): Promise<OAuthClient> {
     const client = await this.authenticateClient(credential);
-    if (client.tokenEndpointAuthMethod === 'none') await this.rateLimiterService.consumePublicClientBudget(client.id, Context.getClientInfo().ip);
-    else await this.rateLimiterService.consumeClientBudget(client.id);
+    const budget =
+      client.tokenEndpointAuthMethod === 'none'
+        ? await this.rateLimiterService.consumePublicClientBudget(client.id, Context.getClientInfo().ip)
+        : await this.rateLimiterService.consumeClientBudget(client.id);
+    if (!budget.allowed) throw this.tooManyRequests(budget.retryAfterSeconds);
     return client;
   }
 

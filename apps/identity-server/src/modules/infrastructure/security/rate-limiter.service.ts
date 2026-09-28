@@ -2,7 +2,6 @@ import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
-import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
@@ -77,18 +76,17 @@ export class RateLimiterService {
     return { allowed: hits < limit, remaining: Math.max(0, limit - hits), retryAfterSeconds: ttl > 0 ? ttl : windowSeconds };
   }
 
-  async consumeClientBudget(clientId: string): Promise<void> {
+  /** The caller refuses a disallowed decision itself, because only it can reach the reply that must carry `Retry-After`. */
+  async consumeClientBudget(clientId: string): Promise<RateDecision> {
     const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
-    if (decision.allowed) return;
-    this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
-    throw AppErrorCode.SEC_001.create();
+    if (!decision.allowed) this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
+    return decision;
   }
 
-  async consumePublicClientBudget(clientId: string, ip: string): Promise<void> {
+  async consumePublicClientBudget(clientId: string, ip: string): Promise<RateDecision> {
     const decision = await this.consume(OAUTH_PUBLIC_CLIENT_BUCKET, `${clientId}:${ip}`, OAUTH_PUBLIC_CLIENT_LIMIT, OAUTH_PUBLIC_CLIENT_WINDOW_SECONDS);
-    if (decision.allowed) return;
-    this.logger.warn('public OAuth client request budget exceeded for source', { securityEvent: 'security.public_client_rate_limited', clientId, ip });
-    throw AppErrorCode.SEC_001.create();
+    if (!decision.allowed) this.logger.warn('public OAuth client request budget exceeded for source', { securityEvent: 'security.public_client_rate_limited', clientId, ip });
+    return decision;
   }
 
   async blockIp(ip: string, ttlSeconds: number): Promise<void> {

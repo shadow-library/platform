@@ -112,7 +112,9 @@ export class AppSessionController {
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : '';
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_002.create();
-    await this.rateLimiterService.consumeClientBudget(client.id);
-    return client;
+    const budget = await this.rateLimiterService.consumeClientBudget(client.id);
+    if (budget.allowed) return client;
+    Context.getResponse()?.header('retry-after', String(budget.retryAfterSeconds));
+    throw AppErrorCode.SEC_001.create();
   }
 }
