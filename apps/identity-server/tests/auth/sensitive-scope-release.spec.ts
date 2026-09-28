@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 
 import { isReleasableAt } from '@server/modules/auth/oauth/scope-release.util';
 import { type GrantedScope } from '@server/modules/auth/oauth/oauth-client.service';
@@ -29,6 +29,7 @@ describe('sensitive scope release', () => {
   it('should withhold a sensitive scope from the AAL1 token and refresh family a code exchange issues', async () => {
     const { service, client, minted, issueCode, issueRefresh } = buildOAuthService({ scopes: [ACCOUNT, DESTRUCTIVE] });
     const code = await issueCode(CONSENTED, MEMOIR);
+    const info = spyOn(service['logger'], 'info');
 
     const result = await withinRequest(() =>
       service.token({ grantType: 'authorization_code', code, redirectUri: REDIRECT_URI, codeVerifier: CODE_VERIFIER }, { clientId: client.id, ...SECRET }),
@@ -37,6 +38,8 @@ describe('sensitive scope release', () => {
     expect(result.scope).toBe(`openid ${ACCOUNT.name}`);
     expect(minted[0]?.scope).toBe(`openid ${ACCOUNT.name}`);
     expect(minted[0]?.aal).toBeUndefined();
+    expect(info).toHaveBeenCalledWith('withheld sensitive scopes from an AAL1 token', { clientId: client.id, audience: MEMOIR, withheld: [DESTRUCTIVE.name] });
+    info.mockRestore();
     expect(issueRefresh.mock.calls[0]?.[0].scope).toBe(`openid ${ACCOUNT.name}`);
   });
 

@@ -327,6 +327,11 @@ export class OAuthService {
     return { audience, scopes: allowed.filter(name => !isWithheld(name)), rejected: principalScoped.filter(name => !isAllowed(name)), withheld: allowed.filter(isWithheld) };
   }
 
+  private logWithheld(client: OAuthClient, grant: ResolvedGrant): void {
+    if (grant.withheld.length === 0) return;
+    this.logger.info('withheld sensitive scopes from an AAL1 token', { clientId: client.id, audience: grant.audience, withheld: grant.withheld });
+  }
+
   async token(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     this.logger.debug('token request received', { grantType: params.grantType, clientId: credential.clientId, resource: params.resource });
     if (params.grantType === 'authorization_code') return this.exchangeCode(params, credential);
@@ -533,6 +538,7 @@ export class OAuthService {
     }
 
     const grant = await this.resolveGrant(client, payload.resource, payload.scope, 'user', 'AAL1');
+    this.logWithheld(client, grant);
     const scope = grant.scopes.join(' ');
     const organisationId = await this.applicationAccessService.resolveActiveOrganisationId(userId, client.applicationId);
     if (!organisationId) {
@@ -644,6 +650,7 @@ export class OAuthService {
 
     const requestedResource = rotated.context.audience === DEFAULT_AUDIENCE ? undefined : (rotated.context.audience ?? undefined);
     const grant = await this.resolveGrant(client, requestedResource, rotated.context.scope ?? '', 'user', 'AAL1');
+    this.logWithheld(client, grant);
     if (grant.rejected.length > 0) {
       this.logger.warn('dropped scopes revoked since the refresh-token family was opened', { clientId: client.id, familyId: rotated.familyId, dropped: grant.rejected });
     }
