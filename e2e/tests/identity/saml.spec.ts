@@ -180,21 +180,18 @@ test.describe('identity saml sso', () => {
     expect(other.assertion.nameId).toMatch(PERSISTENT_NAME_ID);
   });
 
-  // App bug: a `/saml2` reply written with `reply.send` (saml.controller.ts:28, :68) is answered `content-encoding: gzip`
-  // with an empty body by the global @fastify/compress of http-core.module.ts:113-116, so every real SP and browser — none
-  // of which ask for `identity` encoding — gets nothing at all.
-  test.fixme('should serve the SAML documents to a client that accepts compression', async ({ identity }) => {
+  test('should serve the SAML documents to a client that accepts compression', async ({ identity }) => {
     const serviceProvider = await identity.createSamlSp({ label: 'compressed' });
     const actor = await signedIn(identity, 'saml-compressed');
     const request = samlAuthnRequest({ entityId: serviceProvider.entityId, acsUrl: serviceProvider.acsUrl });
 
     const metadata = await actor.ctx.get('/saml2/metadata');
     expect(metadata.status()).toBe(200);
-    expect((await metadata.text()).length, 'metadata reaches a client that accepts gzip').toBeGreaterThan(0);
+    expect(await metadata.text(), 'metadata reaches a client that accepts gzip').toContain('EntityDescriptor');
 
     const sso = await actor.ctx.get(`/saml2/sso?${new URLSearchParams({ SAMLRequest: request.encoded }).toString()}`);
     expect(sso.status()).toBe(200);
-    expect((await sso.text()).length, 'the auto-post form reaches a client that accepts gzip').toBeGreaterThan(0);
+    expect(await sso.text(), 'the auto-post form reaches a client that accepts gzip').toContain('SAMLResponse');
   });
 });
 
