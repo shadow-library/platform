@@ -361,8 +361,7 @@ test.describe('identity app access — grant cache', () => {
     await expectHidden(ctx, app.client, 'after deactivation');
   });
 
-  test.fixme('should drop a deactivated app from the launcher at once', async ({ identity }) => {
-    // The admin application PATCH invalidates the grant cache only for a visibility change, so the launcher keeps a deactivated app for up to 5 minutes.
+  test('should drop a deactivated app from the launcher at once and restore it the moment it is reactivated', async ({ identity }) => {
     const app = await firstPartyApp(identity, 'cache-deactivate', 'PUBLIC');
     const { ctx } = await member(identity, 'cache-deactivate');
     expect(
@@ -370,8 +369,14 @@ test.describe('identity app access — grant cache', () => {
       'warm the cache',
     ).toContain(app.applicationId);
 
-    await updateApplication((await identity.admin()).ctx, app.applicationId, { isActive: false });
+    const admin = (await identity.admin()).ctx;
+    await updateApplication(admin, app.applicationId, { isActive: false });
     expect((await launcher(ctx)).map(entry => entry.id)).not.toContain(app.applicationId);
+    await expectHidden(ctx, app.client, 'a deactivated app is hidden at authorize');
+
+    await updateApplication(admin, app.applicationId, { isActive: true });
+    expect((await launcher(ctx)).map(entry => entry.id)).toContain(app.applicationId);
+    await expectGranted(ctx, app.client, 'a reactivated app is granted at once');
   });
 });
 
