@@ -1910,7 +1910,7 @@ export default function createPlugin() {
   - The check runs once per top-level call and BEFORE the `llm_cache` lookup, so at the limit even a would-be cache hit is refused.
   - Step 4: the second project is blocked too (per owner). Projects with no owner id share one window. After the window elapses (or with a smaller window) calls resume.
   - `chat-title` and helper calls are gated the same way; the refused title call is silent.
-  - Read failure fails CLOSED: 503 `AI_018` with `retryable: true` (a job is retried), logged at error "AI quota check failed — usage read failed, refusing the model call".
+  - Read failure fails CLOSED: 503 `AI_018` with `retryable: true` (an `organise` or `plan` job is retried once; every other job fails with it), logged at error "AI quota check failed — usage read failed, refusing the model call".
 - **Fails when:**
   - Refused at count N-1 (off by one), or the second project not blocked.
   - Spend never trips for an unpriced model: unknown or unpriced models contribute 0.
