@@ -90,6 +90,11 @@ export const templateVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
+    /**
+     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
+     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
+     */
+    baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -146,6 +151,11 @@ export const layoutVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
+    /**
+     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
+     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
+     */
+    baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -176,6 +186,11 @@ export const partialVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
+    /**
+     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
+     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
+     */
+    baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

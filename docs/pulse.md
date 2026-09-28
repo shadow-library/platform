@@ -17,7 +17,10 @@ Notification service and operations console. Other apps send a message by templa
 - Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
   layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
-- A baseline seed creates the default layout, partials and the template catalogue producers rely on; it only creates what is absent, never overwrites edits.
+- A baseline seed (every migration, prod included) creates the default layout, partials and the template catalogue producers rely on. Each version it writes records
+  the fixture's content hash; while the PUBLISHED version is one of those, a changed fixture is published as a new version (archive-then-insert, like rollback).
+  An operator's publish or rollback writes a version without a hash, and from then on the seed never touches that item; an open draft or a changed variable
+  contract withholds the update with a warning. Template metadata, variables and channel settings are only ever created, never updated.
 - Published content is cached in-process; change it only through publish, never by editing rows.
 - `pulse-web` calls same-origin `/api/*` in the browser and `pulse-server` directly during SSR, and authenticates via Identity; its `api-types.gen.ts` is generated from `pulse-server`.
 - Producers send on `POST /api/v1/notifications` (service-only `notifications:send` scope); the console's manual send is `POST /api/v1/notifications/console`

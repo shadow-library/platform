@@ -47,9 +47,10 @@ export interface TemplateFixture {
 }
 
 /**
- * The baseline design system + notification catalogue that pulse bootstraps into an empty datastore. It is authored
- * here purely as data — no message content lives in application code. The bootstrap seeds each item only when absent,
- * so an operator can fully customise (or replace) any template through the CMS and a later boot will not clobber it.
+ * The baseline design system + notification catalogue that pulse bootstraps into every datastore. It is authored here
+ * purely as data — no message content lives in application code. An edit here reaches existing environments as a new
+ * published version on the next migration, until an operator publishes their own version of that item through the CMS;
+ * from then on the seed never touches it (see `planBaselineStep`).
  */
 
 const DEFAULT_LAYOUT_KEY = 'default';

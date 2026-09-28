@@ -29,6 +29,13 @@
       "when": 1790544718507,
       "tag": "0003_repair_double_encoded_jsonb",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790615680589,
+      "tag": "0004_version_baseline_hash",
+      "breakpoints": true
     }
   ]
 }
