@@ -76,6 +76,16 @@ describe('EcosystemSeedService', () => {
       expect(seed.addRole).not.toHaveBeenCalled();
     });
 
+    it('should leave the catalogue of an application that pushes its own to that application once it exists', async () => {
+      const seed = seedOver({ 'novel-forge': [] });
+      const novelForgeId = seed.applications.get('novel-forge')?.id;
+
+      await seed.service.seed(OPERATOR);
+
+      expect(seed.addRole).not.toHaveBeenCalled();
+      expect(seed.ensurePermission.mock.calls.filter(([applicationId]) => applicationId === novelForgeId)).toEqual([]);
+    });
+
     it('should add a role declared after the application already existed, assigning it to the bootstrap administrator as its creation does', async () => {
       const seed = seedOver({
         pulse: [

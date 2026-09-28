@@ -55,6 +55,8 @@ export interface SeedApplication {
   scopes?: readonly SeedScope[];
   permissions?: readonly SeedPermission[];
   roles?: readonly SeedRole[];
+  /** The application pushes its own role catalogue as the complete truth, so the seed provisions `permissions` and `roles` only at creation. */
+  pushesCatalogue?: boolean;
   grants?: readonly SeedScopeGrant[];
   serviceAccess?: readonly SeedServiceAccessRule[];
 }
@@ -139,6 +141,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
       resourceName: 'Novel Forge API',
       publicHost: 'novelforge',
+      pushesCatalogue: true,
       scopes: [
         {
           name: 'novel-forge:bots:manage',

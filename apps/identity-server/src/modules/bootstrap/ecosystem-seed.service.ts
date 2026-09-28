@@ -199,7 +199,7 @@ export class EcosystemSeedService {
   private async reconcileApplication(seed: SeedApplication, operator: EcosystemOperator, scopes: Map<string, string>): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(seed.name);
     await this.ensureResourceScopes(application.id, seed, scopes);
-    await this.reconcileCatalogue(application.id, seed, operator);
+    if (!seed.pushesCatalogue) await this.reconcileCatalogue(application.id, seed, operator);
     await this.bindApplication(seed, scopes);
     await this.reconcileClient(seed);
   }
