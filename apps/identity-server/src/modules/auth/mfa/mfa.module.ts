@@ -9,6 +9,7 @@ import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
+import { SecurityModule } from '@server/modules/infrastructure/security';
 
 import { MfaController } from './mfa.controller';
 import { MfaService } from './mfa.service';
@@ -17,7 +18,7 @@ import { WebauthnController } from './webauthn.controller';
 import { WebauthnService } from './webauthn.service';
 
 @Module({
-  imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule, FederationModule],
+  imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule, FederationModule, SecurityModule],
   controllers: [MfaController, WebauthnController],
   providers: [MfaService, RecoveryCodeService, WebauthnService],
   exports: [MfaService, RecoveryCodeService, WebauthnService],

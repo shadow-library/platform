@@ -24,7 +24,8 @@ Identity and never stores credentials. This is the only doc that describes the a
 - Browser to Identity uses an opaque server-side session cookie (hashed at rest) through one origin: a reverse proxy sends API/OAuth/SAML paths to `identity-server`, the rest to
   `identity-web`. Register/login/recover are short-lived Redis flows that end in a session; OAuth artifacts are minted only by the OAuth endpoints, the app-sessions API and `ServiceTokenService` (Identity's own outbound M2M calls).
 - Postgres is authoritative; Redis holds only flows, rate limits, caches and counters. Signing keys are EdDSA; rotation exists in `KeyService` but nothing calls it, so there is no
-  automated or admin rotation path. The `token_type` claim (user, service, bot) discriminates principals.
+  automated or admin rotation path. The `token_type` claim (user, service, bot) discriminates principals. `security.master-encryption-key` also keys the recovery-code
+  lookup hashes and SAML pairwise ids, so rotating it invalidates every issued recovery code (users must regenerate them) and changes every SAML NameID.
 - PDP/PEP: Identity decides; consuming services enforce via `@shadow-library/auth` (`packages/auth`), configured with issuer, app id and one credential. Its guards verify tokens
   offline against JWKS and call the PDP with a cached decision (shorter for `highRisk`); it also serves first-party login/callback/logout/step-up routes.
 - Identity's own routes use `@Auth({ ... })`; an undecorated route is unguarded, so state intent with `public: true`. Access errors are codes; `identity-web` owns copy.

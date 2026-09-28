@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
+import { AppError } from '@shadow-library/common';
 import { setConfig } from '@shadow-library/common/testing';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
+import { AppErrorCode } from '@server/classes';
 import { RecoveryCodeService } from '@server/modules/auth/mfa/recovery-code.service';
+import { RateLimiterService } from '@server/modules/infrastructure/security/rate-limiter.service';
+
+import { fakeReply, withinRequest } from './request-context';
 
 interface StoredCode {
   id: bigint;
@@ -29,11 +34,13 @@ function recoveryCodes() {
     query: { recoveryCodes: { findMany: () => Promise.resolve(stored.filter(code => code.usedAt === null)) } },
     update: () => ({ set: () => ({ where: () => ({ returning: () => Promise.resolve([{ id: 1n }]) }) }) }),
   };
+  const databaseService = new FakeDatabaseService({ postgres });
   const service = new RecoveryCodeService(
-    new FakeDatabaseService({ postgres }),
+    databaseService,
     { getPrimaryEmail: () => Promise.resolve(null) } as never,
     { record: () => Promise.resolve() } as never,
     {} as never,
+    new RateLimiterService(databaseService),
   );
   return { service, stored };
 }
@@ -43,7 +50,7 @@ describe('RecoveryCodeService', () => {
   let hash: ReturnType<typeof spyOn<typeof Bun.password, 'hash'>>;
 
   beforeEach(() => {
-    setConfig({ 'security.master-encryption-key': 'test-master-key' });
+    setConfig({ 'security.master-encryption-key': 'test-master-key', 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '' });
     hash = spyOn(Bun.password, 'hash').mockImplementation((password => Promise.resolve(`argon2:${String(password)}`)) as typeof Bun.password.hash);
     verify = spyOn(Bun.password, 'verify').mockImplementation(((password, stored) => Promise.resolve(stored === `argon2:${String(password)}`)) as typeof Bun.password.verify);
   });
@@ -82,5 +89,20 @@ describe('RecoveryCodeService', () => {
       expect(code.lookupHash).toMatch(/^[0-9a-f]{64}$/);
       expect(code.lookupHash).not.toContain(normalized(codes[index] as string));
     }
+  });
+
+  it("should refuse a user's recovery codes after ten wrong ones, without verifying, and say when to retry", async () => {
+    const { service } = recoveryCodes();
+    const codes = await service.generate(42n);
+    for (let attempt = 0; attempt < 10; attempt++) expect(await service.consume(42n, `WRONG-${attempt}`)).toBe(false);
+    verify.mockClear();
+    const reply = fakeReply();
+
+    const refused = await withinRequest(() => service.consume(42n, codes[0] as string).catch((error: unknown) => error), reply);
+
+    expect(AppError.is(refused, AppErrorCode.SEC_001)).toBe(true);
+    expect(reply.headers.get('retry-after')).toBe('900');
+    expect(verify).not.toHaveBeenCalled();
+    expect(await service.consume(43n, 'WRONG-CODE0'), "another user's budget is untouched").toBe(false);
   });
 });

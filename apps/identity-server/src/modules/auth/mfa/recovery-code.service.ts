@@ -4,17 +4,23 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { Context } from '@server/modules/access';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+import { RateLimiterService } from '@server/modules/infrastructure/security';
 
 const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_LENGTH = 10;
 const BATCH_SIZE = 10;
 const USED_TEMPLATE = 'auth.mfa.recovery-code-used';
 const ARGON2_OPTIONS = { algorithm: 'argon2id', memoryCost: 65536, timeCost: 3 } as const;
+const FAILURE_BUCKET = 'recovery-code-failures';
+const FAILURE_LIMIT = 10;
+const FAILURE_WINDOW_SECONDS = 900;
 
 @Injectable()
 export class RecoveryCodeService {
@@ -27,6 +33,7 @@ export class RecoveryCodeService {
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     this.db = databaseService.getPostgresClient();
     this.lookupKey = Buffer.from(hkdfSync('sha256', Config.get('security.master-encryption-key'), 'shadow-identity', 'recovery-code-lookup', 32));
@@ -70,7 +77,21 @@ export class RecoveryCodeService {
     return codes;
   }
 
+  /** Wrong codes are budgeted per user, which also caps the argon2 work codes without a lookup hash can still cost. */
   async consume(userId: bigint, code: string): Promise<boolean> {
+    const budget = await this.rateLimiter.peek(FAILURE_BUCKET, userId.toString(), FAILURE_LIMIT, FAILURE_WINDOW_SECONDS);
+    if (!budget.allowed) {
+      this.logger.warn('recovery code refused: too many wrong codes for this user', { securityEvent: 'auth.recovery_code_throttled', userId });
+      Context.getResponse()?.header('retry-after', String(budget.retryAfterSeconds));
+      throw AppErrorCode.SEC_001.create();
+    }
+
+    const matched = await this.redeem(userId, code);
+    if (!matched) await this.rateLimiter.consume(FAILURE_BUCKET, userId.toString(), FAILURE_LIMIT, FAILURE_WINDOW_SECONDS);
+    return matched;
+  }
+
+  private async redeem(userId: bigint, code: string): Promise<boolean> {
     const normalized = this.normalize(code);
     const lookupHash = this.lookupHash(normalized);
     const unused = await this.db.query.recoveryCodes.findMany({
