@@ -46,7 +46,7 @@ function SecurityPage(): React.JSX.Element {
     <div className={styles.page}>
       <SectionCard
         title="Security policies"
-        description="Tighten how long tokens and sessions live for this organisation’s members, and which second factors they may use. The strictest setting across a member’s organisations always wins — you can make a policy stricter than the platform default, never looser."
+        description="Tighten how long tokens and sessions live for this organisation’s members.The strictest setting across a member’s organisations always wins — you can make a policy stricter than the platform default, never looser."
       >
         {policies.isLoading ? (
           <div className={styles.center}>

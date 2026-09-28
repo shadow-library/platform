@@ -4734,8 +4734,7 @@ export interface operations {
           | 'auth.elevation.window'
           | 'auth.refresh_token.idle_ttl'
           | 'auth.app_session.idle_ttl'
-          | 'auth.app_session.absolute_ttl'
-          | 'mfa.email_otp_fallback.enabled';
+          | 'auth.app_session.absolute_ttl';
       };
       cookie?: never;
     };
@@ -4786,8 +4785,7 @@ export interface operations {
           | 'auth.elevation.window'
           | 'auth.refresh_token.idle_ttl'
           | 'auth.app_session.idle_ttl'
-          | 'auth.app_session.absolute_ttl'
-          | 'mfa.email_otp_fallback.enabled';
+          | 'auth.app_session.absolute_ttl';
       };
       cookie?: never;
     };
