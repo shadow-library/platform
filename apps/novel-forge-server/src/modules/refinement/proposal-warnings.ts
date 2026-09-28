@@ -42,12 +42,12 @@ export async function loadBaselineTexts(db: DbExecutor, projectId: bigint, ops: 
   const slugs = textOps.flatMap(op => (op.op === 'bible_document.upsert' ? [op.slug] : []));
   const entityKeys = textOps.flatMap(op => (op.op === 'entity.upsert' ? [op.entityKey] : []));
 
-  const [briefRows, draftRows, docRows, entityRows] = await Promise.all([
-    chapters.length > 0 ? db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, chapters)) }) : [],
-    drafts.length > 0 ? db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, drafts)) }) : [],
-    slugs.length > 0 ? db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.slug, slugs)) }) : [],
-    entityKeys.length > 0 ? db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) }) : [],
-  ]);
+  const briefRows = chapters.length > 0 ? await db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, chapters)) }) : [];
+  const draftRows = drafts.length > 0 ? await db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, drafts)) }) : [];
+  const docRows =
+    slugs.length > 0 ? await db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), inArray(schema.bibleDocuments.slug, slugs)) }) : [];
+  const entityRows =
+    entityKeys.length > 0 ? await db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) }) : [];
 
   const texts = new Map<string, TextFields>();
   for (const row of briefRows) texts.set(`chapter:${row.chapter}`, { title: row.title, body: row.body });

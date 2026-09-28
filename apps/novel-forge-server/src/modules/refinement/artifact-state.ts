@@ -183,10 +183,10 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
 
   const threadKeys = parsed.promiseKeys.filter(p => p.kind === 'thread').map(p => p.key);
   const mysteryKeys = parsed.promiseKeys.filter(p => p.kind === 'mystery').map(p => p.key);
-  const [project, docs, volumes, entities, facts, threads, mysteries] = await Promise.all([
-    parsed.premise ? db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }) : undefined,
+  const project = parsed.premise ? await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }) : undefined;
+  const docs =
     parsed.docs.length > 0
-      ? db.query.bibleDocuments.findMany({
+      ? await db.query.bibleDocuments.findMany({
           where: and(
             eq(schema.bibleDocuments.projectId, projectId),
             inArray(
@@ -199,13 +199,25 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
             ),
           ),
         })
-      : [],
-    parsed.volumeKeys.length > 0 ? db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) }) : [],
-    parsed.entityKeys.length > 0 ? db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, parsed.entityKeys)) }) : [],
-    parsed.factKeys.length > 0 ? db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) }) : [],
-    threadKeys.length > 0 ? db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) }) : [],
-    mysteryKeys.length > 0 ? db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
-  ]);
+      : [];
+  const volumes =
+    parsed.volumeKeys.length > 0
+      ? await db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) })
+      : [];
+  const entities =
+    parsed.entityKeys.length > 0
+      ? await db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, parsed.entityKeys)) })
+      : [];
+  const facts =
+    parsed.factKeys.length > 0
+      ? await db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, parsed.factKeys)) })
+      : [];
+  const threads =
+    threadKeys.length > 0
+      ? await db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) })
+      : [];
+  const mysteries =
+    mysteryKeys.length > 0 ? await db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [];
 
   if (project) records.set('premise', { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
   for (const row of docs) {

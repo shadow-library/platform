@@ -111,13 +111,11 @@ export async function revealsStrandedByRevert(
 ): Promise<{ milestone: string; facts: string[] } | null> {
   if (milestones.length === 0) return null;
   const undone = new Set(milestones);
-  const [state, disclosed] = await Promise.all([
-    loadPlanState(db, projectId),
-    db.query.canonFacts.findMany({
-      columns: { factKey: true },
-      where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.disclosedInChapter, chapter)),
-    }),
-  ]);
+  const state = await loadPlanState(db, projectId);
+  const disclosed = await db.query.canonFacts.findMany({
+    columns: { factKey: true },
+    where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.disclosedInChapter, chapter)),
+  });
   const plan = state.plans.find(candidate => candidate.chapter === chapter) ?? { chapter, volumeKey: null, isEnding: false, claimedMilestones: [], knowledgeContract: null };
   const reverted = {
     ...state,

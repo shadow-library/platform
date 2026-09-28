@@ -667,10 +667,12 @@ export class ProposalApplyService {
 
   /** The highest chapter number that exists at all, drafted or finalized — the bound a promise's `lastAdvancedChapter` may not pass. */
   private async latestChapterNumber(ctx: ApplyContext): Promise<number> {
-    const [chapter, draft] = await Promise.all([
-      ctx.tx.query.chapters.findFirst({ where: eq(schema.chapters.projectId, ctx.projectId), orderBy: desc(schema.chapters.number), columns: { number: true } }),
-      ctx.tx.query.drafts.findFirst({ where: eq(schema.drafts.projectId, ctx.projectId), orderBy: desc(schema.drafts.chapter), columns: { chapter: true } }),
-    ]);
+    const chapter = await ctx.tx.query.chapters.findFirst({
+      where: eq(schema.chapters.projectId, ctx.projectId),
+      orderBy: desc(schema.chapters.number),
+      columns: { number: true },
+    });
+    const draft = await ctx.tx.query.drafts.findFirst({ where: eq(schema.drafts.projectId, ctx.projectId), orderBy: desc(schema.drafts.chapter), columns: { chapter: true } });
     return Math.max(chapter?.number ?? 0, draft?.chapter ?? 0);
   }
 
@@ -1089,16 +1091,14 @@ export class ProposalApplyService {
 
     // A promise's payoff target dangling after the milestone goes is a soft inconsistency, not a correctness hazard like a claimed plan or a
     // fact's unlock — diagnostic only, so it never blocks the removal a claim or an unlock would.
-    const [namingThreads, namingMysteries] = await Promise.all([
-      ctx.tx.query.plotThreads.findMany({
-        columns: { threadKey: true },
-        where: and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.payoffMilestoneKey, op.milestoneKey)),
-      }),
-      ctx.tx.query.mysteries.findMany({
-        columns: { mysteryKey: true },
-        where: and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.payoffMilestoneKey, op.milestoneKey)),
-      }),
-    ]);
+    const namingThreads = await ctx.tx.query.plotThreads.findMany({
+      columns: { threadKey: true },
+      where: and(eq(schema.plotThreads.projectId, ctx.projectId), eq(schema.plotThreads.payoffMilestoneKey, op.milestoneKey)),
+    });
+    const namingMysteries = await ctx.tx.query.mysteries.findMany({
+      columns: { mysteryKey: true },
+      where: and(eq(schema.mysteries.projectId, ctx.projectId), eq(schema.mysteries.payoffMilestoneKey, op.milestoneKey)),
+    });
     if (namingThreads.length > 0 || namingMysteries.length > 0) {
       this.logger.warn('applyMilestoneRemove: milestone named as a payoff target by promises that will be left pointing at nothing', {
         projectId: ctx.projectId,

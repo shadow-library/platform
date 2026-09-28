@@ -150,10 +150,8 @@ export async function assertMilestoneSubject(db: Pick<DbExecutor, 'query'>, proj
 
 /** What would dangle if the milestone went: plans that claim it and facts whose unlock names it. */
 export async function findMilestoneReferences(db: DbExecutor, projectId: bigint, milestoneKey: string): Promise<string[]> {
-  const [briefs, facts] = await Promise.all([
-    db.query.briefs.findMany({ columns: { chapter: true, claimedMilestones: true }, where: eq(schema.briefs.projectId, projectId) }),
-    db.query.canonFacts.findMany({ columns: { factKey: true, unlock: true }, where: eq(schema.canonFacts.projectId, projectId) }),
-  ]);
+  const briefs = await db.query.briefs.findMany({ columns: { chapter: true, claimedMilestones: true }, where: eq(schema.briefs.projectId, projectId) });
+  const facts = await db.query.canonFacts.findMany({ columns: { factKey: true, unlock: true }, where: eq(schema.canonFacts.projectId, projectId) });
   const claiming = briefs
     .filter(brief => (brief.claimedMilestones ?? []).includes(milestoneKey))
     .map(brief => brief.chapter)

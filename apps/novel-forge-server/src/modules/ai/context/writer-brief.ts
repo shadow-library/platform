@@ -23,10 +23,8 @@ export async function loadWriterBrief(
   brief: WriterBriefRow | null | undefined,
   disclosure?: WriterDisclosurePolicy,
 ): Promise<WriterBrief> {
-  const [policy, factWriterNotes] = await Promise.all([
-    disclosure ?? loadWriterDisclosurePolicy(db, projectId, chapter),
-    loadFactWriterNotes(db, projectId, brief?.endingContract),
-  ]);
+  const policy = disclosure ?? (await loadWriterDisclosurePolicy(db, projectId, chapter));
+  const factWriterNotes = await loadFactWriterNotes(db, projectId, brief?.endingContract);
   return {
     chapterBrief: policy.scrub(renderChapterBrief(brief), 'plan'),
     endingContract: policy.scrub(renderEndingContract(brief?.endingContract, factWriterNotes), 'plan'),

@@ -213,6 +213,25 @@ export default defineConfig([
     rules: { 'no-restricted-syntax': 'off' },
   },
 
+  /**
+   * novel-forge-server: a `db`/`tx` handle may be a transaction, one Postgres connection, and concurrent queries over one connection
+   * are undefined behaviour — the shape that left connections idle in transaction under prepared statements. Queries through a
+   * handle are awaited one at a time; `this.db` is the pool and may fan out.
+   */
+  {
+    files: ['apps/novel-forge-server/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='Promise'][callee.property.name=/^(all|allSettled|any|race)$/] Identifier[name=/^(db|tx|rawTx|executor|savepoint)$/]:not(MemberExpression[object.type='ThisExpression'] > Identifier.property):not(Property > Identifier.key)",
+          message: 'Never fan out queries over a db/tx handle with Promise.all — it may be one transaction connection. Await them in turn.',
+        },
+      ],
+    },
+  },
+
   /** identity-server also renders and ships the OIDC consent client from the same workspace: needs both global sets. */
   {
     files: ['apps/identity-server/**/*.{ts,tsx}'],

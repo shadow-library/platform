@@ -12,25 +12,24 @@ import { openBlockingFindings } from '../review/review-records';
 export async function finalizeRefusals(db: PrimaryDatabase, draft: Generation.Draft): Promise<AppError[]> {
   if (draft.status === 'final' && (await isChapterFinalized(db, draft))) return [AppErrorCode.DRF_002.create()];
 
-  const [openBlocking, reviews, revealsRefusal, previousFinal, needsRevalidation, latestReport] = await Promise.all([
-    draft.status === 'final' ? null : openBlockingFindings(db, draft),
-    draft.status === 'final' ? [] : loadChapterReviews(db, draft.projectId, draft.chapter),
-    planRevealsRefusal(db, draft.projectId, draft.chapter),
+  const openBlocking = draft.status === 'final' ? null : await openBlockingFindings(db, draft);
+  const reviews = draft.status === 'final' ? [] : await loadChapterReviews(db, draft.projectId, draft.chapter);
+  const revealsRefusal = await planRevealsRefusal(db, draft.projectId, draft.chapter);
+  const previousFinal =
     draft.chapter > 1
-      ? db.query.drafts.findFirst({
+      ? await db.query.drafts.findFirst({
           where: and(eq(schema.drafts.projectId, draft.projectId), eq(schema.drafts.chapter, draft.chapter - 1), eq(schema.drafts.status, 'final')),
           columns: { id: true },
         })
-      : true,
-    db.query.chapters.findFirst({
-      where: and(eq(schema.chapters.projectId, draft.projectId), eq(schema.chapters.needsRevalidation, true), lt(schema.chapters.number, draft.chapter)),
-      columns: { id: true },
-    }),
-    db.query.validationReports.findFirst({
-      where: and(eq(schema.validationReports.projectId, draft.projectId), eq(schema.validationReports.scope, 'novel')),
-      orderBy: desc(schema.validationReports.createdAt),
-    }),
-  ]);
+      : true;
+  const needsRevalidation = await db.query.chapters.findFirst({
+    where: and(eq(schema.chapters.projectId, draft.projectId), eq(schema.chapters.needsRevalidation, true), lt(schema.chapters.number, draft.chapter)),
+    columns: { id: true },
+  });
+  const latestReport = await db.query.validationReports.findFirst({
+    where: and(eq(schema.validationReports.projectId, draft.projectId), eq(schema.validationReports.scope, 'novel')),
+    orderBy: desc(schema.validationReports.createdAt),
+  });
   const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
 
   const refusals: (AppError | null)[] = [
@@ -54,10 +53,8 @@ export async function finalizeRefusals(db: PrimaryDatabase, draft: Generation.Dr
  * downstream leaves a `final` draft over a half-finalized chapter that must be allowed to finish.
  */
 async function isChapterFinalized(db: PrimaryDatabase, draft: Generation.Draft): Promise<boolean> {
-  const [chapterRow, project] = await Promise.all([
-    db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, draft.projectId), eq(schema.chapters.number, draft.chapter)) }),
-    db.query.projects.findFirst({ where: eq(schema.projects.id, draft.projectId) }),
-  ]);
+  const chapterRow = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, draft.projectId), eq(schema.chapters.number, draft.chapter)) });
+  const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, draft.projectId) });
   if (!chapterRow) return false;
   // Isolated chapters bypass continuity extraction entirely, so their flag never turns true.
   if (!chapterRow.continuityApplied && !draft.isolated) return false;

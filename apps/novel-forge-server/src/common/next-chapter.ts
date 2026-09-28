@@ -9,10 +9,8 @@ type ChapterReader = Pick<DbExecutor, 'query'>;
 
 /** The chapter the author, the chat and generation all write next; a final import without a draft counts as written. */
 export async function nextWritableChapter(db: ChapterReader, projectId: bigint): Promise<number> {
-  const [drafts, finalized] = await Promise.all([
-    db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } }),
-    db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } }),
-  ]);
+  const drafts = await db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
+  const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
   return firstUnwrittenChapter(new Set(drafts.map(draft => draft.chapter)), new Set(finalized.map(chapter => chapter.number)));
 }
 

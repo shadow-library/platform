@@ -292,10 +292,8 @@ export class ChapterInsertService {
 
   /** Highest number any chapter or brief occupies — inserting past it would strand the new brief in an unplanned hole. */
   private async highestChapter(projectId: bigint, db: DbExecutor): Promise<number> {
-    const [chapter, brief] = await Promise.all([
-      db.query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId), orderBy: desc(schema.chapters.number), columns: { number: true } }),
-      db.query.briefs.findFirst({ where: eq(schema.briefs.projectId, projectId), orderBy: desc(schema.briefs.chapter), columns: { chapter: true } }),
-    ]);
+    const chapter = await db.query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId), orderBy: desc(schema.chapters.number), columns: { number: true } });
+    const brief = await db.query.briefs.findFirst({ where: eq(schema.briefs.projectId, projectId), orderBy: desc(schema.briefs.chapter), columns: { chapter: true } });
     return Math.max(chapter?.number ?? 0, brief?.chapter ?? 0);
   }
 

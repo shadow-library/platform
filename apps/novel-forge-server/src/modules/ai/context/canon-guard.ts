@@ -169,7 +169,8 @@ export async function spanUnlockHolds(
   span: ChapterSpan,
   insertAfter?: number,
 ): Promise<(unlock: UnlockCondition) => boolean> {
-  const [state, volumeKey] = await Promise.all([loadPlanState(db, projectId), nearestVolumeKey(db, projectId, span.start - 1)]);
+  const state = await loadPlanState(db, projectId);
+  const volumeKey = await nearestVolumeKey(db, projectId, span.start - 1);
   const ctx = planUnlockContext({ chapter: span.start, volumeKey, isEnding: false, claimedMilestones: [] }, state);
   return unlock => evaluateUnlock(insertAfter === undefined ? unlock : shiftUnlockChapters(unlock, insertAfter), ctx).holds;
 }

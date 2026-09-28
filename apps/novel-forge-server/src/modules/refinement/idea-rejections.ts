@@ -59,7 +59,8 @@ export async function loadActiveVolumeKey(db: DbExecutor, projectId: bigint): Pr
 export async function loadRejectionContext(db: DbExecutor, projectId: bigint, entries: readonly IdeaRejectionEntry[], refs: readonly string[] = []): Promise<RejectionContext> {
   const anchored = entries.flatMap(entry => (entry.rejectionScope === 'not_this_version' ? Object.keys(anchoredStates(entry.rejectionAnchor) ?? {}) : []));
   const wanted = [...new Set([...anchored, ...refs])];
-  const [activeVolumeKey, states] = await Promise.all([loadActiveVolumeKey(db, projectId), wanted.length > 0 ? loadArtifactStates(db, projectId, wanted) : {}]);
+  const activeVolumeKey = await loadActiveVolumeKey(db, projectId);
+  const states = wanted.length > 0 ? await loadArtifactStates(db, projectId, wanted) : {};
   return { activeVolumeKey, states };
 }
 

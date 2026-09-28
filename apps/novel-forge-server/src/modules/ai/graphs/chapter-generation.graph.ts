@@ -447,10 +447,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
   async function draftChapter(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-    const [brief, projectRow] = await Promise.all([
-      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
-      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-    ]);
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     let stableContext = '';
     let volatileContext = '';
@@ -477,10 +475,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const guidance = writerSafeGuidance(disclosure, state.guidance);
     const wordTarget = resolveWordTarget(projectRow);
 
-    const [targetRevision, pack] = await Promise.all([
-      targetRevisionFor(projectId, state.chapter),
-      state.contextPackId ? db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : Promise.resolve(undefined),
-    ]);
+    const targetRevision = await targetRevisionFor(projectId, state.chapter);
+    const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
     ctx.onMessages = writerSnapshots.onMessages({
       projectId,
       chapter: state.chapter,
@@ -554,15 +550,13 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
   async function mechanicalCheck(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-    const [projectRow, priorChapters] = await Promise.all([
-      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      db.query.chapters.findMany({
-        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), eq(schema.chapters.isolated, false), lt(schema.chapters.number, state.chapter)),
-        orderBy: [desc(schema.chapters.number)],
-        limit: MECHANICAL_PRIOR_WINDOW,
-        columns: { content: true },
-      }),
-    ]);
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const priorChapters = await db.query.chapters.findMany({
+      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), eq(schema.chapters.isolated, false), lt(schema.chapters.number, state.chapter)),
+      orderBy: [desc(schema.chapters.number)],
+      limit: MECHANICAL_PRIOR_WINDOW,
+      columns: { content: true },
+    });
 
     const wordTarget = resolveWordTarget(projectRow);
     const mechanicalFindings = checkDraftMechanics(state.prose, priorChapters.map(c => c.content ?? '').filter(Boolean), wordTarget);
@@ -586,10 +580,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
   async function judge(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-    const [projectRow, brief] = await Promise.all([
-      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
-    ]);
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
 
     let renderedPack = '';
     if (state.contextPackId) {
@@ -809,10 +801,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
   async function repairRewrite(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-    const [brief, projectRow] = await Promise.all([
-      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
-      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-    ]);
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     let stableContext = '';
     let volatileContext = '';
@@ -842,10 +832,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const { chapterBrief, endingContract } = await loadWriterBrief(db, projectId, state.chapter, brief, disclosure);
     const wordTarget = resolveWordTarget(projectRow);
 
-    const [targetRevision, pack] = await Promise.all([
-      targetRevisionFor(projectId, state.chapter),
-      state.contextPackId ? db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : Promise.resolve(undefined),
-    ]);
+    const targetRevision = await targetRevisionFor(projectId, state.chapter);
+    const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
     ctx.onMessages = writerSnapshots.onMessages({
       projectId,
       chapter: state.chapter,

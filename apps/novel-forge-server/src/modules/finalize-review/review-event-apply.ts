@@ -126,8 +126,8 @@ export function drizzleRowStore(tx: PrimaryTransaction): RowStore {
         schema.entityRelationships,
         and(eq(schema.entityRelationships.projectId, BigInt(entity['projectId'] as string)), eq(schema.entityRelationships.targetKey, entity['entityKey'] as string)) as SQL,
       );
-      const found = await Promise.all([...byId, asTarget]);
-      return found.some(rows => rows.length > 0);
+      for (const query of [...byId, asTarget]) if ((await query).length > 0) return true;
+      return false;
     },
   };
 }
@@ -172,10 +172,11 @@ export async function rowsTouchedBy(tx: PrimaryTransaction, target: ApplyTarget,
         ? [{ table: 'plot_threads', match: { projectId: project, threadKey: change.thread.threadKey } }]
         : [{ table: 'mysteries', match: { projectId: project, mysteryKey: change.mystery.mysteryKey } }];
     case 'knowledge': {
-      const [id, fact] = await Promise.all([
-        entityId(tx, target.projectId, change.entityKey),
-        tx.query.canonFacts.findFirst({ columns: { id: true }, where: and(eq(schema.canonFacts.projectId, target.projectId), eq(schema.canonFacts.factKey, change.factKey)) }),
-      ]);
+      const id = await entityId(tx, target.projectId, change.entityKey);
+      const fact = await tx.query.canonFacts.findFirst({
+        columns: { id: true },
+        where: and(eq(schema.canonFacts.projectId, target.projectId), eq(schema.canonFacts.factKey, change.factKey)),
+      });
       return id && fact ? [{ table: 'character_knowledge', match: { factId: String(fact.id), entityId: String(id) } }] : [];
     }
     case 'milestone':
@@ -200,10 +201,11 @@ export async function applyChange(tx: PrimaryTransaction, target: ApplyTarget, c
     case 'promise':
       return applyContinuityDelta(tx, projectId, chapter, 'thread' in change ? { ...EMPTY_DELTA, threads: [change.thread] } : { ...EMPTY_DELTA, mysteries: [change.mystery] });
     case 'knowledge': {
-      const [id, fact] = await Promise.all([
-        entityId(tx, projectId, change.entityKey),
-        tx.query.canonFacts.findFirst({ columns: { id: true }, where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, change.factKey)) }),
-      ]);
+      const id = await entityId(tx, projectId, change.entityKey);
+      const fact = await tx.query.canonFacts.findFirst({
+        columns: { id: true },
+        where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, change.factKey)),
+      });
       if (!id || !fact) return;
       await tx
         .insert(schema.characterKnowledge)

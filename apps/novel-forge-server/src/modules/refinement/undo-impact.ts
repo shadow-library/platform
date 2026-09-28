@@ -171,29 +171,27 @@ export async function loadImpactRows(db: DbExecutor, projectId: bigint, proposal
     entityKeys.length > 0 ? inArray(schema.entities.entityKey, entityKeys) : undefined,
   );
 
-  const [plans, drafts, knowledge, suggestions] = await Promise.all([
-    db.query.briefs.findMany({
-      where: eq(schema.briefs.projectId, projectId),
-      columns: { chapter: true, volumeKey: true, pov: true, scenes: true, knowledgeContract: true, claimedMilestones: true, contextRefs: true },
-    }),
-    db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true, status: true } }),
-    knowledgeFilter
-      ? db
-          .select({
-            factKey: schema.canonFacts.factKey,
-            entityKey: schema.entities.entityKey,
-            learnedInChapter: schema.characterKnowledge.learnedInChapter,
-            status: schema.characterKnowledge.status,
-          })
-          .from(schema.characterKnowledge)
-          .innerJoin(schema.canonFacts, eq(schema.canonFacts.id, schema.characterKnowledge.factId))
-          .innerJoin(schema.entities, eq(schema.entities.id, schema.characterKnowledge.entityId))
-          .where(and(eq(schema.characterKnowledge.projectId, projectId), knowledgeFilter))
-      : [],
-    db.query.refinementProposals.findMany({
-      where: and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, proposalId)),
-      columns: { id: true, changeSet: true, baseline: true },
-    }),
-  ]);
+  const plans = await db.query.briefs.findMany({
+    where: eq(schema.briefs.projectId, projectId),
+    columns: { chapter: true, volumeKey: true, pov: true, scenes: true, knowledgeContract: true, claimedMilestones: true, contextRefs: true },
+  });
+  const drafts = await db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true, status: true } });
+  const knowledge = knowledgeFilter
+    ? await db
+        .select({
+          factKey: schema.canonFacts.factKey,
+          entityKey: schema.entities.entityKey,
+          learnedInChapter: schema.characterKnowledge.learnedInChapter,
+          status: schema.characterKnowledge.status,
+        })
+        .from(schema.characterKnowledge)
+        .innerJoin(schema.canonFacts, eq(schema.canonFacts.id, schema.characterKnowledge.factId))
+        .innerJoin(schema.entities, eq(schema.entities.id, schema.characterKnowledge.entityId))
+        .where(and(eq(schema.characterKnowledge.projectId, projectId), knowledgeFilter))
+    : [];
+  const suggestions = await db.query.refinementProposals.findMany({
+    where: and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, proposalId)),
+    columns: { id: true, changeSet: true, baseline: true },
+  });
   return { plans, drafts, knowledge, suggestions };
 }

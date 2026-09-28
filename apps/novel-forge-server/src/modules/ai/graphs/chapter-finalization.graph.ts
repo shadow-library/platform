@@ -229,10 +229,8 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
   async function guard(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
-    const [draftRow, projectRow] = await Promise.all([
-      state.draftId ? db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) }) : null,
-      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-    ]);
+    const draftRow = state.draftId ? await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) }) : null;
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     // `final` is accepted alongside `approved` so a run resumed after a mid-pipeline failure gets past
     // its own commitProse, which already flipped the draft. The service layer establishes that a `final`

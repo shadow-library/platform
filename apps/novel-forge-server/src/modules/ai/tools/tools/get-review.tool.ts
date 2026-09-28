@@ -64,22 +64,18 @@ export const getReviewTool: RegisteredTool = {
     const parsed = inputSchema.parse(input);
     const kinds: readonly ReviewKindArg[] = parsed.kind ? [parsed.kind] : KIND_ORDER;
 
-    const [found, current, currentlyIsolated] = await Promise.all([
-      Promise.all(
-        kinds.map(kind =>
-          ctx.db.query.chapterReviews.findFirst({
-            where: (review, { and, eq }) => and(eq(review.projectId, ctx.projectId), eq(review.chapter, parsed.chapter), eq(review.kind, kind)),
-            orderBy: (review, { desc }) => [desc(review.createdAt), desc(review.id)],
-            with: { remedies: true },
-          }),
-        ),
-      ),
-      findReviewedText(ctx.db, ctx.projectId, parsed.chapter),
-      findCurrentIsolation(ctx.db, ctx.projectId, parsed.chapter),
-    ]);
-
-    const rows = found.filter((row): row is ReviewWithRemedies => row !== undefined);
+    const rows: ReviewWithRemedies[] = [];
+    for (const kind of kinds) {
+      const row = await ctx.db.query.chapterReviews.findFirst({
+        where: (review, { and, eq }) => and(eq(review.projectId, ctx.projectId), eq(review.chapter, parsed.chapter), eq(review.kind, kind)),
+        orderBy: (review, { desc }) => [desc(review.createdAt), desc(review.id)],
+        with: { remedies: true },
+      });
+      if (row) rows.push(row);
+    }
     if (rows.length === 0) return `No ${parsed.kind ? `${parsed.kind} ` : ''}review recorded for chapter ${parsed.chapter}.`;
+    const current = await findReviewedText(ctx.db, ctx.projectId, parsed.chapter);
+    const currentlyIsolated = await findCurrentIsolation(ctx.db, ctx.projectId, parsed.chapter);
 
     const byKind = new Map(rows.map(row => [row.kind, row]));
     const blocks = KIND_ORDER.flatMap(kind => {

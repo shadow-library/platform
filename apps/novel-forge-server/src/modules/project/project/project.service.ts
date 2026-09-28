@@ -277,11 +277,9 @@ export class ProjectService {
       if (!newProject) throw AppErrorCode.S001.create();
 
       if (body.resetDerived !== false) {
-        const [bibleDocs, entities, volumes] = await Promise.all([
-          tx.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, id) }),
-          tx.query.entities.findMany({ where: eq(schema.entities.projectId, id) }),
-          tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, id) }),
-        ]);
+        const bibleDocs = await tx.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, id) });
+        const entities = await tx.query.entities.findMany({ where: eq(schema.entities.projectId, id) });
+        const volumes = await tx.query.volumes.findMany({ where: eq(schema.volumes.projectId, id) });
 
         if (bibleDocs.length > 0) {
           const bibleRows: Omit<Bible.Document, 'id' | 'projectId'>[] = bibleDocs.map(d => utils.object.omitKeys(d, ['id', 'projectId']));

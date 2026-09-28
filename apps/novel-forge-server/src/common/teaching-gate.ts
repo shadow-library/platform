@@ -12,17 +12,18 @@ const teaches = (knowledgeContract: unknown): boolean => (parseKnowledgeContract
  * nor a finalize has settled what — the writer is told what the cast knows, and an unsettled lesson could still move.
  */
 export async function unsettledTeacher(db: Pick<DbExecutor, 'query'>, projectId: bigint, chapter: number): Promise<number | null> {
-  const [briefs, drafts, finalized] = await Promise.all([
-    db.query.briefs.findMany({ columns: { chapter: true, knowledgeContract: true }, where: and(eq(schema.briefs.projectId, projectId), lt(schema.briefs.chapter, chapter)) }),
-    db.query.drafts.findMany({
-      columns: { chapter: true, status: true, reviewStatus: true },
-      where: and(eq(schema.drafts.projectId, projectId), lt(schema.drafts.chapter, chapter)),
-    }),
-    db.query.chapters.findMany({
-      columns: { number: true },
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, chapter)),
-    }),
-  ]);
+  const briefs = await db.query.briefs.findMany({
+    columns: { chapter: true, knowledgeContract: true },
+    where: and(eq(schema.briefs.projectId, projectId), lt(schema.briefs.chapter, chapter)),
+  });
+  const drafts = await db.query.drafts.findMany({
+    columns: { chapter: true, status: true, reviewStatus: true },
+    where: and(eq(schema.drafts.projectId, projectId), lt(schema.drafts.chapter, chapter)),
+  });
+  const finalized = await db.query.chapters.findMany({
+    columns: { number: true },
+    where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), lt(schema.chapters.number, chapter)),
+  });
   const settled = new Set([
     ...finalized.map(row => row.number),
     ...drafts.filter(draft => draft.status === 'final' || draft.reviewStatus === 'approved').map(draft => draft.chapter),

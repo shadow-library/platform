@@ -347,21 +347,23 @@ export function writerDisclosurePolicy(sources: WriterDisclosureSources): Writer
  */
 export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: bigint, chapter: number, overlay?: PlanOverlay): Promise<WriterDisclosureSources> {
   const briefs = schema.briefs;
-  const [lockedFacts, project, plan, storedEnding, plannerPages, volumes] = await Promise.all([
-    loadWriterForbiddenFacts(db, projectId, chapter, overlay),
-    db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) }),
-    overlay ?? db.query.briefs.findFirst({ columns: { volumeKey: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.chapter, chapter)) }),
-    db.query.briefs.findFirst({ columns: { chapter: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.isEnding, true)) }),
-    db.query.bibleDocuments.findMany({
-      columns: { section: true, slug: true, frontmatter: true, body: true },
-      where: and(
-        eq(schema.bibleDocuments.projectId, projectId),
-        eq(schema.bibleDocuments.section, ORGANISED_TIMELINE_DOC.section),
-        inArray(schema.bibleDocuments.slug, [ORGANISED_TIMELINE_DOC.slug, OPEN_QUESTIONS_DOC.slug]),
-      ),
-    }),
-    db.query.volumes.findMany({ columns: { volumeKey: true, ordinal: true, title: true, objective: true, body: true }, where: eq(schema.volumes.projectId, projectId) }),
-  ]);
+  const lockedFacts = await loadWriterForbiddenFacts(db, projectId, chapter, overlay);
+  const project = await db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) });
+  const plan =
+    overlay ?? (await db.query.briefs.findFirst({ columns: { volumeKey: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.chapter, chapter)) }));
+  const storedEnding = await db.query.briefs.findFirst({ columns: { chapter: true, isEnding: true }, where: and(eq(briefs.projectId, projectId), eq(briefs.isEnding, true)) });
+  const plannerPages = await db.query.bibleDocuments.findMany({
+    columns: { section: true, slug: true, frontmatter: true, body: true },
+    where: and(
+      eq(schema.bibleDocuments.projectId, projectId),
+      eq(schema.bibleDocuments.section, ORGANISED_TIMELINE_DOC.section),
+      inArray(schema.bibleDocuments.slug, [ORGANISED_TIMELINE_DOC.slug, OPEN_QUESTIONS_DOC.slug]),
+    ),
+  });
+  const volumes = await db.query.volumes.findMany({
+    columns: { volumeKey: true, ordinal: true, title: true, objective: true, body: true },
+    where: eq(schema.volumes.projectId, projectId),
+  });
 
   const endingPlan = overlay && storedEnding?.chapter === chapter ? undefined : storedEnding;
   const volumeKey = plan?.volumeKey ?? (await nearestVolumeKey(db, projectId, chapter));
@@ -390,10 +392,8 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
  * withheld even at or after the ending chapter, since an image prompt never needs them.
  */
 export async function loadArtDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
-  const [sources, project] = await Promise.all([
-    loadWriterDisclosureSources(db, projectId, chapter),
-    db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) }),
-  ]);
+  const sources = await loadWriterDisclosureSources(db, projectId, chapter);
+  const project = await db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) });
   return writerDisclosurePolicy({
     ...sources,
     ending: present(project?.ending) ? project.ending : null,

@@ -60,7 +60,8 @@ export class ChatJobReader {
   listRecent(projectId: bigint, sessionId: string, now = Date.now()): Promise<ChatJobs> {
     return this.db.transaction(async tx => {
       const cursor = await this.sessionCursor(projectId, sessionId, tx);
-      const [active, settled] = await Promise.all([this.activeJobs(tx, projectId, sessionId), this.settledJobs(tx, projectId, sessionId, now)]);
+      const active = await this.activeJobs(tx, projectId, sessionId);
+      const settled = await this.settledJobs(tx, projectId, sessionId, now);
       const items = [...active, ...settled].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       return { items, cursor };
     }, SNAPSHOT);

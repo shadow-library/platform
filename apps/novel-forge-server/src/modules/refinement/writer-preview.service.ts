@@ -79,24 +79,30 @@ async function loadRefLabels(db: Reader, projectId: bigint, refs: readonly strin
   const volumeKeys = valuesFor(refs, 'volume');
   const chapters = valuesFor(refs, 'chapter').map(Number).filter(Number.isInteger);
   const pages = valuesFor(refs, 'bible_doc');
-  const [entities, volumes, chapterRows, docs] = await Promise.all([
+  const entities =
     entityKeys.length > 0
-      ? db.query.entities.findMany({
+      ? await db.query.entities.findMany({
           columns: { entityKey: true, name: true },
           where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)),
         })
-      : [],
+      : [];
+  const volumes =
     volumeKeys.length > 0
-      ? db.query.volumes.findMany({ columns: { volumeKey: true, title: true }, where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) })
-      : [],
+      ? await db.query.volumes.findMany({
+          columns: { volumeKey: true, title: true },
+          where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)),
+        })
+      : [];
+  const chapterRows =
     chapters.length > 0
-      ? db.query.chapters.findMany({
+      ? await db.query.chapters.findMany({
           columns: { number: true, title: true, isolated: true },
           where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapters)),
         })
-      : [],
+      : [];
+  const docs =
     pages.length > 0
-      ? db.query.bibleDocuments.findMany({
+      ? await db.query.bibleDocuments.findMany({
           columns: { section: true, slug: true, frontmatter: true, body: true },
           where: and(
             eq(schema.bibleDocuments.projectId, projectId),
@@ -106,8 +112,7 @@ async function loadRefLabels(db: Reader, projectId: bigint, refs: readonly strin
             ),
           ),
         })
-      : [],
-  ]);
+      : [];
   const labels = new Map<string, string>([
     ...entities.map(entity => [`entity:${entity.entityKey}`, entity.name] as const),
     ...volumes.map(volume => [`volume:${volume.volumeKey}`, volume.title ?? humaniseSlug(volume.volumeKey)] as const),

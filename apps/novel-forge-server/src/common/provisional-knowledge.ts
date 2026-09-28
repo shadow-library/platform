@@ -53,10 +53,8 @@ async function resolveBriefReveals(db: Pick<PrimaryDatabase, 'query'>, projectId
 
   const factKeys = [...new Set(contract.learns.map(reveal => reveal.factKey))];
   const entityKeys = [...new Set(contract.learns.map(reveal => reveal.entityKey))];
-  const [facts, entities] = await Promise.all([
-    db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)) }),
-    db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) }),
-  ]);
+  const facts = await db.query.canonFacts.findMany({ where: and(eq(schema.canonFacts.projectId, projectId), inArray(schema.canonFacts.factKey, factKeys)) });
+  const entities = await db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, entityKeys)) });
   const contextAt = await plannedUnlockContexts(
     db,
     projectId,
@@ -183,21 +181,22 @@ export async function commitChapterKnowledge(db: KnowledgeCommitter, projectId: 
 }
 
 async function reledgerRemainingClaims(db: KnowledgeLedger, projectId: bigint, revoked: number[], deleted: LedgerPair[]): Promise<void> {
-  const [facts, entities, claimants] = await Promise.all([
-    db.query.canonFacts.findMany({
-      columns: { id: true, factKey: true, revealChapter: true, unlock: true, source: true },
-      where: inArray(schema.canonFacts.id, [...new Set(deleted.map(pair => pair.factId))]),
-    }),
-    db.query.entities.findMany({ columns: { id: true, entityKey: true }, where: inArray(schema.entities.id, [...new Set(deleted.map(pair => pair.entityId))]) }),
-    db.query.drafts.findMany({
-      columns: { chapter: true, revision: true, status: true },
-      where: and(
-        eq(schema.drafts.projectId, projectId),
-        or(eq(schema.drafts.reviewStatus, 'approved'), eq(schema.drafts.status, 'final')),
-        notInArray(schema.drafts.chapter, revoked),
-      ),
-    }),
-  ]);
+  const facts = await db.query.canonFacts.findMany({
+    columns: { id: true, factKey: true, revealChapter: true, unlock: true, source: true },
+    where: inArray(schema.canonFacts.id, [...new Set(deleted.map(pair => pair.factId))]),
+  });
+  const entities = await db.query.entities.findMany({
+    columns: { id: true, entityKey: true },
+    where: inArray(schema.entities.id, [...new Set(deleted.map(pair => pair.entityId))]),
+  });
+  const claimants = await db.query.drafts.findMany({
+    columns: { chapter: true, revision: true, status: true },
+    where: and(
+      eq(schema.drafts.projectId, projectId),
+      or(eq(schema.drafts.reviewStatus, 'approved'), eq(schema.drafts.status, 'final')),
+      notInArray(schema.drafts.chapter, revoked),
+    ),
+  });
   if (claimants.length === 0) return;
 
   const briefs = await db.query.briefs.findMany({

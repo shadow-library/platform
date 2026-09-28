@@ -169,7 +169,8 @@ type RevealFactRow = Parameters<typeof scheduledReveals>[0][number];
 
 /** A scene edited on the card may name a secret the chapter cannot reveal yet, judged with the claims the card itself makes. */
 async function sceneGiveAways(db: Pick<DbExecutor, 'query'>, projectId: bigint, op: BriefUpdateOp, facts: readonly RevealFactRow[]): Promise<RevealViolation[]> {
-  const [state, plan] = await Promise.all([loadPlanState(db, projectId), loadStagedPlan(db, projectId, op)]);
+  const state = await loadPlanState(db, projectId);
+  const plan = await loadStagedPlan(db, projectId, op);
   const ctx = planUnlockContext(plan, state);
   const reveals = scheduledReveals(facts, unlock => evaluateUnlock(unlock, ctx).holds).filter(reveal => isRevealLocked(reveal, op.chapter));
   return findBriefRevealViolations([{ chapter: op.chapter, scenes: op.scenes ?? [] }], reveals);
@@ -180,17 +181,15 @@ export async function loadPlanDiagnostics(db: Pick<DbExecutor, 'query'>, project
   const scenes = op.scenes ?? [];
   if (scenes.length === 0) return [];
   const povs = [...new Set(scenes.flatMap(scene => (scene.pov ? [scene.pov] : [])))];
-  const [characters, facts, project] = await Promise.all([
-    db.query.entities.findMany({
-      columns: { id: true, entityKey: true, name: true },
-      where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.type, 'character')),
-    }),
-    db.query.canonFacts.findMany({
-      columns: { id: true, factKey: true, text: true, revealChapter: true, unlock: true, source: true, disclosedInChapter: true, terms: true, writerNote: true },
-      where: eq(schema.canonFacts.projectId, projectId),
-    }),
-    db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
-  ]);
+  const characters = await db.query.entities.findMany({
+    columns: { id: true, entityKey: true, name: true },
+    where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.type, 'character')),
+  });
+  const facts = await db.query.canonFacts.findMany({
+    columns: { id: true, factKey: true, text: true, revealChapter: true, unlock: true, source: true, disclosedInChapter: true, terms: true, writerNote: true },
+    where: eq(schema.canonFacts.projectId, projectId),
+  });
+  const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
   const povEntities = characters.filter(character => povs.includes(character.entityKey));
   const ledger =
     povEntities.length < 2
@@ -224,7 +223,9 @@ export async function loadPlanDiagnostics(db: Pick<DbExecutor, 'query'>, project
 
 export async function planCardDiagnostics(db: Pick<DbExecutor, 'query'>, projectId: bigint, ops: readonly ChangeOp[]): Promise<PlanDiagnostic[]> {
   const plans = ops.filter((op): op is BriefUpdateOp & ChangeOp => op.op === 'brief.update');
-  return (await Promise.all(plans.map(op => loadPlanDiagnostics(db, projectId, op)))).flat();
+  const diagnostics: PlanDiagnostic[] = [];
+  for (const op of plans) diagnostics.push(...(await loadPlanDiagnostics(db, projectId, op)));
+  return diagnostics;
 }
 
 /** The proposal's diagnostics in warning order: the warnings no plan check typed, as `other`, then the plan card's own findings. */

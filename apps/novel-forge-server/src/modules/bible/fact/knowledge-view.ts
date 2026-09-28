@@ -106,13 +106,11 @@ export async function loadKnowledgeView(
   options: KnowledgeViewOptions = {},
 ): Promise<KnowledgeView> {
   const povKeys = [...new Set(contract.pov)];
-  const [facts, povEntities] = await Promise.all([
-    db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) }),
-    db.query.entities.findMany({
-      columns: { id: true, entityKey: true, name: true },
-      where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, povKeys)),
-    }),
-  ]);
+  const facts = await db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
+  const povEntities = await db.query.entities.findMany({
+    columns: { id: true, entityKey: true, name: true },
+    where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, povKeys)),
+  });
   const nameByKey = new Map(povEntities.map(entity => [entity.entityKey, entity.name]));
   const pooledPov = povKeys.map(entityKey => ({ entityKey, name: nameByKey.get(entityKey) ?? entityKey }));
   if (facts.length === 0) return { known: [], reveals: [], hidden: [], readerKnows: [], pooledPov };

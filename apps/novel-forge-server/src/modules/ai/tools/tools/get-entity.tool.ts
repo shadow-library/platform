@@ -21,12 +21,10 @@ export const getEntityTool: RegisteredTool = {
     });
     if (!entity) return `Entity not found: ${parsed.entityKey}`;
 
-    const [aliases, relationships] = await Promise.all([
-      ctx.db.select().from(schema.entityAliases).where(eq(schema.entityAliases.entityId, entity.id)),
-      ctx.db.query.entityRelationships.findMany({
-        where: (r, { eq: eqFn }) => eqFn(r.entityId, entity.id),
-      }),
-    ]);
+    const aliases = await ctx.db.select().from(schema.entityAliases).where(eq(schema.entityAliases.entityId, entity.id));
+    const relationships = await ctx.db.query.entityRelationships.findMany({
+      where: (r, { eq: eqFn }) => eqFn(r.entityId, entity.id),
+    });
 
     const lines: string[] = [`**${entity.name}** (${entity.type}, ${entity.status ?? 'active'})`, `First seen: ch ${entity.firstSeenChapter ?? '?'}`];
 

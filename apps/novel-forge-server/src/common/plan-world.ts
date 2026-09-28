@@ -27,31 +27,27 @@ export async function lockProjectPlan(tx: DbExecutor, projectId: bigint): Promis
 }
 
 export async function planFrontier(db: PlanReader, projectId: bigint): Promise<number> {
-  const [project, latestFinal] = await Promise.all([
-    db.query.projects.findFirst({ columns: { storyCurrentChapter: true }, where: eq(schema.projects.id, projectId) }),
-    db.query.chapters.findFirst({
-      columns: { number: true },
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
-      orderBy: desc(schema.chapters.number),
-    }),
-  ]);
+  const project = await db.query.projects.findFirst({ columns: { storyCurrentChapter: true }, where: eq(schema.projects.id, projectId) });
+  const latestFinal = await db.query.chapters.findFirst({
+    columns: { number: true },
+    where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
+    orderBy: desc(schema.chapters.number),
+  });
   return Math.max(project?.storyCurrentChapter ?? 0, latestFinal?.number ?? 0);
 }
 
 export async function loadPlanState(db: PlanReader, projectId: bigint): Promise<PlanState> {
-  const [briefs, milestones, volumes, facts, frontier] = await Promise.all([
-    db.query.briefs.findMany({
-      columns: { id: true, chapter: true, volumeKey: true, isEnding: true, claimedMilestones: true, knowledgeContract: true, staleReason: true },
-      where: eq(schema.briefs.projectId, projectId),
-    }),
-    db.query.milestones.findMany({ where: eq(schema.milestones.projectId, projectId) }),
-    db.query.volumes.findMany({ columns: { volumeKey: true, ordinal: true }, where: eq(schema.volumes.projectId, projectId) }),
-    db.query.canonFacts.findMany({
-      columns: { id: true, factKey: true, revealChapter: true, unlock: true, source: true, plannedChapter: true },
-      where: eq(schema.canonFacts.projectId, projectId),
-    }),
-    planFrontier(db, projectId),
-  ]);
+  const briefs = await db.query.briefs.findMany({
+    columns: { id: true, chapter: true, volumeKey: true, isEnding: true, claimedMilestones: true, knowledgeContract: true, staleReason: true },
+    where: eq(schema.briefs.projectId, projectId),
+  });
+  const milestones = await db.query.milestones.findMany({ where: eq(schema.milestones.projectId, projectId) });
+  const volumes = await db.query.volumes.findMany({ columns: { volumeKey: true, ordinal: true }, where: eq(schema.volumes.projectId, projectId) });
+  const facts = await db.query.canonFacts.findMany({
+    columns: { id: true, factKey: true, revealChapter: true, unlock: true, source: true, plannedChapter: true },
+    where: eq(schema.canonFacts.projectId, projectId),
+  });
+  const frontier = await planFrontier(db, projectId);
   const byId = <T extends { id: bigint }>(left: T, right: T): number => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
   return {
     plans: briefs.sort(byId),
