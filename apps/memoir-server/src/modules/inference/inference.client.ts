@@ -26,6 +26,7 @@ export interface InferenceRequest {
 const IN_CLUSTER_HOST = /\.svc(\.cluster\.local)?$/;
 /** A single-label `svc://` name reaches only a Service in the pod's own namespace through cluster DNS; a dotted one cannot be told apart from a public domain. */
 const BARE_SERVICE_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const SERVICE_SCHEME = 'svc://';
 
 /**
  * The single model seam for the whole service (ARCHITECTURE §15.6 and §14.3 step 2 — receipt text is
@@ -48,16 +49,27 @@ export function assertInClusterInference(url: string): void {
   if (!url) return;
   if (!Config.isProductionDeployment()) return;
 
+  const service = url.startsWith(SERVICE_SCHEME) ? url.slice(SERVICE_SCHEME.length).split('/')[0] : null;
+  if (service?.includes(':')) {
+    const name = service.slice(0, service.indexOf(':'));
+    const override = `SERVICE_URL_${name.toUpperCase().replace(/[-.]/g, '_')}`;
+    throw AppError.internal(`ai.inference-url '${url}' names '${service}': svc:// takes a bare service name; a port or address belongs in ${override}`);
+  }
+
   const resolved = resolveInferenceUrl(url);
   if (!resolved) throw AppError.internal(`ai.inference-url '${url}' is not a valid URL`);
 
   const host = new URL(resolved).hostname;
-  const bareService = url.startsWith('svc://') && BARE_SERVICE_NAME.test(host) && host !== 'localhost';
-  if (!bareService && !IN_CLUSTER_HOST.test(host)) {
+  if (IN_CLUSTER_HOST.test(host)) return;
+  if (service !== null && BARE_SERVICE_NAME.test(host) && host !== 'localhost') return;
+  if (service?.includes('.')) {
     throw AppError.internal(
-      `ai.inference-url host '${host}' is not in-cluster; a production deployment may only reach inference over a bare svc://<service> name or a *.svc host (D6)`,
+      `ai.inference-url '${url}' is not in-cluster: a dotted svc:// name cannot be told apart from a public domain; use svc://<service> for a Service in this namespace or a *.svc host (D6)`,
     );
   }
+  throw AppError.internal(
+    `ai.inference-url host '${host}' is not in-cluster; a production deployment may only reach inference over a bare svc://<service> name or a *.svc host (D6)`,
+  );
 }
 
 /** The address actually dialled, so the D6 check and the call can never disagree: `svc://` goes through the platform's service discovery, overrides and scheme included. */

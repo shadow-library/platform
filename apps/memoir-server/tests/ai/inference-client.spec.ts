@@ -79,6 +79,15 @@ describe('In-cluster inference boundary (T-33, D6, ARCHITECTURE §15.6)', () => 
       expect(() => assertInClusterInference('svc://localhost')).toThrow(/not in-cluster/);
     });
 
+    it('should say why a svc:// name with a port or a dotted svc:// name is refused', () => {
+      asDeployment('prod');
+      expect(() => assertInClusterInference('svc://memoir-inference:11434')).toThrow(
+        /svc:\/\/ takes a bare service name; a port or address belongs in SERVICE_URL_MEMOIR_INFERENCE/,
+      );
+      expect(() => assertInClusterInference('svc://memoir-inference.shadow-apps')).toThrow(/dotted svc:\/\/ name cannot be told apart from a public domain/);
+      expect(() => assertInClusterInference('svc://memoir-inference.shadow-apps')).toThrow(/not in-cluster/);
+    });
+
     it('should refuse an in-cluster svc:// name whose service url override points off-cluster', () => {
       asDeployment('prod');
       process.env[overrideKey] = 'https://api.openai.com';
