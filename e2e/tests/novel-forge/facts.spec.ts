@@ -287,9 +287,7 @@ test.describe('novel-forge story API responses', () => {
     expect(await approved.json()).toMatchObject({ id: draft.id, reviewStatus: 'approved', approvedRevision: draft.revision, overriddenFindings: 0 });
   });
 
-  // generation.dto.ts:597 — BriefResponse has no knowledgeContract field, so a plan's contract is write-only through the API, though
-  // docs/novel-forge/ai-testing.md:993 expects `GET /briefs/:n` to echo it back.
-  test.fixme("should read a plan's knowledge contract back from the plan", async ({ forge }) => {
+  test("should read a plan's knowledge contract back from the plan", async ({ forge }) => {
     const owner = await forge.actor({ label: 'facts-brief' });
     const projectId = await createGuardedProject(forge, owner, 'facts-brief');
     await createEntity(owner.ctx, projectId, { entityKey: 'mira', name: 'Mira' });
