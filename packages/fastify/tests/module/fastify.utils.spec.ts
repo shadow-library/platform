@@ -36,7 +36,7 @@ const instanceStub = {
 };
 const fastify = jest.fn(() => instanceStub);
 mock.module('fastify', () => ({ ...fastifyModule, fastify, default: fastify }));
-const { compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } = await import('@lib/module/fastify.utils');
+const { collapseDuplicatePathSlashes, compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } = await import('@lib/module/fastify.utils');
 
 describe('Create Fastify Instance', () => {
   let instance: FastifyInstance;
@@ -87,6 +87,21 @@ describe('Create Fastify Instance', () => {
 
   it('should handle not found error', () => {
     expect(() => notFoundHandler()).toThrow(AppError);
+  });
+
+  describe('collapseDuplicatePathSlashes', () => {
+    it('should collapse duplicate slashes in the path', () => {
+      expect(collapseDuplicatePathSlashes('//api//echo///query')).toBe('/api/echo/query');
+    });
+
+    it('should keep duplicate slashes inside the query string', () => {
+      expect(collapseDuplicatePathSlashes('//api/echo?next=https://example.test//a')).toBe('/api/echo?next=https://example.test//a');
+    });
+
+    it('should return a url without duplicate path slashes unchanged', () => {
+      const url = '/api/echo?next=https://example.test';
+      expect(collapseDuplicatePathSlashes(url)).toBe(url);
+    });
   });
 
   it('should format the schema errors', () => {

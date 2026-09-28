@@ -15,7 +15,7 @@ import { ContextService } from '../services';
 import { DevErrorResponseDto, ErrorResponseDto } from './error-response.dto';
 import { FastifyConfig, FastifyModuleAsyncOptions, FastifyModuleOptions } from './fastify-module.interface';
 import { FastifyRouter } from './fastify-router';
-import { createFastifyInstance } from './fastify.utils';
+import { collapseDuplicatePathSlashes, createFastifyInstance } from './fastify.utils';
 
 /**
  * Defining types
@@ -44,10 +44,8 @@ export class FastifyModule {
 
       requestIdLogLabel: 'rid',
       genReqId: () => uuid(),
-      routerOptions: {
-        ignoreTrailingSlash: true,
-        ignoreDuplicateSlashes: true,
-      },
+      rewriteUrl: request => collapseDuplicatePathSlashes(request.url ?? '/'),
+      routerOptions: { ignoreTrailingSlash: true },
     };
   }
 

@@ -35,6 +35,14 @@ const defaultAjvOptions: AjvOptions = { allErrors: true, useDefaults: true, remo
 
 export const notFoundHandler = (): never => ServerErrorCode.S002.throw();
 
+/** find-my-way's `ignoreDuplicateSlashes` collapses the whole URL before splitting off the query, so it also rewrites query values. */
+export function collapseDuplicatePathSlashes(url: string): string {
+  const queryIndex = url.indexOf('?');
+  const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
+  if (!path.includes('//')) return url;
+  return path.replace(/\/{2,}/g, '/') + (queryIndex === -1 ? '' : url.slice(queryIndex));
+}
+
 function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> {
   if (!schema.$id) return ajv.compile(schema);
 
