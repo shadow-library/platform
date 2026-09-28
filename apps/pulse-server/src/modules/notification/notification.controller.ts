@@ -1,5 +1,5 @@
 import { EnableIf } from '@shadow-library/app';
-import { RequirePermission, RequireScope } from '@shadow-library/auth/module';
+import { RequireElevation, RequirePermission, RequireScope } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { Body, Get, HttpController, Post, Query, RespondFor } from '@shadow-library/fastify';
 
@@ -26,6 +26,7 @@ export class NotificationController {
   /** Separate from the producer route because the auth guard ANDs its requirements, and a service token names no organisation to check a permission in. */
   @Post('/console')
   @RequirePermission(PULSE_PERMISSIONS.notificationsSend, { highRisk: true })
+  @RequireElevation()
   @RespondFor(201, CreateNotificationResponse)
   sendFromConsole(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
     return this.consoleSendService.send(body);
