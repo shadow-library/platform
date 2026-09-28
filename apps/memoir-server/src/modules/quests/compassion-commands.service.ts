@@ -10,7 +10,18 @@ import { AppError, ValidationError } from '@shadow-library/common';
  */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
-import { addDays, capacityWarningFor, computeCapacity, computeReward, currentRuleset, formatLocalDate, type LocalDate, parseLocalDate, type QuestLogState } from '@modules/rules';
+import {
+  accountToday,
+  addDays,
+  capacityWarningFor,
+  computeCapacity,
+  computeReward,
+  currentRuleset,
+  formatLocalDate,
+  type LocalDate,
+  parseLocalDate,
+  type QuestLogState,
+} from '@modules/rules';
 import { RolloverRepository } from '@modules/rollover';
 import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
@@ -43,7 +54,7 @@ export class CompassionCommandsService implements OnModuleInit {
   /** Pending-only (PRD §3.6): reward via the ledger, then a P6 second Comeback arming — this time via recovery, lifting the day's fire allowance to 2. */
   private async completeRecovery(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
-    const date = ctx.envelope.localDate;
+    const date = await this.requireToday(ctx);
     const reflectionText = this.parseReflection(ctx.envelope.payload['reflectionText']);
 
     const updated = await this.rolloverRepository.completeRecoveryQuest(ctx.tx, ctx.accountId, date, reflectionText);
@@ -89,7 +100,7 @@ export class CompassionCommandsService implements OnModuleInit {
   /** Open day only (`rollover_at IS NULL`); capacity thresholds are advisory in the result and never refuse the lock (PRD §4.11 — "never blocks"). */
   private async setLock(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
-    const date = ctx.envelope.localDate;
+    const date = await this.requireToday(ctx);
     const locked = ctx.envelope.payload['locked'] === true;
 
     const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, date);
@@ -121,6 +132,15 @@ export class CompassionCommandsService implements OnModuleInit {
       status: 'applied',
       result: { locked: true, lockedQuestIds: questIds.map(String), capacityWarning: warning, capacity: capacity.capacity, plannedLoad: questIds.length },
     };
+  }
+
+  /** Both commands act on the open day alone; one queued offline before a rollover must not reach a day that is already closed, or one not yet begun. */
+  private async requireToday(ctx: CommandContext): Promise<string> {
+    const date = ctx.envelope.localDate;
+    const account = await this.rolloverRepository.lockAccount(ctx.tx, ctx.accountId);
+    if (!account) throw AppError.internal(`compassion command addressed account '${ctx.accountId}' which does not exist`);
+    if (date !== formatLocalDate(accountToday(Date.now(), account.timezone, account.lastHpDate))) throw AppErrorCode.CMD_002.create({ date });
+    return date;
   }
 
   private async trailingCompletions(ctx: CommandContext, day: LocalDate, windowDays: number): Promise<number[]> {

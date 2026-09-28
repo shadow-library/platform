@@ -11,12 +11,14 @@ import { AppError, ValidationError } from '@shadow-library/common';
 import { applyStreakTransition, CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
+  accountToday,
   addDays,
   applyStreakEvent,
   canFireComeback,
   clampPerformedAt,
   comebackBonus,
   type ComebackFire,
+  compareLocalDates,
   type CompletionKind,
   computeReward,
   currentRuleset,
@@ -54,6 +56,7 @@ import { QuestStreakRepository } from './quest-streak.repository';
 interface AccountSnapshot {
   timezone: TimeZone;
   intensityMode: IntensityMode;
+  lastHpDate: string | null;
 }
 
 interface OccurrenceContext {
@@ -181,6 +184,7 @@ export class QuestCommandsService implements OnModuleInit {
     const ruleset = currentRuleset();
     const occurrence = await this.loadOccurrence(ctx);
     const account = await this.readAccount(ctx.tx, ctx.accountId);
+    this.assertStarted(occurrence, account);
     const timing = this.resolveTiming(ctx, ruleset, occurrence, account);
     const state = logStateFor(completion, timing.band);
 
@@ -283,6 +287,7 @@ export class QuestCommandsService implements OnModuleInit {
     if (state === 'postponed' && !ruleset.strictness[occurrence.quest.strictness].allowsPostpone) throw AppErrorCode.QST_005.create();
 
     const account = await this.readAccount(ctx.tx, ctx.accountId);
+    this.assertStarted(occurrence, account);
     const payload = ctx.envelope.payload;
     const reasonTag = parseReasonTag('reasonTag', payload['reasonTag']);
     const reasonNote = parseReasonNote('note', payload['note']);
@@ -538,11 +543,17 @@ export class QuestCommandsService implements OnModuleInit {
 
   private async readAccount(tx: DatabaseTransaction, accountId: bigint): Promise<AccountSnapshot> {
     const [account] = await tx
-      .select({ timezone: schema.accounts.timezone, intensityMode: schema.accounts.intensityMode })
+      .select({ timezone: schema.accounts.timezone, intensityMode: schema.accounts.intensityMode, lastHpDate: schema.accounts.lastHpDate })
       .from(schema.accounts)
       .where(eq(schema.accounts.id, accountId));
     if (!account) throw AppErrorCode.QST_002.create();
     return account as AccountSnapshot;
+  }
+
+  /** An outcome for a day that has not begun would score as on time today; a past day's is how an offline completion arrives, and stays allowed. */
+  private assertStarted(occurrence: OccurrenceContext, account: AccountSnapshot): void {
+    const today = accountToday(Date.now(), account.timezone, account.lastHpDate);
+    if (compareLocalDates(occurrence.occurrenceDate, today) > 0) throw AppErrorCode.QST_009.create({ date: occurrence.ref.date });
   }
 
   /**

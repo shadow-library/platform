@@ -153,6 +153,13 @@ export const localDateAt = (instant: number, timeZone: TimeZone): LocalDate => z
 
 export const minuteOfDayAt = (instant: number, timeZone: TimeZone): number => zonedFieldsAt(instant, timeZone).minuteOfDay;
 
+/** The account's open day: its zone's date, or the day rollover prepared when a backward zone change has left that day ahead of the zone. */
+export const accountToday = (instant: number, timeZone: TimeZone, lastHpDate: string | null): LocalDate => {
+  const zoneDay = localDateAt(instant, timeZone);
+  const openDay = lastHpDate === null ? null : parseLocalDate(lastHpDate);
+  return openDay !== null && compareLocalDates(openDay, zoneDay) > 0 ? openDay : zoneDay;
+};
+
 const wallMillisOf = (fields: ZonedFields): number => epochDayOf(fields.date) * MS_PER_DAY + fields.minuteOfDay * MS_PER_MINUTE + fields.second * 1000;
 
 export const offsetMinutesAt = (instant: number, timeZone: TimeZone): number =>

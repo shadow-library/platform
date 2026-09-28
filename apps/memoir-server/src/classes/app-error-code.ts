@@ -39,6 +39,9 @@ export class AppErrorCode extends ServerErrorCode {
   /** The envelope names a command type this server has no registered handler for */
   static readonly CMD_001 = AppErrorCode.badRequest('CMD_001', "Unknown command type '{type}'");
 
+  /** A command that acts on the open day only (plan lock, Recovery) was stamped with another day, such as one queued offline before a rollover */
+  static readonly CMD_002 = AppErrorCode.badRequest('CMD_002', "This action is for {date}, which is not the account's current day");
+
   /*!
    * Device Errors
    */
@@ -80,6 +83,9 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** Reschedule moves a scheduled time; day-level quests (Goal/Recovery/Optional) have none to move */
   static readonly QST_008 = AppErrorCode.badRequest('QST_008', 'Reschedule is not available for this quest');
+
+  /** Completing, skipping or postponing an occurrence dated after the account's current day; a past day's occurrence is still accepted, as offline outcomes need */
+  static readonly QST_009 = AppErrorCode.badRequest('QST_009', 'The occurrence on {date} has not started yet');
 
   /*!
    * Compassion Errors
