@@ -142,12 +142,10 @@ export class ProgressionService {
     }));
   }
 
-  /** Not yet called by any command — the Comeback claim flow is T-20 scope. See {@link onRecoveryQuestCompleted}. */
   async onComebackBonusClaimed(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, comebackBonusesClaimed: envelope.counters.comebackBonusesClaimed + 1 } }));
   }
 
-  /** Not yet called by any command — the Overload/lock mechanic (PRD §4.11) is not built in this worktree. See {@link onRecoveryQuestCompleted}. */
   async onLockedDayCleared(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, lockedDaysCleared: envelope.counters.lockedDaysCleared + 1 } }));
   }
