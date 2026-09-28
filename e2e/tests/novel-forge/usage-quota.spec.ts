@@ -387,8 +387,7 @@ test.describe('novel-forge AI settings and project models', () => {
     expect((await readProjectRow(project.id))?.config?.models?.generation, 'the router reads the pin from the stored config').toEqual(ref);
   });
 
-  // defaults.ts:114 isRegisteredModel checks only that the id is registered under that provider, not its kind, so project.service.ts:80 accepts an image model on a text role.
-  test.fixme('should refuse an image model pinned on a text role', async ({ forge }) => {
+  test('should refuse an image model pinned on a text role', async ({ forge }) => {
     const author = await forge.actor({ label: 'models-image' });
     const project = await createProject(author);
     const response = await author.ctx.get('/api/v1/ai/models');
@@ -400,5 +399,10 @@ test.describe('novel-forge AI settings and project models', () => {
       data: { config: { models: { generation: { provider: image.provider, model: image.id } } } },
     });
     await expectOutcome(pinned, 400, 'AI_002', 'an image model cannot write prose');
+
+    const onImageRole = await mutate(author.ctx, 'patch', `/api/v1/projects/${project.id}`, {
+      data: { config: { models: { image: { provider: image.provider, model: image.id } } } },
+    });
+    expect(onImageRole.status(), `the same model is accepted on the image role — body ${await onImageRole.text()}`).toBe(200);
   });
 });
