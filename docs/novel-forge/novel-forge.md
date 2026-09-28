@@ -61,7 +61,8 @@
 - **Usage and cost**: every model call records its tokens, its chapter when it has exactly one, and a cost frozen when written, with its source: `provider` (OpenRouter reported
   it), `gateway` (the CLI gateway reported it) or `estimate` (registry list prices). Every source is shown as the real charge. Runs link to their parent run, so a chat turn's
   figure includes its title and compaction calls; costs roll up per turn, chapter, run, job, project and account through one pricing path, so a legacy row is priced the same
-  everywhere and a call is never counted twice. The AI quota is a rolling window per owner, enforced before dispatch for requests and jobs alike, and fails open on a read error.
+  everywhere and a call is never counted twice. The AI quota is a rolling window per owner, enforced before dispatch for requests and jobs alike;
+  projects with no owner share one window, and a read error refuses the call (fails closed).
 - Retrieval: pgvector indexes of finalized, non-isolated prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
 - The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
   default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each

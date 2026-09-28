@@ -55,3 +55,35 @@ describe('AiQuotaService.currentWindowStatus', () => {
     expect(status.resetsAt).toEqual(new Date(oldestCreatedAt.getTime() + status.windowMs));
   });
 });
+
+function enforcingDb(project: Promise<unknown>, windowRows: unknown[] = []) {
+  return { ...fakeDb(windowRows, []), query: { projects: { findFirst: () => project } } };
+}
+
+const AT_CALL_LIMIT = [{ model: 'anthropic/claude-sonnet-5', calls: 1000, inputTokens: '0', outputTokens: '0', recordedCostUsd: '0' }];
+
+describe('AiQuotaService.enforce', () => {
+  it('should refuse the model call as retryable when usage cannot be read', async () => {
+    const service = new AiQuotaService({ getPostgresClient: () => enforcingDb(Promise.reject(new Error('connection terminated'))) } as never);
+
+    await expect(service.enforce(7n)).rejects.toMatchObject({ code: 'AI_018', data: { retryable: true } });
+  });
+
+  it('should let the model call through when the owner is under both limits', async () => {
+    const service = new AiQuotaService({ getPostgresClient: () => enforcingDb(Promise.resolve({ ownerKind: 'user', ownerId: 1n })) } as never);
+
+    await expect(service.enforce(7n)).resolves.toBeUndefined();
+  });
+
+  it('should refuse the model call once the owner reaches the call limit', async () => {
+    const service = new AiQuotaService({ getPostgresClient: () => enforcingDb(Promise.resolve({ ownerKind: 'user', ownerId: 1n }), AT_CALL_LIMIT) } as never);
+
+    await expect(service.enforce(7n)).rejects.toMatchObject({ code: 'AI_008' });
+  });
+
+  it('should limit a project with no owner against the shared ownerless bucket', async () => {
+    const service = new AiQuotaService({ getPostgresClient: () => enforcingDb(Promise.resolve({ ownerKind: 'user', ownerId: null }), AT_CALL_LIMIT) } as never);
+
+    await expect(service.enforce(7n)).rejects.toMatchObject({ code: 'AI_008' });
+  });
+});

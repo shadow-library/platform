@@ -153,6 +153,7 @@ export class AppErrorCode extends ServerErrorCode {
     'AI_MODEL_OVERRIDE is for local-model test environments — AI_OPENROUTER_API_URL must point at the local model server, not {url}',
     500,
   );
+  static readonly AI_018 = new AppErrorCode('AI_018', 'AI usage could not be checked against the quota, so the model call was refused — try again shortly', 503);
 
   /*!
    * Illustration Errors

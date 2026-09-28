@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -42,8 +42,7 @@ export class AiQuotaService {
   // Per-principal (project owner) throttle enforced before any model dispatch. The window is counted
   // over `model_calls` joined to the owner's projects, so background jobs are gated the same as request
   // turns even though neither carries the acting principal down to this point. A read failure fails
-  // OPEN: the allowlist (HIGH-006) already bounds spend to registry models, and a DB blip must not halt
-  // all authoring — the same blip would already be stopping run/telemetry writes anyway.
+  // closed: on unrestricted routes this is the only spend ceiling, so an unreadable window must not lift it.
   async enforce(projectId: bigint): Promise<void> {
     const { maxCalls, maxCostUsd, windowMs } = this.limits();
     if (maxCalls <= 0 && maxCostUsd <= 0) return;
@@ -54,8 +53,8 @@ export class AiQuotaService {
     try {
       rows = await this.readWindowUsage(projectId, windowStart);
     } catch (err) {
-      this.logger.warn('AI quota check skipped — usage read failed (fail-open)', { projectId, err });
-      return;
+      this.logger.error('AI quota check failed — usage read failed, refusing the model call', { projectId, err });
+      throw AppErrorCode.AI_018.create({ retryable: true });
     }
 
     const breach = quotaBreach(computeWindowUsage(rows), { maxCalls, maxCostUsd });
@@ -69,7 +68,7 @@ export class AiQuotaService {
     const windowStart = new Date(Date.now() - windowMs);
 
     const [rows, [oldest]] = await Promise.all([
-      this.readWindowUsageForOwner(owner, windowStart),
+      this.readWindowUsageWhere(ownedBy(schema.projects, owner), windowStart),
       this.db
         .select({ createdAt: schema.modelCalls.createdAt })
         .from(schema.modelCalls)
@@ -92,11 +91,12 @@ export class AiQuotaService {
 
   private async readWindowUsage(projectId: bigint, windowStart: Date): Promise<WindowUsageRow[]> {
     const project = await this.db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
-    if (project?.ownerId == null) return [];
-    return this.readWindowUsageForOwner({ kind: project.ownerKind, id: project.ownerId }, windowStart);
+    if (!project) return [];
+    const owner = project.ownerId === null ? isNull(schema.projects.ownerId) : ownedBy(schema.projects, { kind: project.ownerKind, id: project.ownerId });
+    return this.readWindowUsageWhere(owner, windowStart);
   }
 
-  private async readWindowUsageForOwner(owner: OwnerRef, windowStart: Date): Promise<WindowUsageRow[]> {
+  private async readWindowUsageWhere(owner: SQL, windowStart: Date): Promise<WindowUsageRow[]> {
     const rows = await this.db
       .select({
         model: schema.modelCalls.model,
@@ -107,7 +107,7 @@ export class AiQuotaService {
       })
       .from(schema.modelCalls)
       .innerJoin(schema.projects, eq(schema.modelCalls.projectId, schema.projects.id))
-      .where(and(ownedBy(schema.projects, owner), gte(schema.modelCalls.createdAt, windowStart)))
+      .where(and(owner, gte(schema.modelCalls.createdAt, windowStart)))
       .groupBy(schema.modelCalls.model);
 
     return rows.map(row => ({

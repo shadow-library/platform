@@ -1907,9 +1907,9 @@ export default function createPlugin() {
   - The refused turn: user message persisted, run `status='failed'`, `error.code='AI_008'`; `GET /chat/sessions/$S/messages` returns `failedTurn.code='AI_008'`; SSE gives an `error` frame with the same code.
   - Rate counts every `model_calls` row in the window across ALL the owner's projects (repair rows and transport-error rows count; cache hits write no row, so they do not). Spend is `Σ recorded cost_usd` (image) plus `Σ tokens × registry price` for rows where `cost_usd IS NULL`, with cached input tokens billed at full price. Check by hand with 0.5's formula and compare to the point where 429 begins.
   - The check runs once per top-level call and BEFORE the `llm_cache` lookup, so at the limit even a would-be cache hit is refused.
-  - Step 4: the second project is blocked too (per owner). A project with no owner id is never limited. After the window elapses (or with a smaller window) calls resume.
+  - Step 4: the second project is blocked too (per owner). Projects with no owner id share one window. After the window elapses (or with a smaller window) calls resume.
   - `chat-title` and helper calls are gated the same way; the refused title call is silent.
-  - Read failure fails OPEN (warn "AI quota check skipped — usage read failed (fail-open)"), by design.
+  - Read failure fails CLOSED: 503 `AI_018` with `retryable: true` (a job is retried), logged at error "AI quota check failed — usage read failed, refusing the model call".
 - **Fails when:**
   - Refused at count N-1 (off by one), or the second project not blocked.
   - Spend never trips for an unpriced model: unknown or unpriced models contribute 0.
