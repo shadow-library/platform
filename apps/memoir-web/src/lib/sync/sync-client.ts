@@ -22,6 +22,8 @@ export class SyncTransportError extends Error {
     readonly status: number,
     message: string,
     readonly code: string | null = null,
+    /** The server's `Retry-After`, when it sent a readable one. */
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message);
     this.name = 'SyncTransportError';
@@ -119,10 +121,19 @@ export class SyncClient {
 
     if (!response.ok) {
       const failure = await readFailure(response);
-      throw new SyncTransportError(classify(response.status, failure.code), response.status, failure.message, failure.code);
+      throw new SyncTransportError(classify(response.status, failure.code), response.status, failure.message, failure.code, retryAfterOf(response));
     }
     return response;
   }
+}
+
+/** Either delay-seconds or an HTTP date (RFC 9110 §10.2.3). */
+function retryAfterOf(response: Response): number | null {
+  const header = response.headers.get('retry-after')?.trim();
+  if (!header) return null;
+  if (/^\d+$/.test(header)) return Number(header) * 1_000;
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
 }
 
 async function readFailure(response: Response): Promise<{ code: string | null; message: string }> {

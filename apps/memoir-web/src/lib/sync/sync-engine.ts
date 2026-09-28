@@ -446,18 +446,21 @@ export class SyncEngine {
     this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
     const held = UNSENDABLE[reason];
     this.settleClaims(held ? { status: 'unconfirmed', reason: held } : undefined);
-    if (isRetryable(error)) this.scheduleRetry();
+    if (isRetryable(error)) this.scheduleRetry(error instanceof SyncTransportError ? error.retryAfterMs : null);
   }
 
-  /** One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm. */
-  private scheduleRetry(): void {
-    const delay = this.retryDelaysMs[this.retriesSpent];
-    if (delay === undefined || this.retryTimer) return;
+  /** One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm; a server's `Retry-After` only ever lengthens the wait. */
+  private scheduleRetry(retryAfterMs: number | null = null): void {
+    const backoff = this.retryDelaysMs[this.retriesSpent];
+    if (backoff === undefined || this.retryTimer) return;
     this.retriesSpent += 1;
-    this.retryTimer = setTimeout(() => {
-      this.retryTimer = null;
-      void this.sync({ background: true });
-    }, delay);
+    this.retryTimer = setTimeout(
+      () => {
+        this.retryTimer = null;
+        void this.sync({ background: true });
+      },
+      Math.max(backoff, retryAfterMs ?? 0),
+    );
   }
 
   private cancelRetry(): void {

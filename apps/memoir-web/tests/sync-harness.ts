@@ -94,6 +94,8 @@ export interface FakeServerOptions {
   outcomes?: (batch: RecordedBatch, attempt: number) => WireCommandOutcome[];
   status?: () => number;
   errorCode?: string;
+  /** Sent as `Retry-After` on every non-200 answer. */
+  retryAfter?: string;
   /** The domains this server registers; defaults to every domain the web knows. */
   serves?: SyncDomain[];
 }
@@ -153,7 +155,10 @@ export function createFakeServer(options: FakeServerOptions = {}): FakeServer {
     const url = String(input);
     const status = options.status?.() ?? 200;
     const headers = { 'x-sync-epoch': server.epoch, 'content-type': 'application/json' };
-    if (status !== 200) return new Response(JSON.stringify({ code: options.errorCode, message: 'no' }), { status, headers });
+    if (status !== 200) {
+      const failureHeaders = options.retryAfter === undefined ? headers : { ...headers, 'retry-after': options.retryAfter };
+      return new Response(JSON.stringify({ code: options.errorCode, message: 'no' }), { status, headers: failureHeaders });
+    }
 
     if (url.includes('/account/devices/')) {
       server.deviceRegistrations.push(url.split('/').pop() as string);

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { type Command } from '@/lib/data';
+import { SyncClient, SyncTransportError } from '@/lib/sync';
 
 import { createTestEngine, waitFor, waitForState } from './sync-harness';
 
@@ -107,5 +108,39 @@ describe('SyncEngine retry', () => {
     await settle(3);
 
     expect(server.requests()).toBe(1);
+  });
+
+  it('should wait out a Retry-After longer than its own backoff before retrying a 429', async () => {
+    const server = failingFor(1, 429);
+    const { engine } = createTestEngine({ today: TODAY, status: server.status, retryAfter: '1', retryDelaysMs: RETRY_DELAYS_MS });
+    engines.push(engine);
+
+    await engine.start();
+    await settle(3);
+
+    expect(server.requests()).toBe(1);
+  });
+});
+
+describe('SyncTransportError retryAfterMs', () => {
+  it.each([
+    ['120', 120_000],
+    ['0', 0],
+    [new Date(Date.now() + 30_000).toUTCString(), 30_000],
+  ])('should read Retry-After %s', async (header, expected) => {
+    const client = new SyncClient({ fetchImpl: async () => new Response('{}', { status: 429, headers: { 'retry-after': header } }) });
+
+    const failure = await client.pullDelta({ since: '0' }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SyncTransportError);
+    expect(Math.abs(((failure as SyncTransportError).retryAfterMs ?? -1) - expected)).toBeLessThan(1_500);
+  });
+
+  it('should carry no delay when the header is missing or unreadable', async () => {
+    for (const headers of [{}, { 'retry-after': 'soon' }]) {
+      const client = new SyncClient({ fetchImpl: async () => new Response('{}', { status: 503, headers }) });
+      const failure = (await client.pullDelta({ since: '0' }).catch((error: unknown) => error)) as SyncTransportError;
+      expect(failure.retryAfterMs).toBeNull();
+    }
   });
 });
