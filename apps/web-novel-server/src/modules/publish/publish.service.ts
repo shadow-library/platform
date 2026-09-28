@@ -1,4 +1,4 @@
-import { and, asc, eq, type SQL } from 'drizzle-orm';
+import { and, asc, eq, or, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
@@ -285,13 +285,20 @@ export class PublishService {
    * is therefore some other novel — another publisher's, or another of this caller's — and both answer
    * WBN_010 because both take the same remedy: publish under a slug this novel can hold. Deciding that
    * ahead of the revision ladder also keeps WBN_003 from quoting a stored revision to a foreign caller.
+   *
+   * Both lookups share one statement, hence one snapshot: as two reads, a concurrent first push committing
+   * between them was missed by ref and then found by slug, refusing this caller its own novel.
    */
   private async lockNovel(tx: PublishTransaction, slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<Novel | undefined> {
-    const filter = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
-    const [owned] = await tx.select().from(schema.novels).where(filter).for('update');
+    const byRef = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
+    const rows = await tx
+      .select()
+      .from(schema.novels)
+      .where(or(byRef, eq(schema.novels.slug, slug)))
+      .for('update');
+    const owned = rows.find(row => row.sourceClientId === caller.callerClientId && row.sourceRef === body.sourceRef);
     if (owned) return owned;
-    const [bySlug] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
-    if (bySlug) throw AppErrorCode.WBN_010.create();
+    if (rows.length > 0) throw AppErrorCode.WBN_010.create();
     return undefined;
   }
 
