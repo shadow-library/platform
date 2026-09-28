@@ -407,7 +407,7 @@ export class JobService {
         unpricedOutputTokens: sql<number>`coalesce(sum(${calls.outputTokens}) filter (where ${calls.costUsd} is null), 0)::bigint`.mapWith(Number),
       })
       .from(calls)
-      .innerJoin(runs, eq(runs.id, calls.runId))
+      .innerJoin(runs, eq(sql`${runs.id}::text`, calls.runId))
       .where(inArray(runs.jobId, ids as string[]))
       .groupBy(runs.jobId, calls.model, calls.status, calls.costSource);
 

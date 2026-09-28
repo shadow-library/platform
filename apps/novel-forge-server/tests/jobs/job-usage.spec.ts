@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { JobService } from '@modules/jobs/job.service';
 
@@ -35,13 +37,14 @@ function groupedRow(overrides: Partial<GroupedRow>): GroupedRow {
   };
 }
 
-function service(rows: GroupedRow[]): JobService {
+function service(rows: GroupedRow[], joins: SQL[] = []): JobService {
   const db = {
     select: () => ({
       from: () => ({
-        innerJoin: () => ({
-          where: () => ({ groupBy: () => Promise.resolve(rows) }),
-        }),
+        innerJoin: (_table: unknown, on: SQL) => {
+          joins.push(on);
+          return { where: () => ({ groupBy: () => Promise.resolve(rows) }) };
+        },
       }),
     }),
   };
@@ -75,6 +78,14 @@ describe('JobService.usageForJobs', () => {
 
     expect(result.has('job-1')).toBe(true);
     expect(result.has('job-2')).toBe(true);
+  });
+
+  it('should join the varchar model_calls.run_id to the uuid workflow_runs.id as text, which Postgres cannot compare directly', async () => {
+    const joins: SQL[] = [];
+
+    await service([], joins).usageForJobs(['job-1']);
+
+    expect(joins.map(on => new PgDialect().sqlToQuery(on).sql)).toEqual(['"workflow_runs"."id"::text = "model_calls"."run_id"']);
   });
 
   it('should cap the number of job ids it queries for', async () => {
