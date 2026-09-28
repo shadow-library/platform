@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Logger } from '@shadow-library/common';
+import { Logger, utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -48,19 +48,21 @@ interface PdpResponse {
  *
  * A throttle is the exception to "failure is a DENY". Identity said "not now", not "no", so reading it
  * as a denial would refuse an entitled caller with a 403 that no retry could ever be expected to fix.
- * It is retried a bounded number of times, never sooner than identity's `Retry-After` and never when
- * that wait would hold the request past `THROTTLE_MAX_WAIT_MS`; after that it is rethrown as the 503 it
- * is, carrying the hint, unless the caller opted into fail-open.
+ * It is rethrown as the 503 it is, carrying identity's hint, unless the caller opted into fail-open.
+ *
+ * Identity's limiters are fixed windows, so `Retry-After` is what is left of the current one: a retry
+ * can only succeed once it has elapsed, and only a window about to close is worth holding the request
+ * for. So a throttle is retried once, and only when identity named a wait within
+ * `THROTTLE_MAX_WAIT_SECONDS`; with no hint the retry would land inside the same window and merely add
+ * load. The jitter keeps every waiter throttled at the same instant from arriving back together.
  */
 const DEFAULT_TTL_SECONDS = 900;
 const HIGH_RISK_TTL_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 1000;
-const THROTTLE_RETRIES = 2;
-const THROTTLE_DEFAULT_WAIT_MS = 250;
-const THROTTLE_MAX_WAIT_MS = 1_000;
+const THROTTLE_RETRIES = 1;
+const THROTTLE_MAX_WAIT_SECONDS = 1;
+const THROTTLE_JITTER_MS = 250;
 const TOO_MANY_REQUESTS = 429;
-
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 export class PdpClient {
   private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
@@ -128,7 +130,7 @@ export class PdpClient {
       } catch (error) {
         const waitMs = this.throttleWait(error, attempt);
         if (waitMs === undefined) throw error;
-        await sleep(waitMs);
+        await utils.temporal.sleep(waitMs);
       }
     }
   }
@@ -136,8 +138,8 @@ export class PdpClient {
   private throttleWait(error: unknown, attempt: number): number | undefined {
     if (!isThrottled(error) || attempt >= THROTTLE_RETRIES) return undefined;
     const hint = retryAfterHint(error);
-    const waitMs = hint === undefined ? THROTTLE_DEFAULT_WAIT_MS : hint * 1000;
-    return waitMs <= THROTTLE_MAX_WAIT_MS ? waitMs : undefined;
+    if (hint === undefined || hint > THROTTLE_MAX_WAIT_SECONDS) return undefined;
+    return hint * 1000 + Math.floor(Math.random() * THROTTLE_JITTER_MS);
   }
 
   private async request(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {
