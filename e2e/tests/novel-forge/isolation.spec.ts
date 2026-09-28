@@ -12,8 +12,8 @@ import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { guardedProject } from './forge-arrange';
 import { assertSpendGuarded } from './forge-db';
-import { type ChapterText, errorCode, readDraft, writeChapterByHand } from './forge-helpers';
-import { insertWriterSnapshot, markDraftIsolated } from './forge-rows';
+import { type ChapterText, errorCode, pasteChapter, readDraft, writeChapterByHand } from './forge-helpers';
+import { insertWriterSnapshot } from './forge-rows';
 import { writerPrompt } from './forge-story';
 
 /**
@@ -63,10 +63,9 @@ function markedChapter(label: string): MarkedChapter {
   };
 }
 
-/** Pasting with `isolated: true` answers 500 today (see the fixme), so the chapter is written by hand and isolated as the paste stores it. */
 async function writeIsolatedChapter(owner: ForgeActor, projectId: string, text: ChapterText): Promise<void> {
-  const draft = await writeChapterByHand(owner.ctx, projectId, text);
-  await markDraftIsolated(projectId, draft.chapter);
+  const draft = await pasteChapter(owner.ctx, projectId, text, { isolated: true });
+  expect(draft.isolated, `the paste isolated chapter ${draft.chapter}`).toBe(true);
 }
 
 async function searchHits(ctx: APIRequestContext, projectId: string, q: string): Promise<number[]> {

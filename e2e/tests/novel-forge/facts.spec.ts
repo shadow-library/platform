@@ -276,9 +276,7 @@ test.describe('novel-forge reveal ledger across approval and finalize', () => {
 });
 
 test.describe('novel-forge story API responses', () => {
-  // generation.controller.ts:180 has no @HttpStatus(200), so packages/fastify/src/module/fastify-router.ts:322-327 defaults the POST to 201, which has
-  // no response transformer (:399-404): the committed draft's bigint ids reach JSON.stringify and the approval answers 500 S001.
-  test.fixme('should answer an approval with the approved draft', async ({ forge }) => {
+  test('should answer an approval with the approved draft', async ({ forge }) => {
     const owner = await forge.actor({ label: 'facts-approve' });
     const projectId = await createGuardedProject(forge, owner, 'facts-approve');
     const draft = await writeChapterOne(owner.ctx, projectId, 'Mira swore the oath on the river stones.');

@@ -129,9 +129,6 @@ export interface FinalizeReview {
 
 export const MODEL_TAG = '@model';
 
-/** The default handler's body for an uncaught server error (`packages/fastify/src/server.error.ts`), which a 500 from the serializer bug carries. */
-const UNEXPECTED_SERVER_ERROR_CODE = 'S001';
-
 const JOB_SETTLE_TIMEOUT_MS = 30_000;
 
 export class ForgeJobTimeoutError extends Error {
@@ -215,17 +212,8 @@ export async function errorCode(response: HttpAnswer): Promise<string | undefine
   return (await jsonOrUndefined<{ code?: string }>(response))?.code;
 }
 
-/**
- * A POST declaring two `@RespondFor` codes and no `@HttpStatus` defaults to 201 (`packages/fastify/src/module/fastify-router.ts:322-327`), which
- * has no bigint-safe response transformer, and a nullable bigint response field that just went non-null fails the same way
- * (`packages/class-schema/src/class-schema.ts:194-200`): the write commits, then answers `500 S001`. Only `expectedStatus` or that exact 500
- * passes — never an unrelated one — and the caller reads the committed state back rather than trusting the body.
- */
-export async function expectCommittedDespiteSerializerBug(response: HttpAnswer, expectedStatus: number, what: string): Promise<void> {
-  if (response.status() === expectedStatus) return;
-  const body = await response.text();
-  expect(response.status(), `${what} — neither ${expectedStatus} nor the serializer bug's 500 — body ${body}`).toBe(500);
-  expect(await errorCode(response), `${what} — a 500 not carrying the serializer bug's code — body ${body}`).toBe(UNEXPECTED_SERVER_ERROR_CODE);
+export async function expectStatus(response: HttpAnswer, status: number, what: string): Promise<void> {
+  expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
 }
 
 export async function createProject(
@@ -293,7 +281,7 @@ export async function importDraft(ctx: APIRequestContext, projectId: string, bas
       ...(options.isolated === undefined ? {} : { isolated: options.isolated }),
     },
   });
-  await expectCommittedDespiteSerializerBug(response, 200, `importing chapter ${base.chapter}`);
+  await expectStatus(response, 200, `importing chapter ${base.chapter}`);
   return readDraft(ctx, projectId, base.chapter);
 }
 

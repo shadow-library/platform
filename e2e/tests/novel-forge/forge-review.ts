@@ -122,12 +122,9 @@ export async function finalizeRoute(ctx: APIRequestContext, projectId: string, c
   return mutate(ctx, 'post', `/api/v1/projects/${projectId}/finalize`, { data: { chapter } });
 }
 
-/**
- * A run `POST /finalize` started. The route declares 200 and 409 without an `@HttpStatus`, so the router answers 201 (the fixme in
- * finalize.spec.ts holds the declared 200); either is accepted here so the run itself can be asserted.
- */
+/** A run `POST /finalize` started. */
 export async function expectFinalizeRun(response: APIResponse, what: string): Promise<FinalizeAnswer> {
-  expect([200, 201], `${what} — body ${await response.text()}`).toContain(response.status());
+  expect(response.status(), `${what} — body ${await response.text()}`).toBe(200);
   return (await response.json()) as FinalizeAnswer;
 }
 

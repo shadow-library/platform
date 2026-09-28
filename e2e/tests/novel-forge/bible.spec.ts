@@ -11,7 +11,7 @@ import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newProject } from './forge-arrange';
 import { computeBibleDocHash, ForgeArrangeError, insertChapterRow, insertRawBibleDoc, readBibleDocRow, readChapterFlags, readProposalRow } from './forge-bible';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
-import { expectCommittedDespiteSerializerBug } from './forge-helpers';
+import { expectStatus } from './forge-helpers';
 
 /**
  * Defining types
@@ -209,8 +209,6 @@ test.describe('novel-forge Story Bible tidy', () => {
 
     const removeEmptyId = (worldDefaultRemoval as TidyItem).id;
     const retitleId = (byKind('retitle')[0] as TidyItem).id;
-    // The tidy POST itself is a single-`@RespondFor(200)` route (`bible-tidy.controller.ts:40-41`) — not affected by the apply/revert
-    // serializer bug, so its response is trusted directly for the proposal id.
     const applied = await mutate(owner.ctx, 'post', base, { data: { items: [{ id: removeEmptyId }, { id: retitleId }] } });
     expect(applied.status(), await applied.text()).toBe(200);
     const proposalId = ((await applied.json()) as { proposal: { id: string } }).proposal.id;
@@ -230,9 +228,8 @@ test.describe('novel-forge Story Bible tidy', () => {
       'unselected split items reappear too',
     ).toBe(true);
 
-    // Revert goes through the shared `POST /proposals/:id/revert` route, which *is* affected by the serializer bug.
     const reverted = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/revert`);
-    await expectCommittedDespiteSerializerBug(reverted, 200, 'reverting a tidy apply');
+    await expectStatus(reverted, 200, 'reverting a tidy apply');
     expect(await readProposalRow(proposalId)).toMatchObject({ status: 'reverted' });
     const restoredEmpty = await getDoc(owner.ctx, projectId, 'world', 'default');
     expect(restoredEmpty.status(), 'revert restores the removed placeholder').toBe(200);

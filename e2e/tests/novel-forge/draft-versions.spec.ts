@@ -43,10 +43,7 @@ const ANCHOR_CONTEXT_CHARS = 32;
  * Declaring the constants
  *
  * Version history and passage suggestions, both written through the hand-save path (`draft-versions.service.ts`,
- * `passage-rewrite.service.ts`). Restoring and applying a suggestion both answer through the fastify-router POST-defaults-to-201 bug
- * (`packages/fastify/src/module/fastify-router.ts:322-327` — two `@RespondFor`s, no `@HttpStatus`), so their success is read back from
- * the draft rather than trusted from the response; refusals carry their own status and are unaffected. A suggestion is DB-inserted as
- * `open`, since making one for real spends a model call under the fail-pin.
+ * `passage-rewrite.service.ts`). A suggestion is DB-inserted as `open`, since making one for real spends a model call under the fail-pin.
  */
 
 function versionsPath(projectId: string, chapter: number, suffix = ''): string {
@@ -253,8 +250,7 @@ test.describe('novel-forge passage suggestions', () => {
 });
 
 test.describe('novel-forge chapter-workspace response bodies', () => {
-  // cc90e2fc — chapter-workspace.controller.ts:44-49: two @RespondFor, no @HttpStatus → fastify-router.ts:322-327 defaults the POST to 201 with no bigint transformer, so restore commits but answers 500 S001.
-  test.fixme('should answer a restore with the restored draft', async ({ forge }) => {
+  test('should answer a restore with the restored draft', async ({ forge }) => {
     const owner = await forge.actor({ label: 'versions-response' });
     const projectId = await createGuardedProject(forge, owner, 'versions-response');
     const empty = await startNextChapter(owner.ctx, projectId);
@@ -268,8 +264,7 @@ test.describe('novel-forge chapter-workspace response bodies', () => {
     expect(await restore.json()).toMatchObject({ body: 'First telling.', revision: 3 });
   });
 
-  // cc90e2fc — chapter-workspace.controller.ts:69-74: same shape as the restore fixme above, so apply commits but answers 500 S001.
-  test.fixme('should answer applying a suggestion with the updated draft and suggestion', async ({ forge }) => {
+  test('should answer applying a suggestion with the updated draft and suggestion', async ({ forge }) => {
     const owner = await forge.actor({ label: 'passage-response' });
     const projectId = await createGuardedProject(forge, owner, 'passage-response');
     const draft = await writeChapterByHand(owner.ctx, projectId, { title: 'One', body: 'Alpha beta gamma.' });

@@ -222,8 +222,7 @@ test.describe("novel-forge a novel's authoring claim", () => {
 });
 
 test.describe('novel-forge chapter insert', () => {
-  // chapter-insert.controller.ts:17 declares 200 and 400 with no @HttpStatus, so fastify-router.ts:322-327 answers 201 untransformed: 500 after commit.
-  test.fixme('should answer a hand chapter insert with the brief it created', async ({ forge }) => {
+  test('should answer a hand chapter insert with the brief it created', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chapter-insert' });
     const projectId = await guardedProject(forge, owner, 'chapter-insert');
 

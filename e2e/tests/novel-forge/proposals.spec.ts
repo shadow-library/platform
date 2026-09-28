@@ -16,8 +16,7 @@ import {
   readVolumeRow,
   rebaselineProposal,
 } from './forge-bible';
-import { createEntity, expectCommittedDespiteSerializerBug, uniqueSuffix, writeChapterByHand } from './forge-helpers';
-import { markDraftIsolated } from './forge-rows';
+import { createEntity, expectStatus, pasteChapter, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -97,7 +96,7 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
     await rebaselineProposal(owner.ctx, projectId, proposalId, changeSet);
 
     const applied = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(applied, 200, 'a multi-op atomic apply');
+    await expectStatus(applied, 200, 'a multi-op atomic apply');
     expect(await proposalStatus(proposalId)).toBe('applied');
     expect(await readEntityRow(projectId, alpha)).toBeDefined();
     expect(await readEntityRow(projectId, beta)).toBeDefined();
@@ -118,7 +117,7 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
     await rebaselineProposal(owner.ctx, projectId, proposalB, changeSetB);
 
     const appliedA = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalA}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(appliedA, 200, 'the first of two racing applies');
+    await expectStatus(appliedA, 200, 'the first of two racing applies');
     expect(await proposalStatus(proposalA)).toBe('applied');
 
     const appliedB = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalB}/apply`, { data: {} });
@@ -146,10 +145,8 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
   test('should refuse a change-set edit that would rewrite an isolated chapter’s prose, then admit an edit that leaves its body alone', async ({ forge }) => {
     const owner = await forge.actor({ label: 'prop-guardrail' });
     const projectId = await newProject(owner, 'prop-guardrail');
-    // `POST /drafts/:n/import` with `isolated: true` 500s today (fastify-router.ts:322-327, same class of bug as the apply/revert fixme
-    // below — see `isolation.spec.ts`'s own fixme), so the chapter is written by hand and isolated the way `markDraftIsolated` stores it.
-    const isolated = await writeChapterByHand(owner.ctx, projectId, { title: 'Behind the wall', body: 'Original isolated prose that chat must never rewrite.' });
-    await markDraftIsolated(projectId, isolated.chapter);
+    const isolated = await pasteChapter(owner.ctx, projectId, { title: 'Behind the wall', body: 'Original isolated prose that chat must never rewrite.' }, { isolated: true });
+    expect(isolated.isolated, 'the paste isolated the chapter').toBe(true);
 
     const rewriteChangeSet = [{ op: 'draft.update', chapter: isolated.chapter, body: 'Chat tries to rewrite the isolated prose here.' }];
     const proposalId = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: rewriteChangeSet, baseline: {} });
@@ -163,7 +160,7 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
     const retitleChangeSet = [{ op: 'draft.update', chapter: isolated.chapter, title: 'Retitled without touching the isolated prose' }];
     await rebaselineProposal(owner.ctx, projectId, proposalId, retitleChangeSet);
     const retitled = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(retitled, 200, 'a draft.update that only retitles an isolated chapter');
+    await expectStatus(retitled, 200, 'a draft.update that only retitles an isolated chapter');
     expect(await proposalStatus(proposalId)).toBe('applied');
   });
 
@@ -185,7 +182,7 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
 
     // An organise card can never be PATCHed, but it can still be applied as staged.
     const applied = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(applied, 200, 'applying an organise card unedited');
+    await expectStatus(applied, 200, 'applying an organise card unedited');
     expect(await proposalStatus(proposalId)).toBe('applied');
   });
 
@@ -247,7 +244,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     );
 
     const applied = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: { opIndexes: [0] } });
-    await expectCommittedDespiteSerializerBug(applied, 200, 'cherry-picking one op');
+    await expectStatus(applied, 200, 'cherry-picking one op');
     expect(await proposalStatus(proposalId)).toBe('applied');
     expect(await readEntityRow(projectId, kept)).toBeDefined();
     expect(await readEntityRow(projectId, skipped), 'the unselected op never wrote its artifact').toBeUndefined();
@@ -278,7 +275,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
       expect(await proposalStatus(proposalId)).toBe('pending');
 
       const selected = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: { opIndexes: [0] } });
-      await expectCommittedDespiteSerializerBug(selected, 200, `cherry-picking the content op beside ${door.op}`);
+      await expectStatus(selected, 200, `cherry-picking the content op beside ${door.op}`);
       expect(await proposalStatus(proposalId)).toBe('applied');
       expect(await readEntityRow(projectId, entityKey)).toBeDefined();
     }
@@ -330,7 +327,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const editChangeSet = [{ op: 'fact.upsert', factKey, constraintNote: 'Edited without ever retracting the ledgered reveal.' }];
     await rebaselineProposal(owner.ctx, projectId, proposalId, editChangeSet);
     const edited = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(edited, 200, 'editing a ledgered fact without removing it');
+    await expectStatus(edited, 200, 'editing a ledgered fact without removing it');
     expect(await proposalStatus(proposalId)).toBe('applied');
   });
 
@@ -346,12 +343,12 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     await rebaselineProposal(owner.ctx, projectId, proposalId, changeSet);
 
     const applied = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(applied, 200, 'removing a volume');
+    await expectStatus(applied, 200, 'removing a volume');
     expect(await proposalStatus(proposalId)).toBe('applied');
     await expectCode(await owner.ctx.get(`/api/v1/projects/${projectId}/volumes/${volumeKey}`), 404, 'VOL_001', 'reading a removed volume');
 
     const reverted = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/revert`);
-    await expectCommittedDespiteSerializerBug(reverted, 200, 'reverting the volume removal');
+    await expectStatus(reverted, 200, 'reverting the volume removal');
     expect(await proposalStatus(proposalId)).toBe('reverted');
     const restored = await readVolumeRow(projectId, volumeKey);
     // `state` is excluded from the byte-identical comparison on purpose: re-inserting the sole volume on revert runs through
@@ -369,14 +366,14 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const proposalA = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetA, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalA, changeSetA);
     const appliedA = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalA}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(appliedA, 200, 'applying the first premise change');
+    await expectStatus(appliedA, 200, 'applying the first premise change');
     expect(await readProjectPremise(projectId)).toBe('A lighthouse keeper discovers the tide itself is listening.');
 
     const changeSetB = [{ op: 'premise.update', premise: 'A cartographer maps a district that is not on any chart.' }];
     const proposalB = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetB, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalB, changeSetB);
     const appliedB = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalB}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(appliedB, 200, 'applying the second premise change over the first');
+    await expectStatus(appliedB, 200, 'applying the second premise change over the first');
     expect(await readProjectPremise(projectId)).toBe('A cartographer maps a district that is not on any chart.');
 
     await expectCode(
@@ -403,7 +400,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const changeSetA = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Original name' }];
     const proposalA = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetA, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalA, changeSetA);
-    await expectCommittedDespiteSerializerBug(
+    await expectStatus(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalA}/apply`, { data: {} }),
       200,
       'creating the entity a later card will depend on',
@@ -431,20 +428,12 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
 
     const proposalA = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetA, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalA, changeSetA);
-    await expectCommittedDespiteSerializerBug(
-      await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalA}/apply`, { data: {} }),
-      200,
-      'applying the first rollback candidate',
-    );
+    await expectStatus(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalA}/apply`, { data: {} }), 200, 'applying the first rollback candidate');
     expect(await proposalStatus(proposalA)).toBe('applied');
 
     const proposalB = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetB, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalB, changeSetB);
-    await expectCommittedDespiteSerializerBug(
-      await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalB}/apply`, { data: {} }),
-      200,
-      'applying the second rollback candidate',
-    );
+    await expectStatus(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalB}/apply`, { data: {} }), 200, 'applying the second rollback candidate');
     expect(await proposalStatus(proposalB)).toBe('applied');
 
     // An action-only card (no content ops, so no inverse ops) applied last — `action.validate` on a project with no finalized chapters
@@ -453,11 +442,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const proposalC = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetC, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalC, changeSetC);
     await assertSpendGuarded(projectId, { requireQuota: true });
-    await expectCommittedDespiteSerializerBug(
-      await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalC}/apply`, { data: {} }),
-      200,
-      'applying the action-only card',
-    );
+    await expectStatus(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalC}/apply`, { data: {} }), 200, 'applying the action-only card');
     expect(await proposalStatus(proposalC)).toBe('applied');
 
     const changes = await owner.ctx.get(`/api/v1/projects/${projectId}/changes`);
@@ -505,13 +490,11 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
  * attempt is not separately covered (only the never-applied and hand-edited-since paths are). A successful `writer-preview` response
  * (a pending `chapter_plan` card with a `brief.update` op) is not covered — every proposal in this file is `kind: 'hub'`.
  */
-test.fixme('should answer 200 with the applied proposal on a successful apply — fastify-router.ts:322-327 defaults the POST to 201 (two @RespondFor codes, no @HttpStatus, proposal.controller.ts:61,84) and the untransformed bigint proposal id then fails to serialize, 500ing after the write commits (ac5a7309)', async ({
-  forge,
-}) => {
-  const owner = await forge.actor({ label: 'prop-apply-status-fixme' });
-  const projectId = await guardedProject(forge, owner, 'prop-apply-status-fixme');
-  const entityKey = `e2e-prop-fixme-${uniqueSuffix()}`;
-  const changeSet = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Fixme Entity' }];
+test('should answer 200 with the applied proposal on a successful apply', async ({ forge }) => {
+  const owner = await forge.actor({ label: 'prop-apply-status' });
+  const projectId = await guardedProject(forge, owner, 'prop-apply-status');
+  const entityKey = `e2e-prop-status-${uniqueSuffix()}`;
+  const changeSet = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'Status Entity' }];
   const proposalId = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet, baseline: {} });
   await rebaselineProposal(owner.ctx, projectId, proposalId, changeSet);
 

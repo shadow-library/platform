@@ -448,8 +448,7 @@ test.describe('novel-forge finalize on the direct continuity path', () => {
     expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
-  // generation.controller.ts:222-224 declares 200 and 409 with no @HttpStatus, so fastify-router.ts:322-327 answers this POST with 201.
-  test.fixme('should answer a finalize with the 200 it declares', async ({ forge }) => {
+  test('should answer a finalize with the 200 it declares', async ({ forge }) => {
     const owner = await forge.actor({ label: 'fin-status' });
     const projectId = await createGuardedProject(forge, owner, 'fin-status');
     await approvedWithFailedReview(owner, projectId, await writeChapterByHand(owner.ctx, projectId, CHAPTER_ONE));

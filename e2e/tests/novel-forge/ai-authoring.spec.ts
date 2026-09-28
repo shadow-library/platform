@@ -18,7 +18,7 @@ import {
   createNovel,
   deleteProjectQuietly,
   type Draft,
-  expectCommittedDespiteSerializerBug,
+  expectStatus,
   finalizeThroughReview,
   HAIKU_MODEL,
   MODEL_FLOW_TIMEOUT_MS,
@@ -61,7 +61,7 @@ const PLAN_KIND = 'chapter_plan';
 
 async function applyProposal(ctx: APIRequestContext, projectId: string, proposalId: string): Promise<void> {
   const applied = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-  await expectCommittedDespiteSerializerBug(applied, 200, `applying proposal ${proposalId}`);
+  await expectStatus(applied, 200, `applying proposal ${proposalId}`);
   expect((await readProposalRow(proposalId))?.status, `proposal ${proposalId} was applied`).toBe('applied');
 }
 
@@ -141,7 +141,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
 
     await test.step('approve chapter 1 and finalize it through its Story Bible review', async () => {
       const draft = await withSummary(ctx, novel.projectId, await readDraft(ctx, novel.projectId, 1));
-      await expectCommittedDespiteSerializerBug(await approveChapter(ctx, novel.projectId, draft), 200, 'approving chapter 1');
+      await expectStatus(await approveChapter(ctx, novel.projectId, draft), 200, 'approving chapter 1');
 
       const review = await finalizeThroughReview(ctx, novel.projectId, 1);
       expect(review.status).toBe('applied');
@@ -172,7 +172,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
     });
 
     await test.step('approve and finalize through the Story Bible review', async () => {
-      await expectCommittedDespiteSerializerBug(await approveChapter(ctx, projectId, await readDraft(ctx, projectId, 1)), 200, 'approving chapter 1');
+      await expectStatus(await approveChapter(ctx, projectId, await readDraft(ctx, projectId, 1)), 200, 'approving chapter 1');
 
       const review = await finalizeThroughReview(ctx, projectId, 1);
       expect(review.status).toBe('applied');

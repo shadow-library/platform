@@ -10,7 +10,7 @@ import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, holdAuthoringClaim, listDispatchedModelCalls, releaseAuthoringClaim } from './forge-db';
-import { CHAPTER_ONE, expectCommittedDespiteSerializerBug, importDraft, pollJobStatus, saveChapter, startNextChapter, uniqueSuffix, writeChapterByHand } from './forge-helpers';
+import { CHAPTER_ONE, expectStatus, importDraft, pollJobStatus, saveChapter, startNextChapter, uniqueSuffix, writeChapterByHand } from './forge-helpers';
 import {
   approveAsRead,
   countApprovals,
@@ -55,10 +55,10 @@ async function setReviewStatus(projectId: string, chapter: number, reviewStatus:
 }
 
 /** Approving always stages a finalize-review model job, so every call is guarded right before it, like {@link approveAsRead}. */
-async function approveTolerant(ctx: APIRequestContext, projectId: string, chapter: number, data: Record<string, unknown>): Promise<APIResponse> {
+async function approveWith(ctx: APIRequestContext, projectId: string, chapter: number, data: Record<string, unknown>): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
   const response = await mutate(ctx, 'post', draftsPath(projectId, chapter, '/approve'), { data });
-  await expectCommittedDespiteSerializerBug(response, 200, `approving chapter ${chapter}`);
+  await expectStatus(response, 200, `approving chapter ${chapter}`);
   return response;
 }
 
@@ -115,8 +115,7 @@ test.describe('novel-forge hand saves, imports and the stale cascade', () => {
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);
   });
 
-  // b3425e3b — generation.controller.ts:213-218: two @RespondFor, no @HttpStatus → fastify-router.ts:322-327 defaults the POST to 201 with no bigint transformer, so import commits but answers 500 S001.
-  test.fixme('should answer an import with the imported draft', async ({ forge }) => {
+  test('should answer an import with the imported draft', async ({ forge }) => {
     const owner = await forge.actor({ label: 'draft-import-response' });
     const projectId = await createGuardedProject(forge, owner, 'draft-import-response');
     const empty = await startNextChapter(owner.ctx, projectId);
@@ -235,10 +234,10 @@ test.describe('novel-forge approval binding', () => {
     await writeChapterByHand(owner.ctx, projectId, { title: 'Two', body: 'Chapter two prose.' });
 
     const key = `e2e-idem-1-${uniqueSuffix()}`;
-    await approveTolerant(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: key });
-    await approveTolerant(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: key });
+    await approveWith(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: key });
+    await approveWith(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: key });
     expect(await countApprovals(projectId, 1), 'a retried idempotency key never duplicates the approval row').toBe(1);
-    await approveTolerant(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: `e2e-idem-2-${uniqueSuffix()}` });
+    await approveWith(owner.ctx, projectId, 1, { revision: ch1.revision, saveSeq: ch1.saveSeq, draftId: ch1.id, idempotencyKey: `e2e-idem-2-${uniqueSuffix()}` });
     expect(await countApprovals(projectId, 1), 'a distinct key records a distinct approval').toBe(2);
 
     await expectCode(
@@ -265,7 +264,7 @@ test.describe('novel-forge approval binding', () => {
       'approving as written with a stale reason that does not match what is stored',
     );
 
-    await approveTolerant(owner.ctx, projectId, 1, {
+    await approveWith(owner.ctx, projectId, 1, {
       revision: stale.revision,
       saveSeq: stale.saveSeq,
       draftId: stale.id,
@@ -273,7 +272,7 @@ test.describe('novel-forge approval binding', () => {
       staleReason: 'e2e forced stale',
     });
     const lifted = await readStaleDraft(owner.ctx, projectId, 1);
-    expect(lifted, 'approving as written commits, even where the response body was lost to S001').toMatchObject({ reviewStatus: 'approved', staleReason: null });
+    expect(lifted, 'approving as written commits').toMatchObject({ reviewStatus: 'approved', staleReason: null });
 
     const [feedbackRow] = await novelForgeDb()<{ note: string | null }[]>`
       SELECT note FROM user_feedback WHERE project_id = ${projectId} AND artifact_type = 'draft' AND artifact_ref = '1' AND disposition = 'approved' ORDER BY id DESC LIMIT 1

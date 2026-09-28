@@ -11,7 +11,7 @@ import { type APIRequestContext, type APIResponse, expect } from '@playwright/te
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { type ForgeActor, type ForgeHarness } from './forge-actors';
 import { assertSpendGuarded, failPin } from './forge-db';
-import { approveChapter, type Draft, type EntitySeed, expectCommittedDespiteSerializerBug, readDraft, uniqueSuffix } from './forge-helpers';
+import { approveChapter, type Draft, type EntitySeed, expectStatus, readDraft, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -243,10 +243,10 @@ export async function writerPrompt(ctx: APIRequestContext, projectId: string, ch
   return ((await response.json()) as { markdown: string }).markdown;
 }
 
-/** Approves the revision read and confirms it from the draft; the approve route answers 500 S001 after it commits (fixme'd in facts.spec.ts). */
+/** Approves the revision read and confirms it from the draft. */
 export async function approveAsRead(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
   await assertSpendGuarded(projectId);
-  await expectCommittedDespiteSerializerBug(await approveChapter(ctx, projectId, draft), 200, `approving chapter ${draft.chapter}`);
+  await expectStatus(await approveChapter(ctx, projectId, draft), 200, `approving chapter ${draft.chapter}`);
   const approved = await readDraft(ctx, projectId, draft.chapter);
   expect(approved, `the approval of chapter ${draft.chapter} committed`).toMatchObject({ reviewStatus: 'approved', approvedRevision: draft.revision });
   return approved;
@@ -454,20 +454,18 @@ export async function countApprovals(projectId: string, chapter: number): Promis
   return row?.count ?? 0;
 }
 
-/** Restores a version through the route that shares {@link expectCommittedDespiteSerializerBug}'s bug, then reads the draft back. */
 export async function restoreVersionAsRead(ctx: APIRequestContext, projectId: string, chapter: number, revision: number, base?: Draft): Promise<Draft> {
   const data = base ? { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq } : {};
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${chapter}/versions/${revision}/restore`, { data });
-  await expectCommittedDespiteSerializerBug(response, 200, `restoring revision ${revision} of chapter ${chapter}`);
+  await expectStatus(response, 200, `restoring revision ${revision} of chapter ${chapter}`);
   return readDraft(ctx, projectId, chapter);
 }
 
-/** Same fastify-router bug as {@link restoreVersionAsRead}, on `POST .../passage-suggestions/:id/apply`. */
 export async function applySuggestionAsRead(ctx: APIRequestContext, projectId: string, chapter: number, suggestionId: string, base: Draft): Promise<Draft> {
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${chapter}/passage-suggestions/${suggestionId}/apply`, {
     data: { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq },
   });
-  await expectCommittedDespiteSerializerBug(response, 200, `applying suggestion ${suggestionId} on chapter ${chapter}`);
+  await expectStatus(response, 200, `applying suggestion ${suggestionId} on chapter ${chapter}`);
   return readDraft(ctx, projectId, chapter);
 }
 

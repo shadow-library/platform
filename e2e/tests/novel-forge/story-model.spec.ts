@@ -172,9 +172,8 @@ test.describe('novel-forge promises', () => {
 });
 
 test.describe('novel-forge volumes', () => {
-  // packages/class-schema/src/class-schema.ts:194-200 turns the nullable `activated` $ref (volume.dto.ts:93) into anyOf[{$ref},{type:'null'}];
-  // fast-json-stringify checks anyOf branches with Ajv, which rejects the raw bigint id/projectId (volume.dto.ts:27-31), so the committed click
-  // answers 500 S001. `activated: null` serializes.
+  // H7 left half-fixed: fastify-router.ts:173-199 stringifies only bigints, so the Date createdAt/updatedAt (volume.dto.ts:76,79) inside the nullable
+  // `activated` $ref (volume.dto.ts:94, anyOf via class-schema.ts:194-198) fail Ajv's string check and the committed click answers 500 S001.
   test.fixme('should answer "goal met" with the completed volume and the one it activated', async ({ forge }) => {
     const owner = await forge.actor({ label: 'story-volume-answer' });
     const projectId = await createGuardedProject(forge, owner, 'story-volume-answer');

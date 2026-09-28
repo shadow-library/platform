@@ -10,7 +10,7 @@ import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { holdAuthoringClaim, insertContextPack, insertModelCalls, releaseAuthoringClaim } from './forge-db';
-import { CHAPTER_TWO, expectCommittedDespiteSerializerBug, writeChapterByHand } from './forge-helpers';
+import { CHAPTER_TWO, expectStatus, writeChapterByHand } from './forge-helpers';
 import { createGuardedProject, insertEntities, insertFinalDraft, insertVolumes, insertWorldFacts, readStaleDraft } from './forge-story';
 
 /**
@@ -206,7 +206,7 @@ test.describe('novel-forge chapter insert by hand', () => {
     expect(await readShiftedValues(projectId), 'or a chapter number').toEqual(shifted);
 
     const inserted = await insertChapter(owner, projectId, 4, { briefOrigin: 'hand', briefBody: HAND_BRIEF });
-    await expectCommittedDespiteSerializerBug(inserted, 200, 'inserting right after the last plan');
+    await expectStatus(inserted, 200, 'inserting right after the last plan');
     expect(
       (await readBriefs(projectId)).map(brief => brief.chapter),
       'an insert right after the highest plan is allowed',
@@ -229,7 +229,7 @@ test.describe('novel-forge chapter insert by hand', () => {
     ).toBeGreaterThan(15);
 
     const inserted = await insertChapter(owner, projectId, 2, { briefOrigin: 'hand', briefBody: HAND_BRIEF });
-    await expectCommittedDespiteSerializerBug(inserted, 200, 'inserting after chapter 2');
+    await expectStatus(inserted, 200, 'inserting after chapter 2');
 
     expect(await readShiftedValues(projectId), 'above moves by one, at and below stay, unset stays unset').toEqual(shiftedAbove(shifted, 2));
     const [kept, landed, moved, last] = await readBriefs(projectId);

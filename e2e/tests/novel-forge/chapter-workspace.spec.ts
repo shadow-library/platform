@@ -17,7 +17,7 @@ import {
   deleteProjectQuietly,
   type Draft,
   errorCode,
-  expectCommittedDespiteSerializerBug,
+  expectStatus,
   readDraft,
   readFinalizeReview,
   saveChapter,
@@ -116,7 +116,7 @@ test.describe('novel-forge hand-written chapters (API)', () => {
 
   test('should approve the revision read and stage a finalize review bound to it', async () => {
     await assertSpendGuarded(projectId);
-    await expectCommittedDespiteSerializerBug(await approveChapter(ctx, projectId, draft), 200, 'approving chapter 1');
+    await expectStatus(await approveChapter(ctx, projectId, draft), 200, 'approving chapter 1');
     draft = await readDraft(ctx, projectId, 1);
     expect(draft).toMatchObject({ reviewStatus: 'approved', approvedRevision: draft.revision });
 
@@ -186,10 +186,8 @@ test.describe('novel-forge chat → write it myself → approve (UI)', () => {
     await assertSpendGuarded(novel.projectId);
     const approval = page.waitForResponse(response => response.request().method() === 'POST' && /\/drafts\/1\/approve$/.test(new URL(response.url()).pathname));
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expectCommittedDespiteSerializerBug(await approval, 200, 'approving chapter 1 from the workspace');
+    await expectStatus(await approval, 200, 'approving chapter 1 from the workspace');
     await expect.poll(async () => (await readDraft(ctx, novel.projectId, 1)).reviewStatus, { timeout: 15_000 }).toBe('approved');
-    // The serializer bug's 500 (generation.controller.ts:180, fixme'd in facts.spec.ts) leaves the page on its stale draft; a 200 must refresh it unaided.
-    if ((await approval).status() === 500) await page.reload();
 
     await page.getByRole('button', { name: 'Finalize · review Story Bible updates' }).click();
     const review = page.getByRole('dialog', { name: /^Finalize chapter 1/ });

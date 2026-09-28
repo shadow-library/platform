@@ -19,7 +19,7 @@ import {
   readProposalRow,
   rebaselineProposal,
 } from './forge-bible';
-import { expectCommittedDespiteSerializerBug, uniqueSuffix } from './forge-helpers';
+import { expectStatus, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -55,15 +55,9 @@ async function listLedger(owner: ForgeActor, projectId: string, query = ''): Pro
   return ((await response.json()) as { entries: LedgerEntryResponse[] }).entries;
 }
 
-/**
- * `GET /ledger/topics/:topic` is a single-`@RespondFor(200)` route, but it serializes the *same* `LedgerEntryResponse` shape as
- * supersede/reject — so a history that includes a superseded entry (a non-null `supersedesId`) hits the identical nullable-bigint
- * bug and 500s too. Returns `undefined` on that tolerated 500; the caller falls back to a DB read for what it needed.
- */
-async function ledgerHistory(owner: ForgeActor, projectId: string, topic: string): Promise<LedgerEntryResponse[] | undefined> {
+async function ledgerHistory(owner: ForgeActor, projectId: string, topic: string): Promise<LedgerEntryResponse[]> {
   const response = await owner.ctx.get(`/api/v1/projects/${projectId}/ledger/topics/${topic}`);
-  await expectCommittedDespiteSerializerBug(response, 200, `reading the history of ${topic}`);
-  if (response.status() !== 200) return undefined;
+  await expectStatus(response, 200, `reading the history of ${topic}`);
   return ((await response.json()) as { entries: LedgerEntryResponse[] }).entries;
 }
 
@@ -83,14 +77,6 @@ async function readActiveLedgerEntryId(projectId: string, topic: string): Promis
   return row?.id;
 }
 
-/** The same chain `GET /ledger/topics/:topic` orders oldest-first, read directly — the fallback for when that route hits the serializer bug. */
-async function readLedgerHistoryIds(projectId: string, topic: string): Promise<string[]> {
-  const rows = await novelForgeDb()<{ id: string }[]>`
-    SELECT id::text FROM decision_ledger_entries WHERE project_id = ${projectId} AND topic = ${topic} ORDER BY created_at ASC, id ASC
-  `;
-  return rows.map(row => row.id);
-}
-
 test.describe('novel-forge notebook ledger', () => {
   test('should create, supersede and withdraw entries under the kind and topic rules', async ({ forge }) => {
     const owner = await forge.actor({ label: 'ledger-lifecycle' });
@@ -104,24 +90,17 @@ test.describe('novel-forge notebook ledger', () => {
     const superseded = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/ledger/${first.id}/supersede`, {
       data: { statement: 'V2: magic always has a cost.' },
     });
-    await expectCommittedDespiteSerializerBug(superseded, 201, 'superseding an entry with no earlier successor');
+    await expectStatus(superseded, 201, 'superseding an entry with no earlier successor');
     const secondId = await readActiveLedgerEntryId(projectId, 'e2e.world-rules');
     if (!secondId) throw new ForgeArrangeError('expected a new active entry on e2e.world-rules after the supersede');
     expect(await readLedgerRow(secondId)).toMatchObject({ topic: 'e2e.world-rules', status: 'active', statement: 'V2: magic always has a cost.' });
     expect(await readLedgerRow(first.id)).toMatchObject({ status: 'superseded' });
 
     const history = await ledgerHistory(owner, projectId, 'e2e.world-rules');
-    if (history) {
-      expect(history.map(entry => ({ id: entry.id, status: entry.status }))).toEqual([
-        { id: first.id, status: 'superseded' },
-        { id: secondId, status: 'active' },
-      ]);
-    } else {
-      expect(await readLedgerHistoryIds(projectId, 'e2e.world-rules'), 'the history route 500d on the superseded entry — order confirmed from the DB instead').toEqual([
-        first.id,
-        secondId,
-      ]);
-    }
+    expect(history.map(entry => ({ id: entry.id, status: entry.status }))).toEqual([
+      { id: first.id, status: 'superseded' },
+      { id: secondId, status: 'active' },
+    ]);
 
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/ledger/${first.id}/supersede`, { data: { statement: 'no longer possible' } }),
@@ -214,7 +193,7 @@ test.describe('novel-forge notebook ledger', () => {
     expect(entry.rejectionScope).toBe('never');
 
     const rejectedAgain = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/ops/0/reject`, { data: { scope: 'not_now' } });
-    await expectCommittedDespiteSerializerBug(rejectedAgain, 201, 'rejecting the same idea a second time');
+    await expectStatus(rejectedAgain, 201, 'rejecting the same idea a second time');
     const secondEntryId = await readActiveLedgerEntryId(projectId, entry.topic);
     if (!secondEntryId) throw new ForgeArrangeError(`expected a new active entry on ${entry.topic} after the repeat rejection`);
     expect(secondEntryId, 'the same idea is superseded, not duplicated').not.toBe(entry.id);
@@ -318,18 +297,16 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
       'hand-editing a still-pending audit card',
     );
 
-    // `BibleAuditReportResponse.proposalId` (`bible-audit.dto.ts:191`) is the same nullable-bigint shape as `LedgerEntryResponse.supersedesId`
-    // — a report already linked to a card (the normal case) 500s on any route that serializes it back.
     const keep = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/bible/audits/${reportId}/findings/finding-a/decision`, { data: { decision: 'kept' } });
-    await expectCommittedDespiteSerializerBug(keep, 200, 'keeping a finding on a card with a linked proposal');
+    await expectStatus(keep, 200, 'keeping a finding on a card with a linked proposal');
     const skip = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/bible/audits/${reportId}/findings/finding-b/decision`, {
       data: { decision: 'skipped', reason: 'not now' },
     });
-    await expectCommittedDespiteSerializerBug(skip, 200, 'skipping a finding on a card with a linked proposal');
+    await expectStatus(skip, 200, 'skipping a finding on a card with a linked proposal');
 
     const applyResponse = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalId}/apply`, { data: {} });
-    await expectCommittedDespiteSerializerBug(applyResponse, 200, 'apply on a card with one kept finding');
-    expect((await readProposalRow(proposalId))?.status, 'the card applied despite the broken response').toBe('applied');
+    await expectStatus(applyResponse, 200, 'apply on a card with one kept finding');
+    expect((await readProposalRow(proposalId))?.status, 'the card applied').toBe('applied');
     expect((await readEntityRow(projectId, keyA))?.name, 'the kept finding’s entity was created').toBe('Kept Entity');
     expect(await readEntityRow(projectId, keyB), 'the skipped finding’s entity was never created').toBeUndefined();
 
@@ -372,7 +349,7 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
     const decideSkip = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/bible/audits/${skipAllReportId}/findings/only-finding/decision`, {
       data: { decision: 'skipped' },
     });
-    await expectCommittedDespiteSerializerBug(decideSkip, 200, 'skipping the only finding on a linked card');
+    await expectStatus(decideSkip, 200, 'skipping the only finding on a linked card');
     expect((await readProposalRow(skipAllProposal))?.status, 'skipping the only finding discards its card').toBe('discarded');
 
     const nothingKeptProposal = await insertPendingProposal({
@@ -401,19 +378,14 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
   });
 });
 
-test.fixme(
-  'should return the entry body with a real supersedesId — ledger.dto.ts:178 (`supersedesId: bigint | null`) and bible-audit.dto.ts:191 (`proposalId?: bigint | null`) ' +
-    "are nullable-bigint response fields that class-schema's nullable/anyOf handling (packages/class-schema/src/class-schema.ts:194-200) fails to serialize once non-null, " +
-    '500ing every second supersede/reject and every decision on a linked audit card, after the write commits',
-  async ({ forge }) => {
-    const owner = await forge.actor({ label: 'notebook-serialize-fixme' });
-    const projectId = await newProject(owner, 'notebook-serialize-fixme');
-    const entry = await postLedger(owner, projectId, { kind: 'direction', topic: 'e2e.fixme-topic', statement: 'first' });
-    expect(entry.status()).toBe(201);
-    const { id } = (await entry.json()) as LedgerEntryResponse;
-    const superseded = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/ledger/${id}/supersede`, { data: { statement: 'second' } });
-    expect(superseded.status(), await superseded.text()).toBe(201);
-    const body = (await superseded.json()) as LedgerEntryResponse;
-    expect(body.supersedesId).toBe(id);
-  },
-);
+test('should return the entry body with a real supersedesId', async ({ forge }) => {
+  const owner = await forge.actor({ label: 'notebook-serialize' });
+  const projectId = await newProject(owner, 'notebook-serialize');
+  const entry = await postLedger(owner, projectId, { kind: 'direction', topic: 'e2e.serialize-topic', statement: 'first' });
+  expect(entry.status()).toBe(201);
+  const { id } = (await entry.json()) as LedgerEntryResponse;
+  const superseded = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/ledger/${id}/supersede`, { data: { statement: 'second' } });
+  expect(superseded.status(), await superseded.text()).toBe(201);
+  const body = (await superseded.json()) as LedgerEntryResponse;
+  expect(body.supersedesId).toBe(id);
+});
