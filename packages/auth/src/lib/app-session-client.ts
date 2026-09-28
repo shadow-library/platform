@@ -18,7 +18,7 @@ import {
   FetchLike,
   SwitchedOrganisation,
 } from '../interfaces';
-import { retryAfterSecondsOf } from './transport';
+import { retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
 
 /**
  * Defining types
@@ -65,8 +65,6 @@ const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'
 
 /** Identity's application-access denials; on the organisation routes they mean "not reachable through that one" */
 const ACCESS_DENIED_CODES = ['APP_006', 'APP_007'];
-
-const TOO_MANY_REQUESTS = 429;
 
 /** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
 const INVALID_GRANT_CODES = ['OAU_003', 'invalid_grant'];

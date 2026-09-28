@@ -17,6 +17,9 @@ import { type FetchLike } from '../interfaces';
  * Declaring the constants
  */
 
+/** Identity's rate limiters answer with this status and a `Retry-After` header */
+export const TOO_MANY_REQUESTS = 429;
+
 /** Mirrors `APIRequest.timeout()`'s positive-finite-milliseconds contract, but as configuration validation rather than a per-call guard */
 export function assertValidTimeout(timeout: number | undefined): void {
   if (timeout === undefined) return;

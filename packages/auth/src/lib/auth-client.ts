@@ -44,7 +44,7 @@ import { PdpClient } from './pdp-client';
 import { assertValidRoleCatalog } from './role-catalog';
 import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
-import { assertValidTimeout, retryAfterSecondsOf, withTimeout } from './transport';
+import { assertValidTimeout, retryAfterSecondsOf, TOO_MANY_REQUESTS, withTimeout } from './transport';
 
 /**
  * Defining types
@@ -107,7 +107,6 @@ const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
 const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
 const UNAUTHORIZED = 401;
-const TOO_MANY_REQUESTS = 429;
 
 /** A 401 is identity refusing this application's own credential, not the key, so it is an outage from the bot's point of view; a 429 never reaches here */
 const isBotKeyRejection = (status: number): boolean => status >= 400 && status < 500 && status !== UNAUTHORIZED;

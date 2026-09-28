@@ -9,7 +9,7 @@ import { Logger, utils } from '@shadow-library/common';
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
-import { isThrottled, retryAfterHint, retryAfterSecondsOf } from './transport';
+import { isThrottled, retryAfterHint, retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
 
 /**
  * Defining types
@@ -62,7 +62,6 @@ const DEFAULT_MAX_ENTRIES = 1000;
 const THROTTLE_RETRIES = 1;
 const THROTTLE_MAX_WAIT_SECONDS = 1;
 const THROTTLE_JITTER_MS = 250;
-const TOO_MANY_REQUESTS = 429;
 
 export class PdpClient {
   private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
