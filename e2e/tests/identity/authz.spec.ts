@@ -214,8 +214,7 @@ test.describe('identity authz — policy decisions', () => {
     expect((await app.check(request)).status(), 'the application’s own caller is still admitted').toBe(200);
   });
 
-  test.fixme('should reject a check whose organisation id is not an organisation id', async ({ identity }) => {
-    // `CheckRequestBody.organisationId` is an unconstrained string (authz.dto.ts:11-12) and `resolveRoleIds` opens with an unguarded `BigInt` (policy-decision.service.ts:195), unlike the bot path's `isNumericId` guard (policy-decision.service.ts:108), so identity answers 500.
+  test('should reject a check whose organisation id is not an organisation id', async ({ identity }) => {
     const ctx = await identity.anonymous();
     const app = await authzApp(identity, ctx, 'pdp-malformed');
     await app.syncOrThrow(readerManifest());
@@ -226,6 +225,9 @@ test.describe('identity authz — policy decisions', () => {
     await expectErrorCode(refused, 'VALIDATION_ERROR');
     const { fields } = (await refused.json()) as { fields?: { field: string }[] };
     expect(fields?.map(entry => entry.field)).toContain('body.organisationId');
+
+    const valid = await app.check({ principalType: 'USER', principalId: user.userId, organisationId: user.personalOrgId, action: READ });
+    expect(valid.status(), 'the same check with a real organisation id is answered').toBe(200);
   });
 
   test('should keep a grant inside its organisation, deny an ungranted action, and raise authzVersion on assign, org-wide grant and revoke', async ({ identity }) => {
