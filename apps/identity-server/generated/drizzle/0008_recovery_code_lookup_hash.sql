@@ -1,0 +1,1 @@
+ALTER TABLE "recovery_codes" ADD COLUMN "lookup_hash" varchar(64);

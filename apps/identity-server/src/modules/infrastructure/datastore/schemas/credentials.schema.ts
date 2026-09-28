@@ -40,6 +40,8 @@ export const recoveryCodes = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     codeHash: text('code_hash').notNull(),
+    /** Keyed HMAC of the normalised code, so a presented code is argon2-verified against its one match; null for codes issued before it existed */
+    lookupHash: varchar('lookup_hash', { length: 64 }),
     generation: integer('generation').notNull().default(1),
     usedAt: timestamp('used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
