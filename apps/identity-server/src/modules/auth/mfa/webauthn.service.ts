@@ -7,7 +7,7 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
@@ -300,9 +300,9 @@ export class WebauthnService {
   async remove(userId: bigint, credentialId: string): Promise<void> {
     const removed = await this.db
       .delete(schema.webauthnCredentials)
-      .where(eq(schema.webauthnCredentials.credentialId, credentialId))
+      .where(and(eq(schema.webauthnCredentials.credentialId, credentialId), eq(schema.webauthnCredentials.userId, userId)))
       .returning({ userId: schema.webauthnCredentials.userId });
-    if (removed.length === 0 || removed[0]?.userId !== userId) throw AppErrorCode.MFA_001.create();
+    if (removed.length === 0) throw AppErrorCode.MFA_001.create();
 
     await this.auditService.record({ action: 'auth.mfa.webauthn_removed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     await this.notify(userId, DISABLED_TEMPLATE);
