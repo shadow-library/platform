@@ -22,7 +22,7 @@ interface VerifyOptions {
   fix: boolean;
   /** Stop after format + lint, skipping type-check/test — the pre-commit hook's speed budget. */
   fast: boolean;
-  /** Run only the test step, always as `bun test` directly — the fast unit-test dev loop. */
+  /** Run only the test step — the fast unit-test dev loop. */
   unit: boolean;
   /** For an `apps/*` workspace, fail the test step on any test over the 50ms hard cap instead of only warning. */
   ci: boolean;
@@ -61,9 +61,10 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
   --all       verify the root tooling and every workspace, and report a combined result
   --fix       apply prettier and eslint fixes in place instead of only reporting
   --fast      stop after format + lint, skipping type-check and test
-  --unit      run only the test step, always as "bun test" (ignores any package.json "test" script) —
-              skips format/lint/type-check; combine with --all to run every opted-in workspace;
-              incompatible with --fix and --fast
+  --unit      run only the test step — "bun test" directly for apps/* (ignoring any package.json "test"
+              script), the workspace's own "test" script elsewhere when it defines one (packages that
+              need "bun test --isolate" or vitest) — skips format/lint/type-check; combine with --all to
+              run every opted-in workspace; incompatible with --fix and --fast
   --ci        for an apps/* workspace, fail the test step when a test exceeds the 50ms hard cap, listing
               offenders — without it, a test over budget only warns; applies to --unit and to the normal
               test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
@@ -215,9 +216,10 @@ function runTest(target: VerifyTarget, ci: boolean): boolean {
 }
 
 /**
- * The `--unit` dev loop: only the test step, always as `bun test` directly — a workspace's own `test`
- * script (e.g. a composed `test:unit && test:integration`) is bypassed on purpose, since those aren't
- * the fast, DB-free unit run this flag exists for.
+ * The `--unit` dev loop: only the test step. An `apps/*` workspace always runs `bun test` directly, bypassing
+ * any composed `test` script, since only that is the fast, DB-free unit run this flag exists for. Any other
+ * workspace runs its own `test` script when it has one, because that script is how the package runs at all:
+ * `packages/fastify`'s specs leak `mock.module` across files without `--isolate`, and `packages/ui` is vitest.
  */
 function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
   log.info(`\nverifying ${target.dir} (unit)`);
@@ -227,7 +229,7 @@ function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
     return true;
   }
 
-  return runBunTestWithBudget(target, ci);
+  return target.dir.startsWith('apps/') ? runBunTestWithBudget(target, ci) : runTest(target, ci);
 }
 
 /**

@@ -15,8 +15,9 @@ Load this when writing or changing tests in any `apps/*`/`packages/*` workspace.
   `package.json` `"shadow"` key if unsure). Workspaces carry **no** `type-check` package.json script either
   — `verify` runs `tsc` directly against the workspace's own `tsconfig.json`, unconditionally, for every
   workspace.
-- Fast dev loop: `bun scripts/verify.ts <workspace> --unit` runs only the test step — always `bun test`
-  directly (a workspace's own `test` script, e.g. a composed sequence, is bypassed on purpose) — skipping
+- Fast dev loop: `bun scripts/verify.ts <workspace> --unit` runs only the test step — `bun test` directly
+  for `apps/*` (a workspace's own `test` script, e.g. a composed sequence, is bypassed on purpose), and a
+  package's own `test` script when it has one (`bun test --isolate`, vitest) — skipping
   format/lint/type-check. Seconds, not the full verify; run it only for the workspace you're changing.
   `--ci` (composable with `--unit` or the full verify) fails an `apps/*` workspace's test step on any test
   over the 50ms hard cap instead of only warning; CI always passes it.
