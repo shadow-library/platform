@@ -3,13 +3,14 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import { type APIRequestContext } from '@playwright/test';
+import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
  * Importing user defined packages
  */
 import {
   CLUSTER_HOST_CANDIDATES,
+  type ConfigKeysProbe,
   fetchJwks,
   type HostReceiver,
   identityDb,
@@ -17,8 +18,10 @@ import {
   type IdentitySession,
   type IdentityUser,
   mintRefreshToken,
+  OAUTH_REDIRECT_URI,
   type OAuthApplication,
   type OAuthTestClient,
+  probeConfigKeys,
   registerOAuthClient,
   requireProductUrl,
   startHostReceiver,
@@ -26,6 +29,7 @@ import {
   waitUntil,
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
+import { expectRefused } from './helpers';
 
 /**
  * Defining types
@@ -54,14 +58,19 @@ interface SignedInUser {
  * Declaring the constants
  *
  * OIDC back-channel logout: ending a session makes identity POST a signed logout token to every client that holds a refresh
- * token for it. The relying party is a real HTTP server on this host, which pods can reach because the delivery `fetch` is
- * unguarded — the SSRF guard that protects webhook delivery is not applied here. Which name reaches the host from inside the
- * cluster varies by container runtime, so the first test that needs one queues a delivery per candidate and keeps whichever
- * one actually arrives.
+ * token for it. Identity runs every logout URI through the webhook SSRF guard, at registration and again before delivery, so
+ * a receiver on this host — plain http, on a private or `.internal` address — is refused unless the deployment sets
+ * `WEBHOOKS_ALLOW_INSECURE_TARGETS` for both identity-server (registration) and identity-worker (delivery). Where the guard is
+ * strict, which is how dev runs, only the refusal and the https registration beside it are testable; the delivery tests run
+ * only in an environment of their own with the flag set. There, which name reaches the host from inside the cluster varies by
+ * container runtime, so the first test that needs one queues a delivery per candidate and keeps whichever one actually arrives.
  *
  * The retry ladder is minutes long by design, so the dead-letter walk fast-forwards `next_attempt_at` in the database between
  * the worker's five-second ticks rather than waiting it out.
  */
+
+const INSECURE_TARGETS_KEY = 'WEBHOOKS_ALLOW_INSECURE_TARGETS';
+const PUBLIC_LOGOUT_URI = 'https://rp.example.com/backchannel-logout';
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;
 const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
@@ -69,6 +78,45 @@ const PROBE_PATH = '/bcl-probe';
 
 let receiver: HostReceiver;
 let clusterHost: Promise<string> | undefined;
+let insecureTargets: ConfigKeysProbe;
+
+/** The flag counts only when both the component that registers and the one that delivers read it. */
+async function probeInsecureTargets(): Promise<ConfigKeysProbe> {
+  const probes = await Promise.all(
+    (['server', 'worker'] as const).map(component =>
+      probeConfigKeys(
+        'identity',
+        [
+          ['configmap', 'cluster-config'],
+          ['configmap', 'common-config'],
+          ['configmap', `identity-${component}-config`],
+          ['secret', 'common-secrets'],
+          ['secret', `identity-${component}-secrets`],
+        ],
+        [INSECURE_TARGETS_KEY],
+      ),
+    ),
+  );
+  return { configured: probes.every(probe => probe.configured), probeFailed: probes.some(probe => probe.probeFailed) };
+}
+
+function registerClient(admin: APIRequestContext, application: OAuthApplication, clientId: string, backchannelLogoutUri: string): Promise<APIResponse> {
+  return identityMutate(admin, 'post', '/api/v1/admin/clients', {
+    clientId,
+    applicationId: application.applicationId,
+    name: `${clientId} client`,
+    kind: 'SPA_PUBLIC',
+    isFirstParty: true,
+    redirectUris: [OAUTH_REDIRECT_URI],
+    grantTypes: ['authorization_code', 'refresh_token'],
+    backchannelLogoutUri,
+  });
+}
+
+async function storedLogoutUris(clientId: string): Promise<(string | null)[]> {
+  const rows = await identityDb()<{ uri: string | null }[]>`SELECT backchannel_logout_uri AS uri FROM oauth_clients WHERE id = ${clientId}`;
+  return rows.map(row => row.uri);
+}
 
 function tag(): string {
   return `e2e${randomBytes(3).toString('hex')}`;
@@ -144,6 +192,7 @@ function clusterHostFor(identity: IdentityHarness): Promise<string> {
 }
 
 test.beforeAll(async () => {
+  insecureTargets = await probeInsecureTargets();
   receiver = await startHostReceiver();
 });
 
@@ -151,7 +200,54 @@ test.afterAll(async () => {
   await receiver?.close();
 });
 
-test.describe('identity back-channel logout', () => {
+test.describe('identity back-channel logout — the SSRF guard', () => {
+  test.beforeEach(() => {
+    test.skip(insecureTargets.probeFailed, 'could not read identity config from the cluster');
+    test.skip(insecureTargets.configured, `${INSECURE_TARGETS_KEY} is set here, so identity accepts the URIs this test expects refused`);
+  });
+
+  test('should refuse a plain-http, private or credentialed logout URI on registration and update, and accept a public https one', async ({ identity }) => {
+    const admin = (await identity.admin()).ctx;
+    const application = await identity.createOAuthApp('bcl-guard');
+    const refusedUris = [
+      receiver.urlFor(CLUSTER_HOST_CANDIDATES[0] ?? 'host.k3d.internal', '/bcl'),
+      'http://rp.example.com/backchannel-logout',
+      'https://127.0.0.1/bcl',
+      'https://10.0.0.1/bcl',
+      'https://localhost/bcl',
+      'https://host.k3d.internal/bcl',
+      'https://user:secret@rp.example.com/bcl',
+    ];
+
+    for (const [index, uri] of refusedUris.entries()) {
+      const clientId = `${application.name}-refused${index}`;
+      await expectRefused(await registerClient(admin, application, clientId, uri), 400, 'ADM_003', `registering ${uri}`);
+      expect(await storedLogoutUris(clientId), `no client was created for ${uri}`).toEqual([]);
+    }
+
+    const clientId = `${application.name}-rp`;
+    const registered = await registerClient(admin, application, clientId, PUBLIC_LOGOUT_URI);
+    expect(registered.status(), await registered.text()).toBe(201);
+    expect(await storedLogoutUris(clientId)).toEqual([PUBLIC_LOGOUT_URI]);
+
+    for (const uri of refusedUris) {
+      await expectRefused(await identityMutate(admin, 'patch', `/api/v1/admin/clients/${clientId}`, { backchannelLogoutUri: uri }), 400, 'ADM_003', `updating to ${uri}`);
+    }
+    expect(await storedLogoutUris(clientId), 'no refused update was written').toEqual([PUBLIC_LOGOUT_URI]);
+
+    const moved = 'https://rp.example.com/logout/backchannel';
+    const updated = await identityMutate(admin, 'patch', `/api/v1/admin/clients/${clientId}`, { backchannelLogoutUri: moved });
+    expect(updated.status(), await updated.text()).toBe(200);
+    expect(await storedLogoutUris(clientId)).toEqual([moved]);
+  });
+});
+
+test.describe('identity back-channel logout — delivery', () => {
+  test.beforeEach(() => {
+    test.skip(insecureTargets.probeFailed, 'could not read identity config from the cluster');
+    test.skip(!insecureTargets.configured, `identity refuses a receiver on this host unless ${INSECURE_TARGETS_KEY} is set for identity-server and identity-worker`);
+  });
+
   test('should deliver a verifiable logout token to every client holding a refresh token for the session', async ({ identity }) => {
     const application = await identity.createOAuthApp('bcl-send');
     const path = `/bcl/${tag()}`;
