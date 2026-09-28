@@ -19,10 +19,17 @@ import { type CSRFCookie, type CSRFOptions } from './csrf-token.types';
  * Defining types
  */
 
+type InvalidCookieReason = 'missing' | 'invalid' | 'expired';
+
 interface CSRFTokenValidationResult {
   isValid: boolean;
-  reason?: 'missing' | 'invalid' | 'expired' | 'mismatch';
+  reason?: InvalidCookieReason | 'mismatch';
   shouldRefresh?: boolean;
+}
+
+interface ParsedCSRFCookie {
+  token: string;
+  expiresAt: number;
 }
 
 /**
@@ -50,6 +57,13 @@ export class CSRFTokenService {
     };
   }
 
+  /** Checks the cookie alone; safe methods never carry the header, so only a missing, malformed or expiring cookie needs re-issuing. */
+  inspectCookie(request: HttpRequest): CSRFTokenValidationResult {
+    const cookie = this.parseCookie(request);
+    if ('reason' in cookie) return { isValid: false, reason: cookie.reason };
+    return { isValid: true, shouldRefresh: this.shouldRefresh(cookie.expiresAt) };
+  }
+
   validateToken(request: HttpRequest): CSRFTokenValidationResult {
     const headerToken = request.headers[this.options.headerName];
     if (!headerToken || Array.isArray(headerToken)) {
@@ -57,36 +71,45 @@ export class CSRFTokenService {
       return { isValid: false };
     }
 
+    const cookie = this.parseCookie(request);
+    if ('reason' in cookie) return { isValid: false, reason: cookie.reason };
+
+    if (headerToken !== cookie.token) {
+      this.logger.warn('CSRF token mismatch', { headerToken, cookieToken: cookie.token });
+      return { isValid: false, reason: 'mismatch' };
+    }
+
+    const shouldRefresh = this.shouldRefresh(cookie.expiresAt);
+    this.logger.debug('CSRF token verified successfully', { expiresAt: cookie.expiresAt, shouldRefresh, csrfCookie: request.cookies[this.options.cookieName] });
+    return { isValid: true, shouldRefresh };
+  }
+
+  private parseCookie(request: HttpRequest): ParsedCSRFCookie | { reason: InvalidCookieReason } {
     const csrfCookie = request.cookies[this.options.cookieName];
     if (!csrfCookie) {
       this.logger.debug('No CSRF token found in cookies');
-      return { isValid: false, reason: 'missing' };
+      return { reason: 'missing' };
     }
-    const [expiryTime, cookieToken] = csrfCookie.split(':');
-    if (!expiryTime || !cookieToken) {
-      this.logger.warn('Invalid CSRF token found in cookies', { expiryTime, cookieToken });
-      return { isValid: false, reason: 'invalid' };
+    const [expiryTime, token] = csrfCookie.split(':');
+    if (!expiryTime || !token) {
+      this.logger.warn('Invalid CSRF token found in cookies', { expiryTime, cookieToken: token });
+      return { reason: 'invalid' };
     }
 
     const expiresAt = parseInt(expiryTime, this.options.tokenRadix);
     if (isNaN(expiresAt)) {
       this.logger.warn('Invalid CSRF token expiry time', { expiryTime });
-      return { isValid: false, reason: 'invalid' };
+      return { reason: 'invalid' };
     }
     if (Date.now() > expiresAt) {
       this.logger.debug('CSRF token has expired', { expiresAt });
-      return { isValid: false, reason: 'expired' };
+      return { reason: 'expired' };
     }
 
-    if (headerToken !== cookieToken) {
-      this.logger.warn('CSRF token mismatch', { headerToken, cookieToken });
-      return { isValid: false, reason: 'mismatch' };
-    }
+    return { token, expiresAt };
+  }
 
-    const refreshTime = DateTime.fromMillis(expiresAt).minus(this.options.refreshLeeway).toMillis();
-    const shouldRefresh = refreshTime < Date.now();
-
-    this.logger.debug('CSRF token verified successfully', { expiresAt, shouldRefresh, csrfCookie });
-    return { isValid: true, shouldRefresh };
+  private shouldRefresh(expiresAt: number): boolean {
+    return DateTime.fromMillis(expiresAt).minus(this.options.refreshLeeway).toMillis() < Date.now();
   }
 }

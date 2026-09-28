@@ -41,8 +41,8 @@ export class CsrfProtectionMiddleware implements MiddlewareGenerator {
       if (!this.hasCookies(request.cookies)) return;
       if (!Config.isProd() && !isCSRFEnabled) return;
 
-      const result = this.csrfTokenService.validateToken(request);
       const isMutation = request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS';
+      const result = isMutation ? this.csrfTokenService.validateToken(request) : this.csrfTokenService.inspectCookie(request);
 
       if (isMutation && !result.isValid) throw ServerErrorCode.S010.create();
       if (!result.isValid || result.shouldRefresh) {

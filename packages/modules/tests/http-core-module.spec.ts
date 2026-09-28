@@ -176,6 +176,40 @@ describe('HttpCore Module', () => {
       expectCSRFCookie(response);
     });
 
+    it('should keep a healthy CSRF cookie on a GET that carries no header', async () => {
+      const csrf = generateCSRFToken(5000);
+      const response = await router.mockRequest().get('/api/test').cookies({ 'csrf-token': csrf.cookieToken });
+      expect(response.statusCode).toBe(200);
+      expect(response.cookies.find(c => c.name === 'csrf-token')).toBeUndefined();
+    });
+
+    it('should keep a healthy CSRF cookie on a GET whose header does not match it', async () => {
+      const csrf = generateCSRFToken(5000);
+      const response = await router.mockRequest().get('/api/test').headers({ 'x-csrf-token': 'stale' }).cookies({ 'csrf-token': csrf.cookieToken });
+      expect(response.statusCode).toBe(200);
+      expect(response.cookies.find(c => c.name === 'csrf-token')).toBeUndefined();
+    });
+
+    it('should re-issue a malformed CSRF cookie on a GET', async () => {
+      const response = await router.mockRequest().get('/api/test').cookies({ 'csrf-token': 'malformed' });
+      expect(response.statusCode).toBe(200);
+      expectCSRFCookie(response);
+    });
+
+    it('should re-issue a CSRF cookie close to expiry on a GET that carries no header', async () => {
+      const csrf = generateCSRFToken(500);
+      const response = await router.mockRequest().get('/api/test').cookies({ 'csrf-token': csrf.cookieToken });
+      expect(response.statusCode).toBe(200);
+      expectCSRFCookie(response);
+    });
+
+    it('should keep the CSRF cookie on a valid POST far from expiry', async () => {
+      const csrf = generateCSRFToken(5000);
+      const response = await router.mockRequest().post('/api/action').headers({ 'x-csrf-token': csrf.token }).cookies({ 'csrf-token': csrf.cookieToken });
+      expect(response.statusCode).toBe(200);
+      expect(response.cookies.find(c => c.name === 'csrf-token')).toBeUndefined();
+    });
+
     describe('when CSRF is disabled', () => {
       let disabledApp: ShadowApplication;
       let disabledRouter: FastifyRouter;
@@ -355,6 +389,22 @@ describe('HttpCore Module', () => {
 
         expect(result.isValid).toBe(true);
         expect(result.shouldRefresh).toBe(true);
+      });
+
+      it('should report a healthy cookie as valid without consulting the header', () => {
+        const farFromExpiry = (Date.now() + 5000).toString(36);
+        const request = { headers: {}, cookies: { 'csrf-token': `${farFromExpiry}:token` } } as any;
+
+        expect(csrfTokenService.inspectCookie(request)).toStrictEqual({ isValid: true, shouldRefresh: false });
+      });
+
+      it('should report a missing, malformed or expired cookie as invalid', () => {
+        const expiredTime = (Date.now() - 10000).toString(36);
+        const inspect = (cookie?: string) => csrfTokenService.inspectCookie({ headers: {}, cookies: cookie ? { 'csrf-token': cookie } : {} } as any);
+
+        expect(inspect()).toStrictEqual({ isValid: false, reason: 'missing' });
+        expect(inspect('malformed')).toStrictEqual({ isValid: false, reason: 'invalid' });
+        expect(inspect(`${expiredTime}:token`)).toStrictEqual({ isValid: false, reason: 'expired' });
       });
 
       it('should set shouldRefresh to false when token is not close to expiry', () => {
