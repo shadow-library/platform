@@ -305,7 +305,7 @@ test.describe('identity OAuth — authorization code flow', () => {
 });
 
 test.describe('identity OAuth — refresh tokens', () => {
-  test('should rotate a refresh token and, on replay of the superseded one, revoke the family and its session', async ({ identity }) => {
+  test('should rotate a refresh token and, on replay of the superseded one after the grace window, revoke the family and its session', async ({ identity }) => {
     const application = await identity.createOAuthApp('refresh-reuse');
     const client = await registerOAuthClient((await identity.admin()).ctx, application);
     const user = await identity.createUser({ label: 'refresh-reuse' });
@@ -321,6 +321,7 @@ test.describe('identity OAuth — refresh tokens', () => {
     expect(second).toBeTruthy();
     expect(second).not.toBe(first);
 
+    await identityDb()`UPDATE refresh_tokens SET rotated_at = rotated_at - interval '1 minute' WHERE token_hash = ${sha256(first)}`;
     await expectTokenError(await refreshGrant(tokenCtx, client, first), 400, 'invalid_grant');
     await expectTokenError(await refreshGrant(tokenCtx, client, second), 400, 'invalid_grant');
 
@@ -333,6 +334,25 @@ test.describe('identity OAuth — refresh tokens', () => {
       SELECT outcome, actor_id AS "actorId" FROM audit_events WHERE action = 'security.token_reuse' AND target_id = ${family.id}
     `;
     expect(audits).toEqual([{ outcome: 'FAILURE', actorId: user.userId }]);
+  });
+
+  test('should refuse a same-client replay inside the rotation grace window without revoking the family', async ({ identity }) => {
+    const application = await identity.createOAuthApp('refresh-grace');
+    const client = await registerOAuthClient((await identity.admin()).ctx, application);
+    const user = await identity.createUser({ label: 'refresh-grace' });
+    const { session, ctx } = await identity.signIn(user);
+    const tokenCtx = await identity.anonymous();
+    const { refreshToken: first } = await issueTokens(ctx, tokenCtx, client);
+    const second = (await tokenBody(await refreshGrant(tokenCtx, client, first))).refresh_token ?? '';
+    expect(second).toBeTruthy();
+
+    await expectTokenError(await refreshGrant(tokenCtx, client, first), 400, 'invalid_grant');
+    const family = await onlyFamily(client.clientId, user.userId);
+    expect(family, 'a duplicate of a rotation that just happened is not reuse').toMatchObject({ status: 'ACTIVE', revokeReason: null });
+    expect(await readSessionStatus(session.sessionId)).toBe('ACTIVE');
+
+    const rotated = await refreshGrant(tokenCtx, client, second);
+    expect(rotated.status(), 'the token the rotation handed out still rotates').toBe(200);
   });
 
   test('should refuse a refresh token presented by another client without consuming it', async ({ identity }) => {
