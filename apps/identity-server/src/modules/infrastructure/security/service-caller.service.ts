@@ -11,10 +11,20 @@ const BEARER_PREFIX = 'Bearer ';
 @Injectable()
 export class ServiceCallerService {
   private readonly issuer = Config.get('oauth.issuer');
+  private readonly callers = new WeakMap<FastifyRequest, string | null>();
 
   constructor(private readonly keyService: KeyService) {}
 
+  /** Both rate-limit hooks ask about the same request, so its bearer is verified once and the answer kept for the request's lifetime */
   clientIdOf(request: FastifyRequest): string | null {
+    const known = this.callers.get(request);
+    if (known !== undefined) return known;
+    const clientId = this.verifiedClientId(request);
+    this.callers.set(request, clientId);
+    return clientId;
+  }
+
+  private verifiedClientId(request: FastifyRequest): string | null {
     const header = request.headers.authorization;
     if (typeof header !== 'string' || !header.startsWith(BEARER_PREFIX)) return null;
 

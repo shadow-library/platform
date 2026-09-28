@@ -56,6 +56,7 @@ describe('RateLimitMiddleware budget selection', () => {
   let redis: InMemoryRedis;
   let onRequest: RateLimitMiddleware;
   let onResponse: M2MRateLimitMiddleware;
+  let verifications = 0;
 
   const counter = async (bucket: string, key: string): Promise<number> => Number((await redis.get(`rl:${bucket}:${key}`)) ?? 0);
   const spend = (bucket: string, key: string, count: number): Promise<unknown> => redis.set(`rl:${bucket}:${key}`, String(count), 'EX', 30);
@@ -66,7 +67,8 @@ describe('RateLimitMiddleware budget selection', () => {
     setConfig({ 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '', 'oauth.issuer': ISSUER });
     redis = new InMemoryRedis();
     const rateLimiter = new RateLimiterService(new FakeDatabaseService({ redis }));
-    const keyService = { verify: (token: string) => TOKENS[token] ?? null } as unknown as KeyService;
+    verifications = 0;
+    const keyService = { verify: (token: string) => (verifications++, TOKENS[token] ?? null) } as unknown as KeyService;
     const serviceCaller = new ServiceCallerService(keyService);
     onRequest = new RateLimitMiddleware(rateLimiter, serviceCaller);
     onResponse = new M2MRateLimitMiddleware(rateLimiter, serviceCaller);
@@ -120,5 +122,15 @@ describe('RateLimitMiddleware budget selection', () => {
     await charge(undefined, 401);
     await charge('user', 403);
     expect(await counter(IP_GENERAL_BUCKET, POD_IP)).toBe(2);
+  });
+
+  it('should verify a bearer once per request however many hooks ask about its caller', async () => {
+    const serviceRequest = requestFrom('service');
+    const reply = replyWith(403);
+
+    await onRequest.generate(M2M_ROUTE)(serviceRequest, reply as unknown as FastifyReply);
+    await onResponse.generate(M2M_ROUTE)?.(serviceRequest, reply as unknown as FastifyReply);
+
+    expect(verifications).toBe(1);
   });
 });
