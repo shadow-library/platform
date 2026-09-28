@@ -173,7 +173,7 @@ export class RefreshTokenService {
         .set({ status: 'ROTATED', rotatedAt: new Date() })
         .where(and(eq(schema.refreshTokens.id, presented.id), eq(schema.refreshTokens.status, 'ACTIVE')))
         .returning({ id: schema.refreshTokens.id });
-      if (consumed.length === 0) throw new RefreshTokenReuseError();
+      if (consumed.length === 0) return null;
       const token = await tx
         .insert(schema.refreshTokens)
         .values({
@@ -188,6 +188,11 @@ export class RefreshTokenService {
         .then(([row]) => row ?? throwError(AppError.internal('Failed to rotate refresh token')));
       return token.id;
     });
+    if (tokenId === null) {
+      this.logger.warn('refresh token rotation rejected: a concurrent use of the same token rotated it first', { securityEvent: 'security.token_reuse', familyId: family.id });
+      await this.revokeFamily(family.id, 'ROTATION_REUSE');
+      throw new RefreshTokenReuseError();
+    }
     this.logger.debug('rotated refresh token', { userId: family.userId, familyId: family.id });
     return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
