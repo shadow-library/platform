@@ -49,8 +49,8 @@ interface NovelManifest {
  * A novel import is one transaction that creates the project, its volumes and placeholder bible, and enqueues an `import` job, which the job
  * executor runs without any model: it lands the chapters and stores the cover. Only the final progress is asserted — each batch overwrites the
  * row's progress in place, and job events are recorded only for chat-started jobs (job.service.ts:339-341). Each malformed bundle is refused
- * before any project exists. The `.novel` export reads the same project back as a zip. GET `/jobs/:id` answers 500 for every job (job.service.ts:410,
- * parked), so the job's redacted payload is read from the forge's own row.
+ * before any project exists. The `.novel` export reads the same project back as a zip. What an import job keeps of the bundle is read from its
+ * stored row, which is where the property lives.
  */
 
 const COVER: BundleCover = { name: 'cover-art', mimeType: 'image/png', bytes: solidPng(180, 40, 60) };

@@ -122,8 +122,7 @@ test.describe('novel-forge organisation sharing', () => {
     });
   });
 
-  // The job list 500s whenever it holds a job (job.service.ts:410, fixme'd for the owner in jobs.spec.ts); this one holds the curator's reach once that is fixed.
-  test.fixme("should list an org-shared project's jobs to its curator", async ({ forge }) => {
+  test("should list an org-shared project's jobs to its curator", async ({ forge }) => {
     const team = await forge.team('share-jobs');
     const curator = await forge.actor({ label: 'jobs-curator', organisation: team, roles: ['NovelForgeCurator'] });
     const shared = await insertProject({ owner: { kind: 'bot', id: strayBotId() }, organisationId: team.organisationId });
@@ -135,8 +134,7 @@ test.describe('novel-forge organisation sharing', () => {
     expect(((await jobs.json()) as { items: { id: string }[] }).items.map(job => job.id)).toContain(jobId);
   });
 
-  // jobs.controller.ts:27 scopes GET /jobs/:jobId through job.service.ts:312 getForOwner, which has no curator branch: 404 JOB_001 today.
-  test.fixme('should let a curator read a job of a project shared with them by its id', async ({ forge }) => {
+  test('should let a curator read a job of a project shared with them by its id', async ({ forge }) => {
     const team = await forge.team('share-job-id');
     const curator = await forge.actor({ label: 'job-id-curator', organisation: team, roles: ['NovelForgeCurator'] });
     const shared = await insertProject({ owner: { kind: 'bot', id: strayBotId() }, organisationId: team.organisationId });

@@ -150,8 +150,7 @@ test.describe('novel-forge background jobs', () => {
     await expectCancel(owner.ctx, projectId, jobId, 'cancelled', 'cancelled', 'the owner through its own project');
   });
 
-  // job.service.ts:410 usageForJobs joins uuid workflow_runs.id to varchar model_calls.run_id, which Postgres refuses at plan time: both reads 500 whenever there is a job to report.
-  test.fixme("should read a job of its own project by id and in the project's job list", async ({ forge }) => {
+  test("should read a job of its own project by id and in the project's job list", async ({ forge }) => {
     const owner = await forge.actor({ label: 'jobs-read' });
     const projectId = await newProject(owner, 'jobs-read');
     const jobId = await reindexJob(projectId, 'e2e-read', 'pending');

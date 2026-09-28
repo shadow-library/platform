@@ -296,10 +296,7 @@ export async function approveChapter(ctx: APIRequestContext, projectId: string, 
   });
 }
 
-/**
- * Waits for a job to settle, read from the forge's own table: `GET /api/v1/jobs/:id` and the project job list answer 500 for any job, because
- * `usageForJobs` joins uuid `workflow_runs.id` to varchar `model_calls.run_id` (`job.service.ts:410`), which Postgres refuses at plan time.
- */
+/** Waits for a job to settle, read from the forge's own table so a caller needs no context that can read the job. */
 export async function pollJobStatus(jobId: string, timeoutMs = JOB_SETTLE_TIMEOUT_MS): Promise<ForgeJob> {
   const job = await pollUntil(
     async () => (await novelForgeDb()<ForgeJob[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`)[0],
