@@ -11,6 +11,8 @@ const SWEEP_INTERVAL_MS = 86_400_000;
 /** LangGraph's PostgresSaver tables, keyed by `thread_id` (a workflow run's id) and absent from the Drizzle schema. */
 const CHECKPOINT_TABLES = ['checkpoints', 'checkpoint_writes', 'checkpoint_blobs'];
 
+const ORPHAN_BATCH = 200;
+
 @Injectable()
 export class CheckpointJanitor {
   private readonly logger = Logger.getLogger(APP_NAME, CheckpointJanitor.name);
@@ -21,8 +23,8 @@ export class CheckpointJanitor {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.sweep();
+  onModuleInit(): void {
+    void this.sweep();
     this.timer = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
     this.timer.unref?.();
   }
@@ -38,7 +40,11 @@ export class CheckpointJanitor {
       return 0;
     });
     if (purged > 0) this.logger.info(`Checkpoint janitor: purged ${purged} stale workflow run(s)`);
-    await this.purgeOrphans(this.db).catch(err => this.logger.warn('Checkpoint janitor orphan purge failed', { err }));
+    const orphans = await this.purgeOrphans(this.db).catch(err => {
+      this.logger.warn('Checkpoint janitor orphan purge failed', { err });
+      return 0;
+    });
+    if (orphans > 0) this.logger.info(`Checkpoint janitor: purged ${orphans} orphaned checkpoint thread(s)`);
     await this.purgeJobEvents(this.db).catch(err => this.logger.warn('Job event retention sweep failed', { err }));
   }
 
@@ -73,12 +79,27 @@ export class CheckpointJanitor {
 
   /**
    * Threads whose run row is gone, cascaded away with its project, which the settled purge can never match. A run's row commits
-   * before its graph writes the first checkpoint, so a thread with no row is never a live one.
+   * before its graph writes the first checkpoint, so a thread with no row is never a live one. Deleted a bounded batch of threads at a
+   * time, per table, so a first purge of a long backlog never holds one long statement.
    */
-  async purgeOrphans(db: PrimaryDatabase): Promise<void> {
+  async purgeOrphans(db: PrimaryDatabase): Promise<number> {
+    let purged = 0;
     for (const table of CHECKPOINT_TABLES) {
-      const threadId = sql.raw(`${table}.thread_id`);
-      await db.execute(sql`DELETE FROM ${sql.raw(table)} WHERE NOT EXISTS (select 1 from ${schema.workflowRuns} where ${schema.workflowRuns.id}::text = ${threadId})`);
+      for (;;) {
+        const threadId = sql.raw(`${table}.thread_id`);
+        const rows = await db.execute<{ thread_id: string }>(
+          sql`select distinct thread_id from ${sql.raw(table)} where not exists (select 1 from ${schema.workflowRuns} where ${schema.workflowRuns.id}::text = ${threadId}) limit ${ORPHAN_BATCH}`,
+        );
+        if (rows.length === 0) break;
+        const threads = sql.join(
+          rows.map(row => sql`${row.thread_id}`),
+          sql`, `,
+        );
+        for (const target of CHECKPOINT_TABLES) await db.execute(sql`DELETE FROM ${sql.raw(target)} WHERE thread_id IN (${threads})`);
+        purged += rows.length;
+        if (rows.length < ORPHAN_BATCH) break;
+      }
     }
+    return purged;
   }
 }
