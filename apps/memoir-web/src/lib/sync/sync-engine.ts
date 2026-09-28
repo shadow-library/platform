@@ -39,6 +39,8 @@ export interface SyncEngineOptions {
   onAccountChanged?: () => void;
   /** How long a claimed outcome is waited for before the claim answers `unconfirmed` and lets the outcome arrive as a notice instead. */
   outcomeTimeoutMs?: number;
+  /** The waits before each automatic retry of a pass that failed in a way a resend can clear; once spent, the next pass waits for the owner, a reconnect or a new command. */
+  retryDelaysMs?: readonly number[];
 }
 
 export interface SyncPassOptions {
@@ -74,6 +76,8 @@ interface OutcomeClaim {
 
 const DEFAULT_MAX_PAGES = 50;
 const DEFAULT_OUTCOME_TIMEOUT_MS = 8_000;
+const DEFAULT_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+const TOO_MANY_REQUESTS = 429;
 const MAX_PULL_ROUNDS = 20;
 
 const UNKNOWN_DOMAIN_CODE = 'SYN_001';
@@ -120,6 +124,13 @@ function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
+/** A refused CSRF token, a busy or failing server and an unreachable one can all clear on their own; a dead session, a deletion or a malformed request cannot. */
+function isRetryable(error: unknown): boolean {
+  if (!(error instanceof SyncTransportError)) return false;
+  if (error.kind === 'offline') return isOnline();
+  return error.kind === 'forbidden' || error.kind === 'server' || error.status === TOO_MANY_REQUESTS;
+}
+
 /** The wire envelope, without the fields that exist only to order and settle the local queue. */
 function toEnvelope(entry: OutboxEntry): CommandEnvelope {
   return { commandId: entry.commandId, type: entry.type, payload: entry.payload, performedAt: entry.performedAt, localDate: entry.localDate, deviceId: entry.deviceId };
@@ -162,6 +173,9 @@ export class SyncEngine {
   private followUp: FollowUpPass | null = null;
   private passRequested = false;
   private readonly claims = new Map<string, OutcomeClaim>();
+  private readonly retryDelaysMs: readonly number[];
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retriesSpent = 0;
   /** Domains the server refused this session; they are neither requested again nor ever recorded as covered. */
   private readonly unserved = new Set<SyncDomain>();
   /** Domains whose last answer was a refusal. Only a domain that was served before its refusal withdraws coverage, so a periodic retry refused again changes nothing. */
@@ -173,6 +187,7 @@ export class SyncEngine {
     this.store = options.store;
     this.client = options.client ?? new SyncClient();
     this.maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+    this.retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
     this.deviceId = options.deviceId;
     this.outbox = new Outbox(this.store, { deviceId: this.deviceId });
   }
@@ -241,6 +256,8 @@ export class SyncEngine {
   stop(): void {
     this.passRequested = false;
     this.followUp = null;
+    this.cancelRetry();
+    this.retriesSpent = 0;
     this.store.close();
     this.settleClaims({ status: 'unconfirmed', reason: 'slow' });
   }
@@ -378,6 +395,7 @@ export class SyncEngine {
   }
 
   private async runSync({ background = false }: SyncPassOptions): Promise<void> {
+    this.cancelRetry();
     if (!isOnline()) return this.markOffline();
 
     this.coldFailure = null;
@@ -397,6 +415,8 @@ export class SyncEngine {
       const state = interrupted || !complete ? 'failed' : 'online';
       this.patch({ state, lastSyncedAt, queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
       this.settleClaims();
+      if (state === 'failed') this.scheduleRetry();
+      else this.retriesSpent = 0;
     } catch (error) {
       await this.handleFailure(error).catch(ignoreAccountBoundary);
     }
@@ -415,6 +435,23 @@ export class SyncEngine {
     this.patch({ state: FAILURE_STATES[reason], queuedCount: await this.outbox.size(), readiness: this.readiness(), sending: [] });
     const held = UNSENDABLE[reason];
     this.settleClaims(held ? { status: 'unconfirmed', reason: held } : undefined);
+    if (isRetryable(error)) this.scheduleRetry();
+  }
+
+  /** One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm. */
+  private scheduleRetry(): void {
+    const delay = this.retryDelaysMs[this.retriesSpent];
+    if (delay === undefined || this.retryTimer) return;
+    this.retriesSpent += 1;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      void this.sync({ background: true });
+    }, delay);
+  }
+
+  private cancelRetry(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
   }
 
   /** A pulled mirror stays readable through any failure except a deletion, which no retry recovers from; that one holds until a pass succeeds. */
