@@ -1,7 +1,7 @@
 type Chain = ((...args: unknown[]) => Chain) & PromiseLike<unknown>;
 
 export interface SerialProbe {
-  /** A query handle standing in for one transaction: every relational read resolves empty on a later macrotask. */
+  /** A query handle standing in for one transaction: every relational read resolves empty on a later microtask. */
   db: unknown;
   /** The most queries that were in flight on the handle at once. */
   peak(): number;
@@ -15,12 +15,10 @@ export function serialProbe(): SerialProbe {
   const settle = <T>(value: T): Promise<T> => {
     inFlight += 1;
     peak = Math.max(peak, inFlight);
-    return new Promise(resolve =>
-      setTimeout(() => {
-        inFlight -= 1;
-        resolve(value);
-      }, 0),
-    );
+    return Promise.resolve().then(() => {
+      inFlight -= 1;
+      return value;
+    });
   };
 
   const chain = (value: unknown): Chain =>

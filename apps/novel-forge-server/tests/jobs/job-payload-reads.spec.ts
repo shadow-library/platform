@@ -42,7 +42,7 @@ function selectingService() {
   return { service: new JobService({ getPostgresClient: () => db } as never, {} as never, {} as never), selects, findFirsts };
 }
 
-describe('JobService reads a running job without its payload', () => {
+describe('JobService.cancellation', () => {
   it('should read only the cancel flag when a running job is polled', async () => {
     const { service, findFirsts } = selectingService();
 
@@ -53,28 +53,30 @@ describe('JobService reads a running job without its payload', () => {
   });
 });
 
-describe('JobService summarises an import bundle in the database for a response', () => {
-  const importSummary = /case when ("jobs"\.)?"kind" = 'import' then jsonb_build_object\(/;
+const IMPORT_SUMMARY = /case when ("jobs"\.)?"kind" = 'import' then jsonb_build_object\(/;
 
+describe('JobService.listByProject', () => {
   it('should list a project jobs with the import payload summarised by Postgres', async () => {
     const { service, selects } = selectingService();
 
     await service.listByProject(1n);
 
-    expect(selects[0]).toMatch(importSummary);
+    expect(selects[0]).toMatch(IMPORT_SUMMARY);
     expect(selects[0]).not.toMatch(/, ("jobs"\.)?"payload", /);
   });
+});
 
+describe('JobService.getWithProject', () => {
   it('should read a job by id with the import payload summarised by Postgres', async () => {
     const { service, selects } = selectingService();
 
     await service.getWithProject('job-1');
 
-    expect(selects[0]).toMatch(importSummary);
+    expect(selects[0]).toMatch(IMPORT_SUMMARY);
   });
 });
 
-describe('JobExecutor polls cancellation without reloading the job', () => {
+describe('JobExecutor.runGenerate — cancellation polling', () => {
   it('should never reread the whole job row between chapters', async () => {
     const get = mock(async () => {
       throw new Error('the job row, payload included, was read again');
