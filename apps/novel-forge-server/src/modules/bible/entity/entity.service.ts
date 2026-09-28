@@ -129,9 +129,19 @@ export class EntityService {
   }
 
   async setImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, depictsChapter?: number): Promise<PresentedEntity> {
+    await this.assertExists(projectId, entityKey);
     const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
     const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
     return this.setImageRef(projectId, entityKey, ref, chapter);
+  }
+
+  // Stored objects are content-addressed and may back other rows, so an upload for an unknown entity is refused before it is saved rather than deleted after.
+  private async assertExists(projectId: bigint, entityKey: string): Promise<void> {
+    const entity = await this.db.query.entities.findFirst({
+      columns: { id: true },
+      where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
+    });
+    if (!entity) throw AppErrorCode.ENT_001.create();
   }
 
   /** Points the portrait at an object already in storage — the path the illustration subsystem takes, since it saved the bytes itself. */
@@ -166,6 +176,7 @@ export class EntityService {
   }
 
   async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string, depictsChapter?: number): Promise<PresentedEntityWithImages> {
+    await this.assertExists(projectId, entityKey);
     const { chapter } = await resolveDepiction(this.db, projectId, depictsChapter, { allowFuture: true });
     const ref = await this.storage.save(new Uint8Array(Buffer.from(image, 'base64')), { contentType: mime });
     return this.addImageRef(projectId, entityKey, ref, chapter, caption);
