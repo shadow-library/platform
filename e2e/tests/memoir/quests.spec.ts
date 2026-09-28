@@ -131,9 +131,7 @@ test.describe('memoir quests', () => {
       });
     });
 
-    test.fixme('should grant first_recovery_completed on the first Recovery completion (app bug: apps/memoir-server/src/modules/quests/compassion-commands.service.ts:42-84 never calls ProgressionService.onRecoveryQuestCompleted, progression.service.ts:140)', async ({
-      memoir,
-    }) => {
+    test('should grant first_recovery_completed on the first Recovery completion', async ({ memoir }) => {
       const rig = await missedAnchorRig(memoir, 'quest-recovery-achievement');
       expectApplied(await submitCommand(rig.ctx, 'recovery.complete', {}));
       expect((await achievementsEarned(rig.accountId)).map(row => row.id)).toContain('first_recovery_completed');
