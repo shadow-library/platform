@@ -361,6 +361,37 @@ describe('Account deletion over the wire', () => {
     expect((await subject.getDeletion()).stage).toEqual({ kind: 'unconfirmed', reason: 'signed-out' });
   });
 
+  it('should pick the flow back up after the sign-in a refused start asks for, rather than leave the owner at a dead end', async () => {
+    const signedOut = { status: 401, body: { code: 'IAM_001', type: 'Unauthorized', message: 'no session' } };
+    let session: 'ended' | 'fresh' | 'elevated' | null = null;
+    const fake = httpFake({
+      'GET /api/v1/account/deletion': () => {
+        if (session === 'ended') return signedOut;
+        if (session === 'fresh') return STEP_UP;
+        return { body: { deletionState: 'none' } };
+      },
+      'POST /api/v1/account/deletion': () => {
+        if (session === null) return ((session = 'ended'), signedOut);
+        return { status: 202, body: { deletionState: 'pending' } };
+      },
+    });
+    const subject = await provider();
+    await acknowledgeBoth(subject);
+    await subject.dispatchCommand({ type: 'deletion.continue' });
+    await subject.dispatchCommand({ type: 'deletion.begin' });
+    expect((await subject.getDeletion()).stage).toEqual({ kind: 'unconfirmed', reason: 'signed-out' });
+
+    session = 'fresh';
+    const afterSignIn = await subject.getDeletion();
+    expect(afterSignIn.stage).toEqual({ kind: 'awaiting-reauth', reason: 'step-up' });
+    expect(afterSignIn.reauth.continueTo).toBe('/api/auth/step-up?return_to=%2Fsettings%2Fdelete');
+
+    session = 'elevated';
+    expect((await subject.getDeletion()).stage).toEqual({ kind: 'confirm' });
+    expect(await subject.dispatchCommand({ type: 'deletion.begin' })).toMatchObject({ status: 'applied', message: DELETION_STARTED });
+    expect(fake.count('POST', '/api/v1/account/deletion')).toBe(2);
+  });
+
   it('should read the status back when the start gets no answer', async () => {
     let state = 'none';
     httpFake({
