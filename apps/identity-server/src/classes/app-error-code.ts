@@ -285,10 +285,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly OAU_002 = AppErrorCode.unauthenticated('invalid_client', 'Client authentication failed');
   /** invalid_grant — the grant or credential is invalid, expired, or revoked */
   static readonly OAU_003 = AppErrorCode.badRequest('invalid_grant', 'The authorization grant is invalid, expired, or revoked');
-  /** unsupported_grant_type / invalid_scope */
+  /** invalid_scope — the requested scope is unknown, not granted, or not allowed for this grant */
   static readonly OAU_004 = AppErrorCode.badRequest('invalid_scope', 'The requested scope or grant is invalid');
   /** invalid_target (RFC 8707) — the requested resource is not a registered API resource */
   static readonly OAU_005 = AppErrorCode.badRequest('invalid_target', 'The requested resource is unknown or not permitted');
   /** unauthorized_client — the authenticated client may not use this grant, such as a bot key exchange by a client that is not first-party */
   static readonly OAU_006 = AppErrorCode.badRequest('unauthorized_client', 'The client is not authorized to use this grant');
+  /** invalid_token (RFC 6750 §3.1) — the bearer presented to a protected resource is missing, malformed, expired, or not a user token */
+  static readonly OAU_007 = AppErrorCode.unauthenticated('invalid_token', 'The access token is invalid or expired');
+  /** unsupported_grant_type — the token endpoint does not implement the requested grant */
+  static readonly OAU_008 = AppErrorCode.badRequest('unsupported_grant_type', 'The authorization grant type is not supported');
 }

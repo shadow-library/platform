@@ -320,7 +320,7 @@ export class OAuthService {
     if (params.grantType === 'client_credentials') return this.clientCredentials(params, credential);
     if (params.grantType === TOKEN_EXCHANGE_GRANT) return this.tokenExchange(params, credential);
     this.logger.warn('token request rejected: unsupported grant type', { grantType: params.grantType, clientId: credential.clientId });
-    throw AppErrorCode.OAU_004.create();
+    throw AppErrorCode.OAU_008.create();
   }
 
   private async tokenExchange(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {

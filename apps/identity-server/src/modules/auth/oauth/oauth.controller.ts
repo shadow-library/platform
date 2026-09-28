@@ -1,5 +1,5 @@
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { Config } from '@shadow-library/common';
+import { type AppError, Config } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
@@ -133,12 +133,13 @@ export class OAuthController {
   @Auth({ public: true })
   @M2MBudget()
   @RespondFor(200, UserInfoResponse)
-  async getUserInfo(@Req() request: FastifyRequest): Promise<UserInfoResponse> {
+  async getUserInfo(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<UserInfoResponse> {
     const header = request.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
-    const claims = token ? this.keyService.verify(token) : null;
-    if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw AppErrorCode.OAU_002.create();
-    if (claims.token_type === 'service' || claims.token_type === 'bot') throw AppErrorCode.OAU_002.create();
+    if (!token) throw this.invalidToken(reply, 'Bearer');
+    const claims = this.keyService.verify(token);
+    if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw this.invalidToken(reply);
+    if (claims.token_type === 'service' || claims.token_type === 'bot') throw this.invalidToken(reply);
     await this.oauthService.consumeUserInfoBudget(claims.client_id);
 
     const userId = BigInt(claims.sub);
@@ -166,6 +167,12 @@ export class OAuthController {
     this.assertFormEncoded(request);
     const result = await this.oauthService.introspect(body.token, this.parseClientCredential(request, body));
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
+  }
+
+  /** RFC 6750 §3.1: a request with no bearer at all is challenged without an error code, so a client learns to authenticate rather than that its token failed */
+  private invalidToken(reply: FastifyReply, challenge = 'Bearer error="invalid_token"'): AppError {
+    reply.header('www-authenticate', challenge);
+    return AppErrorCode.OAU_007.create();
   }
 
   private assertFormEncoded(request: FastifyRequest): void {
