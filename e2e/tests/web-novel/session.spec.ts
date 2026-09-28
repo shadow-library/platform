@@ -123,12 +123,19 @@ test.describe('web-novel session: login', () => {
     expect(readPendingLogin(admitted).returnTo).toBe('/library');
   });
 
-  // A tab survives the `//` check and browsers strip it when parsing the Location: packages/auth/src/module/app-session.service.ts:397-398.
-  test.fixme('should refuse a return_to that only reads as off-origin once a browser strips its tab', async ({ webNovel }) => {
-    const response = await (await webNovel.guest()).get(loginPath('/\t/evil.test/library'), { maxRedirects: 0 });
-    expect(response.status()).toBe(400);
-    expect(await errorCode(response)).toBe('REDIRECT_NOT_ALLOWED');
-    expect(findSetCookie(response, WEB_NOVEL_LOGIN_STATE_COOKIE)).toBeUndefined();
+  test('should refuse a return_to that only reads as off-origin once a browser strips its control characters', async ({ webNovel }) => {
+    const guest = await webNovel.guest();
+
+    for (const returnTo of ['/\t/evil.test/library', '/\n/evil.test/library', '/\r/evil.test/library', '/\t\\evil.test/library']) {
+      const response = await guest.get(loginPath(returnTo), { maxRedirects: 0 });
+      expect(response.status(), `return_to ${JSON.stringify(returnTo)}`).toBe(400);
+      expect(await errorCode(response), `return_to ${JSON.stringify(returnTo)}`).toBe('REDIRECT_NOT_ALLOWED');
+      expect(findSetCookie(response, WEB_NOVEL_LOGIN_STATE_COOKIE), `no login may start for return_to ${JSON.stringify(returnTo)}`).toBeUndefined();
+    }
+
+    const admitted = await guest.get(loginPath('/library/evil.test'), { maxRedirects: 0 });
+    expect(admitted.status(), 'a same-origin path that merely names another host is still accepted').toBe(302);
+    expect(readPendingLogin(admitted).returnTo).toBe('/library/evil.test');
   });
 });
 
