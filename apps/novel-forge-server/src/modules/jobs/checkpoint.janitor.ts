@@ -6,35 +6,39 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-const JOB_EVENT_SWEEP_MS = 86_400_000;
+const SWEEP_INTERVAL_MS = 86_400_000;
+
+/** LangGraph's PostgresSaver tables, keyed by `thread_id` (a workflow run's id) and absent from the Drizzle schema. */
+const CHECKPOINT_TABLES = ['checkpoints', 'checkpoint_writes', 'checkpoint_blobs'];
 
 @Injectable()
 export class CheckpointJanitor {
   private readonly logger = Logger.getLogger(APP_NAME, CheckpointJanitor.name);
   private readonly db: PrimaryDatabase;
-  private jobEventSweep: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   async onModuleInit(): Promise<void> {
-    const purged = await this.purge(this.db).catch(err => {
-      this.logger.warn('Checkpoint janitor purge failed on boot', { err });
-      return 0;
-    });
-    if (purged > 0) this.logger.info(`Checkpoint janitor: purged ${purged} stale workflow run(s)`);
-    await this.sweepJobEvents();
-    this.jobEventSweep = setInterval(() => void this.sweepJobEvents(), JOB_EVENT_SWEEP_MS);
-    this.jobEventSweep.unref?.();
+    await this.sweep();
+    this.timer = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
+    this.timer.unref?.();
   }
 
   onModuleDestroy(): void {
-    if (this.jobEventSweep) clearInterval(this.jobEventSweep);
-    this.jobEventSweep = null;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
   }
 
-  private async sweepJobEvents(): Promise<void> {
+  private async sweep(): Promise<void> {
+    const purged = await this.purge(this.db).catch(err => {
+      this.logger.warn('Checkpoint janitor purge failed', { err });
+      return 0;
+    });
+    if (purged > 0) this.logger.info(`Checkpoint janitor: purged ${purged} stale workflow run(s)`);
+    await this.purgeOrphans(this.db).catch(err => this.logger.warn('Checkpoint janitor orphan purge failed', { err }));
     await this.purgeJobEvents(this.db).catch(err => this.logger.warn('Job event retention sweep failed', { err }));
   }
 
@@ -49,7 +53,6 @@ export class CheckpointJanitor {
     this.logger.debug('Job event retention sweep done', { olderThanDays, cutoff });
   }
 
-  // Uses raw SQL for the three checkpoint tables because they have no Drizzle schema.
   async purge(db: PrimaryDatabase, olderThanDays = 7): Promise<number> {
     const cutoff = new Date(Date.now() - olderThanDays * 86_400_000);
 
@@ -63,10 +66,19 @@ export class CheckpointJanitor {
       .select({ id: sql`${schema.workflowRuns.id}::text` })
       .from(schema.workflowRuns)
       .where(settled);
-    await db.execute(sql`DELETE FROM checkpoints WHERE thread_id IN ${settledThreads}`);
-    await db.execute(sql`DELETE FROM checkpoint_writes WHERE thread_id IN ${settledThreads}`);
-    await db.execute(sql`DELETE FROM checkpoint_blobs WHERE thread_id IN ${settledThreads}`);
+    for (const table of CHECKPOINT_TABLES) await db.execute(sql`DELETE FROM ${sql.raw(table)} WHERE thread_id IN ${settledThreads}`);
 
     return runs;
+  }
+
+  /**
+   * Threads whose run row is gone, cascaded away with its project, which the settled purge can never match. A run's row commits
+   * before its graph writes the first checkpoint, so a thread with no row is never a live one.
+   */
+  async purgeOrphans(db: PrimaryDatabase): Promise<void> {
+    for (const table of CHECKPOINT_TABLES) {
+      const threadId = sql.raw(`${table}.thread_id`);
+      await db.execute(sql`DELETE FROM ${sql.raw(table)} WHERE NOT EXISTS (select 1 from ${schema.workflowRuns} where ${schema.workflowRuns.id}::text = ${threadId})`);
+    }
   }
 }

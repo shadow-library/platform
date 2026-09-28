@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { type SQL } from 'drizzle-orm';
 import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core';
 
@@ -66,5 +66,50 @@ describe('CheckpointJanitor.purge', () => {
 
     expect(await janitor.purge(db as never, 7)).toBe(0);
     expect(executed).toHaveLength(0);
+  });
+});
+
+describe('CheckpointJanitor.purgeOrphans', () => {
+  it('should delete the checkpoints of threads whose workflow run no longer exists', async () => {
+    const executed: SQL[] = [];
+    const db = { execute: async (query: SQL) => void executed.push(query) };
+    const janitor = new CheckpointJanitor({ getPostgresClient: () => db } as never);
+
+    await janitor.purgeOrphans(db as never);
+
+    const orphaned = (table: string) => `DELETE FROM ${table} WHERE NOT EXISTS (select 1 from "workflow_runs" where "workflow_runs"."id"::text = ${table}.thread_id)`;
+    expect(executed.map(query => dialect.sqlToQuery(query).sql)).toEqual([orphaned('checkpoints'), orphaned('checkpoint_writes'), orphaned('checkpoint_blobs')]);
+  });
+});
+
+describe('CheckpointJanitor.onModuleInit', () => {
+  it('should purge checkpoints on every sweep, not only at boot', async () => {
+    const executed: SQL[] = [];
+    const db = {
+      $count: async () => 1,
+      select: (fields: Parameters<QueryBuilder['select']>[0]) => new QueryBuilder().select(fields),
+      execute: async (query: SQL) => void executed.push(query),
+      delete: () => ({ where: async () => undefined }),
+    };
+    const janitor = new CheckpointJanitor({ getPostgresClient: () => db } as never);
+    const scheduled: (() => Promise<void>)[] = [];
+    const setIntervalSpy = spyOn(globalThis, 'setInterval').mockImplementation(((callback: () => Promise<void>) => {
+      scheduled.push(callback);
+      return { unref: () => undefined } as unknown as ReturnType<typeof setInterval>;
+    }) as typeof setInterval);
+
+    try {
+      await janitor.onModuleInit();
+      const atBoot = executed.length;
+      expect(atBoot).toBeGreaterThan(0);
+      expect(scheduled).toHaveLength(1);
+
+      await scheduled[0]?.();
+
+      expect(executed.length).toBe(2 * atBoot);
+    } finally {
+      setIntervalSpy.mockRestore();
+      janitor.onModuleDestroy();
+    }
   });
 });

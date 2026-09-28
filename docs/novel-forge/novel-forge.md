@@ -38,8 +38,8 @@
 ## Architecture
 
 - Jobs and most HTTP requests run through `WorkflowRunService` (one run row, `thread_id = run.id`) -> LangGraph graph -> nodes -> services and chains via `ModelRouterService`;
-  planning, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot after seven days. Jobs are Postgres rows; a duplicate (project,
-  kind, target) request returns the active job.
+  planning, revise and the standalone judge call the router directly. Checkpoints live in Postgres, pruned at boot and daily: a settled run's after seven days, and a
+  thread whose run row is gone on the next sweep. Jobs are Postgres rows; a duplicate (project, kind, target) request returns the active job.
 - **One authoring job per project**, held in the database (`authoring_claims`), so it holds across replicas. Authoring jobs (generate, import, organise, plan, finalize kinds)
   reserve the claim in the transaction that enqueues them, and a second is refused (`JOB_002`) rather than queued; finalize, unrestricted fill and insert hold it for their
   synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches authoring jobs
