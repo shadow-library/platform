@@ -547,6 +547,29 @@ export const BASELINE_TEMPLATES: TemplateFixture[] = [
       },
     ],
   },
+  {
+    templateKey: 'organisation-member-status-changed',
+    producer: 'identity',
+    name: 'Organisation membership status changed',
+    description: 'Notice that a member was suspended, blocked or reinstated in an organisation',
+    messageType: 'TRANSACTIONAL',
+    priority: 'MEDIUM',
+    category: 'organisation',
+    variables: { status: variable('string', true, 'SUSPENDED'), reason: variable('string', false, 'Pending a security review') },
+    channels: [
+      {
+        channel: 'EMAIL',
+        subject: "{% if status == 'ACTIVE' %}Your organisation access was restored{% else %}Your organisation access was paused{% endif %}",
+        layoutKey: DEFAULT_LAYOUT_KEY,
+        body: `{% if status == 'ACTIVE' %}<h1 class="email-h1">Your access was restored</h1>
+<p class="email-text">Your membership in the organisation is active again. You can use its resources on Shadow as before.</p>
+{% else %}<h1 class="email-h1">Your access was paused</h1>
+<p class="email-text">Your membership in the organisation is now <span class="email-strong">{{ status | downcase }}</span>. You can't use its resources on Shadow until an administrator restores it.</p>
+{% if reason != '' %}<div class="email-panel">Reason given: {{ reason }}</div>
+{% endif %}{% endif %}<p class="email-muted">If you have questions about this change, contact your organisation administrator.</p>`,
+      },
+    ],
+  },
 
   {
     templateKey: 'bot.key.expiring',
