@@ -67,6 +67,13 @@ export const publications = pgTable('publications', {
   organisationId: varchar('organisation_id', { length: 64 }),
   /** Separate from `revision` so changing the share list never rewrites the metadata row, and vice versa. */
   accessRevision: integer('access_revision').notNull().default(1),
+  /**
+   * The access revision the reader last accepted, null until one lands. While it trails `accessRevision` the janitor keeps
+   * converging, so a narrowing made after a running converge read the share list still reaches the reader.
+   */
+  accessPushedRevision: integer('access_pushed_revision'),
+  /** Why the last access push failed; an unsweepable one waits for an explicit reconcile or republish, as a chapter row's does. */
+  accessError: text('access_error'),
   revision: integer('revision').notNull().default(1),
   /**
    * A high-entropy token the reader binds to this publication trust-on-first-use and then requires on every

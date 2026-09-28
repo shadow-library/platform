@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { type SQL } from 'drizzle-orm';
 
+import { schema } from '@server/database';
+
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
-import { CANONICAL_PROSE_CHANGED_PREFIX } from '@modules/publishing/publish-runner';
+import { CANONICAL_PROSE_CHANGED_PREFIX, STALE_ERROR_PREFIX } from '@modules/publishing/publish-runner';
 
 import { matchesWhere } from '../sql-filter';
 
@@ -114,5 +116,46 @@ describe('PublicationJanitor.reconcileCrlfContentHashes', () => {
     await janitor.reconcileCrlfContentHashes();
 
     expect(chapterPublications[0]).toMatchObject({ status: 'scheduled', error: null });
+  });
+});
+
+describe('PublicationJanitor.dueProjects', () => {
+  function janitorOver(tables: Map<unknown, Row[]>): PublicationJanitor {
+    const read = () => ({
+      from: (table: unknown) => ({ where: async (where: SQL) => (tables.get(table) ?? []).filter(row => matchesWhere(row, where)).map(row => ({ projectId: row['projectId'] })) }),
+    });
+    const db = { select: read, selectDistinct: read };
+    return new PublicationJanitor({ getPostgresClient: () => db } as never, {} as never, {} as never);
+  }
+
+  function publication(projectId: bigint, overrides: Row = {}): Row {
+    return { projectId, accessRevision: 3, accessPushedRevision: 3, accessError: null, ...overrides };
+  }
+
+  it('should sweep a publication whose share list changed after the reader last accepted one', async () => {
+    const publications = [publication(1n, { accessPushedRevision: 2 }), publication(2n)];
+    const janitor = janitorOver(new Map([[schema.publications, publications]]));
+
+    expect(await janitor.dueProjects()).toEqual([1n]);
+  });
+
+  it('should sweep a publication whose access never reached the reader', async () => {
+    const janitor = janitorOver(new Map([[schema.publications, [publication(1n, { accessPushedRevision: null })]]]));
+
+    expect(await janitor.dueProjects()).toEqual([1n]);
+  });
+
+  it('should keep sweeping a trailing access revision after a failure a retry can clear', async () => {
+    const publications = [publication(1n, { accessPushedRevision: 2, accessError: 'reader service unreachable: connect ECONNREFUSED' })];
+    const janitor = janitorOver(new Map([[schema.publications, publications]]));
+
+    expect(await janitor.dueProjects()).toEqual([1n]);
+  });
+
+  it('should leave a stale access conflict for an explicit reconcile', async () => {
+    const publications = [publication(1n, { accessPushedRevision: 2, accessError: `${STALE_ERROR_PREFIX} the reader already holds revision unknown` })];
+    const janitor = janitorOver(new Map([[schema.publications, publications]]));
+
+    expect(await janitor.dueProjects()).toEqual([]);
   });
 });

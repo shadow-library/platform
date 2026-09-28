@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -89,6 +89,11 @@ class SlugExhaustedError extends Error {
   }
 }
 
+/** The reader has not accepted the current access revision; null until the first access push lands. */
+export function accessBehind(): SQL {
+  return sql`${schema.publications.accessPushedRevision} is distinct from ${schema.publications.accessRevision}`;
+}
+
 function isUnsweepable(error: string | null | undefined): boolean {
   return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
 }
@@ -149,6 +154,7 @@ export class PublishRunner {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await this.recordFailure(this.dueRows(ledger, options), message);
+      await this.recordAccessFailure(publication, message);
       // The header may have laddered before it failed, so the slug the row now holds is not the one it entered with.
       const held = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId), columns: { novelSlug: true } });
       const context = { projectId, slug: publication.novelSlug, heldSlug: held?.novelSlug, message };
@@ -185,6 +191,7 @@ export class PublishRunner {
     // a fact revealed in a chapter published this run becomes visible immediately. It never throws: the chapters
     // already landed, so a reader hiccup here is ledgered soft and swept, exactly like a failed chapter push.
     await this.convergeWiki(projectId, publication.novelSlug, options, result);
+    await this.convergeLateAccess(publication, result);
 
     this.logger.info('publish converge finished', {
       projectId,
@@ -457,11 +464,44 @@ export class PublishRunner {
 
     if (options.reconcile) {
       const served = await this.pushClient.getAccess(publication.novelSlug);
-      if (served && !this.accessDrifted(served, body)) return 'noop';
+      if (served && !this.accessDrifted(served, body)) {
+        await this.recordAccessPushed(publication, body.revision);
+        return 'noop';
+      }
     }
 
     const result = await this.pushClient.upsertAccess(publication.novelSlug, body);
+    await this.recordAccessPushed(publication, body.revision);
     return result.outcome;
+  }
+
+  /**
+   * A share-list change that committed after this pass read the publication row is pushed before the pass ends rather than on the
+   * janitor's next sweep. A failure here is left to that sweep, which converges while the recorded revision trails, because the
+   * chapters of this pass already landed.
+   */
+  private async convergeLateAccess(publication: Publishing.Publication, result: ConvergeResult): Promise<void> {
+    const latest = await this.db.query.publications.findFirst({ where: eq(schema.publications.id, publication.id) });
+    if (!latest || latest.accessRevision === publication.accessRevision) return;
+    try {
+      result.access = await this.convergeAccess(latest, {});
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await this.recordAccessFailure(latest, message);
+      this.logger.warn('late access push failed — the janitor retries it', { projectId: latest.projectId, slug: latest.novelSlug, revision: latest.accessRevision, message });
+    }
+  }
+
+  private async recordAccessPushed(publication: Publishing.Publication, revision: number): Promise<void> {
+    await this.db.update(schema.publications).set({ accessPushedRevision: revision, accessError: null }).where(eq(schema.publications.id, publication.id));
+  }
+
+  /** Only while the reader lacks the current revision: a pass that landed access and failed later leaves nothing to report here. */
+  private async recordAccessFailure(publication: Publishing.Publication, error: string): Promise<void> {
+    await this.db
+      .update(schema.publications)
+      .set({ accessError: error.slice(0, 2000) })
+      .where(and(eq(schema.publications.id, publication.id), accessBehind()));
   }
 
   private accessDrifted(served: AccessState, wanted: AccessPushBody): boolean {

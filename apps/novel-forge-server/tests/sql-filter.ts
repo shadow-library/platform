@@ -21,6 +21,10 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
       return allowed.includes(String(value)) !== Boolean(match[2]);
     },
   },
+  {
+    pattern: new RegExp(`^${COLUMN} is (not )?distinct from ${COLUMN}`),
+    build: match => row => (String(row[camel(match[1])] ?? null) !== String(row[camel(match[3])] ?? null)) !== Boolean(match[2]),
+  },
   { pattern: new RegExp(`^${COLUMN} is (not )?null`), build: match => row => isNullish(row[camel(match[1])]) !== Boolean(match[2]) },
   { pattern: /^"\w+"\.xmin::text = \$(\d+)/, build: (match, params) => row => String(row['xmin']) === String(params[Number(match[1]) - 1]) },
   {

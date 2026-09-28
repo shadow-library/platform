@@ -8,7 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { renderChapterPayload } from '../publishing/publish-payload';
-import { CANONICAL_PROSE_CHANGED_PREFIX, UNSWEEPABLE_ERROR_PREFIXES } from '../publishing/publish-runner';
+import { accessBehind, CANONICAL_PROSE_CHANGED_PREFIX, UNSWEEPABLE_ERROR_PREFIXES } from '../publishing/publish-runner';
 import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
 
@@ -22,8 +22,9 @@ const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
 
 /**
  * The ledger-as-outbox sweeper (checkpoint-janitor pattern): on boot and
- * every minute it finds projects whose ledger has due work — scheduled rows past their gate, or
- * failed pushes a retry can still clear — and (re-)enqueues their `publish` job. The enqueue dedups
+ * every minute it finds projects whose ledger has due work — scheduled rows past their gate, failed
+ * pushes a retry can still clear, or an access revision the reader has not accepted — and
+ * (re-)enqueues their `publish` job. The enqueue dedups
  * onto an active job and resets a terminal one, so a reader outage simply keeps the loop turning
  * until it converges. Stale conflicts and malformed pushes wait for an explicit reconcile or
  * republish.
@@ -112,6 +113,13 @@ export class PublicationJanitor {
       .from(schema.wikiPublications)
       .where(or(eq(schema.wikiPublications.state, 'pending'), and(eq(schema.wikiPublications.state, 'failed'), retryableFailure(schema.wikiPublications.error))));
 
-    return [...new Set([...chapterDue, ...wikiDue].map(row => row.projectId))];
+    // Access rides the same converge. A share-list change deduped onto a publish job that had already read the list is still owed, and
+    // a narrowing must reach the reader, so a publication whose recorded access revision trails is due until one lands.
+    const accessDue = await this.db
+      .select({ projectId: schema.publications.projectId })
+      .from(schema.publications)
+      .where(and(accessBehind(), retryableFailure(schema.publications.accessError)));
+
+    return [...new Set([...chapterDue, ...wikiDue, ...accessDue].map(row => row.projectId))];
   }
 }

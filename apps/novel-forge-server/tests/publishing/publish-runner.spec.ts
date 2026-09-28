@@ -39,12 +39,16 @@ function publicationRow(overrides: Partial<Publishing.Publication> = {}): Publis
 interface ReaderFake {
   upsertNovel?: () => Promise<{ outcome: 'applied' | 'noop' }>;
   upsertAccess?: (body: AccessPushBody) => Promise<{ outcome: 'applied' | 'noop' }>;
+  /** The publication row as it stands once the pass has read the share list — a narrowing that committed meanwhile. */
+  latest?: Publishing.Publication;
+  shareLists?: string[][];
 }
 
 function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
   const updates: Row[] = [];
+  const shareLists = [...(reader.shareLists ?? [['reader-1']])];
   const db = {
-    query: { publications: { findFirst: async () => publication } },
+    query: { publications: { findFirst: async () => reader.latest ?? publication } },
     update: () => ({ set: (patch: Row) => ({ where: async () => void updates.push(patch) }) }),
   };
   const pushed: AccessPushBody[] = [];
@@ -65,7 +69,7 @@ function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
     reassignSlug: async () => undefined,
     restoreSlug: async () => undefined,
   };
-  const accessService = { getPushPayload: async () => ['reader-1'] };
+  const accessService = { getPushPayload: async () => (shareLists.length > 1 ? shareLists.shift() : shareLists[0]) };
   const wikiService = { computeProjections: async () => [], reconcileLedger: async () => [] };
   const instance = new PublishRunner(
     { getPostgresClient: () => db } as never,
@@ -100,5 +104,58 @@ describe('PublishRunner.converge', () => {
     const { runner: publish } = runner(publicationRow(), { upsertAccess: () => Promise.reject(new ReaderPushError('reader service unreachable: connect ECONNREFUSED')) });
 
     await expect(publish.converge(1n, { reconcile: true })).rejects.toMatchObject({ code: 'PUB_004', status: 500 });
+  });
+
+  it('should record the access revision the reader accepted', async () => {
+    const { runner: publish, updates } = runner(publicationRow({ accessRevision: 2 }));
+
+    await publish.converge(1n);
+
+    expect(updates).toContainEqual({ accessPushedRevision: 2, accessError: null });
+  });
+
+  it('should push a share-list narrowing that committed after the pass read the list', async () => {
+    const {
+      runner: publish,
+      pushed,
+      updates,
+    } = runner(publicationRow({ accessRevision: 2 }), {
+      latest: publicationRow({ accessRevision: 3 }),
+      shareLists: [['reader-1', 'reader-2'], ['reader-1']],
+    });
+
+    const result = await publish.converge(1n);
+
+    expect(pushed.map(body => [body.revision, body.subjectIds])).toEqual([
+      [2, ['reader-1', 'reader-2']],
+      [3, ['reader-1']],
+    ]);
+    expect(result.access).toBe('applied');
+    expect(updates).toContainEqual({ accessPushedRevision: 3, accessError: null });
+  });
+
+  it('should record a late access push that failed, leaving it for the janitor, without failing the pass', async () => {
+    let calls = 0;
+    const { runner: publish, updates } = runner(publicationRow({ accessRevision: 2 }), {
+      latest: publicationRow({ accessRevision: 3 }),
+      upsertAccess: async () => {
+        calls += 1;
+        if (calls > 1) throw new ReaderPushError('reader service unreachable: connect ECONNREFUSED');
+        return { outcome: 'applied' };
+      },
+    });
+
+    await publish.converge(1n);
+
+    expect(updates).toContainEqual({ accessError: 'reader service unreachable: connect ECONNREFUSED' });
+    expect(updates).not.toContainEqual({ accessPushedRevision: 3, accessError: null });
+  });
+
+  it('should record an access push that failed the header on the publication', async () => {
+    const { runner: publish, updates } = runner(publicationRow(), { upsertAccess: () => Promise.reject(new StaleRevisionError(2)) });
+
+    await publish.converge(1n).catch(() => undefined);
+
+    expect(updates).toContainEqual({ accessError: new StaleRevisionError(2).message });
   });
 });
