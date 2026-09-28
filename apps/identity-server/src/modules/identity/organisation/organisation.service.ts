@@ -71,12 +71,11 @@ const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1
 const BOT_INVITABLE_ROLES: readonly Organisation.MemberRole[] = ['MEMBER'];
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
+/** Letters and digits only, compatibility-decomposed, so spacing, punctuation, invisible fillers and accents cannot dodge the reservation. */
 const comparableName = (name: string): string =>
   name
-    .normalize('NFKC')
-    .replace(/\p{Cf}/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+    .normalize('NFKD')
+    .replace(/\p{Default_Ignorable_Code_Point}|[^\p{L}\p{N}]/gu, '')
     .toLowerCase();
 const RESERVED_NAME = comparableName(PLATFORM_ORG_NAME);
 

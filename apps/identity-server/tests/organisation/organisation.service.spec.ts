@@ -56,7 +56,17 @@ function platformLookup(rows: { marked?: Organisation; namesake?: Organisation; 
 
 describe('OrganisationService', () => {
   describe('reserved platform organisation name', () => {
-    for (const name of [PLATFORM_ORG_NAME, '  shadow   PLATFORM ', 'Shadow​Platform'.replace('​', '​ ')]) {
+    for (const name of [
+      PLATFORM_ORG_NAME,
+      '  shadow   PLATFORM ',
+      'Shadow\u200b Platform',
+      'Shadow\u200bPlatform',
+      'shadow-platform',
+      'S.h.a.d.o.w P_l_a_t_f_o_r_m!',
+      'Sha\u0301dow Pla\u0308tform',
+      'Shadow\u3164Platform',
+      '\uff33\uff48\uff41\uff44\uff4f\uff57 \uff30\uff4c\uff41\uff54\uff46\uff4f\uff52\uff4d',
+    ]) {
       it(`should refuse to create a team named ${JSON.stringify(name)}`, async () => {
         const writer = teamWriter();
 
@@ -65,12 +75,14 @@ describe('OrganisationService', () => {
       });
     }
 
-    it('should create a team under any other name', async () => {
-      const writer = teamWriter();
+    for (const name of ['Shadow Platform Fans', 'Shadow Platforms', 'Platform Shadow']) {
+      it(`should create a team named ${JSON.stringify(name)}`, async () => {
+        const writer = teamWriter();
 
-      await expect(serviceWith(writer.postgres).createOrganisation(CALLER, { name: 'Shadow Platform Fans' })).resolves.toEqual(writer.created);
-      expect(writer.transaction).toHaveBeenCalledTimes(1);
-    });
+        await expect(serviceWith(writer.postgres).createOrganisation(CALLER, { name })).resolves.toEqual(writer.created);
+        expect(writer.transaction).toHaveBeenCalledTimes(1);
+      });
+    }
 
     it('should refuse to rename a team to the platform organisation name', async () => {
       const update = mock(() => ({ set: () => ({ where: () => Promise.resolve() }) }));
