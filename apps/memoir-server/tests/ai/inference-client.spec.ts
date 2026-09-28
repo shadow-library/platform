@@ -1,10 +1,10 @@
 import '@server/bootstrap';
 
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import { Config } from '@shadow-library/common';
 
-import { assertInClusterInference } from '@modules/inference';
+import { assertInClusterInference, OllamaInferenceClient } from '@modules/inference';
 
 /**
  * Both signals behind `Config.isProductionDeployment()` are pinned per case rather than inherited:
@@ -63,5 +63,51 @@ describe('In-cluster inference boundary (T-33, D6, ARCHITECTURE §15.6)', () => 
   it('should enforce the boundary when the stage is unset, so a forgotten APP_STAGE loses inference rather than the guarantee', () => {
     asDeployment('prod', 'development');
     expect(() => assertInClusterInference('https://api.openai.com/v1')).toThrow(/not in-cluster/);
+  });
+
+  describe('svc:// addresses', () => {
+    const overrideKey = 'SERVICE_URL_MEMOIR_INFERENCE';
+
+    afterEach(() => {
+      delete process.env[overrideKey];
+    });
+
+    it('should refuse a svc:// name that resolves outside the cluster on a production deployment', () => {
+      asDeployment('prod');
+      expect(() => assertInClusterInference('svc://api.openai.com')).toThrow(/not in-cluster/);
+      expect(() => assertInClusterInference('svc://openai.com/v1')).toThrow(/not in-cluster/);
+      expect(() => assertInClusterInference('svc://localhost')).toThrow(/not in-cluster/);
+    });
+
+    it('should refuse an in-cluster svc:// name whose service url override points off-cluster', () => {
+      asDeployment('prod');
+      process.env[overrideKey] = 'https://api.openai.com';
+      expect(() => assertInClusterInference('svc://memoir-inference')).toThrow(/not in-cluster/);
+    });
+
+    it('should allow a bare or *.svc service name, and an override that stays in-cluster', () => {
+      asDeployment('prod');
+      expect(() => assertInClusterInference('svc://memoir-inference')).not.toThrow();
+      expect(() => assertInClusterInference('svc://memoir-inference.shadow-apps.svc')).not.toThrow();
+      process.env[overrideKey] = 'http://memoir-inference.shadow-apps.svc.cluster.local:11434';
+      expect(() => assertInClusterInference('svc://memoir-inference')).not.toThrow();
+    });
+
+    it('should dial the address service discovery resolves, keeping the scheme it configures', async () => {
+      const originalUrl = Config['cache'].get('ai.inference-url');
+      Config['cache'].set('ai.inference-url', 'svc://memoir-inference');
+      process.env[overrideKey] = 'https://memoir-inference.shadow-apps.svc:11434';
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ message: { content: '{"ok":true}' } }));
+
+      try {
+        const answer = await new OllamaInferenceClient().completeJson({ systemPrompt: 's', userPrompt: 'u' });
+
+        expect(answer).toEqual({ ok: true });
+        expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://memoir-inference.shadow-apps.svc:11434/api/chat');
+      } finally {
+        fetchSpy.mockRestore();
+        Config['cache'].set('ai.inference-url', originalUrl);
+      }
+    });
   });
 });

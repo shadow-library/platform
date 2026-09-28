@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
-import { AppError, Config } from '@shadow-library/common';
+import { AppError, Config, ServiceDiscovery } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -24,6 +24,8 @@ export interface InferenceRequest {
 
 /** A Kubernetes service name resolves as `<service>.<namespace>.svc[.cluster.local]`; nothing outside the cluster can hold that suffix. */
 const IN_CLUSTER_HOST = /\.svc(\.cluster\.local)?$/;
+/** A single-label `svc://` name reaches only a Service in the pod's own namespace through cluster DNS; a dotted one cannot be told apart from a public domain. */
+const BARE_SERVICE_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 /**
  * The single model seam for the whole service (ARCHITECTURE §15.6 and §14.3 step 2 — receipt text is
@@ -45,16 +47,26 @@ export abstract class InferenceClient {
 export function assertInClusterInference(url: string): void {
   if (!url) return;
   if (!Config.isProductionDeployment()) return;
-  if (url.startsWith('svc://')) return;
 
-  let host: string;
-  try {
-    host = new URL(url).hostname;
-  } catch {
-    throw AppError.internal(`ai.inference-url '${url}' is not a valid URL`);
+  const resolved = resolveInferenceUrl(url);
+  if (!resolved) throw AppError.internal(`ai.inference-url '${url}' is not a valid URL`);
+
+  const host = new URL(resolved).hostname;
+  const bareService = url.startsWith('svc://') && BARE_SERVICE_NAME.test(host) && host !== 'localhost';
+  if (!bareService && !IN_CLUSTER_HOST.test(host)) {
+    throw AppError.internal(
+      `ai.inference-url host '${host}' is not in-cluster; a production deployment may only reach inference over a bare svc://<service> name or a *.svc host (D6)`,
+    );
   }
-  if (!IN_CLUSTER_HOST.test(host)) {
-    throw AppError.internal(`ai.inference-url host '${host}' is not in-cluster; a production deployment may only reach inference over svc:// or a *.svc name (D6)`);
+}
+
+/** The address actually dialled, so the D6 check and the call can never disagree: `svc://` goes through the platform's service discovery, overrides and scheme included. */
+function resolveInferenceUrl(url: string): string | null {
+  try {
+    const resolved = ServiceDiscovery.resolve(url);
+    return URL.canParse(resolved) ? resolved.replace(/\/$/, '') : null;
+  } catch {
+    return null;
   }
 }
 
@@ -75,7 +87,9 @@ export class OllamaInferenceClient extends InferenceClient implements OnModuleIn
     const configured = Config.get('ai.inference-url');
     if (!configured) throw AppErrorCode.AI_009.create();
 
-    const baseUrl = configured.replace(/^svc:\/\//, 'http://').replace(/\/$/, '');
+    const baseUrl = resolveInferenceUrl(configured);
+    if (!baseUrl) throw AppErrorCode.AI_009.create();
+
     const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
