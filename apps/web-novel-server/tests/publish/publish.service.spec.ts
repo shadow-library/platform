@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { AppError } from '@shadow-library/common';
 import { type ContextService } from '@shadow-library/fastify';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
@@ -8,7 +10,7 @@ import { type PublishAuditService } from '@modules/publish/publish-audit.service
 import { type NovelUpsertBody } from '@modules/publish/publish.dto';
 import { PublishService } from '@modules/publish/publish.service';
 
-import { type ChainCall, scriptedPostgres, type ScriptedPostgres } from '../scripted-postgres';
+import { type ChainCall, scriptedPostgres, type ScriptedPostgres, stepArgs } from '../scripted-postgres';
 
 const SLUG = 'the-novel';
 const CALLER = { sub: 'forge-service', clientId: 'forge' };
@@ -57,6 +59,11 @@ function racedByConcurrentFirstPush(winner: Record<string, unknown>): ScriptedPo
   });
 }
 
+function renderedWhere(call: ChainCall | undefined): { sql: string; params: unknown[] } {
+  const { sql, params } = new PgDialect().sqlToQuery(stepArgs(call, 'where') as SQL);
+  return { sql, params };
+}
+
 function service(postgres: ScriptedPostgres): PublishService {
   const database = new FakeDatabaseService({ postgres: postgres.client, constraintErrorMap: { novels_slug_unique: AppErrorCode.WBN_010.create() } });
   return new PublishService(database, audit, context);
@@ -68,6 +75,27 @@ describe('PublishService', () => {
       const result = await service(racedByConcurrentFirstPush(novelRow())).upsertNovel(SLUG, BODY);
 
       expect(result).toMatchObject({ outcome: 'noop', novelId: 7n });
+    });
+
+    it('should resolve the ref and the slug in one locked read, so both see one snapshot', async () => {
+      const postgres = scriptedPostgres([[novelRow()]]);
+      await service(postgres).upsertNovel(SLUG, BODY);
+      const reads = postgres.calls.filter(call => call.root === 'select');
+
+      expect(reads).toHaveLength(1);
+      expect(renderedWhere(reads[0])).toEqual({
+        sql: '(("novels"."source_client_id" = $1 and "novels"."source_ref" = $2) or "novels"."slug" = $3)',
+        params: [CALLER.clientId, BODY.sourceRef, SLUG],
+      });
+      expect(stepArgs(reads[0], 'for')).toBe('update');
+    });
+
+    it('should resolve its own row when another novel already holds the slug it is moving to', async () => {
+      const foreignHolder = novelRow({ id: 9n, sourceClientId: 'other-publisher', sourceRef: 'elsewhere' });
+      const ownRow = novelRow({ slug: 'old-slug' });
+      const result = await service(scriptedPostgres([[foreignHolder, ownRow]])).upsertNovel(SLUG, BODY);
+
+      expect(result).toMatchObject({ outcome: 'applied', novelId: 7n });
     });
 
     it('should refuse a slug held by another publisher with WBN_010', async () => {
