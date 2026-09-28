@@ -125,6 +125,9 @@ export interface ResolvedBrowserAuthConfig {
   cookie: CookieAttributes;
   stateCookieName: string;
   stateCookie: CookieAttributes;
+  /** Marks a browser already sent back through authorize to consent to a sensitive scope, so a second refusal answers 403 instead of looping */
+  reconsentCookieName: string;
+  reconsentCookie: CookieAttributes;
 }
 
 /**
@@ -176,6 +179,10 @@ const logger = Logger.getLogger(NAMESPACE, 'AuthConfig');
 
 /** The login-state cookie shares the session cookie's name so both stand or fall on the same prefix rules */
 const STATE_COOKIE_SUFFIX = '-login';
+const RECONSENT_COOKIE_SUFFIX = '-reconsent';
+
+/** Long enough to cover a sign-in and the step-up that follows it */
+const RECONSENT_TTL_SECONDS = 15 * 60;
 
 const DEFAULT_ROUTES: AuthRoutePaths = {
   basePath: '/auth',
@@ -265,5 +272,7 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
      * It is the one attribute the state cookie does not inherit.
      */
     stateCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: LOGIN_STATE_TTL_SECONDS },
+    reconsentCookieName: `${cookieName}${RECONSENT_COOKIE_SUFFIX}`,
+    reconsentCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: RECONSENT_TTL_SECONDS },
   };
 }

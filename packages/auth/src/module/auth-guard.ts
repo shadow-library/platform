@@ -57,6 +57,11 @@ export type AuthGuardHandler = (request: GuardedRequest, response?: GuardedRespo
 /** 302 keeps the browser's method on a redirect the user follows interactively */
 const FOUND = 302;
 
+const bearerToken = (request: GuardedRequest): string | undefined => {
+  const header = request.headers.authorization;
+  return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+};
+
 /** Only a top-level navigation gets bounced; anything else is answered with a status a client can act on */
 const isNavigation = (request: GuardedRequest, method: string): boolean => {
   const accept = request.headers.accept;
@@ -97,6 +102,7 @@ export class AuthGuard {
     return async (request: GuardedRequest, response?: GuardedResponse): Promise<unknown> => {
       try {
         const principal = await this.authenticate(request, auth, method, path);
+        if (!bearerToken(request)) await this.assertConsented(principal, auth);
         await this.admit(principal, auth, method, path, response);
         this.context.set(AUTH_PRINCIPAL, principal);
         this.logger.debug('request authenticated', { sub: principal.sub, kind: principal.kind, aal: principal.aal, method, path });
@@ -108,8 +114,7 @@ export class AuthGuard {
   }
 
   private async authenticate(request: GuardedRequest, auth: AuthRouteMetadata, method: string, path: string): Promise<AuthPrincipal> {
-    const header = request.headers.authorization;
-    const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
+    const token = bearerToken(request);
     if (token?.startsWith(BOT_KEY_PREFIX)) return this.authenticateBot(token, request.ip, auth, method, path);
     if (token) return this.client.verify(token).catch((error: Error) => throwError(this.unauthenticated(error)));
 
@@ -140,6 +145,21 @@ export class AuthGuard {
       this.logger.warn('bot key exchange unavailable', { reason: error.message, method, path });
       throw AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'identity could not exchange the bot key', retryAfterSeconds: retryAfterHint(error) });
     });
+  }
+
+  /**
+   * Identity freezes a session's grant at authorize, so a session opened before this application asked
+   * consent for a sensitive scope can never mint it, however recently it stepped up. Only a fresh
+   * authorize fixes that, which is where `CONSENT_REQUIRED` sends the browser; any other missing scope
+   * stays the generic denial.
+   */
+  private async assertConsented(principal: AuthPrincipal, auth: AuthRouteMetadata): Promise<void> {
+    if (!this.sessions || principal.kind !== 'user' || principal.aal !== 'AAL2') return;
+    const missing = auth.scopes?.filter(scope => !principal.scopes.includes(scope)) ?? [];
+    if (missing.length === 0) return;
+
+    const sensitive = await this.sessions.sensitiveScopes();
+    if (missing.every(scope => sensitive.includes(scope))) throw AuthErrorCode.CONSENT_REQUIRED.create({ reason: `the session grant lacks ${missing.join(', ')}` });
   }
 
   private async admit(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string, response: GuardedResponse | undefined): Promise<void> {
@@ -215,6 +235,8 @@ export class AuthGuard {
       return this.bounce(response, sessions.loginUrl(returnTo));
     }
 
+    if (AppError.is(error, AuthErrorCode.CONSENT_REQUIRED) && sessions) return this.reconsent(error, request, response, method, sessions);
+
     /** A mismatch lands here too: the step-up route is where the prompt is restarted with this app's intent */
     if (AppError.is(error, AuthErrorCode.ELEVATION_REQUIRED) || AppError.is(error, AuthErrorCode.ELEVATION_INTENT_MISMATCH)) {
       this.logger.warn('route requires elevation and the principal is not elevated', { method });
@@ -240,6 +262,26 @@ export class AuthGuard {
      */
     if (AppError.is(error, AuthGuardErrorCode) || AppError.is(error, ServerErrorCode.S007)) throw error;
     throw this.unauthenticated(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  /**
+   * Sends the browser back through authorize once, so the fresh session carries the consent. A browser
+   * that already went round and still lacks the scope gets the 403: identity is withholding it, and
+   * another sign-in would only repeat the bounce.
+   */
+  private async reconsent(error: AppError, request: GuardedRequest, response: GuardedResponse | undefined, method: string, sessions: AppSessionService): Promise<unknown> {
+    const cookies = parseCookies(request.headers.cookie);
+    const handle = sessions.readHandle(cookies);
+    if (!handle || sessions.hasReconsented(cookies)) {
+      this.logger.warn('the session still lacks a sensitive scope after a fresh authorize; refusing rather than restarting the login again', { method });
+      response?.header('set-cookie', sessions.reconsentSpentCookie());
+      throw error;
+    }
+
+    this.logger.warn('the session predates consent to a sensitive scope this route needs; restarting the login', { method });
+    for (const cookie of await sessions.beginReconsent(handle)) response?.header('set-cookie', cookie);
+    if (!response || !isNavigation(request, method)) throw AuthGuardErrorCode.IAM_001.create();
+    return this.bounce(response, sessions.loginUrl(request.url ?? '/'));
   }
 
   /**

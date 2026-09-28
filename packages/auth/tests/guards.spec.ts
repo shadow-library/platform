@@ -270,3 +270,111 @@ describe('AuthGuard', () => {
     expect(dynamicModule.exports).toContain(AuthClient);
   });
 });
+
+describe('AuthGuard re-consent for a sensitive scope', () => {
+  const CLIENT = { id: 'svc-memo', secret: 's3cr3t' };
+  const SENSITIVE = 'memo:destroy';
+  const NAVIGATION = { accept: 'text/html' };
+  const ROUTE: HandlerMetadata = { shadowAuth: { authenticated: true, elevated: true, scopes: [SENSITIVE] }, method: 'POST' as never, path: '/deletion' };
+  let idp: TestIdP;
+  let auth: AuthClient;
+  let context: ContextService;
+  let sessions: AppSessionService;
+  let counter = 0;
+
+  beforeAll(async () => {
+    idp = await createTestIdP({ clientId: CLIENT.id, clientSecret: CLIENT.secret, app: { audience: AUDIENCE, scopes: ['memo:read'], sensitiveScopes: [SENSITIVE] } });
+    auth = new AuthClient({ issuer: idp.issuer, appId: CLIENT.id, client: CLIENT });
+    context = new ContextService();
+    extendContextWithAuth(context);
+    sessions = new AppSessionService(
+      auth,
+      resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true, redirectUri: 'https://memo.test/auth/callback' }),
+    );
+  });
+  afterAll(() => {
+    auth.stop();
+    idp.stop();
+  });
+
+  const config = () => resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true });
+  const reconsentCookie = (): string => config().reconsentCookieName;
+
+  /** A session whose grant was frozen from an authorization that did or did not consent to the sensitive scope, already stepped up */
+  const elevatedSession = async (consented: boolean): Promise<string> => {
+    const sub = `memo-user-${++counter}`;
+    const scopes = ['openid', 'profile', 'memo:read', ...(consented ? [SENSITIVE] : [])];
+    const code = idp.createAuthorizationCode({ sub, scopes });
+    const session = await auth.appSessions.createSession({ code, codeVerifier: 'verifier', redirectUri: 'https://memo.test/auth/callback' });
+    idp.setSteppedUp(sub, { clientId: CLIENT.id, resource: AUDIENCE });
+    await sessions.claimElevation(session.sessionHandle);
+    return session.sessionHandle;
+  };
+
+  const capture = (): { response: GuardedResponse; headers: Record<string, string[]>; redirectedTo: () => string | undefined } => {
+    const headers: Record<string, string[]> = {};
+    let location: string | undefined;
+    const response: GuardedResponse = {
+      header: (name, value) => (headers[name] = [...(headers[name] ?? []), ...(Array.isArray(value) ? value : [value])]),
+      redirect: url => (location = url),
+    };
+    return { response, headers, redirectedTo: () => location };
+  };
+
+  const run = (request: GuardedRequest, response: GuardedResponse, metadata: HandlerMetadata = ROUTE): Promise<unknown> =>
+    new Promise((resolve, reject) => {
+      const hook = context.init() as unknown as (request: unknown, response: unknown, done: () => void) => void;
+      hook({ id: `rid-${counter}` }, {}, () => {
+        const handler = new AuthGuard(auth, context, sessions).generate(metadata);
+        if (!handler) return reject(new Error('expected a handler'));
+        handler(request, response).then(resolve, reject);
+      });
+    });
+
+  it('should send a session that predates the consent back through authorize, marking the attempt', async () => {
+    const handle = await elevatedSession(false);
+    const { response, headers, redirectedTo } = capture();
+
+    await run({ url: '/deletion', headers: { ...NAVIGATION, cookie: `${config().cookieName}=${handle}` } }, response, { ...ROUTE, method: 'GET' as never });
+    expect(redirectedTo()).toBe(`/auth/login?return_to=${encodeURIComponent('/deletion')}`);
+    expect(headers['set-cookie']?.some(cookie => cookie.startsWith(`${config().cookieName}=;`))).toBe(true);
+    expect(headers['set-cookie']?.some(cookie => cookie.startsWith(`${reconsentCookie()}=1;`))).toBe(true);
+  });
+
+  it('should answer an api caller with a 401 so its client restarts the login, marking the attempt', async () => {
+    const handle = await elevatedSession(false);
+    const { response, headers } = capture();
+
+    const failure = await run({ url: '/deletion', headers: { cookie: `${config().cookieName}=${handle}` } }, response).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'IAM_001', status: 401 });
+    expect(headers['set-cookie']?.some(cookie => cookie.startsWith(`${reconsentCookie()}=1;`))).toBe(true);
+  });
+
+  it('should answer a clear 403 rather than loop when the re-authorized session still lacks the scope', async () => {
+    const handle = await elevatedSession(false);
+    const { response, headers, redirectedTo } = capture();
+
+    const cookie = `${config().cookieName}=${handle}; ${reconsentCookie()}=1`;
+    const failure = await run({ url: '/deletion', headers: { ...NAVIGATION, cookie } }, response, { ...ROUTE, method: 'GET' as never }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'CONSENT_REQUIRED', status: 403 });
+    expect(redirectedTo()).toBeUndefined();
+    expect(headers['set-cookie']?.some(entry => entry.startsWith(`${reconsentCookie()}=;`))).toBe(true);
+  });
+
+  it('should admit a session that consented to the scope once it has stepped up', async () => {
+    const handle = await elevatedSession(true);
+    const { response } = capture();
+
+    await expect(run({ url: '/deletion', headers: { cookie: `${config().cookieName}=${handle}` } }, response)).resolves.toBeUndefined();
+  });
+
+  it('should keep refusing a missing scope that is not sensitive with the generic 403', async () => {
+    const handle = await elevatedSession(true);
+    const { response, headers } = capture();
+
+    const metadata: HandlerMetadata = { ...ROUTE, shadowAuth: { authenticated: true, elevated: true, scopes: ['memo:admin'] } };
+    const failure = await run({ url: '/deletion', headers: { cookie: `${config().cookieName}=${handle}` } }, response, metadata).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'IAM_002', status: 403 });
+    expect(headers['set-cookie']).toBeUndefined();
+  });
+});

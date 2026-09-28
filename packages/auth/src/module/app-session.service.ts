@@ -348,6 +348,28 @@ export class AppSessionService {
     return cookies[this.config.cookieName] || undefined;
   }
 
+  /** The `is_sensitive` scopes identity declares for this application, which only an elevated mint can carry */
+  async sensitiveScopes(): Promise<string[]> {
+    return (await this.runtime(undefined)).sensitiveScopes;
+  }
+
+  /**
+   * Ends a session whose grant predates this application asking consent for a sensitive scope, so the next
+   * login authorizes afresh, and marks the browser as having been sent round once.
+   */
+  async beginReconsent(handle: string): Promise<string[]> {
+    const cleared = await this.logout(handle);
+    return [...cleared, serializeCookie(this.config.reconsentCookieName, '1', this.config.reconsentCookie)];
+  }
+
+  hasReconsented(cookies: Record<string, string>): boolean {
+    return cookies[this.config.reconsentCookieName] === '1';
+  }
+
+  reconsentSpentCookie(): string {
+    return expireCookie(this.config.reconsentCookieName, this.config.reconsentCookie);
+  }
+
   clearedCookies(): string[] {
     return [expireCookie(this.config.cookieName, this.config.cookie), expireCookie(this.config.stateCookieName, this.config.stateCookie)];
   }

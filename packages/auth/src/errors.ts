@@ -80,6 +80,12 @@ export class AuthErrorCode extends ErrorCode {
   static readonly APP_SESSION_FAILED = AuthErrorCode.unavailable('APP_SESSION_FAILED', 'Application session request failed');
   /** Identity refused to redeem the callback's code: replayed, expired, or issued for another redirect or verifier */
   static readonly AUTHORIZATION_CODE_INVALID = AuthErrorCode.badRequest('AUTHORIZATION_CODE_INVALID', 'The authorization code is invalid, expired or already used');
+  /**
+   * The route needs a sensitive scope that this session's grant lacks even though it stepped up. Identity
+   * freezes a grant at authorize, so the guard first sends the browser back through a fresh one; this
+   * answers only when that fresh session still lacks the scope, which no further sign-in would change.
+   */
+  static readonly CONSENT_REQUIRED = AuthErrorCode.forbidden('CONSENT_REQUIRED', 'This sign-in has not granted a permission the action needs');
   /** The route needs an AAL2 token and no live elevation grant covers this app session and audience */
   static readonly ELEVATION_REQUIRED = AuthErrorCode.forbidden('ELEVATION_REQUIRED', 'Step-up authentication is required');
   /**
