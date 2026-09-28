@@ -111,19 +111,41 @@ export class PolicyService {
 
   private async readAll(organisationId: bigint): Promise<Partial<Record<PolicyKey, number | boolean>>> {
     const cached = await this.redis.get(this.cacheKey(organisationId));
-    if (cached) return JSON.parse(cached) as Partial<Record<PolicyKey, number | boolean>>;
+    if (cached) return this.coerceAll(organisationId, Object.entries(JSON.parse(cached) as Record<string, unknown>));
 
     const rows = await this.db
       .select({ policyKey: schema.organisationPolicies.policyKey, policyValue: schema.organisationPolicies.policyValue })
       .from(schema.organisationPolicies)
       .where(and(eq(schema.organisationPolicies.organisationId, organisationId), inArray(schema.organisationPolicies.policyKey, POLICY_KEYS)));
 
-    const overrides: Partial<Record<PolicyKey, number | boolean>> = {};
-    for (const row of rows) {
-      if (isPolicyKey(row.policyKey)) overrides[row.policyKey] = row.policyValue as number | boolean;
-    }
+    const overrides = this.coerceAll(
+      organisationId,
+      rows.map(row => [row.policyKey, row.policyValue]),
+    );
     await this.redis.set(this.cacheKey(organisationId), JSON.stringify(overrides), 'EX', CACHE_TTL_S);
     return overrides;
+  }
+
+  /** A value that does not fit its key's type is dropped rather than folded: a truthy string would otherwise defeat an AND veto. */
+  private coerceAll(organisationId: bigint, entries: [string, unknown][]): Partial<Record<PolicyKey, number | boolean>> {
+    const overrides: Partial<Record<PolicyKey, number | boolean>> = {};
+    for (const [key, raw] of entries) {
+      if (!isPolicyKey(key)) continue;
+      const value = this.coerce(POLICY_REGISTRY[key] as PolicyDefinition, raw);
+      if (value === undefined) this.logger.warn('ignoring an organisation policy value that does not fit its type', { organisationId, policyKey: key });
+      else overrides[key] = value;
+    }
+    return overrides;
+  }
+
+  private coerce(definition: PolicyDefinition, raw: unknown): number | boolean | undefined {
+    if (definition.type === 'boolean') {
+      if (typeof raw === 'boolean') return raw;
+      if (raw === 'true' || raw === 'false') return raw === 'true';
+      return undefined;
+    }
+    const value = typeof raw === 'string' && /^-?\d+$/.test(raw) ? Number(raw) : raw;
+    return typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
   }
 
   private async invalidate(organisationId: bigint): Promise<void> {
