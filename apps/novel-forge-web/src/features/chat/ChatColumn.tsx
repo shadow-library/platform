@@ -43,11 +43,16 @@ import { type TurnTimeline, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 
+import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import {
+  awaitingAnswer,
   checklistView,
-  composerHint,
+  composerChips,
+  type ComposerMode,
+  composerModeChange,
+  composerModeOf,
   entryNotes,
   firstUserMessageId,
   heroText,
@@ -61,6 +66,7 @@ import {
   promptChips,
   questionOf,
   type QuestionOption,
+  type SessionMode,
   shouldRefocusComposer,
   turnAnnouncement,
   type TurnOutcome,
@@ -69,6 +75,7 @@ import {
   unusedParagraphPrompt,
 } from './chat-view';
 import styles from './Chat.module.css';
+import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
 import { OrganiseReceipt } from './OrganiseReceipt';
 import { ProgressDock } from './ProgressPanel';
@@ -94,7 +101,7 @@ export interface ChatColumnProps {
   onOpenHistory: () => void;
   onOpenChanges: () => void;
   onNewChat: () => void;
-  onStart: (content: string) => void;
+  onStart: (content: string, mode: SessionMode) => void;
   // True while the session create this column handed off is in flight — locks the composer so a second
   // Enter or Send click can't spawn a second session from the same opening message.
   starting: boolean;
@@ -154,6 +161,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [input, setInput] = useState('');
   const [proseEdits, setProseEdits] = useState(false);
   const [justDiscussing, setJustDiscussing] = useState(false);
+  const [draftMode, setDraftMode] = useState<SessionMode>('auto');
+  const [queued, setQueued] = useState<QueuedTurn>();
   const [turnChoice, setTurnChoice] = useState<TurnChoice>();
   const [renamingHeader, setRenamingHeader] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(true);
@@ -177,7 +186,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
 
   const messages = useMemo(() => messagesQuery.data?.messages ?? [], [messagesQuery.data]);
   const project = projectQuery.data;
-  const mode = session?.mode ?? 'auto';
+  const mode = session?.mode ?? draftMode;
   const name = project ? projectTitle(project) : 'this novel';
   const notes = notesQuery.data?.notes;
   const nextChapter = (statusQuery.data?.draftsTotal ?? 0) + 1;
@@ -227,7 +236,18 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
 
   const opener = openerChip(project?.kind, messages.length, notes);
-  const chips: PromptChip[] = [...(opener ? [opener] : []), ...promptChips(checklist?.items ?? [], nextChapter)];
+  const chips: PromptChip[] = composerChips([...(opener ? [opener] : []), ...promptChips(checklist?.items ?? [], nextChapter)], {
+    running: pending,
+    awaitingAnswer: awaitingAnswer(messages),
+  });
+
+  const step = queueStep({ queued, running: pending, locked, stream: stream.status, finishedId, inTranscript: finishedId !== undefined && messageIds.has(finishedId) });
+  const queueNow = useRef(queued);
+  useLayoutEffect(() => {
+    queueNow.current = queued;
+  });
+  const switching = updateSession.isPending && updateSession.variables?.mode !== undefined;
+  const shownMode = (switching ? updateSession.variables?.mode : undefined) ?? mode;
 
   // Stay pinned to the newest message: inline cards load after the transcript, so follow content growth while the
   // author is near the bottom, and stop following the moment they scroll up to read.
@@ -295,17 +315,19 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     }
   }, [jobStream.jobs]);
 
-  const sendTurn = (content: string, draft?: string): void => {
+  const currentSettings = (): TurnSettings => ({ proseEdits, justDiscussing, choice: turnChoice });
+
+  const sendTurn = (content: string, draft?: string, settings: TurnSettings = currentSettings(), requeue?: QueuedTurn): void => {
     if (!session || !content || pending) return;
     setAssistantWatermark(lastAssistantOrdinal(messages));
-    const override = turnOverride(turnChoice, defaults.choice);
+    const override = turnOverride(settings.choice, defaults.choice);
     turn.send(
       content,
       {
         onSuccess: result => {
           announce(turnAnnouncement(turnOutcome(result)));
-          // The model and cost pick is for this turn only; a failed send keeps it for the retry.
-          setTurnChoice(undefined);
+          // The model and cost pick is for this turn only; a failed send keeps it for the retry, and a newer pick for the next message stays.
+          setTurnChoice(current => (current === settings.choice ? undefined : current));
           invalidateProgress(queryClient, novelId);
           if (result.applyNote) toast.warning(result.applyNote);
         },
@@ -313,24 +335,58 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           announce(turnAnnouncement({ applied: 0, suggested: 0, failed: true }));
           if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
           toast.danger(err.message);
-          if (draft !== undefined) setInput(current => current || draft);
+          const { queue, input: restored } = restoreFailed(requeue, draft, Boolean(queueNow.current));
+          if (queue) setQueued(queue);
+          if (restored !== undefined) setInput(current => (current.trim() ? `${restored}\n${current}` : restored));
         },
       },
-      { proseEdits, justDiscussing, ...override },
+      { proseEdits: settings.proseEdits, justDiscussing: settings.justDiscussing, ...override },
     );
+  };
+
+  const enqueue = (content: string): void => {
+    if (queued || locked) return;
+    setQueued({ content, ...currentSettings(), watching: turn.isPending, after: finishedId });
+    setTurnChoice(undefined);
+    setInput('');
   };
 
   const send = (): void => {
     const content = input.trim();
     if (!content) return;
     if (!session) {
-      if (!starting) props.onStart(content);
+      if (!starting) props.onStart(content, draftMode);
       return;
     }
-    if (pending) return;
+    if (switching) return;
+    if (pending) return enqueue(content);
     setInput('');
     sendTurn(content, content);
   };
+
+  const releaseQueued = (via: 'auto' | 'now'): void => {
+    if (!queued || pending || locked) return;
+    setQueued(undefined);
+    sendTurn(queued.content, undefined, releaseSettings(queued, currentSettings(), via), queued);
+  };
+
+  const editQueuedMessage = (): void => {
+    if (!queued) return;
+    const edited = editQueued(queued, input);
+    setInput(edited.input);
+    setProseEdits(edited.settings.proseEdits);
+    setJustDiscussing(edited.settings.justDiscussing);
+    setTurnChoice(edited.settings.choice);
+    setQueued(undefined);
+    inputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (step !== 'send') return;
+    const timer = setTimeout(() => releaseQueued('auto'));
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- releases the queue once, on the step turning to 'send'; the timer runs the render's own releaseQueued
+  }, [step]);
 
   // Both opening messages are sent from a timer the effect's cleanup cancels, not from the effect itself: under StrictMode's
   // mount–unmount–mount the first pass only schedules, its cleanup cancels the timer (never a request in flight), and the ref keeps
@@ -397,9 +453,21 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     );
   };
 
-  const switchToAuto = (): void => {
-    if (!session) return;
-    updateSession.mutate({ sessionId: session.id, mode: 'auto' }, { onError: err => toast.danger(err.message) });
+  const changeMode = (value: ComposerMode): void => {
+    const change = composerModeChange(value, mode);
+    const wasDiscussing = justDiscussing;
+    setJustDiscussing(change.justDiscussing);
+    if (!change.sessionMode) return;
+    if (!session) return setDraftMode(change.sessionMode);
+    updateSession.mutate(
+      { sessionId: session.id, mode: change.sessionMode },
+      {
+        onError: err => {
+          setJustDiscussing(wasDiscussing);
+          toast.danger(err.message);
+        },
+      },
+    );
   };
 
   const onChip = (chip: PromptChip): void => {
@@ -479,7 +547,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const askForPlan = (content: string): void => {
     setPlanStartOpen(false);
     if (session) return sendTurn(content);
-    if (!starting) props.onStart(content);
+    if (!starting) props.onStart(content, draftMode);
   };
 
   const writeMyself = (): void => {
@@ -517,19 +585,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     [],
   );
 
-  const notices = (
-    <>
-      {mode === 'manual' && session && (
-        <div className={styles.composerNotice}>
-          <span>This chat is manual: even your own clear words come back as cards.</span>
-          <Button size="sm" variant="secondary" loading={updateSession.isPending} disabled={locked} onClick={switchToAuto}>
-            Switch to Auto
-          </Button>
-        </div>
-      )}
-      {unanswered > 0 && <div className={styles.composerNotice}>{unansweredWarning(unanswered)}</div>}
-    </>
-  );
+  const notices = unanswered > 0 && <div className={styles.composerNotice}>{unansweredWarning(unanswered)}</div>;
 
   const conversation = view.kind === 'conversation';
   const panelTurn = panelTurnOf({ stream, streamShown: showStream, messages, focus: panelFocus });
@@ -731,16 +787,21 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             onSend={send}
             onStop={pending && activeRunId ? stop : undefined}
             stopping={turn.stopping}
-            sending={session ? pending : starting}
+            sending={!session && starting}
+            running={pending}
             locked={locked}
+            switching={switching}
             chips={chips}
             onChip={onChip}
+            modeMenu={<ComposerModeMenu value={composerModeOf(shownMode, justDiscussing)} onChange={changeMode} disabled={locked || pending || switching} />}
             modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: setTurnChoice }} />}
             justDiscussing={justDiscussing}
-            onJustDiscussingChange={setJustDiscussing}
             proseEdits={proseEdits}
             onProseEditsChange={setProseEdits}
-            hint={composerHint(mode, justDiscussing)}
+            queued={queuedView(queued, step, stream.status)}
+            onEditQueued={editQueuedMessage}
+            onSendQueued={() => releaseQueued('now')}
+            caption={inputCaption({ input, running: pending, queued: Boolean(queued), switching })}
             notices={notices}
             announcement={announcement}
           />

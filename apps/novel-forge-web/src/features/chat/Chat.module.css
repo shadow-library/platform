@@ -434,14 +434,13 @@ button.turnRow:hover {
   text-decoration: underline;
 }
 
-.checklistHead:hover,
-.discussToggle:hover:not(:disabled, [aria-pressed='true']) {
+.checklistHead:hover {
   background: var(--sh-bg-hover);
 }
 
 .headTitleButton:focus-visible,
 .textLink:focus-visible,
-.discussToggle:focus-visible,
+.modeTrigger:focus-visible,
 .option:focus-visible,
 .checklistHead:focus-visible {
   outline: 2px solid var(--sh-border-focus);
@@ -1070,52 +1069,71 @@ button.turnRow:hover {
   margin-top: 8px;
 }
 
-.discussToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--sh-border-default);
-  border-radius: var(--sh-radius-full);
-  background: var(--sh-surface-card);
-  font: inherit;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-secondary);
-  cursor: pointer;
-}
-
-.discussToggle[aria-pressed='true'] {
-  border-color: var(--sh-warning-border);
+.modeTrigger[data-mode='just-discuss'] {
   background: var(--sh-warning-bg-subtle);
   color: var(--sh-warning-text-on-subtle);
+}
+
+.proseToggle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.caption {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.modeDescription {
+  display: block;
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.round.round[data-size] {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--sh-radius-full);
+  margin-left: auto;
+}
+
+.stop.stop[data-variant],
+.stop.stop[data-variant]:not(:disabled):hover,
+.stop.stop[data-variant]:not(:disabled):active {
+  background-color: var(--sh-text-primary);
+  color: var(--sh-surface-card);
+}
+
+.queued {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.queuedLabel {
+  flex: none;
   font-weight: 600;
 }
 
-.discussToggle:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.discussDot {
-  width: 10px;
-  height: 10px;
-  border: 1.5px solid currentColor;
-  border-radius: var(--sh-radius-full);
-}
-
-.discussToggle[aria-pressed='true'] .discussDot {
-  background: currentColor;
-}
-
-.hint {
+.queuedText {
   flex: 1 1 0;
-  font-size: 11px;
-  color: var(--sh-text-tertiary);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--sh-text-primary);
+}
+
+.queuedNote {
+  flex: 1 0 100%;
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
 }
 
 .planStartBar {

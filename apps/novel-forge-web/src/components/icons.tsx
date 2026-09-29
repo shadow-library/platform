@@ -232,6 +232,12 @@ export const SendIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const ArrowUpIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M12 19V5M5 12l7-7 7 7" />
+  </SvgIcon>
+);
+
 export const StopIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />

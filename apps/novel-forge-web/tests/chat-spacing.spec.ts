@@ -168,8 +168,12 @@ const CHAT: Expected[] = [
     source: 'chat.module.css .composerInner; Main l.199',
   },
   { selector: '.composerBar', values: { gap: '8px', 'margin-top': '8px' }, baseline: '.composerBar', source: 'chat.module.css .composerBar; Main l.202' },
-  { selector: '.discussToggle', values: { gap: '6px', height: '24px', padding: '0 8px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.36 .tog' },
-  { selector: '.discussDot', values: { width: '10px', height: '10px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.204 dot' },
+  {
+    selector: '.round.round[data-size]',
+    values: { width: '34px', height: '34px', 'border-radius': 'var(--sh-radius-full)', 'margin-left': 'auto' },
+    source: 'chat redesign .round: 34px circle, margin-left auto',
+  },
+  { selector: '.queued', values: { gap: '8px', padding: '6px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'chat redesign .queued gap 8, padding 6px 10px' },
 ];
 
 const CHAT_PHONE: Expected[] = [
@@ -272,18 +276,36 @@ describe('Chat spacing', () => {
     check(chat.base, CHAT, today);
   });
 
-  it('should keep the composer hint on one line, as today', () => {
-    const hint = (path: string): Record<string, string> => {
-      const css = readFileSync(new URL(path, import.meta.url), 'utf-8');
-      const body = /\n\.hint \{([^}]*)\}/.exec(css)?.[1] ?? '';
-      return Object.fromEntries(
-        body
-          .split(';')
-          .map(line => line.split(':').map(part => part.trim()))
-          .filter(([property]) => property === 'white-space' || property === 'overflow' || property === 'text-overflow' || property === 'min-width'),
-      );
-    };
-    expect(hint('../src/features/chat/Chat.module.css')).toEqual(hint('./fixtures/chat.baseline.module.css'));
+  it('should size the mode pill with the model pill’s own class and keep the Edit prose note inline', () => {
+    const menu = readFileSync(new URL('../src/features/chat/ComposerModeMenu.tsx', import.meta.url), 'utf-8');
+    expect(menu).toContain('modelStyles.trigger');
+    const toggle = readFileSync(new URL('../src/components/nf/ProseEditsToggle.module.css', import.meta.url), 'utf-8');
+    expect(toggle).not.toMatch(/order:|100%/);
+    expect(readFileSync(new URL('../src/features/chat/Chat.module.css', import.meta.url), 'utf-8')).toMatch(/\.proseToggle \{\s*flex: 1 1 auto;\s*min-width: 0;/);
+    expect(toggle).toMatch(/\.label \{\s*flex: none;\s*white-space: nowrap;/);
+  });
+
+  it('should wrap the Edit prose toggle to its own row at 375px, as it did before, because its natural width cannot fit beside the pills and the button', () => {
+    const { base } = spacingOf('../src/features/chat/Chat.module.css');
+    const composerSide = px(base.get('.composer')?.padding, 1);
+    const innerSide = px(base.get('.composerInner')?.padding, 1);
+    const bar = 375 - 2 * composerSide - 2 * innerSide - 2;
+    const gap = px(base.get('.composerBar')?.gap);
+    const round = px(base.get('.round.round[data-size]')?.width);
+    const modePill = 100;
+    const modelPill = 130;
+    const toggleNatural = 36 + 6 + 56;
+    const beside = modePill + gap + modelPill + gap + toggleNatural + gap + round;
+    expect(beside).toBeGreaterThan(bar);
+    expect(modePill + gap + modelPill + gap + round).toBeLessThanOrEqual(bar);
+    const css = readFileSync(new URL('../src/features/chat/Chat.module.css', import.meta.url), 'utf-8');
+    expect(/\.proseToggle \{\s*flex: (\d+) (\d+) ([^;]+);/.exec(css)?.[3]).toBe('auto');
+  });
+
+  it('should keep the queued message on one truncated line', () => {
+    const css = readFileSync(new URL('../src/features/chat/Chat.module.css', import.meta.url), 'utf-8');
+    const body = /\n\.queuedText \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    for (const declaration of ['min-width: 0', 'overflow: hidden', 'text-overflow: ellipsis', 'white-space: nowrap']) expect(body).toContain(declaration);
   });
 
   it('should keep every phone override cited', () => {

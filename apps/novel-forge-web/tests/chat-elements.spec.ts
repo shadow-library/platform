@@ -6,6 +6,7 @@ import { MessageModelTagView, TurnModelPanel, type TurnModelPanelProps } from '.
 import { AppliedBlock, type AppliedBlockProps, UndoImpactBody } from '../src/features/chat/AppliedBlock';
 import { ChatComposer, type ChatComposerProps } from '../src/features/chat/ChatComposer';
 import { checklistView, type OrganiseReceiptView } from '../src/features/chat/chat-view';
+import { ComposerModeMenu } from '../src/features/chat/ComposerModeMenu';
 import { JobProgress } from '../src/features/chat/JobProgress';
 import { OrganiseReceipt, type OrganiseReceiptProps } from '../src/features/chat/OrganiseReceipt';
 import { QuestionCard } from '../src/features/chat/QuestionCard';
@@ -336,15 +337,18 @@ function composer(overrides: Partial<ChatComposerProps> = {}): string {
       onSend: noop,
       stopping: false,
       sending: false,
+      running: false,
       locked: false,
+      switching: false,
       chips: [{ label: 'Plan chapter 1', prompt: 'Let’s plan chapter 1.' }],
       onChip: noop,
-      modelMenu: createElement('span', null, 'model'),
+      modeMenu: createElement('span', null, 'mode-menu'),
+      modelMenu: createElement('span', null, 'model-menu'),
       justDiscussing: false,
-      onJustDiscussingChange: noop,
       proseEdits: false,
       onProseEditsChange: noop,
-      hint: 'Clear instructions in your own words apply at once and can be undone.',
+      onEditQueued: noop,
+      onSendQueued: noop,
       announcement: 'Forge replied.',
       ...overrides,
     }),
@@ -359,22 +363,53 @@ describe('ChatComposer', () => {
     expect(box).toContain('Plan chapter 1');
     expect(box).toContain('aria-live="polite"');
     expect(box).toContain('Forge replied.');
-    expect(box).toContain('Clear instructions in your own words apply at once');
   });
 
-  it('should switch to discussing: pressed toggle, dashed box and a promise nothing changes', () => {
-    const box = composer({ justDiscussing: true, hint: 'Nothing will change until you add it.' });
-    expect(box).toContain('aria-pressed="true"');
+  it('should put the mode, the model and Edit prose in one toolbar row', () => {
+    const box = composer();
+    expect(box.indexOf('mode-menu')).toBeLessThan(box.indexOf('model-menu'));
+    expect(box.indexOf('model-menu')).toBeLessThan(box.indexOf('aria-label="Edit prose"'));
+    expect(box.indexOf('aria-label="Edit prose"')).toBeLessThan(box.indexOf('aria-label="Send"'));
+  });
+
+  it('should show discussing as a dashed box and a think-out-loud prompt', () => {
+    const box = composer({ justDiscussing: true });
     expect(box).toContain('data-discussing="true"');
-    expect(box).toContain('Nothing will change until you add it.');
     expect(box).toContain('Think out loud — what if…');
   });
 
-  it('should disable Send on an empty draft and turn it into Stop while a turn runs', () => {
-    expect(composer()).toMatch(/disabled=""[^>]*>.*Send/s);
-    const running = composer({ input: 'go', onStop: noop });
-    expect(running).toContain('Stop');
-    expect(running).not.toContain('>Send<');
+  it('should disable Send on an empty draft and keep it a labelled round button', () => {
+    expect(composer()).toMatch(/aria-label="Send"[^>]*disabled=""|disabled=""[^>]*aria-label="Send"/);
+    expect(composer({ input: 'go' })).not.toMatch(/disabled=""[^>]*aria-label="Send"|aria-label="Send"[^>]*disabled=""/);
+  });
+
+  it('should turn Send into a labelled Stop while a turn runs and keep the box usable for a queued message', () => {
+    const running = composer({ input: 'go', running: true, onStop: noop });
+    expect(running).toContain('aria-label="Stop"');
+    expect(running).not.toContain('aria-label="Send"');
+    expect(running).toContain('Type to queue a message. It sends when this reply finishes.');
+    expect(running).not.toMatch(/<textarea[^>]*disabled/);
+  });
+
+  it('should disable Stop until the run is known', () => {
+    expect(composer({ running: true })).toMatch(/aria-label="Stop"[^>]*disabled=""|disabled=""[^>]*aria-label="Stop"/);
+  });
+
+  it('should show a queued message with Edit, and Send now only once it is held', () => {
+    const waiting = composer({ running: true, queued: { text: 'Make it darker', held: false } });
+    expect(waiting).toContain('Queued');
+    expect(waiting).toContain('Make it darker');
+    expect(waiting).toContain('Edit');
+    expect(waiting).not.toContain('Send now');
+    expect(waiting).toContain('One message is queued.');
+    const held = composer({ queued: { text: 'Make it darker', held: true, note: 'The reply failed, so this is waiting for you.' } });
+    expect(held).toContain('Send now');
+    expect(held).toContain('The reply failed, so this is waiting for you.');
+    expect(held).not.toContain('Suggested prompts');
+  });
+
+  it('should explain a no-op Enter with a caption', () => {
+    expect(composer({ caption: 'One message is already queued.' })).toContain('One message is already queued.');
   });
 });
 
@@ -395,11 +430,20 @@ function panel(overrides: Partial<TurnModelPanelProps> = {}): string {
   );
 }
 
+describe('ComposerModeMenu', () => {
+  it('should name the current mode on its trigger and be disabled while a turn runs', () => {
+    const pill = html(createElement(ComposerModeMenu, { value: 'just-discuss', onChange: noop }));
+    expect(pill).toContain('Just discuss');
+    expect(pill).toContain('aria-label="Mode: Just discuss"');
+    expect(pill).toContain('data-mode="just-discuss"');
+    expect(html(createElement(ComposerModeMenu, { value: 'edit-freely', onChange: noop, disabled: true }))).toContain('disabled=""');
+  });
+});
+
 describe('ChatComposer notices', () => {
-  it('should show a warning above the box and keep the hint on one truncated line with its full text on hover', () => {
+  it('should show a warning above the box', () => {
     const box = composer({ notices: createElement('div', null, '2 suggestions still need an answer') });
-    expect(box).toContain('2 suggestions still need an answer');
-    expect(box).toContain('title="Clear instructions in your own words apply at once and can be undone."');
+    expect(box.indexOf('2 suggestions still need an answer')).toBeLessThan(box.indexOf('aria-label="Message"'));
   });
 });
 

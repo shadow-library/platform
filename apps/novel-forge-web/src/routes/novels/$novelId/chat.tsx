@@ -4,7 +4,7 @@ import { Button, Dialog, Input, SegmentedControl, Spinner, toast } from '@shadow
 
 import { ArchiveIcon, ChatIcon, EditIcon, SearchIcon, TrashIcon } from '@/components/icons';
 import { CollectionPage, EmptyState, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
-import { ChatColumn, RenameInput } from '@/features/chat';
+import { ChatColumn, RenameInput, type SessionMode } from '@/features/chat';
 import {
   type ChangeItemResponse,
   type ChatSessionResponse,
@@ -399,12 +399,12 @@ function ChatScreen(): React.JSX.Element {
 
   // The first message of a brand-new chat: create the session, then leave the column that typed it mounted
   // so the same turn-sending path sends it — never sent from here directly.
-  const startDraft = (content: string): void => {
+  const startDraft = (content: string, mode: SessionMode): void => {
     if (startingRef.current) return;
     startingRef.current = true;
     const requestId = (startRequestRef.current += 1);
     createSession.mutate(
-      {},
+      { mode },
       {
         onSuccess: async session => {
           if (startRequestRef.current !== requestId) return;

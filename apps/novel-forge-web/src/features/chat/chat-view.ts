@@ -538,10 +538,45 @@ export function rationaleOf(op: ChangeOp): string {
 
 export type SessionMode = 'manual' | 'auto';
 
-export function composerHint(mode: SessionMode, discussing: boolean): string {
-  if (discussing) return 'Nothing will change until you add it. Ideas come back as cards.';
-  if (mode === 'manual') return 'Manual — every change comes back as a card for your yes, even your own words.';
-  return 'Clear instructions in your own words apply at once and can be undone. Its ideas, “what if”s and anything it removes wait for your yes.';
+export type ComposerMode = 'edit-freely' | 'ask-first' | 'just-discuss';
+
+export interface ComposerModeOption {
+  value: ComposerMode;
+  label: string;
+  description: string;
+}
+
+export const COMPOSER_MODES: readonly ComposerModeOption[] = [
+  { value: 'edit-freely', label: 'Edit freely', description: 'Applies most Story Bible changes right away. Removals, plans, prose and secrets still ask. Undo any time.' },
+  { value: 'ask-first', label: 'Ask first', description: 'Suggests every change. You approve each one.' },
+  { value: 'just-discuss', label: 'Just discuss', description: 'Nothing changes until you approve it.' },
+];
+
+export function composerModeOf(mode: SessionMode, discussing: boolean): ComposerMode {
+  if (discussing) return 'just-discuss';
+  return mode === 'manual' ? 'ask-first' : 'edit-freely';
+}
+
+export interface ComposerModeChange {
+  justDiscussing: boolean;
+  /** Absent when the chat already has the mode the pick implies. */
+  sessionMode?: SessionMode;
+}
+
+export function composerModeChange(value: ComposerMode, current: SessionMode): ComposerModeChange {
+  if (value === 'just-discuss') return { justDiscussing: true };
+  const sessionMode: SessionMode = value === 'ask-first' ? 'manual' : 'auto';
+  return { justDiscussing: false, sessionMode: sessionMode === current ? undefined : sessionMode };
+}
+
+export function awaitingAnswer(messages: readonly Pick<ChatMessageResponse, 'role' | 'ordinal' | 'question'>[]): boolean {
+  let latest: (typeof messages)[number] | undefined;
+  for (const message of messages) if (message.role === 'assistant' && (!latest || message.ordinal > latest.ordinal)) latest = message;
+  return Boolean(latest && questionOf(latest.question) && lastUserOrdinal(messages) < latest.ordinal);
+}
+
+export function composerChips(chips: PromptChip[], state: { running: boolean; awaitingAnswer: boolean }): PromptChip[] {
+  return state.running || state.awaitingAnswer ? [] : chips;
 }
 
 export function heroText(name: string, mode: SessionMode): string {

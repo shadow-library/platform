@@ -3,9 +3,13 @@ import { textDigest } from '@shadow-library/sdk';
 
 import {
   appliedRows,
+  awaitingAnswer,
   checklistView,
   commitBarView,
-  composerHint,
+  COMPOSER_MODES,
+  composerChips,
+  composerModeChange,
+  composerModeOf,
   entryNotes,
   finalizeReviewBlocked,
   finalizeReviewChapter,
@@ -467,10 +471,76 @@ describe('appliedRows', () => {
 
 describe('mode copy', () => {
   it('should describe a manual chat as it behaves', () => {
-    expect(composerHint('manual', false)).toContain('Manual — every change comes back as a card');
-    expect(composerHint('auto', false)).toContain('apply at once');
-    expect(composerHint('manual', true)).toContain('Nothing will change until you add it.');
     expect(heroText('The Tide Ledger', 'manual')).toContain('every change waits for your yes');
+  });
+});
+
+describe('composer mode', () => {
+  it('should offer the three modes with a one-line description each', () => {
+    expect(COMPOSER_MODES.map(mode => mode.label)).toEqual(['Edit freely', 'Ask first', 'Just discuss']);
+    expect(COMPOSER_MODES.map(mode => mode.description)).toEqual([
+      'Applies most Story Bible changes right away. Removals, plans, prose and secrets still ask. Undo any time.',
+      'Suggests every change. You approve each one.',
+      'Nothing changes until you approve it.',
+    ]);
+  });
+
+  it('should read the current mode from the chat and the per-turn discuss flag, discuss winning', () => {
+    expect(composerModeOf('auto', false)).toBe('edit-freely');
+    expect(composerModeOf('manual', false)).toBe('ask-first');
+    expect(composerModeOf('auto', true)).toBe('just-discuss');
+    expect(composerModeOf('manual', true)).toBe('just-discuss');
+  });
+
+  it('should save a session mode only when the pick changes it, and never for Just discuss', () => {
+    expect(composerModeChange('ask-first', 'auto')).toEqual({ justDiscussing: false, sessionMode: 'manual' });
+    expect(composerModeChange('edit-freely', 'manual')).toEqual({ justDiscussing: false, sessionMode: 'auto' });
+    expect(composerModeChange('edit-freely', 'auto')).toEqual({ justDiscussing: false, sessionMode: undefined });
+    expect(composerModeChange('just-discuss', 'manual')).toEqual({ justDiscussing: true });
+  });
+});
+
+describe('composerChips', () => {
+  const chips = [{ label: 'Plan chapter 1', prompt: 'Let’s plan chapter 1.' }];
+
+  it('should hide the static chips while a turn runs or a question waits, and keep them otherwise', () => {
+    expect(composerChips(chips, { running: true, awaitingAnswer: false })).toEqual([]);
+    expect(composerChips(chips, { running: false, awaitingAnswer: true })).toEqual([]);
+    expect(composerChips(chips, { running: false, awaitingAnswer: false })).toEqual(chips);
+  });
+});
+
+describe('awaitingAnswer', () => {
+  const question = { question: 'Which tone?', answers: [{ title: 'Grim' }] } as never;
+
+  it('should wait on the latest reply’s question until the author writes something after it', () => {
+    expect(
+      awaitingAnswer([
+        { role: 'user', ordinal: 1, question: null },
+        { role: 'assistant', ordinal: 2, question },
+      ]),
+    ).toBe(true);
+    expect(
+      awaitingAnswer([
+        { role: 'assistant', ordinal: 2, question },
+        { role: 'user', ordinal: 3, question: null },
+      ]),
+    ).toBe(false);
+  });
+
+  it('should ignore a reply with no question or no options', () => {
+    expect(awaitingAnswer([])).toBe(false);
+    expect(awaitingAnswer([{ role: 'assistant', ordinal: 2, question: null }])).toBe(false);
+    expect(awaitingAnswer([{ role: 'assistant', ordinal: 2, question: { question: 'Which tone?', answers: [] } as never }])).toBe(false);
+  });
+
+  it('should judge only the latest reply, not an older unanswered one', () => {
+    expect(
+      awaitingAnswer([
+        { role: 'assistant', ordinal: 2, question },
+        { role: 'assistant', ordinal: 4, question: null },
+      ]),
+    ).toBe(false);
   });
 });
 

@@ -9,13 +9,14 @@ export interface ProseEditsToggleProps {
   onCheckedChange: (checked: boolean) => void;
   message: string;
   disabled?: boolean;
+  className?: string;
 }
 
 /** The per-turn permission for Forge to rewrite chapter text; off means a plan edit stays a plan edit. */
-export function ProseEditsToggle({ checked, onCheckedChange, message, disabled }: ProseEditsToggleProps): React.JSX.Element {
+export function ProseEditsToggle({ checked, onCheckedChange, message, disabled, className }: ProseEditsToggleProps): React.JSX.Element {
   const suggest = !checked && looksLikeProseEdit(message);
   return (
-    <div className={styles.toggle}>
+    <div className={className ? `${styles.toggle} ${className}` : styles.toggle}>
       <Switch aria-label="Edit prose" checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
       <span className={styles.label}>Edit prose</span>
       {checked && <span className={styles.hint}>Forge may rewrite the chapter text itself.</span>}
