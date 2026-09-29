@@ -11,7 +11,6 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 import {
   addOrganisationMember,
   assignApplicationRole,
-  changeChallenge,
   createApplicationRole,
   createAuthzApi,
   expireOrganisationInvitation,
@@ -30,14 +29,13 @@ import {
   releaseApplication,
   relyingPartyClient,
   spendRateLimit,
-  startLogin,
   stepUp,
   unresolvableDomain,
   updateOrganisationMember,
   verifyChallenge,
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
-import { countOutboxRows, expectErrorCode, expectSessionCookie, flowStepOf, pollInviteToken, pollOtp } from './helpers';
+import { expectErrorCode, expectSessionCookie, pollInviteToken, pollOtp } from './helpers';
 
 /**
  * Defining types
@@ -95,9 +93,8 @@ interface PolicyItem {
  */
 
 const ACCESS_TOKEN_TTL = 'auth.access_token.ttl';
-const EMAIL_OTP_FALLBACK = 'mfa.email_otp_fallback.enabled';
+const ELEVATION_WINDOW = 'auth.elevation.window';
 const REGISTER_OTP_TEMPLATE = 'auth.register.otp';
-const LOGIN_OTP_TEMPLATE = 'auth.login.otp';
 const STRONG_PASSWORD = 'E2eOrg#Passw0rd!';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The per-organisation invitation budget (`InvitationService.INVITE_BUDGET`): 20 an hour, so the 21st is refused. */
@@ -590,34 +587,18 @@ test.describe('identity organisations — policies', () => {
     await expectRefused(await setPolicy(team.ownerCtx, team.organisationId, ACCESS_TOKEN_TTL, { value: 86_401 }), 400, 'POL_002', 'above the maximum');
     await expectRefused(await setPolicy(team.ownerCtx, team.organisationId, ACCESS_TOKEN_TTL, { value: 300.5 }), 400, 'POL_002', 'a fractional duration');
     await expectRefused(await setPolicy(team.ownerCtx, team.organisationId, ACCESS_TOKEN_TTL, { enabled: true }), 400, 'POL_002', 'a switch sent for a duration');
-    await expectRefused(await setPolicy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK, { value: 1 }), 400, 'POL_002', 'a duration sent for a switch');
     expect(await policy(team.ownerCtx, team.organisationId, ACCESS_TOKEN_TTL), 'nothing was stored').not.toHaveProperty('configuredValue');
   });
 
-  test('should round-trip a boolean policy as enabled flags alone', async ({ identity }) => {
-    const team = await identity.createTeam({ label: 'org-policy-boolean' });
+  test('should refuse the retired email-code switch as an unknown key while a duration still saves', async ({ identity }) => {
+    const team = await identity.createTeam({ label: 'org-policy-retired' });
 
-    const initial = await policy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK);
-    expect(initial).toMatchObject({ type: 'boolean', defaultEnabled: true, effectiveEnabled: true });
-    expect(initial).not.toHaveProperty('configuredEnabled');
-    expect(initial).not.toHaveProperty('effectiveValue');
+    expect((await setPolicy(team.ownerCtx, team.organisationId, 'mfa.email_otp_fallback.enabled', { enabled: false })).status(), 'the switch is gone from the registry').toBe(422);
+    expect((await clearPolicy(team.ownerCtx, team.organisationId, 'mfa.email_otp_fallback.enabled')).status(), 'and cannot be cleared either').toBe(422);
 
-    expect((await setPolicy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK, { enabled: false })).status()).toBe(200);
-    expect(await policy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK)).toMatchObject({ defaultEnabled: true, effectiveEnabled: false, configuredEnabled: false });
-
-    expect((await clearPolicy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK)).status()).toBe(200);
-    expect(await policy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK)).not.toHaveProperty('configuredEnabled');
-  });
-
-  // `mfa.email_otp_fallback.enabled` (policy.registry.ts:87) is resolved only to render itself (policy.service.ts:100); no enforcement path reads it, so the switch is stored and reported only.
-  test.fixme('should stop issuing emailed codes to a member whose organisation has turned them off', async ({ identity }) => {
-    const team = await identity.createTeam({ label: 'org-policy-veto' });
-    const member = await teamMember(identity, team, 'org-policy-veto-member', 'MEMBER', 'AAL1');
-    expect((await setPolicy(team.ownerCtx, team.organisationId, EMAIL_OTP_FALLBACK, { enabled: false })).status()).toBe(200);
-
-    const ctx = await identity.anonymous();
-    const changed = await changeChallenge(ctx, await startLogin(ctx, member.user.email), 'EMAIL_OTP');
-    expect(await flowStepOf(changed), 'a vetoed organisation gets no emailed code').not.toMatchObject({ status: 'AWAITING_EMAIL_OTP' });
-    expect(await countOutboxRows('email', member.user.email, LOGIN_OTP_TEMPLATE), 'and none is enqueued').toBe(0);
+    expect((await setPolicy(team.ownerCtx, team.organisationId, ELEVATION_WINDOW, { value: 300 })).status()).toBe(200);
+    expect(await policy(team.ownerCtx, team.organisationId, ELEVATION_WINDOW), 'a registered duration still saves').toMatchObject({ configuredValue: 300, effectiveValue: 300 });
+    expect((await clearPolicy(team.ownerCtx, team.organisationId, ELEVATION_WINDOW)).status()).toBe(200);
+    expect(await policy(team.ownerCtx, team.organisationId, ELEVATION_WINDOW)).not.toHaveProperty('configuredValue');
   });
 });
