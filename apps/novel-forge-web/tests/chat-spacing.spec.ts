@@ -49,6 +49,7 @@ function spacingOf(path: string): { base: Rules; phone: Rules } {
 // wherever an entry names a `baseline` rule; "Main l.N" / "NextChapter l.N" / "Phone l.N" are lines in scratch-pad/novel-forge/design/*.dc.html
 // (canvas v11); "rule N" is scratch-pad/novel-forge/ui-spacing-reference.md.
 const CHAT: Expected[] = [
+  { selector: '.frame', values: { 'min-height': '0' }, source: 'chat redesign .shell: the chat beside its progress panel, min-height 0 as .column' },
   { selector: '.column', values: { 'min-height': '0' }, baseline: '.column', source: 'chat.module.css .column' },
   { selector: '.head', values: { height: '52px', gap: '10px', padding: '0 20px' }, baseline: '.head', source: 'chat.module.css .head; Main l.74; Phone header 52 `0 20px`' },
   {
@@ -198,6 +199,58 @@ const MODEL_MENU: Expected[] = [
   { selector: '.done', values: { 'margin-left': 'auto' }, source: 'Main l.216 Done margin-left auto' },
 ];
 
+// "redesign l.N" are lines in the approved chat redesign prototype (novel-forge-chat-redesign.html): its Cowork-style progress panel and receipt.
+const PANEL: Expected[] = [
+  { selector: '.panel', values: { width: '320px', 'min-height': '0' }, source: 'redesign l.46 .shell third column 320' },
+  { selector: '.sheetBody.sheetBody', values: { padding: '0' }, source: 'each .psec pads itself inside the sheet (redesign l.160)' },
+  { selector: '.section', values: { gap: '10px', padding: '14px 16px' }, source: 'redesign l.160 .psec padding 14px 16px; l.161 h3 margin-bottom 10' },
+  { selector: '.sectionTitle', values: { margin: '0', gap: '8px' }, source: 'redesign l.161 .psec h3 gap 8' },
+  { selector: '.empty', values: { margin: '0' }, source: 'paragraph reset' },
+  { selector: '.steps', values: { margin: '0', padding: '0', gap: '2px' }, source: 'redesign l.163 .plan gap 2' },
+  {
+    selector: '.step',
+    values: { 'grid-template-columns': '20px minmax(0, 1fr) auto', gap: '8px', padding: '4px 0' },
+    source: 'redesign l.164 .plan li; padding 5px rounded to .turnRow’s 4px 0',
+  },
+  {
+    selector: '.stepMark',
+    values: { width: '16px', height: '16px', 'margin-top': '2px', 'border-radius': 'var(--sh-radius-full)' },
+    source: 'redesign l.167 .plan .mk 16, margin-top 2, round',
+  },
+  { selector: '.groupLabel', values: { margin: '10px 0 4px' }, source: 'redesign l.173 .chg-g margin 10px 0 4px' },
+  { selector: '.groupLabel:first-child', values: { 'margin-top': '0' }, source: 'redesign l.174 .chg-g:first-child' },
+  { selector: '.changeList', values: { margin: '0', padding: '0' }, source: 'list reset' },
+  {
+    selector: '.change',
+    values: { 'grid-template-columns': 'minmax(0, 1fr) auto', gap: '4px 6px', padding: '4px 0' },
+    source: 'redesign l.175 .ci: columns, gap 6, padding 4px 0',
+  },
+  { selector: '.changeName', values: { gap: '4px' }, source: 'redesign l.178 .ci .idea margin-left 4' },
+  {
+    selector: '.changePrompt',
+    values: { gap: '8px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'chat.module.css .composerNotice strip 8px 10px, radius 6',
+  },
+  { selector: '.promptActions', values: { gap: '8px' }, source: 'rule 6: 8 between controls' },
+  { selector: '.decide', values: { gap: '2px' }, source: 'redesign l.184 .ci .yn gap 2' },
+  { selector: '.sources', values: { margin: '0', padding: '0', gap: '4px' }, source: 'redesign l.189 .srcl gap 4' },
+  { selector: '.source', values: { gap: '8px' }, source: 'chat.module.css .turnSource gap 8' },
+  { selector: '.sourceMark', values: { width: '12px', height: '12px' }, source: 'chat.module.css .turnSourceMark 12' },
+  { selector: '.sourceDot', values: { width: '6px', height: '6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'chat.module.css .turnSourceDot' },
+  {
+    selector: '.receipt',
+    values: { gap: '12px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' },
+    source: 'redesign l.111 .receipt gap 12, padding 12px 14px, radius lg',
+  },
+  { selector: '.receiptMark', values: { width: '26px', height: '26px', 'border-radius': '8px' }, source: 'redesign l.112 .receipt .tick 26, radius 8' },
+  { selector: '.receiptText', values: { gap: '2px' }, source: 'chat.module.css .appliedText title → detail gap 2' },
+  { selector: '.changeValue', values: { gap: '2px' }, source: 'chat.module.css .appliedText value → quote gap 2' },
+  { selector: '.changeValueText', values: { 'max-width': '100%' }, source: 'the value never widens its row' },
+  { selector: '.showMore', values: { padding: '0' }, source: 'chat.module.css .textLink padding 0' },
+  { selector: '.backBar', values: { padding: '14px 16px 0' }, source: 'redesign l.160 .psec padding 14px 16px, closing onto the section below' },
+  { selector: '.srOnly', values: { width: '1px', height: '1px' }, source: 'Main l.30 .sr' },
+];
+
 function check(rules: Rules, table: Expected[], baseline?: Rules): void {
   for (const expected of table) {
     expect({ selector: expected.selector, values: rules.get(expected.selector) }).toEqual({ selector: expected.selector, values: expected.values });
@@ -235,6 +288,10 @@ describe('Chat spacing', () => {
 
   it('should keep every phone override cited', () => {
     check(chat.phone, CHAT_PHONE);
+  });
+
+  it('should keep the progress panel’s values cited', () => {
+    check(spacingOf('../src/features/chat/ProgressPanel.module.css').base, PANEL);
   });
 
   it('should keep the model menu’s values cited', () => {
@@ -295,6 +352,31 @@ describe('Chat width arithmetic', () => {
     expect(layout(1280)).toEqual(layout(1024));
     expect(layout(1920)).toEqual(layout(1024));
     for (const viewport of [768, 1024, 1280]) expect(layout(viewport).option).toBeGreaterThanOrEqual(120);
+  });
+
+  it('should keep the header as it was: the same four controls, with room for the title at 768', () => {
+    const column = readFileSync(new URL('../src/features/chat/ChatColumn.tsx', import.meta.url), 'utf-8');
+    const actions = /className=\{styles\.headActions\}>([\s\S]*?)\n\s*<\/div>\n/.exec(column)?.[1] ?? '';
+    expect([...actions.matchAll(/<Button\b/g)]).toHaveLength(4);
+    expect(actions).not.toContain('Progress');
+
+    const header = Math.min(768 - SIDEBAR - 2 * px(base.get('.head')?.padding, 1), px(base.get('.headInner')?.['max-width']));
+    const labelled = { changes: 96, history: 90, newChat: 100 };
+    const controls = labelled.changes + labelled.history + labelled.newChat + 2 * px(base.get('.headActions')?.gap);
+    expect(header - controls - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
+  });
+
+  it('should put the progress panel beside the thread only while the thread keeps its full column, and offer its button otherwise', () => {
+    const panelCss = readFileSync(new URL('../src/features/chat/ProgressPanel.module.css', import.meta.url), 'utf-8');
+    const chatCss = readFileSync(new URL('../src/features/chat/Chat.module.css', import.meta.url), 'utf-8');
+    const hiddenBelow = Number(/@container chat \(max-width: (\d+)px\)/.exec(panelCss)?.[1]);
+    const buttonHiddenFrom = Number(/@container chat \(min-width: (\d+)px\)/.exec(chatCss)?.[1]);
+    const panelWidth = px(spacingOf('../src/features/chat/ProgressPanel.module.css').base.get('.panel')?.width);
+    expect(buttonHiddenFrom).toBe(hiddenBelow + 1);
+    expect(buttonHiddenFrom).toBe(listMax + 2 * sidePad + panelWidth);
+    const content = (viewport: number): number => (viewport >= 768 ? viewport - SIDEBAR : viewport);
+    expect(content(1440) >= buttonHiddenFrom).toBe(true);
+    expect(content(1280) >= buttonHiddenFrom).toBe(false);
   });
 
   it('should let the chat screen fill the pane and cap only the thread and header columns', () => {

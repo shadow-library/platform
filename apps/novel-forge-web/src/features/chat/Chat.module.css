@@ -1,3 +1,13 @@
+/* The chat and its progress panel side by side; the panel's container queries measure this row, not the viewport, since the app sidebar
+   takes a share of it. */
+.frame {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  container: chat / inline-size;
+}
+
 .column {
   flex: 1;
   min-width: 0;
@@ -297,6 +307,13 @@ button.turnRow:hover {
   padding: 6px 0 2px;
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
+}
+
+/* The running turn's way into the progress sheet, gone where the panel is docked beside the chat (ProgressPanel.module.css .panel). */
+@container chat (min-width: 1080px) {
+  .tailProgress {
+    display: none;
+  }
 }
 
 .turnNote {

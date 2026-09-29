@@ -71,12 +71,15 @@ import {
 import styles from './Chat.module.css';
 import { JobProgress } from './JobProgress';
 import { OrganiseReceipt } from './OrganiseReceipt';
+import { ProgressDock } from './ProgressPanel';
+import { panelTurnOf } from './progress-panel-view';
 import { ProposalSlot } from './ProposalSlot';
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
 import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
+import { TurnReceipt } from './TurnReceipt';
 import { TurnTrace } from './TurnTimeline';
 
 // Matches the shell's own pending-proposal query, so the transcript reads that cache rather than issuing a second request for the same rows.
@@ -110,6 +113,7 @@ interface TranscriptActions {
   answer: (option: QuestionOption) => void;
   leaveUndecided: (key: ProgressItemKey | undefined) => void;
   addParagraph: (paragraph: UnusedParagraph) => void;
+  reviewInPanel: (messageId: string) => void;
 }
 
 function lastAssistantOrdinal(messages: ChatMessageResponse[]): number {
@@ -161,6 +165,12 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   // Every turn this tab watched, by its reply, so each keeps its rows and worked line after the next one starts.
   const [timelines, setTimelines] = useState<ReadonlyMap<string, TurnTimeline>>(() => new Map());
+  // The reply whose receipt asked for review; unset, the panel follows the latest turn.
+  const [panelFocus, setPanelFocus] = useState<string>();
+  const [panelReveal, setPanelReveal] = useState(0);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetReveals, setSheetReveals] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -432,6 +442,27 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     );
   };
 
+  // The side panel collapses to nothing where the thread would lose its column, and the receipt then opens it as a sheet.
+  const reviewInPanel = (messageId: string): void => {
+    setPanelFocus(messageId);
+    setPanelReveal(count => count + 1);
+    if ((panelRef.current?.offsetWidth ?? 0) > 0) return;
+    setSheetReveals(true);
+    setSheetOpen(true);
+  };
+
+  // A turn starting anywhere — this composer, a chip, a queued first message, another tab — takes the panel back to it.
+  const [panelSawPending, setPanelSawPending] = useState(pending);
+  if (pending !== panelSawPending) {
+    setPanelSawPending(pending);
+    if (pending) setPanelFocus(undefined);
+  }
+
+  const openProgress = (): void => {
+    setSheetReveals(false);
+    setSheetOpen(true);
+  };
+
   const planStartBar = useRef<HTMLDivElement>(null);
   const focusPlanStart = useRef(false);
   const openPlanStart = (): void => {
@@ -469,6 +500,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       answer: option => sendTurn(option.title),
       leaveUndecided,
       addParagraph: paragraph => sendTurn(unusedParagraphPrompt(paragraph)),
+      reviewInPanel,
     };
   });
   const actions = useMemo<TranscriptActions>(
@@ -480,6 +512,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       answer: option => latest.current?.answer(option),
       leaveUndecided: key => latest.current?.leaveUndecided(key),
       addParagraph: paragraph => latest.current?.addParagraph(paragraph),
+      reviewInPanel: messageId => latest.current?.reviewInPanel(messageId),
     }),
     [],
   );
@@ -498,202 +531,235 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     </>
   );
 
+  const conversation = view.kind === 'conversation';
+  const panelTurn = panelTurnOf({ stream, streamShown: showStream, messages, focus: panelFocus });
+
   return (
-    <div className={styles.column}>
-      <div className={styles.head}>
-        <div className={styles.headInner}>
-          {session && renamingHeader ? (
-            <RenameInput
-              label={`Rename “${chatTitle(session)}”`}
-              value={session.title ?? ''}
-              loading={updateSession.isPending}
-              onCommit={renameSession}
-              onCancel={() => setRenamingHeader(false)}
-              className={styles.headTitleInput}
-            />
-          ) : session ? (
-            <button type="button" className={styles.headTitleButton} aria-label={`Rename “${chatTitle(session)}”`} onClick={() => setRenamingHeader(true)}>
-              <span className={styles.headTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
-              <EditIcon size={13} className={styles.headTitleEdit} />
-            </button>
-          ) : (
-            <span className={styles.headTitle}>New chat</span>
-          )}
-          {session && session.status !== 'active' && (
-            <StatusChip intent="neutral" dot>
-              {session.status}
-            </StatusChip>
-          )}
-          {session?.mode === 'manual' && <StatusChip intent="warning">manual</StatusChip>}
-          <div className={styles.headActions}>
-            <Button asChild variant="secondary" size="sm" className={styles.phoneOnly}>
-              <Link to="/novels/$novelId/story-bible" params={{ novelId }}>
-                Story Bible
-              </Link>
-            </Button>
-            <Button variant="ghost" size="sm" prefix={<ProposalsIcon size={14} />} onClick={props.onOpenChanges}>
-              <span className={styles.headLabel}>Changes</span>
-            </Button>
-            <Button variant="ghost" size="sm" prefix={<ClockIcon size={14} />} onClick={props.onOpenHistory}>
-              <span className={styles.headLabel}>History</span>
-            </Button>
-            <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={props.onNewChat}>
-              <span className={styles.headLabel}>New chat</span>
-            </Button>
+    <div className={styles.frame}>
+      <div className={styles.column}>
+        <div className={styles.head}>
+          <div className={styles.headInner}>
+            {session && renamingHeader ? (
+              <RenameInput
+                label={`Rename “${chatTitle(session)}”`}
+                value={session.title ?? ''}
+                loading={updateSession.isPending}
+                onCommit={renameSession}
+                onCancel={() => setRenamingHeader(false)}
+                className={styles.headTitleInput}
+              />
+            ) : session ? (
+              <button type="button" className={styles.headTitleButton} aria-label={`Rename “${chatTitle(session)}”`} onClick={() => setRenamingHeader(true)}>
+                <span className={styles.headTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
+                <EditIcon size={13} className={styles.headTitleEdit} />
+              </button>
+            ) : (
+              <span className={styles.headTitle}>New chat</span>
+            )}
+            {session && session.status !== 'active' && (
+              <StatusChip intent="neutral" dot>
+                {session.status}
+              </StatusChip>
+            )}
+            {session?.mode === 'manual' && <StatusChip intent="warning">manual</StatusChip>}
+            <div className={styles.headActions}>
+              <Button asChild variant="secondary" size="sm" className={styles.phoneOnly}>
+                <Link to="/novels/$novelId/story-bible" params={{ novelId }}>
+                  Story Bible
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" prefix={<ProposalsIcon size={14} />} onClick={props.onOpenChanges}>
+                <span className={styles.headLabel}>Changes</span>
+              </Button>
+              <Button variant="ghost" size="sm" prefix={<ClockIcon size={14} />} onClick={props.onOpenHistory}>
+                <span className={styles.headLabel}>History</span>
+              </Button>
+              <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={props.onNewChat}>
+                <span className={styles.headLabel}>New chat</span>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* One flex column in two states: `data-view` moves the stack between centred and transcript-above-composer.
+        {/* One flex column in two states: `data-view` moves the stack between centred and transcript-above-composer.
           Every branch keeps its slot, so the composer never unmounts and the draft, the focus and the model pick survive. */}
-      <div className={styles.body} data-view={view.kind}>
-        <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
-          <div className={styles.msgList}>
-            {view.kind === 'conversation' && (
-              <ReadyChecklist
-                view={checklist}
-                loading={progressQuery.isLoading}
-                error={progressQuery.error}
-                onRetry={() => void progressQuery.refetch()}
-                expanded={checklistOpen}
-                onToggle={() => setChecklistOpen(open => !open)}
-                onMark={markProgress}
-                busyKey={progressOverride.isPending ? progressOverride.variables?.key : undefined}
-              />
-            )}
-            {messagesQuery.isLoading && <PaneLoader />}
-            {messagesQuery.error && <PaneError error={messagesQuery.error} />}
-            {messages.map(m =>
-              m.role === 'user' ? (
-                <div key={m.id} className={styles.userRow}>
-                  <div className={styles.userCol}>
-                    <div className={styles.userBubble}>{m.content}</div>
-                    {m.id === firstUserId && notes?.trim() && <NotesChip notes={notes} />}
-                    {session && offersNotes(m) && <SaveAsNotesOffer novelId={novelId} sessionId={session.id} messageId={m.id} />}
-                    <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
-                      {messageTime(m.createdAt)}
-                    </time>
+        <div className={styles.body} data-view={view.kind}>
+          <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
+            <div className={styles.msgList}>
+              {view.kind === 'conversation' && (
+                <ReadyChecklist
+                  view={checklist}
+                  loading={progressQuery.isLoading}
+                  error={progressQuery.error}
+                  onRetry={() => void progressQuery.refetch()}
+                  expanded={checklistOpen}
+                  onToggle={() => setChecklistOpen(open => !open)}
+                  onMark={markProgress}
+                  busyKey={progressOverride.isPending ? progressOverride.variables?.key : undefined}
+                />
+              )}
+              {messagesQuery.isLoading && <PaneLoader />}
+              {messagesQuery.error && <PaneError error={messagesQuery.error} />}
+              {messages.map(m =>
+                m.role === 'user' ? (
+                  <div key={m.id} className={styles.userRow}>
+                    <div className={styles.userCol}>
+                      <div className={styles.userBubble}>{m.content}</div>
+                      {m.id === firstUserId && notes?.trim() && <NotesChip notes={notes} />}
+                      {session && offersNotes(m) && <SaveAsNotesOffer novelId={novelId} sessionId={session.id} messageId={m.id} />}
+                      <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
+                        {messageTime(m.createdAt)}
+                      </time>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <AssistantMessage
-                  key={m.id}
-                  novelId={novelId}
-                  message={m}
-                  settledQuestions={answeredUpTo > m.ordinal}
-                  busy={busy}
-                  jobs={jobsByMessage.get(m.id) ?? NO_JOBS}
-                  streamStatus={jobStream.status}
-                  cancellingJob={cancellingJob}
-                  notes={notes}
-                  nextChapter={nextChapter}
-                  actions={actions}
-                  timeline={timelines.get(m.id)}
-                />
-              ),
-            )}
-            {showStream && (
-              <div className={styles.assistantRow}>
-                <div className={styles.avatar}>
-                  <BookIcon size={15} />
-                </div>
-                <LiveStreamedTurn
-                  stream={stream}
-                  mode={mode}
-                  footer={
-                    stream.status === 'done' ? (
-                      <MessageModelTag message={stream.turn.assistantMessage} worked={finishedId ? timelines.get(finishedId)?.worked : undefined} />
-                    ) : undefined
-                  }
-                />
-              </div>
-            )}
-            {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={content => sendTurn(content)} />}
-            {looseJobs.length > 0 && (
-              <div className={styles.indented}>
-                {looseJobs.map(job => (
-                  <TranscriptJob
-                    key={job.id}
+                ) : (
+                  <AssistantMessage
+                    key={m.id}
                     novelId={novelId}
-                    job={job}
-                    stream={jobStream.status}
-                    cancelling={cancellingJob === job.id}
-                    notes={notes}
+                    message={m}
+                    settledQuestions={answeredUpTo > m.ordinal}
                     busy={busy}
+                    jobs={jobsByMessage.get(m.id) ?? NO_JOBS}
+                    streamStatus={jobStream.status}
+                    cancellingJob={cancellingJob}
+                    notes={notes}
+                    nextChapter={nextChapter}
                     actions={actions}
+                    timeline={timelines.get(m.id)}
                   />
-                ))}
-              </div>
-            )}
-            {looseJobs.filter(isPlanJob).map(job => (
-              <TranscriptPlanCard key={job.id} novelId={novelId} proposalId={job.progress.proposalId ?? ''} nextChapter={nextChapter} actions={actions} />
-            ))}
-            {waitingCards.length > 0 && (
-              <section className={`${styles.waiting} ${styles.indented}`} aria-label="Waiting on you">
-                {waitingCards.map(proposal => (
-                  <ProposalSlot key={proposal.id} novelId={novelId} proposalId={proposal.id} onApplied={onApplied} />
-                ))}
-              </section>
-            )}
-            {waitingPlans.map(proposal => (
-              <TranscriptPlanCard key={proposal.id} novelId={novelId} proposalId={proposal.id} nextChapter={nextChapter} actions={actions} />
-            ))}
-            {planStartOpen && (
-              <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>
-                <Button size="sm" variant="ghost" prefix={<CloseIcon size={14} />} onClick={() => setPlanStartOpen(false)}>
-                  Not now
+                ),
+              )}
+              {showStream && (
+                <div className={styles.assistantRow}>
+                  <div className={styles.avatar}>
+                    <BookIcon size={15} />
+                  </div>
+                  <LiveStreamedTurn
+                    stream={stream}
+                    mode={mode}
+                    onProgress={openProgress}
+                    receipt={
+                      stream.status === 'done' && (
+                        <TurnReceipt
+                          novelId={novelId}
+                          appliedProposalId={stream.turn.appliedProposal?.id}
+                          proposalId={stream.turn.proposal?.id}
+                          applied={stream.turn.appliedProposal}
+                          cards={stream.turn.proposal}
+                          onReview={() => reviewInPanel(stream.turn.assistantMessage.id)}
+                          onApplied={onApplied}
+                        />
+                      )
+                    }
+                    footer={
+                      stream.status === 'done' ? (
+                        <MessageModelTag message={stream.turn.assistantMessage} worked={finishedId ? timelines.get(finishedId)?.worked : undefined} />
+                      ) : undefined
+                    }
+                  />
+                </div>
+              )}
+              {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={content => sendTurn(content)} />}
+              {looseJobs.length > 0 && (
+                <div className={styles.indented}>
+                  {looseJobs.map(job => (
+                    <TranscriptJob
+                      key={job.id}
+                      novelId={novelId}
+                      job={job}
+                      stream={jobStream.status}
+                      cancelling={cancellingJob === job.id}
+                      notes={notes}
+                      busy={busy}
+                      actions={actions}
+                    />
+                  ))}
+                </div>
+              )}
+              {looseJobs.filter(isPlanJob).map(job => (
+                <TranscriptPlanCard key={job.id} novelId={novelId} proposalId={job.progress.proposalId ?? ''} nextChapter={nextChapter} actions={actions} />
+              ))}
+              {waitingCards.length > 0 && (
+                <section className={`${styles.waiting} ${styles.indented}`} aria-label="Waiting on you">
+                  {waitingCards.map(proposal => (
+                    <ProposalSlot key={proposal.id} novelId={novelId} proposalId={proposal.id} onApplied={onApplied} />
+                  ))}
+                </section>
+              )}
+              {waitingPlans.map(proposal => (
+                <TranscriptPlanCard key={proposal.id} novelId={novelId} proposalId={proposal.id} nextChapter={nextChapter} actions={actions} />
+              ))}
+              {planStartOpen && (
+                <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>
+                  <Button size="sm" variant="ghost" prefix={<CloseIcon size={14} />} onClick={() => setPlanStartOpen(false)}>
+                    Not now
+                  </Button>
+                </div>
+              )}
+              {planStartOpen && (
+                <PlanStart
+                  chapter={nextChapter}
+                  indent
+                  busy={busy || startNextDraft.isPending}
+                  onPlanFromIntent={intent => askForPlan(`Plan chapter ${nextChapter}: ${intent}`)}
+                  onEmptyPlan={() => askForPlan(`Start an empty plan for chapter ${nextChapter} with the plan action — I’ll fill it in myself.`)}
+                  onWriteMyself={writeMyself}
+                />
+              )}
+            </div>
+            {awayFromLatest && view.kind === 'conversation' && (
+              <div className={styles.jumpDock}>
+                <Button size="sm" variant="secondary" className={styles.jump} prefix={<ChevronDownIcon size={14} />} onClick={event => jumpToLatest(event.currentTarget)}>
+                  Latest
                 </Button>
               </div>
             )}
-            {planStartOpen && (
-              <PlanStart
-                chapter={nextChapter}
-                indent
-                busy={busy || startNextDraft.isPending}
-                onPlanFromIntent={intent => askForPlan(`Plan chapter ${nextChapter}: ${intent}`)}
-                onEmptyPlan={() => askForPlan(`Start an empty plan for chapter ${nextChapter} with the plan action — I’ll fill it in myself.`)}
-                onWriteMyself={writeMyself}
-              />
-            )}
           </div>
-          {awayFromLatest && view.kind === 'conversation' && (
-            <div className={styles.jumpDock}>
-              <Button size="sm" variant="secondary" className={styles.jump} prefix={<ChevronDownIcon size={14} />} onClick={event => jumpToLatest(event.currentTarget)}>
-                Latest
-              </Button>
+
+          {view.kind === 'centred' && (
+            <div className={styles.hero}>
+              <h2 className={styles.heroTitle}>What are we working on?</h2>
+              <p className={styles.heroSub}>{heroText(name, mode)}</p>
             </div>
           )}
+
+          <ChatComposer
+            input={input}
+            onInputChange={setInput}
+            inputRef={inputRef}
+            composerRef={composerRef}
+            onSend={send}
+            onStop={pending && activeRunId ? stop : undefined}
+            stopping={turn.stopping}
+            sending={session ? pending : starting}
+            locked={locked}
+            chips={chips}
+            onChip={onChip}
+            modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: setTurnChoice }} />}
+            justDiscussing={justDiscussing}
+            onJustDiscussingChange={setJustDiscussing}
+            proseEdits={proseEdits}
+            onProseEditsChange={setProseEdits}
+            hint={composerHint(mode, justDiscussing)}
+            notices={notices}
+            announcement={announcement}
+          />
         </div>
-
-        {view.kind === 'centred' && (
-          <div className={styles.hero}>
-            <h2 className={styles.heroTitle}>What are we working on?</h2>
-            <p className={styles.heroSub}>{heroText(name, mode)}</p>
-          </div>
-        )}
-
-        <ChatComposer
-          input={input}
-          onInputChange={setInput}
-          inputRef={inputRef}
-          composerRef={composerRef}
-          onSend={send}
-          onStop={pending && activeRunId ? stop : undefined}
-          stopping={turn.stopping}
-          sending={session ? pending : starting}
-          locked={locked}
-          chips={chips}
-          onChip={onChip}
-          modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: setTurnChoice }} />}
-          justDiscussing={justDiscussing}
-          onJustDiscussingChange={setJustDiscussing}
-          proseEdits={proseEdits}
-          onProseEditsChange={setProseEdits}
-          hint={composerHint(mode, justDiscussing)}
-          notices={notices}
-          announcement={announcement}
-        />
       </div>
+      {conversation && (
+        <ProgressDock
+          novelId={novelId}
+          turn={panelTurn}
+          mode={mode}
+          onApplied={onApplied}
+          reveal={panelReveal}
+          onBackToCurrent={panelFocus && pending ? () => setPanelFocus(undefined) : undefined}
+          asideRef={panelRef}
+          sheetOpen={sheetOpen}
+          onSheetOpenChange={setSheetOpen}
+          sheetReveals={sheetReveals}
+        />
+      )}
     </div>
   );
 }
@@ -833,7 +899,6 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
         <div className={styles.assistantCol}>
           {timeline && <TurnTrace rows={timeline.trace} />}
-          {message.appliedProposalId && <ProposalSlot novelId={novelId} proposalId={message.appliedProposalId} />}
           {content && (
             <div>
               <Markdown content={content} className={styles.assistantReply} />
@@ -841,6 +906,15 @@ const AssistantMessage = memo(function AssistantMessage({
             </div>
           )}
           {!content && timeline?.worked && <MessageModelTag message={message} worked={timeline.worked} />}
+          {(message.appliedProposalId || (message.proposalId && !isPlan)) && (
+            <TurnReceipt
+              novelId={novelId}
+              appliedProposalId={message.appliedProposalId ?? undefined}
+              proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
+              onReview={() => actions.reviewInPanel(message.id)}
+              onApplied={actions.onApplied}
+            />
+          )}
           {message.proposalId && !isPlan && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
           {question && (
             <QuestionCard

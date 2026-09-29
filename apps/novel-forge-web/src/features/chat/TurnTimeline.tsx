@@ -89,13 +89,14 @@ function TurnSourceItem({ source }: TurnSourceItemProps): React.JSX.Element {
 
 export interface TurnLiveTailProps {
   tail: TurnTail;
+  onProgress?: () => void;
 }
 
 /**
  * Always the last thing in a running turn, so the newest activity sits at the bottom. Its status line speaks twice at most — when the turn
  * starts and if it turns slow — never per delta; the composer announces the finished turn.
  */
-export function TurnLiveTail({ tail }: TurnLiveTailProps): React.JSX.Element {
+export function TurnLiveTail({ tail, onProgress }: TurnLiveTailProps): React.JSX.Element {
   return (
     <>
       <div className={styles.turnTail}>
@@ -110,6 +111,11 @@ export function TurnLiveTail({ tail }: TurnLiveTailProps): React.JSX.Element {
         <span className={styles.srOnly} role="status">
           {tail.slow ? SLOW_TURN_NOTE : 'Forge is working on your message'}
         </span>
+        {onProgress && (
+          <button type="button" className={`${styles.textLink} ${styles.tailProgress}`} onClick={onProgress}>
+            Progress
+          </button>
+        )}
       </div>
       {tail.slow && (
         <p className={styles.turnNote} aria-hidden="true">

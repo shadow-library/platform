@@ -215,7 +215,7 @@ describe('StreamedTurn', () => {
     expect(out.indexOf('Saving to your Story Bible · 1')).toBeLessThan(out.indexOf('5s'));
   });
 
-  it('should put the receipt where the changes settle and let a footer replace the worked line', () => {
+  it('should put the receipt under the model line and let a footer replace the worked line', () => {
     const done = play([
       [delta(), 1000],
       [{ type: 'done', turn }, 3000],
@@ -225,7 +225,7 @@ describe('StreamedTurn', () => {
     );
 
     expect(out).toContain('receipt');
-    expect(out).toContain('model line');
+    expect(out.indexOf('<p>model line</p>')).toBeLessThan(out.indexOf('<p>receipt</p>'));
     expect(out).not.toContain('Worked');
     expect(html(createElement(StreamedTurn, { stream: done, mode: 'auto', now: 9000 }))).toContain('Worked 3s');
   });

@@ -1,0 +1,406 @@
+/* Beside the chat only while the thread keeps its full 720 column (720 + 2 × 20 thread padding + this 320); narrower, it opens as a sheet. */
+.panel {
+  flex: 0 0 320px;
+  width: 320px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-left: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+}
+
+@container chat (max-width: 1079px) {
+  .panel {
+    display: none;
+  }
+}
+
+/* Doubled to outrank ui's own `.body` padding, which CSS-module import order does not settle: each section pads itself. */
+.sheetBody.sheetBody {
+  padding: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.section:focus {
+  outline: none;
+}
+
+.section:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: -2px;
+}
+
+.sectionTitle {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+}
+
+.sectionMeta {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 4px 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.step[data-state='done'],
+.step[data-state='stopped'],
+.step[data-state='failed'] {
+  color: var(--sh-text-secondary);
+}
+
+.step[data-state='running'] {
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+
+.stepMark {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-full);
+}
+
+.step[data-state='done'] .stepMark {
+  border-color: var(--sh-success-solid);
+  background: var(--sh-success-solid);
+  color: var(--sh-success-on-solid);
+}
+
+.step[data-state='running'] .stepMark {
+  border-color: var(--sh-accent);
+  border-top-color: transparent;
+}
+
+.step[data-state='failed'] .stepMark {
+  border-color: var(--sh-danger-border);
+  color: var(--sh-danger-text);
+}
+
+.stepText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stepSub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sh-text-secondary);
+}
+
+.stepTime {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupLabel {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.groupLabel:first-child {
+  margin-top: 0;
+}
+
+.changeList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 6px;
+  align-items: center;
+  padding: 4px 0;
+  font-size: var(--sh-text-body-sm);
+}
+
+.changeName {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.changeLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change[data-state='reverted'] .changeLabel,
+.change[data-state='decline'] .changeLabel,
+.change[data-state='declined'] .changeLabel,
+.change[data-state='replaced'] .changeLabel {
+  color: var(--sh-text-tertiary);
+  text-decoration: line-through;
+}
+
+.ideaTag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--sh-warning-text);
+}
+
+.changeValue {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.changeValueText {
+  max-width: 100%;
+}
+
+/* Two of .changeValue's 18px lines; a height cap rather than line-clamp, which does not count lines across the markdown's own blocks. */
+.changeValueText[data-clamped] {
+  max-height: 36px;
+  overflow: hidden;
+}
+
+.showMore {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--sh-accent-text);
+  cursor: pointer;
+}
+
+.showMore:hover {
+  text-decoration: underline;
+}
+
+.showMore:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: 2px;
+}
+
+.backBar {
+  display: flex;
+  padding: 14px 16px 0;
+}
+
+.changeQuote,
+.changeNote {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changeError {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--sh-danger-text);
+}
+
+.changePrompt {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-warning-bg-subtle);
+  font-size: 12px;
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.promptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.decide {
+  display: flex;
+  gap: 2px;
+}
+
+.sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sourceMark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.source[data-status='ok'] .sourceMark {
+  color: var(--sh-success-text);
+}
+
+.source[data-status='error'] .sourceMark {
+  color: var(--sh-danger-text);
+}
+
+.sourceDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+
+.receipt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.receiptMark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--sh-success-bg-subtle);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  color: var(--sh-success-text-on-subtle);
+}
+
+.receipt[data-tone='waiting'] .receiptMark {
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.receipt[data-tone='reverted'] .receiptMark {
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+}
+
+.receiptText {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.receiptTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.receiptDetail {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--sh-text-secondary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .step[data-state='running'] .stepMark {
+    animation: step-spin 0.9s linear infinite;
+  }
+}
+
+@keyframes step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

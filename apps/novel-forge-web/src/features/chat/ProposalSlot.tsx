@@ -1,12 +1,10 @@
 import { Link } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Spinner, toast } from '@shadow-library/ui';
 
 import {
   type ApplyProposalResponse,
   type ProposalResponse,
-  useApplyProposalMutation,
-  useDiscardProposalMutation,
   useProposalQuery,
   useRejectProposalOpMutation,
   useRevertProposalMutation,
@@ -15,6 +13,7 @@ import {
 } from '@/lib/apis';
 
 import { AppliedBlock, type AppliedOrigin, UndoImpactDialog } from './AppliedBlock';
+import { currentOpState, updateOpState, useOpState } from './applied-op-store';
 import {
   appliedRows,
   type CardEntryNote,
@@ -26,13 +25,13 @@ import {
   type QuoteSource,
   type RejectionScope,
   rejectionWhy,
-  suggestionCommit,
   type SuggestionDecision,
 } from './chat-view';
 import styles from './Chat.module.css';
-import { answersSettled, readAnswers, reportUnanswered, writeAnswers } from './suggestion-store';
+import { readAnswers, reportUnanswered, updateAnswers } from './suggestion-store';
 import { CommitBar, SuggestionCard } from './SuggestionCard';
 import { TurnProposalCard } from './TurnProposalCard';
+import { useSuggestionAnswering } from './use-suggestion-answering';
 
 const noop = (): void => undefined;
 
@@ -81,37 +80,68 @@ interface AppliedChangeProps {
   paragraphs?: ReadonlyMap<number, number[]>;
 }
 
-export function AppliedChange({ novelId, proposal, origin, quoteSource, paragraphs }: AppliedChangeProps): React.JSX.Element {
+export interface RevertFlow {
+  open: () => void;
+  dialog: React.JSX.Element;
+  /** A change of this proposal is moving — here, or in the progress panel — so a whole revert waits. */
+  locked: boolean;
+}
+
+/** Undoing a whole applied proposal: what relies on it first, then the revert. Focus returns to the opener, or to `fallback` once the opener is gone. */
+export function useRevertFlow(novelId: string, proposalId: string, fallback: RefObject<HTMLElement | null>): RevertFlow {
   const [confirming, setConfirming] = useState(false);
-  const impact = useUndoImpactQuery(novelId, proposal.id, confirming);
+  const impact = useUndoImpactQuery(novelId, proposalId, confirming);
   const revert = useRevertProposalMutation(novelId);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const opState = useOpState(proposalId);
   const openerRef = useRef<HTMLElement | null>(null);
-  const appliedIndexes = new Set((proposal.opResults ?? []).filter(result => result.status === 'applied').map(result => result.index));
-  const rows = appliedRows(proposal.changeSet, paragraphs).filter(row => appliedIndexes.size === 0 || appliedIndexes.has(row.index));
 
   const open = (): void => {
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setConfirming(true);
   };
 
-  // Undo replaces the block the dialog opened from, so focus goes back to the opener while it exists and to the block once it does not.
   const restoreFocus = (event: Event): void => {
     event.preventDefault();
     const opener = openerRef.current;
     if (opener?.isConnected) opener.focus();
-    else rootRef.current?.focus();
+    else fallback.current?.focus();
   };
 
-  const undo = (): void => {
-    revert.mutate(proposal.id, {
-      onSuccess: () => {
-        setConfirming(false);
-        toast.success('Undone — your Story Bible is back as it was');
-      },
-      onError: err => toast.danger(err.message),
-    });
+  const undo = async (): Promise<void> => {
+    if (currentOpState(proposalId).busy !== undefined) return;
+    updateOpState(proposalId, current => ({ ...current, busy: 'all' }));
+    try {
+      await revert.mutateAsync(proposalId);
+      setConfirming(false);
+      toast.success('Undone — your Story Bible is back as it was');
+    } catch (err) {
+      toast.danger(err instanceof Error ? err.message : 'Couldn’t undo it.');
+    } finally {
+      updateOpState(proposalId, current => ({ ...current, busy: undefined }));
+    }
   };
+
+  const dialog = (
+    <UndoImpactDialog
+      open={confirming}
+      onOpenChange={setConfirming}
+      onCloseAutoFocus={restoreFocus}
+      impact={impact.data}
+      loading={impact.isLoading}
+      error={impact.error}
+      onRetry={() => void impact.refetch()}
+      onConfirm={() => void undo()}
+      confirming={opState.busy === 'all'}
+    />
+  );
+  return { open, dialog, locked: opState.busy !== undefined };
+}
+
+export function AppliedChange({ novelId, proposal, origin, quoteSource, paragraphs }: AppliedChangeProps): React.JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const revert = useRevertFlow(novelId, proposal.id, rootRef);
+  const appliedIndexes = new Set((proposal.opResults ?? []).filter(result => result.status === 'applied').map(result => result.index));
+  const rows = appliedRows(proposal.changeSet, paragraphs).filter(row => appliedIndexes.size === 0 || appliedIndexes.has(row.index));
 
   return (
     <div ref={rootRef} tabIndex={-1} className={styles.focusTarget} data-outcome>
@@ -120,7 +150,7 @@ export function AppliedChange({ novelId, proposal, origin, quoteSource, paragrap
         origin={origin}
         state={proposal.status === 'reverted' ? 'reverted' : 'applied'}
         revertible={proposal.revertible}
-        onUndo={open}
+        onUndo={revert.open}
         quoteSource={quoteSource}
         bibleLink={
           <Button asChild size="sm" variant="secondary">
@@ -130,17 +160,7 @@ export function AppliedChange({ novelId, proposal, origin, quoteSource, paragrap
           </Button>
         }
       />
-      <UndoImpactDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        onCloseAutoFocus={restoreFocus}
-        impact={impact.data}
-        loading={impact.isLoading}
-        error={impact.error}
-        onRetry={() => void impact.refetch()}
-        onConfirm={undo}
-        confirming={revert.isPending}
-      />
+      {revert.dialog}
     </div>
   );
 }
@@ -154,27 +174,17 @@ interface SuggestionGroupProps {
 }
 
 function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: SuggestionGroupProps): React.JSX.Element {
-  const apply = useApplyProposalMutation(novelId);
-  const discard = useDiscardProposalMutation(novelId);
   const update = useUpdateProposalMutation(novelId);
   const remember = useRejectProposalOpMutation(novelId);
-  const [stored] = useState(() => readAnswers(proposal.id));
-  const [decisions, setDecisions] = useState<ReadonlyMap<number, SuggestionDecision>>(() => new Map(stored.decisions));
-  const [scopes, setScopes] = useState<ReadonlyMap<number, RejectionScope>>(() => new Map(stored.scopes));
-  const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
-  const [commitError, setCommitError] = useState<string>();
   const focusTarget = useRef<number | 'outcome' | undefined>(undefined);
+  const { answers, decide: answer, commit } = useSuggestionAnswering(novelId, proposal, { onApplied, onCommitted: () => (focusTarget.current = 'outcome') });
+  const { decisions, scopes, committing } = answers;
+  const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
   const groupRef = useRef<HTMLDivElement>(null);
-  const committing = apply.isPending || discard.isPending;
   const busy = committing || update.isPending || remember.isPending;
   const total = proposal.changeSet.length;
   const pending = proposal.status === 'pending';
   const remaining = total - decisions.size;
-  const finished = answersSettled(proposal.status, proposal.changeSet, decisions, scopes);
-
-  useEffect(() => {
-    writeAnswers(proposal.id, finished ? { decisions: [], scopes: [] } : { decisions: [...decisions.entries()], scopes: [...scopes.entries()] });
-  }, [decisions, finished, proposal.id, scopes]);
 
   useEffect(() => {
     reportUnanswered(proposal.id, pending && decisions.size > 0 ? remaining : 0);
@@ -193,33 +203,9 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
     (card?.querySelector<HTMLElement>('button:not([disabled]), textarea') ?? card)?.focus();
   });
 
-  const commit = (next: ReadonlyMap<number, SuggestionDecision>, force = false): void => {
-    const plan = suggestionCommit(total, next, force);
-    if (plan.kind === 'wait') return;
-    setCommitError(undefined);
-    const onError = (err: Error): void => setCommitError(err.message);
-    if (plan.kind === 'discard') return void discard.mutate(proposal.id, { onSuccess: () => (focusTarget.current = 'outcome'), onError });
-    apply.mutate(
-      { proposalId: proposal.id, opIndexes: plan.opIndexes },
-      {
-        onSuccess: result => {
-          focusTarget.current = 'outcome';
-          onApplied?.(result);
-          const failed = result.opResults.filter(op => op.status === 'failed');
-          if (failed.length > 0) toast.danger(`${failed.length} couldn’t be added: ${failed[0]?.error ?? 'the Story Bible refused it'}`);
-        },
-        onError,
-      },
-    );
-  };
-
   const decide = (index: number, decision: SuggestionDecision | undefined): void => {
-    const next = new Map(decisions);
-    if (decision) next.set(index, decision);
-    else next.delete(index);
-    setDecisions(next);
     focusTarget.current = index;
-    if (decision) commit(next);
+    answer(index, decision);
   };
 
   const setDraft = (index: number, value: string | undefined): void => {
@@ -256,7 +242,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
     remember.mutate(
       { proposalId: proposal.id, opIndex: index, scope, why: rejectionWhy(scope) },
       {
-        onSuccess: () => setScopes(current => new Map(current).set(index, scope)),
+        onSuccess: () => updateAnswers(proposal.id, current => ({ ...current, scopes: new Map(current.scopes).set(index, scope) })),
         onError: err => toast.danger(err.message),
       },
     );
@@ -332,7 +318,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
           />
         </div>
       ))}
-      <CommitBar view={commitBarView({ total, decisions, committing, error: commitError })} onCommit={() => commit(decisions, true)} />
+      <CommitBar view={commitBarView({ total, decisions, committing, error: answers.error })} onCommit={() => commit(true)} />
     </div>
   );
 }

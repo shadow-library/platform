@@ -106,8 +106,8 @@
   in the author's stated sentences nor already in the record. A new record's identifying key counts as written content. An op naming a record only a card creates follows it to
   the cards; an idea that does keeps its quote-rule reason, so a turned-down idea is still filtered. An idea the author turned down in scope is dropped unless an op the
   author's own words back leans on it; if the turned-down ideas cannot be read, every idea stays a card.
-- The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the applied block shows each written value beside its quote and undo stays one
-  click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a second, pending one;
+- The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the Progress panel's change list shows each written value beside its quote
+  and undo stays one click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a second, pending one;
   a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
 - Undo lists what relies on the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed fact and
   pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.

@@ -36,10 +36,13 @@ import {
   type ListProposalResponse,
   type ListProposalsQueryParams,
   type PendingTurnResponse,
+  type ProposalOpDependencyErrorResponse,
   type ProposalResponse,
+  type RedoProposalOpResponse,
   type RejectProposalOpBody,
   type RevertProposalResponse,
   type RollbackResponse,
+  type UndoProposalOpResponse,
 } from './api-types.gen';
 import { flushInvalidations, invalidateSoon } from './batched-invalidation';
 import { invalidateLedger } from './ledger.api';
@@ -394,6 +397,9 @@ export interface ChatTurnTiming {
   writingSince: number | null;
   lastWrite: 'reply' | 'change' | null;
   thoughtMs: number;
+  /** When the current reply's first words and first change arrived; a `reset` clears both with the reply they belonged to. */
+  replyAt: number | null;
+  changeAt: number | null;
 }
 
 interface ChatTurnProgress {
@@ -419,6 +425,8 @@ const EMPTY_TIMING: ChatTurnTiming = {
   writingSince: null,
   lastWrite: null,
   thoughtMs: 0,
+  replyAt: null,
+  changeAt: null,
 };
 
 export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], changes: [], userMessage: null, timing: EMPTY_TIMING };
@@ -498,7 +506,7 @@ function lookupTiming(timing: ChatTurnTiming, lookups: ChatTurnLookup[], at: num
 }
 
 function writeTiming(timing: ChatTurnTiming, at: number, kind: 'reply' | 'change'): ChatTurnTiming {
-  const next = { ...timing, lastWrite: kind };
+  const next = kind === 'reply' ? { ...timing, lastWrite: kind, replyAt: timing.replyAt ?? at } : { ...timing, lastWrite: kind, changeAt: timing.changeAt ?? at };
   if (next.writingSince !== null) return next;
   const thought = next.waitingSince === null ? 0 : Math.max(0, at - next.waitingSince);
   return { ...next, thoughtMs: next.thoughtMs + thought, waitingSince: null, writingSince: at };
@@ -516,7 +524,7 @@ export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurn
   const progress: ChatTurnProgress = { reply: state.reply, lookups: state.lookups, changes: state.changes, userMessage: state.userMessage, timing };
   if (event.type === 'reset') {
     const waitingSince = state.lookups.some(entry => entry.status === 'running') ? null : (timing.waitingSince ?? at);
-    const cleared = { ...timing, writingSince: null, lastWrite: null, waitingSince };
+    const cleared = { ...timing, writingSince: null, lastWrite: null, waitingSince, replyAt: null, changeAt: null };
     return { ...progress, status: 'streaming', reply: '', changes: [], timing: cleared };
   }
   if (event.type === 'delta') {
@@ -821,6 +829,64 @@ export function useRevertProposalMutation(projectId: string): UseMutationResult<
     mutationFn: proposalId => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/revert`).execute(),
     onSuccess: () => invalidateProposals(queryClient, projectId),
   });
+}
+
+export type ProposalOpDirection = 'undo' | 'redo';
+
+export interface ProposalOpVariables {
+  proposalId: string;
+  opIndex: number;
+  direction: ProposalOpDirection;
+}
+
+/** `blocked`: other changes of the turn must move first (RFN_015 for an undo, RFN_016 for a redo), in the order the server lists them. */
+export type ProposalOpOutcome = { kind: 'done'; proposal: ProposalResponse } | { kind: 'blocked'; opIndexes: number[] };
+
+const OP_DEPENDENCY_CODES: ReadonlySet<string> = new Set(['RFN_015', 'RFN_016']);
+
+type ProposalOpReply = UndoProposalOpResponse | RedoProposalOpResponse | ProposalOpDependencyErrorResponse;
+
+function isDependencyError(value: ProposalOpReply): value is ProposalOpDependencyErrorResponse {
+  return typeof (value as Partial<ProposalOpDependencyErrorResponse>).code === 'string';
+}
+
+/** A modelled 409 back into an outcome: the dependency refusals become `blocked`, every other refusal the `ApiError` it would have thrown. */
+export function proposalOpOutcome(reply: ProposalOpReply): ProposalOpOutcome {
+  if (!isDependencyError(reply)) return { kind: 'done', proposal: reply.proposal };
+  const opIndexes = reply.details?.opIndexes ?? [];
+  if (OP_DEPENDENCY_CODES.has(reply.code) && opIndexes.length > 0) return { kind: 'blocked', opIndexes };
+  const type = (reply as { type?: unknown }).type;
+  throw new ApiError(409, { code: reply.code, type: typeof type === 'string' ? type : 'Conflict', message: reply.message, fields: reply.fields });
+}
+
+// A 409 is modelled rather than thrown because `ApiError` keeps only the envelope and drops `details`, which names the changes to move first.
+export async function sendProposalOp(projectId: string, { proposalId, opIndex, direction }: ProposalOpVariables): Promise<ProposalOpOutcome> {
+  const reply = await APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/ops/${opIndex}/${direction}`)
+    .body(direction === 'undo' ? { scope: 'not_now' } : {})
+    .modeled(409)
+    .execute<ProposalOpReply>();
+  return proposalOpOutcome(reply);
+}
+
+/**
+ * Undoes or redoes one change of a chat turn's applied proposal. Everything a change can touch is refreshed as after a whole revert, batched so a
+ * sequence of changes refetches once.
+ */
+export function useProposalOpMutation(projectId: string): UseMutationResult<ProposalOpOutcome, ApiError, ProposalOpVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<ProposalOpOutcome, ApiError, ProposalOpVariables>({
+    mutationFn: variables => sendProposalOp(projectId, variables),
+    onSuccess: outcome => {
+      if (outcome.kind === 'blocked') return;
+      queryClient.setQueryData(refinementKeys.proposal(projectId, outcome.proposal.id), outcome.proposal);
+      invalidateSoon(queryClient, { queryKey: ['projects', projectId] });
+    },
+  });
+}
+
+/** The proposal as the cache holds it now, which may be newer than a rendered copy. */
+export function cachedProposal(queryClient: QueryClient, projectId: string, proposalId: string): ProposalResponse | undefined {
+  return queryClient.getQueryData<ProposalResponse>(refinementKeys.proposal(projectId, proposalId));
 }
 
 export function useListChangesQuery(projectId: string, enabled = true): UseQueryResult<ListChangesResponse, ApiError> {

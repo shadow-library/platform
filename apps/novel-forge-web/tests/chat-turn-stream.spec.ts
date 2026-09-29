@@ -186,6 +186,16 @@ describe('reduceChatTurnStream', () => {
     expect(state.timing).toMatchObject({ startedAt: 100, waitingSince: 400 });
   });
 
+  it('should mark when the reply and the changes began, and clear both with the reply a reset voids', () => {
+    const written = [delta('Vex'), delta(' is'), change(0), change(1)].reduce(
+      (state, event, position) => reduceChatTurnStream(state, event, 1000 + position * 500),
+      startChatTurnStream(0),
+    );
+
+    expect(written.timing).toMatchObject({ replyAt: 1000, changeAt: 2000 });
+    expect(reduceChatTurnStream(written, { type: 'reset' }, 4000).timing).toMatchObject({ replyAt: null, changeAt: null });
+  });
+
   it('should start the clock on the first event when the stream was not started explicitly', () => {
     expect(reduceChatTurnStream(idleChatTurnStream, delta('a'), 500).timing.startedAt).toBe(500);
   });

@@ -46,6 +46,7 @@ export function opSubject(op: ChangeOp): string {
   if (type === 'organise.rule') return 'Rule';
   if (type === 'volume.upsert') return text(op.title) ?? `Volume ${String(op.volumeKey)}`;
   if (type === 'milestone.upsert') return text(op.label) ?? String(op.milestoneKey);
+  if (type.startsWith('promise.')) return text(op.label) ?? String(op.key ?? op.op);
   if (type === 'brief.update') return text(op.title) ?? `Chapter ${String(op.chapter)}`;
   if (type === 'bible_document.upsert') return text(isRecord(op.frontmatter) ? op.frontmatter.title : undefined) ?? String(op.slug).replace(/[-_]/g, ' ');
   if (type === 'action.plan_chapter') return 'Plan the next chapter';

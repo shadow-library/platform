@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { type ChangeOp } from '@/lib/proposals';
 
@@ -88,5 +88,59 @@ export function useUnansweredCount(): number {
     subscribe,
     () => snapshot,
     () => 0,
+  );
+}
+
+export interface SuggestionAnswers {
+  decisions: ReadonlyMap<number, SuggestionDecision>;
+  scopes: ReadonlyMap<number, RejectionScope>;
+  committing: boolean;
+  /** Why the last commit failed; the answers are kept for the retry. */
+  error?: string;
+}
+
+const NO_ANSWERS: SuggestionAnswers = { decisions: new Map(), scopes: new Map(), committing: false };
+const liveAnswers = new Map<string, SuggestionAnswers>();
+const answerListeners = new Map<string, Set<() => void>>();
+
+/** One card's answers for the whole tab, so the inline card and the progress panel read and change the same ones. */
+export function currentAnswers(proposalId: string): SuggestionAnswers {
+  const known = liveAnswers.get(proposalId);
+  if (known) return known;
+  const stored = readAnswers(proposalId);
+  const loaded: SuggestionAnswers = { decisions: new Map(stored.decisions), scopes: new Map(stored.scopes), committing: false };
+  liveAnswers.set(proposalId, loaded);
+  return loaded;
+}
+
+export function updateAnswers(proposalId: string, change: (current: SuggestionAnswers) => SuggestionAnswers): void {
+  liveAnswers.set(proposalId, change(currentAnswers(proposalId)));
+  for (const listener of answerListeners.get(proposalId) ?? []) listener();
+}
+
+/**
+ * Answers stay in memory only while something shows the card; once the last reader leaves they are dropped, and the next one starts again
+ * from what the tab stored.
+ */
+export function useSuggestionAnswers(proposalId: string | undefined): SuggestionAnswers {
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (!proposalId) return () => undefined;
+      const listeners = answerListeners.get(proposalId) ?? new Set();
+      listeners.add(listener);
+      answerListeners.set(proposalId, listeners);
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size > 0) return;
+        answerListeners.delete(proposalId);
+        liveAnswers.delete(proposalId);
+      };
+    },
+    [proposalId],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => (proposalId ? currentAnswers(proposalId) : NO_ANSWERS),
+    () => NO_ANSWERS,
   );
 }
