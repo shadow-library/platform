@@ -484,14 +484,18 @@ function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], curre
 export function splitChangeSet(input: WritePolicyInput): ChangeSetSplit {
   const ops = [...input.ops];
   const override = overrideReason(input);
-  const appliesIdeas = override === null && input.ideas === 'apply';
-  const judged = ops.map((op, index) => intrinsicDisposition(op, index, input, appliesIdeas));
-  moveDependentsToCards(ops, judged, input.state.current);
+  const judge = (appliesIdeas: boolean) => {
+    const judged = ops.map((op, index) => intrinsicDisposition(op, index, input, appliesIdeas));
+    moveDependentsToCards(ops, judged, input.state.current);
+    return judged;
+  };
+  const judged = judge(override === null && input.ideas === 'apply');
+  const heldJudged = override === 'held_for_review' && input.ideas === 'apply' ? judge(true) : judged;
 
   const dispositions = judged.map(({ disposition }): OpDisposition =>
     override && disposition.side === 'direct' ? { index: disposition.index, side: 'card', reason: override } : disposition,
   );
-  const eligible = judged.filter(({ disposition }) => disposition.side === 'direct').length;
+  const eligible = heldJudged.filter(({ disposition }) => disposition.side === 'direct').length;
   const direct = dispositions.filter(d => d.side === 'direct');
   return {
     ops,

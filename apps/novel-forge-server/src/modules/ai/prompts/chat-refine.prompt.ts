@@ -15,7 +15,7 @@ import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from './scope-playbooks';
 import { type PromptModule } from './types';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. An op that records what the author said in this message carries their exact words as its quote, and the server decides whether it applies; every other op is a suggestion card that nothing applies until the author accepts it, so propose your own ideas boldly — as ideas, without a quote. A what-if worth keeping is a suggestion card too. Give the complete new value of every field you DO change (a whole field, never a fragment or diff of one), but when you are UPDATING a record that already exists, include ONLY the fields you are changing plus the op's required keys — every field you omit keeps its current stored value, so never re-emit unchanged fields (e.g. to change one character's motivation, changeSet [{"op":"entity.upsert","entityKey":"mira","type":"character","motivation":"<the new motivation>"}] and leave name, notes, body and the rest out). The one exception is bible_document.upsert — a document is a single whole artifact, so always send its complete frontmatter and body, never a subset. Never invent refs, entity keys, or documents not present in the provided context.\n\nIf the playbook lists lookup tools and the provided context is NOT enough to answer or to draft a correct changeSet, request lookups INSTEAD of guessing: return {"reply": <one short sentence saying what you are checking>, "lookups": [{"tool": <listed tool name>, "args": {...}}]} and nothing else — never lookups and a changeSet together. The results come back as the next message; then answer normally. The lookup budget is small, so batch what you need.\n\nWhen the turn puts an identity decision the author hasn't made — premise, ending, protagonist, opposition, the cost of power — to them, raise it as a "question" card instead of writing the examples into the reply's prose: {"question": <the decision, one sentence>, "why"?: <why it matters now>, "answers": [{"title": <the example, a few words>, "why"?: <why it works>, "tradeOff"?: <what it costs>, "recommended"?: true}], "progressKey"?: <the matching common/progress.ts PROGRESS_CHECKS key>}. 2 to 4 answers, one may carry "recommended": true, and "undecided for now" is always an accepted answer on its own, not one of the cards — keep the reply itself short, since the card carries the detail. Never alongside lookups.\n\nRespond with ONLY one valid JSON object of the shape {"reply": string, "changeSet"?: [ops], "lookups"?: [{tool, args}], "question"?: {question, why?, answers, progressKey?}} — all your prose goes INSIDE the reply string; nothing outside the JSON, no markdown fences.`;
+const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. An op that records what the author said in this message carries their exact words as its quote; your own ideas carry no quote. The server decides what applies, and the turn rules say how this session treats each. Give the complete new value of every field you DO change (a whole field, never a fragment or diff of one), but when you are UPDATING a record that already exists, include ONLY the fields you are changing plus the op's required keys — every field you omit keeps its current stored value, so never re-emit unchanged fields (e.g. to change one character's motivation, changeSet [{"op":"entity.upsert","entityKey":"mira","type":"character","motivation":"<the new motivation>"}] and leave name, notes, body and the rest out). The one exception is bible_document.upsert — a document is a single whole artifact, so always send its complete frontmatter and body, never a subset. Never invent refs, entity keys, or documents not present in the provided context.\n\nIf the playbook lists lookup tools and the provided context is NOT enough to answer or to draft a correct changeSet, request lookups INSTEAD of guessing: return {"reply": <one short sentence saying what you are checking>, "lookups": [{"tool": <listed tool name>, "args": {...}}]} and nothing else — never lookups and a changeSet together. The results come back as the next message; then answer normally. The lookup budget is small, so batch what you need.\n\nWhen the turn puts an identity decision the author hasn't made — premise, ending, protagonist, opposition, the cost of power — to them, raise it as a "question" card instead of writing the examples into the reply's prose: {"question": <the decision, one sentence>, "why"?: <why it matters now>, "answers": [{"title": <the example, a few words>, "why"?: <why it works>, "tradeOff"?: <what it costs>, "recommended"?: true}], "progressKey"?: <the matching common/progress.ts PROGRESS_CHECKS key>}. 2 to 4 answers, one may carry "recommended": true, and "undecided for now" is always an accepted answer on its own, not one of the cards — keep the reply itself short, since the card carries the detail. Never alongside lookups.\n\nRespond with ONLY one valid JSON object of the shape {"reply": string, "changeSet"?: [ops], "lookups"?: [{tool, args}], "question"?: {question, why?, answers, progressKey?}} — all your prose goes INSIDE the reply string; nothing outside the JSON, no markdown fences.`;
 
 // The message layout is the caching contract: static system, then the stable scope
 // context, then history, with the volatile tail last — keep this ordering when editing.
@@ -47,7 +47,7 @@ export function chatPromptTokens(scopeInstructions: string): number {
 
 export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
-  version: '2.13.0',
+  version: '2.14.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },
@@ -68,16 +68,23 @@ export interface ChatTurnPermissions {
   proseEdits: boolean;
   /** Whether the author marked the turn as just discussing. */
   justDiscussing?: boolean;
+  mode: Refinement.ChatMode;
 }
 
 const JUST_DISCUSSING_RULE =
   'Just discussing: ON — the author is thinking aloud, so nothing this turn applies. Any change you propose becomes a suggestion card for the author to accept or decline; leave quotes out.';
 
+const WRITE_RULES: Record<Refinement.ChatMode, string> = {
+  auto: "Write policy: Edit freely — your own ideas (no quote) are added to the Story Bible immediately along with the author's quoted words, and the author can undo any of them. Propose an invention with the care you would take writing canon, and describe it as added; the server tells the author if anything waited instead. These always come to the author as cards to accept, never applied: removals and cleared fields, replacing a filled story field, plans, prose, actions, a secret's truth or gating, planner-only pages and volume goals, a volume's order and structure, a promise's status, payoff or progress or reusing a settled promise, and an idea that would remove more than a quarter of a filled field's text.",
+  manual:
+    'Write policy: Ask first — nothing applies until the author accepts it. Every op, quoted or your own idea, is a suggestion card, so propose your ideas boldly, without a quote.',
+};
+
 export function renderTurnRules(permissions: ChatTurnPermissions): string {
   const prose = permissions.proseEdits
     ? 'Prose edits: ON — the author turned on Edit prose, so draft.update, draft.remove and action.revise_draft are available this turn.'
     : 'Prose edits: OFF — the author did not turn on Edit prose. draft.update, draft.remove and action.revise_draft will be rejected, along with approving, judging or finalizing that prose; keep a plan edit in the plan.';
-  return permissions.justDiscussing ? `${prose}\n${JUST_DISCUSSING_RULE}` : prose;
+  return `${prose}\n${permissions.justDiscussing ? JUST_DISCUSSING_RULE : WRITE_RULES[permissions.mode]}`;
 }
 
 /**
@@ -85,7 +92,7 @@ export function renderTurnRules(permissions: ChatTurnPermissions): string {
  * whether lookups are on. A prose op the author did not ask for is advisory rather than blocking, so a model that insists
  * costs one repair and then loses the op, never the turn.
  */
-export function buildChatRefinePrompt(scope: Refinement.ChatScope, permissions: ChatTurnPermissions = { proseEdits: false }): PromptModule<ChatRefineOutput> {
+export function buildChatRefinePrompt(scope: Refinement.ChatScope, permissions: Pick<ChatTurnPermissions, 'proseEdits'> = { proseEdits: false }): PromptModule<ChatRefineOutput> {
   return {
     ...chatRefinePrompt,
     template: buildTemplate(),

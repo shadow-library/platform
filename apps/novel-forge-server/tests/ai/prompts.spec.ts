@@ -199,8 +199,8 @@ describe('Prompt modules', () => {
       expect(planTurn.postValidate?.(output as never)).toEqual([]);
       expect(planTurn.advise?.({ reply: 'checking', lookups: [{ tool: 'get_draft', args: {} }] } as never)).toEqual([]);
       expect(buildChatRefinePrompt('project', { proseEdits: true }).advise?.(output as never)).toEqual([]);
-      expect(renderTurnRules({ proseEdits: false })).toStartWith('Prose edits: OFF');
-      expect(renderTurnRules({ proseEdits: true })).toStartWith('Prose edits: ON');
+      expect(renderTurnRules({ proseEdits: false, mode: 'manual' })).toStartWith('Prose edits: OFF');
+      expect(renderTurnRules({ proseEdits: true, mode: 'manual' })).toStartWith('Prose edits: ON');
       expect(buildChatRefinePrompt('project').advise?.(output as never)).toHaveLength(1);
     });
 
@@ -253,7 +253,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.13.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.14.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');

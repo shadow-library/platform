@@ -68,7 +68,9 @@ export async function splitTurnChangeSet(db: DbExecutor, projectId: bigint, ops:
   const rejected = await context.rejectedIdeas(candidates).catch(() => null);
   if (!rejected) return { ...splitChangeSet({ ...input, ideas: 'card' }), droppedIdeas: [] };
   const filtered = dropRejectedIdeas(split, rejected, current);
-  return { ...filtered.split, droppedIdeas: filtered.dropped };
+  if (filtered.dropped.length === 0) return { ...filtered.split, droppedIdeas: [] };
+  const held = splitChangeSet({ ...input, ops: filtered.split.ops, ideas: 'apply' }).held;
+  return { ...filtered.split, held, droppedIdeas: filtered.dropped };
 }
 
 function sourceOf(split: ChangeSetSplit, index: number): OpSource {

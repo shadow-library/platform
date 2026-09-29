@@ -543,8 +543,17 @@ describe('splitChangeSet — Edit freely', () => {
     expect(split.dispositions).toEqual([{ index: 0, side: 'card', reason: 'no_quote' }]);
   });
 
-  it('should not flag a hold that only kept ideas off the applied side', () => {
-    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true }).held).toBe(false);
+  it('should flag a hold that kept an idea off the applied side', () => {
+    const split = policy([mira({ body: INVENTED })], { ideas: 'apply', held: true });
+
+    expect(split.held).toBe(true);
+    expect(split.dispositions).toEqual([{ index: 0, side: 'card', reason: 'no_quote' }]);
+  });
+
+  it('should not flag a hold when the ideas would not have applied anyway or the turn is manual or just discussing', () => {
+    expect(policy([{ op: 'entity.remove', entityKey: 'aldo' }], { ideas: 'apply', held: true }).held).toBe(false);
+    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true, mode: 'manual' }).held).toBe(false);
+    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true, justDiscussing: true }).held).toBe(false);
   });
 
   it('should send an idea naming a record only a card creates to the cards, keeping the quote rule’s reason so a turned-down idea is still filtered', () => {
@@ -746,8 +755,44 @@ describe('quote checks', () => {
 
 describe('just discussing and quotes in the prompt', () => {
   it('should tell the model the turn only makes cards, and say nothing of it otherwise', () => {
-    expect(renderTurnRules({ proseEdits: false, justDiscussing: true })).toContain('becomes a suggestion card');
-    expect(renderTurnRules({ proseEdits: false })).not.toContain('Just discussing');
+    expect(renderTurnRules({ proseEdits: false, justDiscussing: true, mode: 'manual' })).toContain('becomes a suggestion card');
+    expect(renderTurnRules({ proseEdits: false, mode: 'manual' })).not.toContain('Just discussing');
+  });
+
+  it('should describe Edit freely as immediate and undoable, and Ask first as suggestion cards', () => {
+    const auto = renderTurnRules({ proseEdits: false, mode: 'auto' });
+    const manual = renderTurnRules({ proseEdits: false, mode: 'manual' });
+
+    expect(auto).toContain('added to the Story Bible immediately');
+    expect(auto).toContain('undo');
+    expect(auto).toContain('describe it as added');
+    expect(auto).not.toContain('never as staged');
+    expect(auto).toContain('always come to the author as cards to accept, never applied');
+    for (const kept of [
+      'removals and cleared fields',
+      'replacing a filled story field',
+      "plans, prose, actions, a secret's truth or gating",
+      'planner-only pages',
+      "a promise's status, payoff or progress or reusing a settled promise",
+      "remove more than a quarter of a filled field's text",
+    ]) {
+      expect(auto).toContain(kept);
+    }
+    expect(auto).not.toContain('unless Edit prose is on');
+    expect(auto).not.toContain('cut most of');
+    expect(renderTurnRules({ proseEdits: true, mode: 'auto' })).toContain("plans, prose, actions, a secret's truth or gating");
+    expect(manual).toContain('Ask first');
+    expect(manual).toContain('is a suggestion card');
+    expect(manual).not.toContain('immediately');
+  });
+
+  it('should let just discussing override the write policy in either mode', () => {
+    for (const mode of ['auto', 'manual'] as const) {
+      const rules = renderTurnRules({ proseEdits: false, justDiscussing: true, mode });
+
+      expect(rules).toContain('becomes a suggestion card');
+      expect(rules).not.toContain('Write policy');
+    }
   });
 
   it('should offer quote in the chat playbook only, and accept it on any op', () => {

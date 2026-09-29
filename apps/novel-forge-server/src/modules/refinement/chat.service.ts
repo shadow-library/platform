@@ -486,7 +486,7 @@ export class ChatService {
     const proseEdits = options.proseEdits === true;
     const justDiscussing = options.justDiscussing === true;
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
-    const turnRules = renderTurnRules({ proseEdits, justDiscussing });
+    const turnRules = renderTurnRules({ proseEdits, justDiscussing, mode: session.mode });
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE));
     const promptTokens = chatPromptTokens(scopeInstructions);
     const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
@@ -793,7 +793,7 @@ export class ChatService {
     };
     const staged = await stageTurnChangeSet(port, split, warnings);
     const staging = split.droppedIdeas.length > 0 ? { ...staged, applyNote: [staged.applyNote, IDEAS_DROPPED_NOTE].filter(Boolean).join(' ') } : staged;
-    if (staging.applyNote) this.logger.info('chat turn: author-worded ops not applied as written', { projectId, runId, note: staging.applyNote });
+    if (staging.applyNote) this.logger.info('chat turn: staging left a note for the author', { projectId, runId, note: staging.applyNote });
     return staging;
   }
 

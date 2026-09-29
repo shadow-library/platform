@@ -204,6 +204,7 @@ describe('splitTurnChangeSet', () => {
       query: {
         projects: { findFirst: async () => ({ id: 7n, brief: null, themes: null, instructions: null, ...project }) },
         entities: { findMany: async () => [mira] },
+        canonFacts: { findMany: async () => [] },
       },
     };
   }
@@ -239,6 +240,19 @@ describe('splitTurnChangeSet', () => {
     expect(discussing.dispositions.map(d => (d.side === 'card' ? d.reason : d.side))).toEqual(['just_discussing', 'just_discussing', 'no_quote']);
   });
 
+  it('should hold a turn that carries only ideas, so the author is told why nothing applied', async () => {
+    const db = fakeDb({ premise: '' });
+    const { port } = fakePort();
+    const kael = ops[2] as ChangeOp;
+
+    const held = await splitTurnChangeSet(db as never, 7n, [kael], { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: ['echo'] });
+    const manual = await splitTurnChangeSet(db as never, 7n, [kael], { authorMessage: MESSAGE, mode: 'manual', justDiscussing: false, warnings: ['echo'] });
+
+    expect(held.held).toBe(true);
+    expect((await stageTurnChangeSet(port, held, ['echo'])).applyNote).toBe(HELD_FOR_REVIEW_NOTE);
+    expect(manual.held).toBe(false);
+  });
+
   it('should drop a re-proposed idea the author turned down rather than apply it, asking only about the model-authored ops', async () => {
     const db = fakeDb({ premise: '' });
     const asked: string[][] = [];
@@ -251,6 +265,32 @@ describe('splitTurnChangeSet', () => {
     expect(split.direct).toEqual(ops.slice(0, 2));
     expect(split.sources).toEqual(['quoted', 'quoted']);
     expect(split.droppedIdeas).toEqual([ideaIdOf(ops[2] as ChangeOp)]);
+  });
+
+  it('should stop reporting a hold once the only op it kept off the applied side was a turned-down idea', async () => {
+    const db = fakeDb({ premise: '' });
+    const rejectedIdeas = async (ideaIds: string[]) => new Set(ideaIds);
+    const context = { authorMessage: MESSAGE, mode: 'auto' as const, justDiscussing: false, warnings: ['echo'], rejectedIdeas };
+
+    const onlyIdea = await splitTurnChangeSet(db as never, 7n, [ops[2] as ChangeOp], context);
+    const withQuoted = await splitTurnChangeSet(db as never, 7n, ops, context);
+
+    expect(onlyIdea.ops).toEqual([]);
+    expect(onlyIdea.held).toBe(false);
+    expect(withQuoted.held).toBe(true);
+  });
+
+  it('should not report a hold for a surviving invented fact once the only idea that would have applied was turned down', async () => {
+    const db = fakeDb({ premise: '' });
+    const kael = ops[2] as ChangeOp;
+    const fact: ChangeOp = { op: 'fact.upsert', factKey: 'salt-oath', body: 'Every dock captain swore a salt oath.' };
+    const rejectedIdeas = async () => new Set([ideaIdOf(kael)]);
+
+    const split = await splitTurnChangeSet(db as never, 7n, [kael, fact], { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: ['echo'], rejectedIdeas });
+
+    expect(split.droppedIdeas).toEqual([ideaIdOf(kael)]);
+    expect(split.ops).toEqual([fact]);
+    expect(split.held).toBe(false);
   });
 
   it('should read the payoff targets and milestone labels an idea could empty', async () => {
