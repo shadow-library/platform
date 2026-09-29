@@ -14,12 +14,14 @@ import {
   createApplicationRole,
   createAuthzApi,
   expireOrganisationInvitation,
+  identityDb,
   identityMutate,
   type IdentityUser,
   issueTokens,
   markOrganisationDomainVerified,
   type OAuthTestClient,
   type OrganisationRole,
+  pulseDb,
   rateLimitKey,
   readOrganisationDomain,
   readRateLimit,
@@ -33,6 +35,7 @@ import {
   unresolvableDomain,
   updateOrganisationMember,
   verifyChallenge,
+  waitUntil,
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
 import { expectErrorCode, expectSessionCookie, pollInviteToken, pollOtp } from './helpers';
@@ -82,6 +85,11 @@ interface PolicyItem {
   configuredEnabled?: boolean;
 }
 
+interface StatusNotice {
+  subject: string | null;
+  body: string;
+}
+
 /**
  * Declaring the constants
  *
@@ -95,6 +103,7 @@ interface PolicyItem {
 const ACCESS_TOKEN_TTL = 'auth.access_token.ttl';
 const ELEVATION_WINDOW = 'auth.elevation.window';
 const REGISTER_OTP_TEMPLATE = 'auth.register.otp';
+const MEMBER_STATUS_TEMPLATE = 'organisation-member-status-changed';
 const STRONG_PASSWORD = 'E2eOrg#Passw0rd!';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The per-organisation invitation budget (`InvitationService.INVITE_BUDGET`): 20 an hour, so the 21st is refused. */
@@ -200,6 +209,33 @@ async function teamOnlyClient(identity: IdentityHarness, team: IdentityTeam, lab
 
 async function tokenLifetime(ctx: APIRequestContext, tokenCtx: APIRequestContext, client: OAuthTestClient): Promise<number | undefined> {
   return (await issueTokens(ctx, tokenCtx, client)).body.expires_in;
+}
+
+/**
+ * Waits for `count` membership-status notices to `email` to have gone the whole way: every outbox row identity wrote SENT to pulse
+ * (a missing pulse template once failed them as NOT_FOUND), and pulse's DEV provider holding the rendered message of each SENT job.
+ */
+async function deliveredStatusNotices(email: string, count: number): Promise<StatusNotice[]> {
+  return waitUntil(
+    async () => {
+      const outbox = await identityDb()<{ status: string; lastError: string | null }[]>`
+        SELECT status::text AS status, last_error AS "lastError" FROM notification_outbox
+        WHERE ((recipients #>> '{}')::jsonb) ->> 'email' = ${email} AND template_key = ${MEMBER_STATUS_TEMPLATE}
+      `;
+      const failed = outbox.find(row => row.status === 'FAILED' || row.status === 'DEAD');
+      if (failed) throw new Error(`identity could not hand the notice to pulse: ${failed.status} ${failed.lastError ?? ''}`);
+      if (outbox.length < count || outbox.some(row => row.status !== 'SENT')) return undefined;
+
+      const notices = await pulseDb()<StatusNotice[]>`
+        SELECT m.rendered_subject AS subject, m.rendered_body AS body
+        FROM notification_jobs j JOIN templates t ON t.id = j.template_id JOIN notification_messages m ON m.notification_job_id = j.id
+        WHERE j.recipient = ${email} AND t.template_key = ${MEMBER_STATUS_TEMPLATE} AND j.status = 'SENT'
+        ORDER BY j.created_at
+      `;
+      return notices.length >= count ? notices : undefined;
+    },
+    { timeoutMs: 60_000, intervalMs: 1_000, message: `${count} delivered ${MEMBER_STATUS_TEMPLATE} notices for the member` },
+  );
 }
 
 test.describe('identity organisations — roles and ownership', () => {
@@ -382,6 +418,25 @@ test.describe('identity organisations — member holds', () => {
 
     const held = await setStatus(admin.ctx, team.organisationId, plain.user.userId, hold);
     expect(held.status(), 'an admin still holds a plain member').toBe(200);
+  });
+
+  test('should deliver the member a paused notice through pulse on a suspension and a restored one on reinstatement', async ({ identity }) => {
+    test.setTimeout(150_000);
+    const team = await identity.createTeam({ label: 'org-hold-notice' });
+    const member = await teamMember(identity, team, 'org-hold-notice-member', 'MEMBER');
+
+    const suspended = await setStatus(team.ownerCtx, team.organisationId, member.user.userId, { status: 'SUSPENDED', reason: 'e2e notice' });
+    expect(suspended.status(), await suspended.text()).toBe(200);
+    const [paused] = await deliveredStatusNotices(member.user.email, 1);
+    expect(paused?.subject).toBe('Your organisation access was paused');
+    expect(paused?.body).toMatch(/is now <span[^>]*>suspended<\/span>/);
+    expect(paused?.body).toContain('Reason given: e2e notice');
+
+    const reinstated = await setStatus(team.ownerCtx, team.organisationId, member.user.userId, { status: 'ACTIVE' });
+    expect(reinstated.status(), await reinstated.text()).toBe(200);
+    const [, restored] = await deliveredStatusNotices(member.user.email, 2);
+    expect(restored?.subject).toBe('Your organisation access was restored');
+    expect(restored?.body).toContain('Your membership in the organisation is active again.');
   });
 });
 
