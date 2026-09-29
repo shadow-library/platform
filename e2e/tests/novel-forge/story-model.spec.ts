@@ -172,9 +172,7 @@ test.describe('novel-forge promises', () => {
 });
 
 test.describe('novel-forge volumes', () => {
-  // H7 left half-fixed: fastify-router.ts:173-199 stringifies only bigints, so the Date createdAt/updatedAt (volume.dto.ts:76,79) inside the nullable
-  // `activated` $ref (volume.dto.ts:94, anyOf via class-schema.ts:194-198) fail Ajv's string check and the committed click answers 500 S001.
-  test.fixme('should answer "goal met" with the completed volume and the one it activated', async ({ forge }) => {
+  test('should answer "goal met" with the completed volume and the one it activated', async ({ forge }) => {
     const owner = await forge.actor({ label: 'story-volume-answer' });
     const projectId = await createGuardedProject(forge, owner, 'story-volume-answer');
     await insertVolumes(projectId, [
@@ -184,7 +182,13 @@ test.describe('novel-forge volumes', () => {
 
     const met = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/volumes/v1/goal-met`, { data: {} });
     expect(met.status(), await met.text()).toBe(200);
-    expect(await met.json()).toMatchObject({ completed: { volumeKey: 'v1', state: 'goal_met' }, activated: { volumeKey: 'v2', state: 'active' } });
+    const isoInstant = expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
+    expect(await met.json()).toMatchObject({
+      completed: { volumeKey: 'v1', state: 'goal_met', createdAt: isoInstant, updatedAt: isoInstant },
+      activated: { volumeKey: 'v2', state: 'active', createdAt: isoInstant, updatedAt: isoInstant },
+    });
+    expect(await readVolumes(owner.ctx, projectId), 'the answer matches what was committed').toEqual({ v1: 'goal_met', v2: 'active' });
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
   });
 
   test('should meet only the active volume’s goal and activate the next one, completing it once when it is clicked twice at once', async ({ forge }) => {
