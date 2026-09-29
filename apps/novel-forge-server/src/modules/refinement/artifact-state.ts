@@ -171,9 +171,30 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
 
 export type RecordFields = Readonly<Record<string, unknown>>;
 
+interface PromiseRow {
+  lastAdvancedChapter: number | null;
+  status: string;
+  payoffMilestoneKey: string | null;
+  payoffVolumeKey: string | null;
+  payoffWindow: number | null;
+  intentionallyOpen: boolean;
+}
+
+function promiseFields(row: PromiseRow, label: string | null): RecordFields {
+  return {
+    label,
+    lastAdvancedChapter: row.lastAdvancedChapter,
+    status: row.status,
+    payoffMilestoneKey: row.payoffMilestoneKey,
+    payoffVolumeKey: row.payoffVolumeKey,
+    payoffWindow: row.payoffWindow,
+    dormant: row.intentionallyOpen,
+  };
+}
+
 /**
  * Every ref that exists, mapped to the fields an op of its kind writes — spelled as the op spells them — for the kinds a chat turn may
- * apply without review; the other kinds map to no fields, since only their existence matters there.
+ * apply without review or could empty; the other kinds map to no fields, since only their existence matters there.
  */
 export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Map<string, RecordFields>> {
   const states = await loadArtifactStates(db, projectId, refs);
@@ -218,6 +239,10 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
       : [];
   const mysteries =
     mysteryKeys.length > 0 ? await db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [];
+  const milestones =
+    parsed.milestoneKeys.length > 0
+      ? await db.query.milestones.findMany({ where: and(eq(schema.milestones.projectId, projectId), inArray(schema.milestones.milestoneKey, parsed.milestoneKeys)) })
+      : [];
 
   if (project) records.set('premise', { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
   for (const row of docs) {
@@ -240,7 +265,8 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
       allowedClues: row.allowedClues,
     });
   }
-  for (const row of threads) records.set(`promise:thread:${row.threadKey}`, { label: row.summary, lastAdvancedChapter: row.lastAdvancedChapter, status: row.status });
-  for (const row of mysteries) records.set(`promise:mystery:${row.mysteryKey}`, { label: row.question, lastAdvancedChapter: row.lastAdvancedChapter, status: row.status });
+  for (const row of milestones) records.set(`milestone:${row.milestoneKey}`, { label: row.label, subjectEntityKey: row.subjectEntityKey, kind: row.kind });
+  for (const row of threads) records.set(`promise:thread:${row.threadKey}`, promiseFields(row, row.summary));
+  for (const row of mysteries) records.set(`promise:mystery:${row.mysteryKey}`, promiseFields(row, row.question));
   return records;
 }

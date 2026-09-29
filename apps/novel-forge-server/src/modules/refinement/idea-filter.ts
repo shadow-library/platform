@@ -13,13 +13,14 @@ export interface IdeaFilterResult {
   dropped: string[];
 }
 
+/** A model-authored op: a card no author-backed reason holds, or an op applied as an idea without the author's words. */
 function isFilterable(split: ChangeSetSplit, index: number): boolean {
   const disposition = split.dispositions[index];
-  const op = split.ops[index] as ChangeOp;
-  return disposition?.side === 'card' && !(disposition.reason && AUTHOR_BACKED.has(disposition.reason)) && !isActionOp(op);
+  if (!disposition || isActionOp(split.ops[index] as ChangeOp)) return false;
+  return disposition.side === 'direct' ? disposition.source === 'idea' : !AUTHOR_BACKED.has(disposition.reason);
 }
 
-/** The ideas a turn's model-authored cards offer, the only ones a rejection can filter. */
+/** The ideas a turn's model-authored ops offer, the only ones a rejection can filter. */
 export function filterableIdeaIds(split: ChangeSetSplit): string[] {
   return split.ops.flatMap((op, index) => (isFilterable(split, index) ? [ideaIdOf(op)] : []));
 }
@@ -75,7 +76,7 @@ class OpGraph {
 }
 
 /**
- * Drops each model-authored card whose idea the author turned down and whose scope still holds, then every card that cannot stand
+ * Drops each model-authored op whose idea the author turned down and whose scope still holds, then every op that cannot stand
  * without a dropped one. An op the author's own words back is never dropped, and neither is anything it leans on — the author re-raised it.
  */
 export function dropRejectedIdeas(split: ChangeSetSplit, rejected: ReadonlySet<string>, current: ReadonlyMap<string, RecordFields>): IdeaFilterResult {
@@ -112,7 +113,7 @@ export function dropRejectedIdeas(split: ChangeSetSplit, rejected: ReadonlySet<s
   const dispositions = split.dispositions.filter(d => position.has(d.index)).map(d => ({ ...d, index: position.get(d.index) as number }));
   const on = (side: 'direct' | 'card') => dispositions.filter(d => d.side === side).map(d => ops[d.index] as ChangeOp);
   return {
-    split: { ops, direct: on('direct'), cards: on('card'), dispositions, held: split.held },
+    split: { ops, direct: on('direct'), cards: on('card'), sources: dispositions.flatMap(d => (d.side === 'direct' ? [d.source] : [])), dispositions, held: split.held },
     dropped: [...dropped].map(index => ideaIdOf(split.ops[index] as ChangeOp)),
   };
 }

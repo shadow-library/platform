@@ -67,6 +67,7 @@ import {
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
+import { ALWAYS_CARD } from './write-policy';
 
 export interface AppliedArtifact {
   artifactRef: string;
@@ -86,7 +87,7 @@ export interface OpResult {
 
 export interface ApplyOptions {
   opIndexes?: number[];
-  /** Set by a chat turn applying the author's own words; such an apply carries content ops only. */
+  /** Set when a turn or the organise job applies what the write policy let through; such an apply never carries an always-card op. */
   autoApplied?: boolean;
   /** Applies inside the caller's transaction, so the change commits or rolls back with the caller's own writes. Content ops only: actions run after a commit. */
   tx?: PrimaryTransaction;
@@ -275,6 +276,8 @@ export class ProposalApplyService {
       if (options?.tx && selectedActions.length > 0) throw AppError.internal('action ops cannot run inside a caller transaction');
 
       if (options?.autoApplied && selectedActions.length > 0) throw AppError.internal('an automatic apply carries content ops only — actions are always the author’s selection');
+      const alwaysCard = options?.autoApplied ? contentOps.find(({ op }) => ALWAYS_CARD[op.op] !== undefined) : undefined;
+      if (alwaysCard) throw AppError.internal(`an automatic apply never carries ${alwaysCard.op.op} — the write policy keeps it a card for the author`);
       const door = options?.opIndexes ? undefined : selectedActions.map(action => ONE_WAY_DOORS[action.op.op]).find(code => code !== undefined);
       if (door) throw door.create();
 

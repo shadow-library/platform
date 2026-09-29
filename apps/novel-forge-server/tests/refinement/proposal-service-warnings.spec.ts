@@ -46,7 +46,14 @@ describe('ProposalService.create — reveal-clear warning always runs, even with
       discard: async (id: bigint) => discarded.push(id),
       linkApplied: async () => undefined,
     };
-    const split = { ops: undateOp, direct: undateOp, cards: [], dispositions: [{ index: 0, side: 'direct' as const }], held: false };
+    const split = {
+      ops: undateOp,
+      direct: undateOp,
+      cards: [],
+      sources: ['quoted' as const],
+      dispositions: [{ index: 0, side: 'direct' as const, source: 'quoted' as const }],
+      held: false,
+    };
 
     const staging = await stageTurnChangeSet(port, split, []);
 

@@ -23,6 +23,7 @@ import {
   wholeOrganiseSelection,
 } from '@modules/notes';
 import { type ChangeOp } from '@modules/refinement/change-set';
+import { type OpSource } from '@modules/refinement/write-policy';
 import { type Ledger, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { ledgerEntry } from '../ledger/ledger-fixtures';
@@ -155,6 +156,7 @@ function ledgerExecutor(state: World, proposal: { organiseRecord: unknown }) {
 
 interface Staging {
   options: OrganiseOptions;
+  sources: OpSource[];
   applied: { ops: ChangeOp[]; record: OrganiseRecord };
   card: { ops: ChangeOp[]; record: OrganiseRecord };
 }
@@ -168,6 +170,7 @@ async function stage(state: World, out: NotesOrganiseOutput = output(), mode: Re
   const receipt = organiseReceipt(candidates, direct, cards);
   return {
     options,
+    sources: candidates.split.sources,
     applied: { ops: direct, record: organiseRecordFor(candidates, direct, 'applied', receipt) },
     card: { ops: cards, record: organiseRecordFor(candidates, cards, 'card', receipt) },
   };
@@ -250,7 +253,7 @@ describe('organiseCandidates', () => {
     ]);
   });
 
-  it('should turn a quote-less entry into a card, taking the page that relies on it along', async () => {
+  it('should turn a quote-less entry into a card even in a chat that edits freely, taking the page that relies on it along', async () => {
     const quoteless = output({
       records: [
         { ...ILSE, paragraphs: [1] },
@@ -263,6 +266,8 @@ describe('organiseCandidates', () => {
     expect(staged.card.record.ops.filter(op => op.ref === 'entity:ilse' || op.ref === 'doc:project/cast').map(op => op.label)).toEqual(['suggested', 'suggested']);
     expect(staged.card.ops.find(op => op.op === 'entity.upsert' && op.entityKey === 'ilse')).toMatchObject({ rationale: 'Suggested — not in your notes.' });
     expect(staged.card.ops.find(op => op.op === 'entity.upsert' && op.entityKey === 'ilse')).not.toHaveProperty('quote');
+    expect(staged.sources).toEqual(staged.applied.ops.map(() => 'quoted'));
+    expect(staged.applied.record.ops.map(op => op.label)).toEqual(staged.applied.ops.map(() => 'from_notes'));
   });
 
   it('should hold an entry to the words of the paragraphs it cites, not of the whole notes', async () => {

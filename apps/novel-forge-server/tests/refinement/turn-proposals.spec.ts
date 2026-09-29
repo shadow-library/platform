@@ -15,14 +15,17 @@ import {
   UNLINKED_NOTE,
 } from '@modules/refinement/turn-proposals';
 import { ideaIdOf } from '@modules/refinement/idea-id';
-import { type ChangeSetSplit } from '@modules/refinement/write-policy';
+import { type ChangeSetSplit, type OpDisposition, type OpSource } from '@modules/refinement/write-policy';
 
 const quoted: ChangeOp = { op: 'entity.upsert', entityKey: 'mira', type: 'character', name: 'Mira', quote: 'Mira is a thief' };
 const idea: ChangeOp = { op: 'entity.upsert', entityKey: 'aldo', type: 'character', name: 'Aldo' };
 
-function split(direct: ChangeOp[], cards: ChangeOp[], held = false): ChangeSetSplit {
+function split(direct: ChangeOp[], cards: ChangeOp[], held = false, sources: OpSource[] = direct.map(() => 'quoted')): ChangeSetSplit {
   const ops = [...direct, ...cards];
-  return { ops, direct, cards, held, dispositions: ops.map((_, index) => ({ index, side: index < direct.length ? 'direct' : 'card' })) };
+  const dispositions = ops.map((_, index): OpDisposition =>
+    index < direct.length ? { index, side: 'direct', source: sources[index] ?? 'quoted' } : { index, side: 'card', reason: 'no_quote' },
+  );
+  return { ops, direct, cards, sources, held, dispositions };
 }
 
 interface FakePortOptions {
@@ -35,6 +38,7 @@ interface FakePortOptions {
 function fakePort(options: FakePortOptions = {}) {
   const log: string[] = [];
   const staged: { changeSet: ChangeOp[]; warnings: string[]; options: StageOptions; id: bigint }[] = [];
+  const opResults = (id: bigint) => (staged.find(entry => entry.id === id)?.changeSet ?? []).map((_, index) => ({ index, status: 'applied' }));
   const port: TurnProposalPort = {
     stage: async (changeSet, warnings, stageOptions) => {
       if (options.stageFails?.(changeSet)) throw new Error('op not allowed');
@@ -48,7 +52,12 @@ function fakePort(options: FakePortOptions = {}) {
       log.push(`apply ${id}`);
       if (options.applyFails === 'app') throw AppErrorCode.RFN_003.create();
       if (options.applyFails === 'internal') throw new Error('connection reset by peer at 10.0.0.4');
-      return { proposal: { id, status: 'applied' }, applied: [{ artifactRef: 'entity:mira', newRevision: null }], staleMarked: [], opResults: [] } as unknown as ApplyResult;
+      return {
+        proposal: { id, status: 'applied' },
+        applied: [{ artifactRef: 'entity:mira', newRevision: null }],
+        staleMarked: [],
+        opResults: opResults(id),
+      } as unknown as ApplyResult;
     },
     linkApplied: async proposal => {
       log.push(`link ${proposal.id}`);
@@ -93,6 +102,24 @@ describe('stageTurnChangeSet', () => {
     expect(staging.appliedProposal?.id).toBe(1n);
     expect(staging.applied?.applied).toEqual([{ artifactRef: 'entity:mira', newRevision: null }]);
     expect(staging.cardProposal).toBeNull();
+  });
+
+  it('should mark each applied op as the author’s words or an idea Edit freely applied', async () => {
+    const { port } = fakePort();
+
+    const staging = await stageTurnChangeSet(port, split([quoted, idea], [], false, ['quoted', 'idea']), []);
+
+    expect(staging.applied?.opResults).toEqual([
+      { index: 0, status: 'applied', source: 'quoted' },
+      { index: 1, status: 'applied', source: 'idea' },
+    ]);
+  });
+
+  it('should refuse a split whose sources are misaligned with its applied side before staging anything', async () => {
+    const { port, log } = fakePort();
+
+    await expect(stageTurnChangeSet(port, split([quoted, idea], [], false, ['quoted']), [])).rejects.toThrow('one source per applied op');
+    expect(log).toEqual([]);
   });
 
   it('should apply the direct side before staging the cards, each half exempt from the whole-set materialization check', async () => {
@@ -190,9 +217,14 @@ describe('splitTurnChangeSet', () => {
     project.premise = 'An older premise.';
     const after = await splitTurnChangeSet(db as never, 7n, ops, context);
 
-    expect(before.dispositions.map(d => d.side)).toEqual(['direct', 'direct', 'card']);
+    expect(before.dispositions).toEqual([
+      { index: 0, side: 'direct', source: 'quoted' },
+      { index: 1, side: 'direct', source: 'quoted' },
+      { index: 2, side: 'direct', source: 'idea' },
+    ]);
+    expect(before.sources).toEqual(['quoted', 'quoted', 'idea']);
     expect(after.dispositions[0]).toEqual({ index: 0, side: 'card', reason: 'always_card', rule: 'replaces_story' });
-    expect(after.dispositions[1]).toEqual({ index: 1, side: 'direct' });
+    expect(after.dispositions[1]).toEqual({ index: 1, side: 'direct', source: 'quoted' });
   });
 
   it('should hold the turn when it carries a warning, and make every op a card when just discussing', async () => {
@@ -203,10 +235,11 @@ describe('splitTurnChangeSet', () => {
 
     expect(held.held).toBe(true);
     expect(held.direct).toEqual([]);
-    expect(discussing.dispositions.slice(0, 2).map(d => d.reason)).toEqual(['just_discussing', 'just_discussing']);
+    expect(held.dispositions[2]).toEqual({ index: 2, side: 'card', reason: 'no_quote' });
+    expect(discussing.dispositions.map(d => (d.side === 'card' ? d.reason : d.side))).toEqual(['just_discussing', 'just_discussing', 'no_quote']);
   });
 
-  it('should drop a re-proposed card the author turned down and ask only about the model-authored cards', async () => {
+  it('should drop a re-proposed idea the author turned down rather than apply it, asking only about the model-authored ops', async () => {
     const db = fakeDb({ premise: '' });
     const asked: string[][] = [];
     const rejectedIdeas = async (ideaIds: string[]) => (asked.push(ideaIds), new Set(ideaIds));
@@ -215,8 +248,48 @@ describe('splitTurnChangeSet', () => {
 
     expect(asked).toEqual([[ideaIdOf(ops[2] as ChangeOp)]]);
     expect(split.ops).toEqual(ops.slice(0, 2));
-    expect(split.cards).toEqual([]);
+    expect(split.direct).toEqual(ops.slice(0, 2));
+    expect(split.sources).toEqual(['quoted', 'quoted']);
     expect(split.droppedIdeas).toEqual([ideaIdOf(ops[2] as ChangeOp)]);
+  });
+
+  it('should read the payoff targets and milestone labels an idea could empty', async () => {
+    const thread = {
+      threadKey: 'ledger',
+      summary: 'Who took the ledger',
+      status: 'open',
+      payoffMilestoneKey: 'heist',
+      payoffVolumeKey: null,
+      payoffWindow: null,
+      intentionallyOpen: false,
+    };
+    const heist = { milestoneKey: 'heist', label: 'Mira robs the tide-queen’s vault beneath the drowned court', subjectEntityKey: null, kind: 'event' };
+    const db = { query: { plotThreads: { findMany: async () => [thread] }, milestones: { findMany: async () => [heist] } } };
+    const payoffOps: ChangeOp[] = [
+      { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', someday: true },
+      { op: 'milestone.upsert', milestoneKey: 'heist', label: 'Kael betrays the smiths' },
+    ];
+
+    const split = await splitTurnChangeSet(db as never, 7n, payoffOps, { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: [] });
+
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'always_card', rule: 'removal' },
+      { index: 1, side: 'card', reason: 'removal' },
+    ]);
+  });
+
+  it('should keep every idea a card when the turned-down ideas cannot be read', async () => {
+    const db = fakeDb({ premise: '' });
+    const rejectedIdeas = async (): Promise<ReadonlySet<string>> => {
+      throw new Error('connection reset');
+    };
+
+    const split = await splitTurnChangeSet(db as never, 7n, ops, { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: [], rejectedIdeas });
+
+    expect(split.direct).toEqual(ops.slice(0, 2));
+    expect(split.sources).toEqual(['quoted', 'quoted']);
+    expect(split.dispositions[2]).toEqual({ index: 2, side: 'card', reason: 'no_quote' });
+    expect(split.droppedIdeas).toEqual([]);
   });
 
   it('should not filter the author’s own words even when every idea is turned down', async () => {

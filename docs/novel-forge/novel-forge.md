@@ -86,18 +86,24 @@
 
 ### Write policy and the quote rule
 
-- The author's words apply at once and can be undone; anything the AI invents is a card the author accepts or rejects. The server decides which, never the model: a model-declared
+- A session is Edit freely (`auto`, the default for new chats) or Ask first (`manual`, every op a card). The server decides what applies, never the model: a model-declared
   quote or origin never authorises a write on its own.
-- A chat op applies within the turn only when an auto-mode session sent it (new chats are auto; a manual session makes every op a card), "Just discussing" is off, no warning
-  holds the turn, its kind is allowlisted (Story Bible page, entity, fact, volume title or goal, an empty story field, a promise's label), no always-card rule holds, and its
-  `quote` supports it.
-- Always cards: removals and cleared fields; plans; prose; actions; planner-only and writer-excluded pages; replacing a filled story field; a secret's truth once it exists and
-  its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any time; a volume's order and notes; a promise's status, progress or reuse of a settled one.
+- Under Edit freely, with "Just discussing" off and no warning holding the turn, every op no always-card rule holds applies within the turn and can be undone, including what
+  the AI invents. Each applied op carries its source: `quoted` when its kind is allowlisted (Story Bible page, entity, fact, volume title or goal, an empty story field, a
+  promise's label) and its `quote` supports it, `idea` otherwise, so the author sees which changes are the AI's and can undo them. Only a chat turn applies ideas, and only of
+  the kinds classified as idea-eligible (Story Bible page, entity, volume title, an empty story field, milestone, a promise or its label); an idea that truncates a filled field
+  beyond the removal budget stays a card. Secrets and planner-only content stay cards even under Edit freely: an unbacked fact, new or existing, and an invented volume goal
+  are never ideas. "Just discussing", Ask first or a held turn makes every op a card.
+- Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions; planner-only and
+  writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any
+  time; a volume's order and notes; a promise's disposition (status, payoff target, dormant), progress or reuse of a settled one. The apply engine refuses an always-card kind
+  in an automatic apply, whatever the split decided.
 - A quote supports an op when at least three content words (character bigrams in scripts written without spaces) are found verbatim, whitespace-, case- and typography-normalised,
   in the author's message of that turn, in a sentence stated rather than asked, hedged, negated before the quote or turned down after it; no word the op writes comes only from a
   sentence the author asked or hedged; no field drops more than max(4, 25%) of the content words it held; and the whole op adds at most max(4, 25%) content words that are neither
   in the author's stated sentences nor already in the record. A new record's identifying key counts as written content. An op naming a record only a card creates follows it to
-  the cards.
+  the cards; an idea that does keeps its quote-rule reason, so a turned-down idea is still filtered. An idea the author turned down in scope is dropped unless an op the
+  author's own words back leans on it; if the turned-down ideas cannot be read, every idea stays a card.
 - The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the applied block shows each written value beside its quote and undo stays one
   click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a second, pending one;
   a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
@@ -120,9 +126,9 @@
   recorded stays active) or `not_this_version` (while every record the idea would change is exactly as it was). Rejecting the same idea again replaces the earlier scope.
 - The chat's decline on a suggestion card goes through that route with the author's scope. Declining an action suggestion ("Don't run it") records nothing, since an action
   offers no idea. A finalize the chat cannot run points the author to the chapter's finalize review.
-- A model-authored card whose idea is rejected in scope is dropped before staging, with every card that cannot stand without it. A card the author's own words back (just
-  discussing, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed rejections stop steering the model; similar ideas
-  are avoided only best-effort.
+- A model-authored op — a card, or an idea Edit freely would apply — whose idea is rejected in scope is dropped before staging, with every op that cannot stand without it. An
+  op the author's own words back (quoted, just discussing, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed
+  rejections stop steering the model; similar ideas are avoided only best-effort.
 - A rejection's label names the record only: a secret's truth, its tells and a planner-only page's body never appear in it, so it can ride in any prompt.
 
 ### Notebook and notes
@@ -140,8 +146,9 @@
 - Organising the notes is a chat action that runs as a job. Its output follows the quote rule with the notes standing in for the author's message: an entry applies at once "from
   your notes" only when its quote is found in the notes, stated, and it adds little the paragraphs it cites do not say; in an auto-mode chat those entries apply as one revertible
   proposal. Everything else — no quote, a quote not found or hedged, inferred sections, the model's own suggestions, what relies on a suggestion, the planner-only timeline and
-  open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card. A page mixing both is offered as its notes-backed sections, then the whole
-  page; a card keeping both halves is refused (`NTS_007`). A rule becomes a Notebook direction only when the author keeps it.
+  open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card, even under Edit freely: the card is where the author adopts a
+  suggestion. A page mixing both is offered as its notes-backed sections, then the whole page; a card keeping both halves is refused (`NTS_007`). A rule becomes a Notebook
+  direction only when the author keeps it.
 - Each organise proposal carries its own record (`organise_record`) and records the organise decision from the writes actually applied, so the next run rewrites what organising
   still owns in place. A write the author declined leaves the earlier claim at its ref. A rule or suggestion an earlier answer kept is taken out only when a later round offers it
   again and the author declines it. If the card fails to save after the notes-backed part applied, the whole stage rolls back and the job retries.

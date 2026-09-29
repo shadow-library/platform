@@ -5,8 +5,8 @@ import { HUB_INSTRUCTIONS } from '@modules/ai/prompts/scope-playbooks';
 import { type RecordFields } from '@modules/refinement/artifact-state';
 import { type ChangeOp, renderOpVocabulary, validateChangeSet } from '@modules/refinement/change-set';
 import {
-  type AlwaysCardRule,
-  type CardReason,
+  type CardDisposition,
+  type DirectDisposition,
   exceedsNoveltyBudget,
   exceedsRemovalBudget,
   opReferences,
@@ -35,6 +35,7 @@ type Existing = string[] | Record<string, RecordFields>;
 interface PolicyOptions {
   existing?: Existing;
   mode?: WritePolicyInput['mode'];
+  ideas?: WritePolicyInput['ideas'];
   held?: boolean;
   justDiscussing?: boolean;
   vocabulary?: string;
@@ -42,16 +43,12 @@ interface PolicyOptions {
 }
 
 function policy(ops: ChangeOp[], options: PolicyOptions = {}) {
-  const { existing = [], mode = 'auto', held = false, justDiscussing, vocabulary, message = AUTHOR_MESSAGE } = options;
+  const { existing = [], mode = 'auto', ideas = 'card', held = false, justDiscussing, vocabulary, message = AUTHOR_MESSAGE } = options;
   const entries: [string, RecordFields][] = Array.isArray(existing) ? existing.map(ref => [ref, {}]) : Object.entries(existing);
-  return splitChangeSet({ ops, authorMessage: message, vocabulary, mode, held, justDiscussing, state: { current: new Map(entries) } });
+  return splitChangeSet({ ops, authorMessage: message, vocabulary, mode, ideas, held, justDiscussing, state: { current: new Map(entries) } });
 }
 
-interface Expected {
-  side: OpSide;
-  reason?: CardReason;
-  rule?: AlwaysCardRule;
-}
+type Expected = Omit<DirectDisposition, 'index'> | Omit<CardDisposition, 'index'>;
 
 interface Case extends PolicyOptions {
   name: string;
@@ -73,7 +70,7 @@ const VOLUME_QUOTE = 'Volume two is called The Drowned Court';
 const INVENTED = 'Mira was raised by smugglers in a lighthouse and fears deep water since her brother drowned near the reef.';
 
 const QUOTE_CASES: Case[] = [
-  { name: 'an entity whose quote is in the message applies', op: mira({ quote: QUOTE }), expected: { side: 'direct' } },
+  { name: 'an entity whose quote is in the message applies', op: mira({ quote: QUOTE }), expected: { side: 'direct', source: 'quoted' } },
   { name: 'an entity without a quote is a card', op: mira(), expected: { side: 'card', reason: 'no_quote' } },
   { name: 'a blank quote counts as none', op: mira({ quote: '   ' }), expected: { side: 'card', reason: 'no_quote' } },
   { name: 'a quote from an earlier message is not found', op: mira({ quote: EARLIER_MESSAGE }), expected: { side: 'card', reason: 'quote_not_found' } },
@@ -84,9 +81,9 @@ const QUOTE_CASES: Case[] = [
   {
     name: 'case, whitespace and typographic apostrophes are normalised',
     op: { op: 'entity.upsert', entityKey: 'kael', type: 'character', name: 'Kael', quote: "KAEL the smith   owes Mira a debt he can't repay" },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
-  { name: 'surrounding quote marks the model added are ignored', op: mira({ quote: `"${QUOTE}"` }), expected: { side: 'direct' } },
+  { name: 'surrounding quote marks the model added are ignored', op: mira({ quote: `"${QUOTE}"` }), expected: { side: 'direct', source: 'quoted' } },
 ];
 
 const TENTATIVE_CASES: Case[] = [
@@ -100,24 +97,28 @@ const TENTATIVE_CASES: Case[] = [
   {
     name: 'a negation in an earlier clause leaves the quote stated',
     op: { op: 'entity.upsert', entityKey: 'aldo', type: 'character', name: 'Aldo', quote: 'he runs the Saltgate smuggling ring' },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
 ];
 
 const NOVELTY_CASES: Case[] = [
-  { name: 'a field that adds a word or two applies', op: mira({ body: 'Mira is a thief who works the Saltgate docks at night.', quote: QUOTE }), expected: { side: 'direct' } },
+  {
+    name: 'a field that adds a word or two applies',
+    op: mira({ body: 'Mira is a thief who works the Saltgate docks at night.', quote: QUOTE }),
+    expected: { side: 'direct', source: 'quoted' },
+  },
   { name: 'a field that invents more than the budget is a card', op: mira({ body: INVENTED, quote: QUOTE }), expected: { side: 'card', reason: 'novel_content' } },
   {
     name: "a field's current words count as the author's",
     op: mira({ body: `${INVENTED} She is a thief.`, quote: QUOTE }),
     existing: { 'entity:mira': { name: 'Mira', body: INVENTED } },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'notes handed in as vocabulary count as the author’s words',
     op: mira({ body: INVENTED, quote: QUOTE }),
     vocabulary: `${AUTHOR_MESSAGE}\n${INVENTED}`,
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'a quote that states a goal cannot back a page that states an outcome',
@@ -130,7 +131,7 @@ const ALLOWLIST_CASES: Case[] = [
   {
     name: 'a Story Bible page with a found quote applies',
     op: { op: 'bible_document.upsert', section: 'lore', slug: 'drowned-court', body: 'The tide-queen rules the Drowned Court.', quote: 'its goal is to unseat the tide-queen' },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'a planner-only page is always a card',
@@ -140,13 +141,13 @@ const ALLOWLIST_CASES: Case[] = [
   {
     name: 'a new volume with its title and goal applies',
     op: { op: 'volume.upsert', volumeKey: 'v2', ordinal: 2, title: 'The Drowned Court', objective: 'Unseat the tide-queen', quote: VOLUME_QUOTE },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'renaming an existing volume applies',
     op: { op: 'volume.upsert', volumeKey: 'v2', title: 'The Drowned Court', quote: VOLUME_QUOTE },
     existing: { 'volume:v2': { title: 'Untitled', ordinal: 2 } },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'reordering an existing volume is a card',
@@ -158,14 +159,18 @@ const ALLOWLIST_CASES: Case[] = [
     name: "a state on volume.upsert never gates the op — the op cannot set a volume's state",
     op: { op: 'volume.upsert', volumeKey: 'v2', state: 'goal_met', quote: VOLUME_QUOTE } as unknown as ChangeOp,
     existing: ['volume:v2'],
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: "a volume's notes are a card",
     op: { op: 'volume.upsert', volumeKey: 'v2', body: 'Notes', quote: VOLUME_QUOTE },
     expected: { side: 'card', reason: 'always_card', rule: 'volume_structure' },
   },
-  { name: 'a new secret the author stated applies', op: fact({ body: 'The Hollow Crown eats memories.', subjects: ['mira'], quote: CROWN_QUOTE }), expected: { side: 'direct' } },
+  {
+    name: 'a new secret the author stated applies',
+    op: fact({ body: 'The Hollow Crown eats memories.', subjects: ['mira'], quote: CROWN_QUOTE }),
+    expected: { side: 'direct', source: 'quoted' },
+  },
   {
     name: "a new secret's writer note is a card",
     op: fact({ body: 'It eats memories.', writerNote: 'Hint at gaps.', quote: CROWN_QUOTE }),
@@ -202,13 +207,13 @@ const ALLOWLIST_CASES: Case[] = [
     name: "naming an existing secret's subjects applies",
     op: fact({ subjects: ['mira'], quote: CROWN_QUOTE }),
     existing: ['fact:crown', 'entity:mira'],
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'setting an empty premise applies',
     op: { op: 'premise.update', premise: 'A dock thief takes on a drowned court.', quote: QUOTE },
     existing: { premise: { premise: '' } },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'replacing a non-empty premise is a card',
@@ -288,14 +293,14 @@ const PROMISE_CASES: Case[] = [
     name: 'a new promise the author stated applies',
     op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
     message: PROMISE_MESSAGE,
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'rewording an existing promise applies',
     op: { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'she means to see it paid off', quote: 'she means to see it paid off' },
     existing: ['promise:thread:ledger'],
     message: PROMISE_MESSAGE,
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'closing a promise as paid off is always a card',
@@ -305,11 +310,32 @@ const PROMISE_CASES: Case[] = [
     expected: { side: 'card', reason: 'always_card', rule: 'promise_disposition' },
   },
   {
-    name: 'setting a payoff target is not on the allowlist',
+    name: "setting a payoff target is the promise's disposition, always a card",
     op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', payoffMilestoneKey: 'reveal_thief', quote: 'she means to see it paid off' },
     existing: ['promise:thread:ledger'],
     message: PROMISE_MESSAGE,
-    expected: { side: 'card', reason: 'not_allowlisted' },
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_disposition' },
+  },
+  {
+    name: 'someday over a filled payoff target is a removal',
+    op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', someday: true, quote: 'she means to see it paid off' },
+    existing: { 'promise:thread:ledger': { label: 'Who took the ledger', status: 'open', payoffMilestoneKey: 'reveal_thief', payoffVolumeKey: null, payoffWindow: null } },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'removal' },
+  },
+  {
+    name: 'clearing a filled payoff window is a removal',
+    op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', payoffWindow: null, quote: 'she means to see it paid off' },
+    existing: { 'promise:thread:ledger': { label: 'Who took the ledger', status: 'open', payoffWindow: 12 } },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'removal' },
+  },
+  {
+    name: 'someday on a promise with no payoff target is only its disposition',
+    op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', someday: true, quote: 'she means to see it paid off' },
+    existing: { 'promise:thread:ledger': { label: 'Who took the ledger', status: 'open', payoffMilestoneKey: null, payoffVolumeKey: null, payoffWindow: null } },
+    message: PROMISE_MESSAGE,
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_disposition' },
   },
   {
     name: 'dropping a promise is always a card',
@@ -345,7 +371,7 @@ const PROMISE_CASES: Case[] = [
     name: 'P4-41 probe: a plain key like "ledger" still applies once its label is otherwise stated',
     op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
     message: PROMISE_MESSAGE,
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     // P4-41 probe: before the fix, a long descriptive key's own words were exempt from the novelty budget on create, so a model could smuggle
@@ -363,20 +389,22 @@ const PROMISE_CASES: Case[] = [
   },
 ];
 
-const TABLES: [string, Case[]][] = [
-  ['the quote', QUOTE_CASES],
-  ['a tentative quote', TENTATIVE_CASES],
-  ['the novelty budget', NOVELTY_CASES],
-  ['the allowlist', ALLOWLIST_CASES],
-  ['always-card rules', ALWAYS_CARD_CASES],
-  ['turn overrides', OVERRIDE_CASES],
-  ['promises', PROMISE_CASES],
+const QUOTE_RULE: WritePolicyInput['ideas'][] = ['card'];
+const EITHER: WritePolicyInput['ideas'][] = ['card', 'apply'];
+const TABLES: [string, Case[], WritePolicyInput['ideas'][]][] = [
+  ['the quote', QUOTE_CASES, QUOTE_RULE],
+  ['a tentative quote', TENTATIVE_CASES, QUOTE_RULE],
+  ['the novelty budget', NOVELTY_CASES, QUOTE_RULE],
+  ['the allowlist', ALLOWLIST_CASES, QUOTE_RULE],
+  ['always-card rules', ALWAYS_CARD_CASES, EITHER],
+  ['turn overrides', OVERRIDE_CASES, EITHER],
+  ['promises', PROMISE_CASES, QUOTE_RULE],
 ];
 
-for (const [table, cases] of TABLES) {
+for (const [table, cases, modes] of TABLES) {
   describe(`splitChangeSet — ${table}`, () => {
-    for (const testCase of cases) {
-      it(`should decide that ${testCase.name}`, () => {
+    for (const testCase of cases.flatMap(each => modes.map(ideas => ({ ...each, ideas })))) {
+      it(`should decide that ${testCase.name}${testCase.ideas === 'apply' ? ', even when ideas apply' : ''}`, () => {
         const split = policy([testCase.op], testCase);
 
         expect(split.dispositions).toEqual([{ index: 0, ...testCase.expected }]);
@@ -391,6 +419,162 @@ describe('splitChangeSet — the hold flag', () => {
     expect(policy([mira({ quote: QUOTE })], { held: true }).held).toBe(true);
     expect(policy([mira()], { held: true }).held).toBe(false);
     expect(policy([mira({ quote: QUOTE })], { held: true, justDiscussing: true }).held).toBe(false);
+  });
+});
+
+const EDIT_FREELY_CASES: Case[] = [
+  { name: 'an invented entity applies as an idea', op: mira({ body: INVENTED }), expected: { side: 'direct', source: 'idea' } },
+  { name: 'an entity the author worded applies as quoted', op: mira({ quote: QUOTE }), expected: { side: 'direct', source: 'quoted' } },
+  { name: 'a quote the author never wrote applies as an idea', op: mira({ quote: AI_REPLY }), expected: { side: 'direct', source: 'idea' } },
+  { name: 'a quote from a question applies as an idea', op: mira({ quote: 'Mira have a sister in the court' }), expected: { side: 'direct', source: 'idea' } },
+  { name: 'a quoted op past the novelty budget applies as an idea', op: mira({ body: INVENTED, quote: QUOTE }), expected: { side: 'direct', source: 'idea' } },
+  {
+    name: 'a kind off the allowlist applies as an idea',
+    op: { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist on the court' },
+    expected: { side: 'direct', source: 'idea' },
+  },
+  {
+    name: 'an idea that truncates what a field held stays a card',
+    op: mira({ body: 'A thief.' }),
+    existing: { 'entity:mira': { name: 'Mira', body: INVENTED } },
+    expected: { side: 'card', reason: 'removal' },
+  },
+  { name: 'an unquoted removal stays a card', op: { op: 'entity.remove', entityKey: 'mira' }, expected: { side: 'card', reason: 'always_card', rule: 'removal' } },
+  { name: 'an unquoted plan stays a card', op: { op: 'brief.update', chapter: 4, body: 'Mira robs the court.' }, expected: { side: 'card', reason: 'always_card', rule: 'plan' } },
+  { name: 'unquoted prose stays a card', op: { op: 'draft.update', chapter: 4, body: 'Mira ran.' }, expected: { side: 'card', reason: 'always_card', rule: 'prose' } },
+  { name: 'finalize stays a card', op: { op: 'action.finalize' }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
+  { name: 'approval stays a card', op: { op: 'action.approve_draft', chapter: 4 }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
+  { name: 'generating a chapter stays a card', op: { op: 'action.generate_chapter', chapter: 4 }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
+  {
+    name: "rewriting a secret's truth stays a card",
+    op: fact({ body: 'It eats names.' }),
+    existing: { 'fact:crown': { body: 'It eats memories.' } },
+    expected: { side: 'card', reason: 'always_card', rule: 'secret_truth' },
+  },
+  { name: 'gating a secret stays a card', op: fact({ body: 'It eats memories.', revealChapter: 9 }), expected: { side: 'card', reason: 'always_card', rule: 'secret_gating' } },
+  {
+    name: "a new secret's invented truth stays a card",
+    op: fact({ body: 'It eats memories.' }),
+    expected: { side: 'card', reason: 'no_quote', rule: 'secret_truth' },
+  },
+  {
+    name: 'a new secret quoted from the AI stays a card',
+    op: fact({ body: 'It eats memories.', subjects: ['mira'], quote: AI_REPLY }),
+    existing: ['entity:mira'],
+    expected: { side: 'card', reason: 'quote_not_found', rule: 'secret_truth' },
+  },
+  {
+    name: "an invented secret's subjects stay a card",
+    op: fact({ subjects: ['mira'] }),
+    existing: ['fact:crown', 'entity:mira'],
+    expected: { side: 'card', reason: 'no_quote', rule: 'secret_truth' },
+  },
+  {
+    name: 'a new secret the author stated still applies as quoted',
+    op: fact({ body: 'The Hollow Crown eats memories.', subjects: ['mira'], quote: CROWN_QUOTE }),
+    existing: ['entity:mira'],
+    expected: { side: 'direct', source: 'quoted' },
+  },
+  {
+    name: 'an invented volume goal stays a card, since it is planner-only',
+    op: { op: 'volume.upsert', volumeKey: 'v3', title: 'The Salt Road', objective: 'Crown Mira' },
+    expected: { side: 'card', reason: 'no_quote', rule: 'planner_only_field' },
+  },
+  { name: 'an invented volume title applies as an idea', op: { op: 'volume.upsert', volumeKey: 'v3', title: 'The Salt Road' }, expected: { side: 'direct', source: 'idea' } },
+  {
+    name: 'an invented premise for an empty story applies as an idea',
+    op: { op: 'premise.update', premise: INVENTED },
+    existing: { premise: { premise: '' } },
+    expected: { side: 'direct', source: 'idea' },
+  },
+  {
+    name: 'rewording a promise applies as an idea',
+    op: { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'Who stole the harbour ledger' },
+    existing: { 'promise:thread:ledger': { label: 'Who took the ledger', status: 'open' } },
+    expected: { side: 'direct', source: 'idea' },
+  },
+  {
+    name: 'an invented payoff target stays a card',
+    op: { op: 'promise.set_payoff', kind: 'thread', key: 'ledger', payoffVolumeKey: 'v2' },
+    existing: ['promise:thread:ledger'],
+    expected: { side: 'card', reason: 'always_card', rule: 'promise_disposition' },
+  },
+  {
+    name: 'an invented someday over a filled payoff target stays a removal card',
+    op: { op: 'promise.set_payoff', kind: 'mystery', key: 'crown', someday: true, dormant: true },
+    existing: { 'promise:mystery:crown': { label: 'Who forged the crown?', status: 'open', payoffVolumeKey: 'v2' } },
+    expected: { side: 'card', reason: 'always_card', rule: 'removal' },
+  },
+  {
+    name: 'an invented rule stays a card',
+    op: { op: 'organise.rule', rule: 'Mira never kills.', optionId: 'r1' },
+    expected: { side: 'card', reason: 'not_allowlisted', rule: 'notebook_direction' },
+  },
+  {
+    name: 'a wholesale relabel of a milestone stays a card',
+    op: { op: 'milestone.upsert', milestoneKey: 'heist', label: 'Kael betrays the smiths' },
+    existing: { 'milestone:heist': { label: 'Mira robs the tide-queen’s vault beneath the drowned court', kind: 'event' } },
+    expected: { side: 'card', reason: 'removal' },
+  },
+  {
+    name: "clearing a milestone's subject is a removal",
+    op: { op: 'milestone.upsert', milestoneKey: 'heist', subjectEntityKey: null },
+    existing: { 'milestone:heist': { label: 'The heist', subjectEntityKey: 'mira', kind: 'event' } },
+    expected: { side: 'card', reason: 'always_card', rule: 'removal' },
+  },
+  { name: 'a manual-mode chat keeps an idea a card', op: mira({ body: INVENTED }), mode: 'manual', expected: { side: 'card', reason: 'no_quote' } },
+  { name: 'just discussing keeps an idea a card', op: mira({ body: INVENTED }), justDiscussing: true, expected: { side: 'card', reason: 'no_quote' } },
+  { name: 'a held turn keeps an idea a card', op: mira({ body: INVENTED }), held: true, expected: { side: 'card', reason: 'no_quote' } },
+];
+
+describe('splitChangeSet — Edit freely', () => {
+  for (const testCase of EDIT_FREELY_CASES) {
+    it(`should decide that ${testCase.name}`, () => {
+      const split = policy([testCase.op], { ...testCase, ideas: 'apply' });
+
+      expect(split.dispositions).toEqual([{ index: 0, ...testCase.expected }]);
+      expect(split.sources).toEqual(testCase.expected.side === 'direct' ? [testCase.expected.source] : []);
+    });
+  }
+
+  it('should apply no idea unless the caller opts in', () => {
+    const split = splitChangeSet({ ops: [mira({ body: INVENTED })], authorMessage: AUTHOR_MESSAGE, mode: 'auto', held: false, state: { current: new Map() } });
+
+    expect(split.dispositions).toEqual([{ index: 0, side: 'card', reason: 'no_quote' }]);
+  });
+
+  it('should not flag a hold that only kept ideas off the applied side', () => {
+    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true }).held).toBe(false);
+  });
+
+  it('should send an idea naming a record only a card creates to the cards, keeping the quote rule’s reason so a turned-down idea is still filtered', () => {
+    const ops: ChangeOp[] = [
+      { op: 'volume.upsert', volumeKey: 'v9', title: 'The Drowned Court', body: 'The court floods.' },
+      { op: 'volume.upsert', volumeKey: 'v9', ordinal: 9 },
+      mira({ quote: QUOTE }),
+    ];
+
+    const split = policy(ops, { ideas: 'apply' });
+
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'always_card', rule: 'volume_structure' },
+      { index: 1, side: 'card', reason: 'no_quote' },
+      { index: 2, side: 'direct', source: 'quoted' },
+    ]);
+    expect(split.sources).toEqual(['quoted']);
+  });
+
+  it('should align each applied op’s source with the applied side in listing order', () => {
+    const ops: ChangeOp[] = [
+      { op: 'entity.upsert', entityKey: 'kael', type: 'character', name: 'Kael', body: 'Kael the smith.' },
+      mira({ quote: QUOTE }),
+      { op: 'entity.remove', entityKey: 'aldo' },
+    ];
+
+    const split = policy(ops, { ideas: 'apply' });
+
+    expect(split.direct).toEqual([ops[0], ops[1]] as ChangeOp[]);
+    expect(split.sources).toEqual(['idea', 'quoted']);
   });
 });
 
@@ -459,17 +643,26 @@ const DEPENDENCY_CASES: DependencyCase[] = [
     name: 'ops on a record that already exists split independently',
     ops: [mira({ body: 'An invented backstory.' }), mira({ status: 'thief', quote: QUOTE })],
     existing: ['entity:mira'],
-    expected: [{ side: 'card', reason: 'no_quote' }, { side: 'direct' }],
+    expected: [
+      { side: 'card', reason: 'no_quote' },
+      { side: 'direct', source: 'quoted' },
+    ],
   },
   {
     name: 'a card naming a record the applied side creates stays a card, and the applied op stays applied',
     ops: [kael({ quote: KAEL_QUOTE }), { op: 'brief.update', chapter: 5, pov: 'kael', body: 'Kael forges the key.' }],
-    expected: [{ side: 'direct' }, { side: 'card', reason: 'always_card', rule: 'plan' }],
+    expected: [
+      { side: 'direct', source: 'quoted' },
+      { side: 'card', reason: 'always_card', rule: 'plan' },
+    ],
   },
   {
     name: 'a quoted secret naming a character the applied side creates stays applied',
     ops: [kael({ quote: KAEL_QUOTE }), fact({ body: 'It eats memories.', subjects: ['kael'], quote: CROWN_QUOTE })],
-    expected: [{ side: 'direct' }, { side: 'direct' }],
+    expected: [
+      { side: 'direct', source: 'quoted' },
+      { side: 'direct', source: 'quoted' },
+    ],
   },
   {
     name: 'a quoted page that owes records only a card supplies joins the card',
@@ -483,7 +676,11 @@ const DEPENDENCY_CASES: DependencyCase[] = [
   {
     name: 'a quoted page whose owed records apply beside it stays applied',
     ops: [{ op: 'bible_document.upsert', section: 'project', slug: 'cast', body: 'Mira, a dock thief.', quote: QUOTE }, mira({ quote: QUOTE }), kael()],
-    expected: [{ side: 'direct' }, { side: 'direct' }, { side: 'card', reason: 'no_quote' }],
+    expected: [
+      { side: 'direct', source: 'quoted' },
+      { side: 'direct', source: 'quoted' },
+      { side: 'card', reason: 'no_quote' },
+    ],
   },
 ];
 
@@ -580,7 +777,7 @@ const CONTENT_CASES: Case[] = [
     name: 'the stated sentence alone still applies beside a hedged one',
     op: mira({ body: 'A thief who works the docks.', quote: 'Mira is a thief who works the docks' }),
     message: LAUNDER_MESSAGE,
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'a four-sentence page re-emitted as two sentences is a removal',
@@ -592,7 +789,7 @@ const CONTENT_CASES: Case[] = [
     name: 'a one-sentence page addition applies',
     op: saltgate(`${SALTGATE_PAGE} Mira is a thief who works the docks.`),
     existing: { 'doc:lore/saltgate': { body: SALTGATE_PAGE } },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'an invented motivation beside a stated scar is new content',
@@ -618,14 +815,24 @@ const CONTENT_CASES: Case[] = [
     message: PROBE_MESSAGE,
     expected: { side: 'card', reason: 'novel_content' },
   },
-  { name: 'recording left-handedness applies', op: kaelOp({ notes: 'Left-handed.', quote: 'Kael is left-handed' }), message: PROBE_MESSAGE, expected: { side: 'direct' } },
-  { name: 'recording a hatred of boats applies', op: mira({ motivation: 'Hates boats.', quote: 'Mira hates boats' }), message: PROBE_MESSAGE, expected: { side: 'direct' } },
+  {
+    name: 'recording left-handedness applies',
+    op: kaelOp({ notes: 'Left-handed.', quote: 'Kael is left-handed' }),
+    message: PROBE_MESSAGE,
+    expected: { side: 'direct', source: 'quoted' },
+  },
+  {
+    name: 'recording a hatred of boats applies',
+    op: mira({ motivation: 'Hates boats.', quote: 'Mira hates boats' }),
+    message: PROBE_MESSAGE,
+    expected: { side: 'direct', source: 'quoted' },
+  },
   {
     name: 'renaming a volume applies',
     op: { op: 'volume.upsert', volumeKey: 'v2', title: 'The Drowned Court', quote: VOLUME_QUOTE },
     message: PROBE_MESSAGE,
     existing: { 'volume:v2': { title: 'Untitled' } },
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
 ];
 
@@ -634,7 +841,7 @@ const cue = (name: string, message: string, side: OpSide = 'card'): Case => ({
   name,
   op: mira({ quote: DOCKS }),
   message,
-  expected: side === 'card' ? { side, reason: 'tentative' } : { side },
+  expected: side === 'card' ? { side, reason: 'tentative' } : { side, source: 'quoted' },
 });
 
 const CUE_CASES: Case[] = [
@@ -662,7 +869,7 @@ const CJK_CASES: Case[] = [
     name: 'a CJK quote the author stated applies',
     op: mira({ name: '米拉', body: '码头上的小偷', quote: '米拉是码头上的小偷' }),
     message: '米拉是码头上的小偷。她讨厌船。',
-    expected: { side: 'direct' },
+    expected: { side: 'direct', source: 'quoted' },
   },
   {
     name: 'a CJK quote from a hedged question is tentative',

@@ -237,3 +237,20 @@ describe('ProposalApplyService — action.advance_volume', () => {
     expect(executors.get).not.toHaveBeenCalled();
   });
 });
+
+describe('ProposalApplyService — an automatic apply', () => {
+  it('should refuse a removal, since the write policy always keeps one a card', async () => {
+    const { service, rows } = await fakeProject([{ op: 'volume.remove', volumeKey: 'volume_1' }], {
+      volumes: [{ volumeKey: 'volume_1', ordinal: 1, title: 'The Near Shore', state: 'not_started' }],
+    });
+
+    await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('never carries volume.remove');
+    expect(rows(schema.volumes).find(row => row['volumeKey'] === 'volume_1')).toBeDefined();
+  });
+
+  it('should refuse a chapter plan, since the write policy always keeps one a card', async () => {
+    const { service } = await fakeProject([{ op: 'brief.update', chapter: 3, body: 'Mira robs the court.' }]);
+
+    await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('never carries brief.update');
+  });
+});

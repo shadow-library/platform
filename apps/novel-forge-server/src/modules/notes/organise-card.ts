@@ -239,7 +239,8 @@ function judgedAlone(candidate: Candidate, input: OrganiseCandidateInput): Candi
 /**
  * The quote rule decides which of the round's writes are the author's own. What passes applies at once as its own proposal; everything
  * else — suggestions, the planner-only pages, what an earlier run wrote and this one retires, and the rules — waits on the card. A page
- * mixing both is offered as its notes-backed sections, then the whole page.
+ * mixing both is offered as its notes-backed sections, then the whole page. Unlike a chat turn, Edit freely applies no suggestion here: the
+ * card is where the author adopts one into the Notebook, and a whole page beside its notes-backed half would overwrite that half.
  */
 export function organiseCandidates(input: OrganiseCandidateInput): OrganiseCandidates {
   const all = candidates(input.plan, input.options).map(candidate => (candidate.beside || candidate.label === 'rule' ? candidate : judgedAlone(candidate, input)));
@@ -255,7 +256,7 @@ export function organiseCandidates(input: OrganiseCandidateInput): OrganiseCandi
   judged.forEach((candidate, index) => {
     const disposition = split.dispositions[index];
     candidate.label = labelOf(disposition);
-    if (candidate.op.quote && candidate.label === 'suggested') candidate.reason ??= disposition?.reason;
+    if (candidate.op.quote && disposition?.side === 'card' && candidate.label === 'suggested') candidate.reason ??= disposition.reason;
   });
   const records = new Map<ChangeOp, Candidate>();
   const ops = all.map(candidate => {
@@ -272,7 +273,7 @@ export function organiseCandidates(input: OrganiseCandidateInput): OrganiseCandi
   const decision = input.plan.entries.find(entry => entry.kind === 'decision' && entry.topic === ORGANISE_TOPIC);
   const { pages: _pages, records: _records, ...payload } = (decision?.payload ?? {}) as Record<string, unknown>;
   return {
-    split: { ops, direct, cards: ops.filter(op => !direct.includes(op)), dispositions: split.dispositions, held: false },
+    split: { ops, direct, cards: ops.filter(op => !direct.includes(op)), sources: direct.map(() => 'quoted'), dispositions: split.dispositions, held: false },
     records,
     template: { statement: decision?.statement ?? '', payload },
     settled: input.plan.claims.settled,

@@ -1,4 +1,4 @@
-import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { EnumType, Field, Integer, PickType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
@@ -6,6 +6,7 @@ import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, C
 import { type Project, type Refinement } from '@server/database';
 
 import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
+import { OP_SOURCES, type OpSource } from './write-policy';
 
 @Schema()
 export class ChatProjectParams {
@@ -344,6 +345,16 @@ export class ChatTurnBody {
   costTier?: Project.CostTier;
 }
 
+const AppliedOpSource = EnumType.create('AppliedOpSource', [...OP_SOURCES]);
+
+@Schema({ additionalProperties: true, description: 'Apply-time result for one operation a turn applied, with where its words came from.' })
+export class TurnOpResultItem extends PickType(OpResultItem, ['index', 'status', 'error', 'note', 'result'] as const) {
+  @Field(() => AppliedOpSource, {
+    description: "quoted: the author's own words in this turn back the op. idea: the model proposed it and Edit freely applied it — mark it as an idea the author can undo.",
+  })
+  source: OpSource;
+}
+
 @Schema({ description: 'Proposal application outcome returned as part of an automatic-mode turn.' })
 export class TurnAppliedResult {
   @Field(() => [AppliedArtifactItem])
@@ -352,8 +363,8 @@ export class TurnAppliedResult {
   @Field(() => [String])
   staleMarked: string[];
 
-  @Field(() => [OpResultItem])
-  opResults: OpResultItem[];
+  @Field(() => [TurnOpResultItem], { description: "One result per applied operation, indexed into the applied proposal's change-set." })
+  opResults: TurnOpResultItem[];
 }
 
 @Schema()
@@ -367,10 +378,13 @@ export class ChatTurnResponse {
   @Field(() => ProposalResponse, { optional: true, description: "The turn's suggestion cards, pending the author's per-op accept or decline." })
   proposal?: ProposalResponse;
 
-  @Field(() => ProposalResponse, { optional: true, description: "The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable." })
+  @Field(() => ProposalResponse, {
+    optional: true,
+    description: "The turn's changes already applied and undoable: the author's own words (each op carries its quote) and, under Edit freely, the model's ideas.",
+  })
   appliedProposal?: ProposalResponse;
 
-  @Field(() => TurnAppliedResult, { optional: true, description: 'present when this turn applied the changes taken from the author’s own words' })
+  @Field(() => TurnAppliedResult, { optional: true, description: 'present when this turn applied changes; each result says whether its op is quoted or an idea' })
   applied?: TurnAppliedResult;
 
   @Field({ optional: true, description: 'why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write)' })

@@ -30,14 +30,28 @@ export type AlwaysCardRule =
   | 'volume_structure'
   | 'promise_disposition'
   | 'promise_progress'
-  | 'promise_reuse';
+  | 'promise_reuse'
+  | 'planner_only_field'
+  | 'notebook_direction';
 
-export interface OpDisposition {
+export const OP_SOURCES = ['quoted', 'idea'] as const;
+/** `quoted` when the quote rule backs an applied op with the author's words, `idea` for one Edit freely applied without them. */
+export type OpSource = (typeof OP_SOURCES)[number];
+
+export interface DirectDisposition {
   index: number;
-  side: OpSide;
-  reason?: CardReason;
+  side: 'direct';
+  source: OpSource;
+}
+
+export interface CardDisposition {
+  index: number;
+  side: 'card';
+  reason: CardReason;
   rule?: AlwaysCardRule;
 }
+
+export type OpDisposition = DirectDisposition | CardDisposition;
 
 export interface WritePolicyState {
   /** Every ref the change-set writes that exists, with its current fields (`loadCurrentRecords`); `premise` holds the story fields. */
@@ -51,6 +65,8 @@ export interface WritePolicyInput {
   /** Where an applied op's words must come from; the author's message unless a pass also hands over the notes it organises. */
   vocabulary?: string;
   mode: Refinement.ChatMode;
+  /** What an auto-mode pass does with an op the quote rule does not back and `IDEA_POLICY` lets through: only a chat turn applies it as an idea. */
+  ideas?: 'apply' | 'card';
   justDiscussing?: boolean;
   /** A warning on the turn (negation echo, planner-only read) holds every op for review. */
   held: boolean;
@@ -61,6 +77,8 @@ export interface ChangeSetSplit {
   ops: ChangeOp[];
   direct: ChangeOp[];
   cards: ChangeOp[];
+  /** Each direct op's provenance, aligned with `direct`. */
+  sources: OpSource[];
   dispositions: OpDisposition[];
   /** True when the hold turned at least one op that would have applied into a card. */
   held: boolean;
@@ -87,6 +105,35 @@ export const ALWAYS_CARD: Readonly<Partial<Record<OpType, AlwaysCardRule>>> = {
   'promise.drop': 'removal',
   'brief.update': 'plan',
   'draft.update': 'prose',
+  'promise.set_payoff': 'promise_disposition',
+  ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
+};
+
+/**
+ * What Edit freely does with an op the author's words do not back: apply it as an `idea`, or keep it a card under the named rule. Keyed by
+ * every kind, so a new kind does not compile until it is classified here. A secret's truth, tells and scope are never the model's to settle.
+ */
+export const IDEA_POLICY: Readonly<Record<OpType, 'idea' | AlwaysCardRule>> = {
+  'premise.update': 'idea',
+  'bible_document.upsert': 'idea',
+  'bible_document.remove': 'removal',
+  'volume.upsert': 'idea',
+  'volume.remove': 'removal',
+  'brief.update': 'plan',
+  'brief.remove': 'removal',
+  'draft.update': 'prose',
+  'draft.remove': 'removal',
+  'entity.upsert': 'idea',
+  'entity.remove': 'removal',
+  'fact.upsert': 'secret_truth',
+  'fact.remove': 'removal',
+  'milestone.upsert': 'idea',
+  'milestone.remove': 'removal',
+  'promise.create': 'idea',
+  'promise.update': 'idea',
+  'promise.set_payoff': 'promise_disposition',
+  'promise.drop': 'removal',
+  'organise.rule': 'notebook_direction',
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
 };
 
@@ -95,6 +142,7 @@ const NOVELTY_FLOOR = 4;
 const REMOVAL_FLOOR = 4;
 const BUDGET_SHARE = 0.25;
 const STORY_FIELDS = declaredOpFields('premise.update');
+const PAYOFF_FIELDS = ['payoffMilestoneKey', 'payoffVolumeKey', 'payoffWindow'] as const;
 const FACT_DIRECT_FIELDS: ReadonlySet<string> = new Set(['factKey', 'body', 'subjects', 'constraintNote', 'terms']);
 // A record's identifying key is exempt from the novelty budget once the record exists — but on the op that creates it (P4-41), the key
 // is itself unreviewed written content: a model or author could smuggle a secret into a fresh key and repeat it verbatim in a text field
@@ -109,6 +157,7 @@ const TEXT_FIELDS: Readonly<Partial<Record<OpType, readonly string[]>>> = {
   'fact.upsert': ['body', 'constraintNote', 'terms'],
   'promise.create': ['label'],
   'promise.update': ['label'],
+  'milestone.upsert': ['label'],
 };
 
 const HEDGE_CUE =
@@ -284,12 +333,18 @@ function clearsField(op: ChangeOp, current: RecordFields | undefined): boolean {
   return declaredOpFields(op.op).some(field => fields[field] !== undefined && !isFilled(fields[field]) && isFilled(current[field]));
 }
 
-/** The rule that keeps an allowlisted op a card whatever its quote, from the op and what it would overwrite. */
+/** `someday: true` clears every payoff target at once without naming one, so `clearsField` alone would miss it. */
+function clearsPayoff(op: ChangeOp, current: RecordFields | undefined): boolean {
+  return op.op === 'promise.set_payoff' && op.someday === true && PAYOFF_FIELDS.some(field => isFilled(current?.[field]));
+}
+
+/** The rule that keeps an op a card whatever its quote, from the op and what it would overwrite. */
 export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCardRule | undefined {
-  const kindRule = ALWAYS_CARD[op.op];
-  if (kindRule) return kindRule;
   const [ref] = changeSetRefs([op]);
   const current = ref === undefined ? undefined : state.current.get(ref);
+  if (op.op === 'promise.set_payoff' && (clearsPayoff(op, current) || clearsField(op, current))) return 'removal';
+  const kindRule = ALWAYS_CARD[op.op];
+  if (kindRule) return kindRule;
   if (clearsField(op, current)) return 'removal';
   const fields = op as unknown as Record<string, unknown>;
 
@@ -345,19 +400,44 @@ export function opReferences(op: ChangeOp): string[] {
   ];
 }
 
-function intrinsicDisposition(op: ChangeOp, index: number, input: WritePolicyInput): OpDisposition {
+/** Why the quote rule alone would keep an op off the direct side, or nothing when the author's words back it. */
+function quoteVerdict(op: ChangeOp, current: RecordFields | undefined, input: WritePolicyInput): CardReason | undefined {
+  if (!DIRECT_OP_KINDS.has(op.op)) return 'not_allowlisted';
+  if (typeof op.quote !== 'string' || op.quote.trim() === '') return 'no_quote';
+  if (!quoteFoundIn(op.quote, input.authorMessage)) return 'quote_not_found';
+  const vocabulary = input.vocabulary ?? input.authorMessage;
+  if (quoteIsTentative(op.quote, input.authorMessage) || launders(op, current, vocabulary)) return 'tentative';
+  if (exceedsRemovalBudget(op, current)) return 'removal';
+  if (exceedsNoveltyBudget(op, current, vocabulary)) return 'novel_content';
+  return undefined;
+}
+
+/** Why Edit freely keeps an unbacked op a card: its kind's `IDEA_POLICY`, or a volume's goal, which is planner-only until the writer reaches that volume. */
+export function ideaCardRule(op: ChangeOp): AlwaysCardRule | undefined {
+  const policy = IDEA_POLICY[op.op];
+  if (policy !== 'idea') return policy;
+  return op.op === 'volume.upsert' && op.objective !== undefined ? 'planner_only_field' : undefined;
+}
+
+interface Judged {
+  disposition: OpDisposition;
+  /** The quote rule's reason for an op applied as an idea: where it lands if it has to wait on a card after all. */
+  verdict?: CardReason;
+}
+
+/** An idea kept a card keeps the quote rule's reason, so a turned-down one is still filtered; a truncation drops the author's words, so it is reviewed. */
+function intrinsicDisposition(op: ChangeOp, index: number, input: WritePolicyInput, appliesIdeas: boolean): Judged {
   const rule = alwaysCardRule(op, input.state);
-  if (rule) return { index, side: 'card', reason: 'always_card', rule };
-  if (!DIRECT_OP_KINDS.has(op.op)) return { index, side: 'card', reason: 'not_allowlisted' };
-  if (typeof op.quote !== 'string' || op.quote.trim() === '') return { index, side: 'card', reason: 'no_quote' };
-  if (!quoteFoundIn(op.quote, input.authorMessage)) return { index, side: 'card', reason: 'quote_not_found' };
+  if (rule) return { disposition: { index, side: 'card', reason: 'always_card', rule } };
   const [ref] = changeSetRefs([op]);
   const current = ref === undefined ? undefined : input.state.current.get(ref);
-  const vocabulary = input.vocabulary ?? input.authorMessage;
-  if (quoteIsTentative(op.quote, input.authorMessage) || launders(op, current, vocabulary)) return { index, side: 'card', reason: 'tentative' };
-  if (exceedsRemovalBudget(op, current)) return { index, side: 'card', reason: 'removal' };
-  if (exceedsNoveltyBudget(op, current, vocabulary)) return { index, side: 'card', reason: 'novel_content' };
-  return { index, side: 'direct' };
+  const verdict = quoteVerdict(op, current, input);
+  if (!verdict) return { disposition: { index, side: 'direct', source: 'quoted' } };
+  if (!appliesIdeas) return { disposition: { index, side: 'card', reason: verdict } };
+  const ideaRule = ideaCardRule(op);
+  if (ideaRule) return { disposition: { index, side: 'card', reason: verdict, rule: ideaRule } };
+  if (exceedsRemovalBudget(op, current)) return { disposition: { index, side: 'card', reason: 'removal' } };
+  return { disposition: { index, side: 'direct', source: 'idea' }, verdict };
 }
 
 /** A page body in an entity-bearing section is valid only beside records of the types it owes (`validateChangeSet`), so it follows them to the cards. */
@@ -372,21 +452,22 @@ function awaitsCardEntities(op: ChangeOp, directTypes: ReadonlySet<string>, card
  * transitively, since the op it joins may create records of its own. A card that names a record a direct op creates stays a card: the
  * direct side applies first and the cards are staged after it, so their baseline already holds the record.
  */
-function moveDependentsToCards(ops: readonly ChangeOp[], dispositions: OpDisposition[], current: ReadonlyMap<string, RecordFields>): void {
+function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], current: ReadonlyMap<string, RecordFields>): void {
   const created = (op: ChangeOp) => changeSetRefs([op]).filter(ref => !current.has(ref));
-  const opOf = (disposition: OpDisposition) => ops[disposition.index] as ChangeOp;
-  const entityTypes = (side: OpSide) => new Set(dispositions.filter(d => d.side === side).flatMap(d => (opOf(d).op === 'entity.upsert' ? [(opOf(d) as EntityUpsertOp).type] : [])));
-  const createdByCards = new Set(dispositions.filter(d => d.side === 'card').flatMap(d => created(opOf(d))));
+  const opOf = ({ disposition }: Judged) => ops[disposition.index] as ChangeOp;
+  const entityTypes = (side: OpSide) =>
+    new Set(judged.filter(j => j.disposition.side === side).flatMap(j => (opOf(j).op === 'entity.upsert' ? [(opOf(j) as EntityUpsertOp).type] : [])));
+  const createdByCards = new Set(judged.filter(j => j.disposition.side === 'card').flatMap(j => created(opOf(j))));
 
   let moved = true;
   while (moved) {
     moved = false;
-    for (const disposition of dispositions) {
-      if (disposition.side !== 'direct') continue;
-      const op = opOf(disposition);
+    for (const entry of judged) {
+      if (entry.disposition.side !== 'direct') continue;
+      const op = opOf(entry);
       const namesCardRecord = [...changeSetRefs([op]), ...opReferences(op)].some(ref => createdByCards.has(ref));
       if (!namesCardRecord && !awaitsCardEntities(op, entityTypes('direct'), entityTypes('card'))) continue;
-      Object.assign(disposition, { side: 'card', reason: 'depends_on_card' });
+      entry.disposition = { index: entry.disposition.index, side: 'card', reason: entry.verdict ?? 'depends_on_card' };
       for (const ref of created(op)) createdByCards.add(ref);
       moved = true;
     }
@@ -394,21 +475,32 @@ function moveDependentsToCards(ops: readonly ChangeOp[], dispositions: OpDisposi
 }
 
 /**
- * The quote rule: an op applies without review only when its kind is allowlisted, no always-card rule holds, its quote is found in the
- * author's message this turn and stated rather than asked, it adds little the author did not say, it depends on no card, the author is not
- * just discussing, the session lands changes on its own and nothing on the turn asks for review. Everything else is a card.
+ * The write policy: an op applies without review only when no always-card rule holds, it depends on no card, the author is not just
+ * discussing, the session lands changes on its own and nothing on the turn asks for review. There it applies as `quoted` when its kind is
+ * allowlisted, its quote is found in the author's message this turn and stated rather than asked, and it adds little the author did not
+ * say; a chat turn applies anything else `IDEA_POLICY` admits as an `idea` the author can undo, unless it truncates what a field held.
+ * Everything else is a card. An idea that has to wait on a card keeps the quote rule's reason, so a turned-down idea can still be filtered out.
  */
 export function splitChangeSet(input: WritePolicyInput): ChangeSetSplit {
   const ops = [...input.ops];
-  const dispositions = ops.map((op, index) => intrinsicDisposition(op, index, input));
-  moveDependentsToCards(ops, dispositions, input.state.current);
-
-  const eligible = dispositions.filter(d => d.side === 'direct');
   const override = overrideReason(input);
-  if (override) for (const disposition of eligible) Object.assign(disposition, { side: 'card', reason: override });
+  const appliesIdeas = override === null && input.ideas === 'apply';
+  const judged = ops.map((op, index) => intrinsicDisposition(op, index, input, appliesIdeas));
+  moveDependentsToCards(ops, judged, input.state.current);
 
-  const on = (side: OpSide) => dispositions.filter(d => d.side === side).map(d => ops[d.index] as ChangeOp);
-  return { ops, direct: on('direct'), cards: on('card'), dispositions, held: override === 'held_for_review' && eligible.length > 0 };
+  const dispositions = judged.map(({ disposition }): OpDisposition =>
+    override && disposition.side === 'direct' ? { index: disposition.index, side: 'card', reason: override } : disposition,
+  );
+  const eligible = judged.filter(({ disposition }) => disposition.side === 'direct').length;
+  const direct = dispositions.filter(d => d.side === 'direct');
+  return {
+    ops,
+    direct: direct.map(d => ops[d.index] as ChangeOp),
+    cards: dispositions.filter(d => d.side === 'card').map(d => ops[d.index] as ChangeOp),
+    sources: direct.map(d => d.source),
+    dispositions,
+    held: override === 'held_for_review' && eligible > 0,
+  };
 }
 
 function overrideReason(input: WritePolicyInput): CardReason | null {

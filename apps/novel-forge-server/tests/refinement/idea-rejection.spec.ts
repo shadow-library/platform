@@ -5,17 +5,18 @@ import { type ChangeOp, renderActionVocabulary, renderOpVocabulary, validateChan
 import { dropRejectedIdeas } from '@modules/refinement/idea-filter';
 import { ideaIdOf, ideaLabel, stampIdeaIds } from '@modules/refinement/idea-id';
 import { type IdeaRejectionEntry, rejectionAnchor, type RejectionContext, rejectionInScope } from '@modules/refinement/idea-rejections';
-import { type ChangeSetSplit, type OpDisposition } from '@modules/refinement/write-policy';
+import { type CardDisposition, type ChangeSetSplit, type DirectDisposition, type OpDisposition } from '@modules/refinement/write-policy';
 
 const kael: ChangeOp = { op: 'entity.upsert', entityKey: 'kael', type: 'character', name: 'Kael', motivation: 'He wants the lamp for himself.' };
 const kaelPage: ChangeOp = { op: 'fact.upsert', factKey: 'kael_betrayal', body: 'Kael sold the keeper out.', subjects: ['kael'] };
 const mira: ChangeOp = { op: 'entity.upsert', entityKey: 'mira', type: 'character', status: 'thief', quote: 'Mira is a thief' };
 const MISSING = { exists: false, revision: null, contentHash: null };
 
-function split(ops: ChangeOp[], dispositions: Omit<OpDisposition, 'index'>[]): ChangeSetSplit {
-  const indexed = dispositions.map((disposition, index) => ({ ...disposition, index }));
+function split(ops: ChangeOp[], dispositions: (Omit<DirectDisposition, 'index'> | Omit<CardDisposition, 'index'>)[]): ChangeSetSplit {
+  const indexed = dispositions.map((disposition, index) => ({ ...disposition, index }) as OpDisposition);
   const on = (side: 'direct' | 'card') => indexed.filter(d => d.side === side).map(d => ops[d.index] as ChangeOp);
-  return { ops, direct: on('direct'), cards: on('card'), dispositions: indexed, held: false };
+  const sources = indexed.flatMap(d => (d.side === 'direct' ? [d.source] : []));
+  return { ops, direct: on('direct'), cards: on('card'), sources, dispositions: indexed, held: false };
 }
 
 function context(overrides: Partial<RejectionContext> = {}): RejectionContext {
@@ -86,7 +87,13 @@ describe('rejectionInScope', () => {
 
 describe('dropRejectedIdeas', () => {
   it('should drop a re-proposed card whose idea the author turned down, keeping the rest', () => {
-    const turn = split([mira, kael], [{ side: 'direct' }, { side: 'card', reason: 'no_quote' }]);
+    const turn = split(
+      [mira, kael],
+      [
+        { side: 'direct', source: 'quoted' },
+        { side: 'card', reason: 'no_quote' },
+      ],
+    );
 
     const { split: filtered, dropped } = dropRejectedIdeas(turn, new Set([ideaIdOf(kael)]), new Map());
 
@@ -147,6 +154,23 @@ describe('dropRejectedIdeas', () => {
 
     expect(dropped).toEqual([]);
     expect(filtered).toBe(turn);
+  });
+
+  it('should drop a turned-down idea Edit freely would apply, with what leans on it, but never a quoted op', () => {
+    const turn = split(
+      [mira, kael, kaelPage],
+      [
+        { side: 'direct', source: 'quoted' },
+        { side: 'direct', source: 'idea' },
+        { side: 'direct', source: 'idea' },
+      ],
+    );
+
+    const { split: filtered, dropped } = dropRejectedIdeas(turn, new Set([ideaIdOf(kael), ideaIdOf(mira)]), new Map());
+
+    expect(dropped).toEqual([ideaIdOf(kael), ideaIdOf(kaelPage)]);
+    expect(filtered.direct).toEqual([mira]);
+    expect(filtered.sources).toEqual(['quoted']);
   });
 });
 

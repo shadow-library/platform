@@ -4857,9 +4857,9 @@ export interface components {
       assistantMessage: components['schemas']['ChatMessageResponse'];
       /** @description The turn's suggestion cards, pending the author's per-op accept or decline. */
       proposal?: components['schemas']['ProposalResponse'];
-      /** @description The turn's changes taken from the author's own words (each op carries its quote), already applied and undoable. */
+      /** @description The turn's changes already applied and undoable: the author's own words (each op carries its quote) and, under Edit freely, the model's ideas. */
       appliedProposal?: components['schemas']['ProposalResponse'];
-      /** @description present when this turn applied the changes taken from the author’s own words */
+      /** @description present when this turn applied changes; each result says whether its op is quoted or an idea */
       applied?: components['schemas']['TurnAppliedResult'];
       /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
       applyNote?: string;
@@ -4869,8 +4869,26 @@ export interface components {
     TurnAppliedResult: {
       applied: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
-      opResults: components['schemas']['OpResultItem'][];
+      /** @description One result per applied operation, indexed into the applied proposal's change-set. */
+      opResults: components['schemas']['TurnOpResultItem'][];
     };
+    /** @description Apply-time result for one operation a turn applied, with where its words came from. */
+    TurnOpResultItem: {
+      index: number;
+      status: string;
+      error?: string;
+      /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
+      note?: string;
+      result?: {
+        [key: string]: unknown;
+      };
+      /** @description quoted: the author's own words in this turn back the op. idea: the model proposed it and Edit freely applied it — mark it as an idea the author can undo. */
+      source: components['schemas']['AppliedOpSource'];
+    } & {
+      [key: string]: unknown;
+    };
+    /** @enum {string} */
+    AppliedOpSource: 'quoted' | 'idea';
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
       title?: string;
@@ -16095,6 +16113,8 @@ export type ChatTurnStatusResponse = components['schemas']['ChatTurnStatusRespon
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
+export type TurnOpResultItem = components['schemas']['TurnOpResultItem'];
+export type AppliedOpSource = components['schemas']['AppliedOpSource'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];

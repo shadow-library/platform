@@ -32,11 +32,11 @@ import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
-import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
+import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
-import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnProposalPort, type TurnStaging } from './turn-proposals';
+import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnApplied, type TurnProposalPort, type TurnStaging } from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
@@ -94,9 +94,9 @@ export interface ChatTurnResult {
   assistantMessage: ChatMessageView;
   /** The turn's suggestion cards, pending review. */
   proposal: Refinement.Proposal | null;
-  /** The ops the author's own words backed, applied in the turn. */
+  /** The ops applied in the turn: the author's own words and, under Edit freely, the model's ideas. */
   appliedProposal?: Refinement.Proposal | null;
-  applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
+  applied?: TurnApplied;
   applyNote?: string;
   runId: string;
 }
@@ -738,7 +738,7 @@ export class ChatService {
     return { userMessage, assistantMessage, proposal: staging.cardProposal, appliedProposal: staging.appliedProposal, applied: staging.applied, applyNote: staging.applyNote };
   }
 
-  /** Splits the change-set by the quote rule and stages it as at most two proposals: the author's words applied, the rest as cards. */
+  /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */
   private async stageChangeSet(
     projectId: bigint,
     session: Refinement.ChatSession,
@@ -754,8 +754,8 @@ export class ChatService {
 
     const rejectedIdeas = (ideaIds: string[]) =>
       loadRejectedIdeas(this.db, projectId, ideaIds).catch((err: unknown) => {
-        this.logger.warn('chat turn: reading turned-down ideas failed — staging without the filter', { projectId, runId, err });
-        return new Set<string>();
+        this.logger.warn('chat turn: reading turned-down ideas failed — every idea stays a card', { projectId, runId, err });
+        throw err;
       });
     const split = await splitTurnChangeSet(this.db, projectId, ops, { authorMessage, mode: session.mode, justDiscussing, warnings, rejectedIdeas });
     this.logger.debug('chat turn: write policy', { projectId, runId, dispositions: split.dispositions });

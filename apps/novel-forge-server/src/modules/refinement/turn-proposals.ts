@@ -5,8 +5,8 @@ import { type DbExecutor, type Refinement } from '@server/database';
 import { loadCurrentRecords } from './artifact-state';
 import { type ChangeOp, changeSetRefs } from './change-set';
 import { dropRejectedIdeas, filterableIdeaIds } from './idea-filter';
-import { type ApplyResult } from './proposal-apply.service';
-import { type ChangeSetSplit, splitChangeSet } from './write-policy';
+import { type ApplyResult, type OpResult } from './proposal-apply.service';
+import { type ChangeSetSplit, type OpSource, splitChangeSet } from './write-policy';
 
 export const HELD_FOR_REVIEW_NOTE = 'Not applied automatically: review the warnings on these suggestions first.';
 export const APPLY_FAILED_NOTE = 'Your words could not be applied as they stand, so every change is offered as a suggestion instead.';
@@ -27,10 +27,18 @@ export interface TurnProposalPort {
   discard: (proposalId: bigint) => Promise<unknown>;
 }
 
+export interface TurnOpResult extends OpResult {
+  source: OpSource;
+}
+
+export interface TurnApplied extends Pick<ApplyResult, 'applied' | 'staleMarked'> {
+  opResults: TurnOpResult[];
+}
+
 export interface TurnStaging {
-  /** "From your words": the quote-backed ops, already applied, undone by reverting this proposal. */
+  /** The ops that applied in the turn — the author's words and, under Edit freely, the model's ideas — undone by reverting this proposal. */
   appliedProposal: Refinement.Proposal | null;
-  applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
+  applied?: TurnApplied;
   /** "Suggestions": everything else, pending the author's per-op accept or decline. */
   cardProposal: Refinement.Proposal | null;
   applyNote?: string;
@@ -41,7 +49,7 @@ export interface TurnPolicyContext {
   mode: Refinement.ChatMode;
   justDiscussing: boolean;
   warnings: readonly string[];
-  /** Which of these ideas the author turned down in a scope that still holds. */
+  /** Which of these ideas the author turned down in a scope that still holds; when it fails, no idea applies, since none can be checked. */
   rejectedIdeas?: (ideaIds: string[]) => Promise<ReadonlySet<string>>;
 }
 
@@ -53,18 +61,20 @@ export interface TurnSplit extends ChangeSetSplit {
 /** The quote rule over the records as they stand when the turn stages, not when it started — a long turn may overlap other writes. */
 export async function splitTurnChangeSet(db: DbExecutor, projectId: bigint, ops: readonly ChangeOp[], context: TurnPolicyContext): Promise<TurnSplit> {
   const current = await loadCurrentRecords(db, projectId, changeSetRefs([...ops]));
-  const split = splitChangeSet({
-    ops,
-    authorMessage: context.authorMessage,
-    mode: context.mode,
-    justDiscussing: context.justDiscussing,
-    held: context.warnings.length > 0,
-    state: { current },
-  });
+  const input = { ops, authorMessage: context.authorMessage, mode: context.mode, justDiscussing: context.justDiscussing, held: context.warnings.length > 0, state: { current } };
+  const split = splitChangeSet({ ...input, ideas: 'apply' });
   const candidates = filterableIdeaIds(split);
   if (!context.rejectedIdeas || candidates.length === 0) return { ...split, droppedIdeas: [] };
-  const filtered = dropRejectedIdeas(split, await context.rejectedIdeas(candidates), current);
+  const rejected = await context.rejectedIdeas(candidates).catch(() => null);
+  if (!rejected) return { ...splitChangeSet({ ...input, ideas: 'card' }), droppedIdeas: [] };
+  const filtered = dropRejectedIdeas(split, rejected, current);
   return { ...filtered.split, droppedIdeas: filtered.dropped };
+}
+
+function sourceOf(split: ChangeSetSplit, index: number): OpSource {
+  const source = split.sources[index];
+  if (source === undefined) throw AppError.internal(`applied op ${index} has no source: the split's sources are misaligned with its applied side`);
+  return source;
 }
 
 function failureNote(err: unknown): string {
@@ -82,6 +92,7 @@ export async function stageTurnChangeSet(port: TurnProposalPort, split: ChangeSe
   // Staging re-runs its own checks over the whole change-set, so a warning the direct side raised comes back on the cards without being passed on.
   const allAsCards = async (applyNote: string): Promise<TurnStaging> => ({ appliedProposal: null, cardProposal: await port.stage(split.ops, warnings, whole), applyNote });
 
+  if (split.sources.length !== split.direct.length) throw AppError.internal('a split carries one source per applied op');
   if (split.direct.length === 0) {
     const cardProposal = split.cards.length > 0 ? await port.stage(split.cards, warnings, whole) : null;
     return { appliedProposal: null, cardProposal, applyNote: split.held ? HELD_FOR_REVIEW_NOTE : undefined };
@@ -110,7 +121,8 @@ export async function stageTurnChangeSet(port: TurnProposalPort, split: ChangeSe
     () => false,
   );
 
-  const applied = { applied: result.applied, staleMarked: result.staleMarked, opResults: result.opResults };
+  const opResults = result.opResults.map(opResult => ({ ...opResult, source: sourceOf(split, opResult.index) }));
+  const applied = { applied: result.applied, staleMarked: result.staleMarked, opResults };
   const unlinkedNote = linked ? undefined : UNLINKED_NOTE;
   if (split.cards.length === 0) return { appliedProposal: result.proposal, applied, cardProposal: null, applyNote: unlinkedNote };
   try {
