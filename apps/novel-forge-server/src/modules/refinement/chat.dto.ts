@@ -1,12 +1,12 @@
-import { EnumType, Field, Integer, PickType, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, PickType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
 import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, CostTier, SortByTime } from '@server/common';
 import { type Project, type Refinement } from '@server/database';
 
-import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
-import { OP_SOURCES, type OpSource } from './write-policy';
+import { AppliedArtifactItem, AppliedOpSource, OpResultItem, ProposalResponse } from './refinement.dto';
+import { type OpSource } from './write-policy';
 
 @Schema()
 export class ChatProjectParams {
@@ -344,8 +344,6 @@ export class ChatTurnBody {
   })
   costTier?: Project.CostTier;
 }
-
-const AppliedOpSource = EnumType.create('AppliedOpSource', [...OP_SOURCES]);
 
 @Schema({ additionalProperties: true, description: 'Apply-time result for one operation a turn applied, with where its words came from.' })
 export class TurnOpResultItem extends PickType(OpResultItem, ['index', 'status', 'error', 'note', 'result'] as const) {

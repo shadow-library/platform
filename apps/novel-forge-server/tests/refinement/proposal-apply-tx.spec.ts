@@ -78,7 +78,7 @@ describe('ProposalApplyService.apply inside a caller transaction', () => {
     expect(deleted).toHaveLength(1);
     expect(result.applied).toEqual([{ artifactRef: 'volume:volume_4', newRevision: null }]);
     expect(JSON.parse(JSON.stringify(result.proposal.inverseOps))).toEqual([
-      { op: 'volume.upsert', volumeKey: 'volume_4', ordinal: 4, title: 'The Flood', objective: 'Reach the far bank.' },
+      { op: 'volume.upsert', volumeKey: 'volume_4', ordinal: 4, title: 'The Flood', objective: 'Reach the far bank.', body: null },
     ]);
   });
 

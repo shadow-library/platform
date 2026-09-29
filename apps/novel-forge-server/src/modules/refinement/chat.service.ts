@@ -782,7 +782,7 @@ export class ChatService {
             this.logger.warn('chat turn: staging a proposal failed', { projectId, runId, err });
             throw err;
           }),
-      apply: proposalId => this.proposalApplyService.apply(projectId, proposalId, { autoApplied: true }),
+      apply: (proposalId, opSources) => this.proposalApplyService.apply(projectId, proposalId, { autoApplied: true, opSources }),
       linkApplied: proposal =>
         this.linkMessage(message, { appliedProposalId: proposal.id }).catch((err: unknown) => {
           this.logger.warn('chat turn: linking the applied proposal to its reply failed', { projectId, runId, proposalId: proposal.id, err });

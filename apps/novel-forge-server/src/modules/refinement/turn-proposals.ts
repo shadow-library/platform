@@ -21,7 +21,8 @@ export interface StageOptions {
 
 export interface TurnProposalPort {
   stage: (changeSet: ChangeOp[], warnings: string[], options: StageOptions) => Promise<Refinement.Proposal>;
-  apply: (proposalId: bigint) => Promise<ApplyResult>;
+  /** `sources` holds the write policy's source for each op of the staged change-set, kept on the applied proposal's results. */
+  apply: (proposalId: bigint, sources: readonly OpSource[]) => Promise<ApplyResult>;
   /** Called as soon as the apply commits, so the turn keeps its link to the applied change whatever happens to the cards. */
   linkApplied: (proposal: Refinement.Proposal) => Promise<unknown>;
   discard: (proposalId: bigint) => Promise<unknown>;
@@ -113,7 +114,7 @@ export async function stageTurnChangeSet(port: TurnProposalPort, split: ChangeSe
 
   let result: ApplyResult;
   try {
-    result = await port.apply(staged.id);
+    result = await port.apply(staged.id, split.sources);
   } catch (err) {
     await port.discard(staged.id);
     return allAsCards(failureNote(err));

@@ -158,6 +158,9 @@ export const refinementProposals = pgTable(
     // after apply — together they make the proposal revertible under a strict conflict guard.
     inverseOps: jsonb('inverse_ops'),
     postState: jsonb('post_state'),
+    // A chat turn's applied proposal only, indexed like the change-set: each applied op's own inverse and, once undone on its own, the
+    // state its undo left, so one change can be undone and redone while `inverse_ops` and `post_state` keep describing the rest.
+    opUndo: jsonb('op_undo'),
     model: varchar('model'),
     runId: varchar('run_id'),
     appliedAt: timestamp('applied_at'),

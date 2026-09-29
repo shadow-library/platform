@@ -243,6 +243,15 @@ export class AppErrorCode extends ServerErrorCode {
     'This chapter is isolated — chat cannot see its prose, so it cannot rewrite it. Edit the prose in the chapter editor.',
   );
   static readonly RFN_013 = AppErrorCode.badRequest('RFN_013', 'A writer preview is only for a pending chapter plan card');
+  static readonly RFN_014 = AppErrorCode.badRequest(
+    'RFN_014',
+    'Change {opIndex} cannot be undone or redone on its own — only a change a chat turn applied can be; undo the whole proposal instead',
+  );
+  static readonly RFN_015 = AppErrorCode.conflict('RFN_015', 'Other changes from this turn rely on change {opIndex} — undo changes {opIndexes} first');
+  static readonly RFN_016 = AppErrorCode.conflict('RFN_016', 'Change {opIndex} relies on changes that are undone — redo changes {opIndexes} first');
+  static readonly RFN_017 = AppErrorCode.badRequest('RFN_017', 'This turn’s changes were undone as a whole — a change can be redone only while the rest of its turn is applied');
+  // A user-facing 500: the author must learn the undo did not happen, and why
+  static readonly RFN_018 = new AppErrorCode('RFN_018', 'Change {opIndex} could not be put back exactly as it was before, so nothing was undone', 500);
 
   /*!
    * Context Errors

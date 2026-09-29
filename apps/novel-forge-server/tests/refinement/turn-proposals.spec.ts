@@ -38,6 +38,7 @@ interface FakePortOptions {
 function fakePort(options: FakePortOptions = {}) {
   const log: string[] = [];
   const staged: { changeSet: ChangeOp[]; warnings: string[]; options: StageOptions; id: bigint }[] = [];
+  const appliedSources: (readonly OpSource[])[] = [];
   const opResults = (id: bigint) => (staged.find(entry => entry.id === id)?.changeSet ?? []).map((_, index) => ({ index, status: 'applied' }));
   const port: TurnProposalPort = {
     stage: async (changeSet, warnings, stageOptions) => {
@@ -48,8 +49,9 @@ function fakePort(options: FakePortOptions = {}) {
       const own = options.stageWarnings?.(changeSet) ?? [];
       return { id, changeSet, status: 'pending', warnings: own.length > 0 ? own : null } as unknown as Refinement.Proposal;
     },
-    apply: async id => {
+    apply: async (id, sources) => {
       log.push(`apply ${id}`);
+      appliedSources.push(sources);
       if (options.applyFails === 'app') throw AppErrorCode.RFN_003.create();
       if (options.applyFails === 'internal') throw new Error('connection reset by peer at 10.0.0.4');
       return {
@@ -65,7 +67,7 @@ function fakePort(options: FakePortOptions = {}) {
     },
     discard: async id => log.push(`discard ${id}`),
   };
-  return { port, log, staged };
+  return { port, log, staged, appliedSources };
 }
 
 describe('stageTurnChangeSet', () => {
@@ -113,6 +115,14 @@ describe('stageTurnChangeSet', () => {
       { index: 0, status: 'applied', source: 'quoted' },
       { index: 1, status: 'applied', source: 'idea' },
     ]);
+  });
+
+  it('should hand the apply each op’s source, so the applied proposal keeps it for a reloaded chat', async () => {
+    const { port, appliedSources } = fakePort();
+
+    await stageTurnChangeSet(port, split([quoted, idea], [], false, ['quoted', 'idea']), []);
+
+    expect(appliedSources).toEqual([['quoted', 'idea']]);
   });
 
   it('should refuse a split whose sources are misaligned with its applied side before staging anything', async () => {

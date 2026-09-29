@@ -10,6 +10,15 @@ export interface BriefMergeDefaults {
   contentMode: Project.ContentMode | null;
 }
 
+/** A captured inverse's brief: the fields that were empty come back `null` so a revert empties them again; `OP_SPECS` refuses `null` for them from anyone else. */
+export type BriefRestoreFields = Omit<BriefUpdateOp, 'title' | 'contextRefs' | 'chapterPurpose' | 'readerValue' | 'endingContract'> & {
+  title?: string | null;
+  contextRefs?: string[] | null;
+  chapterPurpose?: string | null;
+  readerValue?: string[] | null;
+  endingContract?: BriefUpdateOp['endingContract'] | null;
+};
+
 type MergedBrief = Pick<
   Generation.Brief,
   | 'title'
@@ -32,19 +41,19 @@ type MergedBrief = Pick<
 >;
 
 /** The brief as applying `op` leaves it. Pure: the apply writes it, and a plan card's preview judges it without writing. */
-export function mergeBriefUpdate(existing: MergedBrief | undefined, op: BriefUpdateOp, defaults: BriefMergeDefaults): MergedBrief {
+export function mergeBriefUpdate(existing: MergedBrief | undefined, op: BriefRestoreFields, defaults: BriefMergeDefaults): MergedBrief {
   const merged: MergedBrief = {
-    title: op.title ?? existing?.title ?? null,
+    title: op.title !== undefined ? op.title : (existing?.title ?? null),
     body: op.body ?? existing?.body ?? '',
     writeMode: op.writeMode ?? existing?.writeMode ?? 'standard',
     volumeKey: op.volumeKey !== undefined ? op.volumeKey : existing ? existing.volumeKey : defaults.volumeKey,
-    contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
+    contextRefs: op.contextRefs !== undefined ? op.contextRefs : (existing?.contextRefs ?? null),
     pov: op.pov !== undefined ? op.pov?.trim() || null : (existing?.pov ?? null),
-    chapterPurpose: op.chapterPurpose ?? existing?.chapterPurpose ?? null,
-    readerValue: op.readerValue ?? existing?.readerValue ?? null,
+    chapterPurpose: op.chapterPurpose !== undefined ? op.chapterPurpose : (existing?.chapterPurpose ?? null),
+    readerValue: op.readerValue !== undefined ? op.readerValue : (existing?.readerValue ?? null),
     repetitionRisks: op.repetitionRisks !== undefined ? op.repetitionRisks : (existing?.repetitionRisks ?? null),
     densityRisk: op.densityRisk !== undefined ? op.densityRisk?.trim() || null : (existing?.densityRisk ?? null),
-    endingContract: op.endingContract ?? existing?.endingContract ?? null,
+    endingContract: op.endingContract !== undefined ? op.endingContract : (existing?.endingContract ?? null),
     knowledgeContract: op.knowledgeContract !== undefined ? op.knowledgeContract : (existing?.knowledgeContract ?? null),
     direction: op.direction !== undefined ? op.direction?.trim() || null : (existing?.direction ?? null),
     contentMode: op.contentMode !== undefined ? op.contentMode : existing ? existing.contentMode : defaults.contentMode,

@@ -1,13 +1,16 @@
 import { EnumType, Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
-import { Transform } from '@shadow-library/fastify';
+import { ErrorResponseDto, Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
 import { ChatScope, LedgerRejectionScope, ProposalDiagnosticKind, RefinementKind, RefinementProposalStatus, SortByTime, UndoDependentKind } from '@server/common';
 import { type Ledger, type Refinement } from '@server/database';
 
+import { LedgerEntryResponse } from '../ledger/ledger.dto';
+import { OP_SOURCES, type OpSource } from './write-policy';
 import { WRITER_KEPT_KINDS, type WriterKeptKind } from './writer-preview.service';
 
 const WriterKeptKindEnum = EnumType.create('WriterKeptKind', [...WRITER_KEPT_KINDS]);
+export const AppliedOpSource = EnumType.create('AppliedOpSource', [...OP_SOURCES]);
 
 @Schema()
 export class ProposalProjectParams {
@@ -101,8 +104,17 @@ export class OpResultItem {
   @Field(() => Integer)
   index: number;
 
-  @Field()
+  @Field({
+    description:
+      '`applied`, `declined`, `pending` (an action not yet run), `failed`, or `reverted`: a change a chat turn applied that was undone on its own while the rest of its turn stays applied.',
+  })
   status: string;
+
+  @Field(() => AppliedOpSource, {
+    optional: true,
+    description: "On every op a chat turn applied. quoted: the author's own words in that turn back it. idea: the model proposed it and Edit freely applied it.",
+  })
+  source?: OpSource;
 
   @Field({ optional: true })
   error?: string;
@@ -318,6 +330,72 @@ export class RevertProposalResponse {
 
   @Field(() => [String])
   staleMarked: string[];
+}
+
+@Schema()
+export class UndoProposalOpBody {
+  @Field(() => LedgerRejectionScope, {
+    optional: true,
+    default: 'not_now',
+    description: 'For an idea only: how long the undone idea stays turned down, as on a declined suggestion card. Undoing a quoted change records nothing.',
+  })
+  scope?: Ledger.RejectionScope;
+
+  @Field({ optional: true, maxLength: 4000, description: "The author's reason, kept on the Notebook entry an undone idea records." })
+  why?: string;
+}
+
+@Schema({ description: 'One change of a chat turn applied again after it was undone on its own.' })
+export class RedoProposalOpResponse {
+  @Field(() => ProposalResponse, { description: "The turn's applied proposal, with this change's result as it now stands." })
+  proposal: ProposalResponse;
+
+  @Field(() => Integer)
+  opIndex: number;
+
+  @Field({ description: 'False when the change already stood as asked, so nothing was written: undo and redo are idempotent.' })
+  changed: boolean;
+
+  @Field(() => AppliedOpSource, { optional: true })
+  source?: OpSource;
+
+  @Field(() => [AppliedArtifactItem], { description: 'The records this call wrote.' })
+  artifacts: AppliedArtifactItem[];
+
+  @Field(() => [String])
+  staleMarked: string[];
+}
+
+@Schema({ description: 'One change of a chat turn undone on its own; the rest of the turn stays applied.' })
+export class UndoProposalOpResponse extends RedoProposalOpResponse {
+  @Field(() => LedgerEntryResponse, {
+    optional: true,
+    nullable: true,
+    description: 'The Notebook rejection an undone idea holds, so it is not offered again in its scope; null for a quoted change.',
+  })
+  rejection?: LedgerEntryResponse | null;
+}
+
+@Schema()
+export class ProposalOpDependencyDetails {
+  @Field(() => [Integer], { description: 'The changes to undo (or redo) first, in that order.' })
+  opIndexes: number[];
+}
+
+@Schema({
+  description:
+    'RFN_015: other applied changes of the turn rely on the one being undone. RFN_016: the change being redone relies on changes that are undone. Nothing was written either way.',
+})
+export class ProposalOpDependencyErrorResponse extends ErrorResponseDto {
+  @Field(() => ProposalOpDependencyDetails, { optional: true })
+  details?: ProposalOpDependencyDetails;
+}
+
+@Schema()
+export class UndoImpactQuery {
+  @Field(() => Integer, { optional: true, minimum: 0, description: "One change of a chat turn's applied proposal: what undoing only that change would affect." })
+  @Transform('int:parse')
+  opIndex?: number;
 }
 
 @Schema({ description: 'A record that relies on something an undo would take back.' })

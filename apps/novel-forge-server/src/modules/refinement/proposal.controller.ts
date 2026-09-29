@@ -7,7 +7,8 @@ import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/con
 import { LedgerEntryResponse } from '../ledger/ledger.dto';
 import { ledgerEntryStatus } from '../ledger/ledger.service';
 import { IdeaRejectionService } from './idea-rejection.service';
-import { ProposalApplyService } from './proposal-apply.service';
+import { type OpToggleResult, ProposalApplyService } from './proposal-apply.service';
+import { ProposalOpUndoService } from './proposal-op-undo.service';
 import { ProposalService } from './proposal.service';
 import {
   ApplyProposalBody,
@@ -15,12 +16,17 @@ import {
   ListProposalResponse,
   ListProposalsQuery,
   ProposalIdParams,
+  ProposalOpDependencyErrorResponse,
   ProposalOpParams,
   ProposalProjectParams,
   ProposalResponse,
+  RedoProposalOpResponse,
   RejectProposalOpBody,
   RevertProposalResponse,
+  UndoImpactQuery,
   UndoImpactResponse,
+  UndoProposalOpBody,
+  UndoProposalOpResponse,
   UpdateProposalBody,
   WriterPreviewResponse,
 } from './refinement.dto';
@@ -36,6 +42,7 @@ export class ProposalController {
     private readonly proposalApplyService: ProposalApplyService,
     private readonly writerPreviewService: WriterPreviewService,
     private readonly ideaRejectionService: IdeaRejectionService,
+    private readonly proposalOpUndoService: ProposalOpUndoService,
   ) {}
 
   @Get()
@@ -69,8 +76,8 @@ export class ProposalController {
 
   @Get('/:proposalId/undo-impact')
   @RespondFor(200, UndoImpactResponse)
-  async undoImpact(@Params() params: ProposalIdParams): Promise<UndoImpactResponse> {
-    const impact = await this.proposalService.undoImpact(params.projectId, params.proposalId);
+  async undoImpact(@Params() params: ProposalIdParams, @Query() query: UndoImpactQuery): Promise<UndoImpactResponse> {
+    const impact = await this.proposalService.undoImpact(params.projectId, params.proposalId, query.opIndex);
     return { proposalId: params.proposalId, ...impact };
   }
 
@@ -89,6 +96,25 @@ export class ProposalController {
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/:proposalId/ops/:opIndex/undo')
+  @RespondFor(200, UndoProposalOpResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
+  @RespondFor(409, ProposalOpDependencyErrorResponse)
+  async undoOp(@Params() params: ProposalOpParams, @Body() body: UndoProposalOpBody): Promise<UndoProposalOpResponse> {
+    const { rejection, ...result } = await this.proposalOpUndoService.undo(params.projectId, params.proposalId, params.opIndex, body);
+    return { ...serialiseOpToggle(params.opIndex, result), rejection: rejection && { ...rejection, status: ledgerEntryStatus(rejection) } };
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/:proposalId/ops/:opIndex/redo')
+  @RespondFor(200, RedoProposalOpResponse)
+  @RespondFor(400, RevealRuleErrorResponse)
+  @RespondFor(409, ProposalOpDependencyErrorResponse)
+  async redoOp(@Params() params: ProposalOpParams): Promise<RedoProposalOpResponse> {
+    return serialiseOpToggle(params.opIndex, await this.proposalOpUndoService.redo(params.projectId, params.proposalId, params.opIndex));
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:proposalId/ops/:opIndex/reject')
   @RespondFor(201, LedgerEntryResponse)
   async rejectOp(@Params() params: ProposalOpParams, @Body() body: RejectProposalOpBody): Promise<LedgerEntryResponse> {
@@ -102,4 +128,16 @@ export class ProposalController {
   discardProposal(@Params() params: ProposalIdParams): Promise<ProposalResponse> {
     return this.proposalService.discard(params.projectId, params.proposalId).then(serialiseProposal);
   }
+}
+
+function serialiseOpToggle(opIndex: number, result: OpToggleResult<unknown>): RedoProposalOpResponse {
+  const { proposal, changed, source, artifacts, staleMarked } = result;
+  return {
+    proposal: serialiseProposal(proposal),
+    opIndex,
+    changed,
+    source,
+    artifacts: artifacts.map(({ artifactRef, newRevision }) => ({ artifactRef, newRevision })),
+    staleMarked,
+  };
 }

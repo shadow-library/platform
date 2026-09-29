@@ -3,7 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { AppError, type ErrorCode, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { AppErrorCode, RevealRuleError } from '@server/classes';
+import { AppErrorCode, OpDependencyError, RevealRuleError } from '@server/classes';
 import {
   assertMilestoneSubject,
   assertStartsNextChapter,
@@ -36,8 +36,8 @@ import { isCostTier } from '../ai/defaults';
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
 import { hasOrganiseUndo, recordOrganiseDecision, revertOrganiseDecision, wholeOrganiseSelection } from '../notes/organise-record';
 import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
-import { type ArtifactState, loadArtifactStates } from './artifact-state';
-import { mergeBriefUpdate } from './brief-merge';
+import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
+import { type BriefRestoreFields, mergeBriefUpdate } from './brief-merge';
 import { CHAT_TURN_GRAPH } from './chat-selection';
 import {
   type ActionOp,
@@ -67,7 +67,8 @@ import {
   type VolumeRemoveOp,
   type VolumeUpsertOp,
 } from './change-set';
-import { ALWAYS_CARD } from './write-policy';
+import { AppliedOpGraph, type OpUndoRecord } from './op-undo';
+import { ALWAYS_CARD, type OpSource } from './write-policy';
 
 export interface AppliedArtifact {
   artifactRef: string;
@@ -78,7 +79,10 @@ export interface AppliedArtifact {
 
 export interface OpResult {
   index: number;
-  status: 'applied' | 'declined' | 'pending' | 'failed';
+  /** `reverted`: a change a chat turn applied, undone on its own while the rest of its turn stays applied. */
+  status: 'applied' | 'declined' | 'pending' | 'failed' | 'reverted';
+  /** Set on every op a chat turn applied: whether the author's words backed it or it was the model's idea. */
+  source?: OpSource;
   error?: string;
   /** Why the engine declined an op the author did not reject; only proposals applied before the quote rule carry one. */
   note?: string;
@@ -89,6 +93,8 @@ export interface ApplyOptions {
   opIndexes?: number[];
   /** Set when a turn or the organise job applies what the write policy let through; such an apply never carries an always-card op. */
   autoApplied?: boolean;
+  /** The write policy's source for each op of an automatic apply, indexed like the change-set and kept on its result. */
+  opSources?: readonly OpSource[];
   /** Applies inside the caller's transaction, so the change commits or rolls back with the caller's own writes. Content ops only: actions run after a commit. */
   tx?: PrimaryTransaction;
 }
@@ -106,6 +112,21 @@ export interface RevertResult {
   staleMarked: string[];
 }
 
+export interface OpToggleResult<T = never> {
+  proposal: Refinement.Proposal;
+  artifacts: AppliedArtifact[];
+  staleMarked: string[];
+  /** False when the change already stood as asked: undo and redo are idempotent. */
+  changed: boolean;
+  op: ContentOp;
+  source?: OpSource;
+  /** What the caller's hook returned; present only when the change moved. */
+  followUp?: T;
+}
+
+/** Runs inside the undo or redo transaction once the change moved, so the caller's own writes commit or roll back with it. */
+export type OpToggleHook<T> = (tx: PrimaryTransaction, change: { op: ContentOp; source?: OpSource }) => Promise<T>;
+
 export interface RollbackResult {
   reverted: { proposalId: bigint; artifacts: AppliedArtifact[] }[];
   skipped: bigint[];
@@ -119,9 +140,19 @@ interface BaselineMismatch {
   actual: ArtifactState;
 }
 
+// A captured inverse writes back exactly what the row held: a field that was empty comes back `null`, so undoing an op that filled it
+// empties it again instead of merging as "keep". `OP_SPECS` refuses `null` for these fields, so only an inverse ever carries one.
+type Restorable<T, K extends keyof T> = Omit<T, K> & { [P in K]?: T[P] | null };
+
+type PremiseRestoreOp = Restorable<PremiseUpdateOp, 'premise' | 'brief' | 'themes' | 'instructions'>;
+type BibleDocumentRestoreOp = Restorable<BibleDocumentUpsertOp, 'frontmatter' | 'body'>;
+type VolumeRestoreOp = Restorable<VolumeUpsertOp, 'title' | 'objective' | 'body'>;
+type EntityRestoreOp = Restorable<EntityUpsertOp, 'status' | 'motivation' | 'notes' | 'body'>;
+type FactRestoreOp = Restorable<FactUpsertOp, 'subjects' | 'constraintNote' | 'terms'>;
+
 // Captured on the inverse and restored on revert, but deliberately absent from `OP_SPECS`: whether a human wrote the brief
 // is the engine's to record, never a field a model or author change-set can set.
-type BriefRestoreOp = BriefUpdateOp & { handEdited?: boolean };
+type BriefRestoreOp = BriefRestoreFields & { handEdited?: boolean };
 
 // A removed milestone comes back with the chapter that reached it; its planned state is re-derived from the plans.
 type MilestoneRestoreOp = MilestoneUpsertOp & { reachedChapter?: number | null; boundRevision?: number | null };
@@ -154,7 +185,12 @@ interface PromiseRow {
 }
 
 // The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
-type DraftRestoreOp = DraftUpdateOp & { isolated?: boolean; generator?: Project.ContentGenerator };
+type DraftRestoreOp = Restorable<DraftUpdateOp, 'title' | 'summary'> & { isolated?: boolean; generator?: Project.ContentGenerator };
+
+/** An op's value for a field, or the row's when the op leaves it out; only a restore op's `null` clears it. */
+function keptOr<T>(value: T | null | undefined, existing: T | null | undefined): T | null {
+  return value === undefined ? (existing ?? null) : value;
+}
 
 interface ApplyContext {
   tx: PrimaryDatabase;
@@ -205,6 +241,33 @@ const PLAN_STATE_OPS: ReadonlySet<string> = new Set([
   'milestone.upsert',
   'milestone.remove',
 ]);
+
+/** A chat turn's applied proposal: the only kind whose changes are undone and redone one at a time. */
+const PER_OP_UNDO_KINDS: ReadonlySet<Refinement.Kind> = new Set(['chat', 'hub']);
+
+interface TurnOp {
+  proposal: Refinement.Proposal;
+  ops: ChangeOp[];
+  opUndo: (OpUndoRecord | null)[];
+  opResults: OpResult[];
+  op: ContentOp;
+  record: OpUndoRecord;
+  result: OpResult;
+}
+
+/** Whether every ref holds the expected content; revisions are left out, since a restore bumps them. */
+function sameContent(refs: readonly string[], expected: Readonly<Record<string, ArtifactState>>, actual: Readonly<Record<string, ArtifactState>>): boolean {
+  return refs.every(ref => {
+    const want = expected[ref];
+    const found = actual[ref] ?? MISSING_ARTIFACT;
+    return want !== undefined && want.exists === found.exists && want.contentHash === found.contentHash;
+  });
+}
+
+/** The change-set indexes in the order an apply runs their ops. */
+function applyOrder(ops: readonly ChangeOp[], indexes: readonly number[]): number[] {
+  return removalsLast(indexes.map(index => ({ op: (ops[index] as ChangeOp).op, index }))).map(entry => entry.index);
+}
 
 /** Plans, and the facts, volumes and milestones their reveal rule reads, are checked as the whole change-set leaves them, so one op may rely on another. */
 async function enforcePlanOps(tx: PrimaryDatabase, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
@@ -306,20 +369,28 @@ export class ProposalApplyService {
         return { outcome: 'conflicted', proposal: conflicted ?? proposal };
       }
 
+      if (options?.opSources && options.opSources.length !== ops.length) throw AppError.internal('an automatic apply carries one source per op of its change-set');
+
       const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
       const inverseOps: ContentOp[] = [];
+      const perOpUndo = options?.autoApplied === true && PER_OP_UNDO_KINDS.has(proposal.kind);
+      const opUndo: (OpUndoRecord | null)[] = ops.map(() => null);
+      const indexOf = new Map<ChangeOp, number>(contentOps.map(entry => [entry.op, entry.index]));
       const selectedContent = contentOps.map(entry => entry.op);
       if (selectedContent.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
       if (proposal.kind === 'chapter_plan') await assertPlanCardCurrent(ctx.tx, projectId, selectedContent);
       for (const op of removalsLast(selectedContent)) {
+        const beforeState = perOpUndo ? await loadArtifactStates(ctx.tx, projectId, changeSetRefs([op])) : {};
         const inverse = await this.captureInverse(ctx, op);
         await this.applyOp(ctx, op);
-        if (inverse) inverseOps.unshift(inverse);
+        if (!inverse) continue;
+        inverseOps.unshift(inverse);
+        opUndo[indexOf.get(op) as number] = { inverse, beforeState };
       }
       await enforcePlanOps(ctx.tx, projectId, selectedContent);
       const postState = await loadArtifactStates(ctx.tx, projectId, changeSetRefs(contentOps.map(c => c.op)));
 
-      const opResults = this.opResultsFor(ops, selected);
+      const opResults = this.opResultsFor(ops, selected, options?.opSources);
 
       const [applied] = await tx
         .update(schema.refinementProposals)
@@ -329,6 +400,7 @@ export class ProposalApplyService {
           opResults,
           inverseOps,
           postState,
+          opUndo: perOpUndo ? opUndo : null,
           appliedAt: new Date(),
           updatedAt: new Date(),
         })
@@ -365,10 +437,11 @@ export class ProposalApplyService {
     return { proposal, applied: result.applied, staleMarked: result.staleMarked, opResults };
   }
 
-  private opResultsFor(ops: ChangeOp[], selected: number[]): OpResult[] {
-    return ops.map((op, index) => {
+  private opResultsFor(ops: ChangeOp[], selected: number[], sources?: readonly OpSource[]): OpResult[] {
+    return ops.map((op, index): OpResult => {
       if (!selected.includes(index)) return { index, status: 'declined' };
-      return { index, status: isActionOp(op) ? 'pending' : 'applied' };
+      const source = sources?.[index];
+      return { index, status: isActionOp(op) ? 'pending' : 'applied', ...(source ? { source } : {}) };
     });
   }
 
@@ -504,12 +577,12 @@ export class ProposalApplyService {
   private async inversePremiseUpdate(ctx: ApplyContext, op: PremiseUpdateOp): Promise<ContentOp | null> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
     if (!project) return null;
-    const inverse: PremiseUpdateOp = { op: 'premise.update' };
-    if (op.premise !== undefined) inverse.premise = project.premise ?? '';
-    if (op.brief !== undefined) inverse.brief = project.brief ?? '';
-    if (op.themes !== undefined) inverse.themes = (project.themes as string[] | null) ?? [];
-    if (op.instructions !== undefined) inverse.instructions = project.instructions ?? '';
-    return inverse;
+    const inverse: PremiseRestoreOp = { op: 'premise.update' };
+    if (op.premise !== undefined) inverse.premise = project.premise;
+    if (op.brief !== undefined) inverse.brief = project.brief;
+    if (op.themes !== undefined) inverse.themes = project.themes as string[] | null;
+    if (op.instructions !== undefined) inverse.instructions = project.instructions;
+    return inverse as ContentOp;
   }
 
   private async inverseBibleDoc(ctx: ApplyContext, op: BibleDocumentUpsertOp | BibleDocumentRemoveOp): Promise<ContentOp | null> {
@@ -517,26 +590,21 @@ export class ProposalApplyService {
       where: and(eq(schema.bibleDocuments.projectId, ctx.projectId), eq(schema.bibleDocuments.section, op.section), eq(schema.bibleDocuments.slug, op.slug)),
     });
     if (!doc) return op.op === 'bible_document.upsert' ? { op: 'bible_document.remove', section: op.section, slug: op.slug } : null;
-    return {
+    const inverse: BibleDocumentRestoreOp = {
       op: 'bible_document.upsert',
       section: op.section,
       slug: op.slug,
-      frontmatter: (doc.frontmatter as Record<string, unknown> | null) ?? undefined,
-      body: doc.body ?? undefined,
+      frontmatter: doc.frontmatter as Record<string, unknown> | null,
+      body: doc.body,
     };
+    return inverse as ContentOp;
   }
 
   private async inverseVolume(ctx: ApplyContext, op: VolumeUpsertOp | VolumeRemoveOp): Promise<ContentOp | null> {
     const volume = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
     if (!volume) return op.op === 'volume.upsert' ? { op: 'volume.remove', volumeKey: op.volumeKey } : null;
-    return {
-      op: 'volume.upsert',
-      volumeKey: op.volumeKey,
-      ordinal: volume.ordinal,
-      title: volume.title ?? undefined,
-      objective: volume.objective ?? undefined,
-      body: volume.body ?? undefined,
-    };
+    const inverse: VolumeRestoreOp = { op: 'volume.upsert', volumeKey: op.volumeKey, ordinal: volume.ordinal, title: volume.title, objective: volume.objective, body: volume.body };
+    return inverse as ContentOp;
   }
 
   private async inverseBrief(ctx: ApplyContext, op: BriefUpdateOp | BriefRemoveOp): Promise<ContentOp | null> {
@@ -545,18 +613,18 @@ export class ProposalApplyService {
     const inverse: BriefRestoreOp = {
       op: 'brief.update',
       chapter: op.chapter,
-      title: brief.title ?? undefined,
+      title: brief.title,
       body: brief.body,
       volumeKey: brief.volumeKey,
       writeMode: brief.writeMode,
       handEdited: brief.handEdited,
-      contextRefs: (brief.contextRefs as string[] | null) ?? undefined,
+      contextRefs: brief.contextRefs as string[] | null,
       pov: brief.pov,
-      chapterPurpose: brief.chapterPurpose ?? undefined,
-      readerValue: (brief.readerValue as string[] | null) ?? undefined,
+      chapterPurpose: brief.chapterPurpose,
+      readerValue: brief.readerValue as string[] | null,
       repetitionRisks: brief.repetitionRisks,
       densityRisk: brief.densityRisk,
-      endingContract: (brief.endingContract as BriefUpdateOp['endingContract'] | null) ?? undefined,
+      endingContract: brief.endingContract as BriefUpdateOp['endingContract'] | null,
       // Always explicit: an omitted contract would merge as "keep", leaving a reverted reveal in place.
       knowledgeContract: (brief.knowledgeContract as BriefUpdateOp['knowledgeContract']) ?? null,
       direction: brief.direction,
@@ -565,7 +633,7 @@ export class ProposalApplyService {
       claimedMilestones: brief.claimedMilestones,
       isEnding: brief.isEnding,
     };
-    return inverse;
+    return inverse as ContentOp;
   }
 
   private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp): Promise<ContentOp | null> {
@@ -574,46 +642,48 @@ export class ProposalApplyService {
     const inverse: DraftRestoreOp = {
       op: 'draft.update',
       chapter: op.chapter,
-      title: draft.title ?? undefined,
+      title: draft.title,
       body: draft.body,
-      summary: draft.summary ?? undefined,
+      summary: draft.summary,
       isolated: draft.isolated,
       generator: draft.generator,
     };
-    return inverse;
+    return inverse as ContentOp;
   }
 
   private async inverseEntity(ctx: ApplyContext, op: EntityUpsertOp | EntityRemoveOp): Promise<ContentOp | null> {
     const entity = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
     if (!entity) return op.op === 'entity.upsert' ? { op: 'entity.remove', entityKey: op.entityKey } : null;
-    return {
+    const inverse: EntityRestoreOp = {
       op: 'entity.upsert',
       entityKey: op.entityKey,
       type: entity.type as EntityUpsertOp['type'],
       name: entity.name,
-      status: entity.status ?? undefined,
-      motivation: entity.motivation ?? undefined,
-      notes: entity.notes ?? undefined,
-      body: entity.body ?? undefined,
+      status: entity.status,
+      motivation: entity.motivation,
+      notes: entity.notes,
+      body: entity.body,
     };
+    return inverse as ContentOp;
   }
 
   private async inverseFact(ctx: ApplyContext, op: FactUpsertOp | FactRemoveOp): Promise<ContentOp | null> {
     const fact = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
     if (!fact) return op.op === 'fact.upsert' ? { op: 'fact.remove', factKey: op.factKey } : null;
-    return {
+    const inverse: FactRestoreOp = {
       op: 'fact.upsert',
       factKey: op.factKey,
       body: fact.text,
-      subjects: (fact.subjects as string[] | null) ?? undefined,
-      constraintNote: fact.constraintNote ?? undefined,
+      subjects: fact.subjects as string[] | null,
+      constraintNote: fact.constraintNote,
       writerNote: fact.writerNote ?? '',
-      terms: (fact.terms as string[] | null) ?? undefined,
+      terms: fact.terms as string[] | null,
       // Always explicit: an omitted schedule would merge as "keep", leaving a reverted date in place.
       revealChapter: fact.revealChapter,
       unlock: fact.unlock,
       allowedClues: fact.allowedClues,
     };
+    return inverse as ContentOp;
   }
 
   private async inverseMilestone(ctx: ApplyContext, op: MilestoneUpsertOp | MilestoneRemoveOp): Promise<ContentOp | null> {
@@ -761,7 +831,7 @@ export class ProposalApplyService {
     }
   }
 
-  private async applyPremiseUpdate(ctx: ApplyContext, op: PremiseUpdateOp): Promise<void> {
+  private async applyPremiseUpdate(ctx: ApplyContext, op: PremiseRestoreOp): Promise<void> {
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (op.premise !== undefined) update['premise'] = op.premise;
     if (op.brief !== undefined) update['brief'] = op.brief;
@@ -774,7 +844,7 @@ export class ProposalApplyService {
 
   // Deliberately does not derive a title into frontmatter here: this op also replays as an inverse op
   // on revert/rollback, and that replay must restore the prior row's exact frontmatter, byte for byte.
-  private async applyBibleDocUpsert(ctx: ApplyContext, op: BibleDocumentUpsertOp): Promise<void> {
+  private async applyBibleDocUpsert(ctx: ApplyContext, op: BibleDocumentRestoreOp): Promise<void> {
     const contentHash = computeBibleDocHash(op.frontmatter, op.body);
     const [row] = await ctx.tx
       .insert(schema.bibleDocuments)
@@ -811,14 +881,14 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `doc:${op.section}/${op.slug}`, newRevision: null });
   }
 
-  private async applyVolumeUpsert(ctx: ApplyContext, op: VolumeUpsertOp): Promise<void> {
+  private async applyVolumeUpsert(ctx: ApplyContext, op: VolumeRestoreOp): Promise<void> {
     const existing = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
 
     const merged = {
       ordinal: op.ordinal ?? existing?.ordinal ?? 0,
-      title: op.title ?? existing?.title ?? null,
-      objective: op.objective ?? existing?.objective ?? null,
-      body: op.body ?? existing?.body ?? null,
+      title: keptOr(op.title, existing?.title),
+      objective: keptOr(op.objective, existing?.objective),
+      body: keptOr(op.body, existing?.body),
       // Never from `op`: state moves only through action.advance_volume, so an upsert keeps an existing volume's state and starts a new one not_started.
       state: existing?.state ?? 'not_started',
     };
@@ -917,7 +987,7 @@ export class ProposalApplyService {
     if (!existing && body === undefined) throw AppErrorCode.RFN_004.create();
     if (existing?.isolated && body !== undefined && body !== existing.body) throw AppErrorCode.RFN_012.create();
 
-    const merged = { title: op.title ?? existing?.title ?? null, body: body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
+    const merged = { title: keptOr(op.title, existing?.title), body: body ?? existing?.body ?? '', summary: keptOr(op.summary, existing?.summary) };
 
     let written: { id: bigint; revision: number; saveSeq: number } | undefined;
     if (existing) {
@@ -981,17 +1051,17 @@ export class ProposalApplyService {
     ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: null });
   }
 
-  private async applyEntityUpsert(ctx: ApplyContext, op: EntityUpsertOp): Promise<void> {
+  private async applyEntityUpsert(ctx: ApplyContext, op: EntityRestoreOp): Promise<void> {
     const existing = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
     if (!existing && !op.name) throw AppErrorCode.RFN_004.create();
 
     const merged = {
       type: op.type,
       name: op.name ?? existing?.name ?? op.entityKey,
-      status: op.status ?? existing?.status ?? null,
-      motivation: op.motivation ?? existing?.motivation ?? null,
-      notes: op.notes ?? existing?.notes ?? null,
-      body: op.body ?? existing?.body ?? null,
+      status: keptOr(op.status, existing?.status),
+      motivation: keptOr(op.motivation, existing?.motivation),
+      notes: keptOr(op.notes, existing?.notes),
+      body: keptOr(op.body, existing?.body),
     };
 
     if (existing) {
@@ -1015,16 +1085,16 @@ export class ProposalApplyService {
   }
 
   /** Mirrors FactService.upsert's field merge on the apply transaction — reveals stay out of the grammar. */
-  private async applyFactUpsert(ctx: ApplyContext, op: FactUpsertOp): Promise<void> {
+  private async applyFactUpsert(ctx: ApplyContext, op: FactRestoreOp): Promise<void> {
     const existing = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
     if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
 
     const merged = {
       text: op.body ?? existing?.text ?? '',
-      subjects: (op.subjects ?? existing?.subjects ?? null) as never,
-      constraintNote: op.constraintNote ?? existing?.constraintNote ?? null,
+      subjects: keptOr(op.subjects, existing?.subjects as string[] | null | undefined) as never,
+      constraintNote: keptOr(op.constraintNote, existing?.constraintNote),
       writerNote: op.writerNote === undefined ? (existing?.writerNote ?? null) : op.writerNote.trim() || null,
-      terms: (op.terms ?? existing?.terms ?? null) as never,
+      terms: keptOr(op.terms, existing?.terms as string[] | null | undefined) as never,
       revealChapter: op.revealChapter === undefined ? (existing?.revealChapter ?? null) : op.revealChapter,
       unlock: op.unlock === undefined ? (existing?.unlock ?? null) : op.unlock,
       allowedClues: op.allowedClues === undefined ? (existing?.allowedClues ?? null) : op.allowedClues && normalizeStringList(op.allowedClues),
@@ -1278,6 +1348,148 @@ export class ProposalApplyService {
     if (result.outcome === 'conflicted') throw AppErrorCode.RFN_006.create();
     this.logger.info(`proposal ${proposalId} reverted: ${result.reverted.map(a => a.artifactRef).join(', ')}`);
     return { proposal: result.proposal, reverted: result.reverted, staleMarked: result.staleMarked };
+  }
+
+  /**
+   * Undoes one change of a chat turn's applied proposal through the inverse its apply captured, under the whole revert's conflict guard
+   * over the records that change wrote. Refused while another applied change of the turn relies on it (RFN_015), listing them: undoing
+   * them too would take back changes the author did not choose. The proposal stays applied; its `inverse_ops` and `post_state` narrow to
+   * what is still applied, so undoing the rest as a whole keeps working.
+   */
+  async undoOp<T = never>(projectId: bigint, proposalId: bigint, opIndex: number, onUndone?: OpToggleHook<T>): Promise<OpToggleResult<T>> {
+    const result = await this.db.transaction(async (tx): Promise<OpToggleResult<T>> => {
+      const turn = await this.lockTurnOp(tx, projectId, proposalId, opIndex);
+      if (turn.proposal.status === 'reverted' || turn.result.status === 'reverted') return this.unchanged(turn);
+      if (turn.proposal.status !== 'applied') throw AppErrorCode.RFN_007.create();
+
+      const { graph, applied } = this.appliedOpGraph(turn);
+      const dependents = graph.dependents(opIndex, applied);
+      if (dependents.length > 0) throw new OpDependencyError(AppErrorCode.RFN_015, opIndex, dependents);
+      const refs = changeSetRefs([turn.op]);
+      if (!(await this.statesMatch(tx, projectId, refs, turn.proposal.postState))) throw AppErrorCode.RFN_006.create();
+
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const { inverse } = turn.record;
+      if (PLAN_STATE_OPS.has(inverse.op)) await lockProjectPlan(tx, projectId);
+      await this.applyOp(ctx, inverse);
+      await enforcePlanOps(ctx.tx, projectId, [inverse]);
+      const undoneState = await loadArtifactStates(ctx.tx, projectId, refs);
+      if (!sameContent(refs, turn.record.beforeState, undoneState)) {
+        this.logger.error('undoOp: the inverse did not restore the records as the apply found them', { projectId, proposalId, opIndex, refs });
+        throw AppErrorCode.RFN_018.create({ opIndex: String(opIndex) });
+      }
+      const proposal = await this.settleTurnOp(tx, turn, 'reverted', { ...turn.record, undoneState }, undoneState);
+      await tx
+        .insert(schema.userFeedback)
+        .values({ projectId, artifactType: 'refinement_proposal', artifactRef: String(proposalId), disposition: 'rejected', note: `undone op ${opIndex}` });
+      const followUp = onUndone ? await onUndone(tx, { op: turn.op, source: turn.result.source }) : undefined;
+      return { proposal, artifacts: ctx.applied, staleMarked: [...new Set(ctx.staleMarked)], changed: true, op: turn.op, source: turn.result.source, followUp };
+    });
+    if (result.changed) this.logger.info('proposal op undone', { projectId, proposalId, opIndex, refs: result.artifacts.map(a => a.artifactRef) });
+    return result;
+  }
+
+  /**
+   * Applies again one change a per-change undo took back, capturing a fresh inverse, only while the rest of its turn stays applied (RFN_017),
+   * the changes it relies on are back (RFN_016) and its records are exactly as the undo left them (RFN_003).
+   */
+  async redoOp<T = never>(projectId: bigint, proposalId: bigint, opIndex: number, onRedone?: OpToggleHook<T>): Promise<OpToggleResult<T>> {
+    const result = await this.db.transaction(async (tx): Promise<OpToggleResult<T>> => {
+      const turn = await this.lockTurnOp(tx, projectId, proposalId, opIndex);
+      if (turn.proposal.status !== 'applied') throw AppErrorCode.RFN_017.create();
+      if (turn.result.status === 'applied') return this.unchanged(turn);
+
+      const { graph, applied, undone } = this.appliedOpGraph(turn);
+      const prerequisites = graph.prerequisites(opIndex, undone, applied);
+      if (prerequisites.length > 0) throw new OpDependencyError(AppErrorCode.RFN_016, opIndex, prerequisites);
+      const refs = changeSetRefs([turn.op]);
+      if (!(await this.statesMatch(tx, projectId, refs, turn.record.undoneState))) throw AppErrorCode.RFN_003.create();
+
+      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      if (PLAN_STATE_OPS.has(turn.op.op)) await lockProjectPlan(tx, projectId);
+      const beforeState = await loadArtifactStates(ctx.tx, projectId, refs);
+      const inverse = await this.captureInverse(ctx, turn.op);
+      if (!inverse) throw AppError.internal(`redoing op ${opIndex} captured no inverse, so it could not be undone again`);
+      await this.applyOp(ctx, turn.op);
+      await enforcePlanOps(ctx.tx, projectId, [turn.op]);
+      const redoneState = await loadArtifactStates(ctx.tx, projectId, refs);
+      const proposal = await this.settleTurnOp(tx, turn, 'applied', { inverse, beforeState }, redoneState);
+      await tx
+        .insert(schema.userFeedback)
+        .values({ projectId, artifactType: 'refinement_proposal', artifactRef: String(proposalId), disposition: 'approved', note: `redone op ${opIndex}` });
+      const followUp = onRedone ? await onRedone(tx, { op: turn.op, source: turn.result.source }) : undefined;
+      return { proposal, artifacts: ctx.applied, staleMarked: [...new Set(ctx.staleMarked)], changed: true, op: turn.op, source: turn.result.source, followUp };
+    });
+    if (result.changed) this.logger.info('proposal op redone', { projectId, proposalId, opIndex, refs: result.artifacts.map(a => a.artifactRef) });
+    return result;
+  }
+
+  private async lockTurnOp(tx: PrimaryTransaction, projectId: bigint, proposalId: bigint, opIndex: number): Promise<TurnOp> {
+    const [proposal] = await tx
+      .select()
+      .from(schema.refinementProposals)
+      .where(and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.id, proposalId)))
+      .for('update');
+    if (!proposal) throw AppErrorCode.RFN_001.create();
+    const ops = proposal.changeSet as ChangeOp[];
+    if (!Number.isInteger(opIndex) || opIndex < 0 || opIndex >= ops.length) throw AppErrorCode.RFN_011.create();
+
+    const opUndo = proposal.opUndo as (OpUndoRecord | null)[] | null;
+    const opResults = (proposal.opResults ?? []) as OpResult[];
+    const record = opUndo?.[opIndex];
+    const result = opResults.find(entry => entry.index === opIndex);
+    const toggleable = result?.status === 'applied' || result?.status === 'reverted';
+    if (!opUndo || !record || !result || !toggleable || !PER_OP_UNDO_KINDS.has(proposal.kind)) throw AppErrorCode.RFN_014.create({ opIndex: String(opIndex) });
+    return { proposal, ops, opUndo, opResults, op: ops[opIndex] as ContentOp, record, result };
+  }
+
+  private unchanged<T>(turn: TurnOp): OpToggleResult<T> {
+    return { proposal: turn.proposal, artifacts: [], staleMarked: [], changed: false, op: turn.op, source: turn.result.source };
+  }
+
+  private appliedOpGraph(turn: TurnOp): { graph: AppliedOpGraph; applied: number[]; undone: number[] } {
+    const baseline = turn.proposal.baseline as Record<string, ArtifactState>;
+    const existing = new Set(Object.keys(baseline).filter(ref => baseline[ref]?.exists));
+    const content = turn.opResults.filter(entry => turn.opUndo[entry.index]);
+    const withStatus = (status: OpResult['status']) => content.filter(entry => entry.status === status).map(entry => entry.index);
+    const order = applyOrder(
+      turn.ops,
+      content.map(entry => entry.index),
+    );
+    return { graph: new AppliedOpGraph(turn.ops, existing, order), applied: withStatus('applied'), undone: withStatus('reverted') };
+  }
+
+  private async statesMatch(tx: PrimaryTransaction, projectId: bigint, refs: string[], expected: unknown): Promise<boolean> {
+    const current = await loadArtifactStates(tx as unknown as PrimaryDatabase, projectId, refs);
+    return sameContent(refs, (expected ?? {}) as Record<string, ArtifactState>, current);
+  }
+
+  /** Records one change's new state and narrows the whole revert's inverse and conflict guard to the changes still applied. */
+  private async settleTurnOp(
+    tx: PrimaryTransaction,
+    turn: TurnOp,
+    status: 'applied' | 'reverted',
+    record: OpUndoRecord,
+    opState: Record<string, ArtifactState>,
+  ): Promise<Refinement.Proposal> {
+    const index = turn.result.index;
+    const opResults = turn.opResults.map(entry => (entry.index === index ? { ...entry, status } : entry));
+    const opUndo = turn.opUndo.map((entry, at) => (at === index ? record : entry));
+    const live = opResults.filter(entry => entry.status === 'applied' && opUndo[entry.index]).map(entry => entry.index);
+    const inverseOps = applyOrder(turn.ops, live)
+      .reverse()
+      .map(at => (opUndo[at] as OpUndoRecord).inverse);
+    const liveRefs = new Set(changeSetRefs(live.map(at => turn.ops[at] as ChangeOp)));
+    const previous = Object.entries((turn.proposal.postState ?? {}) as Record<string, ArtifactState>).filter(([ref]) => !(ref in opState));
+    const postState = Object.fromEntries([...previous, ...Object.entries(opState)].filter(([ref]) => liveRefs.has(ref)));
+
+    const [updated] = await tx
+      .update(schema.refinementProposals)
+      .set({ opResults, opUndo, inverseOps, postState, updatedAt: new Date() })
+      .where(eq(schema.refinementProposals.id, turn.proposal.id))
+      .returning();
+    if (!updated) throw AppErrorCode.RFN_001.create();
+    return updated;
   }
 
   /**

@@ -13,6 +13,8 @@ import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './arti
 import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
 import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { stampIdeaIds } from './idea-id';
+import { type OpUndoRecord } from './op-undo';
+import { type OpResult } from './proposal-apply.service';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';
@@ -313,12 +315,24 @@ export class ProposalService {
   }
 
   /** What reverting an applied proposal would leave relying on records it no longer backs — shown before the author undoes it. */
-  async undoImpact(projectId: bigint, proposalId: bigint): Promise<UndoImpact> {
+  /** With `opIndex`, what undoing only that change of a chat turn would affect; the turn's own changes that rely on it refuse the undo instead. */
+  async undoImpact(projectId: bigint, proposalId: bigint, opIndex?: number): Promise<UndoImpact> {
     const proposal = await this.get(projectId, proposalId);
+    if (opIndex !== undefined) return this.opUndoImpact(proposal, opIndex);
     const inverseOps = proposal.inverseOps as ContentOp[] | null;
     if (proposal.status !== 'applied' || !inverseOps?.length) throw AppErrorCode.RFN_007.create();
     const refs = Object.keys((proposal.postState ?? {}) as Record<string, unknown>);
     return undoImpact(undoneChange(refs, inverseOps), await loadImpactRows(this.db, projectId, proposalId, refs));
+  }
+
+  private async opUndoImpact(proposal: Refinement.Proposal, opIndex: number): Promise<UndoImpact> {
+    const record = (proposal.opUndo as (OpUndoRecord | null)[] | null)?.[opIndex];
+    const result = (proposal.opResults as OpResult[] | null)?.find(entry => entry.index === opIndex);
+    const op = (proposal.changeSet as ChangeOp[])[opIndex];
+    if (proposal.status !== 'applied') throw AppErrorCode.RFN_007.create();
+    if (!record || !op || result?.status !== 'applied') throw AppErrorCode.RFN_014.create({ opIndex: String(opIndex) });
+    const refs = changeSetRefs([op]);
+    return undoImpact(undoneChange(refs, [record.inverse]), await loadImpactRows(this.db, proposal.projectId, proposal.id, refs));
   }
 
   async discard(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {

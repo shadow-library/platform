@@ -109,6 +109,15 @@
   a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
 - Undo lists what relies on the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed fact and
   pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.
+- Each change a turn applied, with its source, is undone and redone on its own, only for a chat turn's applied proposal. Undo runs that change's own inverse under the whole
+  revert's conflict guard, and is refused (`RFN_018`) unless its records come back exactly as the apply found them — a field the change filled comes back empty. The
+  proposal stays applied with the change marked `reverted`, and whole revert then undoes only what is still applied. Undo and redo are idempotent and never touch another
+  proposal.
+- A change another applied change of the same turn relies on — one naming a record it created or needing its entity type, or a later change to the same record — is refused
+  (`RFN_015`) with those changes listed, never undone with them: the author takes back only what they chose. Redo mirrors it (`RFN_016`), so each record's changes stay a
+  stack. Redo needs the rest of the turn applied and the records exactly as the undo left them.
+- Undoing an idea turns it down in the Notebook as declining its card does (default `not_now`); redoing it withdraws that rejection. Either commits with the change or not
+  at all, and a call that moves nothing writes nothing. Undoing the author's own words records nothing.
 - `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft. Action ops run after
   the content transaction commits and stop at first failure.
 - Plan edits stay plan edits: a chat turn MUST NEVER rewrite prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose for that turn;

@@ -1419,6 +1419,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/ops/{opIndex}/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Undo Op */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_undo'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/ops/{opIndex}/redo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Redo Op */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_redo'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/ops/{opIndex}/reject': {
     parameters: {
       query?: never;
@@ -3902,7 +3936,10 @@ export interface components {
     /** @description Apply-time disposition for one operation, optionally including a job, run, or proposal result. */
     OpResultItem: {
       index: number;
+      /** @description `applied`, `declined`, `pending` (an action not yet run), `failed`, or `reverted`: a change a chat turn applied that was undone on its own while the rest of its turn stays applied. */
       status: string;
+      /** @description On every op a chat turn applied. quoted: the author's own words in that turn back it. idea: the model proposed it and Edit freely applied it. */
+      source?: components['schemas']['AppliedOpSource'];
       error?: string;
       /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
       note?: string;
@@ -3912,6 +3949,8 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** @enum {string} */
+    AppliedOpSource: 'quoted' | 'idea';
     /** @description One advisory finding on a proposal. Its message is the matching entry of warnings. */
     ProposalDiagnosticItem: {
       kind: components['schemas']['ProposalDiagnosticKind'];
@@ -4617,14 +4656,31 @@ export interface components {
       reverted: components['schemas']['AppliedArtifactItem'][];
       staleMarked: string[];
     };
-    RejectProposalOpBody: {
-      /** @description `never`: not offered again until the author withdraws the Notebook entry. `not_now`: not offered again while the active volume stays the same. `not_this_version`: not offered again while every record the change would write is unchanged — a later edit to any of them makes the idea eligible again. */
+    UndoProposalOpBody: {
+      /**
+       * @description For an idea only: how long the undone idea stays turned down, as on a declined suggestion card. Undoing a quoted change records nothing.
+       * @default not_now
+       */
       scope: components['schemas']['LedgerRejectionScope'];
-      /** @description The author's reason, kept on the Notebook entry. */
+      /** @description The author's reason, kept on the Notebook entry an undone idea records. */
       why?: string;
     };
     /** @enum {string} */
     LedgerRejectionScope: 'never' | 'not_now' | 'not_this_version';
+    /** @description One change of a chat turn undone on its own; the rest of the turn stays applied. */
+    UndoProposalOpResponse: {
+      /** @description The turn's applied proposal, with this change's result as it now stands. */
+      proposal: components['schemas']['ProposalResponse'];
+      opIndex: number;
+      /** @description False when the change already stood as asked, so nothing was written: undo and redo are idempotent. */
+      changed: boolean;
+      source?: components['schemas']['AppliedOpSource'];
+      /** @description The records this call wrote. */
+      artifacts: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+      /** @description The Notebook rejection an undone idea holds, so it is not offered again in its scope; null for a quoted change. */
+      rejection?: components['schemas']['LedgerEntryResponse'] | null;
+    };
     LedgerEntryResponse: {
       id: string;
       projectId: string;
@@ -4680,6 +4736,35 @@ export interface components {
     BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
     /** @enum {string} */
     LedgerEntryStatus: 'active' | 'superseded' | 'withdrawn';
+    /** @description RFN_015: other applied changes of the turn rely on the one being undone. RFN_016: the change being redone relies on changes that are undone. Nothing was written either way. */
+    ProposalOpDependencyErrorResponse: {
+      code: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+      details?: components['schemas']['ProposalOpDependencyDetails'];
+    };
+    ProposalOpDependencyDetails: {
+      /** @description The changes to undo (or redo) first, in that order. */
+      opIndexes: number[];
+    };
+    /** @description One change of a chat turn applied again after it was undone on its own. */
+    RedoProposalOpResponse: {
+      /** @description The turn's applied proposal, with this change's result as it now stands. */
+      proposal: components['schemas']['ProposalResponse'];
+      opIndex: number;
+      /** @description False when the change already stood as asked, so nothing was written: undo and redo are idempotent. */
+      changed: boolean;
+      source?: components['schemas']['AppliedOpSource'];
+      /** @description The records this call wrote. */
+      artifacts: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+    };
+    RejectProposalOpBody: {
+      /** @description `never`: not offered again until the author withdraws the Notebook entry. `not_now`: not offered again while the active volume stays the same. `not_this_version`: not offered again while every record the change would write is unchanged — a later edit to any of them makes the idea eligible again. */
+      scope: components['schemas']['LedgerRejectionScope'];
+      /** @description The author's reason, kept on the Notebook entry. */
+      why?: string;
+    };
     ListChangesResponse: {
       total: number;
       limit: number;
@@ -4875,6 +4960,7 @@ export interface components {
     /** @description Apply-time result for one operation a turn applied, with where its words came from. */
     TurnOpResultItem: {
       index: number;
+      /** @description `applied`, `declined`, `pending` (an action not yet run), `failed`, or `reverted`: a change a chat turn applied that was undone on its own while the rest of its turn stays applied. */
       status: string;
       error?: string;
       /** @description Why an op nobody rejected was declined anyway — an action that may not run from an auto-mode turn. */
@@ -4887,8 +4973,6 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** @enum {string} */
-    AppliedOpSource: 'quoted' | 'idea';
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
       title?: string;
@@ -10536,7 +10620,10 @@ export interface operations {
   };
   get_api_v1_projects_projectId_proposals_proposalId_undo_impact: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description One change of a chat turn's applied proposal: what undoing only that change would affect. */
+        opIndex?: number | string;
+      };
       header?: never;
       path: {
         projectId: string;
@@ -10644,6 +10731,130 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_undo: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+        opIndex: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UndoProposalOpBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UndoProposalOpResponse'];
+        };
+      };
+      /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalOpDependencyErrorResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_proposals_proposalId_ops_opIndex_redo: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+        opIndex: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RedoProposalOpResponse'];
+        };
+      };
+      /** @description Default Response */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RevealRuleErrorResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalOpDependencyErrorResponse'];
         };
       };
       /** @description Default Response */
@@ -16005,6 +16216,7 @@ export type RefinementKind = components['schemas']['RefinementKind'];
 export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
 export type ChangeOpItem = components['schemas']['ChangeOpItem'];
 export type OpResultItem = components['schemas']['OpResultItem'];
+export type AppliedOpSource = components['schemas']['AppliedOpSource'];
 export type ProposalDiagnosticItem = components['schemas']['ProposalDiagnosticItem'];
 export type ProposalDiagnosticKind = components['schemas']['ProposalDiagnosticKind'];
 export type ProposalDiagnosticData = components['schemas']['ProposalDiagnosticData'];
@@ -16083,8 +16295,9 @@ export type WriterKeptItem = components['schemas']['WriterKeptItem'];
 export type WriterKeptKind = components['schemas']['WriterKeptKind'];
 export type WriterUnlockItem = components['schemas']['WriterUnlockItem'];
 export type RevertProposalResponse = components['schemas']['RevertProposalResponse'];
-export type RejectProposalOpBody = components['schemas']['RejectProposalOpBody'];
+export type UndoProposalOpBody = components['schemas']['UndoProposalOpBody'];
 export type LedgerRejectionScope = components['schemas']['LedgerRejectionScope'];
+export type UndoProposalOpResponse = components['schemas']['UndoProposalOpResponse'];
 export type LedgerEntryResponse = components['schemas']['LedgerEntryResponse'];
 export type LedgerEntryKind = components['schemas']['LedgerEntryKind'];
 export type LedgerDecidedBy = components['schemas']['LedgerDecidedBy'];
@@ -16092,6 +16305,10 @@ export type LedgerLinksResponse = components['schemas']['LedgerLinksResponse'];
 export type LedgerBibleDocumentLinkResponse = components['schemas']['LedgerBibleDocumentLinkResponse'];
 export type BibleSection = components['schemas']['BibleSection'];
 export type LedgerEntryStatus = components['schemas']['LedgerEntryStatus'];
+export type ProposalOpDependencyErrorResponse = components['schemas']['ProposalOpDependencyErrorResponse'];
+export type ProposalOpDependencyDetails = components['schemas']['ProposalOpDependencyDetails'];
+export type RedoProposalOpResponse = components['schemas']['RedoProposalOpResponse'];
+export type RejectProposalOpBody = components['schemas']['RejectProposalOpBody'];
 export type ListChangesResponse = components['schemas']['ListChangesResponse'];
 export type ChangeItemResponse = components['schemas']['ChangeItemResponse'];
 export type RollbackBody = components['schemas']['RollbackBody'];
@@ -16114,7 +16331,6 @@ export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
 export type TurnOpResultItem = components['schemas']['TurnOpResultItem'];
-export type AppliedOpSource = components['schemas']['AppliedOpSource'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];
@@ -16388,6 +16604,7 @@ export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['par
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
+export type UndoImpactQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['query'], undefined>;
 export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
 export type WriterPreviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/writer-preview']['get']['parameters']['path'], undefined>;
 export type ListChangesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/changes']['get']['parameters']['query'], undefined>;

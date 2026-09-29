@@ -30,10 +30,11 @@ function requiredEntityTypes(op: ChangeOp): readonly string[] {
   return requiredEntityTypesForSlug(op.section, op.slug);
 }
 
-class OpGraph {
+export class OpGraph {
   constructor(
     private readonly ops: readonly ChangeOp[],
-    private readonly current: ReadonlyMap<string, RecordFields>,
+    /** The records that exist without these ops: an op writing any other ref creates it. */
+    private readonly current: Pick<ReadonlySet<string>, 'has'>,
   ) {}
 
   /** Whether op `from` cannot stand without op `to`: it names a record only `to` creates, or it is a page body owing `to`'s entity type. */
