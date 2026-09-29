@@ -81,6 +81,17 @@
   a do-not-propose rule.
 - A turn streams its reply and, as each proposed change is written, that change's name and Story Bible group (never its body). Both are provisional and belong to the reply
   being written: a replaced reply (a retry, repair or lookup round) voids them, and only the settled turn says what was applied or carded.
+- **A running turn is a chronological timeline** (reading, thinking, the reply, changes as they are written) whose live status is always its last line. The settled turn result is
+  the authority: nothing claims "saved", applied or carded before it arrives, and a replaced or failed reply leaves no streamed change standing. Thinking time is measured, not
+  shown: the gateway does not forward the model's reasoning, so there is no reasoning summary.
+- **The mode is the author's choice in the composer**, and its label always names what the next turn will do: Edit freely (session `auto`, the default), Ask first (session
+  `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
+  prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
+- **The Progress panel** lists a turn's steps, its Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the sources
+  it read. It docks beside the chat where the thread keeps its full column and otherwise opens as a sheet from the turn's receipt; the chat header is unchanged. Its undo
+  refuses rather than cascades, as the write policy below requires.
+- **One message may be queued while a turn runs**, and it is sent only after this tab's own turn settles cleanly. A failed or stopped reply, a turn started in another tab or a
+  locked chat holds it for the author, who can edit it or send it now. A message released on its own keeps the settings it was queued with.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.
 - A chat turn's model type applies to its reply only; the actions it starts inherit its tier and NEVER its model type. A turn's selection NEVER outlives the turn. A standard turn
   NEVER receives replies or a summary an unrestricted model wrote (placeholders stand in; the author's own messages stay verbatim), and compaction's model type only rises: it
@@ -90,12 +101,12 @@
 
 - A session is Edit freely (`auto`, the default for new chats) or Ask first (`manual`, every op a card). The server decides what applies, never the model: a model-declared
   quote or origin never authorises a write on its own.
-- Under Edit freely, with "Just discussing" off and no warning holding the turn, every op no always-card rule holds applies within the turn and can be undone, including what
+- Under Edit freely, with Just discuss off and no warning holding the turn, every op no always-card rule holds applies within the turn and can be undone, including what
   the AI invents. Each applied op carries its source: `quoted` when its kind is allowlisted (Story Bible page, entity, fact, volume title or goal, an empty story field, a
   promise's label) and its `quote` supports it, `idea` otherwise, so the author sees which changes are the AI's and can undo them. Only a chat turn applies ideas, and only of
   the kinds classified as idea-eligible (Story Bible page, entity, volume title, an empty story field, milestone, a promise or its label); an idea that truncates a filled field
   beyond the removal budget stays a card. Secrets and planner-only content stay cards even under Edit freely: an unbacked fact, new or existing, and an invented volume goal
-  are never ideas. "Just discussing", Ask first or a held turn makes every op a card.
+  are never ideas. Just discuss, Ask first or a held turn makes every op a card.
 - Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions; planner-only and
   writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any
   time; a volume's order and notes; a promise's disposition (status, payoff target, dormant), progress or reuse of a settled one. The apply engine refuses an always-card kind
@@ -107,8 +118,8 @@
   the cards; an idea that does keeps its quote-rule reason, so a turned-down idea is still filtered. An idea the author turned down in scope is dropped unless an op the
   author's own words back leans on it; if the turned-down ideas cannot be read, every idea stays a card.
 - The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the Progress panel's change list shows each written value beside its quote
-  and undo stays one click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a second, pending one;
-  a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
+  and undo stays one click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a
+  second, pending one; a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
 - Undo lists what relies on the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed fact and
   pending suggestions, with finalized plans and drafts only counted — and never rewrites finalized history.
 - Each change a turn applied, with its source, is undone and redone on its own, only for a chat turn's applied proposal. Undo runs that change's own inverse under the whole
@@ -138,7 +149,7 @@
 - The chat's decline on a suggestion card goes through that route with the author's scope. Declining an action suggestion ("Don't run it") records nothing, since an action
   offers no idea. A finalize the chat cannot run points the author to the chapter's finalize review.
 - A model-authored op — a card, or an idea Edit freely would apply — whose idea is rejected in scope is dropped before staging, with every op that cannot stand without it. An
-  op the author's own words back (quoted, just discussing, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed
+  op the author's own words back (quoted, just discuss, manual mode, held for review, depending on another card) is never filtered, nor is anything it leans on. Lapsed
   rejections stop steering the model; similar ideas are avoided only best-effort.
 - A rejection's label names the record only: a secret's truth, its tells and a planner-only page's body never appear in it, so it can ride in any prompt.
 

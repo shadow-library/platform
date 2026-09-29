@@ -27,8 +27,7 @@ Several features are reachable only through the API, and some observability is i
 
 - Premise enhancement and `POST /validate` have no web caller; `POST /finalize` is called by the web only for a chapter
   approved before finalize reviews existed (every other finalize goes through `…/drafts/:n/finalize-review/finalize`).
-- Manual chat sessions exist only through the API (`POST /chat/sessions {"mode":"manual"}`); the web creates auto sessions
-  and shows an old manual one a notice with **Switch to Auto**.
+- Manual chat sessions are made through the API (`POST /chat/sessions {"mode":"manual"}`) or by choosing **Ask first** in the composer's mode menu.
 - `novel-forge:admin` (role `NovelForgeAdmin`, never default or bot-grantable) is needed to read prompts, context packs
   and raw model output; a platform role admin must assign it to you.
 
@@ -1518,7 +1517,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 
 #### 1.1 Manual hub turn: materialise canon as a staged proposal
 
-- **Entry:** API only — the web has no Manual/Auto control and shows a manual session the notice "This chat is manual: even your own clear words come back as cards." with **Switch to Auto**. `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`. In a manual session every op is a card; Part 6 §3 covers the auto-mode quote rule.
+- **Entry:** the composer's mode menu (**Ask first**), or the API. `POST /chat/sessions {"mode":"manual"}` then `POST /chat/sessions/$S/messages`. In a manual session every op is a card; Part 6 §3 covers the auto-mode quote rule.
 - **Preconditions:** empty new_novel project.
 - **Input** (`content`):
   > Set up canon for a serialized web novel, The Tidewrights. In the port city of Saltmarrow the sea takes a district every spring tide unless the Tidewrights Guild returns one named memory to the water (the Memory Tithe). Wren Okafor, a Guild apprentice, sold her dead mother's memory of the lighthouse to the smuggler Marrow Vance to pay a 40-silver debt, and wants it back. Harbour Warden Ilse Brandt secretly plans to burn the Drowned Archive, where the Ledger of Foam records every tithed memory, so none can ever be bought back. SECRET, hidden until chapter 30: the Compact was signed not with the sea but with something under the harbour that feeds on memory. Create entity records for Wren, Marrow, Ilse, the Tidewrights Guild, the Drowned Archive and the Memory Tithe rule. Give each character a want, a wound and a speech habit. Put the secret in a canon fact only. Plan 2 volumes, each with the goal it works towards. Do not run generation.
@@ -1611,7 +1610,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 
 #### 1.6 Auto mode
 
-- **Entry:** every new chat, or `PATCH /chat/sessions/$S {"mode":"auto"}` (the web's **Switch to Auto**). Auto mode
+- **Entry:** every new chat, or `PATCH /chat/sessions/$S {"mode":"auto"}`. Auto mode
   does not apply everything: an op applies within the turn only under the quote rule (Part 6 §3); the rest are cards.
 - **Preconditions:** 1.1 canon applied.
 - **Input:** `Change Wren's speech habit: she hums the tide table instead of counting things. Update her record.`
@@ -1969,7 +1968,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     drew on. Check that list against your notes by hand: a fact in neither the Story Bible nor that list was lost.
   - `refinement_proposals.organise_record` is set on each organise proposal; a second run rewrites what organising
     owns in place rather than beside it.
-  - Undo of the applied block (`POST /proposals/:id/revert`) puts the Notebook back as it was; it is refused with
+  - Undo all on the turn's receipt, or reverting the applied proposal (`POST /proposals/:id/revert`) puts the Notebook back as it was; it is refused with
     `NTS_010` while a later organise change builds on it.
   - **Quality:** nothing the notes place late in the book appears as current; the ending lands only in planner-only
     pages; a suggestion is labelled as one.
@@ -1982,11 +1981,11 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 - **Entry:** any auto session. `POST /chat/sessions/$S/messages {"content","justDiscussing"?,"proseEdits"?}`.
 - **Input A (stated):** `Marrow Vance runs the ferry at night and owes the Guild forty silver.`
 - **Input B (hedged):** `Maybe Marrow runs the ferry at night? Not sure yet.`
-- **Input C:** Input A again with `"justDiscussing": true` (the composer's **Just discussing** toggle).
+- **Input C:** Input A again with `"justDiscussing": true` (the composer's **Just discuss** mode).
 - **Verify:**
   - A: the entity op lands in `appliedProposal` with its `quote`; the assistant message carries `appliedProposalId`.
-    Anything the model added beyond your words (a new trait, a rank) is in `proposal` as a card. The web block
-    shows each written value beside its quote.
+    Anything the model added beyond your words (a new trait, a rank) is in `proposal` as a card. The Progress panel's
+    change list shows each written value beside its quote, with a per-change undo.
   - B and C: nothing applies; every op is a card.
   - Removals, plans, prose, actions, planner-only pages, replacing a filled story field, a secret's truth or its
     gating, a volume's order or notes, and a promise's status or progress are always cards whatever the quote
