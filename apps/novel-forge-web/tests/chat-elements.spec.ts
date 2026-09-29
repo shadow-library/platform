@@ -10,7 +10,7 @@ import { JobProgress } from '../src/features/chat/JobProgress';
 import { OrganiseReceipt, type OrganiseReceiptProps } from '../src/features/chat/OrganiseReceipt';
 import { QuestionCard } from '../src/features/chat/QuestionCard';
 import { ReadyChecklist, type ReadyChecklistProps } from '../src/features/chat/ReadyChecklist';
-import { StreamedReply } from '../src/features/chat/StreamedReply';
+import { StreamedTurn } from '../src/features/chat/StreamedTurn';
 import { CommitBar, SuggestionCard, type SuggestionCardProps } from '../src/features/chat/SuggestionCard';
 import { idleChatTurnStream } from '../src/lib/apis/refinement.api';
 import { ApiError } from '../src/lib/apis/transport';
@@ -319,10 +319,10 @@ describe('OrganiseReceipt', () => {
   });
 });
 
-describe('StreamedReply', () => {
-  it('should mark the reply busy while it streams and keep a stopped reply', () => {
-    expect(html(createElement(StreamedReply, { stream: { ...idleChatTurnStream, status: 'streaming' } }))).toContain('aria-busy="true"');
-    const stopped = html(createElement(StreamedReply, { stream: { ...idleChatTurnStream, status: 'stopped' } }));
+describe('StreamedTurn', () => {
+  it('should mark the turn busy while it streams and keep a stopped reply', () => {
+    expect(html(createElement(StreamedTurn, { stream: { ...idleChatTurnStream, status: 'streaming' }, mode: 'auto', now: 0 }))).toContain('aria-busy="true"');
+    const stopped = html(createElement(StreamedTurn, { stream: { ...idleChatTurnStream, status: 'stopped' }, mode: 'auto', now: 0 }));
     expect(stopped).toContain('Stopped');
     expect(stopped).toContain('aria-busy="false"');
   });

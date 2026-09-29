@@ -2,15 +2,11 @@
   flex: 1;
 }
 
-/* The page owns the viewport — the composer is pinned, only the transcript scrolls. One column: what a
-   chat changed lives in its transcript, with the change history one dialog away. */
+/* The page owns the viewport — the composer is pinned, only the transcript scrolls. Full width, so the thread's
+   scrollbar sits at the pane's edge; the chat centres its own column. */
 .screen {
   position: absolute;
   inset: 0;
-  /* Centred on the same column every other screen uses: `inset: 0` with `max-width` leaves the
-     over-constrained width to the auto margins, which is what centres an absolutely positioned box. */
-  max-width: var(--sh-page-max);
-  margin-inline: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, toast } from '@shadow-library/ui';
 
-import { BookIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
+import { BookIcon, ChevronDownIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { Markdown } from '@/components/nf/Markdown';
@@ -39,6 +39,7 @@ import {
 } from '@/lib/apis';
 import { type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
+import { type TurnTimeline, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 
@@ -74,8 +75,9 @@ import { ProposalSlot } from './ProposalSlot';
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
-import { StreamedReply } from './StreamedReply';
+import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
+import { TurnTrace } from './TurnTimeline';
 
 // Matches the shell's own pending-proposal query, so the transcript reads that cache rather than issuing a second request for the same rows.
 const PENDING_PROPOSAL_LIMIT = 50;
@@ -156,6 +158,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [cancellingJob, setCancellingJob] = useState<string>();
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the first one past it.
   const [assistantWatermark, setAssistantWatermark] = useState(0);
+  const [awayFromLatest, setAwayFromLatest] = useState(false);
+  // Every turn this tab watched, by its reply, so each keeps its rows and worked line after the next one starts.
+  const [timelines, setTimelines] = useState<ReadonlyMap<string, TurnTimeline>>(() => new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -173,14 +178,19 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const pending = turn.isPending || (state.kind === 'pending' && stream.status !== 'stopped');
   const activeRunId = turn.runId ?? (state.kind === 'pending' ? (state.pending?.runId ?? null) : null);
   const settled = lastAssistantOrdinal(messages) > assistantWatermark;
-  const showStream = !settled && (stream.status === 'stopped' || stream.lookups.length > 0 || stream.reply.length > 0);
-  const showTurnStatus = !showStream || stream.status === 'failed';
+  const streamed = stream.lookups.length > 0 || stream.reply.length > 0 || stream.changes.length > 0;
+  const showStream = !settled && (turn.isPending || stream.status === 'stopped' || streamed);
+  // A failed stream keeps what it wrote; the failure card joins it once the transcript has recorded the failure.
+  const showTurnStatus = !showStream || (stream.status === 'failed' && state.kind !== 'pending');
   const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream || planStartOpen });
   const locked = session ? session.status !== 'active' : starting;
   const busy = pending || locked;
   const firstUserId = firstUserMessageId(messages);
   const answeredUpTo = lastUserOrdinal(messages);
   const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
+
+  const finishedId = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
+  if (finishedId && !timelines.has(finishedId)) setTimelines(new Map(timelines).set(finishedId, turnTimeline(stream, stream.timing.endedAt ?? 0, mode)));
 
   const messageIds = useMemo(() => new Set(messages.map(message => message.id)), [messages]);
   const jobsByMessage = useMemo(() => {
@@ -217,6 +227,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     if (!el) return;
     const onScroll = (): void => {
       pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      setAwayFromLatest(!pinnedRef.current);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     const observer = new ResizeObserver(() => {
@@ -229,10 +240,22 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     };
   }, []);
 
+  // Sending is the one moment the thread jumps to the newest turn regardless; everything else follows only while pinned.
   useEffect(() => {
+    if (!pending) return;
     pinnedRef.current = true;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages.length, pending]);
+  }, [pending]);
+
+  // The pill unmounts once the thread reaches the bottom, so focus it held moves on to the composer rather than the page.
+  const jumpToLatest = (pill: HTMLElement): void => {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current = true;
+    if (document.activeElement === pill) inputRef.current?.focus({ preventScroll: true });
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
+  };
 
   // Send turns the Send button into Stop, which drops focus to the page; when the turn ends it goes back to the composer.
   const wasPending = useRef(pending);
@@ -478,44 +501,46 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   return (
     <div className={styles.column}>
       <div className={styles.head}>
-        {session && renamingHeader ? (
-          <RenameInput
-            label={`Rename “${chatTitle(session)}”`}
-            value={session.title ?? ''}
-            loading={updateSession.isPending}
-            onCommit={renameSession}
-            onCancel={() => setRenamingHeader(false)}
-            className={styles.headTitleInput}
-          />
-        ) : session ? (
-          <button type="button" className={styles.headTitleButton} aria-label={`Rename “${chatTitle(session)}”`} onClick={() => setRenamingHeader(true)}>
-            <span className={styles.headTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
-            <EditIcon size={13} className={styles.headTitleEdit} />
-          </button>
-        ) : (
-          <span className={styles.headTitle}>New chat</span>
-        )}
-        {session && session.status !== 'active' && (
-          <StatusChip intent="neutral" dot>
-            {session.status}
-          </StatusChip>
-        )}
-        {session?.mode === 'manual' && <StatusChip intent="warning">manual</StatusChip>}
-        <div className={styles.headActions}>
-          <Button asChild variant="secondary" size="sm" className={styles.phoneOnly}>
-            <Link to="/novels/$novelId/story-bible" params={{ novelId }}>
-              Story Bible
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" prefix={<ProposalsIcon size={14} />} onClick={props.onOpenChanges}>
-            <span className={styles.headLabel}>Changes</span>
-          </Button>
-          <Button variant="ghost" size="sm" prefix={<ClockIcon size={14} />} onClick={props.onOpenHistory}>
-            <span className={styles.headLabel}>History</span>
-          </Button>
-          <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={props.onNewChat}>
-            <span className={styles.headLabel}>New chat</span>
-          </Button>
+        <div className={styles.headInner}>
+          {session && renamingHeader ? (
+            <RenameInput
+              label={`Rename “${chatTitle(session)}”`}
+              value={session.title ?? ''}
+              loading={updateSession.isPending}
+              onCommit={renameSession}
+              onCancel={() => setRenamingHeader(false)}
+              className={styles.headTitleInput}
+            />
+          ) : session ? (
+            <button type="button" className={styles.headTitleButton} aria-label={`Rename “${chatTitle(session)}”`} onClick={() => setRenamingHeader(true)}>
+              <span className={styles.headTitle}>{session.title ?? (state.kind === 'pending' ? 'Naming…' : 'New chat')}</span>
+              <EditIcon size={13} className={styles.headTitleEdit} />
+            </button>
+          ) : (
+            <span className={styles.headTitle}>New chat</span>
+          )}
+          {session && session.status !== 'active' && (
+            <StatusChip intent="neutral" dot>
+              {session.status}
+            </StatusChip>
+          )}
+          {session?.mode === 'manual' && <StatusChip intent="warning">manual</StatusChip>}
+          <div className={styles.headActions}>
+            <Button asChild variant="secondary" size="sm" className={styles.phoneOnly}>
+              <Link to="/novels/$novelId/story-bible" params={{ novelId }}>
+                Story Bible
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" prefix={<ProposalsIcon size={14} />} onClick={props.onOpenChanges}>
+              <span className={styles.headLabel}>Changes</span>
+            </Button>
+            <Button variant="ghost" size="sm" prefix={<ClockIcon size={14} />} onClick={props.onOpenHistory}>
+              <span className={styles.headLabel}>History</span>
+            </Button>
+            <Button variant="primary" size="sm" prefix={<PlusIcon size={14} />} onClick={props.onNewChat}>
+              <span className={styles.headLabel}>New chat</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -563,6 +588,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                   notes={notes}
                   nextChapter={nextChapter}
                   actions={actions}
+                  timeline={timelines.get(m.id)}
                 />
               ),
             )}
@@ -571,7 +597,15 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 <div className={styles.avatar}>
                   <BookIcon size={15} />
                 </div>
-                <StreamedReply stream={stream} />
+                <LiveStreamedTurn
+                  stream={stream}
+                  mode={mode}
+                  footer={
+                    stream.status === 'done' ? (
+                      <MessageModelTag message={stream.turn.assistantMessage} worked={finishedId ? timelines.get(finishedId)?.worked : undefined} />
+                    ) : undefined
+                  }
+                />
               </div>
             )}
             {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={content => sendTurn(content)} />}
@@ -622,6 +656,13 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               />
             )}
           </div>
+          {awayFromLatest && view.kind === 'conversation' && (
+            <div className={styles.jumpDock}>
+              <Button size="sm" variant="secondary" className={styles.jump} prefix={<ChevronDownIcon size={14} />} onClick={event => jumpToLatest(event.currentTarget)}>
+                Latest
+              </Button>
+            </div>
+          )}
         </div>
 
         {view.kind === 'centred' && (
@@ -762,6 +803,8 @@ interface AssistantMessageProps {
   notes?: string;
   nextChapter: number;
   actions: TranscriptActions;
+  /** The settled timeline of the turn this tab just watched; history has none, and none is invented for it. */
+  timeline?: TurnTimeline;
 }
 
 /** A reply row, then any plan card it staged as a sibling in the transcript — a plan card never sits inside the row's flex column. */
@@ -776,6 +819,7 @@ const AssistantMessage = memo(function AssistantMessage({
   notes,
   nextChapter,
   actions,
+  timeline,
 }: AssistantMessageProps): React.JSX.Element {
   const question = useMemo(() => questionOf(message.question), [message.question]);
   const content = message.content;
@@ -788,13 +832,15 @@ const AssistantMessage = memo(function AssistantMessage({
           <BookIcon size={15} />
         </div>
         <div className={styles.assistantCol}>
+          {timeline && <TurnTrace rows={timeline.trace} />}
           {message.appliedProposalId && <ProposalSlot novelId={novelId} proposalId={message.appliedProposalId} />}
           {content && (
             <div>
-              <Markdown content={content} className={styles.assistantBubble} />
-              <MessageModelTag message={message} />
+              <Markdown content={content} className={styles.assistantReply} />
+              <MessageModelTag message={message} worked={timeline?.worked} />
             </div>
           )}
+          {!content && timeline?.worked && <MessageModelTag message={message} worked={timeline.worked} />}
           {message.proposalId && !isPlan && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
           {question && (
             <QuestionCard

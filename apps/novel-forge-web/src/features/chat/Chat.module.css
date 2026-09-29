@@ -18,6 +18,16 @@
   border-bottom: 1px solid var(--sh-border-subtle);
 }
 
+.headInner {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .headTitleButton {
   display: flex;
   align-items: center;
@@ -84,10 +94,32 @@
   flex: 1;
   min-height: 0;
   padding: 24px 20px;
+  /* A classic scrollbar would otherwise pull the centred thread off the header's column by half its width. */
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Zero-height and sticky at the end of the thread, so the pill rides the thread's bottom edge — just above the composer — without measuring it. */
+.jumpDock {
+  position: sticky;
+  bottom: 0;
+  height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.jump {
+  transform: translateY(calc(-100% - 12px));
+  box-shadow: var(--sh-shadow-e2);
+}
+
+/* Doubled to outrank ui's own `.root[data-size]` radius, which CSS-module import order does not settle. */
+.jump.jump[data-size] {
+  border-radius: var(--sh-radius-full);
 }
 
 .body[data-view='centred'] .scroll {
   flex: 0 0 auto;
+  scrollbar-gutter: auto;
   padding: 0;
   overflow: hidden;
 }
@@ -158,23 +190,181 @@
   gap: 8px;
 }
 
-.assistantBubble {
-  background: var(--sh-surface-card);
-  border: 1px solid var(--sh-border-subtle);
-  padding: 12px 15px;
-  border-radius: 14px 14px 14px 4px;
+.assistantReply {
   font-size: var(--sh-text-body);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
-.streamFailed {
-  border-color: var(--sh-danger-border);
+.replyStopped {
+  opacity: 0.75;
 }
 
-.streamStopped {
-  border-color: var(--sh-border-default);
-  opacity: 0.75;
+.turnTrace {
+  display: flex;
+  flex-direction: column;
+}
+
+.turnRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  text-align: left;
+}
+
+button.turnRow {
+  cursor: pointer;
+}
+
+button.turnRow:hover {
+  color: var(--sh-text-primary);
+}
+
+.turnIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--sh-text-tertiary);
+}
+
+.turnChevron {
+  transition: transform 0.15s;
+}
+
+.turnRow[aria-expanded='true'] .turnChevron {
+  transform: rotate(90deg);
+}
+
+.turnDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px 26px;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--sh-border-subtle);
+  list-style: none;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.turnSource {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.turnSourceMark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.turnSource[data-status='ok'] .turnSourceMark {
+  color: var(--sh-success-text);
+}
+
+.turnSource[data-status='error'] .turnSourceMark {
+  color: var(--sh-danger-text);
+}
+
+.turnSourceDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+
+.turnTail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.turnNote {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.turnElapsed {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.spark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--sh-accent);
+}
+
+.shimmer {
+  color: var(--sh-text-secondary);
+}
+
+/* Motion is opt-in: under reduced motion the spark stands still and a running label reads as plain secondary text. */
+@media (prefers-reduced-motion: no-preference) {
+  .spark svg {
+    animation: turn-spin 3.2s linear infinite;
+  }
+
+  .spark[data-breathe] svg {
+    animation:
+      turn-spin 3.2s linear infinite,
+      turn-breathe 1.6s ease-in-out infinite;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, var(--sh-text-tertiary) 0 35%, var(--sh-text-primary) 50%, var(--sh-text-tertiary) 65% 100%);
+    background-size: 260% 100%;
+    background-clip: text;
+    color: transparent;
+    animation: turn-sweep 1.9s linear infinite;
+  }
+}
+
+@keyframes turn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes turn-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes turn-sweep {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -160% 0;
+  }
 }
 
 .commitError {

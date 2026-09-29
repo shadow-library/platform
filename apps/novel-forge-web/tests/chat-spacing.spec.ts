@@ -57,6 +57,11 @@ const CHAT: Expected[] = [
     baseline: '.headTitleButton',
     source: 'chat.module.css .headTitleButton',
   },
+  {
+    selector: '.headInner',
+    values: { 'max-width': '720px', margin: '0 auto', gap: '10px' },
+    source: 'chat redesign .chat-head .in: the header aligned to the thread column (.msgList 720, margin 0 auto), keeping .head’s own gap 10',
+  },
   { selector: '.headActions', values: { gap: '8px', 'margin-left': 'auto' }, source: 'Main l.76 header buttons gap 8, margin-left auto' },
   { selector: '.body', values: { 'min-height': '0' }, baseline: '.body', source: 'chat.module.css .body' },
   { selector: ".body[data-view='centred']", values: { 'padding-bottom': '6vh' }, baseline: ".body[data-view='centred']", source: 'chat.module.css centred state' },
@@ -69,12 +74,21 @@ const CHAT: Expected[] = [
   { selector: '.assistantRow', values: { gap: '12px' }, baseline: '.assistantRow', source: 'chat.module.css .assistantRow; Main l.107' },
   { selector: '.avatar', values: { width: '28px', height: '28px', 'border-radius': '8px' }, baseline: '.avatar', source: 'chat.module.css .avatar; Main l.108' },
   { selector: '.assistantCol', values: { 'max-width': '88%', gap: '8px' }, source: 'chat.module.css max 88% + .streamCol gap 8 / .turnCard margin-top 8' },
+  { selector: '.jumpDock', values: { height: '0' }, source: 'chat redesign .jump: pinned to the thread’s bottom edge, taking no room' },
+  { selector: '.jump.jump[data-size]', values: { 'border-radius': 'var(--sh-radius-full)' }, source: 'chat redesign .jump pill radius 999px' },
+  { selector: '.turnRow', values: { gap: '8px', width: 'fit-content', 'max-width': '100%', padding: '4px 0' }, source: 'chat redesign .trow' },
+  { selector: '.turnIcon', values: { width: '18px', height: '18px' }, source: 'chat redesign .trow .ic width 18' },
   {
-    selector: '.assistantBubble',
-    values: { padding: '12px 15px', 'border-radius': '14px 14px 14px 4px' },
-    baseline: '.assistantBubble',
-    source: 'chat.module.css .assistantBubble; Main l.150',
+    selector: '.turnDetail',
+    values: { gap: '4px', margin: '0 0 6px 26px', padding: '0 0 0 12px' },
+    source: 'chat redesign .tdetail: under the label (icon 18 + gap 8), padding-left 12',
   },
+  { selector: '.turnSource', values: { gap: '8px' }, source: 'chat redesign .tdetail .src gap 8' },
+  { selector: '.turnSourceMark', values: { width: '12px', height: '12px' }, source: 'chat redesign .tdetail .src::before, an 11–12px mark' },
+  { selector: '.turnSourceDot', values: { width: '6px', height: '6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'chat redesign .src.running dot' },
+  { selector: '.turnTail', values: { gap: '8px', padding: '6px 0 2px' }, source: 'chat redesign .live-tail' },
+  { selector: '.turnNote', values: { margin: '0' }, source: 'TurnStatus.module.css .note, the slow-turn note' },
+  { selector: '.spark', values: { width: '18px', height: '18px' }, source: 'chat redesign .spark in a .trow (18)' },
   { selector: '.row', values: { gap: '8px' }, source: 'Main l.158 card buttons gap 8; rule 6' },
   { selector: '.pushEnd', values: { 'margin-left': 'auto' }, source: 'Main l.206 Send margin-left auto' },
   { selector: '.srOnly', values: { width: '1px', height: '1px' }, source: 'Main l.30 .sr' },
@@ -233,9 +247,9 @@ describe('Chat spacing', () => {
   });
 });
 
-// The shell: sidebar 254 from 768 (a drawer below), content padding none; the chat screen caps at --sh-page-max 1200 (reference, Page shell).
+// The shell: sidebar 254 from 768 (a drawer below), content padding none. The chat screen takes the whole content region, so the thread's
+// scrollbar sits at the pane edge; only the thread column (.msgList) and the header inside it are capped.
 const SIDEBAR = 254;
-const PAGE_MAX = 1200;
 const PHONE = 760;
 
 function px(value: string | undefined, index = 0): number {
@@ -253,7 +267,7 @@ describe('Chat width arithmetic', () => {
   const optionGap = px(base.get('.questionOptions')?.gap);
 
   const layout = (viewport: number): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
-    const content = Math.min(viewport >= 768 ? viewport - SIDEBAR : viewport, PAGE_MAX);
+    const content = viewport >= 768 ? viewport - SIDEBAR : viewport;
     const list = Math.min(content - 2 * sidePad, listMax);
     const isPhone = viewport <= PHONE;
     const reply = isPhone ? list : Math.min(list - avatar, list * 0.88);
@@ -279,6 +293,15 @@ describe('Chat width arithmetic', () => {
     expect(layout(768)).toEqual({ list: 474, reply: 417.12, option: 133.70666666666668, checklistCell: 213, appliedText: 287.12 });
     expect(layout(1024)).toEqual({ list: 720, reply: 633.6, option: 205.86666666666667, checklistCell: 336, appliedText: 503.6 });
     expect(layout(1280)).toEqual(layout(1024));
+    expect(layout(1920)).toEqual(layout(1024));
     for (const viewport of [768, 1024, 1280]) expect(layout(viewport).option).toBeGreaterThanOrEqual(120);
+  });
+
+  it('should let the chat screen fill the pane and cap only the thread and header columns', () => {
+    const route = readFileSync(new URL('../src/routes/novels/$novelId/chat.module.css', import.meta.url), 'utf-8');
+    const screen = /\n\.screen \{([^}]*)\}/.exec(route)?.[1] ?? '';
+    expect(screen).toContain('inset: 0');
+    expect(screen).not.toMatch(/max-width|margin/);
+    expect(base.get('.headInner')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
   });
 });

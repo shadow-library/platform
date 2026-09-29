@@ -338,14 +338,17 @@ function TurnModelMenu({ novelId, session, disabled, control }: TurnModelMenuPro
 
 interface MessageModelTagProps {
   message: ChatMessageResponse;
+  /** How long the turn worked and what it read; only known for a turn this tab watched. */
+  worked?: string | null;
 }
 
-export function MessageModelTag({ message }: MessageModelTagProps): React.JSX.Element | null {
+export function MessageModelTag({ message, worked }: MessageModelTagProps): React.JSX.Element | null {
   const modelsQuery = useAiModelsQuery();
   if (message.role !== 'assistant') return null;
   const model = modelLabel(modelsQuery.data?.models ?? [], message.modelId, message.modelProvider);
   const parts = modelTagParts({ model, contentMode: message.contentMode, costTier: message.costTier, costUsd: message.costUsd });
-  return <MessageModelTagView parts={parts} createdAt={message.createdAt} />;
+  const tail = worked ? [worked.charAt(0).toLowerCase() + worked.slice(1)] : [];
+  return <MessageModelTagView parts={[...parts, ...tail]} createdAt={message.createdAt} />;
 }
 
 export interface MessageModelTagViewProps {

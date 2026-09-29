@@ -2,6 +2,7 @@ import { Button } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
 import { type FailedTurnResponse, type TurnState } from '@/lib/apis';
+import { SLOW_TURN_MS, SLOW_TURN_NOTE } from '@/lib/chat-turn-timeline';
 import { formatElapsed } from '@/lib/format';
 import { useElapsed } from '@/lib/use-elapsed';
 
@@ -38,9 +39,6 @@ const FAILURE_COPY: Record<string, FailureCopy> = {
 
 const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reason: 'Something went wrong on the server.' };
 
-// Past this the wait is worth naming: the median turn lands well inside it, so the copy switching is
-// itself the signal that this one is unusual.
-const SLOW_AFTER_MS = 45_000;
 // Elapsed time before this reads as a stopwatch on a request that was always going to be quick.
 const SHOW_ELAPSED_AFTER_MS = 5_000;
 
@@ -71,7 +69,7 @@ interface GhostReplyProps {
 }
 
 function GhostReply({ phase, fallbackLabel, elapsed }: GhostReplyProps): React.JSX.Element {
-  const slow = elapsed >= SLOW_AFTER_MS;
+  const slow = elapsed >= SLOW_TURN_MS;
   const label = phase ? (slow ? phase.slowLabel : phase.label) : fallbackLabel;
 
   return (
@@ -92,7 +90,7 @@ function GhostReply({ phase, fallbackLabel, elapsed }: GhostReplyProps): React.J
             )}
           </div>
           <LinesGhost count={4} />
-          {slow && <p className={styles.note}>This one’s taking longer than usual. The model is still answering.</p>}
+          {slow && <p className={styles.note}>{SLOW_TURN_NOTE}</p>}
         </div>
       </div>
     </div>

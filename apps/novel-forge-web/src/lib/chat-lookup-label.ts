@@ -1,4 +1,4 @@
-const GENERIC_LABEL = 'Looked something up';
+export const GENERIC_LOOKUP_LABEL = 'Looked something up';
 const QUERY_LIMIT = 40;
 
 type Args = Record<string, unknown>;
@@ -81,5 +81,5 @@ const LABELS: Record<string, (args: Args) => string> = {
 };
 
 export function lookupLabel(tool: string, args: Args): string {
-  return Object.hasOwn(LABELS, tool) ? (LABELS[tool]?.(args) ?? GENERIC_LABEL) : GENERIC_LABEL;
+  return Object.hasOwn(LABELS, tool) ? (LABELS[tool]?.(args) ?? GENERIC_LOOKUP_LABEL) : GENERIC_LOOKUP_LABEL;
 }

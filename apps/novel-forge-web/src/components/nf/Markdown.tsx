@@ -1,5 +1,5 @@
 import { marked } from 'marked';
-import { type ReactElement } from 'react';
+import { type ReactElement, useMemo } from 'react';
 
 import { sanitizeHtml } from './sanitize-html';
 
@@ -11,6 +11,6 @@ interface MarkdownProps {
 marked.setOptions({ gfm: true, breaks: true });
 
 export function Markdown({ content, className }: MarkdownProps): ReactElement {
-  const html = sanitizeHtml(marked.parse(content ?? '', { async: false }) as string);
+  const html = useMemo(() => sanitizeHtml(marked.parse(content ?? '', { async: false }) as string), [content]);
   return <div className={`nf-md${className ? ` ${className}` : ''}`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
