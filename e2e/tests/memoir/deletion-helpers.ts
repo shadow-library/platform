@@ -114,30 +114,6 @@ export async function createMemoirTokenIssuer(memoir: MemoirHarness, label = 'me
   };
 }
 
-/**
- * Memoir's own browser step-up, hop by hop: memoir's step-up route finds nothing to claim and hands the browser to identity's
- * prompt, which names memoir as the beneficiary; the password answer is what identity-web's prompt posts; identity then returns
- * the browser to memoir, which claims the step-up and sends it on to `returnTo`.
- */
-export async function stepUpThroughMemoir(persona: MemoirPersona, identityCtx: APIRequestContext, returnTo: string): Promise<void> {
-  const bounce = await persona.ctx.get(`/api/auth/step-up?return_to=${encodeURIComponent(returnTo)}`, { maxRedirects: 0 });
-  const promptLocation = bounce.headers().location;
-  if (bounce.status() !== 302 || !promptLocation) throw new MemoirDeletionError(`memoir's step-up route answered ${bounce.status()}: ${await bounce.text()}`);
-
-  const prompt = new URL(promptLocation);
-  const clientId = prompt.searchParams.get('client_id');
-  const resource = prompt.searchParams.get('resource');
-  const back = prompt.searchParams.get('return_to');
-  if (!clientId || !resource || !back) throw new MemoirDeletionError(`identity's step-up prompt names no beneficiary: ${promptLocation}`);
-
-  const steppedUp = await stepUp(identityCtx, { password: persona.user.password, clientId, resource });
-  if (steppedUp.status() !== 200) throw new MemoirDeletionError(`step-up answered ${steppedUp.status()}: ${await steppedUp.text()}`);
-
-  const claimed = await persona.ctx.get(back, { maxRedirects: 0 });
-  const landing = claimed.headers().location;
-  if (claimed.status() !== 302 || landing !== returnTo) throw new MemoirDeletionError(`memoir did not claim the step-up: ${claimed.status()} → ${landing}`);
-}
-
 export async function deletionRowOf(accountId: string): Promise<DeletionRow | undefined> {
   const [row] = await memoirDb()<DeletionRow[]>`SELECT deletion_state::text AS state, deletion_started_at AS "startedAt" FROM accounts WHERE id = ${accountId}`;
   return row;

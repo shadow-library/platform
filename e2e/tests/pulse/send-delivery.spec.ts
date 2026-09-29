@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { randomInt } from 'node:crypto';
+
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 /**
@@ -13,12 +15,13 @@ import {
   fetchLatestOtp,
   mutate,
   pulseDb,
+  type PulseStaff,
   registerInit,
   requireProductUrl,
-  storageStateFor,
+  stepUpThroughApp,
   uniqueEmail,
 } from '../../lib';
-import { expect, test } from './fixtures';
+import { expect, type PulseHarness, test } from './fixtures';
 import { createPublishedTemplate, createTemplate, memoirSendToken, uniqueKey } from './helpers';
 
 /**
@@ -40,7 +43,20 @@ interface SendBody {
  * included — can hold it. Two service clients do: identity's own outbound client, whose self-signed token e2e cannot
  * forge, and memoir's, which authenticates by its bound `memoir/memoir-server` workload identity. The producer path is
  * proven by a real identity action; the contract of the endpoint itself is driven as memoir.
+ *
+ * The console's manual send is its own route, `POST /api/v1/notifications/console`: a `pulse:notifications:send` permission on a
+ * stepped-up session, refusing identity's and other security templates and limiting each actor to 20 sends in ten minutes, counted
+ * per pulse replica (`console-send-limiter.service.ts`). Its callers are fresh staff accounts, so no test spends the seeded admin's budget.
  */
+
+const TEMPLATES_READ = 'pulse:templates:read';
+const NOTIFICATIONS_SEND = 'pulse:notifications:send';
+const SENDABLE_TEMPLATE = 'sign-up';
+const SENDABLE_PAYLOAD = '{ "name": "Ada" }';
+const IDENTITY_TEMPLATE = 'organisation-invitation';
+const IDENTITY_PAYLOAD = { organisationName: 'Acme Corp', role: 'ADMIN', token: 'inv-4f9d8a7b2c31' };
+const CONSOLE_SEND_LIMIT = 20;
+const CONSOLE_SEND_WINDOW_SECONDS = 600;
 
 /** True when `templateKey` has a published version with at least one enabled channel — the send precondition. */
 async function hasPublishedTemplate(templateKey: string): Promise<boolean> {
@@ -57,6 +73,27 @@ async function hasPublishedTemplate(templateKey: string): Promise<boolean> {
 async function countJobsTo(recipient: string): Promise<number> {
   const [row] = await pulseDb()<{ count: number }[]>`SELECT count(*)::int AS count FROM notification_jobs WHERE recipient = ${recipient}`;
   return row?.count ?? 0;
+}
+
+function uniquePhone(): string {
+  return `+1555${randomInt(1_000_000, 10_000_000)}`;
+}
+
+async function expectRefusal(response: APIResponse, status: number, code: string, message?: string): Promise<void> {
+  const body = await response.text();
+  expect(response.status(), message ?? body).toBe(status);
+  expect((JSON.parse(body) as { code?: string }).code, body).toBe(code);
+}
+
+function consoleSend(ctx: APIRequestContext, data: Record<string, unknown>): Promise<APIResponse> {
+  return mutate(ctx, 'post', '/api/v1/notifications/console', { data });
+}
+
+/** A staff account holding the console send, stepped up through pulse's own step-up route. */
+async function elevatedSender(pulse: PulseHarness, label: string): Promise<PulseStaff> {
+  const sender = await pulse.staff({ label, permissions: [TEMPLATES_READ, NOTIFICATIONS_SEND] });
+  await stepUpThroughApp(sender, await pulse.identityCaller(sender), '/send');
+  return sender;
 }
 
 async function sendAs(guest: APIRequestContext, token: string, data: Record<string, unknown>): Promise<{ response: APIResponse; body: SendBody }> {
@@ -182,21 +219,136 @@ test.describe('send + delivery — service caller', () => {
 });
 
 test.describe('send + delivery — console', () => {
-  test.use({ storageState: storageStateFor('admin') });
+  test.beforeEach(() => requireProductUrl('pulse'));
 
-  test.fixme('should complete a manual send from /send as admin (app gap: a service-only scope guards the route, notification.controller.ts:16)', async ({ page }) => {
-    const url = requireProductUrl('pulse');
+  test('should walk an unelevated sender through step-up from /send, restore the form and deliver the send', async ({ pulse, browser }) => {
+    const pulseUrl = requireProductUrl('pulse');
+    const sender = await pulse.staff({ label: 'console-ui', permissions: [TEMPLATES_READ, NOTIFICATIONS_SEND] });
     const email = uniqueEmail('console-send');
-    await page.goto(`${url}/send`);
+    const phone = uniquePhone();
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
 
     try {
-      await page.getByLabel('Template key').click();
-      await page.getByRole('option', { name: 'auth.password.changed' }).click();
+      await pulse.signInBrowser(context, sender);
+      const page = await context.newPage();
+      await page.goto(`${pulseUrl}/send`);
+      await page.getByRole('combobox', { name: 'Template key' }).fill(SENDABLE_TEMPLATE);
+      await page.getByRole('option', { name: SENDABLE_TEMPLATE, exact: true }).click();
       await page.getByLabel('Email').fill(email);
-      await page.getByLabel('Payload').fill('{ "ipAddress": "203.0.113.7" }');
+      await page.getByLabel('Phone').fill(phone);
+      await page.getByLabel('Payload').fill(SENDABLE_PAYLOAD);
       await page.getByRole('main').getByRole('button', { name: 'Send notification' }).click();
 
-      await expect(page.getByText(/Overall status: Accepted/i)).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Confirm it’s you' }), 'the unelevated send is walked into identity’s step-up prompt').toBeVisible({ timeout: 15_000 });
+      await page.getByLabel('Password', { exact: true }).fill(sender.user.password);
+      await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+
+      await expect(page).toHaveURL(`${pulseUrl}/send`, { timeout: 15_000 });
+      await expect(page.getByRole('combobox', { name: 'Template key' }), 'the form survives the round trip').toHaveValue(SENDABLE_TEMPLATE);
+      await expect(page.getByLabel('Email')).toHaveValue(email);
+      await expect(page.getByLabel('Phone')).toHaveValue(phone);
+      await expect(page.getByLabel('Payload')).toHaveValue(SENDABLE_PAYLOAD);
+      expect(await page.evaluate(() => sessionStorage.getItem('pulse.send-draft')), 'and the stashed draft is dropped once restored').toBeNull();
+
+      await page.getByRole('main').getByRole('button', { name: 'Send notification' }).click();
+      await expect(page.getByText('Overall status: Accepted')).toBeVisible({ timeout: 15_000 });
+      expect((await pollForDeliveredMessage(email, 'Ada')).renderedBody).toContain('Welcome to Shadow, Ada');
+    } finally {
+      await context.close();
+      await deletePulseNotificationsTo([email, phone]);
+    }
+  });
+
+  test('should refuse an identity template with 403 NTF_005 and the console refusal copy, queue nothing, and still send a sendable one', async ({ pulse, browser }) => {
+    const pulseUrl = requireProductUrl('pulse');
+    const sender = await elevatedSender(pulse, 'console-ntf005');
+    const email = uniqueEmail('console-identity');
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+
+    try {
+      await expectRefusal(await consoleSend(sender.ctx, { templateKey: IDENTITY_TEMPLATE, recipients: { email }, payload: IDENTITY_PAYLOAD }), 403, 'NTF_005');
+
+      await pulse.signInBrowser(context, sender);
+      const page = await context.newPage();
+      await page.goto(`${pulseUrl}/send`);
+      await page.getByRole('combobox', { name: 'Template key' }).fill(IDENTITY_TEMPLATE);
+      await page.getByRole('option', { name: IDENTITY_TEMPLATE, exact: true }).click();
+      await page.getByLabel('Email').fill(email);
+      await page.getByLabel('Payload').fill(JSON.stringify(IDENTITY_PAYLOAD));
+      await page.getByRole('main').getByRole('button', { name: 'Send notification' }).click();
+      const refusal = page.getByRole('alert').filter({ hasText: 'Cannot send' });
+      await expect(refusal).toContainText('cannot be sent from the console. Only the flows that own them send them.');
+      await expect(page).toHaveURL(`${pulseUrl}/send`);
+      expect(await countJobsTo(email), 'a refused console send queues nothing').toBe(0);
+
+      const accepted = await consoleSend(sender.ctx, { templateKey: SENDABLE_TEMPLATE, recipients: { email }, payload: { name: 'Ada' } });
+      expect(accepted.status(), await accepted.text()).toBe(201);
+      expect(((await accepted.json()) as SendBody).channelResults).toContainEqual(expect.objectContaining({ channel: 'EMAIL', status: 'QUEUED', jobId: expect.any(String) }));
+    } finally {
+      await context.close();
+      await deletePulseNotificationsTo([email]);
+    }
+  });
+
+  test('should ask an unelevated admin to step up with IAM_003 and refuse an elevated viewer with IAM_002, while an elevated sender still sends', async ({ pulse }) => {
+    const email = uniqueEmail('console-refusals');
+    const send = { templateKey: SENDABLE_TEMPLATE, recipients: { email }, payload: { name: 'Ada' } };
+
+    try {
+      await expectRefusal(await consoleSend(await pulse.admin(), send), 403, 'IAM_003');
+
+      const viewer = await pulse.staff({ label: 'console-viewer', permissions: [TEMPLATES_READ] });
+      await stepUpThroughApp(viewer, await pulse.identityCaller(viewer), '/send');
+      await expectRefusal(await consoleSend(viewer.ctx, send), 403, 'IAM_002');
+      expect(await countJobsTo(email), 'no refused caller queues anything').toBe(0);
+
+      const sender = await elevatedSender(pulse, 'console-legit');
+      const accepted = await consoleSend(sender.ctx, send);
+      expect(accepted.status(), await accepted.text()).toBe(201);
+      expect(await countJobsTo(email)).toBeGreaterThan(0);
+    } finally {
+      await deletePulseNotificationsTo([email]);
+    }
+  });
+
+  test('should refuse a service token on the console route with IAM_002 while it still sends on the producer route', async ({ pulse }) => {
+    test.skip(!(await clusterTokensAvailable()), 'kubectl cannot mint service-account tokens against k3d-shadow-apps-dev');
+    const guest = await pulse.guest();
+    const token = await memoirSendToken(await pulse.identityAnonymous());
+    const email = uniqueEmail('console-service');
+    const send = { templateKey: SENDABLE_TEMPLATE, recipients: { email }, payload: { name: 'Ada' } };
+
+    try {
+      await expectRefusal(await guest.post('/api/v1/notifications/console', { headers: { authorization: `Bearer ${token}` }, data: send }), 403, 'IAM_002');
+      expect(await countJobsTo(email), 'the refused console send queues nothing').toBe(0);
+
+      const produced = await sendAs(guest, token, send);
+      expect(produced.response.status()).toBe(201);
+      expect(produced.body.channelResults).toContainEqual(expect.objectContaining({ channel: 'EMAIL', status: 'QUEUED' }));
+    } finally {
+      await deletePulseNotificationsTo([email]);
+    }
+  });
+
+  test('should refuse the 21st console send in ten minutes with 429 NTF_006 and Retry-After, for that actor alone', async ({ pulse }) => {
+    const limited = await elevatedSender(pulse, 'console-limit');
+    const email = uniqueEmail('console-limit');
+
+    try {
+      for (let attempt = 1; attempt <= CONSOLE_SEND_LIMIT; attempt++) {
+        await expectRefusal(await consoleSend(limited.ctx, { templateKey: IDENTITY_TEMPLATE, recipients: { email }, payload: IDENTITY_PAYLOAD }), 403, 'NTF_005');
+      }
+
+      const over = await consoleSend(limited.ctx, { templateKey: SENDABLE_TEMPLATE, recipients: { email }, payload: { name: 'Ada' } });
+      await expectRefusal(over, 429, 'NTF_006', 'every admitted attempt counts, refused templates included');
+      const retryAfter = Number(over.headers()['retry-after']);
+      expect(retryAfter, 'Retry-After names when the oldest send leaves the window').toBeGreaterThan(0);
+      expect(retryAfter).toBeLessThanOrEqual(CONSOLE_SEND_WINDOW_SECONDS);
+      expect(await countJobsTo(email), 'nothing was queued').toBe(0);
+
+      const other = await elevatedSender(pulse, 'console-limit-other');
+      const accepted = await consoleSend(other.ctx, { templateKey: SENDABLE_TEMPLATE, recipients: { email }, payload: { name: 'Ada' } });
+      expect(accepted.status(), 'another sender keeps its own budget').toBe(201);
     } finally {
       await deletePulseNotificationsTo([email]);
     }

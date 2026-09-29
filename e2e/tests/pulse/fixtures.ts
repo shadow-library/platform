@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type APIRequestContext, test as base, request } from '@playwright/test';
+import { type APIRequestContext, test as base, type BrowserContext, request } from '@playwright/test';
 
 /**
  * Importing user defined packages
@@ -25,6 +25,7 @@ import {
   type PulseStaffOptions,
   requireProductUrl,
   runAll,
+  useClientIp,
 } from '../../lib';
 import { deleteNotificationJobs, deleteTemplates } from './helpers';
 
@@ -41,6 +42,8 @@ export interface PulseHarness {
   guest(): Promise<APIRequestContext>;
   /** A platform-organisation staff account with a live pulse session and exactly the permissions asked for. */
   staff(options?: Omit<PulseStaffOptions, 'clientIp'>): Promise<PulseStaff>;
+  /** Signs `context` in as `staff` — its pulse session and identity's cookies — and charges its every request to this test's address. */
+  signInBrowser(context: BrowserContext, staff: PulseStaff): Promise<void>;
   /** A pulse context carrying `staff`'s identity cookies but no pulse session, for driving the login flow by hand. */
   preLogin(staff: PulseStaff): Promise<APIRequestContext>;
   /** An identity context signed in as `staff`, for the OAuth calls that ride a session. */
@@ -95,6 +98,10 @@ export const test = base.extend<{ pulse: PulseHarness }>({
         const staff = await createPulseStaff({ ...options, clientIp });
         staffAccounts.push(staff);
         return staff;
+      },
+      signInBrowser: async (context, staff) => {
+        await context.addCookies((await staff.ctx.storageState()).cookies);
+        await useClientIp(context, clientIp);
       },
       preLogin: async staff =>
         track(

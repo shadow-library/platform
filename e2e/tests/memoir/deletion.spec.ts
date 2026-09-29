@@ -8,7 +8,7 @@ import { type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { decodeJwt, memoirDb, pollUntil } from '../../lib';
+import { decodeJwt, memoirDb, pollUntil, stepUpThroughApp } from '../../lib';
 import {
   ACCOUNT_SCOPE,
   accountOwnedTables,
@@ -24,7 +24,6 @@ import {
   ownedRowCounts,
   RECEIPT_PNG,
   seedAccountActivity,
-  stepUpThroughMemoir,
   waitForDeletionState,
   wipeAccount,
 } from './deletion-helpers';
@@ -150,7 +149,7 @@ test.describe('memoir account deletion — step-up gate', () => {
     const persona = await memoir.persona({ label: 'del-web', onboard: true });
     const accountId = (await getAccount(persona.ctx)).id;
 
-    await stepUpThroughMemoir(persona, await memoir.identityCaller(persona), DELETION_PATH);
+    await stepUpThroughApp(persona, await memoir.identityCaller(persona), DELETION_PATH);
     await expectDeletionState(await memoirMutate(persona.ctx, 'post', DELETION_PATH), 202, 'pending');
     expect((await persona.ctx.get('/api/auth/session')).status(), 'the start revokes the app session that asked for it').toBe(401);
     expect((await waitForDeletionState(accountId, 'data_deleted'))?.state).toBe('data_deleted');

@@ -154,6 +154,30 @@ export function stepUp(ctx: APIRequestContext, request: StepUpRequest): Promise<
   return identityMutate(ctx, 'post', '/api/v1/me/mfa/step-up', request);
 }
 
+/**
+ * An application's own browser step-up, hop by hop: the app's step-up route finds nothing to claim and hands the browser to identity's
+ * prompt, which names the app as the beneficiary; the password answer is what identity-web's prompt posts; identity then returns the
+ * browser to the app, which claims the step-up and sends it on to `returnTo`. `caller.ctx` carries the app's session cookie.
+ */
+export async function stepUpThroughApp(caller: { ctx: APIRequestContext; user: { password: string } }, identityCtx: APIRequestContext, returnTo: string): Promise<void> {
+  const bounce = await caller.ctx.get(`/api/auth/step-up?return_to=${encodeURIComponent(returnTo)}`, { maxRedirects: 0 });
+  const promptLocation = bounce.headers().location;
+  if (bounce.status() !== 302 || !promptLocation) throw new IdentityAuthError(`the app's step-up route answered ${bounce.status()}: ${await bounce.text()}`);
+
+  const prompt = new URL(promptLocation);
+  const clientId = prompt.searchParams.get('client_id');
+  const resource = prompt.searchParams.get('resource');
+  const back = prompt.searchParams.get('return_to');
+  if (!clientId || !resource || !back) throw new IdentityAuthError(`identity's step-up prompt names no beneficiary: ${promptLocation}`);
+
+  const steppedUp = await stepUp(identityCtx, { password: caller.user.password, clientId, resource });
+  if (steppedUp.status() !== 200) throw new IdentityAuthError(`step-up answered ${steppedUp.status()}: ${await steppedUp.text()}`);
+
+  const claimed = await caller.ctx.get(back, { maxRedirects: 0 });
+  const landing = claimed.headers().location;
+  if (claimed.status() !== 302 || landing !== returnTo) throw new IdentityAuthError(`the app did not claim the step-up: ${claimed.status()} → ${landing}`);
+}
+
 export function registerInit(ctx: APIRequestContext, email: string): Promise<APIResponse> {
   return ctx.post('/api/v1/auth/register/init', { data: { email } });
 }

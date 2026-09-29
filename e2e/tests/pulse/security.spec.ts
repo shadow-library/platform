@@ -62,8 +62,8 @@ test.describe('security', () => {
    * (`PulseViewer`/`PulseOperator`/`PulseAdmin`) is ever granted it, and `AuthGuard.authorize()`'s scope check
    * (`packages/auth/src/module/auth-guard.ts:113`) is a plain membership test against `principal.scopes`
    * regardless of whether the principal came from a bearer token or a session cookie. So even the bootstrap
-   * admin — who holds every `pulse:*` permission there is — can never satisfy this route. See
-   * `send-delivery.spec.ts` for the fuller writeup and the resulting `/send` UI implication.
+   * admin — who holds every `pulse:*` permission there is — can never satisfy this route. The console sends through its
+   * own permission-gated route instead, covered in `send-delivery.spec.ts`.
    */
   test('should 403 IAM_002 for admin (a user session can never hold the service-only notifications:send scope) POST /api/v1/notifications', async () => {
     const ctx = await apiContext('pulse', 'admin');
