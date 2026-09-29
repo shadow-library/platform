@@ -213,7 +213,7 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
   });
 
   // Seeds the ORGANISATION-visibility novel (normally a forge-owned tier) bound to the org just created, with one
-  // published chapter. Runs first so the member-read fixme below can rely on the row existing once its bug is fixed.
+  // published chapter, which the member-read step below then reads.
   test('should hide the ORGANISATION novel from non-members, guests, and the public catalog', async () => {
     const [novel] = await webNovelDb()<{ id: string }[]>`
       INSERT INTO novels (slug, source_client_id, source_ref, title, genres, status, visibility, organisation_id, revision)

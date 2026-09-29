@@ -32,11 +32,7 @@ export interface MemoirTokenIssuer {
   readonly client: OAuthTestClient;
   /** The throwaway application's own audience — somewhere other than memoir a token can be minted for. */
   readonly audience: string;
-  /**
-   * A plain authorization-code token, which never carries an `aal` claim. Identity currently also releases consented sensitive
-   * scopes into it without a step-up (apps/identity-server/src/modules/auth/oauth/oauth.service.ts:298-313); that is observed
-   * behaviour, not a contract, so a caller checks the minted scopes before relying on them.
-   */
+  /** A plain authorization-code token: no `aal` claim, and no sensitive scope such as `memoir:destructive`, which identity withholds without a step-up. */
   unelevated(persona: MemoirPersona, scope?: string): Promise<string>;
   /** Opens an app session, steps the persona up for `resource`, claims it, and mints an `AAL2` token for `resource`. */
   elevated(persona: MemoirPersona, options?: ElevatedTokenOptions): Promise<string>;

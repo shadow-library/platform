@@ -99,24 +99,6 @@ test.describe('memoir account deletion — step-up gate', () => {
     await expectDeletionState(await guest.get(DELETION_PATH, bearer(await issuer.elevated(persona))), 200, 'none');
   });
 
-  test('should refuse a bearer token carrying memoir:destructive without a step-up with 403 IAM_003, and start nothing', async ({ memoir }) => {
-    test.setTimeout(60_000);
-    const persona = await memoir.persona({ label: 'del-aal1-bearer', onboard: true });
-    const accountId = (await getAccount(persona.ctx)).id;
-    const issuer = await createMemoirTokenIssuer(memoir);
-    const guest = await memoir.guest();
-
-    const unelevated = await issuer.unelevated(persona);
-    expect(decodeJwt(unelevated).payload, 'the refusal must be for the missing step-up alone').toMatchObject({ aud: MEMOIR_AUDIENCE, sub: persona.sub });
-    expect(decodeJwt(unelevated).payload['aal']).not.toBe('AAL2');
-    test.skip(!scopesOf(unelevated).includes(DESTRUCTIVE_SCOPE), 'identity withholds a sensitive scope from a code grant without a step-up, so no such token exists to refuse');
-    await expectRefusal(await guest.post(DELETION_PATH, bearer(unelevated)), 403, 'IAM_003');
-    await expectRefusal(await guest.get(DELETION_PATH, bearer(unelevated)), 403, 'IAM_003');
-
-    expect(await deletionRowOf(accountId)).toEqual({ state: 'none', startedAt: null });
-    await expectDeletionState(await guest.get(DELETION_PATH, bearer(await issuer.elevated(persona))), 200, 'none');
-  });
-
   test('should withhold memoir:destructive from a code grant until the session steps up', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'del-aal1-scope' });
     const issuer = await createMemoirTokenIssuer(memoir);
