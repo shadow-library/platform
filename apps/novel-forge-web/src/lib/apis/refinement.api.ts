@@ -367,18 +367,41 @@ export interface ChatTurnFailure {
   message: string;
 }
 
+const CHANGE_GROUPS = ['premise', 'pages', 'people', 'places', 'power', 'threads', 'other'] as const;
+
+export type ChatTurnChangeGroup = (typeof CHANGE_GROUPS)[number];
+
+export interface ChatTurnChange {
+  index: number;
+  op: string;
+  label: string;
+  group: ChatTurnChangeGroup;
+}
+
 export type ChatTurnStreamEvent =
   | { type: 'user'; message: ChatMessageResponse }
   | { type: 'lookup'; lookup: ChatTurnLookup }
   | { type: 'delta'; text: string }
+  | { type: 'change'; change: ChatTurnChange }
   | { type: 'reset' }
   | { type: 'done'; turn: ChatTurnResponse }
   | { type: 'error'; failure: ChatTurnFailure };
 
+export interface ChatTurnTiming {
+  startedAt: number | null;
+  endedAt: number | null;
+  waitingSince: number | null;
+  writingSince: number | null;
+  lastWrite: 'reply' | 'change' | null;
+  thoughtMs: number;
+}
+
 interface ChatTurnProgress {
   reply: string;
   lookups: ChatTurnLookup[];
+  changes: ChatTurnChange[];
   userMessage: ChatMessageResponse | null;
+  timing: ChatTurnTiming;
 }
 
 export type ChatTurnStreamState =
@@ -389,13 +412,34 @@ export type ChatTurnStreamState =
   // error to show. Reuses the `error` precedent of keeping the partial reply rather than voiding it.
   | (ChatTurnProgress & { status: 'stopped' });
 
-export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], userMessage: null };
+const EMPTY_TIMING: ChatTurnTiming = {
+  startedAt: null,
+  endedAt: null,
+  waitingSince: null,
+  writingSince: null,
+  lastWrite: null,
+  thoughtMs: 0,
+};
 
-const CHAT_TURN_EVENTS = ['user', 'lookup', 'delta', 'reset', 'done', 'error'] as const;
+export const idleChatTurnStream: ChatTurnStreamState = { status: 'idle', reply: '', lookups: [], changes: [], userMessage: null, timing: EMPTY_TIMING };
+
+export function startChatTurnStream(at: number): ChatTurnStreamState {
+  return { ...idleChatTurnStream, timing: { ...EMPTY_TIMING, startedAt: at, waitingSince: at } };
+}
+
+const CHAT_TURN_EVENTS = ['user', 'lookup', 'delta', 'change', 'reset', 'done', 'error'] as const;
 const LOOKUP_STATUSES = ['running', 'ok', 'error'] as const;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function parseChange(payload: Record<string, unknown>): ChatTurnChange | undefined {
+  const { index, op, label, group } = payload;
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return undefined;
+  if (typeof op !== 'string' || op === '' || typeof label !== 'string') return undefined;
+  if (!CHANGE_GROUPS.includes(group as ChatTurnChangeGroup)) return undefined;
+  return { index, op, label, group: group as ChatTurnChangeGroup };
 }
 
 export function parseChatTurnEvent(name: string, data: unknown): ChatTurnStreamEvent | undefined {
@@ -409,6 +453,10 @@ export function parseChatTurnEvent(name: string, data: unknown): ChatTurnStreamE
   if (!payload) return undefined;
   if (name === 'reset') return { type: 'reset' };
   if (name === 'delta') return typeof payload.text === 'string' ? { type: 'delta', text: payload.text } : undefined;
+  if (name === 'change') {
+    const change = parseChange(payload);
+    return change ? { type: 'change', change } : undefined;
+  }
   if (name === 'user') return typeof payload.content === 'string' ? { type: 'user', message: payload as unknown as ChatMessageResponse } : undefined;
   if (name === 'done') return asRecord(payload.assistantMessage) ? { type: 'done', turn: payload as unknown as ChatTurnResponse } : undefined;
   if (name === 'error')
@@ -422,30 +470,75 @@ export function parseChatTurnEvent(name: string, data: unknown): ChatTurnStreamE
 
 /**
  * Lookups carry no call id, so a round's start and finish are matched on `(round, tool, args)` and upserted.
- * Appending would double the trace whenever the backlog replays it — which every reconnect does.
+ * Appending would double the trace whenever the backlog replays it — which every reconnect does. A settled lookup is final: the replay
+ * re-states it as running first, and honouring that would restart the think clock, so such an event is dropped (`undefined`).
  */
-function mergeLookup(lookups: ChatTurnLookup[], lookup: ChatTurnLookup): ChatTurnLookup[] {
+function mergeLookup(lookups: ChatTurnLookup[], lookup: ChatTurnLookup): ChatTurnLookup[] | undefined {
   const key = (entry: ChatTurnLookup): string => `${entry.round}\u0000${entry.tool}\u0000${JSON.stringify(entry.args)}`;
   const index = lookups.findIndex(entry => key(entry) === key(lookup));
   if (index < 0) return [...lookups, lookup];
+  if (lookups[index]?.status !== 'running') return undefined;
   return lookups.map((entry, at) => (at === index ? lookup : entry));
 }
 
+function mergeChange(changes: ChatTurnChange[], change: ChatTurnChange): ChatTurnChange[] {
+  const at = changes.findIndex(entry => entry.index === change.index);
+  if (at >= 0) return changes.map((entry, position) => (position === at ? change : entry));
+  return [...changes, change].sort((a, b) => a.index - b.index);
+}
+
+function beganAt(timing: ChatTurnTiming, at: number): ChatTurnTiming {
+  return timing.startedAt === null ? { ...timing, startedAt: at, waitingSince: at } : timing;
+}
+
+function lookupTiming(timing: ChatTurnTiming, lookups: ChatTurnLookup[], at: number): ChatTurnTiming {
+  const running = lookups.some(entry => entry.status === 'running');
+  const base = { ...timing, writingSince: null, lastWrite: null };
+  return { ...base, waitingSince: running ? null : (timing.waitingSince ?? at) };
+}
+
+function writeTiming(timing: ChatTurnTiming, at: number, kind: 'reply' | 'change'): ChatTurnTiming {
+  const next = { ...timing, lastWrite: kind };
+  if (next.writingSince !== null) return next;
+  const thought = next.waitingSince === null ? 0 : Math.max(0, at - next.waitingSince);
+  return { ...next, thoughtMs: next.thoughtMs + thought, waitingSince: null, writingSince: at };
+}
+
 /**
- * The whole wire protocol as one pure function. `reset` voids the deltas and only the deltas — the lookups
- * already ran and the replay that follows a reconnect re-states them. `error` keeps the partial text and
- * marks the turn failed: it is what the model actually said, and no better text is coming.
+ * The whole wire protocol as one pure function; `at` is the arrival time the caller stamps on the event. `reset` voids the reply and the
+ * changes written so far and only those — the lookups already ran and the replay that follows a reconnect re-states them. `error` keeps
+ * the partial text and marks the turn failed: it is what the model actually said, and no better text is coming. Changes are provisional:
+ * `done` is authoritative for what was applied or carded and clears them.
  */
-export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurnStreamEvent): ChatTurnStreamState {
+export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurnStreamEvent, at: number): ChatTurnStreamState {
   if (state.status === 'done' || state.status === 'failed' || state.status === 'stopped') return state;
-  const progress: ChatTurnProgress = { reply: state.reply, lookups: state.lookups, userMessage: state.userMessage };
-  if (event.type === 'reset') return { ...progress, status: 'streaming', reply: '' };
-  if (event.type === 'delta') return { ...progress, status: 'streaming', reply: state.reply + event.text };
+  const timing = beganAt(state.timing, at);
+  const progress: ChatTurnProgress = { reply: state.reply, lookups: state.lookups, changes: state.changes, userMessage: state.userMessage, timing };
+  if (event.type === 'reset') {
+    const waitingSince = state.lookups.some(entry => entry.status === 'running') ? null : (timing.waitingSince ?? at);
+    const cleared = { ...timing, writingSince: null, lastWrite: null, waitingSince };
+    return { ...progress, status: 'streaming', reply: '', changes: [], timing: cleared };
+  }
+  if (event.type === 'delta') {
+    const written = event.text === '' ? timing : writeTiming(timing, at, 'reply');
+    return { ...progress, status: 'streaming', reply: state.reply + event.text, timing: written };
+  }
+  if (event.type === 'change') return { ...progress, status: 'streaming', changes: mergeChange(state.changes, event.change), timing: writeTiming(timing, at, 'change') };
   if (event.type === 'user') return { ...progress, status: 'streaming', userMessage: event.message };
-  if (event.type === 'lookup') return { ...progress, status: 'streaming', lookups: mergeLookup(state.lookups, event.lookup) };
+  if (event.type === 'lookup') {
+    const lookups = mergeLookup(state.lookups, event.lookup);
+    if (!lookups) return { ...progress, status: 'streaming', timing: lookupTiming(timing, state.lookups, at) };
+    return { ...progress, status: 'streaming', lookups, timing: lookupTiming(timing, lookups, at) };
+  }
+  const ended = { ...timing, endedAt: at, writingSince: null };
   // `done` is authoritative, and a model that emits no top-level `reply` streams no deltas at all.
-  if (event.type === 'done') return { ...progress, status: 'done', reply: event.turn.assistantMessage.content, turn: event.turn };
-  return { ...progress, status: 'failed', failure: event.failure };
+  if (event.type === 'done') return { ...progress, status: 'done', changes: [], reply: event.turn.assistantMessage.content, turn: event.turn, timing: ended };
+  return { ...progress, status: 'failed', failure: event.failure, timing: ended };
+}
+
+export function stopChatTurnStream(state: ChatTurnStreamState, at: number): ChatTurnStreamState {
+  if (state.status !== 'idle' && state.status !== 'streaming') return state;
+  return { ...state, status: 'stopped', timing: { ...beganAt(state.timing, at), endedAt: at, writingSince: null } };
 }
 
 export interface ChatTurnHandlers {
@@ -522,7 +615,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     const current = (): boolean => mountedRef.current && tokenRef.current === token;
     sourceRef.current?.close();
     sourceRef.current = undefined;
-    setStream(idleChatTurnStream);
+    setStream(startChatTurnStream(Date.now()));
     setStreaming(true);
     setRunId(null);
     const context = await beginChatTurn(queryClient, projectId, sessionId, content);
@@ -553,7 +646,8 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
         if (!event) return;
         const terminal = event.type === 'done' || event.type === 'error';
         if (terminal) close();
-        if (current()) setStream(state => reduceChatTurnStream(state, event));
+        const arrivedAt = Date.now();
+        if (current()) setStream(state => reduceChatTurnStream(state, event, arrivedAt));
         if (!terminal) return;
         if (current()) {
           setStreaming(false);
@@ -624,7 +718,8 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
             sourceRef.current = undefined;
             setStreaming(false);
             setRunId(null);
-            setStream(state => (state.status === 'idle' || state.status === 'streaming' ? { ...state, status: 'stopped' } : state));
+            const stoppedAt = Date.now();
+            setStream(state => stopChatTurnStream(state, stoppedAt));
           }
         }
         handlers?.onOutcome?.(result.outcome);

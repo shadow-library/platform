@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type ChatMessageResponse, type ChatTurnResponse } from '../src/lib/apis/api-types.gen';
-import { type ChatTurnStreamEvent, type ChatTurnStreamState, idleChatTurnStream, parseChatTurnEvent, reduceChatTurnStream } from '../src/lib/apis/refinement.api';
+import {
+  type ChatTurnStreamEvent,
+  type ChatTurnStreamState,
+  idleChatTurnStream,
+  parseChatTurnEvent,
+  reduceChatTurnStream,
+  startChatTurnStream,
+  stopChatTurnStream,
+} from '../src/lib/apis/refinement.api';
 
 const message = (ordinal: number, role: string, content: string): ChatMessageResponse => ({
   id: `m${ordinal}`,
@@ -15,10 +23,11 @@ const message = (ordinal: number, role: string, content: string): ChatMessageRes
 const turn: ChatTurnResponse = { userMessage: message(1, 'user', 'who is Vex?'), assistantMessage: message(2, 'assistant', 'Vex is the exiled cartographer.'), runId: 'r1' };
 
 const lookup = (round: number, tool: string, status: 'running' | 'ok' | 'error'): ChatTurnStreamEvent => ({ type: 'lookup', lookup: { round, tool, args: { id: 'vex' }, status } });
+const change = (index: number, label = `change ${index}`): ChatTurnStreamEvent => ({ type: 'change', change: { index, op: 'entity.upsert', label, group: 'people' } });
 const delta = (text: string): ChatTurnStreamEvent => ({ type: 'delta', text });
 
 function play(events: ChatTurnStreamEvent[], from: ChatTurnStreamState = idleChatTurnStream): ChatTurnStreamState {
-  return events.reduce(reduceChatTurnStream, from);
+  return events.reduce((state, event, position) => reduceChatTurnStream(state, event, position * 1000), from);
 }
 
 describe('parseChatTurnEvent', () => {
@@ -43,6 +52,24 @@ describe('parseChatTurnEvent', () => {
 
   it('should ignore a lookup whose status is not one the protocol declares', () => {
     expect(parseChatTurnEvent('lookup', '{"round":0,"tool":"get_arc","args":{},"status":"pending"}')).toBeUndefined();
+  });
+
+  it('should parse a change', () => {
+    expect(parseChatTurnEvent('change', '{"index":0,"op":"entity.upsert","label":"Vex","group":"people"}')).toEqual({
+      type: 'change',
+      change: { index: 0, op: 'entity.upsert', label: 'Vex', group: 'people' },
+    });
+  });
+
+  it.each([
+    ['a missing index', '{"op":"a","label":"b","group":"pages"}'],
+    ['a fractional index', '{"index":1.5,"op":"a","label":"b","group":"pages"}'],
+    ['a negative index', '{"index":-1,"op":"a","label":"b","group":"pages"}'],
+    ['an empty op', '{"index":0,"op":"","label":"b","group":"pages"}'],
+    ['a non-string label', '{"index":0,"op":"a","label":3,"group":"pages"}'],
+    ['an unknown group', '{"index":0,"op":"a","label":"b","group":"lore"}'],
+  ])('should ignore a change with %s', (_name, data) => {
+    expect(parseChatTurnEvent('change', data)).toBeUndefined();
   });
 
   it('should ignore an event name it does not know', () => {
@@ -115,8 +142,64 @@ describe('reduceChatTurnStream', () => {
   });
 
   it('should treat a stopped turn as terminal, keeping its partial text and ignoring anything after', () => {
-    const stopped: ChatTurnStreamState = { status: 'stopped', reply: 'half a rep', lookups: [], userMessage: null };
+    const stopped: ChatTurnStreamState = { ...idleChatTurnStream, status: 'stopped', reply: 'half a rep' };
 
-    expect(reduceChatTurnStream(stopped, delta(' more'))).toBe(stopped);
+    expect(reduceChatTurnStream(stopped, delta(' more'), 1)).toBe(stopped);
+  });
+
+  it('should list changes in index order and upsert a replayed index in place', () => {
+    const state = play([change(1), change(0), change(1, 'renamed')]);
+
+    expect(state.changes.map(entry => [entry.index, entry.label])).toEqual([
+      [0, 'change 0'],
+      [1, 'renamed'],
+    ]);
+  });
+
+  it('should not duplicate changes when a reconnect replays them after a reset', () => {
+    const live = [delta('Vex'), change(0), change(1)];
+
+    expect(play([...live, { type: 'reset' }, ...live]).changes).toHaveLength(2);
+  });
+
+  it('should void the changes on a reset but keep the lookups', () => {
+    const state = play([lookup(0, 'get_arc', 'ok'), change(0), { type: 'reset' }]);
+
+    expect(state.changes).toEqual([]);
+    expect(state.lookups).toHaveLength(1);
+  });
+
+  it('should clear the provisional changes when the turn is done', () => {
+    expect(play([change(0), { type: 'done', turn }]).changes).toEqual([]);
+  });
+
+  it('should keep the provisional changes on failure and on stop', () => {
+    const failed = play([change(0), { type: 'error', failure: { code: 'AI_007', message: 'x' } }]);
+
+    expect(failed.changes).toHaveLength(1);
+    expect(stopChatTurnStream(play([change(0)]), 9000).changes).toHaveLength(1);
+  });
+
+  it('should stamp arrival times from the supplied clock', () => {
+    const state = reduceChatTurnStream(reduceChatTurnStream(startChatTurnStream(100), lookup(0, 'get_arc', 'running'), 250), lookup(0, 'get_arc', 'ok'), 400);
+
+    expect(state.timing).toMatchObject({ startedAt: 100, waitingSince: 400 });
+  });
+
+  it('should start the clock on the first event when the stream was not started explicitly', () => {
+    expect(reduceChatTurnStream(idleChatTurnStream, delta('a'), 500).timing.startedAt).toBe(500);
+  });
+
+  it('should not count an empty delta as writing', () => {
+    expect(reduceChatTurnStream(startChatTurnStream(0), delta(''), 500).timing.writingSince).toBeNull();
+  });
+
+  it('should freeze a stopped stream with its end time, and leave a settled one alone', () => {
+    const stopped = stopChatTurnStream(startChatTurnStream(0), 700);
+    const done = play([{ type: 'done', turn }]);
+
+    expect(stopped.status).toBe('stopped');
+    expect(stopped.timing.endedAt).toBe(700);
+    expect(stopChatTurnStream(done, 9000)).toBe(done);
   });
 });
