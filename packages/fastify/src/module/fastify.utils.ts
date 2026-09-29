@@ -145,15 +145,16 @@ export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataV
 
 /**
  * fast-json-stringify picks an `anyOf`/`oneOf` branch (every nullable `$ref` is one) by validating the value with Ajv, where
- * `additionalProperties: false` rejects an object carrying any undeclared property. Its generated serializers never write
- * undeclared properties anyway, so they compile from a copy without the constraint.
+ * `additionalProperties: false` rejects an object carrying any undeclared property. A typed schema's serializer writes only
+ * declared properties, so it compiles from a copy without the constraint; an untyped one keeps it, because without it fjs
+ * no longer infers an object and writes the whole value through `JSON.stringify`.
  */
 function openClosedObjects(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(openClosedObjects);
   if (schema === null || typeof schema !== 'object') return schema;
   const copy: Record<string, unknown> = {};
   for (const [keyword, value] of Object.entries(schema)) {
-    if (keyword === 'additionalProperties' && value === false) continue;
+    if (keyword === 'additionalProperties' && value === false && 'type' in schema) continue;
     copy[keyword] = openClosedObjects(value);
   }
   return copy;

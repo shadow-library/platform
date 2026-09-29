@@ -133,6 +133,7 @@ return the result. All business logic lives in the service.
    Return the entity (or a service result whose field names match the DTO). Only DTO-declared fields are
    emitted, so entity secrets never leak. The handler's TS return type is decoupled from `@RespondFor`'s
    schema — return native values and let the schema shape the wire.
+   In a non-discriminated `SchemaComposer.anyOf`/`oneOf` object union the first branch whose required fields are present wins and the other branches' fields are dropped; use `SchemaComposer.discriminator` when branches overlap.
    *Native non-JSON values (bigint, Date): class-schema itself performs NO value coercion — wire
    conversion is handled at the HTTP layer (transformers/serializer). Mirror an existing response DTO in
    the workspace for the exact pattern (e.g. `@Field(() => String)` on a bigint id, `@Transform('strip:null')`
