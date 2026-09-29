@@ -301,6 +301,15 @@ describe('ModelRouterService.streamStructured', () => {
     expect(streamCalls).toBe(1);
   });
 
+  it('should not scan for changes when the caller has no change handler', async () => {
+    const payload = JSON.stringify({ reply: 'Only words.', changeSet: CHANGES });
+    const { router } = makeRouter(fakeClient([{ chunks: split(payload, 9) }]));
+    const { handlers, events } = recorder();
+
+    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    expect(events.every(event => event.type === 'delta')).toBe(true);
+  });
+
   it('should leave `structured` on the invoke path, never calling stream', async () => {
     const payload = JSON.stringify({ reply: 'Plain call.', changeSet: [] });
     const client = fakeClient([{ chunks: [payload] }], [payload]);
@@ -310,5 +319,111 @@ describe('ModelRouterService.streamStructured', () => {
     expect(result.reply).toBe('Plain call.');
     expect(client.streamCalls).toBe(0);
     expect(client.invokeCalls).toBe(1);
+  });
+});
+
+type ChangeStreamEvent = StreamEvent | { type: 'change'; index: number; op: string };
+
+const CHANGES = [
+  { op: 'premise.update', premise: 'A harbour town that floods every spring.' },
+  { op: 'entity.upsert', entityKey: 'mara', type: 'character', name: 'Mara', body: 'She keeps the {tide} ledger — "always".' },
+];
+
+function changeRecorder(): { handlers: ReplyStreamHandlers; events: ChangeStreamEvent[] } {
+  const events: ChangeStreamEvent[] = [];
+  return {
+    events,
+    handlers: {
+      onDelta: text => events.push({ type: 'delta', text }),
+      onChange: ({ index, element }) => events.push({ type: 'change', index, op: element.op }),
+      onReset: () => events.push({ type: 'reset' }),
+    },
+  };
+}
+
+const changeOps = (events: ChangeStreamEvent[]): string[] => events.flatMap(event => (event.type === 'change' ? [`${event.index}:${event.op}`] : []));
+
+describe('ModelRouterService.streamStructured changes', () => {
+  it('should emit each changeSet element in order after the reply, without a reset', async () => {
+    const payload = JSON.stringify({ reply: 'Two changes.', changeSet: CHANGES });
+    const { router } = makeRouter(fakeClient([{ chunks: split(payload, 7) }]));
+    const { handlers, events } = changeRecorder();
+
+    const result = await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    expect(deltaText(events.filter((event): event is StreamEvent => event.type !== 'change'))).toBe('Two changes.');
+    expect(changeOps(events)).toEqual(['0:premise.update', '1:entity.upsert']);
+    expect(events.some(event => event.type === 'reset')).toBe(false);
+    expect(result.changeSet).toHaveLength(2);
+  });
+
+  it('should emit a change before the reply when the model writes changeSet first', async () => {
+    const payload = JSON.stringify({ changeSet: CHANGES.slice(0, 1), reply: 'After.' });
+    const { router } = makeRouter(fakeClient([{ chunks: split(payload, 5) }]));
+    const { handlers, events } = changeRecorder();
+
+    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    expect(events[0]).toEqual({ type: 'change', index: 0, op: 'premise.update' });
+    expect(events.some(event => event.type === 'reset')).toBe(false);
+  });
+
+  it('should reset and restart change indexes when a transport retry follows a streamed change', async () => {
+    const payload = JSON.stringify({ reply: 'Retry.', changeSet: CHANGES });
+    const partial = `{"reply":"Retry.","changeSet":[${JSON.stringify(CHANGES[0])},{"op":"ent`;
+    const { router } = makeRouter(fakeClient([{ chunks: [partial], fail: true }, { chunks: split(payload, 11) }]));
+    const { handlers, events } = changeRecorder();
+
+    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    const resetAt = events.findIndex(event => event.type === 'reset');
+    expect(changeOps(events.slice(0, resetAt))).toEqual(['0:premise.update']);
+    expect(changeOps(events.slice(resetAt))).toEqual(['0:premise.update', '1:entity.upsert']);
+    expect(events.filter(event => event.type === 'reset')).toHaveLength(1);
+  });
+
+  it('should reset when repair keeps the reply but changes the change set', async () => {
+    const broken = `{"reply":"Same words.","changeSet":[${JSON.stringify(CHANGES[0])}],"lookups":"not-an-array"}`;
+    const repaired = JSON.stringify({ reply: 'Same words.', changeSet: CHANGES });
+    const { router } = makeRouter(fakeClient([{ chunks: split(broken, 6) }], [repaired]));
+    const { handlers, events } = changeRecorder();
+
+    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    expect(changeOps(events)).toEqual(['0:premise.update']);
+    expect(events.at(-1)).toEqual({ type: 'reset' });
+  });
+
+  it('should not reset when repair reproduces the streamed reply and changes', async () => {
+    const broken = `{"reply":"Same words.","changeSet":${JSON.stringify(CHANGES)},"lookups":"not-an-array"}`;
+    const repaired = JSON.stringify({ reply: 'Same words.', changeSet: CHANGES });
+    const { router } = makeRouter(fakeClient([{ chunks: split(broken, 6) }], [repaired]));
+    const { handlers, events } = changeRecorder();
+
+    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    expect(changeOps(events)).toEqual(['0:premise.update', '1:entity.upsert']);
+    expect(events.some(event => event.type === 'reset')).toBe(false);
+  });
+
+  it('should emit the cached changes at once and never call the model', async () => {
+    const client = fakeClient([]);
+    const { router } = makeRouter(client, JSON.stringify({ reply: 'Cached.', changeSet: CHANGES }));
+    const { handlers, events } = changeRecorder();
+
+    await router.streamStructured<ChatRefineOutput>(cacheablePrompt, {}, CTX, handlers);
+    expect(changeOps(events)).toEqual(['0:premise.update', '1:entity.upsert']);
+    expect(client.streamCalls).toBe(0);
+  });
+
+  it('should finish the turn when the change sink throws', async () => {
+    const payload = JSON.stringify({ reply: 'Sink is gone.', changeSet: CHANGES });
+    const { router, warns } = makeRouter(fakeClient([{ chunks: split(payload, 4) }]));
+    const deltas: string[] = [];
+
+    const result = await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, {
+      onDelta: text => deltas.push(text),
+      onChange: () => {
+        throw new Error('connection closed');
+      },
+    });
+    expect(result.changeSet).toHaveLength(2);
+    expect(deltas.join('')).toBe('Sink is gone.');
+    expect(warns.some(warn => warn.message.includes('Reply stream sink failed'))).toBe(true);
   });
 });

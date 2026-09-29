@@ -317,6 +317,35 @@ describe('ModelRouterService hard line', () => {
     expect(resets).toEqual([1]);
   });
 
+  it('should never stream an unrestricted change whose text it refuses', async () => {
+    const run = router();
+    const clean = { op: 'entity.upsert', entityKey: 'mara', type: 'character', name: 'Mara' };
+    const refused = { op: 'entity.upsert', entityKey: 'jon', type: 'character', name: 'Jon', body: `The ${MINOR} ${SEXUAL_ONLY}.` };
+    const payload = JSON.stringify({ reply: 'Two people.', changeSet: [clean, refused] });
+    (run.service as unknown as Record<string, unknown>)['buildClient'] = () => ({
+      stream: async function* () {
+        yield { content: payload };
+      },
+    });
+    const changes: string[] = [];
+    const resets: number[] = [];
+    const chatPrompt = { ...echoPrompt, key: 'chat-refine' as const, role: 'chat' as const, schema: ChatRefineSchema };
+
+    const err = await refusal(
+      run.service.streamStructured(
+        chatPrompt,
+        { userMessage: 'Go on.' },
+        CTX,
+        { onDelta: () => undefined, onChange: ({ element }) => changes.push(String(element.entityKey)), onReset: () => resets.push(1) },
+        { contentMode: 'unrestricted' },
+      ),
+    );
+
+    expect(isHardLineRefusal(err)).toBe(true);
+    expect(changes).toEqual(['mara']);
+    expect(resets).toEqual([1]);
+  });
+
   it('should leave a standard call to the standard model’s own refusal', async () => {
     const run = router();
     run.stubClient();

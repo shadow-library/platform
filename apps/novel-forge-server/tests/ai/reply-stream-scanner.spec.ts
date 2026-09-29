@@ -285,3 +285,114 @@ describe('ReplyStreamScanner', () => {
     expect(scanner.replyFound).toBe(true);
   });
 });
+
+const CHANGE_ELEMENTS = [
+  { op: 'entity.upsert', entityKey: 'mara', type: 'character', name: 'Mara "the Quiet"', body: 'Braces { and } and brackets [ ] and a \\ backslash' },
+  { op: 'bible_document.upsert', section: 'world', slug: 'tides', frontmatter: { title: 'Tides', tags: ['sea', { nested: [1, 2, { deep: '}]' }] }] } },
+  { op: 'promise.create', kind: 'mystery', key: 'who-rang', label: 'Who rang the bell? — café 😀', openedChapter: 3, done: null, flag: true },
+];
+
+const CHANGES_AFTER_REPLY = JSON.stringify({ reply: 'Here are the changes.', changeSet: CHANGE_ELEMENTS, question: 'Anything else?' });
+const CHANGES_BEFORE_REPLY = JSON.stringify({ changeSet: CHANGE_ELEMENTS, lookups: [], reply: 'Changes first.' });
+
+function feedChanges(text: string, chunkSizes: number[]): { reply: string; elements: unknown[]; afterEachPush: number[] } {
+  const scanner = new ReplyStreamScanner();
+  const elements: unknown[] = [];
+  const afterEachPush: number[] = [];
+  let reply = '';
+  let offset = 0;
+  for (const size of [...chunkSizes, text.length]) {
+    if (offset >= text.length) break;
+    reply += scanner.push(text.slice(offset, offset + size));
+    offset += size;
+    elements.push(...scanner.takeChangeSetElements());
+    afterEachPush.push(elements.length);
+  }
+  return { reply, elements, afterEachPush };
+}
+
+describe('ReplyStreamScanner changeSet elements', () => {
+  it('should hand over every changeSet element after the reply, parsed exactly', () => {
+    const { reply, elements } = feedChanges(CHANGES_AFTER_REPLY, [CHANGES_AFTER_REPLY.length]);
+    expect(reply).toBe('Here are the changes.');
+    expect(elements).toEqual(CHANGE_ELEMENTS);
+  });
+
+  it('should hand over every changeSet element that precedes the reply', () => {
+    const { reply, elements } = feedChanges(CHANGES_BEFORE_REPLY, [CHANGES_BEFORE_REPLY.length]);
+    expect(reply).toBe('Changes first.');
+    expect(elements).toEqual(CHANGE_ELEMENTS);
+  });
+
+  it.each([
+    ['after', CHANGES_AFTER_REPLY],
+    ['before', CHANGES_BEFORE_REPLY],
+  ])('should produce the same elements for every two-chunk split with changeSet %s the reply, including inside strings, escapes and nested containers', (_, payload) => {
+    for (let splitAt = 0; splitAt <= payload.length; splitAt++) expect(feedChanges(payload, [splitAt]).elements).toEqual(CHANGE_ELEMENTS);
+  });
+
+  it('should produce the same elements when fed one character at a time', () => {
+    const { reply, elements } = feedChanges(
+      CHANGES_AFTER_REPLY,
+      Array.from({ length: CHANGES_AFTER_REPLY.length }, () => 1),
+    );
+    expect(reply).toBe('Here are the changes.');
+    expect(elements).toEqual(CHANGE_ELEMENTS);
+  });
+
+  it('should release an element as soon as its closing brace arrives, before the array closes', () => {
+    const firstEnd = CHANGES_AFTER_REPLY.indexOf(JSON.stringify(CHANGE_ELEMENTS[0])) + JSON.stringify(CHANGE_ELEMENTS[0]).length;
+    const scanner = new ReplyStreamScanner();
+    scanner.push(CHANGES_AFTER_REPLY.slice(0, firstEnd - 1));
+    expect(scanner.takeChangeSetElements()).toEqual([]);
+    scanner.push(CHANGES_AFTER_REPLY.slice(firstEnd - 1, firstEnd));
+    expect(scanner.takeChangeSetElements()).toEqual([CHANGE_ELEMENTS[0]]);
+    expect(scanner.takeChangeSetElements()).toEqual([]);
+  });
+
+  it('should hand over nothing when the payload has no changeSet', () => {
+    const { reply, elements } = feedChanges('{"reply":"Just talking.","question":"Why?"}', [5]);
+    expect(reply).toBe('Just talking.');
+    expect(elements).toEqual([]);
+  });
+
+  it('should hand over nothing for an empty changeSet', () => {
+    expect(feedChanges('{"reply":"x","changeSet":[]}', [3]).elements).toEqual([]);
+  });
+
+  it('should skip elements that do not parse, are not objects, or lack a string op, and keep the rest', () => {
+    const payload = '{"reply":"x","changeSet":[{"op":"a",},"text",42,["op"],{"op":7},{"kind":"thread"},{"op":undefined},{"op":"premise.update"},null]}';
+    expect(feedChanges(payload, [payload.length]).elements).toEqual([{ op: 'premise.update' }]);
+  });
+
+  it('should ignore a changeSet key that is not top-level', () => {
+    const payload = '{"reply":"x","lookups":[{"tool":"t","args":{"changeSet":[{"op":"hidden"}]}}]}';
+    expect(feedChanges(payload, [payload.length]).elements).toEqual([]);
+  });
+
+  it('should never hand over an element the stream cut off before its closing brace', () => {
+    const cut = CHANGES_AFTER_REPLY.slice(0, CHANGES_AFTER_REPLY.indexOf('"promise.create"'));
+    expect(feedChanges(cut, [cut.length]).elements).toEqual(CHANGE_ELEMENTS.slice(0, 2));
+  });
+
+  it('should stream only the first top-level reply when the key repeats', () => {
+    expect(feedChanges('{"reply":"first","changeSet":[{"op":"a"}],"reply":"second"}', [4]).reply).toBe('first');
+  });
+
+  it('should skip an element that closes as invalid JSON and still hand over the ones after it', () => {
+    const payload = '{"reply":"x","changeSet":[{"op":"lost" oops},{"op":"kept","note":"a\\"}b"}]}';
+    expect(feedChanges(payload, [7]).elements).toEqual([{ op: 'kept', note: 'a"}b' }]);
+  });
+
+  it('should ignore everything after the top-level object closes', () => {
+    const trailing = '{"reply":"x","changeSet":[{"op":"a"}]}\n{"reply":"y","changeSet":[{"op":"b"}]}';
+    const { reply, elements } = feedChanges(trailing, [trailing.length]);
+    expect(reply).toBe('x');
+    expect(elements).toEqual([{ op: 'a' }]);
+  });
+
+  it('should handle pretty-printed changeSet elements', () => {
+    const pretty = JSON.stringify({ reply: 'x', changeSet: CHANGE_ELEMENTS }, null, 2);
+    expect(feedChanges(pretty, [11]).elements).toEqual(CHANGE_ELEMENTS);
+  });
+});

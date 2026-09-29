@@ -4,11 +4,16 @@ import { AppError, ErrorCode, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { ChatService, type ChatTurnEmitter, type ChatTurnOptions } from './chat.service';
+import { ChatService, type ChatTurnOptions } from './chat.service';
+import { type ChatTurnEmitter } from './chat-turn-emitter';
 import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
 import { TurnCostService } from './turn-cost.service';
 
-export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'reset' | 'done' | 'error';
+/**
+ * `delta` (`{ text }`) and `change` (a `ChatChangeEvent`) belong to the reply being written; `reset` voids both, as the reply they built
+ * was replaced, and a `change` index restarts after it. Both are provisional: `done` alone says what the turn applied and carded.
+ */
+export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'change' | 'reset' | 'done' | 'error';
 
 export interface TurnStreamFrame {
   event: TurnStreamEventName;
@@ -84,6 +89,7 @@ export class TurnStreamService {
       onUserMessage: message => this.emit(sink.run, 'user', serialiseMessage(message)),
       onLookup: event => this.emit(sink.run, 'lookup', event),
       onDelta: text => this.emit(sink.run, 'delta', { text }),
+      onChange: event => this.emit(sink.run, 'change', event),
       onReset: () => this.emit(sink.run, 'reset', {}),
     };
 

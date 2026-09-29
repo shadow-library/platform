@@ -34,7 +34,7 @@ import { extractJsonCandidates, tryParseJson } from './json-extract';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
-import { ReplyStreamScanner } from './reply-stream-scanner';
+import { type ChangeSetElement, ReplyStreamScanner } from './reply-stream-scanner';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toConstrainedSchema, toHostedPromptSchema } from './schemas/validate';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
@@ -151,10 +151,18 @@ function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data
   return { success: false, issues };
 }
 
+export interface StreamedChange {
+  /** Order among the changes this response emitted, from 0; restarts after `onReset`. */
+  index: number;
+  element: ChangeSetElement;
+}
+
 export interface ReplyStreamHandlers {
   /** Newly decoded text of the response's top-level `reply` field; never called with an empty string. */
   onDelta: (text: string) => void;
-  /** Everything emitted so far is void: a transport retry restarted the response, or repair replaced it. */
+  /** An object element of the response's top-level `changeSet`, the moment it closes. Provisional: the returned value decides what the response held. */
+  onChange?: (change: StreamedChange) => void;
+  /** Everything emitted so far, deltas and changes alike, is void: a transport retry restarted the response, or repair replaced it. */
   onReset?: () => void;
 }
 
@@ -176,14 +184,25 @@ function lastSentenceEnd(text: string): number {
   return end;
 }
 
+function stringLeaves(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(stringLeaves);
+  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(stringLeaves);
+  return [];
+}
+
 class ReplyStreamRelay {
   private scanner = new ReplyStreamScanner();
   private streamed = '';
+  private changes: string[] = [];
   private retired = false;
   private held = '';
   private withheld = false;
 
-  /** `refuses`: an unrestricted reply is released a whole sentence at a time, each screened first, so refused text never reaches the client. */
+  /**
+   * `refuses`: an unrestricted reply is released a whole sentence at a time, each screened first, so refused text never reaches the client;
+   * a change is screened whole, and one it refuses is never shown.
+   */
   constructor(
     private readonly handlers: ReplyStreamHandlers,
     private readonly onSinkError: (err: unknown) => void,
@@ -196,24 +215,42 @@ class ReplyStreamRelay {
 
   push(chunk: string): void {
     const text = this.scanner.push(chunk);
-    if (!text) return;
-    this.streamed += text;
-    this.forward(text, false);
+    if (text) {
+      this.streamed += text;
+      this.forward(text, false);
+    }
+    for (const element of this.visibleChanges(this.scanner)) {
+      const index = this.changes.length;
+      this.changes.push(JSON.stringify(element));
+      this.emit(() => this.handlers.onChange?.({ index, element }));
+    }
   }
 
   restart(): void {
     this.scanner = new ReplyStreamScanner();
     this.held = '';
     this.withheld = false;
-    if (!this.streamed) return;
+    if (!this.streamed && this.changes.length === 0) return;
     this.streamed = '';
+    this.changes = [];
     this.emit(() => this.handlers.onReset?.());
   }
 
   settle(rawResponse: string): void {
     this.forward('', true);
-    if (!this.streamed || this.streamed === new ReplyStreamScanner().push(rawResponse)) return;
+    if (!this.streamed && this.changes.length === 0) return;
+    const final = new ReplyStreamScanner();
+    const reply = final.push(rawResponse);
+    const changes = this.visibleChanges(final).map(element => JSON.stringify(element));
+    if (this.streamed === reply && changes.length === this.changes.length && changes.every((change, index) => change === this.changes[index])) return;
     this.emit(() => this.handlers.onReset?.());
+  }
+
+  private visibleChanges(scanner: ReplyStreamScanner): ChangeSetElement[] {
+    const elements = scanner.takeChangeSetElements();
+    if (!this.handlers.onChange) return [];
+    const refuses = this.refuses;
+    return refuses ? elements.filter(element => !refuses(stringLeaves(element).join('\n'))) : elements;
   }
 
   private forward(text: string, final: boolean): void {

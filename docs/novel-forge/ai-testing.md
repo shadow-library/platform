@@ -1654,7 +1654,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
   2. Reconnect the GET after `done` within 60 s.
   3. Stop test: send a long prompt and `POST /projects/$P/runs/<runId>/cancel` mid-stream.
 - **Verify:**
-  - SSE order: `ready`; `reset` (replay opener); `user` (user message); optional `lookup` `{round,tool,args,status:'running'→'ok'|'error'}`; many `delta` `{text}`; optional `reset`; final `done` (`{userMessage,assistantMessage,proposal?,applied?,applyNote?,runId}`) or `error` `{code,message}`. The stream closes after the terminal frame.
+  - SSE order: `ready`; `reset` (replay opener); `user` (user message); optional `lookup` `{round,tool,args,status:'running'→'ok'|'error'}`; many `delta` `{text}`; a `change` `{index,op,label,group}` per changeSet element as it completes (group: premise|pages|people|places|power|threads|other; index restarts after each `reset`); optional `reset`; final `done` (`{userMessage,assistantMessage,proposal?,applied?,applyNote?,runId}`) or `error` `{code,message}`. The stream closes after the terminal frame.
   - Concatenated `delta` text equals `assistantMessage.content`; if it does not, a `reset` must precede the corrected text. Deltas are the model's `reply` field only, never raw JSON. A model that returns no `reply` key gives no deltas (log "Model defeated the reply stream").
   - Reconnect after `done` replays everything (within 60 s TTL); another project's run returns 404 `CHT_007`.
   - The turn completes and persists even if nobody connects (`GET /chat/sessions/$S/turn` polls `pendingTurn`/`failedTurn`/`lastOrdinal`).

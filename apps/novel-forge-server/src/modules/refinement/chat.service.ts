@@ -16,7 +16,7 @@ import { countTokens } from '../ai/context/token-budget';
 import { isRegisteredModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { hardLineError, screenTexts } from '../ai/hard-line';
-import { type ModelRoute, ModelRouterService, type ProjectConfig, type ReplyStreamHandlers } from '../ai/model-router.service';
+import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
@@ -27,6 +27,7 @@ import { NotesStoreService } from '../notes/notes-store.service';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
+import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
@@ -99,92 +100,6 @@ export interface ChatTurnResult {
   applied?: TurnApplied;
   applyNote?: string;
   runId: string;
-}
-
-export interface ChatLookupEvent {
-  round: number;
-  tool: string;
-  args: Record<string, unknown>;
-  status: 'running' | 'ok' | 'error';
-}
-
-/**
- * Progress a caller can observe while a turn runs. Its members are the four events the turn
- * itself produces — `ready`, `done` and `error` belong to the transport, which knows things the turn does
- * not — so the SSE route relays rather than translates.
- */
-export interface ChatTurnEmitter {
-  /** The run this turn was given, reported as soon as it exists — long before the turn settles. */
-  onRunId: (runId: string) => void;
-  onUserMessage: (message: Refinement.ChatMessage) => void;
-  onLookup: (event: ChatLookupEvent) => void;
-  onDelta: (text: string) => void;
-  onReset: () => void;
-}
-
-/**
- * Failure-isolated view of the caller's emitter. The first throw — an SSE write to a browser that has
- * already gone — retires it and the turn runs on unobserved, because the turn persists its exchange
- * whether or not anyone is still listening.
- */
-class EmitterRelay {
-  private retired = false;
-  private shown = false;
-  private supersede = false;
-
-  constructor(
-    private readonly emitter: ChatTurnEmitter,
-    private readonly onError: (err: unknown) => void,
-  ) {}
-
-  get streamHandlers(): ReplyStreamHandlers {
-    return {
-      onDelta: text => {
-        if (this.supersede) this.reset();
-        this.shown = true;
-        this.send(() => this.emitter.onDelta(text));
-      },
-      onReset: () => this.reset(),
-    };
-  }
-
-  runId(runId: string): void {
-    this.send(() => this.emitter.onRunId(runId));
-  }
-
-  userMessage(message: Refinement.ChatMessage): void {
-    this.send(() => this.emitter.onUserMessage(message));
-  }
-
-  lookup(event: ChatLookupEvent): void {
-    this.send(() => this.emitter.onLookup(event));
-  }
-
-  /**
-   * A lookup round re-invokes the model for a reply that replaces the one already displayed, but the
-   * replacement is only worth a blank composer once its own text starts arriving: a round that streams
-   * nothing would otherwise leave the author staring at nothing until the turn lands.
-   */
-  supersedeOnNextDelta(): void {
-    this.supersede = this.shown;
-  }
-
-  private reset(): void {
-    this.supersede = false;
-    if (!this.shown) return;
-    this.shown = false;
-    this.send(() => this.emitter.onReset());
-  }
-
-  private send(emit: () => void): void {
-    if (this.retired) return;
-    try {
-      emit();
-    } catch (err) {
-      this.retired = true;
-      this.onError(err);
-    }
-  }
 }
 
 interface SessionListFilter {
