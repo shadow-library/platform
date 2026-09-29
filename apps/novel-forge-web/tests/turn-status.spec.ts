@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type ChatTurnStatusResponse, type ListChatMessagesResponse } from '../src/lib/apis/api-types.gen';
-import { transcriptBehind } from '../src/lib/apis/refinement.api';
+import { transcriptBehind, transcriptTurnState } from '../src/lib/apis/refinement.api';
+import { ApiError } from '../src/lib/apis/transport';
 
 const message = (ordinal: number): ListChatMessagesResponse['messages'][number] => ({
   id: String(ordinal),
@@ -46,5 +47,22 @@ describe('transcriptBehind', () => {
   it('should not refetch before either side has loaded', () => {
     expect(transcriptBehind(undefined, status(3))).toBe(false);
     expect(transcriptBehind(transcript([1]), undefined)).toBe(false);
+  });
+});
+
+describe('transcriptTurnState', () => {
+  const notFound = new ApiError(404, { code: 'PRJ_001', type: 'NOT_FOUND', message: 'Project not found' });
+
+  it('should report the cached running turn while the transcript still loads', () => {
+    expect(transcriptTurnState({ data: transcript([1], { pendingTurn: pending }), error: null })).toEqual({ kind: 'pending', pending });
+  });
+
+  it('should drop a cached running turn once the chat is gone from the server', () => {
+    expect(transcriptTurnState({ data: transcript([1], { pendingTurn: pending }), error: notFound })).toEqual({ kind: 'idle' });
+  });
+
+  it('should keep the cached running turn through a transient failure', () => {
+    const unavailable = new ApiError(503, { code: 'SRV_001', type: 'SERVER_ERROR', message: 'Unavailable' });
+    expect(transcriptTurnState({ data: transcript([1], { pendingTurn: pending }), error: unavailable })).toEqual({ kind: 'pending', pending });
   });
 });

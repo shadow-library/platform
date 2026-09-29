@@ -191,6 +191,18 @@ export function turnState(data: ListChatMessagesResponse | undefined): TurnState
   return strandedFor > TURN_SPINUP_GRACE_MS ? { kind: 'failed', failed: null, retryContent: last.content } : { kind: 'pending', pending: null };
 }
 
+function isGone(error: ApiError | null): boolean {
+  return error?.status === 404;
+}
+
+/**
+ * A failed refetch keeps the last good transcript, and a just-sent turn's optimistic `pendingTurn` with it. Once the chat or its novel is
+ * deleted every refetch 404s, so that cached turn would read as running forever; a transcript the server no longer has holds no turn.
+ */
+export function transcriptTurnState(transcript: Pick<UseQueryResult<ListChatMessagesResponse, ApiError>, 'data' | 'error'>): TurnState {
+  return isGone(transcript.error) ? { kind: 'idle' } : turnState(transcript.data);
+}
+
 /** A transcript that has grown or whose turn has started, short of the turn finishing; its status is left to its own poll. */
 export function invalidateChatSession(queryClient: QueryClient, projectId: string, sessionId: string): void {
   invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId), exact: true });
@@ -241,14 +253,15 @@ export function useChatMessagesQuery(projectId: string, sessionId: string | unde
   const status = useQuery<ChatTurnStatusResponse, ApiError>({
     queryKey: refinementKeys.turn(projectId, sessionId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/turn`).execute(),
-    enabled: active && turnState(transcript.data).kind === 'pending',
+    enabled: active && transcriptTurnState(transcript).kind === 'pending',
     refetchInterval: livePolling(projectId, 1500),
   });
   const behind = status.dataUpdatedAt > transcript.dataUpdatedAt && transcriptBehind(transcript.data, status.data);
+  const gone = isGone(status.error);
 
   useEffect(() => {
-    if (behind) invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId ?? ''), exact: true });
-  }, [behind, projectId, queryClient, sessionId]);
+    if (behind || gone) invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId ?? ''), exact: true });
+  }, [behind, gone, projectId, queryClient, sessionId]);
 
   return transcript;
 }

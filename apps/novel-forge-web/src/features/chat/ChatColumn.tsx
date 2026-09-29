@@ -22,7 +22,7 @@ import {
   jobSettled,
   type ProgressItemKey,
   type ProgressOverrideStatus,
-  turnState,
+  transcriptTurnState,
   useAuthorNotesQuery,
   useCancelChatJobMutation,
   useChatJobStream,
@@ -167,7 +167,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const notes = notesQuery.data?.notes;
   const nextChapter = (statusQuery.data?.draftsTotal ?? 0) + 1;
   const checklist = progressQuery.data ? checklistView(progressQuery.data.items, nextChapter - 1) : undefined;
-  const state = turnState(messagesQuery.data);
+  const state = transcriptTurnState(messagesQuery);
   const stream = turn.stream;
   // Once this tab has stopped its own turn, the server's pending view lags behind; the stream already knows better.
   const pending = turn.isPending || (state.kind === 'pending' && stream.status !== 'stopped');
@@ -312,7 +312,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       if (!content || initialConsumed.current) return;
       initialConsumed.current = true;
       onInitialTurnSent?.();
-      setInput(current => (current === content ? '' : current));
+      setInput(current => (current.trim() === content ? '' : current));
       sendTurn(content, content);
     });
     return () => clearTimeout(timer);
