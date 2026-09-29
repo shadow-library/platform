@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/shadow-library/fastify#readme",
   "dependencies": {
+    "@fastify/fast-json-stringify-compiler": "^5.1.0",
     "@shadow-library/app": "workspace:*",
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",

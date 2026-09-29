@@ -405,6 +405,7 @@
       "name": "@shadow-library/fastify",
       "version": "2.0.0-alpha.2",
       "dependencies": {
+        "@fastify/fast-json-stringify-compiler": "^5.1.0",
         "@shadow-library/app": "workspace:*",
         "@shadow-library/class-schema": "workspace:*",
         "@shadow-library/common": "workspace:*",

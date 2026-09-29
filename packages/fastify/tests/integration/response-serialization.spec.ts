@@ -42,7 +42,58 @@ class ConflictResponse {
   code: string;
 }
 
+@Schema()
+class ChapterResponse {
+  @Field(() => String, { format: 'date-time' })
+  draftedAt: Date;
+}
+
+@Schema()
+class DatedVolumeResponse {
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => [String])
+  revisedAt: Date[];
+
+  @Field(() => [ChapterResponse])
+  chapters: ChapterResponse[];
+
+  @Field(() => ChapterResponse)
+  latest: ChapterResponse;
+}
+
+@Schema()
+class DatedGoalMetResponse {
+  @Field(() => DatedVolumeResponse, { nullable: true })
+  activated: DatedVolumeResponse | null;
+
+  @Field(() => String, { format: 'date-time', nullable: true })
+  archivedAt: Date | null;
+}
+
 const goalMet: GoalMetResponse = { completed: { id: 1n }, activated: { id: 2n }, supersedesId: 3n };
+
+const CREATED_AT = new Date('2026-09-01T10:00:00.000Z');
+const REVISED_AT = new Date('2026-09-02T11:30:00.500Z');
+const DRAFTED_AT = new Date('2026-09-03T12:45:00.000Z');
+const ARCHIVED_AT = new Date('2026-09-04T08:15:00.000Z');
+const datedGoalMet: DatedGoalMetResponse = {
+  activated: { createdAt: CREATED_AT, revisedAt: [REVISED_AT], chapters: [{ draftedAt: DRAFTED_AT }], latest: { draftedAt: DRAFTED_AT } },
+  archivedAt: ARCHIVED_AT,
+};
+
+const volumeRow = { completed: { id: 1n, contentHash: 'a1' }, activated: { id: 2n, contentHash: 'b2' }, supersedesId: null };
+const datedVolumeRow = {
+  activated: {
+    createdAt: CREATED_AT,
+    revisedAt: [REVISED_AT],
+    chapters: [{ draftedAt: DRAFTED_AT, wordCount: 1200 }],
+    latest: { draftedAt: DRAFTED_AT, wordCount: 1200 },
+    contentHash: 'c3',
+  },
+  archivedAt: null,
+};
 
 @HttpController('/api')
 class VolumeController {
@@ -57,6 +108,24 @@ class VolumeController {
   @RespondFor(200, GoalMetResponse)
   volume(): GoalMetResponse {
     return goalMet;
+  }
+
+  @Get('/dated-volume')
+  @RespondFor(200, DatedGoalMetResponse)
+  datedVolume(): DatedGoalMetResponse {
+    return datedGoalMet;
+  }
+
+  @Get('/volume-row')
+  @RespondFor(200, GoalMetResponse)
+  volumeRow(): GoalMetResponse {
+    return volumeRow;
+  }
+
+  @Get('/dated-volume-row')
+  @RespondFor(200, DatedGoalMetResponse)
+  datedVolumeRow(): DatedGoalMetResponse {
+    return datedVolumeRow;
   }
 
   @Get('/untyped')
@@ -89,6 +158,40 @@ describe('response serialization', () => {
     const response = await router.mockRequest().get('/api/volume');
     expect(response.statusCode).toBe(200);
     expect(response.json()).toStrictEqual({ completed: { id: '1' }, activated: { id: '2' }, supersedesId: '3' });
+  });
+
+  it('should serialize dates held by a nullable object field, in its arrays and in its nested objects', async () => {
+    const response = await router.mockRequest().get('/api/dated-volume');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual({
+      activated: {
+        createdAt: CREATED_AT.toISOString(),
+        revisedAt: [REVISED_AT.toISOString()],
+        chapters: [{ draftedAt: DRAFTED_AT.toISOString() }],
+        latest: { draftedAt: DRAFTED_AT.toISOString() },
+      },
+      archivedAt: ARCHIVED_AT.toISOString(),
+    });
+  });
+
+  it('should drop the undeclared properties of an object held by a nullable object field', async () => {
+    const response = await router.mockRequest().get('/api/volume-row');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual({ completed: { id: '1' }, activated: { id: '2' }, supersedesId: null });
+  });
+
+  it('should drop undeclared properties nested in the arrays and objects of a nullable object field', async () => {
+    const response = await router.mockRequest().get('/api/dated-volume-row');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toStrictEqual({
+      activated: {
+        createdAt: CREATED_AT.toISOString(),
+        revisedAt: [REVISED_AT.toISOString()],
+        chapters: [{ draftedAt: DRAFTED_AT.toISOString() }],
+        latest: { draftedAt: DRAFTED_AT.toISOString() },
+      },
+      archivedAt: null,
+    });
   });
 
   it('should serialize bigints in a response that declares no schema', async () => {

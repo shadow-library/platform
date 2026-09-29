@@ -3083,16 +3083,16 @@ export interface components {
       status: components['schemas']['JobStatus'];
       /** @description Attempts started so far; a model or gateway timeout retries an organise or plan job once. */
       attempts: number;
-      lastError?: null | string;
+      lastError?: string | null;
       /** @description Latest progress snapshot; `proposalId` names the staged card once there is one. */
-      progress?: null | {
+      progress?: {
         [key: string]: unknown;
-      };
+      } | null;
       /**
        * Format: date-time
        * @description When a job waiting to retry is dispatched again.
        */
-      nextAttemptAt?: null | string;
+      nextAttemptAt?: string | null;
       origin: components['schemas']['ChatJobOriginResponse'];
       /** Format: date-time */
       createdAt: string;
@@ -3107,7 +3107,7 @@ export interface components {
     ChatJobOriginResponse: {
       proposalId: string;
       opIndex: number;
-      messageId?: null | string;
+      messageId?: string | null;
     };
     ListChatJobEventsResponse: {
       items: components['schemas']['ChatJobEventResponse'][];
@@ -3120,9 +3120,9 @@ export interface components {
       kind: components['schemas']['JobKind'];
       type: components['schemas']['JobEventType'];
       /** @description `step` and `done` carry the job's progress; `started` and `retrying` the attempt; `failed` and `retrying` the error. */
-      data?: null | {
+      data?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -3252,7 +3252,7 @@ export interface components {
     /** @description Spend on one of the signed-in author's novels. */
     ProjectCostItem: {
       projectId: string;
-      title?: null | string;
+      title?: string | null;
       calls: number;
       costUsd: number;
     };
@@ -3270,7 +3270,7 @@ export interface components {
        * Format: date-time
        * @description When the oldest call counted in the window ages out and the window first frees capacity. Null when nothing is counted in the window right now.
        */
-      resetsAt?: null | string;
+      resetsAt?: string | null;
     };
     /** @description What each group of AI work on this novel runs on under one model type and cost tier — a chat pin is not included. */
     ProjectModelsResponse: {
@@ -3372,18 +3372,18 @@ export interface components {
     /** @description A brief's identity and freshness without its body. */
     BriefSummaryResponse: {
       chapter: number;
-      volumeKey?: null | string;
-      title?: null | string;
-      staleReason?: null | string;
+      volumeKey?: string | null;
+      title?: string | null;
+      staleReason?: string | null;
       /** @description Set when the outliner judged the planned material too thin for the word target. */
-      densityRisk?: null | string;
+      densityRisk?: string | null;
       /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
       writeMode: components['schemas']['BriefWriteMode'];
       /**
        * Format: date-time
        * @description Set when this brief was created by the insert operation rather than by an outline pass.
        */
-      insertedAt?: null | string;
+      insertedAt?: string | null;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -3393,47 +3393,47 @@ export interface components {
       id: string;
       projectId: string;
       chapter: number;
-      volumeKey?: null | string;
-      title?: null | string;
+      volumeKey?: string | null;
+      title?: string | null;
       body: string;
       /** @description Artifact keys for the retrieval context used to build this draft. */
-      contextRefs?: null | string[];
+      contextRefs?: string[] | null;
       /** @description Entity key of the point-of-view character. */
-      pov?: null | string;
+      pov?: string | null;
       /** @description Why the chapter exists — its narrative job in the arc. */
-      chapterPurpose?: null | string;
+      chapterPurpose?: string | null;
       /** @description What concretely changes for the reader in this chapter. */
-      readerValue?: null | string[];
+      readerValue?: string[] | null;
       /** @description Recent scene patterns the chapter should avoid repeating. */
-      repetitionRisks?: null | string[];
+      repetitionRisks?: string[] | null;
       /** @description The outliner's warning that the chapter's planned material cannot fill the word target without padding, and the suggested remedy; cleared by a hand edit. */
-      densityRisk?: null | string;
+      densityRisk?: string | null;
       /** @description How the chapter must end: hookType, emotionalBeat, openQuestion, handoffState and mustNotResolve. Older briefs may carry none. */
-      endingContract?: null | {
+      endingContract?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description Who bounds what the chapter may state and which facts they learn on-page; null when the chapter is unfiltered. */
       knowledgeContract?: components['schemas']['KnowledgeContractResponse'] | null;
       /** @description The author's standing guidance for this chapter's writer. */
-      guidance?: null | string;
+      guidance?: string | null;
       /** @description The agreed direction for the chapter. */
-      direction?: null | string;
+      direction?: string | null;
       /** @description How the chapter is written; null follows the project's content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
-      scenes?: null | components['schemas']['BriefSceneSchema'][];
+      scenes?: components['schemas']['BriefSceneSchema'][] | null;
       /** @description Milestone keys this chapter claims to reach. */
-      claimedMilestones?: null | string[];
+      claimedMilestones?: string[] | null;
       /** @description True for the chapter planned as the ending. */
       isEnding: boolean;
       /** @description Set when the plan changed under this brief; generation refuses a stale brief. */
-      staleReason?: null | string;
+      staleReason?: string | null;
       /** @description 'external' means the primary writer's batch loop skips this slot; fill it via generate-unrestricted or POST /drafts/:n/import instead of the normal generate button. */
       writeMode: components['schemas']['BriefWriteMode'];
       /**
        * Format: date-time
        * @description Set when this brief was created by the insert operation rather than by an outline pass.
        */
-      insertedAt?: null | string;
+      insertedAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -3455,7 +3455,7 @@ export interface components {
     BriefSceneSchema: {
       summary: string;
       /** @description Entity key of the scene’s point-of-view character. */
-      pov?: null | string;
+      pov?: string | null;
       /** @description What the point-of-view character wants in the scene. */
       goal?: string;
       /** @description Who or what stands in the way. */
@@ -3564,14 +3564,14 @@ export interface components {
       target: string;
       status: components['schemas']['JobStatus'];
       attempts: number;
-      lastError?: null | string;
+      lastError?: string | null;
       /** @description Event-specific payload. */
-      payload?: null | {
+      payload?: {
         [key: string]: unknown;
-      };
-      progress?: null | {
+      } | null;
+      progress?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -3603,28 +3603,28 @@ export interface components {
       id: string;
       projectId: string;
       chapter: number;
-      title?: null | string;
+      title?: string | null;
       status: components['schemas']['DraftStatus'];
       revision: number;
       /** @description Moves on every hand save, including one folded into the current revision; send it back as `baseSaveSeq`. */
       saveSeq: number;
       /** @description The last revision the author approved. It survives later edits and finalize; a different `revision` means the text changed since that approval. */
-      approvedRevision: null | number;
-      summary?: null | string;
-      body?: null | string;
-      state?: null | {
+      approvedRevision: number | null;
+      summary?: string | null;
+      body?: string | null;
+      state?: {
         [key: string]: unknown;
-      };
-      volumeKey?: null | string;
+      } | null;
+      volumeKey?: string | null;
       reviewStatus: components['schemas']['DraftReviewStatus'];
-      staleReason?: null | string;
+      staleReason?: string | null;
       generator: string;
       /** @description Firewalls this chapter's prose from the vector index, continuity extraction, and the verbatim-prose adjacency rule. Independent of `generator` — a pasted chapter can be `generator: 'human'` and still isolated. */
       isolated: boolean;
       /** @description Content rating of this draft's prose; null means unrated — never "none". */
       contentRating?: components['schemas']['ContentRatingInput'] | null;
-      judge?: null | string;
-      judgeNote?: null | string;
+      judge?: string | null;
+      judgeNote?: string | null;
       /** @description Set by an approval: how many blocking review findings still open on the approved text the approval recorded as overridden ("approved by the author"). */
       overriddenFindings?: number;
       /** Format: date-time */
@@ -3656,10 +3656,10 @@ export interface components {
     /** @description One chapter's draft state without its prose. */
     DraftSummaryItem: {
       chapter: number;
-      title?: null | string;
+      title?: string | null;
       status: components['schemas']['DraftStatus'];
       reviewStatus: components['schemas']['DraftReviewStatus'];
-      judge?: null | string;
+      judge?: string | null;
       isolated: boolean;
       /** @description An ancestor chapter changed since this draft was written; approval is refused until it is regenerated. */
       stale: boolean;
@@ -3685,9 +3685,9 @@ export interface components {
       id: string;
       revision: number;
       saveSeq: number;
-      title: null | string;
+      title: string | null;
       body: string;
-      summary: null | string;
+      summary: string | null;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -3721,7 +3721,7 @@ export interface components {
       artifactType: string;
       artifactRef: string;
       disposition: components['schemas']['UserFeedbackDisposition'];
-      note?: null | string;
+      note?: string | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -3758,11 +3758,11 @@ export interface components {
       revision: number;
       source: components['schemas']['DraftRevisionSource'];
       body: string;
-      summary?: null | string;
-      state?: null | {
+      summary?: string | null;
+      state?: {
         [key: string]: unknown;
-      };
-      runId?: null | string;
+      } | null;
+      runId?: string | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -3837,9 +3837,9 @@ export interface components {
       proposal: {
         [key: string]: unknown;
       };
-      model?: null | string;
+      model?: string | null;
       /** Format: date-time */
-      appliedAt?: null | string;
+      appliedAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -3848,13 +3848,13 @@ export interface components {
     ProposalResponse: {
       id: string;
       projectId: string;
-      sessionId?: null | string;
-      messageId?: null | string;
+      sessionId?: string | null;
+      messageId?: string | null;
       scopeType: components['schemas']['ChatScope'];
-      scopeRef?: null | string;
+      scopeRef?: string | null;
       kind: components['schemas']['RefinementKind'];
       status: components['schemas']['RefinementProposalStatus'];
-      summary?: null | string;
+      summary?: string | null;
       /** @description Proposed operations, each discriminated by its op field. */
       changeSet: components['schemas']['ChangeOpItem'][];
       /** @description Artifact snapshots keyed by the references the change-set was drafted against. */
@@ -3865,17 +3865,17 @@ export interface components {
       /** @description Whether this proposal has been applied and carries inverse operations, allowing it to be reverted. */
       revertible: boolean;
       /** @description Apply-time result for each operation. */
-      opResults?: null | components['schemas']['OpResultItem'][];
-      model?: null | string;
-      runId?: null | string;
+      opResults?: components['schemas']['OpResultItem'][] | null;
+      model?: string | null;
+      runId?: string | null;
       /** Format: date-time */
-      appliedAt?: null | string;
+      appliedAt?: string | null;
       /** Format: date-time */
-      revertedAt?: null | string;
+      revertedAt?: string | null;
       /** @description Error-source-specific failure details recorded when proposal application fails. */
-      error?: null | {
+      error?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description Advisory findings from deterministic checks on the proposal, such as a removal written as a negation; a chapter plan card also carries its pooling, point-of-view and density diagnostics, judged again on every edit. None blocks the proposal. Empty when none apply. */
       warnings: string[];
       /** @description The warnings as typed findings, one per warning and in the same order; a chapter plan card's pooling and give-away findings carry what they point at. */
@@ -3935,7 +3935,7 @@ export interface components {
       /** @description pooling: the scene whose point of view learns the secret on the page, on a learned-on-the-page finding. */
       learnedInScene?: number;
       /** @description give_away and pov: the scene the finding is about. */
-      sceneIndex?: null | number;
+      sceneIndex?: number | null;
       /** @description give_away: the scene field that names the term, such as summary or beats. */
       field?: string;
       /** @description give_away: the beat, when the term is in one. */
@@ -3945,7 +3945,7 @@ export interface components {
       /** @description give_away: that secret's title — never its truth. */
       label?: string;
       /** @description pov: the point of view the scene names, if any. */
-      pov?: null | string;
+      pov?: string | null;
     };
     /** @description A point-of-view character a diagnostic names. */
     DiagnosticPovItem: {
@@ -3981,17 +3981,17 @@ export interface components {
     WorkflowRunListItemResponse: {
       id: string;
       projectId: string;
-      jobId?: null | string;
+      jobId?: string | null;
       graph: string;
       target: string;
       status: components['schemas']['WorkflowRunStatus'];
-      outcome?: null | string;
+      outcome?: string | null;
       /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
       skippedStages: string[];
       /** Format: date-time */
       startedAt: string;
       /** Format: date-time */
-      endedAt?: null | string;
+      endedAt?: string | null;
       totals: components['schemas']['RunUsageResponse'];
     };
     /** @enum {string} */
@@ -4007,7 +4007,7 @@ export interface components {
       /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
       estimatedCostUsd: number;
       /** @description Wall-clock milliseconds from startedAt to endedAt; null while the run is still in progress. */
-      durationMs?: null | number;
+      durationMs?: number | null;
       byCostSource: components['schemas']['RunCostSourceItem'][];
     };
     /** @description Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none. */
@@ -4019,19 +4019,19 @@ export interface components {
     WorkflowRunDetailResponse: {
       id: string;
       projectId: string;
-      jobId?: null | string;
+      jobId?: string | null;
       graph: string;
       target: string;
       status: components['schemas']['WorkflowRunStatus'];
-      outcome?: null | string;
+      outcome?: string | null;
       /** @description Workflow-specific input captured for this run. */
-      input?: null | {
+      input?: {
         [key: string]: unknown;
-      };
-      error?: null | {
+      } | null;
+      error?: {
         [key: string]: unknown;
-      };
-      nodeTrace?: null | string[];
+      } | null;
+      nodeTrace?: string[] | null;
       /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
       skippedStages: string[];
       /** @description Model calls made by this run. Included only by the run-detail endpoint. */
@@ -4043,31 +4043,31 @@ export interface components {
       /** Format: date-time */
       startedAt: string;
       /** Format: date-time */
-      endedAt?: null | string;
+      endedAt?: string | null;
       totals: components['schemas']['RunUsageResponse'];
     };
     RunModelCallResponse: {
       id: string;
-      node?: null | string;
+      node?: string | null;
       role: string;
       provider: string;
       model: string;
       promptKey: string;
       promptVersion: string;
       status: string;
-      inputTokens?: null | number;
+      inputTokens?: number | null;
       /** @description The share of inputTokens served from a provider cache; null when the provider reported no cache accounting. */
-      cachedInputTokens?: null | number;
-      outputTokens?: null | number;
-      latencyMs?: null | number;
-      costUsd?: null | string;
+      cachedInputTokens?: number | null;
+      outputTokens?: number | null;
+      latencyMs?: number | null;
+      costUsd?: string | null;
       /** @description Where costUsd came from; null on a row written before cost_source existed. */
       costSource?: components['schemas']['CostSource'] | null;
       /** @description The cost tier this call ran under; null when the call predates tier tracking. */
       tier?: components['schemas']['CostTier'] | null;
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
-      reasoningEffort?: null | string;
+      reasoningEffort?: string | null;
       attempt: number;
       /** Format: date-time */
       createdAt: string;
@@ -4077,14 +4077,14 @@ export interface components {
     /** @description A read-only lookup performed by a model during a run. */
     RunToolCallResponse: {
       id: string;
-      node?: null | string;
+      node?: string | null;
       tool: string;
-      args?: null | {
+      args?: {
         [key: string]: unknown;
-      };
+      } | null;
       status: string;
-      resultDigest?: null | string;
-      latencyMs?: null | number;
+      resultDigest?: string | null;
+      latencyMs?: number | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -4092,8 +4092,8 @@ export interface components {
     RunContextPackResponse: {
       id: string;
       purpose: string;
-      budgetTokens?: null | number;
-      usedTokens?: null | number;
+      budgetTokens?: number | null;
+      usedTokens?: number | null;
       sections: components['schemas']['RunContextSectionItem'][];
     };
     RunContextSectionItem: {
@@ -4107,17 +4107,17 @@ export interface components {
     RunUsageDetailResponse: {
       id: string;
       projectId: string;
-      jobId?: null | string;
+      jobId?: string | null;
       graph: string;
       target: string;
       status: components['schemas']['WorkflowRunStatus'];
-      outcome?: null | string;
+      outcome?: string | null;
       /** @description Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph. */
       skippedStages: string[];
       /** Format: date-time */
       startedAt: string;
       /** Format: date-time */
-      endedAt?: null | string;
+      endedAt?: string | null;
       totals: components['schemas']['RunUsageResponse'];
       calls: components['schemas']['RunModelCallResponse'][];
     };
@@ -4148,41 +4148,41 @@ export interface components {
     RunContextResponse: {
       id: string;
       purpose: string;
-      budgetTokens?: null | number;
-      usedTokens?: null | number;
+      budgetTokens?: number | null;
+      usedTokens?: number | null;
       sections: components['schemas']['RunContextSectionItem'][];
       /** @description The exact stable and volatile context text supplied to the prompt, in order. */
       rendered: string;
     };
     RunModelCallDetailResponse: {
       id: string;
-      node?: null | string;
+      node?: string | null;
       role: string;
       provider: string;
       model: string;
       promptKey: string;
       promptVersion: string;
       status: string;
-      inputTokens?: null | number;
+      inputTokens?: number | null;
       /** @description The share of inputTokens served from a provider cache; null when the provider reported no cache accounting. */
-      cachedInputTokens?: null | number;
-      outputTokens?: null | number;
-      latencyMs?: null | number;
-      costUsd?: null | string;
+      cachedInputTokens?: number | null;
+      outputTokens?: number | null;
+      latencyMs?: number | null;
+      costUsd?: string | null;
       /** @description Where costUsd came from; null on a row written before cost_source existed. */
       costSource?: components['schemas']['CostSource'] | null;
       /** @description The cost tier this call ran under; null when the call predates tier tracking. */
       tier?: components['schemas']['CostTier'] | null;
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description Reasoning effort sent with the call; null when the call sent none or predates effort tracking. */
-      reasoningEffort?: null | string;
+      reasoningEffort?: string | null;
       attempt: number;
       /** Format: date-time */
       createdAt: string;
-      rawOutput?: null | string;
-      error?: null | {
+      rawOutput?: string | null;
+      error?: {
         [key: string]: unknown;
-      };
+      } | null;
     };
     SearchResponse: {
       hits: components['schemas']['SearchHitResponse'][];
@@ -4204,7 +4204,7 @@ export interface components {
       chapter: number;
       /** @description Absolute public URL for the stored scene image. */
       imageUrl: string;
-      caption?: null | string;
+      caption?: string | null;
       sortOrder: number;
       /** Format: date-time */
       createdAt: string;
@@ -4271,7 +4271,7 @@ export interface components {
       counts: components['schemas']['ChapterRowCountsResponse'];
       totalWords: number;
       /** @description The lowest brief with no draft — the chapter `generate` targets next. */
-      nextBriefChapter?: null | number;
+      nextBriefChapter?: number | null;
       /** @description The only chapter a new draft may start at — the lowest with neither a draft nor finalized prose, planned or not. Writing or filling any other unwritten chapter is refused. */
       nextWritableChapter: number;
       /** @description The highest planned or written chapter number, 0 when there are none. */
@@ -4287,11 +4287,11 @@ export interface components {
       kind: components['schemas']['ChapterRowKind'];
       chapter: number;
       /** @description The draft's title for a written row, the brief's for a planned one. */
-      title?: null | string;
+      title?: string | null;
       /** @description Null for a written chapter that has no brief. */
       writeMode?: components['schemas']['BriefWriteMode'] | null;
       /** @description The chapter's point of view: the brief's own pov, or the first pooled scene pov. Null when neither names one. */
-      pov?: null | string;
+      pov?: string | null;
       /** @description Written rows only. */
       status?: components['schemas']['DraftStatus'];
       /** @description Written rows only. */
@@ -4305,7 +4305,7 @@ export interface components {
       /** @description Written rows only: the draft's current revision. */
       revision?: number;
       /** @description Written rows only: the last revision the author approved, null when none was. */
-      approvedRevision?: null | number;
+      approvedRevision?: number | null;
       /** @description Written rows only. */
       wordCount?: number;
     };
@@ -4361,13 +4361,13 @@ export interface components {
       isolated: boolean;
       /** Format: date-time */
       createdAt: string;
-      contextPackId?: null | string;
+      contextPackId?: string | null;
       messages: components['schemas']['WriterSnapshotMessageResponse'][];
-      keptBack?: null | {
+      keptBack?: {
         [key: string]: unknown;
-      };
-      planRevision?: null | number;
-      bibleHash?: null | string;
+      } | null;
+      planRevision?: number | null;
+      bibleHash?: string | null;
     };
     /** @description One message as the model router sent it. */
     WriterSnapshotMessageResponse: {
@@ -4384,7 +4384,7 @@ export interface components {
       /** @description What made this version; null for current text written before history was kept. */
       source: components['schemas']['DraftRevisionSource'] | null;
       /** @description Set on a `restored` version: the revision it brought back. */
-      restoredFrom: null | number;
+      restoredFrom: number | null;
       current: boolean;
       /** @description The revision the author last approved. */
       approved: boolean;
@@ -4437,7 +4437,7 @@ export interface components {
       leakLines: string[];
       status: components['schemas']['PassageSuggestionStatus'];
       /** @description The draft revision applying it produced. */
-      appliedRevision: null | number;
+      appliedRevision: number | null;
       location: components['schemas']['PassageLocationResponse'];
       /** Format: date-time */
       createdAt: string;
@@ -4448,8 +4448,8 @@ export interface components {
     PassageLocationResponse: {
       /** @description `fresh`: the passage and the 32 characters either side still stand at its anchored offsets. `relocated`: it moved cleanly — text and context occur exactly once, at the offsets given. `stale`: it or the text around it changed, is gone or is ambiguous — applying is refused with PSG_004. */
       freshness: components['schemas']['PassageFreshness'];
-      start: null | number;
-      end: null | number;
+      start: number | null;
+      end: number | null;
     };
     /** @enum {string} */
     PassageFreshness: 'fresh' | 'relocated' | 'stale';
@@ -4489,17 +4489,17 @@ export interface components {
       target: string;
       status: components['schemas']['JobStatus'];
       attempts: number;
-      lastError?: null | string;
+      lastError?: string | null;
       /** @description Job input whose fields depend on the job kind. */
-      payload?: null | {
+      payload?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description Current progress snapshot whose fields depend on the job kind. */
-      progress?: null | {
+      progress?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** Format: date-time */
-      nextAttemptAt?: null | string;
+      nextAttemptAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4538,7 +4538,7 @@ export interface components {
     };
     AppliedArtifactItem: {
       artifactRef: string;
-      newRevision?: null | number;
+      newRevision?: number | null;
     };
     /** @description A job an applied action started — follow it on the chat's job event stream. */
     AppliedActionJobItem: {
@@ -4561,7 +4561,7 @@ export interface components {
       /** @description The dependent record: `chapter:<n>` for a plan, `draft:<n>` for a draft, `knowledge:<entityKey>/<factKey>` for what a character knows, `proposal:<id>` for a pending suggestion. */
       ref: string;
       /** @description The chapter the record belongs to, or where the character learned the fact. */
-      chapter?: null | number;
+      chapter?: number | null;
       /** @description The undone record this one relies on, as a change-set ref. */
       because: string;
       /** @description Finalized history: undo never rewrites it, so the record stays as it is after the revert. */
@@ -4599,7 +4599,7 @@ export interface components {
       key: string;
       label: string;
       /** @description secret: its writer note as the writer's scrub leaves it — what the writer reads among its writing constraints while the secret stays locked. Null when it has none; the writer is then told nothing of it. */
-      coverNote?: null | string;
+      coverNote?: string | null;
     };
     /** @enum {string} */
     WriterKeptKind: 'secret' | 'ending' | 'ending_question' | 'volume' | 'planner_page' | 'ref';
@@ -4631,29 +4631,29 @@ export interface components {
       kind: components['schemas']['LedgerEntryKind'];
       topic: string;
       statement: string;
-      why: null | string;
+      why: string | null;
       rejectedAlternatives: string[];
       /** @description What the decision means for the chapter writer; chapter packs carry it while the decision is active. */
-      writerLine: null | string;
+      writerLine: string | null;
       decidedBy: components['schemas']['LedgerDecidedBy'];
       /** @description The pass that wrote the entry, such as `organise`; null for what the author wrote directly. */
-      stepKey: null | string;
+      stepKey: string | null;
       /** @description Structured detail whose fields depend on the topic. */
-      payload: null | {
+      payload: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description Content this entry produced, addressed by the keys the change-set ops use. */
       links: components['schemas']['LedgerLinksResponse'];
-      supersedesId: null | string;
+      supersedesId: string | null;
       /**
        * Format: date-time
        * @description Set once the entry was superseded or withdrawn; an entry is active while it is null.
        */
-      supersededAt: null | string;
+      supersededAt: string | null;
       /** @description The author’s reason, when the entry was withdrawn rather than superseded. */
-      withdrawnReason: null | string;
+      withdrawnReason: string | null;
       /** @description The suggestion this rejection turns down, by the idea id its card op carried; null for any other entry. */
-      ideaId: null | string;
+      ideaId: string | null;
       /** @description How long a rejected idea stays turned down: `never` until withdrawn, `not_now` while the same volume is active, `not_this_version` while the records it would change are unchanged. */
       rejectionScope: components['schemas']['LedgerRejectionScope'] | null;
       /** @description Superseded entries have a successor on the same topic; withdrawn ones do not. */
@@ -4688,19 +4688,19 @@ export interface components {
     };
     ChangeItemResponse: {
       id: string;
-      sessionId?: null | string;
+      sessionId?: string | null;
       kind: components['schemas']['RefinementKind'];
       scopeType: components['schemas']['ChatScope'];
       status: components['schemas']['RefinementProposalStatus'];
-      summary?: null | string;
+      summary?: string | null;
       autoApplied: boolean;
       refs: string[];
       revertible: boolean;
-      opResults?: null | components['schemas']['OpResultItem'][];
+      opResults?: components['schemas']['OpResultItem'][] | null;
       /** Format: date-time */
-      appliedAt?: null | string;
+      appliedAt?: string | null;
       /** Format: date-time */
-      revertedAt?: null | string;
+      revertedAt?: string | null;
     };
     RollbackBody: {
       /** @description Newest applied proposal to keep; every later proposal is reverted newest first. */
@@ -4727,20 +4727,20 @@ export interface components {
       id: string;
       projectId: string;
       scopeType: components['schemas']['ChatScope'];
-      scopeRef?: null | string;
-      title?: null | string;
+      scopeRef?: string | null;
+      title?: string | null;
       status: components['schemas']['ChatSessionStatus'];
       mode: components['schemas']['ChatMode'];
-      modelProvider?: null | string;
-      modelId?: null | string;
+      modelProvider?: string | null;
+      modelId?: string | null;
       /** @description The chat's own model type; null follows the project's content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description The chat's own cost tier; null follows the project's cost tier. */
       costTier?: components['schemas']['CostTier'] | null;
-      summary?: null | string;
+      summary?: string | null;
       summaryThroughOrdinal: number;
       /** Format: date-time */
-      lastTurnAt?: null | string;
+      lastTurnAt?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -4768,21 +4768,21 @@ export interface components {
       role: string;
       content: string;
       /** @description The turn's suggestion cards: a pending proposal the author accepts or declines op by op. */
-      proposalId?: null | string;
+      proposalId?: string | null;
       /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
-      appliedProposalId?: null | string;
-      runId?: null | string;
-      modelProvider?: null | string;
-      modelId?: null | string;
+      appliedProposalId?: string | null;
+      runId?: string | null;
+      modelProvider?: string | null;
+      modelId?: string | null;
       /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description The cost tier the reply was written at; null on user messages and on replies older than the selection. */
       costTier?: components['schemas']['CostTier'] | null;
       /** @description This reply's model cost, folding in its title and compaction runs; null on user messages and on a reply that carries no run. */
-      costUsd?: null | number;
-      inputTokens?: null | number;
-      cachedInputTokens?: null | number;
-      outputTokens?: null | number;
+      costUsd?: number | null;
+      inputTokens?: number | null;
+      cachedInputTokens?: number | null;
+      outputTokens?: number | null;
       /** @description A message of the author’s long enough to keep as notes, which the notes do not hold yet: offer "Save this as notes?", answered by `POST /notes/from-message`. */
       offersNotes?: boolean;
       /** @description This turn's question card, when Forge raised one; null on every other message. */
@@ -4801,8 +4801,8 @@ export interface components {
     /** @description One concrete example answer to a question card, with the reasoning to accept or decline it. */
     ChatQuestionAnswerResponse: {
       title: string;
-      why?: null | string;
-      tradeOff?: null | string;
+      why?: string | null;
+      tradeOff?: string | null;
       /** @description true on the one answer Forge recommends */
       recommended?: boolean;
     };
@@ -5027,11 +5027,11 @@ export interface components {
       /** @description Findings the author has neither kept nor skipped. */
       openFindings: number;
       /** @description The pending proposal that carries the changes; null when the audit proposed none. */
-      proposalId?: null | string;
+      proposalId?: string | null;
       proposalStatus?: components['schemas']['AuditProposalStatus'] | null;
       /** @description The card’s op indexes to apply: every op a finding not skipped still proposes. Pass as opIndexes when applying the card. */
       selection: number[];
-      runId?: null | string;
+      runId?: string | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -5096,7 +5096,7 @@ export interface components {
       /** @description The ops of the audit’s card that carry this finding’s changes; empty when it has none. */
       opIndexes: number[];
       /** @description Why a change the audit proposed for this finding was not put on the card. */
-      withheld?: null | string;
+      withheld?: string | null;
       /** @description The author’s Keep or Skip, if any. */
       decision?: components['schemas']['AuditFindingDecisionResponse'] | null;
     };
@@ -5106,7 +5106,7 @@ export interface components {
       /** @description "doc:<section>/<slug>", "entity:<key>", "fact:<key>" or "chapter:<n>" — always something the audit read. */
       ref: string;
       /** @description Words quoted from that source, verified to appear there; null when the finding points at the source as a whole. */
-      quote?: null | string;
+      quote?: string | null;
     };
     AuditFindingDecisionResponse: {
       decision: components['schemas']['AuditFindingDecision'];
@@ -5160,13 +5160,13 @@ export interface components {
       id: string;
       projectId: string;
       number: number;
-      title?: null | string;
-      wordCount?: null | number;
+      title?: string | null;
+      wordCount?: number | null;
       status: components['schemas']['ChapterStatus'];
-      generator?: null | string;
+      generator?: string | null;
       continuityApplied: boolean;
       isolated: boolean;
-      volumeKey?: null | string;
+      volumeKey?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -5182,7 +5182,7 @@ export interface components {
     };
     ChapterSearchHit: {
       number: number;
-      title?: null | string;
+      title?: string | null;
       /** @description A short excerpt around the first match, ellipsised at either end when truncated. */
       snippet: string;
       /** @description How many times the query occurs in this chapter, case-insensitively. */
@@ -5192,20 +5192,20 @@ export interface components {
       id: string;
       projectId: string;
       number: number;
-      title?: null | string;
-      wordCount?: null | number;
+      title?: string | null;
+      wordCount?: number | null;
       status: components['schemas']['ChapterStatus'];
-      generator?: null | string;
+      generator?: string | null;
       continuityApplied: boolean;
       isolated: boolean;
-      volumeKey?: null | string;
+      volumeKey?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
-      content?: null | string;
-      summary?: null | string;
-      note?: null | string;
+      content?: string | null;
+      summary?: string | null;
+      note?: string | null;
     };
     UpdateChapterBody: {
       title?: string;
@@ -5223,7 +5223,7 @@ export interface components {
       /** @description A final isolated chapter's bridge read again after its text changed: only the bridge summary is asked, and nothing is applied to the Story Bible. */
       bridgeOnly: boolean;
       /** @description Why reading the updates failed, when it did. */
-      error?: null | string;
+      error?: string | null;
       disclosure: components['schemas']['FinalizeReviewDisclosureResponse'];
       /** @description Items still waiting for an answer; finalize refuses until both are zero. */
       open: components['schemas']['FinalizeReviewOpenResponse'];
@@ -5231,11 +5231,11 @@ export interface components {
       routine: components['schemas']['FinalizeReviewItemResponse'][];
       autoKeep: components['schemas']['FinalizeReviewCategory'][];
       /** Format: date-time */
-      appliedAt?: null | string;
+      appliedAt?: string | null;
       /** @description The revision whose Story Bible updates stand applied — Undo is available while it is set — even when the review shown is a later bridge-only one. Null once they are undone, or when none were applied. */
-      appliedRevision?: null | number;
+      appliedRevision?: number | null;
       /** Format: date-time */
-      revertedAt?: null | string;
+      revertedAt?: string | null;
     };
     /** @enum {string} */
     FinalizeReviewStatus: 'preparing' | 'ready' | 'failed' | 'applied' | 'reverted';
@@ -5262,25 +5262,25 @@ export interface components {
       /** @description The update in plain words. */
       claim: string;
       /** @description The line it came from; withheld on an isolated chapter. */
-      evidence?: null | string;
+      evidence?: string | null;
       /** @description The change finalize applies when the item is kept. */
       proposed: {
         [key: string]: unknown;
       };
       /** @description The change as the author edited it; applied instead of `proposed`. */
-      edited?: null | {
+      edited?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here. */
       flag?: components['schemas']['FinalizeReviewFlag'] | null;
       /** @description What the flag puts at stake: the reveals that need a missed milestone, or what a disclosure still waits on. */
-      dependents?: null | string[];
+      dependents?: string[] | null;
       decision?: components['schemas']['FinalizeReviewDecision'] | null;
-      reason?: null | string;
+      reason?: string | null;
       /** @description Kept by the author’s auto-keep setting rather than by hand. */
       autoKept: boolean;
       /** Format: date-time */
-      decidedAt?: null | string;
+      decidedAt?: string | null;
     };
     /** @enum {string} */
     FinalizeReviewCategory: 'entity' | 'appearance' | 'character_state' | 'relationship' | 'promise' | 'knowledge' | 'milestone' | 'summary';
@@ -5309,7 +5309,7 @@ export interface components {
       /** @description False when nothing is approved against the current text: standard calls then read the chapter as walled off. */
       approved: boolean;
       /** @description The approved bridge summary, the only account of the chapter standard calls read. */
-      summary?: null | string;
+      summary?: string | null;
       /** @description Where approved characters stand and what condition they are in at the end of the chapter. */
       positions: components['schemas']['BridgePositionResponse'][];
       /** @description Approved lines left out because they cross the hard line; they never reach a standard call. */
@@ -5319,7 +5319,7 @@ export interface components {
     };
     BridgePositionResponse: {
       entityKey: string;
-      location?: null | string;
+      location?: string | null;
       /** @description Injuries and other conditions, as approved. */
       conditions: string[];
     };
@@ -5333,7 +5333,7 @@ export interface components {
     ListChapterReviewsResponse: {
       chapter: number;
       /** @description The draft revision the chapter is at now; null when it has no draft. */
-      currentRevision?: null | number;
+      currentRevision?: number | null;
       /** @description The newest review of each kind. */
       latest: components['schemas']['ChapterReviewRecordResponse'][];
       /** @description Every review of this chapter, newest first, up to the most recent 50. */
@@ -5347,11 +5347,11 @@ export interface components {
       /** @description clear renders as "No issue detected · revision N"; failed means the review could not be read and checked nothing. */
       disposition: components['schemas']['ChapterReviewDisposition'];
       /** @description The model's own verdict: consistent / contradiction / evaluation_failed for the judge, approve / revision_requested for the editor. */
-      verdict?: null | string;
+      verdict?: string | null;
       /** @description The editor's overall note to the author. */
-      note?: null | string;
+      note?: string | null;
       /** @description The draft revision that was reviewed; null for finalized prose that has no draft. */
-      draftRevision?: null | number;
+      draftRevision?: number | null;
       /** @description True once the chapter text has changed since this review; its findings then describe an older text. */
       stale: boolean;
       /** @description The reviewed chapter is isolated or written unrestricted; its findings may quote prose a standard model must not read. */
@@ -5368,15 +5368,15 @@ export interface components {
       endingCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
       knowledgeCompliance?: components['schemas']['ReviewComplianceResponse'] | null;
       /** @description Deterministic measurements (word count, readability averages). */
-      metrics?: null | {
+      metrics?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** @description The run that made the model calls; its usage is readable, its prompts stay admin-only. */
-      runId?: null | string;
+      runId?: string | null;
       costTier?: components['schemas']['CostTier'] | null;
       contentMode?: components['schemas']['ContentMode'] | null;
-      modelProvider?: null | string;
-      model?: null | string;
+      modelProvider?: string | null;
+      model?: string | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -5392,7 +5392,7 @@ export interface components {
       category: components['schemas']['ReviewFindingCategory'];
       text: string;
       /** @description The passage the finding rests on, verified to appear verbatim in the reviewed text. */
-      evidence?: null | string;
+      evidence?: string | null;
       /** @description The author’s answer to this finding, if any. */
       remedy?: components['schemas']['ReviewRemedyResponse'] | null;
     };
@@ -5444,8 +5444,8 @@ export interface components {
     };
     ChapterReviewResponse: {
       disposition: string;
-      note?: null | string;
-      findings?: null | components['schemas']['JudgeFindingResponse'][];
+      note?: string | null;
+      findings?: components['schemas']['JudgeFindingResponse'][] | null;
     };
     StartIllustrationBody: {
       subjectType: components['schemas']['IllustrationSubjectType'];
@@ -5480,7 +5480,7 @@ export interface components {
       id: string;
       projectId: string;
       subjectType: components['schemas']['IllustrationSubjectType'];
-      subjectKey?: null | string;
+      subjectKey?: string | null;
       status: components['schemas']['IllustrationStatus'];
       revision: number;
       /** @description 'uploaded' when the session was opened on a cover the author supplied rather than composed from the canon; its prompt only reworks that image. */
@@ -5496,10 +5496,10 @@ export interface components {
       attachedReferences: components['schemas']['AttachedReferenceResponse'][];
       /** @description Whether the auto-rules may add references. */
       autoReferences: boolean;
-      selectedRef?: null | string;
-      selectedUrl?: null | string;
+      selectedRef?: string | null;
+      selectedUrl?: string | null;
       /** @description The chapter an entity illustration is drawn as of; null for other subjects and for sessions from before dating. */
-      depictsChapter: null | number;
+      depictsChapter: number | null;
       /** @description Appearance the composer derived because the entity had none; PATCH it onto the entity to make it canon. */
       suggestedAppearance?: string;
       /** @description Set when `suggestedAppearance` was described from a likeness reference rather than derived from canon. */
@@ -5604,7 +5604,7 @@ export interface components {
       chapter?: number;
       caption?: string;
       subjectType?: components['schemas']['IllustrationSubjectType'];
-      subjectKey?: null | string;
+      subjectKey?: string | null;
     };
     UpdateIllustrationReferencesBody: {
       /** @description The complete attached set, replacing the stored one. Entries already attached (same source and sourceId) are kept with a warning when out of slots; new entries must fit beside the edit source the next refinement sends, or ILL_011. */
@@ -5688,18 +5688,18 @@ export interface components {
       name: string;
       /** @enum {string} */
       significance?: 'major' | 'minor';
-      status?: null | string;
-      origin?: null | string;
-      firstSeenChapter?: null | number;
-      notes?: null | string;
-      motivation?: null | string;
-      body?: null | string;
+      status?: string | null;
+      origin?: string | null;
+      firstSeenChapter?: number | null;
+      notes?: string | null;
+      motivation?: string | null;
+      body?: string | null;
       /** @description Canonical visual description used as the anchor for generated illustrations. */
-      appearance?: null | string;
+      appearance?: string | null;
       /** @description Absolute public URL for the portrait, or null when the entity has no portrait. */
-      imageUrl?: null | string;
+      imageUrl?: string | null;
       /** @description The chapter the portrait shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on a portrait from before dating, which keeps its old visibility. */
-      imageDepictsChapter?: null | number;
+      imageDepictsChapter?: number | null;
       /** @description The entity's additional reference images. Included by the single-entity endpoint. */
       images?: components['schemas']['EntityImageResponse'][];
       /** Format: date-time */
@@ -5711,10 +5711,10 @@ export interface components {
       id: string;
       /** @description Absolute public URL for the stored image. */
       imageUrl: string;
-      caption?: null | string;
+      caption?: string | null;
       sortOrder: number;
       /** @description The chapter the image shows the entity as of (0 = before the story); readers see it from that chapter on. Null only on an image from before dating, which keeps its old visibility. */
-      depictsChapter?: null | number;
+      depictsChapter?: number | null;
     };
     ListEntityResponse: {
       total: number;
@@ -5734,9 +5734,9 @@ export interface components {
       /** @description Distinguishes multiple events of the same kind in one chapter, e.g. a relationship's target and kind; empty for a kind that is already one-per-chapter. */
       detailKey?: string;
       /** @description The changed field's shape before this chapter — null when this is the first record of it, or when it was backfilled and no earlier history is known. */
-      before?: null | Record<string, never>;
+      before?: Record<string, never> | null;
       /** @description The changed field's shape as of this chapter. */
-      after?: null | Record<string, never>;
+      after?: Record<string, never> | null;
       source: components['schemas']['CharacterEventSource'];
       /** @description Provisional events belong to an approval not yet finalized; committed ones are canon. */
       status: components['schemas']['KnowledgeStatus'];
@@ -5793,28 +5793,28 @@ export interface components {
       projectId: string;
       volumeKey: string;
       ordinal: number;
-      title?: null | string;
+      title?: string | null;
       /** @description The goal the volume works towards. */
-      objective?: null | string;
+      objective?: string | null;
       revision: number;
       /** @description The author's notes on the volume. */
-      body?: null | string;
+      body?: string | null;
       /** @description Where the story stands against the volume goal. */
       state: components['schemas']['VolumeState'];
       /** @description Computed on read from the chapters that carry this volume key — never stored. */
       chapterCount: number;
       /** @description Lowest chapter number in the volume; null when it has none. */
-      firstChapter?: null | number;
+      firstChapter?: number | null;
       /** @description Highest chapter number in the volume; null when it has none. */
-      lastChapter?: null | number;
+      lastChapter?: number | null;
       /** @description Sum of word counts across the volume’s chapters. */
       wordCount: number;
       /** @description Chapters this volume claims anywhere in the plan — final, drafted, or briefed only — so a not-yet-written chapter still places into it. */
       planChapterCount: number;
       /** @description Lowest chapter number claimed anywhere in the plan; null when it has none. */
-      planFirstChapter?: null | number;
+      planFirstChapter?: number | null;
       /** @description Highest chapter number claimed anywhere in the plan; null when it has none. */
-      planLastChapter?: null | number;
+      planLastChapter?: number | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -5853,10 +5853,10 @@ export interface components {
       section: components['schemas']['BibleSection'];
       slug: string;
       /** @description Author-authored YAML frontmatter with document-specific keys. */
-      frontmatter?: null | {
+      frontmatter?: {
         [key: string]: unknown;
-      };
-      body?: null | string;
+      } | null;
+      body?: string | null;
       /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
       writerExcluded: boolean;
       /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review. */
@@ -5881,18 +5881,18 @@ export interface components {
       projectId: string;
       factKey: string;
       text: string;
-      subjects?: null | string[];
-      constraintNote?: null | string;
-      writerNote?: null | string;
-      terms?: null | string[];
-      revealChapter?: null | number;
+      subjects?: string[] | null;
+      constraintNote?: string | null;
+      writerNote?: string | null;
+      terms?: string[] | null;
+      revealChapter?: number | null;
       /** @description When the fact may be revealed; absent when it has no condition. */
       unlock?: components['schemas']['UnlockConditionSchema'];
       /** @description The chapter whose plan currently schedules the reveal; provisional until that chapter is final. */
-      plannedChapter?: null | number;
+      plannedChapter?: number | null;
       /** @description The finalized chapter in which the reader learned the fact. */
-      disclosedInChapter?: null | number;
-      allowedClues?: null | string[];
+      disclosedInChapter?: number | null;
+      allowedClues?: string[] | null;
       knowledge: components['schemas']['KnowledgeEntryResponse'][];
       /** Format: date-time */
       createdAt: string;
@@ -5919,7 +5919,7 @@ export interface components {
       entityName: string;
       learnedInChapter: number;
       source: components['schemas']['FactSource'];
-      note?: null | string;
+      note?: string | null;
       /** @description Provisional while it rests on an approved, not yet finalized draft; committed once that chapter is final. Until the knowledge lifecycle lands every row reads committed, including reveals ledgered at approval. */
       status: components['schemas']['KnowledgeStatus'];
       /** Format: date-time */
@@ -5955,16 +5955,16 @@ export interface components {
       projectId: string;
       milestoneKey: string;
       label: string;
-      subjectEntityKey?: null | string;
+      subjectEntityKey?: string | null;
       kind: components['schemas']['MilestoneKind'];
       /** @description open until a plan claims it, planned while one does, reached once the claiming chapter is finalized. */
       state: components['schemas']['MilestoneState'];
       /** @description The chapter whose plan claims it; provisional until that chapter is final. */
-      plannedChapter?: null | number;
+      plannedChapter?: number | null;
       /** @description The finalized chapter that reached it. */
-      reachedChapter?: null | number;
+      reachedChapter?: number | null;
       /** @description The approved draft revision that chapter was finalized from. */
-      boundRevision?: null | number;
+      boundRevision?: number | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -6011,19 +6011,19 @@ export interface components {
       status: components['schemas']['PromiseStatus'];
       /** @description Marked by the outliner or continuity extraction as a deliberate running promise, not an oversight. */
       intentionallyOpen: boolean;
-      openedChapter?: null | number;
+      openedChapter?: number | null;
       /** @description The most recent chapter whose continuity extraction named this promise. */
-      lastAdvancedChapter?: null | number;
+      lastAdvancedChapter?: number | null;
       /** @description Set once a thread is closed; null for a mystery. */
-      closedChapter?: null | number;
+      closedChapter?: number | null;
       /** @description Set once a mystery is resolved; null for a thread. */
-      resolvedChapter?: null | number;
+      resolvedChapter?: number | null;
       /** @description A single target chapter the promise is expected to pay off by. */
-      payoffWindow?: null | number;
+      payoffWindow?: number | null;
       /** @description The milestone this promise is meant to pay off by. */
-      payoffMilestoneKey?: null | string;
+      payoffMilestoneKey?: string | null;
       /** @description The volume this promise is meant to pay off by. */
-      payoffVolumeKey?: null | string;
+      payoffVolumeKey?: string | null;
       /** @description P4-41b: 'due' once the payoff milestone is reached or the payoff volume is the one now active; 'overdue' once the authored chapter window passes or the payoff volume already met its goal. */
       due: components['schemas']['DueStanding'];
     };
@@ -6095,26 +6095,26 @@ export interface components {
       ownerKind: components['schemas']['OwnerKind'];
       /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
       sharedWithOrg: boolean;
-      title?: null | string;
+      title?: string | null;
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
-      coverUrl?: null | string;
+      coverUrl?: string | null;
       contentMode: components['schemas']['ContentMode'];
       /** @description The default cost tier AI work on this novel runs at. */
       costTier: components['schemas']['CostTier'];
       config?: components['schemas']['ProjectConfigResponse'];
-      brief?: null | string;
+      brief?: string | null;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
-      instructions?: null | string;
-      storyCurrentChapter?: null | number;
-      theme?: null | string;
+      instructions?: string | null;
+      storyCurrentChapter?: number | null;
+      theme?: string | null;
       /** @description The question the story is heading to answer. */
-      endingQuestion?: null | string;
+      endingQuestion?: string | null;
       /** @description The planned ending. Only the planner reads it; the chapter writer and publishing never do. */
-      ending?: null | string;
-      readerPromise?: null | string;
+      ending?: string | null;
+      readerPromise?: string | null;
       /** @description Entity key of the protagonist. */
-      protagonistKey?: null | string;
-      opposition?: null | string;
+      protagonistKey?: string | null;
+      opposition?: string | null;
       /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
       /** Format: date-time */
@@ -6172,26 +6172,26 @@ export interface components {
       ownerKind: components['schemas']['OwnerKind'];
       /** @description True when the project is open to every member of its owning organisation who holds the curate permission, on top of its owner. */
       sharedWithOrg: boolean;
-      title?: null | string;
+      title?: string | null;
       /** @description Absolute public cover URL resolved by the server; absent when the project has no cover. */
-      coverUrl?: null | string;
+      coverUrl?: string | null;
       contentMode: components['schemas']['ContentMode'];
       /** @description The default cost tier AI work on this novel runs at. */
       costTier: components['schemas']['CostTier'];
       config?: components['schemas']['ProjectConfigResponse'];
-      brief?: null | string;
+      brief?: string | null;
       /** @description The project’s additions to the built-in chapter-writing style; null when the project writes to the default alone. The writer receives the built-in style followed by these, and these win where the two conflict. */
-      instructions?: null | string;
-      storyCurrentChapter?: null | number;
-      theme?: null | string;
+      instructions?: string | null;
+      storyCurrentChapter?: number | null;
+      theme?: string | null;
       /** @description The question the story is heading to answer. */
-      endingQuestion?: null | string;
+      endingQuestion?: string | null;
       /** @description The planned ending. Only the planner reads it; the chapter writer and publishing never do. */
-      ending?: null | string;
-      readerPromise?: null | string;
+      ending?: string | null;
+      readerPromise?: string | null;
       /** @description Entity key of the protagonist. */
-      protagonistKey?: null | string;
-      opposition?: null | string;
+      protagonistKey?: string | null;
+      opposition?: string | null;
       /** @description Effective chapter word-count target, when the project overrides the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
       /** Format: date-time */
@@ -6620,11 +6620,11 @@ export interface components {
       id: string;
       novelSlug: string;
       title: string;
-      originalAuthor?: null | string;
-      blurb?: null | string;
-      coverPath?: null | string;
-      genres?: null | components['schemas']['NovelGenre'][];
-      tags?: null | components['schemas']['NovelTag'][];
+      originalAuthor?: string | null;
+      blurb?: string | null;
+      coverPath?: string | null;
+      genres?: components['schemas']['NovelGenre'][] | null;
+      tags?: components['schemas']['NovelTag'][] | null;
       sexualContent?: components['schemas']['SexualContentRating'] | null;
       violence?: components['schemas']['ViolenceRating'] | null;
       darkContent?: components['schemas']['DarkContentRating'] | null;
@@ -6644,15 +6644,15 @@ export interface components {
       chapter: number;
       publishedOrdinal: number;
       title: string;
-      authorNote?: null | string;
+      authorNote?: string | null;
       contentHash: string;
       revision: number;
       status: components['schemas']['ChapterPublicationStatus'];
       /** Format: date-time */
-      scheduledAt?: null | string;
+      scheduledAt?: string | null;
       /** Format: date-time */
-      publishedAt?: null | string;
-      error?: null | string;
+      publishedAt?: string | null;
+      error?: string | null;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -6660,7 +6660,7 @@ export interface components {
     ChapterPublicationStatus: 'scheduled' | 'published' | 'failed' | 'unpublished';
     PublicationAccessResponse: {
       visibility: components['schemas']['PublicationVisibility'];
-      organisationId?: null | string;
+      organisationId?: string | null;
       accessRevision: number;
       grants: components['schemas']['AccessGrantItem'][];
     };
@@ -6669,7 +6669,7 @@ export interface components {
     AccessGrantItem: {
       email: string;
       /** @description Verified account subject; absent addresses convey no access and are not pushed to the reader. */
-      subjectId?: null | string;
+      subjectId?: string | null;
       state: components['schemas']['PublicationGrantState'];
     };
     /** @enum {string} */

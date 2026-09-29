@@ -3,6 +3,7 @@
  */
 import assert from 'node:assert';
 
+import { SerializerFactory, SerializerSelector } from '@fastify/fast-json-stringify-compiler';
 import Ajv, { Options as AjvOptions, SchemaObject, ValidateFunction } from 'ajv';
 import { fastify, FastifyInstance } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
@@ -142,6 +143,29 @@ export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataV
   return validationError;
 }
 
+/**
+ * fast-json-stringify picks an `anyOf`/`oneOf` branch (every nullable `$ref` is one) by validating the value with Ajv, where
+ * `additionalProperties: false` rejects an object carrying any undeclared property. Its generated serializers never write
+ * undeclared properties anyway, so they compile from a copy without the constraint.
+ */
+function openClosedObjects(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(openClosedObjects);
+  if (schema === null || typeof schema !== 'object') return schema;
+  const copy: Record<string, unknown> = {};
+  for (const [keyword, value] of Object.entries(schema)) {
+    if (keyword === 'additionalProperties' && value === false) continue;
+    copy[keyword] = openClosedObjects(value);
+  }
+  return copy;
+}
+
+function buildOpenObjectSerializer(buildSerializer: SerializerFactory): SerializerFactory {
+  return (externalSchemas, options) => {
+    const compile = buildSerializer(openClosedObjects(externalSchemas), options);
+    return route => compile({ ...route, schema: openClosedObjects(route.schema) });
+  };
+}
+
 export async function createFastifyInstance(config: FastifyConfig, fastifyFactory?: FastifyModuleOptions['fastifyFactory']): Promise<FastifyInstance> {
   const options = utils.object.omitKeys(config, ['port', 'host', 'errorHandler', 'responseSchema']);
   const { errorHandler } = config;
@@ -155,7 +179,9 @@ export async function createFastifyInstance(config: FastifyConfig, fastifyFactor
     ajvPlugin(lenientValidator, options);
   }
 
-  const instance = fastify(options);
+  const { schemaController } = config;
+  const buildSerializer = buildOpenObjectSerializer(schemaController?.compilersFactory?.buildSerializer ?? SerializerSelector());
+  const instance = fastify({ ...options, schemaController: { ...schemaController, compilersFactory: { ...schemaController?.compilersFactory, buildSerializer } } });
   instance.setSchemaErrorFormatter(formatSchemaErrors);
   instance.setNotFoundHandler(notFoundHandler);
   instance.setValidatorCompiler(routeSchema => compileValidator(routeSchema, { strictValidator, lenientValidator }));

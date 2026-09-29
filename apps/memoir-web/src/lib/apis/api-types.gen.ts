@@ -613,18 +613,18 @@ export interface components {
     };
     DeviceResponseDto: {
       id: string;
-      userAgent?: null | string;
+      userAgent?: string | null;
       pushOptIn: boolean;
-      pushSubscription?: null | {
+      pushSubscription?: {
         [key: string]: unknown;
-      };
-      reminderPrefs?: null | {
+      } | null;
+      reminderPrefs?: {
         [key: string]: unknown;
-      };
+      } | null;
       /** Format: date-time */
-      lastSeenAt?: null | string;
+      lastSeenAt?: string | null;
       /** @description The delta cursor this device last acknowledged */
-      lastSyncSeq?: null | string;
+      lastSyncSeq?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -632,9 +632,9 @@ export interface components {
     };
     AccountResponseDto: {
       id: string;
-      email?: null | string;
-      displayName?: null | string;
-      photoUrl?: null | string;
+      email?: string | null;
+      displayName?: string | null;
+      photoUrl?: string | null;
       authProvider: components['schemas']['AuthProvider'];
       /** @description ISO 4217 currency code; immutable once onboarding completes */
       defaultCurrency: string;
@@ -642,7 +642,7 @@ export interface components {
       /** @description IANA timezone; the day-boundary authority for this account */
       timezone: string;
       /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
-      pendingTimezone?: null | string;
+      pendingTimezone?: string | null;
       scheduleStartMin: number;
       scheduleEndMin: number;
       theme: components['schemas']['Theme'];
@@ -652,13 +652,13 @@ export interface components {
       pendingIntensityMode?: components['schemas']['IntensityMode'] | null;
       returnerThresholdDays: number;
       /** @description Monthly spending budget in minor units of defaultCurrency; null when no budget is set */
-      monthlyBudgetMinor?: null | number;
+      monthlyBudgetMinor?: number | null;
       notificationPrefs: components['schemas']['NotificationPrefsDto'];
       /**
        * Format: date-time
        * @description Null routes the client back into the forced-essentials onboarding flow
        */
-      onboardingCompletedAt?: null | string;
+      onboardingCompletedAt?: string | null;
       level: number;
       totalXp: string;
       coins: number;
@@ -670,21 +670,21 @@ export interface components {
       hpStartToday: number;
       hpMax: number;
       /** Format: date */
-      lastHpDate?: null | string;
+      lastHpDate?: string | null;
       /** Format: date */
-      lastActiveDate?: null | string;
-      capacityBaseline?: null | number;
+      lastActiveDate?: string | null;
+      capacityBaseline?: number | null;
       warmthState: components['schemas']['WarmthState'];
       /** Format: date */
-      crownPeriodStart?: null | string;
-      crownRemaining?: null | number;
-      crownCoinsRemaining?: null | number;
-      displayedTitleId?: null | string;
+      crownPeriodStart?: string | null;
+      crownRemaining?: number | null;
+      crownCoinsRemaining?: number | null;
+      displayedTitleId?: string | null;
       featureFlags: {
         [key: string]: unknown;
       };
       /** Format: date */
-      ocrQuotaDate?: null | string;
+      ocrQuotaDate?: string | null;
       ocrQuotaCount: number;
       deletionState: components['schemas']['DeletionState'];
       /** Format: date-time */
@@ -748,18 +748,18 @@ export interface components {
     };
     OcrParseResponseDto: {
       amount: string;
-      merchant?: null | string;
-      category?: null | string;
+      merchant?: string | null;
+      category?: string | null;
       /** Format: date */
-      date?: null | string;
+      date?: string | null;
       confidence: number;
       /** @description Present only when the structuring call resolved individual line items; the client still offers full/total-only/mix at confirm time */
-      lineItems?: null | components['schemas']['OcrLineItemDto'][];
+      lineItems?: components['schemas']['OcrLineItemDto'][] | null;
     };
     OcrLineItemDto: {
       label: string;
-      amountText?: null | string;
-      amountMinor?: null | number;
+      amountText?: string | null;
+      amountMinor?: number | null;
     };
     OcrQuotaResponseDto: {
       /** @description Daily scan cap (quotas.ocr-daily, tunable) */
@@ -836,7 +836,7 @@ export interface components {
        * @description Drives the "ready tonight" pending-state copy
        */
       expectedBy: string;
-      error?: null | string;
+      error?: string | null;
     };
     AiConsentListResponseDto: {
       /** @description One entry per known consent data class, including classes that have never been granted */
@@ -850,9 +850,9 @@ export interface components {
        * Format: date-time
        * @description Absent when this data class has never been decided; equals `withdrawnAt` when the class was declined without ever being granted
        */
-      grantedAt?: null | string;
+      grantedAt?: string | null;
       /** Format: date-time */
-      withdrawnAt?: null | string;
+      withdrawnAt?: string | null;
     };
     AiConsentUpdateDto: {
       grants: components['schemas']['AiConsentGrantDto'][];
@@ -899,14 +899,14 @@ export interface components {
       /** Format: date-time */
       requestedAt: string;
       /** Format: date-time */
-      completedAt?: null | string;
+      completedAt?: string | null;
       /** @description Presigned `GET` URL for the assembled manifest; present only once `status` is `done` */
-      downloadUrl?: null | string;
+      downloadUrl?: string | null;
       /**
        * Format: date-time
        * @description When the manifest object and this job row are removed by the cleanup sweep
        */
-      expiresAt?: null | string;
+      expiresAt?: string | null;
     };
     /** @enum {string} */
     ExportJobStatus: 'pending' | 'running' | 'done' | 'failed';
