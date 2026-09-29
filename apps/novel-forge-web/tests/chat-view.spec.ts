@@ -16,9 +16,13 @@ import {
   jobView,
   lastUserOrdinal,
   offersNotes,
+  opCardTitle,
   openerChip,
+  opEyebrow,
+  opSubject,
   opTopicLabel,
   opTouchesRecord,
+  opWrittenText,
   opWrittenValue,
   organiseReceiptView,
   pendingDecisionLabel,
@@ -34,6 +38,7 @@ import {
   RETIRES_NOTE,
   rowSource,
   shouldRefocusComposer,
+  SUGGESTED_EYEBROW,
   suggestionCommit,
   turnAnnouncement,
   unansweredWarning,
@@ -57,6 +62,46 @@ describe('opWrittenValue', () => {
 
   it('should fall back to the subject when the op writes no text', () => {
     expect(opWrittenValue({ op: 'milestone.upsert', milestoneKey: 'rank-3' })).toBe('rank-3');
+  });
+});
+
+describe('bible document ops', () => {
+  const doc = { op: 'bible_document.upsert', section: 'project', slug: 'default', frontmatter: { title: 'Project' }, body: '# Heading\n\n**bold**' };
+
+  it('should title the card with the document title instead of the slug', () => {
+    expect(opSubject(doc)).toBe('Project');
+  });
+
+  it('should fall back to the slug when the document has no title', () => {
+    expect(opSubject({ ...doc, frontmatter: { title: '  ' } })).toBe('default');
+    expect(opSubject({ ...doc, frontmatter: undefined })).toBe('default');
+  });
+
+  it('should return the written value alone without the subject prefix', () => {
+    expect(opWrittenText(doc)).toBe('# Heading\n\n**bold**');
+    expect(opWrittenText({ op: 'milestone.upsert', milestoneKey: 'rank-3' })).toBe('rank-3');
+  });
+
+  it('should join topic and subject in the card title unless they are the same', () => {
+    expect(opCardTitle({ op: 'premise.update', premise: 'x' })).toBe('The story: Premise');
+    expect(opCardTitle({ op: 'bible_document.upsert', section: 'project', slug: 'story-core', frontmatter: { title: 'Story core' } })).toBe('Story core');
+  });
+});
+
+describe('opEyebrow', () => {
+  const op = (rationale?: string) => ({ op: 'premise.update', premise: 'x', rationale });
+
+  it('should cite the note paragraphs in the rationale compactly', () => {
+    expect(opEyebrow(op('Organises the setting from notes ¶1, ¶4 and ¶13.'))).toBe('From your notes · ¶1, ¶4, ¶13');
+  });
+
+  it('should keep a paragraph range as written', () => {
+    expect(opEyebrow(op('Draws on ¶4–¶10 of your notes.'))).toBe('From your notes · ¶4–¶10');
+  });
+
+  it('should stay suggested when the rationale cites no paragraph', () => {
+    expect(opEyebrow(op('A fitting ¶ mark, nothing more.'))).toBe(SUGGESTED_EYEBROW);
+    expect(opEyebrow(op())).toBe(SUGGESTED_EYEBROW);
   });
 });
 

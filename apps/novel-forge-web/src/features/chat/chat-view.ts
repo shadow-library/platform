@@ -1,6 +1,7 @@
 import { textDigest } from '@shadow-library/sdk';
 
 import { type ChatJobState, type OrganiseCardEntry, type OrganiseEntryLabel, type OrganiseReceipt } from '@/lib/apis/chat.api';
+import { isRecord } from '@/lib/is-record';
 import {
   type BibleSection,
   type ChatMessageResponse,
@@ -46,7 +47,7 @@ export function opSubject(op: ChangeOp): string {
   if (type === 'volume.upsert') return text(op.title) ?? `Volume ${String(op.volumeKey)}`;
   if (type === 'milestone.upsert') return text(op.label) ?? String(op.milestoneKey);
   if (type === 'brief.update') return text(op.title) ?? `Chapter ${String(op.chapter)}`;
-  if (type === 'bible_document.upsert') return String(op.slug).replace(/[-_]/g, ' ');
+  if (type === 'bible_document.upsert') return text(isRecord(op.frontmatter) ? op.frontmatter.title : undefined) ?? String(op.slug).replace(/[-_]/g, ' ');
   if (type === 'action.plan_chapter') return 'Plan the next chapter';
   if (type === 'action.organise_notes') return 'Organise your notes';
   return text(op.name) ?? String(op.entityKey ?? op.factKey ?? op.op);
@@ -59,6 +60,17 @@ export function opWrittenField(op: ChangeOp): (typeof PROSE_FIELDS)[number] | 'l
   if (text(op.label)) return 'label';
   if (text(op.title)) return 'title';
   return text(op.name) ? 'name' : undefined;
+}
+
+export function opWrittenText(op: ChangeOp): string {
+  const field = opWrittenField(op);
+  return (field ? text(op[field]) : undefined) ?? opSubject(op);
+}
+
+export function opCardTitle(op: ChangeOp): string {
+  const topic = opTopicLabel(op);
+  const subject = opSubject(op);
+  return topic.toLowerCase() === subject.toLowerCase() ? subject : `${topic}: ${subject}`;
 }
 
 export function opWrittenValue(op: ChangeOp): string {
@@ -505,6 +517,14 @@ export interface CardEntryNote {
 
 export function entryNotes(entries: readonly OrganiseCardEntry[]): Map<number, CardEntryNote> {
   return new Map(entries.map(entry => [entry.opIndex, { eyebrow: ENTRY_EYEBROW[entry.label] ?? SUGGESTED_EYEBROW, retires: Boolean(entry.retires?.length) }]));
+}
+
+const NOTES_CITATION = /¶\d+(?:\s*[–-]\s*¶?\d+)?/g;
+
+export function opEyebrow(op: ChangeOp): string {
+  const cited = rationaleOf(op).match(NOTES_CITATION);
+  if (!cited) return SUGGESTED_EYEBROW;
+  return `From your notes · ${cited.join(', ')}`;
 }
 
 export const RETIRES_NOTE = 'Already in your Notebook — declining it takes it out.';

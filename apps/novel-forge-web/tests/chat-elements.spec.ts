@@ -160,6 +160,13 @@ describe('SuggestionCard', () => {
     for (const label of ['Add to Story Bible', 'Edit first', 'Not this']) expect(card).toContain(label);
   });
 
+  it('should cite the notes paragraphs when there is no organise entry, and render the body as markdown', () => {
+    const card = suggestion({ op: { ...COUNCIL, body: 'Families who **trade** memories.', rationale: 'Straight from ¶3 and ¶5–¶6.' }, note: undefined });
+    expect(card).toContain('From your notes · ¶3, ¶5–¶6');
+    expect(card).toContain('Factions &amp; peoples: The Tidewarden’s council');
+    expect(card).toContain('<strong>trade</strong>');
+  });
+
   it('should carry an organise label instead of the default eyebrow, and say when declining retires a Notebook entry', () => {
     expect(suggestion({ note: { eyebrow: 'A rule from your notes', retires: false } })).toContain('A rule from your notes');
     expect(suggestion({ note: { eyebrow: 'A rule from your notes', retires: true } })).toContain('declining it takes it out');

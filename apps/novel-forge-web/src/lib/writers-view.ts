@@ -1,4 +1,5 @@
 import { type WriterAttemptRole, type WriterSnapshotDetailResponse, type WriterSnapshotSummaryResponse } from '@/lib/apis';
+import { isRecord } from '@/lib/is-record';
 
 const ROLE_LABELS: Record<WriterAttemptRole, string> = {
   draft: 'First draft',
@@ -68,10 +69,6 @@ const FIELD_LABELS: Record<string, string> = {
   note: 'your notes',
   plugin: 'plugin material',
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** `keptBack` is stored as the server recorded it at writing time, so every field is narrowed rather than trusted. */
 export function keptBackView(keptBack: WriterSnapshotDetailResponse['keptBack']): KeptBackView {

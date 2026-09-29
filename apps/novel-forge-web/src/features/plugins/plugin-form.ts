@@ -1,3 +1,5 @@
+import { isRecord } from '@/lib/is-record';
+
 export type PluginFieldType = 'string' | 'number' | 'boolean';
 
 export type PluginFieldWidget = 'input' | 'textarea' | 'checkbox' | 'select';
@@ -20,10 +22,6 @@ export interface PluginForm {
 export type PluginFormValues = Record<string, string | boolean>;
 
 const FIELD_TYPES: PluginFieldType[] = ['string', 'number', 'boolean'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function toStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || value.length === 0) return undefined;

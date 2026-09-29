@@ -1,15 +1,18 @@
 import { Button, Textarea } from '@shadow-library/ui';
 
+import { Markdown } from '@/components/nf/Markdown';
 import { type ChangeOp } from '@/lib/proposals';
 
 import {
   type CardEntryNote,
   type CommitBarView,
   isActionOp,
+  opCardTitle,
+  opEyebrow,
   opSubject,
   opTopicLabel,
   opWrittenField,
-  opWrittenValue,
+  opWrittenText,
   pendingDecisionLabel,
   rationaleOf,
   REJECTION_SCOPE_LABEL,
@@ -17,7 +20,6 @@ import {
   rejectionScopeNote,
   rejectionScopesFor,
   RETIRES_NOTE,
-  SUGGESTED_EYEBROW,
   type SuggestionDecision,
 } from './chat-view';
 import styles from './Chat.module.css';
@@ -111,12 +113,10 @@ export function SuggestionCard(props: SuggestionCardProps): React.JSX.Element {
 
   return (
     <section className={styles.suggestion} aria-label={`Suggestion: ${subject}`}>
-      <span className={styles.suggestionEyebrow}>{note?.eyebrow ?? SUGGESTED_EYEBROW}</span>
-      <span className={styles.suggestionTitle}>
-        {topic}: {subject}
-      </span>
+      <span className={styles.suggestionEyebrow}>{note?.eyebrow ?? opEyebrow(op)}</span>
+      <span className={styles.suggestionTitle}>{opCardTitle(op)}</span>
       {draft === undefined ? (
-        <span className={styles.suggestionBody}>{opWrittenValue(op)}</span>
+        <Markdown className={styles.suggestionBody} content={opWrittenText(op)} />
       ) : (
         <div className={styles.editFirst}>
           <Textarea aria-label={`Edit “${subject}” before adding`} value={draft} onValueChange={props.onDraftChange} minRows={2} maxRows={8} autoGrow />

@@ -10,7 +10,8 @@ async function serverWindow(): Promise<WindowLike> {
   return new JSDOM('').window as unknown as WindowLike;
 }
 
-const sanitize = createHtmlSanitizer(import.meta.env.SSR ? await serverWindow() : (globalThis.window as unknown as WindowLike));
+// bun test leaves import.meta.env.SSR undefined; `!== false` keeps jsdom out of the client bundle while still loading it there
+const sanitize = createHtmlSanitizer(import.meta.env.SSR !== false ? await serverWindow() : (globalThis.window as unknown as WindowLike));
 
 export function sanitizeHtml(dirty: string): string {
   return sanitize(dirty);
