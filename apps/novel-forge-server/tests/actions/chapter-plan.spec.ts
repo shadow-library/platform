@@ -363,7 +363,7 @@ describe('chapterPlanPrompt', () => {
   it('should be a new versioned planner that plans one chapter with a point of view per scene, intent first', () => {
     const human = JSON.stringify(chapterPlanPrompt.template);
 
-    expect([chapterPlanPrompt.key, chapterPlanPrompt.version, chapterPlanPrompt.role]).toEqual(['chapter-plan', '1.0.0', 'outline']);
+    expect([chapterPlanPrompt.key, chapterPlanPrompt.version, chapterPlanPrompt.role]).toEqual(['chapter-plan', '1.1.0', 'outline']);
     expect(chapterPlanPrompt.system).toContain('You plan ONE chapter');
     expect(chapterPlanPrompt.system).toContain('Each scene names its point of view');
     expect(human.indexOf('{authorIntent}')).toBeLessThan(human.indexOf('{chosenDirection}'));
@@ -445,7 +445,7 @@ describe('ChapterPlanService', () => {
       milestones: expect.stringContaining('claiming it unlocks: lamp_origin'),
     });
     expect(calls[0]?.vars['catalog']).toContain('## Chapter 3: The Gate');
-    expect(calls[0]?.ctx).toMatchObject({ promptKey: 'chapter-plan', promptVersion: '1.0.0', runId: 'run-1', chapter: 4 });
+    expect(calls[0]?.ctx).toMatchObject({ promptKey: 'chapter-plan', promptVersion: '1.1.0', runId: 'run-1', chapter: 4 });
     expect(op).toMatchObject({ chapter: 4, direction: 'Mara tests the lamp', pov: 'mara' });
   });
 

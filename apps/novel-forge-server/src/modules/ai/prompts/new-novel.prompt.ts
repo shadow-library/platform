@@ -9,7 +9,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nYou are a novel architect generat
 
 export const newNovelPrompt: PromptModule<BibleStageOutput> = {
   key: 'new-novel',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   role: 'bible',
   system,

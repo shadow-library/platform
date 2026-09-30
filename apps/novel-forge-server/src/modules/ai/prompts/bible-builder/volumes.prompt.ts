@@ -10,7 +10,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the volume plan overview
 
 export const volumesPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:volumes',
-  version: '2.1.0',
+  version: '2.2.0',
   kind: 'authoring',
   role: 'bible',
   system,

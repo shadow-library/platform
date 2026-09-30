@@ -253,7 +253,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.14.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.15.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -263,6 +263,22 @@ describe('Prompt modules', () => {
       expect(hub).toContain('ending is PLANNER-ONLY');
       expect(hub).toContain('outrank every summary');
       expect(hub).toContain('raise it as a `question` card');
+    });
+
+    it('should judge a choice by its effect on the reader, never by whether it serves a theme', () => {
+      const system = PROMPT_REGISTRY['chat-refine'].system;
+      expect(system).toContain('never one that merely fails to serve a theme');
+      expect(system).toContain('Characters decide as people');
+      expect(system).toContain('a personal motive never licenses writing someone out of character');
+      expect(system).toContain('never pad the card with a contrarian answer');
+      expect(system).toContain('never the reason another is weaker');
+      expect(system).toContain('never argue a theme back at them');
+      expect(HUB_INSTRUCTIONS).toContain("A character's motivation is what they want now, in personal terms");
+      expect(HUB_INSTRUCTIONS).toContain('what a lead wants for themselves');
+    });
+
+    it('should keep the themes, the destination and stated ideals out of the canon a character must obey', () => {
+      for (const p of [PROMPT_REGISTRY['chat-refine'], PROMPT_REGISTRY.fix]) expect(p.system).toContain("a character's stated ideals are not rules a character must obey");
     });
 
     it('fetches the draft and the review before critiquing a hand-written chapter, naming the revision', () => {

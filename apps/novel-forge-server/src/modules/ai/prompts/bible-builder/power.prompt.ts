@@ -10,7 +10,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the power-system bible d
 
 export const powerPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:power',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'bible',
   system,

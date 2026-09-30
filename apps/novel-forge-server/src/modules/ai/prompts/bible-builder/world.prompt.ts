@@ -10,7 +10,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the setting bible docume
 
 export const worldPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:world',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'bible',
   system,

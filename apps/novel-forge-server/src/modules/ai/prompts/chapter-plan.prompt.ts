@@ -36,7 +36,7 @@ Respond with ONLY one valid JSON object, nothing outside it and no markdown fenc
 
 export const chapterPlanPrompt: PromptModule<ChapterPlanOutput> = {
   key: 'chapter-plan',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'outline',
   system,

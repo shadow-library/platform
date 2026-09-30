@@ -13,7 +13,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\n${EDIT_BY_DELETION}\n\nYou are a 
 
 export const premiseEnhancePrompt: PromptModule<PremiseEnhanceOutput> = {
   key: 'premise-enhance',
-  version: '1.2.0',
+  version: '1.3.0',
   kind: 'authoring',
   role: 'premise',
   cacheStrategy: { stableVars: ['stableContext'] },

@@ -22,7 +22,7 @@ The catalog's CANON FACTS section lists every fact the story holds, revealed and
 
 export const outlinePrompt: PromptModule<OutlineOutput> = {
   key: 'outline',
-  version: '3.2.0',
+  version: '3.3.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

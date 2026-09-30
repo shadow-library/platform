@@ -10,7 +10,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the escalation map. Cove
 
 export const plotPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:plot',
-  version: '2.0.0',
+  version: '2.1.0',
   kind: 'authoring',
   role: 'bible',
   system,

@@ -11,7 +11,7 @@ const system = `${AUTHORING_STYLE_REPAIR}\n\n${EDIT_BY_DELETION}\n\nYou are rewr
 
 export const passageRewritePrompt: PromptModule<PassageRewriteOutput> = {
   key: 'passage-rewrite',
-  version: '1.0.0',
+  version: '1.1.0',
   kind: 'authoring',
   role: 'revision',
   system,

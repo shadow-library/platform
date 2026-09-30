@@ -74,9 +74,8 @@ describe('ModelRouterService cacheStrategy integration', () => {
 
     const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];
     expect(messages[0]?.getType()).toBe('system');
-    // The chat system prompt sits below the 1024-token cacheable minimum, so only the stable
-    // scope-context human message earns a breakpoint here.
-    expect(typeof messages[0]?.content).toBe('string');
+    expect(countTokens(chatRefinePrompt.system)).toBeGreaterThanOrEqual(MIN_CACHEABLE_TOKENS);
+    expect(cacheControlOf(messages[0]?.content)).toEqual({ type: 'ephemeral' });
     expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
     expect(typeof messages[messages.length - 1]?.content).toBe('string');
   });

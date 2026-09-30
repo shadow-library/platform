@@ -12,7 +12,7 @@ export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 - Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
 
 const VOICE_AND_CANON_RULES = `- Maintain established character voice and speech patterns exactly as recorded in their entity card.
-- Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
+- Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot. Canon is the world's rules and what has already happened; the themes, where the story ends up, and a character's stated ideals are not rules a character must obey in a given scene.`;
 
 // Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
 // but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any

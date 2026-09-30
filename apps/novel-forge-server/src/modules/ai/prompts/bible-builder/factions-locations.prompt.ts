@@ -10,7 +10,7 @@ const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the factions and locatio
 
 export const factionsLocationsPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:factions-locations',
-  version: '2.0.0',
+  version: '2.1.0',
   kind: 'authoring',
   role: 'bible',
   system,

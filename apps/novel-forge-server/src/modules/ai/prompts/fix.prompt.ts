@@ -26,7 +26,7 @@ const fewShots = [
 
 export const fixPrompt: PromptModule<FixOutput> = {
   key: 'fix',
-  version: '1.4.0',
+  version: '1.5.0',
   kind: 'authoring',
   system,
   // Few-shots ride inside the template — a fewShots field the router never injects teaches nothing.
