@@ -26,8 +26,7 @@ function cacheControlOf(content: unknown): unknown {
 
 describe('applyAnthropicCacheControl', () => {
   it('marks system, first human, and the last prior-turn message — never the volatile tail', () => {
-    const messages = [new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)];
-    applyAnthropicCacheControl(messages);
+    const messages = applyAnthropicCacheControl([new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)]);
 
     expect(cacheControlOf(messages[0]?.content)).toEqual({ type: 'ephemeral' });
     expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
@@ -36,12 +35,19 @@ describe('applyAnthropicCacheControl', () => {
   });
 
   it('leaves blocks below the minimum cacheable size unmarked', () => {
-    const messages = [new SystemMessage(smallText), new HumanMessage(bigText), new HumanMessage(smallText)];
-    applyAnthropicCacheControl(messages);
+    const messages = applyAnthropicCacheControl([new SystemMessage(smallText), new HumanMessage(bigText), new HumanMessage(smallText)]);
 
     expect(typeof messages[0]?.content).toBe('string');
     expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
     expect(typeof messages[2]?.content).toBe('string');
+  });
+
+  it('should mark copies, leaving the messages it was given untouched', () => {
+    const shared = new SystemMessage(bigText);
+    const [marked] = applyAnthropicCacheControl([shared, new HumanMessage(smallText)]);
+
+    expect(cacheControlOf(marked?.content)).toEqual({ type: 'ephemeral' });
+    expect(shared.content).toBe(bigText);
   });
 });
 
@@ -105,8 +111,7 @@ describe('ModelRouterService cacheStrategy integration', () => {
 // which is what carries `cache_control` onto the wire in the shape OpenRouter forwards to Anthropic.
 describe('cache_control wire shape through ChatOpenAI', () => {
   it('survives the completions-params conversion as a text part carrying cache_control', () => {
-    const messages = [new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)];
-    applyAnthropicCacheControl(messages);
+    const messages = applyAnthropicCacheControl([new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)]);
 
     const params = convertMessagesToCompletionsMessageParams({ messages, model: 'anthropic/claude-sonnet-5' });
 
