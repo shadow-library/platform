@@ -6,7 +6,7 @@ import { AUTHORING_STYLE_PLANNING, BIBLE_STAGE_OUTPUT_SHAPE } from '../authoring
 import { type PromptModule } from '../types';
 import { renderStageContract, validateStageCoverage } from './stage-contract';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the volume plan overview. For each planned volume: its goal, the part of the story it covers, the central antagonist force, the conflict it raises and the payoff it owes the reader by its end, the protagonist's emotional state entering and leaving it, and the power-level benchmarks. This is prose, not a structured plan — write it as an author's guide to the novel's shape.\n\n${renderStageContract('volumes')}\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
+const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the volume plan overview. For each planned volume: its goal, the part of the story it covers, the central opposing force (a person, a faction, or the situation itself), the conflict it raises and the payoff it owes the reader by its end, the protagonist's emotional state entering and leaving it, and the power-level benchmarks. This is prose, not a structured plan — write it as an author's guide to the novel's shape.\n\n${renderStageContract('volumes')}\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
 
 export const volumesPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:volumes',

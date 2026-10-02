@@ -6,7 +6,7 @@ import { AUTHORING_STYLE_PLANNING, BIBLE_STAGE_OUTPUT_SHAPE } from '../authoring
 import { type PromptModule } from '../types';
 import { renderStageContract, validateStageCoverage } from './stage-contract';
 
-const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the factions and locations bible document. For each major faction: its goals, methods, internal structure, and relationship to the protagonist and antagonist forces — and why it collides with the others rather than coexisting. For each major location: what it looks, sounds, and feels like, why it matters to the plot, and who controls it. Include only factions and locations that will appear in the story.\n\n${renderStageContract('factionsAndLocations')}\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
+const system = `${AUTHORING_STYLE_PLANNING}\n\nGenerate the factions and locations bible document. For each major faction: its goals, methods, internal structure, and relationship to the protagonist and to whatever opposes them — and why it collides with the others rather than coexisting. For each major location: what it looks, sounds, and feels like, why it matters to the plot, and who controls it. Include only factions and locations that will appear in the story.\n\n${renderStageContract('factionsAndLocations')}\n\n${BIBLE_STAGE_OUTPUT_SHAPE}`;
 
 export const factionsLocationsPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:factions-locations',

@@ -769,8 +769,9 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
   A stage whose document already has a body is **skipped** unless `force: true` (`counts[stage] = 0`, still in `stagesDone`).
   **Quality:** every character entity's `body` must carry a want, a wound/cost and a voice tic concrete enough to write
   dialogue from; `power/system-and-limits` must state what the power _cannot_ do and what breaking a rule costs;
-  `project/cast` must name a protagonist, an antagonist and the relationships that generate conflict — a cast document
-  with no antagonist is the classic weak output here.
+  `project/cast` must name a protagonist, what opposes them and the relationships that generate conflict. The opposition
+  may be a person, a faction or the situation itself — a survival story needs no antagonist — but a cast document that
+  names no pressure at all is the classic weak output here.
 - **Fails when:** repeated `model_calls` rows with `attempt=1` on one stage — the coverage floor was missed and the
   reply was retried; a stage silently skipped because its document already had a body (`project/premise`,
   `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`; an HTTP timeout at the
@@ -894,7 +895,7 @@ any document body.
 moves through `premise.update`, and `project/premise` grows past the 250-word substance floor only if the model also
 staged a `bible_document.upsert` — note which it did ☐ the enhanced premise still never states the ending.
 
-**Stage 10 — compare.** Export the seven manifest documents + the entity roster and diff against your baseline bible on: antagonist presence, a named cost for every power rule, per-character want/wound/voice, escalation stated per
+**Stage 10 — compare.** Export the seven manifest documents + the entity roster and diff against your baseline bible on: a named opposing pressure, a named cost for every power rule, per-character want/wound/voice, escalation stated per
 volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
 
 ---

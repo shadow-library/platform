@@ -105,7 +105,7 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
     purpose: 'the cast: who carries the story, what each wants, and the relationships that generate conflict',
     materializes: ['character'],
     minEntities: 3,
-    requiredTopics: ['protagonist', 'antagonist', 'supporting cast', 'relationships'],
+    requiredTopics: ['protagonist', 'opposition', 'supporting cast', 'relationships'],
     role: {
       label: 'Cast',
       sections: ['project', 'ai', 'lore'],

@@ -79,7 +79,8 @@
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
 - **Start**: a new novel is a title (never blank; the web names an untitled one) plus notes of at most 10,000 words, created with its first chat in one transaction. The progress
   map ("Ready for chapter 1") is advice, never a gate; an item marked undecided or dismissed is recorded under a reserved Notebook topic that never reads as an author decision or
-  a do-not-propose rule.
+  a do-not-propose rule. An answer the author picks is written to the story field its question settles, which closes the item, and the chat moves on to the next one.
+  Opposition is whatever pushes back — a person or faction, or the situation itself — and a story with no antagonist is a shape the chat supports, not a gap it fills.
 - A turn streams its reply and, as each proposed change is written, that change's name and Story Bible group (never its body). Both are provisional and belong to the reply
   being written: a replaced reply (a retry, repair or lookup round) voids them, and only the settled turn says what was applied or carded.
 - **A running turn is a chronological timeline** (reading, thinking, the reply, changes as they are written) whose live status is always its last line. The settled turn result is
