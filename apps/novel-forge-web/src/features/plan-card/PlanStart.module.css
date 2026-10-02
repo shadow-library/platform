@@ -6,10 +6,6 @@
   min-width: 0;
 }
 
-.start[data-indent] {
-  margin-left: 40px;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -97,12 +93,6 @@
 
   .row .aside {
     flex-basis: 100%;
-    margin-left: 0;
-  }
-}
-
-@media (max-width: 760px) {
-  .start[data-indent] {
     margin-left: 0;
   }
 }

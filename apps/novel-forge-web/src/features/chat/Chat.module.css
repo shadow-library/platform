@@ -174,26 +174,7 @@
   color: var(--sh-text-tertiary);
 }
 
-.assistantRow {
-  display: flex;
-  gap: 12px;
-}
-
-.avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-700));
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sh-neutral-white);
-}
-
 .assistantCol {
-  flex: 1;
-  max-width: 88%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -687,7 +668,6 @@ button.turnRow:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-left: 40px;
   min-width: 0;
 }
 
@@ -1164,18 +1144,6 @@ button.turnRow:hover {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .avatar {
-    display: none;
-  }
-
-  .indented {
-    margin-left: 0;
-  }
-
-  .assistantCol {
-    max-width: 100%;
   }
 
   .checklistItems,

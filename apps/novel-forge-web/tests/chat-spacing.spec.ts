@@ -72,9 +72,11 @@ const CHAT: Expected[] = [
   { selector: '.userCol', values: { gap: '8px', 'max-width': '86%' }, source: 'chat.module.css max 86%; Main l.102 user column gap 8 (bubble → notes chip)' },
   { selector: '.userBubble', values: { padding: '11px 14px', 'border-radius': '14px 14px 4px 14px' }, baseline: '.userBubble', source: 'chat.module.css .userBubble; Main l.103' },
   { selector: '.userTime', values: { 'margin-top': '-4px' }, source: 'chat.module.css .userTime margin-top 4 — net 4 under the column gap 8' },
-  { selector: '.assistantRow', values: { gap: '12px' }, baseline: '.assistantRow', source: 'chat.module.css .assistantRow; Main l.107' },
-  { selector: '.avatar', values: { width: '28px', height: '28px', 'border-radius': '8px' }, baseline: '.avatar', source: 'chat.module.css .avatar; Main l.108' },
-  { selector: '.assistantCol', values: { 'max-width': '88%', gap: '8px' }, source: 'chat.module.css max 88% + .streamCol gap 8 / .turnCard margin-top 8' },
+  {
+    selector: '.assistantCol',
+    values: { gap: '8px' },
+    source: 'chat.module.css .streamCol gap 8 / .turnCard margin-top 8; no avatar and no width cap — the reply reads as a page',
+  },
   { selector: '.jumpDock', values: { height: '0' }, source: 'chat redesign .jump: pinned to the thread’s bottom edge, taking no room' },
   { selector: '.jump.jump[data-size]', values: { 'border-radius': 'var(--sh-radius-full)' }, source: 'chat redesign .jump pill radius 999px' },
   { selector: '.turnRow', values: { gap: '8px', width: 'fit-content', 'max-width': '100%', padding: '4px 0' }, source: 'chat redesign .trow' },
@@ -126,7 +128,7 @@ const CHAT: Expected[] = [
   { selector: '.cardActions', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardActions', source: 'Main l.139 actions; chat.module.css .turnCardActions' },
   { selector: '.notice', values: { gap: '8px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.165 declined notice; l.146 undone notice padding' },
   { selector: '.willAdd', values: { gap: '10px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.162 accepted strip, before the card commits' },
-  { selector: '.indented', values: { gap: '8px', 'margin-left': '40px' }, source: 'NextChapter l.84 margin-left 40 under the avatar (28 + gap 12); gap 8 as .assistantCol' },
+  { selector: '.indented', values: { gap: '8px' }, source: 'gap 8 as .assistantCol; no avatar, so no indent' },
   { selector: '.composerNotice', values: { gap: '8px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'Main l.214 strip padding 8px 10px radius 6' },
   { selector: '.impact', values: { gap: '12px' }, source: 'rule 6: 12 inside cards' },
   { selector: '.impactList', values: { margin: '0', padding: '0', gap: '6px' }, source: 'NextChapter l.76 owed list gap 6' },
@@ -177,9 +179,7 @@ const CHAT: Expected[] = [
 ];
 
 const CHAT_PHONE: Expected[] = [
-  { selector: '.indented', values: { 'margin-left': '0' }, source: 'Phone: no avatar, so no indent (as the plan card)' },
   { selector: '.headLabel', values: { width: '1px', height: '1px' }, source: 'visually hidden label: icon buttons keep their names at 390' },
-  { selector: '.assistantCol', values: { 'max-width': '100%' }, source: 'Phone transcript: replies run the full column, no avatar' },
   { selector: '.checklistItems, .questionOptions', values: { 'grid-template-columns': 'minmax(0, 1fr)' }, source: 'Phone one column' },
   { selector: '.appliedRow', values: { gap: '2px' }, source: 'Main l.120 value → quote gap 2, stacked on phone' },
   { selector: '.appliedTopic', values: { width: 'auto', 'padding-top': '0' }, source: 'topic stacked above the value on phone' },
@@ -342,14 +342,13 @@ describe('Chat width arithmetic', () => {
   const sidePad = px(base.get('.scroll')?.padding, 1);
   const listMax = px(base.get('.msgList')?.['max-width']);
   const cardPad = px(base.get('.cardHead')?.padding, 1);
-  const avatar = px(base.get('.avatar')?.width) + px(base.get('.assistantRow')?.gap);
   const optionGap = px(base.get('.questionOptions')?.gap);
 
   const layout = (viewport: number): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
     const content = viewport >= 768 ? viewport - SIDEBAR : viewport;
     const list = Math.min(content - 2 * sidePad, listMax);
     const isPhone = viewport <= PHONE;
-    const reply = isPhone ? list : Math.min(list - avatar, list * 0.88);
+    const reply = list;
     const columns = isPhone ? 1 : 3;
     const option = (reply - optionGap * (columns - 1)) / columns;
     const checklistCell = isPhone ? list - 2 * 14 : (list - 2 * 14 - 20) / 2;
@@ -369,8 +368,8 @@ describe('Chat width arithmetic', () => {
   });
 
   it('should keep every block readable at 768, 1024 and 1280', () => {
-    expect(layout(768)).toEqual({ list: 474, reply: 417.12, option: 133.70666666666668, checklistCell: 213, appliedText: 287.12 });
-    expect(layout(1024)).toEqual({ list: 720, reply: 633.6, option: 205.86666666666667, checklistCell: 336, appliedText: 503.6 });
+    expect(layout(768)).toEqual({ list: 474, reply: 474, option: 152.66666666666666, checklistCell: 213, appliedText: 344 });
+    expect(layout(1024)).toEqual({ list: 720, reply: 720, option: 234.66666666666666, checklistCell: 336, appliedText: 590 });
     expect(layout(1280)).toEqual(layout(1024));
     expect(layout(1920)).toEqual(layout(1024));
     for (const viewport of [768, 1024, 1280]) expect(layout(viewport).option).toBeGreaterThanOrEqual(120);

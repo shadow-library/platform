@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, toast } from '@shadow-library/ui';
 
-import { BookIcon, ChevronDownIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
+import { ChevronDownIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { Markdown } from '@/components/nf/Markdown';
@@ -689,31 +689,26 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 ),
               )}
               {showStream && (
-                <div className={styles.assistantRow}>
-                  <div className={styles.avatar}>
-                    <BookIcon size={15} />
-                  </div>
-                  <LiveStreamedTurn
-                    stream={stream}
-                    mode={mode}
-                    onProgress={openProgress}
-                    receipt={
-                      stream.status === 'done' && (
-                        <TurnReceipt
-                          novelId={novelId}
-                          appliedProposalId={stream.turn.appliedProposal?.id}
-                          proposalId={stream.turn.proposal?.id}
-                          applied={stream.turn.appliedProposal}
-                          cards={stream.turn.proposal}
-                          held={stream.turn.held}
-                          onReview={() => reviewInPanel(stream.turn.assistantMessage.id)}
-                          onApplied={onApplied}
-                        />
-                      )
-                    }
-                    footer={stream.status === 'done' ? <MessageModelTag message={stream.turn.assistantMessage} worked={finishedWorked} /> : undefined}
-                  />
-                </div>
+                <LiveStreamedTurn
+                  stream={stream}
+                  mode={mode}
+                  onProgress={openProgress}
+                  receipt={
+                    stream.status === 'done' && (
+                      <TurnReceipt
+                        novelId={novelId}
+                        appliedProposalId={stream.turn.appliedProposal?.id}
+                        proposalId={stream.turn.proposal?.id}
+                        applied={stream.turn.appliedProposal}
+                        cards={stream.turn.proposal}
+                        held={stream.turn.held}
+                        onReview={() => reviewInPanel(stream.turn.assistantMessage.id)}
+                        onApplied={onApplied}
+                      />
+                    )
+                  }
+                  footer={stream.status === 'done' ? <MessageModelTag message={stream.turn.assistantMessage} worked={finishedWorked} /> : undefined}
+                />
               )}
               {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={content => sendTurn(content)} />}
               {looseJobs.length > 0 && (
@@ -755,7 +750,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               {planStartOpen && (
                 <PlanStart
                   chapter={nextChapter}
-                  indent
                   busy={busy || startNextDraft.isPending}
                   onPlanFromIntent={intent => askForPlan(`Plan chapter ${nextChapter}: ${intent}`)}
                   onEmptyPlan={() => askForPlan(`Start an empty plan for chapter ${nextChapter} with the plan action — I’ll fill it in myself.`)}
@@ -832,13 +826,11 @@ interface TranscriptPlanCardProps {
   actions: TranscriptActions;
 }
 
-/** Always a direct child of the transcript list: the card sets its own indent under the avatar and drops it below 760px. */
 function TranscriptPlanCard({ novelId, proposalId, nextChapter, actions }: TranscriptPlanCardProps): React.JSX.Element {
   return (
     <ChatPlanCard
       projectId={novelId}
       proposalId={proposalId}
-      indent
       onAskForChanges={() => actions.sendTurn(`Let’s change the plan for chapter ${nextChapter}.`)}
       onPlanAgain={() => actions.sendTurn(`Plan chapter ${nextChapter} again from scratch.`)}
       onWriting={actions.onWriting}
@@ -934,7 +926,7 @@ interface AssistantMessageProps {
   actions: TranscriptActions;
 }
 
-/** A reply row, then any plan card it staged as a sibling in the transcript — a plan card never sits inside the row's flex column. */
+/** A reply, then any plan card it staged as a sibling in the transcript — a plan card never sits inside the reply's flex column. */
 const AssistantMessage = memo(function AssistantMessage({
   novelId,
   message,
@@ -956,44 +948,39 @@ const AssistantMessage = memo(function AssistantMessage({
   const ownCard = Boolean(message.proposalId) && turnCardsInline(staged.data, staged.isLoading);
   return (
     <>
-      <div className={styles.assistantRow}>
-        <div className={styles.avatar}>
-          <BookIcon size={15} />
-        </div>
-        <div className={styles.assistantCol}>
-          {timeline && <TurnTrace rows={timeline.trace} />}
-          {content && (
-            <div>
-              <Markdown content={content} className={styles.assistantReply} />
-              <MessageModelTag message={message} worked={timeline?.worked} />
-            </div>
-          )}
-          {!content && timeline?.worked && <MessageModelTag message={message} worked={timeline.worked} />}
-          {(message.appliedProposalId || (message.proposalId && !isPlan)) && (
-            <TurnReceipt
-              novelId={novelId}
-              appliedProposalId={message.appliedProposalId ?? undefined}
-              proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
-              held={held}
-              onReview={() => actions.reviewInPanel(message.id)}
-              onApplied={actions.onApplied}
-            />
-          )}
-          {ownCard && message.proposalId && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
-          {question && (
-            <QuestionCard
-              key={`${message.id}:question`}
-              question={question}
-              settled={settledQuestions}
-              disabled={busy}
-              onPick={actions.answer}
-              onUndecided={() => actions.leaveUndecided(question.progressKey)}
-            />
-          )}
-          {jobs.map(job => (
-            <TranscriptJob key={job.id} novelId={novelId} job={job} stream={streamStatus} cancelling={cancellingJob === job.id} notes={notes} busy={busy} actions={actions} />
-          ))}
-        </div>
+      <div className={styles.assistantCol}>
+        {timeline && <TurnTrace rows={timeline.trace} />}
+        {content && (
+          <div>
+            <Markdown content={content} className={styles.assistantReply} />
+            <MessageModelTag message={message} worked={timeline?.worked} />
+          </div>
+        )}
+        {!content && timeline?.worked && <MessageModelTag message={message} worked={timeline.worked} />}
+        {(message.appliedProposalId || (message.proposalId && !isPlan)) && (
+          <TurnReceipt
+            novelId={novelId}
+            appliedProposalId={message.appliedProposalId ?? undefined}
+            proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
+            held={held}
+            onReview={() => actions.reviewInPanel(message.id)}
+            onApplied={actions.onApplied}
+          />
+        )}
+        {ownCard && message.proposalId && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
+        {question && (
+          <QuestionCard
+            key={`${message.id}:question`}
+            question={question}
+            settled={settledQuestions}
+            disabled={busy}
+            onPick={actions.answer}
+            onUndecided={() => actions.leaveUndecided(question.progressKey)}
+          />
+        )}
+        {jobs.map(job => (
+          <TranscriptJob key={job.id} novelId={novelId} job={job} stream={streamStatus} cancelling={cancellingJob === job.id} notes={notes} busy={busy} actions={actions} />
+        ))}
       </div>
       {isPlan && message.proposalId && <TranscriptPlanCard novelId={novelId} proposalId={message.proposalId} nextChapter={nextChapter} actions={actions} />}
       {jobs.filter(isPlanJob).map(job => (

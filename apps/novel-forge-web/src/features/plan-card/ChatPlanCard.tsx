@@ -10,8 +10,6 @@ import { usePlanCard } from './use-plan-card';
 export interface ChatPlanCardProps {
   projectId: string;
   proposalId: string;
-  /** Sets the canvas's 40px indent under the assistant's avatar. */
-  indent?: boolean;
   onAskForChanges?: () => void;
   onPlanAgain?: () => void;
   onWriting?: (job: JobEnqueueResponse) => void;
@@ -19,7 +17,7 @@ export interface ChatPlanCardProps {
 
 const ENTITY_LIMIT = 500;
 
-export function ChatPlanCard({ projectId, proposalId, indent, onAskForChanges, onPlanAgain, onWriting }: ChatPlanCardProps): React.JSX.Element {
+export function ChatPlanCard({ projectId, proposalId, onAskForChanges, onPlanAgain, onWriting }: ChatPlanCardProps): React.JSX.Element {
   const card = usePlanCard(projectId, proposalId, onWriting);
   const [dirty, setDirty] = useState(false);
   const entities = useListEntitiesQuery(projectId, { limit: ENTITY_LIMIT });
@@ -45,7 +43,6 @@ export function ChatPlanCard({ projectId, proposalId, indent, onAskForChanges, o
   return (
     <PlanCard
       {...card}
-      indent={indent}
       loading={card.loading || entities.isLoading || project.isLoading || (replanning && brief.isLoading)}
       characters={characters}
       milestones={milestones.data?.milestones ?? []}

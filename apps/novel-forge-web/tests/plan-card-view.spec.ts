@@ -210,11 +210,6 @@ describe('PlanCard', () => {
     expect(partial).not.toContain('still missing');
     expect(card().match(/role="status"/g)).toHaveLength(1);
   });
-
-  it('should take the canvas indent only when asked', () => {
-    expect(card({ indent: true })).toContain('data-indent="true"');
-    expect(card()).not.toContain('data-indent');
-  });
 });
 
 function start(overrides: Partial<PlanStartProps> = {}): string {

@@ -21,8 +21,6 @@ export interface PlanStartProps {
   directions?: readonly PlanDirection[];
   /** The direction a plan is being made from, shown picked. */
   picked?: string;
-  /** Sets the canvas's 40px indent under the assistant's avatar. */
-  indent?: boolean;
   /** A plan action is already starting; every path waits for it. */
   busy?: boolean;
   onPickDirection?: (direction: PlanDirection) => void;
@@ -33,14 +31,14 @@ export interface PlanStartProps {
 
 type Phase = 'choose' | 'intent' | 'manual';
 
-export function PlanStart({ chapter, directions = [], picked, indent, busy, onPickDirection, onPlanFromIntent, onEmptyPlan, onWriteMyself }: PlanStartProps): React.JSX.Element {
+export function PlanStart({ chapter, directions = [], picked, busy, onPickDirection, onPlanFromIntent, onEmptyPlan, onWriteMyself }: PlanStartProps): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>('choose');
   const [intent, setIntent] = useState('');
   const intentId = useId();
 
   if (phase === 'intent')
     return (
-      <div className={styles.start} data-indent={indent || undefined}>
+      <div className={styles.start}>
         <form
           aria-label={`Your idea for chapter ${chapter}`}
           className={styles.panel}
@@ -68,7 +66,7 @@ export function PlanStart({ chapter, directions = [], picked, indent, busy, onPi
 
   if (phase === 'manual')
     return (
-      <div className={styles.start} data-indent={indent || undefined}>
+      <div className={styles.start}>
         <section aria-label={`Write chapter ${chapter} yourself`} className={styles.panel}>
           <span className={styles.panelTitle}>Chapter {chapter} — your draft</span>
           <span className={styles.body}>
@@ -88,7 +86,7 @@ export function PlanStart({ chapter, directions = [], picked, indent, busy, onPi
     );
 
   return (
-    <div className={styles.start} data-indent={indent || undefined}>
+    <div className={styles.start}>
       {directions.length > 0 && (
         <div role="group" aria-label={`Ways chapter ${chapter} could go`} className={styles.grid}>
           {directions.map((direction, index) => (

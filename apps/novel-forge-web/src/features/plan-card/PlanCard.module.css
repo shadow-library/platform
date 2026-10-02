@@ -2,7 +2,7 @@
   width: 100%;
   min-width: 0;
   max-width: 720px;
-  margin-top: 8px;
+  margin-top: 0;
   overflow: hidden;
   border: var(--sh-border-width) solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
@@ -18,13 +18,6 @@
 
 .card[data-status='conflicted'] {
   border-color: var(--sh-danger-border, var(--sh-border-default));
-}
-
-.card[data-indent] {
-  width: auto;
-  max-width: 680px;
-  margin-top: 0;
-  margin-left: 40px;
 }
 
 .head {
@@ -305,11 +298,6 @@
 }
 
 @media (max-width: 760px) {
-  .card[data-indent] {
-    max-width: none;
-    margin-left: 0;
-  }
-
   .scene {
     flex-wrap: wrap;
   }

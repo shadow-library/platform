@@ -31,14 +31,9 @@ function spacingOf(file: string, media?: string): Map<string, Record<string, str
 const CARD: Expected[] = [
   {
     selector: '.card',
-    values: { width: '100%', 'max-width': '720px', 'margin-top': '8px', 'border-radius': 'var(--sh-radius-lg)' },
-    source: 'turnCard: width 100%, max-width 720px, margin-top 8px, radius lg (chat.module.css); canvas l.121 radius 8px',
-  },
-  {
-    selector: '.card[data-indent]',
-    values: { width: 'auto', 'max-width': '680px', 'margin-top': '0', 'margin-left': '40px' },
+    values: { width: '100%', 'max-width': '720px', 'margin-top': '0', 'border-radius': 'var(--sh-radius-lg)' },
     source:
-      'canvas l.121 margin-left 40px inside the 720px column (720 − 40); width auto so the indent never overflows a list under 720px; margin-top 0 — the transcript gap 20 is the canvas spacing',
+      'turnCard: width 100%, max-width 720px, radius lg (chat.module.css); canvas l.121 radius 8px; margin-top 0 — the transcript gap 20 is the canvas spacing, and the card has no avatar to indent under',
   },
   { selector: '.head', values: { gap: '8px', padding: '10px 12px' }, source: 'turnCard .turnCardHead gap 8, padding 10px 12px; canvas l.122 identical' },
   { selector: '.length', values: { gap: '6px', 'margin-left': 'auto' }, source: 'canvas l.125 length control gap 6px, margin-left auto' },
@@ -87,7 +82,6 @@ const CARD: Expected[] = [
 ];
 
 const CARD_PHONE: Expected[] = [
-  { selector: '.card[data-indent]', values: { 'max-width': 'none', 'margin-left': '0' }, source: 'phone: no indent, the card takes the column (reference §2.2.10 one column)' },
   { selector: '.scenePov', values: { width: 'auto' }, source: 'phone (≤760, reference breakpoint): POV takes the first line beside the number and remove' },
   { selector: '.sceneSummary', values: { 'flex-basis': '100%' }, source: 'phone: summary gets its own full-width line' },
   { selector: '.modes', values: { 'grid-template-columns': 'minmax(0, 1fr)' }, source: 'phone: one column (reference §2.2.10 one column)' },
@@ -100,7 +94,6 @@ const START: Expected[] = [
     values: { 'container-type': 'inline-size', gap: '12px' },
     source: 'canvas l.84/l.96 grids gap 12px; a container so it stacks by its own width, as the chapters list does',
   },
-  { selector: '.start[data-indent]', values: { 'margin-left': '40px' }, source: 'canvas l.84, l.96 and l.104 margin-left 40px under the assistant’s avatar' },
   { selector: '.grid', values: { 'grid-template-columns': 'repeat(3, minmax(0, 1fr))', gap: '12px' }, source: 'canvas l.84 and l.96 three columns, gap 12px' },
   { selector: '.alt', values: { gap: '2px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'canvas l.33 .alt gap 2px, padding 10px 12px, radius 8px' },
   {
@@ -111,8 +104,6 @@ const START: Expected[] = [
   { selector: '.row', values: { gap: '8px' }, source: 'canvas l.107 button row gap 8px' },
   { selector: '.row .aside', values: { 'margin-left': 'auto' }, source: 'canvas l.107 aside margin-left auto' },
 ];
-
-const START_PHONE_INDENT: Expected[] = [{ selector: '.start[data-indent]', values: { 'margin-left': '0' }, source: 'phone (≤760): no indent, as the plan card' }];
 
 const START_PHONE: Expected[] = [
   { selector: '.grid', values: { 'grid-template-columns': 'minmax(0, 1fr)' }, source: 'one column under a 640px container, the chapters list’s container breakpoint' },
@@ -135,6 +126,5 @@ describe('Plan card spacing', () => {
   it('should keep the phone layout’s values cited too', () => {
     check('PlanCard.module.css', CARD_PHONE, '@media (max-width: 760px)');
     check('PlanStart.module.css', START_PHONE, '@container (max-width: 640px)');
-    check('PlanStart.module.css', START_PHONE_INDENT, '@media (max-width: 760px)');
   });
 });

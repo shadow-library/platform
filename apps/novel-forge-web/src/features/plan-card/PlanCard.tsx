@@ -61,8 +61,6 @@ export interface PlanCardProps {
   projectContentMode: ContentMode;
   /** The mode the chapter already has from an earlier plan; null follows the novel. */
   chapterContentMode?: ContentMode | null;
-  /** Sets the canvas's 40px indent under the assistant's avatar. */
-  indent?: boolean;
   saving?: boolean;
   saveError?: ApiError | null;
   onRetrySave?: () => void;
@@ -123,7 +121,7 @@ export function PlanCard(props: PlanCardProps): React.JSX.Element {
 type PlanCardBodyProps = PlanCardProps & { proposal: ProposalResponse; planRef: PlanOpRef };
 
 function PlanCardBody(props: PlanCardBodyProps): React.JSX.Element {
-  const { proposal, planRef, characters, milestones = [], pages = [], kept = [], projectContentMode, chapterContentMode = null, indent } = props;
+  const { proposal, planRef, characters, milestones = [], pages = [], kept = [], projectContentMode, chapterContentMode = null } = props;
   const { saving, saveError, onRetrySave, writing, applyError, onClearApplyError, writeFailure, onRetryWrite, discarding } = props;
   const { onChange, onWrite, onDiscard, onAskForChanges, onPlanAgain, onDirtyChange } = props;
   const baseId = useId();
@@ -211,7 +209,7 @@ function PlanCardBody(props: PlanCardBodyProps): React.JSX.Element {
   const saveView = !applyView && saveError ? planErrorView(saveError) : null;
 
   return (
-    <section className={styles.card} aria-label={`Chapter ${chapter} plan`} data-status={proposal.status} data-indent={indent || undefined}>
+    <section className={styles.card} aria-label={`Chapter ${chapter} plan`} data-status={proposal.status}>
       <div className={styles.head}>
         <span className={styles.title}>Chapter {chapter} plan</span>
         {statusChip ? (
