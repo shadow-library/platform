@@ -114,7 +114,8 @@
   the kinds classified as idea-eligible (Story Bible page, entity, volume title, an empty story field, milestone, a promise or its label); an idea that truncates a filled field
   beyond the removal budget stays a card. Secrets and planner-only content stay cards even under Edit freely: an unbacked fact, new or existing, and an invented volume goal
   are never ideas. A turn that drew on the notes or a planner-only page holds every op the chapter writer or a reader can see — the premise, story brief and themes
-  reach readers as the published description, tags and illustration prompts, so they are held with the style guide; only planner-side records (milestones) apply as usual, unless
+  reach readers as the published description, tags and illustration prompts, so they are held with the style guide, and the other story fields travel in the same op and are
+  held with them; only planner-side records (milestones) apply as usual, unless
   one leans on a held op. Just discuss, Ask first or any other warning on the turn makes every op a card.
 - Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions; planner-only and
   writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any

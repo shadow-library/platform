@@ -59,7 +59,8 @@ function withText(head: string, ...texts: (string | null | undefined)[]): string
 export function ideaLabel(op: ContentOp): string {
   switch (op.op) {
     case 'premise.update':
-      return withText('Story', op.premise, op.brief, op.themes?.join(', '), op.instructions);
+      // The ending and its question are planner-only, and this label rides in any prompt.
+      return withText('Story', op.premise, op.brief, op.themes?.join(', '), op.instructions, op.theme, op.readerPromise, op.protagonistKey, op.opposition);
     case 'bible_document.upsert':
       return isWriterExcludedBibleDoc({ section: op.section, slug: op.slug }) ? `Page ${op.section}/${op.slug}` : withText(`Page ${op.section}/${op.slug}`, op.body);
     case 'bible_document.remove':

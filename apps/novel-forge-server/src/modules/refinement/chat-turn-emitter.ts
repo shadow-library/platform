@@ -51,9 +51,26 @@ function key(value: unknown): string | undefined {
   return typeof value === 'number' ? String(value) : text(value);
 }
 
+const PREMISE_FIELDS = ['premise', 'brief', 'themes', 'instructions'] as const;
+const STORY_FIELD_LABELS = {
+  theme: 'Theme',
+  readerPromise: 'Reader promise',
+  protagonistKey: 'Protagonist',
+  opposition: 'Opposition',
+  endingQuestion: 'Ending question',
+  ending: 'Ending',
+} as const;
+
+/** Names the story basics a premise.update sets, with "Premise" standing for the premise, brief, themes and instructions together. */
+function storySubject(element: Readonly<Record<string, unknown>>): string {
+  const named = Object.entries(STORY_FIELD_LABELS).flatMap(([field, name]) => (element[field] === undefined ? [] : [name]));
+  const premise = PREMISE_FIELDS.some(field => element[field] !== undefined) || named.length === 0;
+  return [...(premise ? ['Premise'] : []), ...named].join(', ');
+}
+
 function subject(element: ChangeSetElement): string | undefined {
   const { op } = element;
-  if (op === 'premise.update') return 'Premise';
+  if (op === 'premise.update') return storySubject(element);
   if (op === 'organise.rule') return 'Rule';
   if (op === 'action.plan_chapter') return 'Plan the next chapter';
   if (op === 'action.organise_notes') return 'Organise your notes';

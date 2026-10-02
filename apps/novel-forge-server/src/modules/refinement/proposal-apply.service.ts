@@ -144,7 +144,9 @@ interface BaselineMismatch {
 // empties it again instead of merging as "keep". `OP_SPECS` refuses `null` for these fields, so only an inverse ever carries one.
 type Restorable<T, K extends keyof T> = Omit<T, K> & { [P in K]?: T[P] | null };
 
-type PremiseRestoreOp = Restorable<PremiseUpdateOp, 'premise' | 'brief' | 'themes' | 'instructions'>;
+const STORY_TEXT_FIELDS = ['theme', 'readerPromise', 'protagonistKey', 'opposition', 'endingQuestion', 'ending'] as const;
+
+type PremiseRestoreOp = Restorable<PremiseUpdateOp, 'premise' | 'brief' | 'themes' | 'instructions' | (typeof STORY_TEXT_FIELDS)[number]>;
 type BibleDocumentRestoreOp = Restorable<BibleDocumentUpsertOp, 'frontmatter' | 'body'>;
 type VolumeRestoreOp = Restorable<VolumeUpsertOp, 'title' | 'objective' | 'body'>;
 type EntityRestoreOp = Restorable<EntityUpsertOp, 'status' | 'motivation' | 'notes' | 'body'>;
@@ -582,6 +584,7 @@ export class ProposalApplyService {
     if (op.brief !== undefined) inverse.brief = project.brief;
     if (op.themes !== undefined) inverse.themes = project.themes as string[] | null;
     if (op.instructions !== undefined) inverse.instructions = project.instructions;
+    for (const field of STORY_TEXT_FIELDS) if (op[field] !== undefined) inverse[field] = project[field];
     return inverse as ContentOp;
   }
 
@@ -837,6 +840,7 @@ export class ProposalApplyService {
     if (op.brief !== undefined) update['brief'] = op.brief;
     if (op.themes !== undefined) update['themes'] = op.themes;
     if (op.instructions !== undefined) update['instructions'] = writingInstructionAdditions(op.instructions);
+    for (const field of STORY_TEXT_FIELDS) if (op[field] !== undefined) update[field] = op[field]?.trim() || null;
 
     await ctx.tx.update(schema.projects).set(update).where(eq(schema.projects.id, ctx.projectId));
     ctx.applied.push({ artifactRef: 'premise', newRevision: null });

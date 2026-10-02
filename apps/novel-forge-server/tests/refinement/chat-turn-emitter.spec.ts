@@ -30,6 +30,8 @@ describe('describeStreamedChange', () => {
   it('should label and group each op the way the progress panel lists it', () => {
     const cases: [Record<string, unknown>, string, ChatChangeEvent['group']][] = [
       [{ op: 'premise.update', premise: 'x' }, 'Premise', 'premise'],
+      [{ op: 'premise.update', opposition: 'x' }, 'Opposition', 'premise'],
+      [{ op: 'premise.update', brief: 'x', theme: 'y', protagonistKey: 'mara' }, 'Premise, Theme, Protagonist', 'premise'],
       [{ op: 'bible_document.upsert', section: 'world', slug: 'tide-law', frontmatter: { title: 'The Tide Law' } }, 'The Tide Law', 'pages'],
       [{ op: 'bible_document.upsert', section: 'world', slug: 'tide_law' }, 'tide law', 'pages'],
       [{ op: 'bible_document.remove', section: 'world', slug: 'old-page' }, 'old page', 'pages'],

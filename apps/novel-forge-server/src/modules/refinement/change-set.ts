@@ -18,6 +18,12 @@ export interface PremiseUpdateOp {
   brief?: string;
   themes?: string[];
   instructions?: string;
+  theme?: string;
+  readerPromise?: string;
+  protagonistKey?: string;
+  opposition?: string;
+  endingQuestion?: string;
+  ending?: string;
 }
 
 export interface BibleDocumentUpsertOp {
@@ -344,7 +350,23 @@ const PROMISE_KINDS = ['thread', 'mystery'];
 const PROMISE_STATUSES = ['open', 'paid_off'];
 const PROMISE_KEY = /^\S+$/;
 const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
-  'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
+  'premise.update': {
+    required: {},
+    optional: {
+      premise: 'string',
+      brief: 'string',
+      themes: 'string[]',
+      instructions: 'string',
+      theme: 'string',
+      readerPromise: 'string',
+      protagonistKey: 'string',
+      opposition: 'string',
+      endingQuestion: 'string',
+      ending: 'string',
+    },
+    description:
+      'The story basics. theme is what the book is about underneath the plot, in a sentence; readerPromise is what the reader is waiting for and expects paid off; protagonistKey is the entity key of the character the reader follows; opposition is what pushes back on the leads, so chapters have something to write against — a person or faction, but just as well the situation itself, survival, nature, scarcity, a system or the lead’s own flaw, named specifically enough to escalate; endingQuestion is the question the ending answers and ending is how the book ends, both planner-only and never shown to the reader early.',
+  },
   'bible_document.upsert': { required: { section: 'string', slug: 'string' }, optional: { frontmatter: 'object', body: 'string' } },
   'bible_document.remove': { required: { section: 'string', slug: 'string' }, optional: {} },
   'volume.upsert': {

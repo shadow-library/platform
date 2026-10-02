@@ -52,6 +52,20 @@ function parseRefs(refs: string[]): ParsedRefs {
  * "missing" rather than throwing, so a stale ref surfaces as a baseline mismatch, not a crash.
  * Works on a transaction handle as well as the root client.
  */
+const STORY_FIELDS = ['theme', 'readerPromise', 'protagonistKey', 'opposition', 'endingQuestion', 'ending'] as const;
+
+type PremiseRow = Pick<typeof schema.projects.$inferSelect, 'premise' | 'brief' | 'themes' | 'instructions' | (typeof STORY_FIELDS)[number]>;
+
+function premiseFields(project: PremiseRow): Record<string, unknown> {
+  return { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions };
+}
+
+// A story field joins the hash only once it holds a value, so the baseline of every premise card staged before these fields existed still matches.
+function premiseHashInput(project: PremiseRow): Record<string, unknown> {
+  const story = STORY_FIELDS.flatMap(field => ((project[field] ?? null) === null ? [] : [[field, project[field]] as const]));
+  return { ...premiseFields(project), ...Object.fromEntries(story) };
+}
+
 export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Record<string, ArtifactState>> {
   const parsed = parseRefs(refs);
   const states: Record<string, ArtifactState> = {};
@@ -60,7 +74,7 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
   if (parsed.premise) {
     const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (project) {
-      const contentHash = computeContentHash({ premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
+      const contentHash = computeContentHash(premiseHashInput(project));
       states['premise'] = { exists: true, revision: null, contentHash };
     }
   }
@@ -244,7 +258,7 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
       ? await db.query.milestones.findMany({ where: and(eq(schema.milestones.projectId, projectId), inArray(schema.milestones.milestoneKey, parsed.milestoneKeys)) })
       : [];
 
-  if (project) records.set('premise', { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions });
+  if (project) records.set('premise', { ...premiseFields(project), ...Object.fromEntries(STORY_FIELDS.map(field => [field, project[field]])) });
   for (const row of docs) {
     const ref = `doc:${row.section}/${row.slug}`;
     if (records.has(ref)) records.set(ref, { body: row.body, frontmatter: row.frontmatter });

@@ -224,6 +224,18 @@ const ALLOWLIST_CASES: Case[] = [
     expected: { side: 'card', reason: 'always_card', rule: 'replaces_story' },
   },
   {
+    name: 'setting an empty opposition applies like the premise',
+    op: { op: 'premise.update', opposition: 'A dock thief takes on a drowned court.', quote: QUOTE },
+    existing: { premise: { premise: '', opposition: null } },
+    expected: { side: 'direct', source: 'quoted' },
+  },
+  {
+    name: 'replacing a filled opposition is a card',
+    op: { op: 'premise.update', opposition: 'A dock thief takes on a drowned court.', quote: QUOTE },
+    existing: { premise: { premise: '', opposition: 'The tide itself.' } },
+    expected: { side: 'card', reason: 'always_card', rule: 'replaces_story' },
+  },
+  {
     name: 'replacing non-empty themes is a card',
     op: { op: 'premise.update', themes: ['debt'], quote: QUOTE },
     existing: { premise: { premise: '', themes: ['memory'] } },
@@ -431,6 +443,7 @@ describe('isPlannerSide', () => {
     ['the premise', premise({ premise: 'A thief.' }), false],
     ['the story brief and themes', premise({ brief: 'A heist.', themes: ['debt'] }), false],
     ['the style guide', premise({ instructions: 'Short sentences.' }), false],
+    ['the other story fields', premise({ opposition: 'The tide.', theme: 'Debt.', readerPromise: 'A heist.', protagonistKey: 'mira', endingQuestion: 'Does she pay?' }), false],
     ['a milestone removal', { op: 'milestone.remove', milestoneKey: 'heist' }, false],
     ['an entity', mira(), false],
     ['a fact', fact({ body: 'The crown eats memories.' }), false],
@@ -489,6 +502,17 @@ describe('splitChangeSet — a writer-read hold', () => {
       { index: 6, side: 'card', reason: 'no_quote' },
     ]);
     expect(split.held).toBe('writer_read');
+  });
+
+  it('should hold the other story fields with the premise', () => {
+    const fields = ['theme', 'readerPromise', 'opposition', 'endingQuestion', 'ending'] as const;
+    const split = policy(
+      fields.map(field => ({ op: 'premise.update', [field]: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE }) as ChangeOp),
+      { ideas: 'apply', hold: 'writer_read' },
+    );
+
+    expect(split.direct).toEqual([]);
+    expect(split.dispositions.map(disposition => disposition.side === 'card' && disposition.reason)).toEqual(fields.map(() => 'held_for_review'));
   });
 
   it('should hold an op that would have applied, keeping an idea’s quote-rule reason so a turned-down one is still filtered', () => {
