@@ -12,7 +12,7 @@ import { cn, matchPath } from '@/lib';
 import { AccountMenu } from '../AccountMenu';
 import { Badge } from '../Badge';
 import { Shell } from '../Shell';
-import { Sidebar } from '../Sidebar';
+import { Sidebar, useSidebar } from '../Sidebar';
 import { TopNavigation } from '../TopNavigation';
 import styles from './AppShell.module.css';
 import { type AppShellBrand, type AppShellProps, type NavBranch, type NavLeaf, type NavNode, type NavSection } from './AppShell.types';
@@ -120,10 +120,12 @@ function NavNodeItem({ node, pathname, search }: { node: NavNode; pathname: stri
 }
 
 function BrandMark({ brand, tone }: { brand: AppShellBrand; tone: 'default' | 'warning' }): ReactElement {
+  const { collapsed } = useSidebar();
+  const markOnly = collapsed && brand.icon != null;
   const content = (
     <>
       {brand.icon != null ? <span className={styles.brandIcon}>{brand.icon}</span> : null}
-      <span className={styles.brandText}>
+      <span className={markOnly ? styles.srOnly : styles.brandText}>
         <span className={styles.brandName}>{brand.name}</span>
         {brand.tagline != null ? (
           <span className={styles.brandTagline} data-tone={tone}>
@@ -166,6 +168,8 @@ export function AppShell({
   sidebarFooter,
   collapsible = false,
   storageKey,
+  sidebarCollapsed,
+  onSidebarCollapsedChange,
   bottomNav,
   stickyTopbar,
   contentWidth,
@@ -185,6 +189,8 @@ export function AppShell({
       footer={sidebarFooter}
       defaultCollapsed={collapsible || storageKey != null ? false : undefined}
       storageKey={storageKey}
+      collapsed={sidebarCollapsed}
+      onCollapsedChange={onSidebarCollapsedChange}
     >
       {nav.variant === 'project' ? (
         <Sidebar.Switcher

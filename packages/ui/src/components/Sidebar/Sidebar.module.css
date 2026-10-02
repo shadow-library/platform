@@ -99,6 +99,10 @@
   padding: 8px 14px;
   border-top: var(--sh-border-width) solid var(--sh-border-subtle);
 }
+/* A footer that renders nothing in rail mode leaves no ruled, padded strip behind. */
+.footer:empty {
+  display: none;
+}
 
 /* ── Switcher ────────────────────────────────────────────── */
 .switcher {

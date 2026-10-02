@@ -145,6 +145,13 @@ export interface AppShellProps {
   collapsible?: boolean;
   /** Persist the rail choice across reloads. Implies `collapsible`. */
   storageKey?: string;
+  /**
+   * Controls the rail from outside — for a product that folds it by viewport. Without
+   * `onSidebarCollapsedChange` it is a fixed state the author cannot toggle.
+   */
+  sidebarCollapsed?: boolean;
+  /** Reports the author's toggle; passing it offers the toggle, as `collapsible` does. */
+  onSidebarCollapsedChange?: (collapsed: boolean) => void;
   /** Phone-only bottom navigation. */
   bottomNav?: ReactNode;
   /** Pin the top bar to the viewport below md too. @default false */

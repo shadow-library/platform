@@ -295,4 +295,37 @@ describe('AppShell', () => {
     await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]) });
     expect(document.querySelector('[data-sticky]')).not.toBeInTheDocument();
   });
+
+  it("should follow a controlled rail and report the author's toggle without taking it", async () => {
+    const onSidebarCollapsedChange = vi.fn();
+    await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]), sidebarCollapsed: true, onSidebarCollapsedChange });
+
+    expect(screen.getByRole('navigation', { name: 'Main' })).toHaveAttribute('data-collapsed');
+    await userEvent.click(screen.getByRole('button', { name: 'Expand navigation' }));
+
+    expect(onSidebarCollapsedChange).toHaveBeenCalledWith(false);
+    expect(screen.getByRole('navigation', { name: 'Main' })).toHaveAttribute('data-collapsed');
+  });
+
+  it('should hold a controlled rail with no handler as a fixed state', async () => {
+    await renderShell({ nav: section([{ to: '/account', label: 'Overview' }]), sidebarCollapsed: false });
+
+    expect(screen.getByRole('navigation', { name: 'Main' })).not.toHaveAttribute('data-collapsed');
+    expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument();
+  });
+
+  it('should keep only the brand mark in view on the rail while the link keeps its name', async () => {
+    const brand = { name: 'Shadow', tagline: 'Operator console', icon: <svg aria-hidden="true" />, to: '/' };
+    await renderShell({ brand, nav: section([{ to: '/account', label: 'Overview' }]), sidebarCollapsed: true });
+
+    const link = screen.getByRole('link', { name: 'Shadow Operator console' });
+    expect(link.lastElementChild).toHaveClass(/srOnly/);
+  });
+
+  it('should show the brand name beside its mark when expanded', async () => {
+    const brand = { name: 'Shadow', icon: <svg aria-hidden="true" />, to: '/' };
+    await renderShell({ brand, nav: section([{ to: '/account', label: 'Overview' }]), sidebarCollapsed: false });
+
+    expect(screen.getByRole('link', { name: 'Shadow' }).lastElementChild).toHaveClass(/brandText/);
+  });
 });
