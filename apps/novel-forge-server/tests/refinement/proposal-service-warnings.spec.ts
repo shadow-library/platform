@@ -52,7 +52,7 @@ describe('ProposalService.create — reveal-clear warning always runs, even with
       cards: [],
       sources: ['quoted' as const],
       dispositions: [{ index: 0, side: 'direct' as const, source: 'quoted' as const }],
-      held: false,
+      held: 'none' as const,
     };
 
     const staging = await stageTurnChangeSet(port, split, []);

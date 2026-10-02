@@ -18,6 +18,10 @@ describe('planner-only guard', () => {
     expect(PLANNER_ONLY_WARNING).toContain('your notes');
   });
 
+  it('should say the warning holds only what the chapter writer reads, since what only planning reads applies', () => {
+    expect(PLANNER_ONLY_WARNING).toContain('its changes to what the chapter writer reads wait for you');
+  });
+
   it('should warn once on a turn that read one, and leave any other turn’s warnings as they are', () => {
     expect(chatTurnWarnings([], true)).toEqual([PLANNER_ONLY_WARNING]);
     expect(chatTurnWarnings(['echo'], true)).toEqual(['echo', PLANNER_ONLY_WARNING]);

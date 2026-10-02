@@ -50,6 +50,8 @@ const IDEA_KINDS: ReadonlySet<string> = new Set([
 const NEVER_DIRECT: ReadonlySet<string> = new Set([...REMOVALS, 'brief.update', 'draft.update', 'promise.set_payoff', 'organise.rule']);
 const FACT_GATING = ['writerNote', 'revealChapter', 'unlock', 'allowedClues'] as const;
 const METADATA: ReadonlySet<string> = new Set(['op', 'quote', 'rationale', 'ideaId']);
+/** Written here rather than imported, like the kind lists: what a writer-read hold may still apply is asserted against this, not the policy's own table. */
+const PLANNER_SIDE_PREMISE_FIELDS: ReadonlySet<string> = new Set(['premise', 'brief', 'themes']);
 
 interface Turn {
   input: WritePolicyInput;
@@ -135,7 +137,7 @@ function generateTurn(seed: number): Turn {
         }),
       );
     }
-    if (kind === 'premise.update') ops.push(withQuote({ op: kind, premise: text }));
+    if (kind === 'premise.update') ops.push(withQuote(rng.chance(0.3) ? { op: kind, instructions: text } : { op: kind, premise: text }));
     if (kind === 'bible_document.upsert')
       ops.push(withQuote(rng.chance(0.3) ? { op: kind, section: 'project', slug: 'timeline', body: text } : { op: kind, section: 'world', slug: `${key}-notes`, body: text }));
     if (kind === 'volume.upsert')
@@ -188,7 +190,11 @@ function generateTurn(seed: number): Turn {
     authorMessage: [...message, ...(rng.chance(0.3) ? [rng.pick(STATED)] : [])].join('. '),
     mode,
     ideas: 'apply',
-    held: rng.chance(0.1),
+    hold: rng.weighted([
+      ['none', 8],
+      ['turn', 1],
+      ['writer_read', 2],
+    ] as const),
     justDiscussing: rng.chance(0.1),
     state: { current: existing },
   };
@@ -201,6 +207,13 @@ function isFilled(value: unknown): boolean {
   return typeof value !== 'string' || value.trim() !== '';
 }
 
+/** Only milestones and the premise's story fields stay out of the chapter writer's reach. */
+function plannerSide(op: ChangeOp): boolean {
+  const fields = op as unknown as Record<string, unknown>;
+  if (op.op === 'milestone.upsert') return true;
+  return op.op === 'premise.update' && Object.keys(fields).every(field => METADATA.has(field) || fields[field] === undefined || PLANNER_SIDE_PREMISE_FIELDS.has(field));
+}
+
 /** What an op may never do on the applied side, checked from the op and the record alone. */
 function forbiddenDirect(op: ChangeOp, current: RecordFields | undefined, source: OpSource): string | undefined {
   const fields = op as unknown as Record<string, unknown>;
@@ -210,7 +223,7 @@ function forbiddenDirect(op: ChangeOp, current: RecordFields | undefined, source
   const cleared = Object.keys(fields).filter(field => !METADATA.has(field) && fields[field] !== undefined && !isFilled(fields[field]) && isFilled(current?.[field]));
   if (cleared.length > 0) return `cleared ${cleared.join(', ')}`;
   if (op.op === 'bible_document.upsert' && op.slug === 'timeline') return 'a planner-only page';
-  if (op.op === 'premise.update' && isFilled(current?.['premise'])) return 'a replaced story field';
+  if (op.op === 'premise.update' && Object.keys(fields).some(field => !METADATA.has(field) && isFilled(current?.[field]))) return 'a replaced story field';
   if (op.op === 'volume.upsert' && (op.body !== undefined || (source === 'idea' && op.objective !== undefined))) return "a volume's notes or an invented goal";
   if (op.op === 'promise.update' && (op.status !== undefined || op.lastAdvancedChapter !== undefined)) return "a promise's disposition or progress";
   if (op.op !== 'fact.upsert') return undefined;
@@ -256,8 +269,9 @@ function expectQuoteRuleHolds({ input, describe: turn }: Turn): void {
     const op = input.ops[disposition.index] as ChangeOp;
     const [ref] = changeSetRefs([op]);
     const current = ref === undefined ? undefined : input.state.current.get(ref);
-    const override = input.mode !== 'auto' || input.held || input.justDiscussing;
+    const override = input.mode !== 'auto' || input.hold === 'turn' || input.justDiscussing;
     expect(override, `${op.op} applied in a turn that applies nothing — ${JSON.stringify(context)}`).toBe(false);
+    if (input.hold === 'writer_read') expect(plannerSide(op), `${op.op} applied what the chapter writer reads in a held turn — ${JSON.stringify(context)}`).toBe(true);
     expect(forbiddenDirect(op, current, disposition.source), `${op.op} applied as ${disposition.source} — ${JSON.stringify(context)}`).toBeUndefined();
     expect(exceedsRemovalBudget(op, current), `${op.op} truncated a field without review — ${JSON.stringify(context)}`).toBe(false);
     expect(disposition.source, `${op.op} carries the wrong source — ${JSON.stringify(context)}`).toBe(quoteRulePermits(op, input) ? 'quoted' : 'idea');
@@ -297,6 +311,14 @@ describe('quote rule and dependency split — seeded chat turns', () => {
     expect(quoteRuleOnly.filter(turn => turn.direct.length > 0).length).toBeGreaterThan(20);
     expect(quoteRuleOnly.filter(turn => turn.dispositions.some(disposition => disposition.side === 'card' && disposition.reason === 'depends_on_card')).length).toBeGreaterThan(0);
     expect(editFreely.filter(turn => turn.sources.includes('idea')).length).toBeGreaterThan(20);
+  });
+
+  it('should have generated writer-read holds that applied planner-side ops and held writer-read ones', () => {
+    const turns = Array.from({ length: TESTS * CASES_PER_TEST }, (_, index) => generateTurn(9000 + index).input).filter(input => input.hold === 'writer_read');
+    const splits = turns.map(input => splitChangeSet(input));
+
+    expect(splits.filter(split => split.direct.length > 0).length).toBeGreaterThan(5);
+    expect(splits.filter(split => split.held === 'writer_read').length).toBeGreaterThan(5);
   });
 
   it('should have generated the kinds Edit freely must keep cards, and kept some of them only because they were ideas', () => {

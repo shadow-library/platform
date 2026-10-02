@@ -232,7 +232,7 @@ function keptBefore(ledger: readonly Ledger.Entry[], entry: NewLedgerEntry): Led
 function judgedAlone(candidate: Candidate, input: OrganiseCandidateInput): Candidate {
   if (!candidate.op.quote) return candidate;
   const vocabulary = candidate.paragraphs.map(number => input.source.paragraphs[number - 1] ?? '').join('\n\n');
-  const [disposition] = splitChangeSet({ ops: [candidate.op], authorMessage: vocabulary, vocabulary, mode: 'auto', held: false, state: { current: input.current } }).dispositions;
+  const [disposition] = splitChangeSet({ ops: [candidate.op], authorMessage: vocabulary, vocabulary, mode: 'auto', hold: 'none', state: { current: input.current } }).dispositions;
   return disposition?.side === 'direct' ? candidate : { ...candidate, op: withoutQuote(candidate.op), reason: disposition?.reason };
 }
 
@@ -250,7 +250,7 @@ export function organiseCandidates(input: OrganiseCandidateInput): OrganiseCandi
     authorMessage: input.source.notes,
     vocabulary: input.source.notes,
     mode: input.mode,
-    held: false,
+    hold: 'none',
     state: { current: input.current },
   });
   judged.forEach((candidate, index) => {
@@ -273,7 +273,7 @@ export function organiseCandidates(input: OrganiseCandidateInput): OrganiseCandi
   const decision = input.plan.entries.find(entry => entry.kind === 'decision' && entry.topic === ORGANISE_TOPIC);
   const { pages: _pages, records: _records, ...payload } = (decision?.payload ?? {}) as Record<string, unknown>;
   return {
-    split: { ops, direct, cards: ops.filter(op => !direct.includes(op)), sources: direct.map(() => 'quoted'), dispositions: split.dispositions, held: false },
+    split: { ops, direct, cards: ops.filter(op => !direct.includes(op)), sources: direct.map(() => 'quoted'), dispositions: split.dispositions, held: 'none' },
     records,
     template: { statement: decision?.statement ?? '', payload },
     settled: input.plan.claims.settled,

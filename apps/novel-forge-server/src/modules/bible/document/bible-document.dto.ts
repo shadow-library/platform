@@ -56,7 +56,10 @@ export class BibleDocListItem {
   @Field({ description: 'The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page.' })
   writerExcluded: boolean;
 
-  @Field({ description: 'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review.' })
+  @Field({
+    description:
+      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read.',
+  })
   plannerOnly: boolean;
 
   @Field(() => String, { format: 'date-time' })
@@ -92,7 +95,10 @@ export class BibleDocResponse {
   @Field({ description: 'The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page.' })
   writerExcluded: boolean;
 
-  @Field({ description: 'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review.' })
+  @Field({
+    description:
+      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read.',
+  })
   plannerOnly: boolean;
 
   @Field(() => String, { format: 'date-time' })

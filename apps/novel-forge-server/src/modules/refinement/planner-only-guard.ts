@@ -4,13 +4,13 @@ export const PLANNER_ONLY_LOOKUP_TOOL = 'get_bible_document';
 export const AUTHOR_NOTES_LOOKUP_TOOL = 'get_notes';
 
 /**
- * The warning a chat proposal carries when the turn read the author's notes, organised timeline or open questions. They name what happens
- * later in the book, and nothing backs them with a scheduled canon fact the writer's scrub could withhold, so a change drawn from them is
- * reviewed by the author rather than applied on its own.
+ * The warning a chat turn's cards carry when it read the author's notes, organised timeline or open questions. They name what happens
+ * later in the book, and nothing backs them with a scheduled canon fact the writer's scrub could withhold, so a change drawn from them to
+ * anything the chapter writer reads is reviewed by the author rather than applied on its own; what only planning reads still applies.
  */
 export const PLANNER_ONLY_WARNING = [
-  'This change drew on your notes, organised timeline or open questions, which only planning steps read.',
-  'Check it does not carry later-story material into a brief or page the chapter writer reads.',
+  'This turn drew on your notes, organised timeline or open questions, which only planning steps read, so its changes to what the chapter writer reads wait for you.',
+  'Check none carries later-story material into a brief or page the chapter writer reads.',
 ].join(' ');
 
 /** A lookup that returned the author's notes or a planner-only page's content. */

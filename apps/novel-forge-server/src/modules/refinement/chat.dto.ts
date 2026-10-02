@@ -1,4 +1,4 @@
-import { Field, Integer, PickType, Schema } from '@shadow-library/class-schema';
+import { EnumType, Field, Integer, PickType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
@@ -6,7 +6,10 @@ import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, C
 import { type Project, type Refinement } from '@server/database';
 
 import { AppliedArtifactItem, AppliedOpSource, OpResultItem, ProposalResponse } from './refinement.dto';
+import { TURN_HOLD_REASONS, type TurnHoldReason } from './turn-proposals';
 import { type OpSource } from './write-policy';
+
+const TurnHoldReasonEnum = EnumType.create('TurnHoldReason', [...TURN_HOLD_REASONS]);
 
 @Schema()
 export class ChatProjectParams {
@@ -387,6 +390,13 @@ export class ChatTurnResponse {
 
   @Field({ optional: true, description: 'why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write)' })
   applyNote?: string;
+
+  @Field(() => TurnHoldReasonEnum, {
+    optional: true,
+    description:
+      'present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so only the changes the chapter writer reads were held.',
+  })
+  held?: TurnHoldReason;
 
   @Field()
   runId: string;

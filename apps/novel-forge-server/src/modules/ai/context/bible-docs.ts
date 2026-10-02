@@ -65,7 +65,8 @@ export const OPEN_QUESTIONS_DOC = { section: 'project', slug: 'open-questions' }
 /**
  * Reserved addresses only planners read, whoever writes to them. The organised timeline and the open questions name what happens later in
  * the book and no scheduled canon fact backs them for the writer's scrub, so they stay out of the outliner's citable catalog, every writer
- * pack, brief refs, the voice step's cited pages and the lore index. The chat hub may look them up, and a turn that does is held for review.
+ * pack, brief refs, the voice step's cited pages and the lore index. The chat hub may look them up, and a turn that does holds for review
+ * every change the chapter writer would read.
  */
 const PLANNER_ONLY_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [ORGANISED_TIMELINE_DOC, OPEN_QUESTIONS_DOC];
 

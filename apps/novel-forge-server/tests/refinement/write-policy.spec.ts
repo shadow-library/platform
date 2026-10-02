@@ -14,7 +14,9 @@ import {
   quoteFoundIn,
   quoteIsTentative,
   splitChangeSet,
+  type WriteHold,
   type WritePolicyInput,
+  writerExposure,
 } from '@modules/refinement/write-policy';
 
 const AUTHOR_MESSAGE = [
@@ -36,16 +38,16 @@ interface PolicyOptions {
   existing?: Existing;
   mode?: WritePolicyInput['mode'];
   ideas?: WritePolicyInput['ideas'];
-  held?: boolean;
+  hold?: WriteHold;
   justDiscussing?: boolean;
   vocabulary?: string;
   message?: string;
 }
 
 function policy(ops: ChangeOp[], options: PolicyOptions = {}) {
-  const { existing = [], mode = 'auto', ideas = 'card', held = false, justDiscussing, vocabulary, message = AUTHOR_MESSAGE } = options;
+  const { existing = [], mode = 'auto', ideas = 'card', hold = 'none', justDiscussing, vocabulary, message = AUTHOR_MESSAGE } = options;
   const entries: [string, RecordFields][] = Array.isArray(existing) ? existing.map(ref => [ref, {}]) : Object.entries(existing);
-  return splitChangeSet({ ops, authorMessage: message, vocabulary, mode, ideas, held, justDiscussing, state: { current: new Map(entries) } });
+  return splitChangeSet({ ops, authorMessage: message, vocabulary, mode, ideas, hold, justDiscussing, state: { current: new Map(entries) } });
 }
 
 type Expected = Omit<DirectDisposition, 'index'> | Omit<CardDisposition, 'index'>;
@@ -272,17 +274,17 @@ const ALWAYS_CARD_CASES: Case[] = [
 
 const OVERRIDE_CASES: Case[] = [
   { name: 'a manual-mode chat applies nothing on its own', op: mira({ quote: QUOTE }), mode: 'manual', expected: { side: 'card', reason: 'manual_mode' } },
-  { name: 'a turn warning holds a quote-backed op for review', op: mira({ quote: QUOTE }), held: true, expected: { side: 'card', reason: 'held_for_review' } },
+  { name: 'a turn warning holds a quote-backed op for review', op: mira({ quote: QUOTE }), hold: 'turn', expected: { side: 'card', reason: 'held_for_review' } },
   { name: 'just discussing turns a quote-backed op into a card', op: mira({ quote: QUOTE }), justDiscussing: true, expected: { side: 'card', reason: 'just_discussing' } },
   {
     name: 'just discussing outranks manual mode and a hold',
     op: mira({ quote: QUOTE }),
     justDiscussing: true,
     mode: 'manual',
-    held: true,
+    hold: 'turn',
     expected: { side: 'card', reason: 'just_discussing' },
   },
-  { name: 'manual mode outranks a hold', op: mira({ quote: QUOTE }), mode: 'manual', held: true, expected: { side: 'card', reason: 'manual_mode' } },
+  { name: 'manual mode outranks a hold', op: mira({ quote: QUOTE }), mode: 'manual', hold: 'turn', expected: { side: 'card', reason: 'manual_mode' } },
   { name: 'just discussing keeps the reason of an op that was a card anyway', op: mira(), justDiscussing: true, expected: { side: 'card', reason: 'no_quote' } },
 ];
 
@@ -416,9 +418,105 @@ for (const [table, cases, modes] of TABLES) {
 
 describe('splitChangeSet — the hold flag', () => {
   it('should flag the hold only when it turned an op that would have applied into a card', () => {
-    expect(policy([mira({ quote: QUOTE })], { held: true }).held).toBe(true);
-    expect(policy([mira()], { held: true }).held).toBe(false);
-    expect(policy([mira({ quote: QUOTE })], { held: true, justDiscussing: true }).held).toBe(false);
+    expect(policy([mira({ quote: QUOTE })], { hold: 'turn' }).held).toBe('turn');
+    expect(policy([mira()], { hold: 'turn' }).held).toBe('none');
+    expect(policy([mira({ quote: QUOTE })], { hold: 'turn', justDiscussing: true }).held).toBe('none');
+  });
+});
+
+describe('writerExposure', () => {
+  const premise = (fields: Omit<Extract<ChangeOp, { op: 'premise.update' }>, 'op'>): ChangeOp => ({ op: 'premise.update', ...fields });
+  const cases: [string, ChangeOp, 'planner_side' | 'writer_read'][] = [
+    ['a milestone', { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist' }, 'planner_side'],
+    ['the premise', premise({ premise: 'A thief.' }), 'planner_side'],
+    ['the story brief and themes', premise({ brief: 'A heist.', themes: ['debt'] }), 'planner_side'],
+    ['the style guide', premise({ instructions: 'Short sentences.' }), 'writer_read'],
+    ['the premise beside the style guide', premise({ premise: 'A thief.', instructions: 'Short sentences.' }), 'writer_read'],
+    ['an entity', mira(), 'writer_read'],
+    ['a fact', fact({ body: 'The crown eats memories.' }), 'writer_read'],
+    ['a volume', { op: 'volume.upsert', volumeKey: 'v2', title: 'The Drowned Court' }, 'writer_read'],
+    ['a Story Bible page', { op: 'bible_document.upsert', section: 'world', slug: 'saltgate', body: 'Docks.' }, 'writer_read'],
+    ['a new promise', { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger' }, 'writer_read'],
+    ['a promise update', { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'The ledger' }, 'writer_read'],
+  ];
+
+  for (const [name, op, expected] of cases) {
+    it(`should classify ${name} as ${expected}`, () => {
+      expect(writerExposure(op)).toBe(expected);
+    });
+  }
+});
+
+describe('splitChangeSet — a writer-read hold', () => {
+  const premise: ChangeOp = { op: 'premise.update', premise: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE };
+  const style: ChangeOp = { op: 'premise.update', instructions: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE };
+  const heist = (fields: Partial<Extract<ChangeOp, { op: 'milestone.upsert' }>> = {}): ChangeOp => ({
+    op: 'milestone.upsert',
+    milestoneKey: 'heist',
+    label: 'The heist',
+    ...fields,
+  });
+
+  it('should apply what only planning reads as usual', () => {
+    const split = policy([premise, heist()], { ideas: 'apply', hold: 'writer_read' });
+
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'direct', source: 'quoted' },
+      { index: 1, side: 'direct', source: 'idea' },
+    ]);
+    expect(split.held).toBe('none');
+  });
+
+  it('should hold a writer-read op that would have applied, keeping an idea’s quote-rule reason so a turned-down one is still filtered', () => {
+    const ops = [mira({ quote: QUOTE }), mira({ entityKey: 'kael', name: 'Kael', body: INVENTED }), style, premise];
+    const split = policy(ops, { ideas: 'apply', hold: 'writer_read', existing: ['premise'] });
+
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'held_for_review' },
+      { index: 1, side: 'card', reason: 'no_quote' },
+      { index: 2, side: 'card', reason: 'held_for_review' },
+      { index: 3, side: 'direct', source: 'quoted' },
+    ]);
+    expect(split.held).toBe('writer_read');
+  });
+
+  it('should send a planner-side op to the cards when it names a record only a held op creates', () => {
+    const held = policy([mira({ quote: QUOTE }), heist({ subjectEntityKey: 'mira' })], { ideas: 'apply', hold: 'writer_read' });
+    const existing = policy([mira({ quote: QUOTE }), heist({ subjectEntityKey: 'mira' })], { ideas: 'apply', hold: 'writer_read', existing: ['entity:mira'] });
+
+    expect(held.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'held_for_review' },
+      { index: 1, side: 'card', reason: 'not_allowlisted' },
+    ]);
+    expect(held.held).toBe('writer_read');
+    expect(existing.dispositions[1]).toEqual({ index: 1, side: 'direct', source: 'idea' });
+  });
+
+  it('should apply a quoted planner-side op when ideas do not apply', () => {
+    const split = policy([premise, mira({ quote: QUOTE })], { ideas: 'card', hold: 'writer_read' });
+
+    expect(split.direct).toEqual([premise]);
+    expect(split.dispositions[1]).toEqual({ index: 1, side: 'card', reason: 'held_for_review' });
+  });
+
+  it('should leave the turn to manual mode or just discussing, which outrank it', () => {
+    const manual = policy([premise, mira({ quote: QUOTE })], { mode: 'manual', hold: 'writer_read' });
+    const discussing = policy([premise, mira({ quote: QUOTE })], { justDiscussing: true, hold: 'writer_read' });
+
+    expect(manual.dispositions.map(d => (d.side === 'card' ? d.reason : d.side))).toEqual(['manual_mode', 'manual_mode']);
+    expect(discussing.dispositions.map(d => (d.side === 'card' ? d.reason : d.side))).toEqual(['just_discussing', 'just_discussing']);
+    expect([manual.held, discussing.held]).toEqual(['none', 'none']);
+  });
+
+  it('should leave a whole-turn hold holding every op, planner-side ones included', () => {
+    const split = policy([premise, heist(), mira({ quote: QUOTE })], { ideas: 'apply', hold: 'turn' });
+
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'held_for_review' },
+      { index: 1, side: 'card', reason: 'not_allowlisted' },
+      { index: 2, side: 'card', reason: 'held_for_review' },
+    ]);
+    expect(split.held).toBe('turn');
   });
 });
 
@@ -524,7 +622,7 @@ const EDIT_FREELY_CASES: Case[] = [
   },
   { name: 'a manual-mode chat keeps an idea a card', op: mira({ body: INVENTED }), mode: 'manual', expected: { side: 'card', reason: 'no_quote' } },
   { name: 'just discussing keeps an idea a card', op: mira({ body: INVENTED }), justDiscussing: true, expected: { side: 'card', reason: 'no_quote' } },
-  { name: 'a held turn keeps an idea a card', op: mira({ body: INVENTED }), held: true, expected: { side: 'card', reason: 'no_quote' } },
+  { name: 'a held turn keeps an idea a card', op: mira({ body: INVENTED }), hold: 'turn', expected: { side: 'card', reason: 'no_quote' } },
 ];
 
 describe('splitChangeSet — Edit freely', () => {
@@ -538,22 +636,22 @@ describe('splitChangeSet — Edit freely', () => {
   }
 
   it('should apply no idea unless the caller opts in', () => {
-    const split = splitChangeSet({ ops: [mira({ body: INVENTED })], authorMessage: AUTHOR_MESSAGE, mode: 'auto', held: false, state: { current: new Map() } });
+    const split = splitChangeSet({ ops: [mira({ body: INVENTED })], authorMessage: AUTHOR_MESSAGE, mode: 'auto', hold: 'none', state: { current: new Map() } });
 
     expect(split.dispositions).toEqual([{ index: 0, side: 'card', reason: 'no_quote' }]);
   });
 
   it('should flag a hold that kept an idea off the applied side', () => {
-    const split = policy([mira({ body: INVENTED })], { ideas: 'apply', held: true });
+    const split = policy([mira({ body: INVENTED })], { ideas: 'apply', hold: 'turn' });
 
-    expect(split.held).toBe(true);
+    expect(split.held).toBe('turn');
     expect(split.dispositions).toEqual([{ index: 0, side: 'card', reason: 'no_quote' }]);
   });
 
   it('should not flag a hold when the ideas would not have applied anyway or the turn is manual or just discussing', () => {
-    expect(policy([{ op: 'entity.remove', entityKey: 'aldo' }], { ideas: 'apply', held: true }).held).toBe(false);
-    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true, mode: 'manual' }).held).toBe(false);
-    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', held: true, justDiscussing: true }).held).toBe(false);
+    expect(policy([{ op: 'entity.remove', entityKey: 'aldo' }], { ideas: 'apply', hold: 'turn' }).held).toBe('none');
+    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', hold: 'turn', mode: 'manual' }).held).toBe('none');
+    expect(policy([mira({ body: INVENTED })], { ideas: 'apply', hold: 'turn', justDiscussing: true }).held).toBe('none');
   });
 
   it('should send an idea naming a record only a card creates to the cards, keeping the quote rule’s reason so a turned-down idea is still filtered', () => {

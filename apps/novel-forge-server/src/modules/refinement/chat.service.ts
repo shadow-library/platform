@@ -37,7 +37,7 @@ import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
-import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnApplied, type TurnProposalPort, type TurnStaging } from './turn-proposals';
+import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnApplied, type TurnHoldReason, type TurnProposalPort, type TurnStaging } from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
@@ -99,6 +99,7 @@ export interface ChatTurnResult {
   appliedProposal?: Refinement.Proposal | null;
   applied?: TurnApplied;
   applyNote?: string;
+  held?: TurnHoldReason;
   runId: string;
 }
 
@@ -650,7 +651,8 @@ export class ChatService {
     if (staging.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staging.cardProposal.id });
 
     await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
-    return { userMessage, assistantMessage, proposal: staging.cardProposal, appliedProposal: staging.appliedProposal, applied: staging.applied, applyNote: staging.applyNote };
+    const { cardProposal: proposal, appliedProposal, applied, applyNote, held } = staging;
+    return { userMessage, assistantMessage, proposal, appliedProposal, applied, applyNote, held };
   }
 
   /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */

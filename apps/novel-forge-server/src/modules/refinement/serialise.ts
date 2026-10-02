@@ -102,6 +102,7 @@ export function serialiseTurn(result: ChatTurnResult, offersNotes: NotesOffer = 
       opResults: applied.opResults,
     },
     applyNote: result.applyNote,
+    held: result.held,
     runId: result.runId,
   };
 }

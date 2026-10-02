@@ -3,9 +3,15 @@ import { type Refinement } from '@server/database';
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
 import { type RecordFields } from './artifact-state';
-import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, type OpType } from './change-set';
+import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, type OpType, type PremiseUpdateOp } from './change-set';
 
 export type OpSide = 'direct' | 'card';
+/**
+ * What a turn's warnings hold for review: `turn` every op, `writer_read` only the ops whose records the chapter writer reads, so a turn that
+ * drew on planner-only material still lands what only planning reads.
+ */
+export type WriteHold = 'none' | 'turn' | 'writer_read';
+export type WriterExposure = 'planner_side' | 'writer_read';
 export type CardReason =
   | 'just_discussing'
   | 'manual_mode'
@@ -68,8 +74,7 @@ export interface WritePolicyInput {
   /** What an auto-mode pass does with an op the quote rule does not back and `IDEA_POLICY` lets through: only a chat turn applies it as an idea. */
   ideas?: 'apply' | 'card';
   justDiscussing?: boolean;
-  /** A warning on the turn (negation echo, planner-only read) holds every op for review. */
-  held: boolean;
+  hold: WriteHold;
   state: WritePolicyState;
 }
 
@@ -80,8 +85,8 @@ export interface ChangeSetSplit {
   /** Each direct op's provenance, aligned with `direct`. */
   sources: OpSource[];
   dispositions: OpDisposition[];
-  /** True when the hold turned at least one op that would have applied into a card. */
-  held: boolean;
+  /** The hold that turned at least one op that would have applied into a card, or `none` when it turned none. */
+  held: WriteHold;
 }
 
 export const DIRECT_OP_KINDS: ReadonlySet<OpType> = new Set([
@@ -135,6 +140,41 @@ export const IDEA_POLICY: Readonly<Record<OpType, 'idea' | AlwaysCardRule>> = {
   'promise.drop': 'removal',
   'organise.rule': 'notebook_direction',
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
+};
+
+const PREMISE_FIELD_EXPOSURE: Readonly<Record<Exclude<keyof PremiseUpdateOp, 'op'>, WriterExposure>> = {
+  premise: 'planner_side',
+  brief: 'planner_side',
+  themes: 'planner_side',
+  instructions: 'writer_read',
+};
+
+/**
+ * Whether the chapter writer reads what an op writes, so a `writer_read` hold knows which ops to keep for review. Keyed by every kind, so a
+ * new kind does not compile until it is classified here; a premise update is judged by the fields it writes.
+ */
+export const WRITER_EXPOSURE: Readonly<Record<OpType, WriterExposure | Readonly<Record<string, WriterExposure>>>> = {
+  'premise.update': PREMISE_FIELD_EXPOSURE,
+  'bible_document.upsert': 'writer_read',
+  'bible_document.remove': 'writer_read',
+  'volume.upsert': 'writer_read',
+  'volume.remove': 'writer_read',
+  'brief.update': 'writer_read',
+  'brief.remove': 'writer_read',
+  'draft.update': 'writer_read',
+  'draft.remove': 'writer_read',
+  'entity.upsert': 'writer_read',
+  'entity.remove': 'writer_read',
+  'fact.upsert': 'writer_read',
+  'fact.remove': 'writer_read',
+  'milestone.upsert': 'planner_side',
+  'milestone.remove': 'writer_read',
+  'promise.create': 'writer_read',
+  'promise.update': 'writer_read',
+  'promise.set_payoff': 'writer_read',
+  'promise.drop': 'writer_read',
+  'organise.rule': 'writer_read',
+  ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'writer_read'])) as Record<ActionType, WriterExposure>),
 };
 
 const MIN_QUOTE_WORDS = 3;
@@ -359,6 +399,14 @@ export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCar
   return gates || (current && op.terms !== undefined) ? 'secret_gating' : undefined;
 }
 
+/** An op is planner-side only when every field it writes is: one writer-read field, or one not yet classified, puts the whole op in front of the writer. */
+export function writerExposure(op: ChangeOp): WriterExposure {
+  const exposure = WRITER_EXPOSURE[op.op];
+  if (typeof exposure === 'string') return exposure;
+  const fields = op as unknown as Record<string, unknown>;
+  return declaredOpFields(op.op).every(field => fields[field] === undefined || exposure[field] === 'planner_side') ? 'planner_side' : 'writer_read';
+}
+
 /** Plans cite Story Bible pages as `bible_doc:`, change-sets name them `doc:`. */
 function asChangeSetRef(ref: string): string {
   return ref.startsWith('bible_doc:') ? `doc:${ref.slice('bible_doc:'.length)}` : ref;
@@ -475,8 +523,22 @@ function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], curre
 }
 
 /**
+ * A held op is judged as if ideas did not apply, so a quoted one waits as `held_for_review` and an idea keeps the quote rule's reason — a
+ * turned-down idea is still filtered out. The hold lands before the dependency pass, so an op that names a record only a held op creates waits with it.
+ */
+function judge(ops: readonly ChangeOp[], input: WritePolicyInput, appliesIdeas: boolean, hold: WriteHold): Judged[] {
+  const judged = ops.map((op, index): Judged => {
+    const held = hold === 'turn' || (hold === 'writer_read' && writerExposure(op) === 'writer_read');
+    const intrinsic = intrinsicDisposition(op, index, input, appliesIdeas && !held);
+    return held && intrinsic.disposition.side === 'direct' ? { disposition: { index, side: 'card', reason: 'held_for_review' } } : intrinsic;
+  });
+  moveDependentsToCards(ops, judged, input.state.current);
+  return judged;
+}
+
+/**
  * The write policy: an op applies without review only when no always-card rule holds, it depends on no card, the author is not just
- * discussing, the session lands changes on its own and nothing on the turn asks for review. There it applies as `quoted` when its kind is
+ * discussing, the session lands changes on its own and no hold on the turn covers it. There it applies as `quoted` when its kind is
  * allowlisted, its quote is found in the author's message this turn and stated rather than asked, and it adds little the author did not
  * say; a chat turn applies anything else `IDEA_POLICY` admits as an `idea` the author can undo, unless it truncates what a field held.
  * Everything else is a card. An idea that has to wait on a card keeps the quote rule's reason, so a turned-down idea can still be filtered out.
@@ -484,18 +546,15 @@ function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], curre
 export function splitChangeSet(input: WritePolicyInput): ChangeSetSplit {
   const ops = [...input.ops];
   const override = overrideReason(input);
-  const judge = (appliesIdeas: boolean) => {
-    const judged = ops.map((op, index) => intrinsicDisposition(op, index, input, appliesIdeas));
-    moveDependentsToCards(ops, judged, input.state.current);
-    return judged;
-  };
-  const judged = judge(override === null && input.ideas === 'apply');
-  const heldJudged = override === 'held_for_review' && input.ideas === 'apply' ? judge(true) : judged;
+  const hold = override ? 'none' : input.hold;
+  const appliesIdeas = override === null && input.ideas === 'apply';
+  const judged = judge(ops, input, appliesIdeas, hold);
+  const unheld = hold === 'none' ? judged : judge(ops, input, appliesIdeas, 'none');
 
   const dispositions = judged.map(({ disposition }): OpDisposition =>
     override && disposition.side === 'direct' ? { index: disposition.index, side: 'card', reason: override } : disposition,
   );
-  const eligible = heldJudged.filter(({ disposition }) => disposition.side === 'direct').length;
+  const turned = unheld.some(({ disposition }) => disposition.side === 'direct' && dispositions[disposition.index]?.side === 'card');
   const direct = dispositions.filter(d => d.side === 'direct');
   return {
     ops,
@@ -503,12 +562,11 @@ export function splitChangeSet(input: WritePolicyInput): ChangeSetSplit {
     cards: dispositions.filter(d => d.side === 'card').map(d => ops[d.index] as ChangeOp),
     sources: direct.map(d => d.source),
     dispositions,
-    held: override === 'held_for_review' && eligible > 0,
+    held: turned ? hold : 'none',
   };
 }
 
 function overrideReason(input: WritePolicyInput): CardReason | null {
   if (input.justDiscussing) return 'just_discussing';
-  if (input.mode !== 'auto') return 'manual_mode';
-  return input.held ? 'held_for_review' : null;
+  return input.mode === 'auto' ? null : 'manual_mode';
 }

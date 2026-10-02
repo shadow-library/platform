@@ -16,7 +16,7 @@ function split(ops: ChangeOp[], dispositions: (Omit<DirectDisposition, 'index'> 
   const indexed = dispositions.map((disposition, index) => ({ ...disposition, index }) as OpDisposition);
   const on = (side: 'direct' | 'card') => indexed.filter(d => d.side === side).map(d => ops[d.index] as ChangeOp);
   const sources = indexed.flatMap(d => (d.side === 'direct' ? [d.source] : []));
-  return { ops, direct: on('direct'), cards: on('card'), sources, dispositions: indexed, held: false };
+  return { ops, direct: on('direct'), cards: on('card'), sources, dispositions: indexed, held: 'none' };
 }
 
 function context(overrides: Partial<RejectionContext> = {}): RejectionContext {

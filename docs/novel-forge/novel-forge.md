@@ -75,7 +75,8 @@
   recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
   history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
-  character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page is held for review.
+  character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
+  every change the chapter writer would read (see the write policy).
 - **Start**: a new novel is a title (never blank; the web names an untitled one) plus notes of at most 10,000 words, created with its first chat in one transaction. The progress
   map ("Ready for chapter 1") is advice, never a gate; an item marked undecided or dismissed is recorded under a reserved Notebook topic that never reads as an author decision or
   a do-not-propose rule.
@@ -101,12 +102,14 @@
 
 - A session is Edit freely (`auto`, the default for new chats) or Ask first (`manual`, every op a card). The server decides what applies, never the model: a model-declared
   quote or origin never authorises a write on its own.
-- Under Edit freely, with Just discuss off and no warning holding the turn, every op no always-card rule holds applies within the turn and can be undone, including what
+- Under Edit freely, with Just discuss off and no hold covering it, every op no always-card rule holds applies within the turn and can be undone, including what
   the AI invents. Each applied op carries its source: `quoted` when its kind is allowlisted (Story Bible page, entity, fact, volume title or goal, an empty story field, a
   promise's label) and its `quote` supports it, `idea` otherwise, so the author sees which changes are the AI's and can undo them. Only a chat turn applies ideas, and only of
   the kinds classified as idea-eligible (Story Bible page, entity, volume title, an empty story field, milestone, a promise or its label); an idea that truncates a filled field
   beyond the removal budget stays a card. Secrets and planner-only content stay cards even under Edit freely: an unbacked fact, new or existing, and an invented volume goal
-  are never ideas. Just discuss, Ask first or a held turn makes every op a card.
+  are never ideas. A turn that drew on the notes or a planner-only page holds only the ops whose records the chapter writer reads: what only planning reads — milestones
+  and the premise, story brief and themes — applies as usual unless it leans on a held op, and an op writing any field the writer reads is held whole. Just discuss, Ask
+  first or any other warning on the turn makes every op a card.
 - Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions; planner-only and
   writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any
   time; a volume's order and notes; a promise's disposition (status, payoff target, dormant), progress or reuse of a settled one. The apply engine refuses an always-card kind
