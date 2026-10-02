@@ -2,14 +2,15 @@
   flex: 1;
 }
 
-/* The page owns the viewport — the composer is pinned, only the transcript scrolls. Full width, so the thread's
-   scrollbar sits at the pane's edge; the chat centres its own column. */
+/* The page owns the viewport — the composer is pinned, only the transcript and the panel scroll. Full width, so the
+   thread's scrollbar sits at the pane's edge; the chat centres its own column. `clip`, not `hidden`: a hidden box is
+   still a scroller that scrollIntoView and focus() move, which slid the whole chat up under the top bar. */
 .screen {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
   background: var(--sh-surface-app);
 }
 
@@ -111,9 +112,4 @@
   display: flex;
   gap: 6px;
   margin-top: 8px;
-}
-
-.screen {
-  flex-direction: column;
-  overflow-y: auto;
 }

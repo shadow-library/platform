@@ -1,5 +1,7 @@
 /* Beside the chat only while the thread keeps its full 720 column (720 + 2 × 20 thread padding + this 320); narrower, it opens as a sheet. */
 .panel {
+  /* Holds the absolutely placed screen-reader text, which would otherwise overflow the screen rather than this scroller. */
+  position: relative;
   flex: 0 0 320px;
   width: 320px;
   min-height: 0;

@@ -101,6 +101,8 @@
 }
 
 .scroll {
+  /* Holds the absolutely placed screen-reader text, which would otherwise overflow the screen rather than this scroller. */
+  position: relative;
   flex: 1;
   min-height: 0;
   padding: 24px 20px;

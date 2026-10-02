@@ -388,6 +388,16 @@ export function ChangesSection({ view, sectionRef, applied, cards }: ChangesSect
   );
 }
 
+// scrollIntoView also moves every scrollable ancestor, so it dragged the chat screen under the top bar; this moves only the panel's own scroller.
+function scrollToTopOfScroller(element: HTMLElement): void {
+  for (let scroller = element.parentElement; scroller; scroller = scroller.parentElement) {
+    const { overflowY } = getComputedStyle(scroller);
+    if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
+    scroller.scrollTo({ top: scroller.scrollTop + element.getBoundingClientRect().top - scroller.getBoundingClientRect().top });
+    return;
+  }
+}
+
 export interface ProgressPanelProps {
   novelId: string;
   turn: PanelTurn;
@@ -416,8 +426,10 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
 
   useEffect(() => {
     if (reveal === 0) return;
-    sectionRef.current?.scrollIntoView?.({ block: 'start' });
-    sectionRef.current?.focus({ preventScroll: true });
+    const section = sectionRef.current;
+    if (!section) return;
+    scrollToTopOfScroller(section);
+    section.focus({ preventScroll: true });
   }, [reveal]);
 
   // Committing removes the add and decline buttons, which drops their focus to the page.
