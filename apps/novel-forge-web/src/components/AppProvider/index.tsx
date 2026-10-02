@@ -1,6 +1,8 @@
 import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
 
+import { SidebarRailProvider } from '@/components/Layout';
+
 export interface AppProvidersProps {
   children?: React.ReactNode;
 }
@@ -16,7 +18,9 @@ export interface AppProvidersProps {
 export function AppProviders(props: AppProvidersProps): React.JSX.Element {
   return (
     <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="theme">
-      <TooltipProvider>{props.children}</TooltipProvider>
+      <TooltipProvider>
+        <SidebarRailProvider>{props.children}</SidebarRailProvider>
+      </TooltipProvider>
       <Toaster placement="top-end" />
     </ThemeProvider>
   );

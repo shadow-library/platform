@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
+import { PANEL_DOCK_MIN, PROGRESS_PANEL_WIDTH, SHELL_DESKTOP_MIN, SIDEBAR_EXPANDED_MIN, SIDEBAR_RAIL_WIDTH, SIDEBAR_WIDTH } from '../src/lib/sidebar-rail';
+
 const SPACING = /^(padding|padding-top|padding-bottom|margin|margin-top|margin-left|gap|border-radius|width|height|max-width|min-height|grid-template-columns)$/;
 
 type Rules = Map<string, Record<string, string>>;
@@ -326,10 +328,15 @@ describe('Chat spacing', () => {
   });
 });
 
-// The shell: sidebar 254 from 768 (a drawer below), content padding none. The chat screen takes the whole content region, so the thread's
-// scrollbar sits at the pane edge; only the thread column (.msgList) and the header inside it are capped.
-const SIDEBAR = 254;
+// The shell: a drawer below 768, the 56 rail until the progress panel can dock beside the 254 sidebar, then 254; the author may still expand
+// the rail by hand. Content padding none. The chat screen takes the whole content region, so the thread's scrollbar sits at the pane edge;
+// only the thread column (.msgList) and the header inside it are capped.
 const PHONE = 760;
+
+function sidebarAt(viewport: number): number {
+  if (viewport < SHELL_DESKTOP_MIN) return 0;
+  return viewport < SIDEBAR_EXPANDED_MIN ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH;
+}
 
 function px(value: string | undefined, index = 0): number {
   const parts = (value ?? '0').split(/\s+/);
@@ -344,9 +351,10 @@ describe('Chat width arithmetic', () => {
   const cardPad = px(base.get('.cardHead')?.padding, 1);
   const optionGap = px(base.get('.questionOptions')?.gap);
 
-  const layout = (viewport: number): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
-    const content = viewport >= 768 ? viewport - SIDEBAR : viewport;
-    const list = Math.min(content - 2 * sidePad, listMax);
+  const layout = (viewport: number, sidebar = sidebarAt(viewport)): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
+    const content = viewport - sidebar;
+    const thread = content >= PANEL_DOCK_MIN ? content - PROGRESS_PANEL_WIDTH : content;
+    const list = Math.min(thread - 2 * sidePad, listMax);
     const isPhone = viewport <= PHONE;
     const reply = list;
     const columns = isPhone ? 1 : 3;
@@ -367,12 +375,15 @@ describe('Chat width arithmetic', () => {
     expect(header - actions - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
   });
 
-  it('should keep every block readable at 768, 1024 and 1280', () => {
-    expect(layout(768)).toEqual({ list: 474, reply: 474, option: 152.66666666666666, checklistCell: 213, appliedText: 344 });
+  it('should keep every block readable at 768, 1024 and 1280, with the rail and with the sidebar expanded by hand', () => {
+    expect(layout(768)).toEqual({ list: 672, reply: 672, option: 218.66666666666666, checklistCell: 312, appliedText: 542 });
+    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 474, reply: 474, option: 152.66666666666666, checklistCell: 213, appliedText: 344 });
     expect(layout(1024)).toEqual({ list: 720, reply: 720, option: 234.66666666666666, checklistCell: 336, appliedText: 590 });
+    expect(layout(1024, SIDEBAR_WIDTH)).toEqual(layout(1024));
     expect(layout(1280)).toEqual(layout(1024));
+    expect(layout(1280, SIDEBAR_WIDTH)).toEqual(layout(1024));
     expect(layout(1920)).toEqual(layout(1024));
-    for (const viewport of [768, 1024, 1280]) expect(layout(viewport).option).toBeGreaterThanOrEqual(120);
+    for (const viewport of [768, 1024, 1280]) expect(layout(viewport, SIDEBAR_WIDTH).option).toBeGreaterThanOrEqual(120);
   });
 
   it('should keep the header as it was: the same four controls, with room for the title at 768', () => {
@@ -381,7 +392,7 @@ describe('Chat width arithmetic', () => {
     expect([...actions.matchAll(/<Button\b/g)]).toHaveLength(4);
     expect(actions).not.toContain('Progress');
 
-    const header = Math.min(768 - SIDEBAR - 2 * px(base.get('.head')?.padding, 1), px(base.get('.headInner')?.['max-width']));
+    const header = Math.min(768 - SIDEBAR_WIDTH - 2 * px(base.get('.head')?.padding, 1), px(base.get('.headInner')?.['max-width']));
     const labelled = { changes: 96, history: 90, newChat: 100 };
     const controls = labelled.changes + labelled.history + labelled.newChat + 2 * px(base.get('.headActions')?.gap);
     expect(header - controls - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
@@ -395,9 +406,15 @@ describe('Chat width arithmetic', () => {
     const panelWidth = px(spacingOf('../src/features/chat/ProgressPanel.module.css').base.get('.panel')?.width);
     expect(buttonHiddenFrom).toBe(hiddenBelow + 1);
     expect(buttonHiddenFrom).toBe(listMax + 2 * sidePad + panelWidth);
-    const content = (viewport: number): number => (viewport >= 768 ? viewport - SIDEBAR : viewport);
-    expect(content(1440) >= buttonHiddenFrom).toBe(true);
-    expect(content(1280) >= buttonHiddenFrom).toBe(false);
+    expect(buttonHiddenFrom).toBe(PANEL_DOCK_MIN);
+  });
+
+  it('should dock the progress panel from 1136 beside the rail and from 1334 beside the sidebar', () => {
+    const docks = (viewport: number, sidebar = sidebarAt(viewport)): boolean => viewport - sidebar >= PANEL_DOCK_MIN;
+    expect([1440, 1334, 1280, 1136].map(viewport => docks(viewport))).toEqual([true, true, true, true]);
+    expect([1135, 1024, 768].map(viewport => docks(viewport))).toEqual([false, false, false]);
+    expect(docks(1333, SIDEBAR_WIDTH)).toBe(false);
+    expect(docks(1280, SIDEBAR_WIDTH)).toBe(false);
   });
 
   it('should let the chat screen fill the pane and cap only the thread and header columns', () => {

@@ -1,12 +1,12 @@
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
-import { type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useTheme } from '@shadow-library/ui';
+import { cn, type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useHydrated, useSidebar, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
 import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
-import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
+import { type LifecyclePhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
 import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UsageIcon } from '../icons';
@@ -15,6 +15,8 @@ import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
 import { type NovelParams } from './routes';
 import { PROJECT_SCREENS, type ProjectScreen, topBarCrumbs } from './screens';
+import { useSidebarRail } from './SidebarRail';
+import railStyles from './SidebarRail.module.css';
 
 const PROJECT_LIMIT = 50;
 
@@ -28,12 +30,32 @@ function ThemeToggle(): React.JSX.Element {
   );
 }
 
+function LifecycleFooter({ phase }: { phase: LifecyclePhase }): React.JSX.Element | null {
+  const { collapsed } = useSidebar();
+  if (collapsed) return null;
+  return (
+    <div className={styles.lifecycle}>
+      <div className={styles.lifecycleHeading}>Lifecycle</div>
+      <div className={styles.lifecycleBar}>
+        {Array.from({ length: phase.total }).map((_, index) => (
+          <div key={index} className={styles.lifecycleSeg} data-state={index < phase.completed ? 'done' : index === phase.completed ? 'current' : 'todo'} />
+        ))}
+      </div>
+      <div className={styles.lifecycleLabel}>
+        {phase.label} · {phase.completed} of {phase.total} phases
+      </div>
+    </div>
+  );
+}
+
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { novelId } = useParams({ strict: false }) as NovelParams;
   const inProject = Boolean(novelId);
   const [palette, setPalette] = useState<PaletteState>({ kind: 'closed' });
+  const rail = useSidebarRail();
+  const hydrated = useHydrated();
 
   const openScope = useCallback((scope: JumpScope) => setPalette({ kind: 'scoped', scope }), []);
   const dropScope = useCallback(() => setPalette(current => (current.kind === 'scoped' ? { kind: 'closed' } : current)), []);
@@ -216,24 +238,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         }
         actions={inProject ? <JobsTray novelId={novelId} /> : undefined}
         utility={<ThemeToggle />}
-        sidebarFooter={
-          inProject && phase.total > 0 ? (
-            <div className={styles.lifecycle}>
-              <div className={styles.lifecycleHeading}>Lifecycle</div>
-              <div className={styles.lifecycleBar}>
-                {Array.from({ length: phase.total }).map((_, index) => (
-                  <div key={index} className={styles.lifecycleSeg} data-state={index < phase.completed ? 'done' : index === phase.completed ? 'current' : 'todo'} />
-                ))}
-              </div>
-              <div className={styles.lifecycleLabel}>
-                {phase.label} · {phase.completed} of {phase.total} phases
-              </div>
-            </div>
-          ) : undefined
-        }
+        sidebarFooter={inProject && phase.total > 0 ? <LifecycleFooter phase={phase} /> : undefined}
+        sidebarCollapsed={rail?.collapsed}
+        onSidebarCollapsedChange={rail?.setCollapsed}
         contentWidth="fluid"
         contentPadding="none"
-        className={styles.shellRoot}
+        className={cn(styles.shellRoot, rail != null && !hydrated && railStyles.pending)}
       >
         <div className={`nf-scroll ${styles.content}`}>{children}</div>
       </Chrome>

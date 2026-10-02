@@ -1,0 +1,12 @@
+/* The server cannot see the viewport, so it draws the sidebar expanded. Until hydration hands the sidebar to the rail state, hold it at the
+   rail's width with its contents hidden, so the content beside it never jumps. 768 is --sh-breakpoint-md; 1333 and 56 are
+   SIDEBAR_EXPANDED_MIN − 1 and SIDEBAR_RAIL_WIDTH in lib/sidebar-rail.ts (tests/sidebar-rail.spec.ts holds them equal). */
+@media (min-width: 768px) and (max-width: 1333px) {
+  .pending :global(nav[aria-label='Main']) {
+    width: 56px;
+  }
+
+  .pending :global(nav[aria-label='Main']) > * {
+    visibility: hidden;
+  }
+}
