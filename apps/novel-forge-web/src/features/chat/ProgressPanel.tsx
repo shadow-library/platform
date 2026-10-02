@@ -7,7 +7,7 @@ import { type ApplyProposalResponse, isApiError, type ProposalResponse, usePropo
 import { useNow } from '@/lib/use-elapsed';
 
 import { type AppliedOpState, currentOpState, type OpRun, updateOpState, useOpState } from './applied-op-store';
-import { opSubject, type SessionMode, type SuggestionDecision } from './chat-view';
+import { opSubject, REJECTION_SCOPE_LABEL, type RejectionScope, rejectionScopeNote, type SessionMode, type SuggestionDecision } from './chat-view';
 import {
   type AppliedPanelChange,
   type CardPanelChange,
@@ -218,15 +218,16 @@ export function AppliedChangeRow({ change, locked, busy, error, prompt, onToggle
   );
 }
 
-const CARD_NOTE: Partial<Record<CardPanelChange['state'], string>> = { added: 'Added', declined: 'Not added', replaced: 'Replaced by a newer card' };
+const CARD_NOTE: Partial<Record<CardPanelChange['state'], string>> = { added: 'Added', undone: 'Added, then undone', declined: 'Not added', replaced: 'Replaced by a newer card' };
 
 export interface CardChangeRowProps {
   change: CardPanelChange;
   busy: boolean;
   onDecide: (decision: SuggestionDecision | undefined) => void;
+  onScope: (scope: RejectionScope) => void;
 }
 
-export function CardChangeRow({ change, busy, onDecide }: CardChangeRowProps): React.JSX.Element {
+export function CardChangeRow({ change, busy, onDecide, onScope }: CardChangeRowProps): React.JSX.Element {
   const note = CARD_NOTE[change.state];
   const pick = (decision: SuggestionDecision): void => onDecide(change.state === decision ? undefined : decision);
   return (
@@ -252,8 +253,27 @@ export function CardChangeRow({ change, busy, onDecide }: CardChangeRowProps): R
       ) : (
         <span />
       )}
+      {change.value && <WrittenValue value={change.value} long={change.valueLong} />}
+      {change.quote && (
+        <span className={styles.changeQuote} title={change.quote}>
+          from your message: “{change.quote}”
+        </span>
+      )}
       {note && <span className={styles.changeNote}>{note}</span>}
       {!change.decidable && change.state === 'open' && <span className={styles.changeNote}>Answer it on its card in the chat</span>}
+      {change.scope && <span className={styles.changeNote}>Won’t be suggested again {rejectionScopeNote(change.scope)}</span>}
+      {change.askScope.length > 0 && (
+        <div className={styles.changePrompt}>
+          <span>Should it ever be suggested again?</span>
+          <span className={styles.promptActions} role="group" aria-label={`When to suggest “${change.label}” again`}>
+            {change.askScope.map(scope => (
+              <Button key={scope} size="sm" variant="secondary" disabled={busy} onClick={() => onScope(scope)}>
+                {REJECTION_SCOPE_LABEL[scope]}
+              </Button>
+            ))}
+          </span>
+        </div>
+      )}
     </li>
   );
 }
@@ -318,9 +338,15 @@ interface CardChangesProps {
 }
 
 function CardChanges({ novelId, proposal, groups, title, onApplied }: CardChangesProps): React.JSX.Element {
-  const { answers, decide } = useSuggestionAnswering(novelId, proposal, { onApplied });
+  const { answers, decide, remember, remembering } = useSuggestionAnswering(novelId, proposal, { onApplied });
   const row = (change: CardPanelChange): React.JSX.Element => (
-    <CardChangeRow key={change.key} change={change} busy={answers.committing} onDecide={decision => decide(change.index, decision)} />
+    <CardChangeRow
+      key={change.key}
+      change={change}
+      busy={answers.committing || remembering}
+      onDecide={decision => decide(change.index, decision)}
+      onScope={scope => remember(change.index, scope)}
+    />
   );
   if (!title) return <Groups groups={groups} row={row} />;
   return (
@@ -382,7 +408,7 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
   const applied = appliedQuery.data ?? refs.applied;
   const cards = cardsQuery.data ?? refs.cards;
   const answers = useSuggestionAnswers(cards?.id);
-  const changes = changesView({ turn, mode, applied, cards, decisions: answers.decisions });
+  const changes = changesView({ turn, mode, applied, cards, decisions: answers.decisions, scopes: answers.scopes });
   const settledCount = changes.kind === 'settled' ? [...changes.applied, ...changes.cards].reduce((sum, group) => sum + group.items.length, 0) : 0;
   const saveMode: SessionMode = turn.kind === 'message' ? (refs.appliedProposalId ? 'auto' : 'manual') : mode;
   const progress = progressView({ turn, mode: saveMode, now, changes: settledCount, question: refs.question });
@@ -393,6 +419,16 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
     sectionRef.current?.scrollIntoView?.({ block: 'start' });
     sectionRef.current?.focus({ preventScroll: true });
   }, [reveal]);
+
+  // Committing removes the add and decline buttons, which drops their focus to the page.
+  const cardsId = cards?.id;
+  const cardsPending = cards?.status === 'pending';
+  const lastCards = useRef({ id: cardsId, pending: cardsPending });
+  useEffect(() => {
+    const committed = lastCards.current.id === cardsId && lastCards.current.pending && !cardsPending;
+    lastCards.current = { id: cardsId, pending: cardsPending };
+    if (committed && document.activeElement === document.body) sectionRef.current?.focus({ preventScroll: true });
+  }, [cardsId, cardsPending]);
 
   return (
     <>

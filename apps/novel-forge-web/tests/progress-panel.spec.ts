@@ -18,7 +18,9 @@ import {
   panelTurnOf,
   progressView,
   runOpSequence,
+  savedSides,
   sourcesView,
+  turnReceipt,
   turnRefs,
 } from '../src/features/chat/progress-panel-view';
 import { TurnReceiptView } from '../src/features/chat/TurnReceipt';
@@ -345,6 +347,41 @@ describe('changes', () => {
     expect(cardChanges({ ...CARDS, changeSet: [{ op: 'action.finalize' }] }, new Map())[0]?.decidable).toBe(false);
   });
 
+  it('should carry what a suggestion would write and the words it quotes', () => {
+    const quoted = proposal({
+      ...CARDS,
+      changeSet: [{ op: 'entity.upsert', entityKey: 'council', name: 'The Council', body: 'Families who trade memories.', quote: 'the council trades' }],
+    });
+    expect(cardChanges(quoted, new Map())[0]).toMatchObject({ value: 'Families who trade memories.', valueLong: false, quote: 'the council trades' });
+    expect(cardChanges(CARDS, new Map())[0]?.value).toBeUndefined();
+  });
+
+  it('should ask when to suggest a declined change again until a scope is recorded, pending or committed', () => {
+    const declined = new Map([[0, 'decline' as const]]);
+    expect(cardChanges(CARDS, declined)[0]?.askScope).toEqual(['never', 'not_now', 'not_this_version']);
+    expect(cardChanges(CARDS, declined)[1]?.askScope).toEqual([]);
+    const committed = proposal({ ...CARDS, status: 'applied', opResults: [{ index: 1, status: 'applied' }] });
+    expect(cardChanges(committed, declined)[0]?.askScope).toHaveLength(3);
+    expect(cardChanges(committed, declined, new Map([[0, 'not_now']]))[0]).toMatchObject({ askScope: [], scope: 'not_now' });
+    expect(cardChanges(committed, new Map())[0]?.askScope).toEqual([]);
+    expect(cardChanges({ ...CARDS, status: 'superseded' }, declined)[0]?.askScope).toEqual([]);
+    expect(cardChanges({ ...CARDS, changeSet: [{ op: 'action.plan_chapter' }] }, declined)[0]?.askScope).toEqual([]);
+  });
+
+  it('should mark the suggestions of an undone card as undone', () => {
+    const undone = proposal({ ...CARDS, status: 'reverted', opResults: [{ index: 0, status: 'applied' }] });
+    expect(cardChanges(undone, new Map()).map(row => row.state)).toEqual(['undone', 'declined']);
+  });
+
+  it('should leave prose and plan edits to their own card in the thread', () => {
+    const prose = { ...CARDS, changeSet: [...CARDS.changeSet, { op: 'draft.update', chapter: 2, body: 'New prose.' }] };
+    expect(cardChanges(prose, new Map([[0, 'decline']])).map(row => [row.decidable, row.askScope.length])).toEqual([
+      [false, 0],
+      [false, 0],
+      [false, 0],
+    ]);
+  });
+
   it('should list streamed changes while the turn runs, then rebuild from the settled turn', () => {
     const live = changesView({ turn: streamTurn(play(FULL)), mode: 'auto', decisions: new Map() });
     expect(live).toMatchObject({ kind: 'streamed', count: '2 so far' });
@@ -377,15 +414,16 @@ describe('receipts', () => {
   });
 
   it('should count what is still applied, name the ideas, and offer Undo all', () => {
-    expect(appliedReceipt(APPLIED, 2)).toEqual({
+    expect(appliedReceipt([APPLIED], 2)).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 3 changes',
       detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 2 need your OK',
       canUndoAll: true,
+      canAddAll: false,
     });
-    expect(appliedReceipt({ ...APPLIED, status: 'reverted' }, 0)).toEqual({ kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' });
+    expect(appliedReceipt([{ ...APPLIED, status: 'reverted' }], 0)).toEqual({ kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' });
     const allUndone = { ...APPLIED, opResults: (APPLIED.opResults ?? []).map(result => ({ ...result, status: result.status === 'applied' ? 'reverted' : result.status })) };
-    expect(appliedReceipt(allUndone, 0)).toEqual({ kind: 'reverted', title: 'Every change from this turn was undone.' });
+    expect(appliedReceipt([allUndone], 0)).toEqual({ kind: 'reverted', title: 'Every change from this turn was undone.' });
   });
 
   it('should count the cards still waiting and offer Add all until every one has an answer', () => {
@@ -414,6 +452,164 @@ describe('receipts', () => {
       detail: 'Passed on 1',
     });
     expect(cardsReceipt({ ...CARDS, kind: 'chapter_plan' }, { decisions: new Map(), committing: false })).toEqual({ kind: 'none' });
+  });
+});
+
+describe('turnReceipt', () => {
+  const answers = (decisions: [number, 'add' | 'decline'][] = [], extra: { committing?: boolean; error?: string } = {}) => ({
+    decisions: new Map(decisions),
+    committing: false,
+    ...extra,
+  });
+  const ONE_WAY = proposal({ ...CARDS, changeSet: [...CARDS.changeSet, { op: 'action.finalize', upTo: 3 }] });
+  const PROSE = proposal({ ...CARDS, changeSet: [{ op: 'draft.update', chapter: 2, body: 'New prose.' }] });
+  const WARNED = proposal({ ...CARDS, warnings: ['the council entry drops "rich" by stating its absence.'] });
+
+  it('should lead a mixed turn with what it saved and offer Add all for what waits', () => {
+    expect(turnReceipt({ applied: APPLIED, cards: CARDS, answers: answers([[0, 'decline']]) })).toEqual({
+      kind: 'applied',
+      title: 'Updated your Story Bible · 3 changes',
+      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 1 needs your OK',
+      canUndoAll: true,
+      canAddAll: true,
+    });
+    expect(turnReceipt({ applied: APPLIED, cards: CARDS, answers: answers([], { committing: true }) })).toMatchObject({ canAddAll: false });
+  });
+
+  it('should count cards answered on their own card but never add them from the receipt', () => {
+    expect(turnReceipt({ applied: APPLIED, cards: ONE_WAY, answers: answers(), held: 'warnings' })).toEqual({
+      kind: 'applied',
+      title: 'Updated your Story Bible · 3 changes',
+      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 3 need your OK',
+      canUndoAll: true,
+      canAddAll: false,
+    });
+    expect(turnReceipt({ cards: ONE_WAY, answers: answers() })).toEqual({ kind: 'none' });
+    expect(turnReceipt({ cards: PROSE, answers: answers() })).toEqual({ kind: 'none' });
+  });
+
+  it('should say why held cards wait, from the turn this tab ran', () => {
+    expect(turnReceipt({ cards: CARDS, answers: answers(), held: 'planner_sources' })).toMatchObject({
+      kind: 'cards',
+      title: '2 changes waiting for you',
+      canAddAll: true,
+      hold: 'Held for review: this turn drew on your notes, so changes your chapters or readers would see wait for you.',
+    });
+    expect(turnReceipt({ applied: APPLIED, cards: WARNED, answers: answers(), held: 'warnings' })).toMatchObject({
+      kind: 'applied',
+      canAddAll: true,
+      hold: 'Held for review: the council entry drops "rich" by stating its absence.',
+    });
+    expect(turnReceipt({ cards: CARDS, answers: answers(), held: 'warnings' })).toMatchObject({ hold: 'Held for review: check the warnings on these first.' });
+  });
+
+  it('should explain a reloaded turn’s cards by their own warnings, or not at all', () => {
+    expect(turnReceipt({ cards: WARNED, answers: answers() })).toMatchObject({ hold: 'the council entry drops "rich" by stating its absence.' });
+    expect(turnReceipt({ cards: CARDS, answers: answers() })).not.toHaveProperty('hold');
+    expect(
+      turnReceipt({
+        cards: WARNED,
+        answers: answers(
+          [
+            [0, 'add'],
+            [1, 'add'],
+          ],
+          { committing: true },
+        ),
+      }),
+    ).not.toHaveProperty('hold');
+  });
+
+  it('should offer the commit a fully answered card still owes, alone or beside saved changes', () => {
+    const failed = answers(
+      [
+        [0, 'add'],
+        [1, 'decline'],
+      ],
+      { error: 'Offline.' },
+    );
+    expect(turnReceipt({ cards: CARDS, answers: failed })).toMatchObject({ title: 'All changes answered', detail: 'Couldn’t finish: Offline.', commit: 'Add 1 now' });
+    expect(turnReceipt({ applied: APPLIED, cards: CARDS, answers: failed })).toMatchObject({
+      kind: 'applied',
+      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · Couldn’t finish: Offline.',
+      commit: 'Add 1 now',
+    });
+    expect(
+      turnReceipt({
+        cards: CARDS,
+        answers: answers(
+          [
+            [0, 'add'],
+            [1, 'add'],
+          ],
+          { committing: true },
+        ),
+      }),
+    ).not.toHaveProperty('commit');
+  });
+
+  it('should offer Undo all for suggestions the author added, saying what was passed on', () => {
+    const added = proposal({ ...CARDS, status: 'applied', revertible: true, opResults: [{ index: 0, status: 'applied' }] });
+    expect(turnReceipt({ cards: added, answers: answers() })).toEqual({
+      kind: 'applied',
+      title: 'Updated your Story Bible · 1 change',
+      detail: '1 record · passed on 1',
+      canUndoAll: true,
+      canAddAll: false,
+    });
+    expect(turnReceipt({ cards: { ...added, status: 'reverted' }, answers: answers() })).toEqual({ kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' });
+  });
+
+  it('should count both saved sides of a mixed turn after Add all and undo them newest first', () => {
+    const added = proposal({
+      ...CARDS,
+      status: 'applied',
+      revertible: true,
+      opResults: [
+        { index: 0, status: 'applied' },
+        { index: 1, status: 'applied' },
+      ],
+    });
+    expect(savedSides(APPLIED, added).map(side => side.id)).toEqual(['cp', 'ap']);
+    expect(turnReceipt({ applied: APPLIED, cards: added, answers: answers() })).toEqual({
+      kind: 'applied',
+      title: 'Updated your Story Bible · 5 changes',
+      detail: 'Premise, 1 page, 2 records, 1 other change · 1 is Forge’s idea · 1 undone',
+      canUndoAll: true,
+      canAddAll: false,
+    });
+    expect(turnReceipt({ applied: APPLIED, cards: { ...added, revertible: false }, answers: answers() })).toMatchObject({ canUndoAll: false });
+    expect(savedSides(APPLIED, proposal({ ...CARDS, status: 'applied', changeSet: [{ op: 'draft.update', chapter: 2, body: 'x' }] })).map(side => side.id)).toEqual(['ap']);
+  });
+
+  it('should keep the commit a card still owes after the saved side was undone', () => {
+    const undone = proposal({ ...APPLIED, status: 'reverted' });
+    expect(
+      turnReceipt({
+        applied: undone,
+        cards: CARDS,
+        answers: answers(
+          [
+            [0, 'add'],
+            [1, 'add'],
+          ],
+          { error: 'Offline.' },
+        ),
+      }),
+    ).toMatchObject({
+      kind: 'cards',
+      commit: 'Add 2 now',
+    });
+  });
+
+  it('should turn to the waiting cards once the saved side is undone, and stay undone once nothing waits', () => {
+    const undone = proposal({ ...APPLIED, status: 'reverted' });
+    expect(turnReceipt({ applied: undone, cards: CARDS, answers: answers() })).toMatchObject({ kind: 'cards', count: 2, canAddAll: true });
+    expect(turnReceipt({ applied: undone, cards: proposal({ ...CARDS, status: 'discarded' }), answers: answers() })).toEqual({
+      kind: 'reverted',
+      title: 'Undone — your Story Bible is back as it was.',
+    });
+    expect(turnReceipt({ applied: APPLIED, answers: answers() })).toMatchObject({ kind: 'applied', canAddAll: false });
   });
 });
 
@@ -513,12 +709,29 @@ describe('ProgressPanel sections', () => {
 
   it('should answer a card with pressed add and decline buttons, or say where to answer it', () => {
     const [council] = cardChanges(CARDS, new Map([[0, 'add']]));
-    const out = html(createElement(CardChangeRow, { change: council!, busy: false, onDecide: noop }));
+    const out = html(createElement(CardChangeRow, { change: council!, busy: false, onDecide: noop, onScope: noop }));
     expect(out).toContain('aria-label="Answer “The Council”"');
     expect(out).toContain('aria-label="Add"');
     expect(out).toContain('aria-pressed="true"');
     const oneWay = cardChanges({ ...CARDS, changeSet: [{ op: 'action.finalize', upTo: 3 }] }, new Map())[0];
-    expect(html(createElement(CardChangeRow, { change: oneWay!, busy: false, onDecide: noop }))).toContain('Answer it on its card in the chat');
+    expect(html(createElement(CardChangeRow, { change: oneWay!, busy: false, onDecide: noop, onScope: noop }))).toContain('Answer it on its card in the chat');
+  });
+
+  it('should show what a suggestion writes and ask when to suggest a declined one again', () => {
+    const quoted = proposal({
+      ...CARDS,
+      changeSet: [{ op: 'entity.upsert', entityKey: 'council', name: 'The Council', body: 'Families who trade memories.', quote: 'they trade' }],
+    });
+    const [declined] = cardChanges(quoted, new Map([[0, 'decline']]));
+    const out = html(createElement(CardChangeRow, { change: declined!, busy: false, onDecide: noop, onScope: noop }));
+    expect(out).toContain('Families who trade memories.');
+    expect(out).toContain('from your message: “they trade”');
+    expect(out).toContain('aria-label="When to suggest “The Council” again"');
+    expect(out).toContain('Not now — maybe later');
+    const [scoped] = cardChanges(quoted, new Map([[0, 'decline']]), new Map([[0, 'never']]));
+    const remembered = html(createElement(CardChangeRow, { change: scoped!, busy: false, onDecide: noop, onScope: noop }));
+    expect(remembered).toContain('Won’t be suggested again for this story');
+    expect(remembered).not.toContain('When to suggest');
   });
 
   it('should head the changes with their count and draw the streamed labels', () => {
@@ -532,16 +745,45 @@ describe('ProgressPanel sections', () => {
 
 describe('TurnReceiptView', () => {
   it('should offer Review and Undo all for saved changes, and Add all for waiting ones', () => {
-    const saved = html(createElement(TurnReceiptView, { view: appliedReceipt(APPLIED, 0), onReview: noop, onUndoAll: noop }));
+    const saved = html(createElement(TurnReceiptView, { view: appliedReceipt([APPLIED], 0), onReview: noop, onUndoAll: noop }));
     expect(saved).toContain('Updated your Story Bible · 3 changes');
     expect(saved).toContain('Review in panel');
     expect(saved).toContain('Undo all');
     const waiting = html(createElement(TurnReceiptView, { view: cardsReceipt(CARDS, { decisions: new Map(), committing: false }), onReview: noop, onAddAll: noop }));
     expect(waiting).toContain('2 changes waiting for you');
     expect(waiting).toContain('Add all');
-    const reverted = html(createElement(TurnReceiptView, { view: appliedReceipt({ ...APPLIED, status: 'reverted' }, 0), onReview: noop, onUndoAll: noop }));
+    const reverted = html(createElement(TurnReceiptView, { view: appliedReceipt([{ ...APPLIED, status: 'reverted' }], 0), onReview: noop, onUndoAll: noop }));
     expect(reverted).not.toContain('Undo all');
     expect(html(createElement(TurnReceiptView, { view: { kind: 'none' }, onReview: noop }))).toBe('');
+  });
+});
+
+describe('TurnReceiptView for a mixed or held turn', () => {
+  it('should offer Undo all and Add all together, with the hold in a line of its own', () => {
+    const view = turnReceipt({ applied: APPLIED, cards: CARDS, answers: { decisions: new Map(), committing: false }, held: 'planner_sources' });
+    const out = html(createElement(TurnReceiptView, { view, onReview: noop, onUndoAll: noop, onAddAll: noop }));
+    expect(out).toContain('Updated your Story Bible · 3 changes');
+    expect(out).toContain('2 need your OK');
+    expect(out).toContain('Undo all');
+    expect(out).toContain('Add all');
+    expect(out).toContain('Held for review: this turn drew on your notes');
+  });
+
+  it('should offer the owed commit in place of Add all', () => {
+    const view = turnReceipt({
+      cards: CARDS,
+      answers: {
+        decisions: new Map([
+          [0, 'add'],
+          [1, 'add'],
+        ]),
+        committing: false,
+        error: 'Offline.',
+      },
+    });
+    const out = html(createElement(TurnReceiptView, { view, onReview: noop, onAddAll: noop, onCommit: noop }));
+    expect(out).toContain('Add 2 now');
+    expect(out).not.toContain('Add all');
   });
 });
 

@@ -2,15 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Spinner, toast } from '@shadow-library/ui';
 
-import {
-  type ApplyProposalResponse,
-  type ProposalResponse,
-  useProposalQuery,
-  useRejectProposalOpMutation,
-  useRevertProposalMutation,
-  useUndoImpactQuery,
-  useUpdateProposalMutation,
-} from '@/lib/apis';
+import { type ApplyProposalResponse, type ProposalResponse, useProposalQuery, useRevertProposalMutation, useUndoImpactQuery, useUpdateProposalMutation } from '@/lib/apis';
 
 import { AppliedBlock, type AppliedOrigin, UndoImpactDialog } from './AppliedBlock';
 import { currentOpState, updateOpState, useOpState } from './applied-op-store';
@@ -18,17 +10,16 @@ import {
   appliedRows,
   type CardEntryNote,
   commitBarView,
+  mergeUndoImpacts,
   opWrittenField,
   picksOf,
   picksSentence,
   proposalPresentation,
   type QuoteSource,
-  type RejectionScope,
-  rejectionWhy,
   type SuggestionDecision,
 } from './chat-view';
 import styles from './Chat.module.css';
-import { readAnswers, reportUnanswered, updateAnswers } from './suggestion-store';
+import { readAnswers, reportUnanswered } from './suggestion-store';
 import { CommitBar, SuggestionCard } from './SuggestionCard';
 import { TurnProposalCard } from './TurnProposalCard';
 import { useSuggestionAnswering } from './use-suggestion-answering';
@@ -83,17 +74,21 @@ interface AppliedChangeProps {
 export interface RevertFlow {
   open: () => void;
   dialog: React.JSX.Element;
-  /** A change of this proposal is moving — here, or in the progress panel — so a whole revert waits. */
+  /** A change of these proposals is moving — here, or in the progress panel — so a whole revert waits. */
   locked: boolean;
 }
 
-/** Undoing a whole applied proposal: what relies on it first, then the revert. Focus returns to the opener, or to `fallback` once the opener is gone. */
-export function useRevertFlow(novelId: string, proposalId: string, fallback: RefObject<HTMLElement | null>): RevertFlow {
+/** Undoes whole applied proposals in the order given — a turn's added suggestions before its saved changes — after showing what relies on them. */
+export function useRevertFlow(novelId: string, proposalIds: readonly string[], fallback: RefObject<HTMLElement | null>): RevertFlow {
+  const [first, second] = proposalIds;
   const [confirming, setConfirming] = useState(false);
-  const impact = useUndoImpactQuery(novelId, proposalId, confirming);
+  const firstImpact = useUndoImpactQuery(novelId, first, confirming);
+  const secondImpact = useUndoImpactQuery(novelId, second, confirming);
   const revert = useRevertProposalMutation(novelId);
-  const opState = useOpState(proposalId);
+  const firstState = useOpState(first);
+  const secondState = useOpState(second);
   const openerRef = useRef<HTMLElement | null>(null);
+  const busy = firstState.busy ?? secondState.busy;
 
   const open = (): void => {
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -108,38 +103,40 @@ export function useRevertFlow(novelId: string, proposalId: string, fallback: Ref
   };
 
   const undo = async (): Promise<void> => {
-    if (currentOpState(proposalId).busy !== undefined) return;
-    updateOpState(proposalId, current => ({ ...current, busy: 'all' }));
+    if (proposalIds.length === 0 || proposalIds.some(id => currentOpState(id).busy !== undefined)) return;
+    for (const id of proposalIds) updateOpState(id, current => ({ ...current, busy: 'all' }));
     try {
-      await revert.mutateAsync(proposalId);
+      for (const id of proposalIds) await revert.mutateAsync(id);
       setConfirming(false);
       toast.success('Undone — your Story Bible is back as it was');
     } catch (err) {
       toast.danger(err instanceof Error ? err.message : 'Couldn’t undo it.');
     } finally {
-      updateOpState(proposalId, current => ({ ...current, busy: undefined }));
+      for (const id of proposalIds) updateOpState(id, current => ({ ...current, busy: undefined }));
     }
   };
 
+  const impacts = [firstImpact, ...(second ? [secondImpact] : [])];
+  const loaded = impacts.flatMap(impact => (impact.data ? [impact.data] : []));
   const dialog = (
     <UndoImpactDialog
       open={confirming}
       onOpenChange={setConfirming}
       onCloseAutoFocus={restoreFocus}
-      impact={impact.data}
-      loading={impact.isLoading}
-      error={impact.error}
-      onRetry={() => void impact.refetch()}
+      impact={loaded.length === impacts.length ? mergeUndoImpacts(loaded) : undefined}
+      loading={impacts.some(impact => impact.isLoading)}
+      error={impacts.find(impact => impact.error)?.error}
+      onRetry={() => impacts.forEach(impact => void impact.refetch())}
       onConfirm={() => void undo()}
-      confirming={opState.busy === 'all'}
+      confirming={busy === 'all'}
     />
   );
-  return { open, dialog, locked: opState.busy !== undefined };
+  return { open, dialog, locked: busy !== undefined };
 }
 
 export function AppliedChange({ novelId, proposal, origin, quoteSource, paragraphs }: AppliedChangeProps): React.JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
-  const revert = useRevertFlow(novelId, proposal.id, rootRef);
+  const revert = useRevertFlow(novelId, [proposal.id], rootRef);
   const appliedIndexes = new Set((proposal.opResults ?? []).filter(result => result.status === 'applied').map(result => result.index));
   const rows = appliedRows(proposal.changeSet, paragraphs).filter(row => appliedIndexes.size === 0 || appliedIndexes.has(row.index));
 
@@ -175,13 +172,12 @@ interface SuggestionGroupProps {
 
 function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: SuggestionGroupProps): React.JSX.Element {
   const update = useUpdateProposalMutation(novelId);
-  const remember = useRejectProposalOpMutation(novelId);
   const focusTarget = useRef<number | 'outcome' | undefined>(undefined);
-  const { answers, decide: answer, commit } = useSuggestionAnswering(novelId, proposal, { onApplied, onCommitted: () => (focusTarget.current = 'outcome') });
+  const { answers, decide: answer, commit, remember, remembering } = useSuggestionAnswering(novelId, proposal, { onApplied, onCommitted: () => (focusTarget.current = 'outcome') });
   const { decisions, scopes, committing } = answers;
   const [drafts, setDrafts] = useState<ReadonlyMap<number, string>>(new Map());
   const groupRef = useRef<HTMLDivElement>(null);
-  const busy = committing || update.isPending || remember.isPending;
+  const busy = committing || update.isPending || remembering;
   const total = proposal.changeSet.length;
   const pending = proposal.status === 'pending';
   const remaining = total - decisions.size;
@@ -236,18 +232,6 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
     );
   };
 
-  const recordScope = (index: number, scope: RejectionScope): void => {
-    const op = proposal.changeSet[index];
-    if (!op) return;
-    remember.mutate(
-      { proposalId: proposal.id, opIndex: index, scope, why: rejectionWhy(scope) },
-      {
-        onSuccess: () => updateAnswers(proposal.id, current => ({ ...current, scopes: new Map(current.scopes).set(index, scope) })),
-        onError: err => toast.danger(err.message),
-      },
-    );
-  };
-
   if (!pending) {
     const declined = proposal.changeSet.map((op, index) => ({ op, index })).filter(({ index }) => decisions.get(index) === 'decline');
     const replaced = proposal.status === 'superseded' || proposal.status === 'conflicted';
@@ -274,7 +258,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
                 decision="decline"
                 scope={scopes.get(index)}
                 remaining={0}
-                busy={remember.isPending}
+                busy={remembering}
                 onAdd={noop}
                 onEditFirst={noop}
                 onDraftChange={noop}
@@ -283,7 +267,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
                 onDecline={noop}
                 onUndoDecision={noop}
                 canUndo={false}
-                onScope={scope => recordScope(index, scope)}
+                onScope={scope => remember(index, scope)}
               />
             </div>
           ))}
@@ -314,7 +298,7 @@ function SuggestionGroup({ novelId, proposal, onApplied, notes, quoteSource }: S
             onCancelEdit={() => setDraft(index, undefined)}
             onDecline={() => decide(index, 'decline')}
             onUndoDecision={() => decide(index, undefined)}
-            onScope={scope => recordScope(index, scope)}
+            onScope={scope => remember(index, scope)}
           />
         </div>
       ))}

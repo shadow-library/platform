@@ -93,7 +93,9 @@
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
 - **The Progress panel** lists a turn's steps, its Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the sources
   it read. It docks beside the chat where the thread keeps its full column and otherwise opens as a sheet from the turn's receipt; the chat header is unchanged. Its undo
-  refuses rather than cascades, as the write policy below requires.
+  refuses rather than cascades, as the write policy below requires. A turn's suggestions are answered there too, never as cards in the thread: the turn's one receipt
+  carries Undo all for what it saved, Add all for what waits and why a hold kept it. An action, prose or a plan edit keeps its own card in the thread and is never added
+  in bulk.
 - **One message may be queued while a turn runs**, and it is sent only after this tab's own turn settles cleanly. A failed or stopped reply, a turn started in another tab or a
   locked chat holds it for the author, who can edit it or send it now. A message released on its own keeps the settings it was queued with.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.

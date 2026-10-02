@@ -1,11 +1,23 @@
-import { type ChatMessageResponse, type ChatTurnTraceResponse, type ProposalResponse } from '@/lib/apis/api-types.gen';
+import { type ChatMessageResponse, type ChatTurnTraceResponse, type ProposalResponse, type TurnHoldReason } from '@/lib/apis/api-types.gen';
 import { type ChatTurnChangeGroup, type ChatTurnStreamState, type ProposalOpDirection, type ProposalOpOutcome } from '@/lib/apis/refinement.api';
 import { turnPhase, turnSummary } from '@/lib/chat-turn-phase';
 import { type TurnSource, turnSources } from '@/lib/chat-turn-timeline';
 import { formatElapsed } from '@/lib/format';
 import { type ChangeOp } from '@/lib/proposals';
 
-import { isActionOp, opSubject, opWrittenText, proposalPresentation, questionOf, type SessionMode, type SuggestionDecision } from './chat-view';
+import {
+  answeredInPanel,
+  commitBarView,
+  isActionOp,
+  opSubject,
+  opWrittenText,
+  proposalPresentation,
+  questionOf,
+  type RejectionScope,
+  rejectionScopesFor,
+  type SessionMode,
+  type SuggestionDecision,
+} from './chat-view';
 
 /** The turn the panel follows: the one running, one this tab watched settle, or one from the transcript. */
 export type PanelTurn = { kind: 'none' } | { kind: 'stream'; stream: ChatTurnStreamState } | { kind: 'message'; message: ChatMessageResponse };
@@ -283,16 +295,23 @@ export interface AppliedPanelChange {
   actionable: boolean;
 }
 
-export type CardState = 'open' | 'add' | 'decline' | 'added' | 'declined' | 'replaced';
+export type CardState = 'open' | 'add' | 'decline' | 'added' | 'undone' | 'declined' | 'replaced';
 
 export interface CardPanelChange {
   key: string;
   index: number;
   label: string;
+  /** What the suggestion would write, when it says more than its label. */
+  value?: string;
+  valueLong: boolean;
   group: ChatTurnChangeGroup;
+  quote?: string;
   state: CardState;
-  /** Answerable here: a pending card drawn as suggestions. One-way doors and plans are answered on their own card. */
+  /** False for actions, prose, plan edits and plans, which are answered on their own card in the thread. */
   decidable: boolean;
+  /** The scopes to offer for a decline the author has not yet said when to suggest again; empty when there is nothing to ask. */
+  askScope: readonly RejectionScope[];
+  scope?: RejectionScope;
 }
 
 function text(value: unknown): string | undefined {
@@ -335,18 +354,39 @@ export function appliedChanges(proposal: Pick<ProposalResponse, 'id' | 'status' 
   });
 }
 
+const REMEMBERED_STATES: ReadonlySet<CardState> = new Set(['decline', 'declined']);
+
 export function cardChanges(
   proposal: Pick<ProposalResponse, 'id' | 'kind' | 'status' | 'changeSet' | 'opResults'>,
   decisions: ReadonlyMap<number, SuggestionDecision>,
+  scopes: ReadonlyMap<number, RejectionScope> = new Map(),
 ): CardPanelChange[] {
   const added = new Set((proposal.opResults ?? []).filter(result => result.status === 'applied').map(result => result.index));
-  const decidable = proposal.status === 'pending' && proposalPresentation(proposal) === 'suggestions';
+  const inPanel = answeredInPanel(proposal);
+  const decidable = inPanel && proposal.status === 'pending' && proposalPresentation(proposal) === 'suggestions';
   const settled = (index: number): CardState => {
     if (proposal.status === 'pending') return decisions.get(index) ?? 'open';
-    if (proposal.status === 'applied' || proposal.status === 'reverted') return added.has(index) ? 'added' : 'declined';
+    if (proposal.status === 'applied') return added.has(index) ? 'added' : 'declined';
+    if (proposal.status === 'reverted') return added.has(index) ? 'undone' : 'declined';
     return proposal.status === 'discarded' ? 'declined' : 'replaced';
   };
-  return proposal.changeSet.map((op, index) => ({ key: `${proposal.id}:${index}`, index, label: opSubject(op), group: opChangeGroup(op), state: settled(index), decidable }));
+  return proposal.changeSet.map((op, index) => {
+    const state = settled(index);
+    const scope = scopes.get(index);
+    const asked = inPanel && !scope && REMEMBERED_STATES.has(state) && decisions.get(index) === 'decline';
+    return {
+      key: `${proposal.id}:${index}`,
+      index,
+      label: opSubject(op),
+      ...writtenValue(op),
+      group: opChangeGroup(op),
+      quote: text(op.quote),
+      state,
+      decidable,
+      askScope: asked ? rejectionScopesFor(op) : [],
+      scope,
+    };
+  });
 }
 
 export type ChangesView =
@@ -360,11 +400,12 @@ export interface ChangesInput {
   applied?: ProposalResponse;
   cards?: ProposalResponse;
   decisions: ReadonlyMap<number, SuggestionDecision>;
+  scopes?: ReadonlyMap<number, RejectionScope>;
 }
 
 const WAITING_NOTE: Record<SessionMode, string> = { auto: 'Changes appear here as they’re saved.', manual: 'Changes appear here for you to review.' };
 
-export function changesView({ turn, mode, applied, cards, decisions }: ChangesInput): ChangesView {
+export function changesView({ turn, mode, applied, cards, decisions, scopes }: ChangesInput): ChangesView {
   if (turn.kind === 'none') return { kind: 'empty', note: 'Nothing yet.' };
   if (turn.kind === 'stream' && turn.stream.status !== 'done') {
     const { stream } = turn;
@@ -374,7 +415,7 @@ export function changesView({ turn, mode, applied, cards, decisions }: ChangesIn
     return { kind: 'streamed', count: `${stream.changes.length} so far`, groups: groupChanges(streamed) };
   }
   const appliedRows = applied ? appliedChanges(applied) : [];
-  const cardRows = cards && cards.kind !== 'chapter_plan' ? cardChanges(cards, decisions) : [];
+  const cardRows = cards && cards.kind !== 'chapter_plan' ? cardChanges(cards, decisions, scopes) : [];
   if (appliedRows.length === 0 && cardRows.length === 0) return { kind: 'empty', note: 'No Story Bible changes this turn.' };
   const saved = appliedRows.filter(row => row.state === 'applied').length;
   const open = cardRows.filter(row => row.state === 'open').length;
@@ -385,9 +426,9 @@ export function changesView({ turn, mode, applied, cards, decisions }: ChangesIn
 
 export type ReceiptView =
   | { kind: 'none' }
-  | { kind: 'applied'; title: string; detail: string; canUndoAll: boolean }
+  | { kind: 'applied'; title: string; detail: string; canUndoAll: boolean; canAddAll: boolean; commit?: string; hold?: string }
   | { kind: 'reverted'; title: string }
-  | { kind: 'cards'; tone: 'waiting' | 'settled'; count: number; title: string; detail: string; canAddAll: boolean };
+  | { kind: 'cards'; tone: 'waiting' | 'settled'; count: number; title: string; detail: string; canAddAll: boolean; commit?: string; hold?: string };
 
 const BREAKDOWN: [ChatTurnChangeGroup[], string, string][] = [
   [['pages'], 'page', 'pages'],
@@ -406,25 +447,36 @@ export function changeBreakdown(changes: readonly Pick<AppliedPanelChange, 'grou
   return parts.join(', ');
 }
 
-export function appliedReceipt(applied: ProposalResponse, waitingCards: number): ReceiptView {
-  if (applied.status === 'reverted') return { kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' };
-  const rows = appliedChanges(applied);
+/** A turn's saved proposals, newest first: suggestions the author added from the panel, then what the turn saved on its own. */
+export function savedSides(applied: ProposalResponse | undefined, cards: ProposalResponse | undefined): ProposalResponse[] {
+  const added = cards && (cards.status === 'applied' || cards.status === 'reverted') && answeredInPanel(cards) ? [cards] : [];
+  return [...added, ...(applied ? [applied] : [])];
+}
+
+export function appliedReceipt(sides: readonly ProposalResponse[], waitingCards: number): ReceiptView {
+  if (sides.length === 0) return { kind: 'none' };
+  if (sides.every(side => side.status === 'reverted')) return { kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' };
+  const rows = sides.flatMap(side => appliedChanges(side));
   const live = rows.filter(row => row.state === 'applied');
   const undone = rows.filter(row => row.state === 'reverted').length;
   if (rows.length === 0) return { kind: 'none' };
   if (live.length === 0) return { kind: 'reverted', title: undone > 0 ? 'Every change from this turn was undone.' : 'Nothing from this turn could be saved.' };
   const ideas = live.filter(row => row.idea).length;
+  const passed = sides.filter(side => !side.autoApplied).reduce((sum, side) => sum + side.changeSet.length - appliedChanges(side).length, 0);
+  const standing = sides.filter(side => side.status === 'applied');
   const detail = [
     changeBreakdown(live),
     ...(ideas > 0 ? [ideas === 1 ? '1 is Forge’s idea' : `${ideas} are Forge’s ideas`] : []),
     ...(undone > 0 ? [`${undone} undone`] : []),
+    ...(passed > 0 ? [`passed on ${passed}`] : []),
     ...(waitingCards > 0 ? [waitingCards === 1 ? '1 needs your OK' : `${waitingCards} need your OK`] : []),
   ].join(' · ');
   return {
     kind: 'applied',
     title: `Updated your Story Bible · ${plural(live.length, 'change', 'changes')}`,
     detail,
-    canUndoAll: applied.revertible && applied.status === 'applied',
+    canUndoAll: standing.length > 0 && standing.every(side => side.revertible),
+    canAddAll: false,
   };
 }
 
@@ -434,12 +486,23 @@ export interface CardsReceiptInput {
   error?: string;
 }
 
-export function cardsReceipt(cards: ProposalResponse, { decisions, committing, error }: CardsReceiptInput): ReceiptView {
+/** Owed after a failed add, or by answers kept across a reload. */
+function owedCommit(cards: ProposalResponse, { decisions, committing, error }: CardsReceiptInput): { commit?: string } {
+  const bar = commitBarView({ total: cards.changeSet.length, decisions, committing, error });
+  return bar.kind === 'ready' ? { commit: bar.action } : {};
+}
+
+function answeredDetail({ committing, error }: CardsReceiptInput): string {
+  if (committing) return 'Adding to your Story Bible…';
+  return error ? `Couldn’t finish: ${error}` : 'Nothing is saved until you add it';
+}
+
+export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput): ReceiptView {
   const presentation = proposalPresentation(cards);
-  if (presentation === 'plan' || (presentation === 'legacy' && cards.status === 'pending')) return { kind: 'none' };
+  if (presentation === 'plan' || (cards.status === 'pending' && !answeredInPanel(cards))) return { kind: 'none' };
   const total = cards.changeSet.length;
   if (cards.status === 'pending') {
-    const waiting = total - decisions.size;
+    const waiting = total - answers.decisions.size;
     if (waiting > 0)
       return {
         kind: 'cards',
@@ -447,10 +510,9 @@ export function cardsReceipt(cards: ProposalResponse, { decisions, committing, e
         count: waiting,
         title: `${plural(waiting, 'change', 'changes')} waiting for you`,
         detail: 'Nothing is saved until you add it',
-        canAddAll: !committing,
+        canAddAll: !answers.committing,
       };
-    const detail = committing ? 'Adding to your Story Bible…' : error ? `Couldn’t finish: ${error}` : 'Nothing is saved until you add it';
-    return { kind: 'cards', tone: 'waiting', count: 0, title: 'All changes answered', detail, canAddAll: false };
+    return { kind: 'cards', tone: 'waiting', count: 0, title: 'All changes answered', detail: answeredDetail(answers), canAddAll: false, ...owedCommit(cards, answers) };
   }
   const added = (cards.opResults ?? []).filter(result => result.status === 'applied').length;
   if (cards.status === 'applied' || cards.status === 'reverted') {
@@ -466,6 +528,44 @@ export function cardsReceipt(cards: ProposalResponse, { decisions, committing, e
   }
   if (cards.status === 'discarded') return { kind: 'cards', tone: 'settled', count: 0, title: 'You passed on these suggestions', detail: '', canAddAll: false };
   return { kind: 'cards', tone: 'settled', count: 0, title: 'Replaced before anything was added', detail: '', canAddAll: false };
+}
+
+const HOLD_LINE: Record<TurnHoldReason, string> = {
+  planner_sources: 'Held for review: this turn drew on your notes, so changes your chapters or readers would see wait for you.',
+  warnings: 'Held for review: check the warnings on these first.',
+};
+
+/** A reloaded turn has no typed reason, so it falls back to the card's own warnings. */
+export function holdLine(cards: Pick<ProposalResponse, 'warnings'>, held: TurnHoldReason | undefined): string | undefined {
+  const warnings = cards.warnings.join(' ');
+  if (held === 'planner_sources') return HOLD_LINE.planner_sources;
+  if (held === 'warnings') return warnings ? `Held for review: ${warnings}` : HOLD_LINE.warnings;
+  return warnings || undefined;
+}
+
+export interface TurnReceiptInput {
+  applied?: ProposalResponse;
+  cards?: ProposalResponse;
+  answers: CardsReceiptInput;
+  held?: TurnHoldReason;
+}
+
+export function turnReceipt({ applied, cards, answers, held }: TurnReceiptInput): ReceiptView {
+  const pending = cards?.status === 'pending' && cards.kind !== 'chapter_plan' ? cards : undefined;
+  const waiting = pending ? pending.changeSet.length - answers.decisions.size : 0;
+  const panelCards = pending && answeredInPanel(pending) ? pending : undefined;
+  const hold = panelCards && waiting > 0 ? holdLine(panelCards, held) : undefined;
+  const saved = appliedReceipt(savedSides(applied, cards), waiting);
+  if (saved.kind === 'applied') {
+    if (!panelCards) return saved;
+    if (waiting > 0) return { ...saved, canAddAll: !answers.committing, ...(hold && { hold }) };
+    const owed = answers.committing || answers.error ? [answeredDetail(answers)] : [];
+    return { ...saved, detail: [saved.detail, ...owed].join(' · '), ...owedCommit(panelCards, answers) };
+  }
+  if (saved.kind === 'reverted' && !panelCards) return saved;
+  const carded = cards ? cardsReceipt(cards, answers) : ({ kind: 'none' } as const);
+  if (carded.kind === 'cards') return { ...carded, ...(hold && { hold }) };
+  return saved.kind === 'none' ? carded : saved;
 }
 
 export interface OpPrompt {

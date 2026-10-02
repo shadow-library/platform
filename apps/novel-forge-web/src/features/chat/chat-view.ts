@@ -6,6 +6,7 @@ import {
   type BibleSection,
   type ChatMessageResponse,
   type ChatQuestionResponse,
+  type ChatTurnResponse,
   type EntityType,
   type JobKind,
   type LedgerRejectionScope,
@@ -125,6 +126,14 @@ function counted(count: number, [one, many]: [string, string]): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+export function mergeUndoImpacts(impacts: readonly UndoImpactResponse[]): UndoImpactResponse | undefined {
+  const [first] = impacts;
+  if (!first) return undefined;
+  const refs = new Set<string>();
+  const dependents = impacts.flatMap(impact => impact.dependents).filter(dependent => !refs.has(dependent.ref) && Boolean(refs.add(dependent.ref)));
+  return { proposalId: first.proposalId, dependents, finalUnaffected: impacts.reduce((sum, impact) => sum + impact.finalUnaffected, 0) };
+}
+
 export function undoImpactView(impact: UndoImpactResponse): UndoImpactView {
   const byKind = new Map<string, number>();
   for (const dependent of impact.dependents) byKind.set(dependent.kind, (byKind.get(dependent.kind) ?? 0) + 1);
@@ -157,7 +166,7 @@ export function suggestionCommit(total: number, decisions: ReadonlyMap<number, S
 
 export type ProposalPresentation = 'plan' | 'suggestions' | 'applied' | 'reverted' | 'passed' | 'legacy';
 
-const ONE_WAY_DOORS = new Set(['action.finalize', 'action.approve_draft', 'action.generate_chapter']);
+const ONE_WAY_DOORS = new Set(['action.finalize', 'action.approve_draft', 'action.generate_chapter', 'action.advance_volume']);
 
 /** How the transcript draws a proposal: one-way doors keep the explicit per-op card, where nothing is selected for the author. */
 export function proposalPresentation(proposal: { kind: string; status: string; changeSet: readonly ChangeOp[] }): ProposalPresentation {
@@ -167,6 +176,27 @@ export function proposalPresentation(proposal: { kind: string; status: string; c
   if (proposal.status === 'discarded') return 'passed';
   if (proposal.status !== 'pending' || proposal.changeSet.some(op => ONE_WAY_DOORS.has(String(op.op)))) return 'legacy';
   return 'suggestions';
+}
+
+const OWN_CARD_OPS = new Set(['draft.update', 'draft.remove', 'brief.update']);
+
+/** An action starts work or walks through a one-way door, and prose or a plan edit is read in full, so each keeps its own card in the thread. */
+export function answeredInPanel(proposal: { kind: string; changeSet: readonly ChangeOp[] }): boolean {
+  return proposal.kind !== 'chapter_plan' && !proposal.changeSet.some(op => isActionOp(op) || OWN_CARD_OPS.has(String(op.op)));
+}
+
+/** A turn's card proposal that needs its own card in the thread; unknown until it loads, and shown on a load error so the error can be retried. */
+export function turnCardsInline(proposal: { kind: string; changeSet: readonly ChangeOp[] } | undefined, loading: boolean): boolean {
+  if (loading) return false;
+  return !proposal || (proposal.kind !== 'chapter_plan' && !answeredInPanel(proposal));
+}
+
+/** The apply note worth a toast: a hold on cards answered in the panel is explained in the turn's receipt, unless the applied side also lost its link to the reply. */
+export function applyNoteToast(turn: Pick<ChatTurnResponse, 'applyNote' | 'held' | 'proposal' | 'appliedProposal' | 'assistantMessage'>): string | undefined {
+  if (!turn.applyNote) return undefined;
+  const explained = turn.held !== undefined && turn.proposal !== undefined && answeredInPanel(turn.proposal);
+  const unlinked = turn.appliedProposal !== undefined && !turn.assistantMessage.appliedProposalId;
+  return explained && !unlinked ? undefined : turn.applyNote;
 }
 
 const FINALIZE_BLOCKED_CODES: ReadonlySet<string> = new Set(['FRV_002', 'FRV_003', 'FRV_004', 'FRV_005', 'FRV_006']);

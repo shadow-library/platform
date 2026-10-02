@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { answersSettled, currentAnswers, readAnswers, updateAnswers, writeAnswers } from '../src/features/chat/suggestion-store';
-import { plannedCommit } from '../src/features/chat/use-suggestion-answering';
+import { addAllDecisions, plannedCommit } from '../src/features/chat/use-suggestion-answering';
 
 class MemoryStorage {
   private readonly items = new Map<string, string>();
@@ -114,5 +114,26 @@ describe('plannedCommit', () => {
   it('should wait while another place commits the card, or once the cache says it already settled', () => {
     expect(plannedCommit({ status: 'pending', committing: true, total: 2, decisions: both, force: false })).toEqual({ kind: 'wait' });
     expect(plannedCommit({ status: 'applied', committing: false, total: 2, decisions: both, force: true })).toEqual({ kind: 'wait' });
+  });
+});
+
+describe('addAllDecisions', () => {
+  const council = { op: 'entity.upsert', entityKey: 'council', name: 'The Council' };
+
+  it('should answer only the open suggestions with add, keeping the author’s own answers', () => {
+    const next = addAllDecisions({ kind: 'chat', changeSet: [council, council, council] }, new Map([[1, 'decline' as const]]));
+    expect(next && [...next.entries()].sort(([a], [b]) => a - b)).toEqual([
+      [0, 'add'],
+      [1, 'decline'],
+      [2, 'add'],
+    ]);
+  });
+
+  it('should never add an action, prose or a plan edit in bulk', () => {
+    expect(addAllDecisions({ kind: 'chat', changeSet: [council, { op: 'action.finalize', upTo: 3 }] }, new Map())).toBeUndefined();
+    expect(addAllDecisions({ kind: 'chat', changeSet: [council, { op: 'action.advance_volume' }] }, new Map())).toBeUndefined();
+    expect(addAllDecisions({ kind: 'chat', changeSet: [council, { op: 'action.organise_notes' }] }, new Map())).toBeUndefined();
+    expect(addAllDecisions({ kind: 'chat', changeSet: [{ op: 'draft.update', chapter: 2, body: 'New prose.' }] }, new Map())).toBeUndefined();
+    expect(addAllDecisions({ kind: 'chapter_plan', changeSet: [] }, new Map())).toBeUndefined();
   });
 });

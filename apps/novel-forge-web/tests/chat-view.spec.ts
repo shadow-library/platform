@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test';
 import { textDigest } from '@shadow-library/sdk';
 
 import {
+  answeredInPanel,
   appliedRows,
+  applyNoteToast,
   awaitingAnswer,
   checklistView,
   commitBarView,
@@ -19,6 +21,7 @@ import {
   jobKindForOp,
   jobView,
   lastUserOrdinal,
+  mergeUndoImpacts,
   offersNotes,
   opCardTitle,
   openerChip,
@@ -45,10 +48,12 @@ import {
   SUGGESTED_EYEBROW,
   suggestionCommit,
   turnAnnouncement,
+  turnCardsInline,
   unansweredWarning,
   undoImpactView,
   unusedParagraphPrompt,
 } from '../src/features/chat/chat-view';
+import { type ChatMessageResponse, type ChatTurnResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
 import { type ChatJobState, type OrganiseReceipt } from '../src/lib/apis/chat.api';
 
 const COUNCIL = { op: 'entity.upsert', entityKey: 'council', type: 'faction', name: 'The Tidewarden’s council', body: 'The families who grew rich trading memories.' };
@@ -241,6 +246,74 @@ describe('proposalPresentation', () => {
     expect(proposalPresentation({ kind: 'hub', status: 'reverted', changeSet: [COUNCIL] })).toBe('reverted');
     expect(proposalPresentation({ kind: 'hub', status: 'discarded', changeSet: [COUNCIL] })).toBe('passed');
     expect(proposalPresentation({ kind: 'hub', status: 'conflicted', changeSet: [COUNCIL] })).toBe('legacy');
+    expect(proposalPresentation({ kind: 'hub', status: 'pending', changeSet: [COUNCIL, { op: 'action.advance_volume' }] })).toBe('legacy');
+  });
+});
+
+describe('answeredInPanel', () => {
+  it('should answer Story Bible suggestions in the panel, settled or not', () => {
+    expect(answeredInPanel({ kind: 'chat', changeSet: [COUNCIL, { op: 'milestone.upsert', milestoneKey: 'm1' }] })).toBe(true);
+  });
+
+  it('should keep every action, prose, plan edits and plans on their own card in the thread', () => {
+    const ops = ['action.finalize', 'action.approve_draft', 'action.generate_chapter', 'action.advance_volume', 'action.organise_notes', 'action.plan_chapter'];
+    for (const op of [...ops, 'action.audit_bible', 'draft.update', 'draft.remove', 'action.revise_draft', 'brief.update'])
+      expect(answeredInPanel({ kind: 'chat', changeSet: [COUNCIL, { op }] })).toBe(false);
+    expect(answeredInPanel({ kind: 'chapter_plan', changeSet: [] })).toBe(false);
+  });
+});
+
+describe('turnCardsInline', () => {
+  it('should mount a turn’s cards in the thread only when they need their own card, or failed to load', () => {
+    expect(turnCardsInline({ kind: 'chat', changeSet: [COUNCIL] }, false)).toBe(false);
+    expect(turnCardsInline({ kind: 'chat', changeSet: [COUNCIL, { op: 'action.finalize' }] }, false)).toBe(true);
+    expect(turnCardsInline({ kind: 'chat', changeSet: [{ op: 'draft.update', chapter: 2 }] }, false)).toBe(true);
+    expect(turnCardsInline({ kind: 'chapter_plan', changeSet: [] }, false)).toBe(false);
+    expect(turnCardsInline(undefined, true)).toBe(false);
+    expect(turnCardsInline(undefined, false)).toBe(true);
+  });
+});
+
+describe('mergeUndoImpacts', () => {
+  it('should list each dependent once and count every final chapter left as it is', () => {
+    const plan = { kind: 'plan' as const, ref: 'chapter:3', because: 'entity:tamsin', final: false };
+    const draft = { kind: 'draft' as const, ref: 'draft:3', because: 'entity:tamsin', final: false };
+    expect(
+      mergeUndoImpacts([
+        { proposalId: 'cp', dependents: [plan], finalUnaffected: 1 },
+        { proposalId: 'ap', dependents: [plan, draft], finalUnaffected: 2 },
+      ]),
+    ).toEqual({ proposalId: 'cp', dependents: [plan, draft], finalUnaffected: 3 });
+    expect(mergeUndoImpacts([])).toBeUndefined();
+  });
+});
+
+describe('applyNoteToast', () => {
+  const reply = (extra: Partial<ChatMessageResponse> = {}): ChatMessageResponse => ({
+    id: 'a1',
+    sessionId: 's',
+    ordinal: 2,
+    role: 'assistant',
+    content: 'Done.',
+    createdAt: '2026-10-02T10:00:00.000Z',
+    ...extra,
+  });
+  const cards = (changeSet: ProposalResponse['changeSet']): ProposalResponse => ({ id: 'cp', kind: 'chat', status: 'pending', changeSet }) as ProposalResponse;
+  const turn = (extra: Partial<ChatTurnResponse>): ChatTurnResponse =>
+    ({ userMessage: reply({ role: 'user' }), assistantMessage: reply(), runId: 'r', ...extra }) as ChatTurnResponse;
+
+  it('should leave a hold on panel cards to the receipt', () => {
+    expect(applyNoteToast(turn({ applyNote: 'Held.', held: 'planner_sources', proposal: cards([COUNCIL]) }))).toBeUndefined();
+    expect(
+      applyNoteToast(turn({ applyNote: 'Held.', held: 'warnings', proposal: cards([COUNCIL]), appliedProposal: cards([]), assistantMessage: reply({ appliedProposalId: 'ap' }) })),
+    ).toBeUndefined();
+  });
+
+  it('should still toast a note the receipt cannot carry', () => {
+    expect(applyNoteToast(turn({ applyNote: 'Could not apply.' }))).toBe('Could not apply.');
+    expect(applyNoteToast(turn({ applyNote: 'Held. Not linked.', held: 'planner_sources', proposal: cards([COUNCIL]), appliedProposal: cards([]) }))).toBe('Held. Not linked.');
+    expect(applyNoteToast(turn({ applyNote: 'Held.', held: 'warnings', proposal: cards([COUNCIL, { op: 'action.finalize' }]) }))).toBe('Held.');
+    expect(applyNoteToast(turn({}))).toBeUndefined();
   });
 });
 

@@ -23,6 +23,7 @@ import {
   type ProgressItemKey,
   type ProgressOverrideStatus,
   transcriptTurnState,
+  type TurnHoldReason,
   useAuthorNotesQuery,
   useCancelChatJobMutation,
   useChatJobStream,
@@ -47,6 +48,7 @@ import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, relea
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import {
+  applyNoteToast,
   awaitingAnswer,
   checklistView,
   composerChips,
@@ -69,6 +71,7 @@ import {
   type SessionMode,
   shouldRefocusComposer,
   turnAnnouncement,
+  turnCardsInline,
   type TurnOutcome,
   unansweredWarning,
   type UnusedParagraph,
@@ -207,6 +210,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
 
   const finishedId = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
+  const finishedHeld = stream.status === 'done' ? stream.turn.held : undefined;
   const finishedWorked = useMemo(() => (stream.status === 'done' ? turnTimeline(stream, stream.timing.endedAt ?? 0, mode).worked : null), [stream, mode]);
 
   const messageIds = useMemo(() => new Set(messages.map(message => message.id)), [messages]);
@@ -327,7 +331,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           // The model and cost pick is for this turn only; a failed send keeps it for the retry, and a newer pick for the next message stays.
           setTurnChoice(current => (current === settings.choice ? undefined : current));
           invalidateProgress(queryClient, novelId);
-          if (result.applyNote) toast.warning(result.applyNote);
+          const note = applyNoteToast(result);
+          if (note) toast.warning(note);
         },
         onError: async (err, context) => {
           announce(turnAnnouncement({ applied: 0, suggested: 0, failed: true }));
@@ -672,6 +677,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                     novelId={novelId}
                     message={m}
                     settledQuestions={answeredUpTo > m.ordinal}
+                    held={m.id === finishedId ? finishedHeld : undefined}
                     busy={busy}
                     jobs={jobsByMessage.get(m.id) ?? NO_JOBS}
                     streamStatus={jobStream.status}
@@ -699,6 +705,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                           proposalId={stream.turn.proposal?.id}
                           applied={stream.turn.appliedProposal}
                           cards={stream.turn.proposal}
+                          held={stream.turn.held}
                           onReview={() => reviewInPanel(stream.turn.assistantMessage.id)}
                           onApplied={onApplied}
                         />
@@ -916,6 +923,8 @@ interface AssistantMessageProps {
   novelId: string;
   message: ChatMessageResponse;
   settledQuestions: boolean;
+  /** Why the turn's cards were held, for the turn this tab ran. */
+  held?: TurnHoldReason;
   busy: boolean;
   jobs: readonly ChatJobState[];
   streamStatus: ChatJobStreamStatus;
@@ -930,6 +939,7 @@ const AssistantMessage = memo(function AssistantMessage({
   novelId,
   message,
   settledQuestions,
+  held,
   busy,
   jobs,
   streamStatus,
@@ -943,6 +953,7 @@ const AssistantMessage = memo(function AssistantMessage({
   const content = message.content;
   const staged = useProposalQuery(novelId, message.proposalId ?? undefined);
   const isPlan = staged.data?.kind === PLAN_KIND;
+  const ownCard = Boolean(message.proposalId) && turnCardsInline(staged.data, staged.isLoading);
   return (
     <>
       <div className={styles.assistantRow}>
@@ -963,11 +974,12 @@ const AssistantMessage = memo(function AssistantMessage({
               novelId={novelId}
               appliedProposalId={message.appliedProposalId ?? undefined}
               proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
+              held={held}
               onReview={() => actions.reviewInPanel(message.id)}
               onApplied={actions.onApplied}
             />
           )}
-          {message.proposalId && !isPlan && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
+          {ownCard && message.proposalId && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
           {question && (
             <QuestionCard
               key={`${message.id}:question`}
