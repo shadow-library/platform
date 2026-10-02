@@ -390,7 +390,7 @@ describe('changes', () => {
     const done = reduceChatTurnStream(play(FULL), { type: 'done', turn: turn({ appliedProposal: APPLIED, proposal: CARDS }) }, 24_000);
     const settled = changesView({ turn: streamTurn(done), mode: 'auto', applied: APPLIED, cards: CARDS, decisions: new Map() });
     expect(settled).toMatchObject({ kind: 'settled', count: '3 saved · 2 to review', cardsTitle: 'Needs your OK' });
-    expect(settled.kind === 'settled' && settled.applied.map(group => group.label)).toEqual(['Premise', 'Pages', 'Characters & factions', 'Places', 'Open threads']);
+    expect(settled.kind === 'settled' && settled.applied.map(group => group.label)).toEqual(['The story', 'Pages', 'Characters & factions', 'Places', 'Open threads']);
   });
 
   it('should say why there is nothing to list', () => {
@@ -409,7 +409,7 @@ describe('changes', () => {
 describe('receipts', () => {
   it('should sum up saved changes by the shape of the Story Bible', () => {
     expect(changeBreakdown([{ group: 'premise' }, { group: 'pages' }, { group: 'pages' }, { group: 'people' }, { group: 'places' }, { group: 'threads' }])).toBe(
-      'Premise, 2 pages, 2 records, 1 open thread',
+      'The story, 2 pages, 2 records, 1 open thread',
     );
   });
 
@@ -417,7 +417,7 @@ describe('receipts', () => {
     expect(appliedReceipt([APPLIED], 2)).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 3 changes',
-      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 2 need your OK',
+      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 2 need your OK',
       canUndoAll: true,
       canAddAll: false,
     });
@@ -469,7 +469,7 @@ describe('turnReceipt', () => {
     expect(turnReceipt({ applied: APPLIED, cards: CARDS, answers: answers([[0, 'decline']]) })).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 3 changes',
-      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 1 needs your OK',
+      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 1 needs your OK',
       canUndoAll: true,
       canAddAll: true,
     });
@@ -480,7 +480,7 @@ describe('turnReceipt', () => {
     expect(turnReceipt({ applied: APPLIED, cards: ONE_WAY, answers: answers(), held: 'warnings' })).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 3 changes',
-      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 3 need your OK',
+      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 3 need your OK',
       canUndoAll: true,
       canAddAll: false,
     });
@@ -531,7 +531,7 @@ describe('turnReceipt', () => {
     expect(turnReceipt({ cards: CARDS, answers: failed })).toMatchObject({ title: 'All changes answered', detail: 'Couldn’t finish: Offline.', commit: 'Add 1 now' });
     expect(turnReceipt({ applied: APPLIED, cards: CARDS, answers: failed })).toMatchObject({
       kind: 'applied',
-      detail: 'Premise, 1 page, 1 record · 1 is Forge’s idea · 1 undone · Couldn’t finish: Offline.',
+      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · Couldn’t finish: Offline.',
       commit: 'Add 1 now',
     });
     expect(
@@ -574,7 +574,7 @@ describe('turnReceipt', () => {
     expect(turnReceipt({ applied: APPLIED, cards: added, answers: answers() })).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 5 changes',
-      detail: 'Premise, 1 page, 2 records, 1 other change · 1 is Forge’s idea · 1 undone',
+      detail: 'The story, 1 page, 2 records, 1 other change · 1 is Forge’s idea · 1 undone',
       canUndoAll: true,
       canAddAll: false,
     });

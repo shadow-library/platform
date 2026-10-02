@@ -23,6 +23,11 @@ const OP_PROSE_FIELDS = new Set([
   'chapterSummary',
   'instructions',
   'note',
+  'opposition',
+  'theme',
+  'readerPromise',
+  'endingQuestion',
+  'ending',
 ]);
 
 function formatOpValue(value: unknown): string {

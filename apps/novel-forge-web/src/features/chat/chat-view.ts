@@ -18,7 +18,32 @@ import { documentTopic, TOPIC_LABEL, topicForEntityType } from '@/lib/bible-topi
 import { type ChangeOp } from '@/lib/proposals';
 
 const STORY_LABEL = 'The story';
-const PROSE_FIELDS = ['body', 'rule', 'objective', 'premise', 'motivation', 'notes', 'brief', 'note', 'constraintNote', 'writerNote'] as const;
+const PROSE_FIELDS = [
+  'body',
+  'rule',
+  'objective',
+  'premise',
+  'motivation',
+  'notes',
+  'brief',
+  'note',
+  'constraintNote',
+  'writerNote',
+  'opposition',
+  'theme',
+  'readerPromise',
+  'endingQuestion',
+  'ending',
+] as const;
+const PREMISE_FIELDS = ['premise', 'brief', 'themes', 'instructions'] as const;
+const STORY_FIELD_LABELS = {
+  theme: 'Theme',
+  readerPromise: 'Reader promise',
+  protagonistKey: 'Protagonist',
+  opposition: 'Opposition',
+  endingQuestion: 'Ending question',
+  ending: 'Ending',
+} as const;
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -41,9 +66,16 @@ export function opTopicLabel(op: ChangeOp): string {
   return 'Change';
 }
 
+/** Names the story basics a premise.update sets, with "Premise" standing for the premise, brief, themes and instructions together. */
+function storySubject(op: ChangeOp): string {
+  const named = Object.entries(STORY_FIELD_LABELS).flatMap(([field, name]) => (op[field] === undefined ? [] : [name]));
+  const premise = PREMISE_FIELDS.some(field => op[field] !== undefined) || named.length === 0;
+  return [...(premise ? ['Premise'] : []), ...named].join(', ');
+}
+
 export function opSubject(op: ChangeOp): string {
   const type = String(op.op);
-  if (type === 'premise.update') return 'Premise';
+  if (type === 'premise.update') return storySubject(op);
   if (type === 'organise.rule') return 'Rule';
   if (type === 'volume.upsert') return text(op.title) ?? `Volume ${String(op.volumeKey)}`;
   if (type === 'milestone.upsert') return text(op.label) ?? String(op.milestoneKey);

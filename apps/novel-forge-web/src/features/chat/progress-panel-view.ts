@@ -239,7 +239,7 @@ function sourceList(sources: TurnSource[], live: boolean): SourcesView {
 }
 
 export const CHANGE_GROUP_LABEL: Record<ChatTurnChangeGroup, string> = {
-  premise: 'Premise',
+  premise: 'The story',
   pages: 'Pages',
   people: 'Characters & factions',
   places: 'Places',
@@ -437,9 +437,9 @@ const BREAKDOWN: [ChatTurnChangeGroup[], string, string][] = [
   [['other'], 'other change', 'other changes'],
 ];
 
-/** "Premise, 5 pages, 16 records, 4 open threads": what a turn saved, by the shape of the Story Bible rather than op by op. */
+/** "The story, 5 pages, 16 records, 4 open threads": what a turn saved, by the shape of the Story Bible rather than op by op. */
 export function changeBreakdown(changes: readonly Pick<AppliedPanelChange, 'group'>[]): string {
-  const parts = changes.some(change => change.group === 'premise') ? ['Premise'] : [];
+  const parts = changes.some(change => change.group === 'premise') ? ['The story'] : [];
   for (const [groups, one, many] of BREAKDOWN) {
     const count = changes.filter(change => groups.includes(change.group)).length;
     if (count > 0) parts.push(plural(count, one, many));

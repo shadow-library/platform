@@ -94,6 +94,8 @@ describe('bible document ops', () => {
 
   it('should join topic and subject in the card title unless they are the same', () => {
     expect(opCardTitle({ op: 'premise.update', premise: 'x' })).toBe('The story: Premise');
+    expect(opCardTitle({ op: 'premise.update', opposition: 'The campus itself' })).toBe('The story: Opposition');
+    expect(opCardTitle({ op: 'premise.update', premise: 'x', theme: 'y', readerPromise: 'z' })).toBe('The story: Premise, Theme, Reader promise');
     expect(opCardTitle({ op: 'bible_document.upsert', section: 'project', slug: 'story-core', frontmatter: { title: 'Story core' } })).toBe('Story core');
   });
 });
