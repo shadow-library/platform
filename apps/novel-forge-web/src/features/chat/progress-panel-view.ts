@@ -1,4 +1,4 @@
-import { type ChatMessageResponse, type ProposalResponse } from '@/lib/apis/api-types.gen';
+import { type ChatMessageResponse, type ChatTurnTraceResponse, type ProposalResponse } from '@/lib/apis/api-types.gen';
 import { type ChatTurnChangeGroup, type ChatTurnStreamState, type ProposalOpDirection, type ProposalOpOutcome } from '@/lib/apis/refinement.api';
 import { turnPhase, turnSummary } from '@/lib/chat-turn-phase';
 import { type TurnSource, turnSources } from '@/lib/chat-turn-timeline';
@@ -7,7 +7,7 @@ import { type ChangeOp } from '@/lib/proposals';
 
 import { isActionOp, opSubject, opWrittenText, proposalPresentation, questionOf, type SessionMode, type SuggestionDecision } from './chat-view';
 
-/** The turn the panel follows: the one running, one this tab watched settle (with its timings), or one from the transcript (without). */
+/** The turn the panel follows: the one running, one this tab watched settle, or one from the transcript. */
 export type PanelTurn = { kind: 'none' } | { kind: 'stream'; stream: ChatTurnStreamState } | { kind: 'message'; message: ChatMessageResponse };
 
 export interface PanelTurnInput {
@@ -165,9 +165,7 @@ function liveSteps(state: ChatTurnStreamState, mode: SessionMode, now: number): 
   return steps;
 }
 
-function settledSteps(state: ChatTurnStreamState, input: ProgressInput): ProgressStep[] {
-  const clock = stepClock(state, input.now);
-  const sources = turnSources(state.lookups);
+function settledSteps(clock: StepClock, sources: TurnSource[], input: ProgressInput): ProgressStep[] {
   const time = (ms: number | undefined): string | undefined => (ms === undefined ? undefined : formatElapsed(ms));
   return [
     ...(sources.length > 0 ? [{ key: 'read' as const, label: STEP_LABEL.read, state: 'done' as const, sub: sourcesSub(sources, false), time: time(clock.readMs) }] : []),
@@ -186,9 +184,16 @@ function endedSteps(state: ChatTurnStreamState, mode: SessionMode, now: number, 
   return reached.map((step, index) => (index === reached.length - 1 ? { ...step, state: ending, time: undefined } : step));
 }
 
+function settledTrace(turn: PanelTurn): ChatTurnTraceResponse | null | undefined {
+  if (turn.kind === 'message') return turn.message.trace;
+  return turn.kind === 'stream' && turn.stream.status === 'done' ? turn.stream.turn.assistantMessage.trace : undefined;
+}
+
 export function progressView(input: ProgressInput): ProgressView {
   const { turn, mode, now } = input;
   if (turn.kind === 'none') return { status: '', steps: [] };
+  const trace = settledTrace(turn);
+  if (trace) return { status: `Done · ${formatElapsed(trace.timing.workedMs)}`, steps: settledSteps(trace.timing, turnSources(trace.sources), input) };
   if (turn.kind === 'message') {
     const steps: ProgressStep[] = [
       { key: 'write', label: STEP_LABEL.write, state: 'done' },
@@ -199,7 +204,7 @@ export function progressView(input: ProgressInput): ProgressView {
   }
   const { stream } = turn;
   const worked = formatElapsed(turnSummary(stream, now).workedMs);
-  if (stream.status === 'done') return { status: `Done · ${worked}`, steps: settledSteps(stream, input) };
+  if (stream.status === 'done') return { status: `Done · ${worked}`, steps: settledSteps(stepClock(stream, now), turnSources(stream.lookups), input) };
   if (stream.status === 'stopped') return { status: `Stopped · ${worked}`, steps: endedSteps(stream, mode, now, 'stopped') };
   if (stream.status === 'failed') return { status: 'Didn’t finish', steps: endedSteps(stream, mode, now, 'failed') };
   const phase = turnPhase(stream, now);
@@ -210,10 +215,14 @@ export type SourcesView = { kind: 'list'; sources: TurnSource[] } | { kind: 'emp
 
 export function sourcesView(turn: PanelTurn): SourcesView {
   if (turn.kind === 'none') return { kind: 'empty', note: 'Nothing yet.' };
-  if (turn.kind === 'message') return { kind: 'empty', note: 'Sources are listed for turns run while this tab was open.' };
-  const sources = turnSources(turn.stream.lookups);
+  const trace = settledTrace(turn);
+  if (trace) return sourceList(turnSources(trace.sources), false);
+  if (turn.kind === 'message') return { kind: 'empty', note: 'Sources weren’t kept for this turn.' };
+  return sourceList(turnSources(turn.stream.lookups), turn.stream.status === 'idle' || turn.stream.status === 'streaming');
+}
+
+function sourceList(sources: TurnSource[], live: boolean): SourcesView {
   if (sources.length > 0) return { kind: 'list', sources };
-  const live = turn.stream.status === 'idle' || turn.stream.status === 'streaming';
   return { kind: 'empty', note: live ? 'Nothing read yet.' : 'Nothing needed looking up.' };
 }
 

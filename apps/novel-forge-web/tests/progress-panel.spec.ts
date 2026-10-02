@@ -23,7 +23,7 @@ import {
 } from '../src/features/chat/progress-panel-view';
 import { TurnReceiptView } from '../src/features/chat/TurnReceipt';
 import { TurnLiveTail } from '../src/features/chat/TurnTimeline';
-import { type ChatMessageResponse, type ChatTurnResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
+import { type ChatMessageResponse, type ChatTurnResponse, type ChatTurnTraceResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
 import {
   type ChatTurnStreamEvent,
   type ChatTurnStreamState,
@@ -119,6 +119,17 @@ const FULL: [ChatTurnStreamEvent, number][] = [
 ];
 
 const streamTurn = (stream: ChatTurnStreamState): PanelTurn => ({ kind: 'stream', stream });
+
+const TRACE: ChatTurnTraceResponse = {
+  sources: [
+    { tool: 'get_notes', args: {}, status: 'ok' },
+    { tool: 'get_bible_document', args: { slug: 'premise' }, status: 'ok' },
+    { tool: 'search_lore', args: { query: 'lamps' }, status: 'error' },
+  ],
+  timing: { readMs: 3000, thinkMs: 7000, writeMs: 10_000, saveMs: 4000, workedMs: 24_000 },
+};
+
+const reloaded = (trace: ChatTurnTraceResponse | null): PanelTurn => ({ kind: 'message', message: message('a1', 2, 'assistant', { trace }) });
 
 describe('panelTurnOf', () => {
   const messages = [message('u1', 1, 'user'), message('a1', 2, 'assistant', { appliedProposalId: 'ap' }), message('u2', 3, 'user'), message('a2', 4, 'assistant')];
@@ -222,8 +233,35 @@ describe('progressView', () => {
     expect(failed.steps.map(step => [step.key, step.state])).toEqual([['read', 'failed']]);
   });
 
-  it('should show only what a reloaded turn can prove: its reply, its changes and its question', () => {
-    const history = progressView({ turn: { kind: 'message', message: message('a1', 2, 'assistant') }, mode: 'manual', now: 0, changes: 2, question: false });
+  it('should rebuild a reloaded turn’s steps and timings from its trace', () => {
+    const history = progressView({ turn: reloaded(TRACE), mode: 'manual', now: 0, changes: 2, question: true });
+    expect(history.status).toBe('Done · 24s');
+    expect(history.steps.map(step => [step.label, step.state, step.sub, step.time])).toEqual([
+      ['Read your notes and Bible', 'done', '2 sources · 1 couldn’t be read', '3s'],
+      ['Think it through', 'done', undefined, '7s'],
+      ['Write the reply', 'done', undefined, '10s'],
+      ['Prepare suggestions', 'done', '2 changes', '4s'],
+      ['Ask about what’s missing', 'done', '1 question', undefined],
+    ]);
+  });
+
+  it('should leave untimed the steps a reply that streamed nothing never took', () => {
+    const quiet = progressView({ turn: reloaded({ sources: [], timing: { readMs: 0, thinkMs: 5000, workedMs: 6000 } }), mode: 'auto', now: 0, changes: 1, question: false });
+    expect(quiet.status).toBe('Done · 6s');
+    expect(quiet.steps.map(step => [step.key, step.time])).toEqual([
+      ['think', '5s'],
+      ['write', undefined],
+      ['save', undefined],
+    ]);
+  });
+
+  it('should time a watched turn by its saved trace once it is done', () => {
+    const done = reduceChatTurnStream(play(FULL), { type: 'done', turn: turn({ assistantMessage: message('a2', 4, 'assistant', { trace: TRACE }) }) }, 30_000);
+    expect(view(done, 99_999).status).toBe('Done · 24s');
+  });
+
+  it('should show only what a turn older than its trace can prove: its reply, its changes and its question', () => {
+    const history = progressView({ turn: reloaded(null), mode: 'manual', now: 0, changes: 2, question: false });
     expect(history).toEqual({
       status: 'Done',
       steps: [
@@ -243,6 +281,17 @@ describe('sourcesView', () => {
     ]);
     expect(sourcesView(streamTurn(startChatTurnStream(0)))).toEqual({ kind: 'empty', note: 'Nothing read yet.' });
     expect(sourcesView({ kind: 'message', message: message('a1', 2, 'assistant') }).kind).toBe('empty');
+  });
+
+  it('should list a reloaded turn’s sources from its trace, and say a turn older than the trace kept none', () => {
+    const view = sourcesView(reloaded(TRACE));
+    expect(view.kind === 'list' && view.sources.map(source => [source.label, source.status])).toEqual([
+      ['Your notes', 'ok'],
+      ['Premise', 'ok'],
+      ['Searched the lore for “lamps”', 'error'],
+    ]);
+    expect(sourcesView(reloaded({ sources: [], timing: { readMs: 0, thinkMs: 0, workedMs: 900 } }))).toEqual({ kind: 'empty', note: 'Nothing needed looking up.' });
+    expect(sourcesView(reloaded(null))).toEqual({ kind: 'empty', note: 'Sources weren’t kept for this turn.' });
   });
 });
 
@@ -437,6 +486,9 @@ describe('ProgressPanel sections', () => {
     const out = html(createElement(SourcesSection, { view: sourcesView(streamTurn(play(FULL.slice(0, 1)))) }));
     expect(out).toContain('Your notes');
     expect(out).toContain(', reading');
+    const saved = html(createElement(SourcesSection, { view: sourcesView(reloaded(TRACE)) }));
+    expect(saved).toContain('Searched the lore for “lamps”');
+    expect(saved).toContain(', couldn’t be read');
   });
 
   it('should label an applied change’s undo, tag ideas, quote the author and ask before moving other changes', () => {

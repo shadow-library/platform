@@ -1,3 +1,4 @@
+import { type ChatTurnTraceResponse } from './apis/api-types.gen';
 import { type ChatTurnLookup, type ChatTurnStreamState } from './apis/refinement.api';
 import { GENERIC_LOOKUP_LABEL, lookupLabel } from './chat-lookup-label';
 import { type ChatTurnPhase, turnPhase, turnSummary } from './chat-turn-phase';
@@ -75,8 +76,10 @@ function lowerFirst(value: string): string {
   return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
+type SourceEntry = Pick<ChatTurnLookup, 'tool' | 'args' | 'status'>;
+
 /** One entry per distinct lookup: a later round asking the same thing again is the same source, at its latest status. */
-export function turnSources(lookups: ChatTurnLookup[]): TurnSource[] {
+export function turnSources(lookups: readonly SourceEntry[]): TurnSource[] {
   const sources = new Map<string, TurnSource>();
   for (const lookup of lookups) {
     const key = `${lookup.tool}\u0000${JSON.stringify(lookup.args)}`;
@@ -93,7 +96,7 @@ export function readingLabel(lookup: Pick<ChatTurnLookup, 'tool' | 'args'>): str
   return `Reading ${lookup.tool === 'get_bible_document' ? label : lowerFirst(label)}…`;
 }
 
-export function readSummary(lookups: ChatTurnLookup[]): string {
+export function readSummary(lookups: readonly SourceEntry[]): string {
   const sources = turnSources(lookups);
   const read = sources.filter(source => source.status !== 'error');
   const failed = sources.length - read.length;
@@ -108,7 +111,7 @@ export function readSummary(lookups: ChatTurnLookup[]): string {
   return failed > 0 ? `${summary} · ${failed} couldn’t be read` : summary;
 }
 
-function readRow(lookups: ChatTurnLookup[], live: boolean): TurnRow {
+function readRow(lookups: readonly SourceEntry[], live: boolean): TurnRow {
   const current = live ? lookups.filter(lookup => lookup.status === 'running').at(-1) : undefined;
   return { key: 'read', label: current ? readingLabel(current) : readSummary(lookups), running: Boolean(current), sources: turnSources(lookups) };
 }
@@ -126,20 +129,31 @@ function savingRow(state: ChatTurnStreamState, phase: ChatTurnPhase, mode: TurnM
   return { key: 'save', label: `${SAVING[mode]} · ${state.changes.length}`, running: phase.kind === 'saving', sources: [] };
 }
 
-function workedLabel(state: ChatTurnStreamState, workedMs: number): string | null {
-  if (state.status !== 'done' && state.status !== 'stopped') return null;
-  const read = turnSources(state.lookups).filter(source => source.status !== 'error').length;
-  const lead = state.status === 'done' ? `Worked ${formatElapsed(workedMs)}` : `Stopped after ${formatElapsed(workedMs)}`;
+function workedLabel(ending: 'done' | 'stopped', workedMs: number, lookups: readonly SourceEntry[]): string {
+  const read = turnSources(lookups).filter(source => source.status !== 'error').length;
+  const lead = ending === 'done' ? `Worked ${formatElapsed(workedMs)}` : `Stopped after ${formatElapsed(workedMs)}`;
   return read > 0 ? `${lead} · read ${plural(read, 'source', 'sources')}` : lead;
 }
 
+function traceRows(lookups: readonly SourceEntry[], live: boolean, think: TurnRow | null): TurnRow[] {
+  return [...(lookups.length > 0 ? [readRow(lookups, live)] : []), ...(think ? [think] : [])];
+}
+
+export function timelineOfTrace(trace: ChatTurnTraceResponse): TurnTimeline {
+  const { timing, sources } = trace;
+  const rows = traceRows(sources, false, thinkRow({ kind: 'settled' }, timing.thinkMs));
+  return { live: false, trace: rows, saving: null, tail: null, worked: workedLabel('done', timing.workedMs, sources) };
+}
+
+// Drawn from the saved trace so the transcript refetch that swaps in the saved reply changes nothing.
 export function turnTimeline(state: ChatTurnStreamState, now: number, mode: TurnMode): TurnTimeline {
+  if (state.status === 'done' && state.turn.assistantMessage.trace) return timelineOfTrace(state.turn.assistantMessage.trace);
   const live = state.status === 'idle' || state.status === 'streaming';
   const phase = turnPhase(state, now);
   const { thoughtMs, workedMs } = turnSummary(state, now);
-  const think = thinkRow(phase, thoughtMs);
-  const trace = [...(state.lookups.length > 0 ? [readRow(state.lookups, live)] : []), ...(think ? [think] : [])];
+  const trace = traceRows(state.lookups, live, thinkRow(phase, thoughtMs));
   const slow = workedMs >= SLOW_TURN_MS;
   const tail: TurnTail | null = !live ? null : phase.kind === 'starting' ? { kind: 'starting', slow } : { kind: 'working', elapsed: formatElapsed(workedMs), slow };
-  return { live, trace, saving: savingRow(state, phase, mode, live), tail, worked: workedLabel(state, workedMs) };
+  const worked = state.status === 'done' || state.status === 'stopped' ? workedLabel(state.status, workedMs, state.lookups) : null;
+  return { live, trace, saving: savingRow(state, phase, mode, live), tail, worked };
 }

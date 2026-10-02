@@ -4,9 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { StreamedTurn } from '../src/features/chat/StreamedTurn';
 import { TurnLiveTail, TurnTrace } from '../src/features/chat/TurnTimeline';
-import { type ChatTurnResponse } from '../src/lib/apis/api-types.gen';
+import { type ChatTurnResponse, type ChatTurnTraceResponse } from '../src/lib/apis/api-types.gen';
 import { type ChatTurnStreamEvent, type ChatTurnStreamState, reduceChatTurnStream, startChatTurnStream, stopChatTurnStream } from '../src/lib/apis/refinement.api';
-import { readingLabel, readSummary, turnTimeline } from '../src/lib/chat-turn-timeline';
+import { lookupLabel } from '../src/lib/chat-lookup-label';
+import { readingLabel, readSummary, timelineOfTrace, turnTimeline } from '../src/lib/chat-turn-timeline';
 
 const turn = {
   userMessage: { id: 'm1', sessionId: 's', ordinal: 1, role: 'user', content: 'hi', createdAt: '2026-09-19T10:00:00.000Z' },
@@ -129,6 +130,76 @@ describe('turnTimeline', () => {
   });
 });
 
+describe('timelineOfTrace', () => {
+  const traced = (trace: ChatTurnTraceResponse): ChatTurnResponse => ({ ...turn, assistantMessage: { ...turn.assistantMessage, trace } });
+  const READ_TRACE: ChatTurnTraceResponse = {
+    sources: [
+      { tool: 'get_notes', args: { from: 11 }, status: 'ok' },
+      { tool: 'get_bible_document', args: { slug: 'premise' }, status: 'ok' },
+      { tool: 'get_bible_document', args: { slug: 'magic-system' }, status: 'ok' },
+    ],
+    timing: { readMs: 0, thinkMs: 10_000, writeMs: 38_000, workedMs: 48_000 },
+  };
+
+  it('should word a saved trace exactly as the stream it was saved from settled', () => {
+    const watched = turnTimeline(play([...READ, [delta(), 10_000], [{ type: 'done', turn }, 48_000]]), 99_000, 'auto');
+
+    expect(timelineOfTrace(READ_TRACE)).toEqual(watched);
+    expect(watched.trace.map(row => row.label)).toEqual(['Read your notes and 2 Bible pages', 'Thought for 10s']);
+  });
+
+  it('should label a query the server clipped as the live turn labelled it unclipped', () => {
+    const query = 'where the lamp-keepers first lit the harbour lamps at dusk';
+    const view = timelineOfTrace({
+      sources: [{ tool: 'search_lore', args: { query: `${query.slice(0, 40).trimEnd()}…` }, status: 'ok' }],
+      timing: { readMs: 900, thinkMs: 0, workedMs: 2000 },
+    });
+
+    expect(view.trace[0]?.sources[0]?.label).toBe(lookupLabel('search_lore', { query }));
+  });
+
+  it('should keep a reply that streamed nothing to its think row and worked line', () => {
+    const view = timelineOfTrace({ sources: [], timing: { readMs: 0, thinkMs: 3200, workedMs: 4100 } });
+
+    expect(view).toEqual({ live: false, trace: [{ key: 'think', label: 'Thought for 3s', running: false, sources: [] }], saving: null, tail: null, worked: 'Worked 4s' });
+    expect(timelineOfTrace({ sources: [], timing: { readMs: 0, thinkMs: 400, workedMs: 900 } }).trace).toEqual([]);
+  });
+
+  it('should name what could not be read and count only what was', () => {
+    const partly = timelineOfTrace({
+      sources: [
+        { tool: 'get_notes', args: {}, status: 'ok' },
+        { tool: 'get_draft', args: { chapter: 1 }, status: 'error' },
+      ],
+      timing: { readMs: 1500, thinkMs: 0, workedMs: 6000 },
+    });
+    const none = timelineOfTrace({ sources: [{ tool: 'get_draft', args: { chapter: 1 }, status: 'error' }], timing: { readMs: 500, thinkMs: 0, workedMs: 2000 } });
+
+    expect(partly.trace[0]).toMatchObject({ label: 'Read your notes · 1 couldn’t be read', running: false });
+    expect(partly.trace[0]?.sources.map(source => [source.label, source.status])).toEqual([
+      ['Your notes', 'ok'],
+      ['Chapter 1 draft', 'error'],
+    ]);
+    expect(partly.worked).toBe('Worked 6s · read 1 source');
+    expect(none.trace[0]?.label).toBe('Couldn’t read 1 source');
+    expect(none.worked).toBe('Worked 2s');
+  });
+
+  it('should draw a done stream from its reply’s trace, so the refetched reply changes nothing', () => {
+    const asked = play([...READ, [lookup('get_notes', 'ok', { from: 11, limit: 40 }), 3000], [delta(), 10_000]]);
+    const done = reduceChatTurnStream(asked, { type: 'done', turn: traced(READ_TRACE) }, 48_000);
+
+    expect(turnTimeline(asked, 11_000, 'auto').trace[0]?.sources).toHaveLength(4);
+    expect(turnTimeline(done, 99_000, 'auto')).toEqual(timelineOfTrace(READ_TRACE));
+  });
+
+  it('should fall back to the stream for a reply saved without a trace', () => {
+    const done = play([...READ, [delta(), 10_000], [{ type: 'done', turn: { ...turn, assistantMessage: { ...turn.assistantMessage, trace: null } } }, 48_000]]);
+
+    expect(turnTimeline(done, 99_000, 'auto').worked).toBe('Worked 48s · read 3 sources');
+  });
+});
+
 describe('readSummary', () => {
   const settled = (tool: string, args: Record<string, unknown> = {}, status: 'ok' | 'error' = 'ok') => ({ round: 0, tool, args, status });
 
@@ -174,6 +245,18 @@ describe('TurnTrace', () => {
     expect(out).toContain('Thought for 10s');
     expect(out.match(/<button/g)).toHaveLength(1);
     expect(out).not.toContain('Notes from ¶11');
+  });
+
+  it('should draw a reloaded reply’s rows from its trace', () => {
+    const out = html(
+      createElement(TurnTrace, {
+        rows: timelineOfTrace({ sources: [{ tool: 'get_notes', args: {}, status: 'ok' }], timing: { readMs: 1000, thinkMs: 4000, workedMs: 9000 } }).trace,
+      }),
+    );
+
+    expect(out).toContain('Read your notes');
+    expect(out).toContain('Thought for 4s');
+    expect(out.match(/<button/g)).toHaveLength(1);
   });
 
   it('should render nothing without rows', () => {

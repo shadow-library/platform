@@ -338,7 +338,7 @@ function TurnModelMenu({ novelId, session, disabled, control }: TurnModelMenuPro
 
 interface MessageModelTagProps {
   message: ChatMessageResponse;
-  /** How long the turn worked and what it read; only known for a turn this tab watched. */
+  /** How long the turn worked and what it read; unknown for a reply older than the turn trace. */
   worked?: string | null;
 }
 

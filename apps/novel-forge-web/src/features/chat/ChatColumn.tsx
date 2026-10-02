@@ -39,7 +39,7 @@ import {
 } from '@/lib/apis';
 import { type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
-import { type TurnTimeline, turnTimeline } from '@/lib/chat-turn-timeline';
+import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 
@@ -172,8 +172,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the first one past it.
   const [assistantWatermark, setAssistantWatermark] = useState(0);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
-  // Every turn this tab watched, by its reply, so each keeps its rows and worked line after the next one starts.
-  const [timelines, setTimelines] = useState<ReadonlyMap<string, TurnTimeline>>(() => new Map());
   // The reply whose receipt asked for review; unset, the panel follows the latest turn.
   const [panelFocus, setPanelFocus] = useState<string>();
   const [panelReveal, setPanelReveal] = useState(0);
@@ -209,7 +207,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
 
   const finishedId = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
-  if (finishedId && !timelines.has(finishedId)) setTimelines(new Map(timelines).set(finishedId, turnTimeline(stream, stream.timing.endedAt ?? 0, mode)));
+  const finishedWorked = useMemo(() => (stream.status === 'done' ? turnTimeline(stream, stream.timing.endedAt ?? 0, mode).worked : null), [stream, mode]);
 
   const messageIds = useMemo(() => new Set(messages.map(message => message.id)), [messages]);
   const jobsByMessage = useMemo(() => {
@@ -681,7 +679,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                     notes={notes}
                     nextChapter={nextChapter}
                     actions={actions}
-                    timeline={timelines.get(m.id)}
                   />
                 ),
               )}
@@ -707,11 +704,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                         />
                       )
                     }
-                    footer={
-                      stream.status === 'done' ? (
-                        <MessageModelTag message={stream.turn.assistantMessage} worked={finishedId ? timelines.get(finishedId)?.worked : undefined} />
-                      ) : undefined
-                    }
+                    footer={stream.status === 'done' ? <MessageModelTag message={stream.turn.assistantMessage} worked={finishedWorked} /> : undefined}
                   />
                 </div>
               )}
@@ -930,8 +923,6 @@ interface AssistantMessageProps {
   notes?: string;
   nextChapter: number;
   actions: TranscriptActions;
-  /** The settled timeline of the turn this tab just watched; history has none, and none is invented for it. */
-  timeline?: TurnTimeline;
 }
 
 /** A reply row, then any plan card it staged as a sibling in the transcript — a plan card never sits inside the row's flex column. */
@@ -946,9 +937,9 @@ const AssistantMessage = memo(function AssistantMessage({
   notes,
   nextChapter,
   actions,
-  timeline,
 }: AssistantMessageProps): React.JSX.Element {
   const question = useMemo(() => questionOf(message.question), [message.question]);
+  const timeline = useMemo(() => (message.trace ? timelineOfTrace(message.trace) : undefined), [message.trace]);
   const content = message.content;
   const staged = useProposalQuery(novelId, message.proposalId ?? undefined);
   const isPlan = staged.data?.kind === PLAN_KIND;
